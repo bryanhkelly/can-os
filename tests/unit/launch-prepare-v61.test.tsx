@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
+import { LaunchModuleDestinationV61, launchModuleDestinationsV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
 import { filterPublishedSolutionRecipes, preferredCatalogDelivery, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -133,6 +134,26 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("Saved Programs &amp; Audiences could not be loaded");
     expect(html).toContain("Available Solutions");
     expect(html).not.toContain("You have not saved any learning interests");
+  });
+
+  it("prepares admissions in Prepare and enables enrollment only through Open authority", () => {
+    expect(prepareModulesV61.find(module => module.id === "funding-enrollment")?.title)
+      .toBe("Funding & Admissions Setup");
+    const prepare = renderToStaticMarkup(
+      <LaunchPrepareV61 siteId={siteId} module="funding-enrollment" />,
+    );
+    expect(prepare).toContain("Funding &amp; Admissions Setup");
+    expect(prepare).toContain("Prepare admissions capacity");
+    expect(prepare).toContain("registration is enabled independently in Open");
+    expect(prepare).not.toContain("Enable Enrollment");
+
+    expect(launchModuleDestinationsV61.open.note).toContain("not a Site-wide toggle");
+    const open = renderToStaticMarkup(
+      <LaunchModuleDestinationV61 module="open" title="Open" stage="Open" siteId={siteId} />,
+    );
+    expect(open).toContain("Enable Enrollment");
+    expect(open).toContain("/programs/noncredit/enrollment?publicSiteId=" + siteId);
+    expect(open).toContain("only for independently approved noncredit releases");
   });
 
   it("keeps Site publication an explicit Prepare decision, separate from enrollment", () => {
