@@ -4,6 +4,8 @@
  * Usage: CAN_EDUCATION_RETIREMENT_CHECK=1 DATABASE_URL=<actual Neon main>
  *        node scripts/acceptance/check-education-v30-retirement.mjs
  * This is deliberately failing until the full application cutover is complete.
+ * Reports exact row counts for every remaining education_v30 table; it never
+ * drops, changes or copies data and does not read secure-schema table records.
  */
 import { neon } from "@neondatabase/serverless";
 
@@ -56,8 +58,33 @@ async function main() {
     WHERE an.nspname='education_v30' AND bn.nspname='public'
       AND a.relkind IN ('r','p') AND b.relkind IN ('r','p')
   `;
+  // Exact row counts, not pg_class.reltuples estimates. Read-only: even an
+  // empty legacy table can still carry an application/schema dependency.
+  const legacyRelations=await sql`
+    SELECT c.relname AS name
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='education_v30' AND c.relkind IN ('r','p')
+    ORDER BY c.relname
+  `;
+  const quoteIdentifier=value=>'"'+value.replaceAll('"','""')+'"';
+  const counts=[];
+  for(let start=0;start<legacyRelations.length;start+=50){
+    const batch=legacyRelations.slice(start,start+50);
+    const query=batch.map(({name})=>
+      'SELECT '+"'"+name.replaceAll("'","''")+"'"+' AS name, count(*)::bigint AS record_count '+
+      'FROM education_v30.'+quoteIdentifier(name)
+    ).join(' UNION ALL ');
+    counts.push(...await sql.query(query));
+  }
+  const populated=counts
+    .filter(row=>BigInt(row.record_count)>0n)
+    .map(row=>({name:row.name,rows:String(row.record_count)}))
+    .sort((a,b)=>Number(BigInt(b.rows)-BigInt(a.rows))||a.name.localeCompare(b.name));
   const result={
     project:target.project,branch:target.branch,readOnly:true,
+    native_empty_tables:counts.length-populated.length,
+    native_populated_tables:populated.length,
+    populated_native_tables:populated,
     ...inventory,colliding_names:collision.count,
     old_schema_absent:inventory.old_schemas===0
   };
