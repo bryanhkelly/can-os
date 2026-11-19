@@ -31,7 +31,7 @@ export async function listBlueprintReviewEvidence(
     id: evidenceDocumentVersions.id,
     documentId: evidenceDocuments.id,
     kind: evidenceDocuments.kindCode,
-    title: sql<string>`education_v30.evidence_documents.title`,
+    title: sql<string>`public.evidence_documents.title`,
   }).from(evidenceDocuments)
     .innerJoin(evidenceDocumentVersions,
       eq(evidenceDocumentVersions.documentId, evidenceDocuments.id))
