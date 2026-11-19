@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
 import { siteWebsiteDraftReadCapability } from "@/domain/site-publication-policy";
 import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
+import {
+  initialSiteBrandConfiguration, resolveSiteBrandVersion,
+  type SavedSiteBrandVersion,
+} from "@/domain/site-brand";
 
 const state = vi.hoisted(() => ({
   sites: [] as Array<{ id: string; organizationId: string; name: string; organizationName: string }>,
@@ -9,6 +13,7 @@ const state = vi.hoisted(() => ({
   addresses: [] as Array<{ slug: string; status: string }>,
   reads: 0,
   catalogSiteIds: [] as string[],
+  brand: null as unknown,
 }));
 
 vi.mock("@/db/client", () => ({
@@ -77,7 +82,9 @@ vi.mock("@/modules/sites/site-local-content.server", () => ({
   readLocalContentHistory: async () => [],
 }));
 
-vi.mock("@/modules/sites/site-brand.functions",()=>({readSavedBrandVersion:async()=>null}));
+vi.mock("@/modules/sites/site-brand.functions",()=>({
+  readSavedBrandVersion:async()=>state.brand,
+}));
 import { getPartnerWebsitePreview } from "@/modules/sites/site-website-preview.server";
 
 function editor(overrides: Partial<AccessContext> = {}): AccessContext {
@@ -101,6 +108,7 @@ beforeEach(() => {
   state.addresses = [{ slug: "partner-academy", status: "draft" }];
   state.reads = 0;
   state.catalogSiteIds = [];
+  state.brand = null;
 });
 
 describe("read-only church partner website", () => {
@@ -170,6 +178,31 @@ describe("read-only church partner website", () => {
     expect(draft.previewHtml).not.toContain("editorialBaseline");
     expect(draft.previewHtml).not.toContain("<script");
     // The private preview is read-only. Published local content is never updated.
+  });
+
+  it("uses the saved immutable Brand for an unsaved first-visit website preview", async () => {
+    const version:SavedSiteBrandVersion={
+      id:"22222222-2222-4222-8222-222222222222",
+      siteId:"site-a",revision:3,
+      configuration:{
+        ...initialSiteBrandConfiguration("Canonical Learning Community"),
+        paletteId:"forest",typographyId:"traditional",
+        headingFontId:"palatino",bodyFontId:"verdana",
+      },
+      fingerprint:"a".repeat(64),createdAt:"2026-11-19T00:00:00.000Z",
+    };
+    state.brand = {version,resolved:resolveSiteBrandVersion(version,new Map())};
+    const result=await getPartnerWebsitePreview(editor());
+    expect(result.currentBrandVersionId).toBe(version.id);
+    expect(result.currentBrandRevision).toBe(3);
+    expect(result.editingContent).toBeNull();
+    expect(result.previewHtml).toContain("Canonical Learning Community");
+    expect(result.previewHtml).toContain("Approved Academy");
+    expect(result.previewHtml).not.toContain("studentProfileId");
+    // The source is the immutable Brand. The first-visit starter remains a
+    // private, unsaved website copy, not a second saved branding record.
+    expect(result.currentBrandConfiguration?.paletteId).toBe("forest");
+    expect(result.currentRevision).toBe(0);
   });
 
   it("never inserts a consent-unconfirmed logo into the website HTML", async () => {
