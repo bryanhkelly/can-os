@@ -53,7 +53,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
   }, [load]);
 
   async function change(action: "publish" | "unpublish") {
-    if (!state?.address || busy || reason.trim().length < 10 || reason.trim().length > 500) return;
+    if (!state?.address || !state.canPublishSite || busy ||
+      reason.trim().length < 10 || reason.trim().length > 500) return;
     if (action === "publish" && (!reviewed || !state.publishingPrerequisitesPresent ||
       state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required")) return;
     setBusy(true);
@@ -86,10 +87,10 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
         siteId, expectedRevision: state.latestWebsiteRevision, contentReviewed: true,
       } });
       setCopyReviewed(false);
+      await load();
       if (result.status !== "published") {
         setError("The website copy contains protected claims that require independent review.");
       }
-      await load();
     } catch (cause) {
       setError(normalizeClientError(cause, "Website copy could not be approved.").message);
     } finally { setBusy(false); }
@@ -212,7 +213,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
             Publication requires an explicit review and recorded decision. It never publishes unpublished
             programs, establishes accreditation or turns on enrollment.
           </WorkspaceNotice>}
-          <div className="border-t pt-5">
+          {state.canPublishSite ? <div className="border-t pt-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <ShieldCheck className="size-4 text-primary" />
               {state.address.status === "published" ? "Withdraw public publication" : "Review and publish"}
@@ -239,7 +240,10 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                 {busy ? "Saving decision…" : state.address.status === "published" ? "Unpublish Site" : "Publish Site website"}
               </Button>
             </div>
-          </div>
+          </div> : <WorkspaceNotice tone="attention">
+            Only the separately appointed Site publisher can make the official
+            publication decision. Your website editing permission does not grant it.
+          </WorkspaceNotice>}
         </>}
       </div> : <WorkspaceNotice tone="attention">
         {error ?? "The Site publication information could not be retrieved."}
