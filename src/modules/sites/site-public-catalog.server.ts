@@ -1,3 +1,8 @@
+import { siteLocalContentVersions } from "@/db/schema";
+import { readSavedBrandVersion } from "./site-brand.functions";
+import { siteBrandPresentationIdentity } from "@/domain/site-brand";
+import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-local-content";
+import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
@@ -14,7 +19,6 @@ import { AuthorizationError } from "@/domain/command-context";
 import { requireCurrentSchoolJurisdictionForOpening } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
-import { readCurrentLocalContent } from "./site-local-content.server";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
 import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
@@ -37,6 +41,9 @@ export async function readPublishedSiteCatalog(slug: string) {
       organizationName: organizations.name,
       status: sitePublications.status,
       publishedAt: sitePublications.publishedAt,
+      brandVersionId:sitePublications.brandVersionId,
+      websiteContentRevision:sitePublications.websiteContentRevision,
+      websiteTemplateId:sitePublications.websiteTemplateId,
     }).from(sitePublications)
       .innerJoin(sites, eq(sites.id, sitePublications.siteId))
       .innerJoin(organizations, eq(organizations.id, sites.organizationId))
@@ -70,11 +77,25 @@ export async function readPublishedSiteCatalog(slug: string) {
         break;
       }
     }
-    const locallyPublished = await readCurrentLocalContent(site.id, tx);
+    if(!site.brandVersionId)throw new Error("Published Site has no pinned Brand version.");
+    const brand=await readSavedBrandVersion(site.id,site.brandVersionId,tx);
+    if(!brand)throw new Error("Published Site Brand version is missing.");
+    const [pinnedContent]=site.websiteContentRevision
+      ? await tx.select({content:siteLocalContentVersions.content}).from(siteLocalContentVersions)
+        .where(and(eq(siteLocalContentVersions.siteId,site.id),
+          eq(siteLocalContentVersions.revision,site.websiteContentRevision),
+          eq(siteLocalContentVersions.status,"published"))).limit(1)
+      : [];
+    if(site.websiteContentRevision&&!pinnedContent)
+      throw new Error("Published website content revision is missing.");
+    const localContent={
+      ...normalizeSiteLocalContent(pinnedContent?.content ?? emptySiteLocalContent),
+      branding:siteBrandPresentationIdentity(brand.resolved,
+        resolveSiteTemplateId(site.websiteTemplateId)),
+    };
     const approvedPhotos = await readApprovedSchoolSitePhotos(site.id,tx);
     const media = projectApprovedSchoolSiteMedia(site.id,publicSiteHost(slug),approvedPhotos);
     const publicOfferings = offerings.map(toPublicSiteEnrichment);
-    const localContent = locallyPublished?.content ?? null;
     // Same publication-locked, independently approved fragments used by
     // the authorized private editor; no draft services or invented weekday defaults.
     const parentExtras = await readApprovedPublicParentExtras(site.id,
@@ -101,14 +122,14 @@ export async function readPublishedSiteCatalog(slug: string) {
       });
     return {
       parentInformation: projectApprovedParentInformation({
-        site: { name: site.name, organizationName: site.organizationName },
+        site: { name: brand.resolved.displayName, organizationName: site.organizationName },
         academicPrograms:authorizedPrograms, offerings: publicOfferings, localContent,
         ...parentExtras,
       }),
       demonstration: site.metadata?.synthetic === true,
       operatingStatus,
       host: publicSiteHost(slug),
-      site: { name: site.name, organizationName: site.organizationName },
+      site: { name: brand.resolved.displayName, organizationName: site.organizationName },
       academicPrograms:authorizedPrograms,
       localContent,
       media,
