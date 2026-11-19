@@ -40,6 +40,10 @@ export const saveSiteLaunchPreferences = createServerFn({method:"POST"})
       });
       const previous=site.metadata.launchPreferences;
       const current=previous == null ? null : siteLaunchPreferencesSchema.parse(previous);
+      // The older command has no expected revision; never let it mutate a V2
+      // record that is now governed by the revision-aware Site planning writer.
+      if(current?.planningVersion === 2)
+        throw new Error("Use the current Programs & Audiences editor to update Site planning.");
       // Keep the V6.1 planning dimensions even if an older consumer submits
       // only delivery + interests. Focus cannot reference a removed interest.
       const interestIds=data.preferences.interestIds;
