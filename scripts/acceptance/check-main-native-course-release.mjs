@@ -53,10 +53,10 @@ async function main(){
   const courses=await sql`
     SELECT c.id course_id,c.course_code,cv.id course_version_id,
       cv.lifecycle,cv.published_at,oc.is_required,
-      (SELECT count(*)::int FROM education_v30.course_lessons l
+      (SELECT count(*)::int FROM public.course_lessons l
        WHERE l.course_version_id=cv.id) lesson_count
-    FROM education_v30.offering_courses oc
-    JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
+    FROM public.offering_courses oc
+    JOIN public.course_versions cv ON cv.id=oc.course_version_id
     JOIN public.courses c ON c.id=cv.course_id
     WHERE oc.offering_version_id=${offeringVersionId}::uuid
       AND c.publisher_organization_id=${offering.publisher_organization_id}::uuid
@@ -87,8 +87,8 @@ async function main(){
       AND acc.person_id=g.person_id AND NOT acc.disabled
       AND acc.email_verified_at IS NOT NULL
     WHERE a.course_id IN (
-      SELECT cv.course_id FROM education_v30.course_versions cv
-      JOIN education_v30.offering_courses oc ON oc.course_version_id=cv.id
+      SELECT cv.course_id FROM public.course_versions cv
+      JOIN public.offering_courses oc ON oc.course_version_id=cv.id
       WHERE oc.offering_version_id=${offeringVersionId}::uuid
     )
       AND a.organization_id=${offering.publisher_organization_id}::uuid
@@ -134,8 +134,8 @@ async function main(){
          role='academic_content_reviewer') reviewer_grants,
       (SELECT count(*)::int FROM education_v30.professional_role_assignments
        WHERE course_id IN (
-         SELECT cv.course_id FROM education_v30.course_versions cv
-         JOIN education_v30.offering_courses oc ON oc.course_version_id=cv.id
+         SELECT cv.course_id FROM public.course_versions cv
+         JOIN public.offering_courses oc ON oc.course_version_id=cv.id
          WHERE oc.offering_version_id=${offeringVersionId}::uuid
        )) raw_appointments,
       (SELECT count(*)::int FROM pg_constraint con
@@ -190,9 +190,9 @@ async function main(){
       (SELECT count(*)::int FROM education_v30.professional_capability_authorizations ca
         JOIN education_v30.professional_role_assignments a
           ON a.capability_authorization_id=ca.id AND a.person_id=ca.person_id
-        JOIN education_v30.offering_courses oc
+        JOIN public.offering_courses oc
           ON oc.offering_version_id=(SELECT id FROM target)
-        JOIN education_v30.course_versions cv
+        JOIN public.course_versions cv
           ON cv.id=oc.course_version_id AND cv.course_id=a.course_id
         WHERE ca.decision='approved'
       ) AS approved_publisher_capability_assignments,
