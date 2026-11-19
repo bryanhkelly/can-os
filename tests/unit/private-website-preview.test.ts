@@ -74,6 +74,9 @@ describe("authenticated school full-page preview", () => {
     const result = renderPrivateWebsitePreviewHtml(html, siteId, [], false, "site");
     expect(result).toContain("Private Site website preview");
     expect(result).toContain("Unsaved Site starter");
+    expect(result).toContain(`href="/launch/site?siteId=${siteId}"`);
+    expect(result).toContain("Return to Launch Studio");
+    expect(result).not.toContain("Return to Website &amp; Brand Studio");
     expect(result).not.toContain("Private school website preview");
   });
 
