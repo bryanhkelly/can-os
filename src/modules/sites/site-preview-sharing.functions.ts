@@ -50,8 +50,8 @@ async function authorizedShareSite(siteId: string) {
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) throw new AuthorizationError("Site preview sharing scope");
   await assertPreviewSharingScope(actor, site);
-  if (site.lifecycleStatus === "closed")
-    throw new DomainError("UNAVAILABLE", "A closed Site cannot share a new preview.");
+  // Closed Sites cannot issue new links, but their authorized operators may
+  // still inspect and revoke existing links. Public GET already denies closed Sites.
   return { actor, site };
 }
 
