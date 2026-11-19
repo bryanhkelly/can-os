@@ -77,6 +77,7 @@ vi.mock("@/modules/sites/site-local-content.server", () => ({
   readLocalContentHistory: async () => [],
 }));
 
+vi.mock("@/modules/sites/site-brand.functions",()=>({readSavedBrandVersion:async()=>null}));
 import { getPartnerWebsitePreview } from "@/modules/sites/site-website-preview.server";
 
 function editor(overrides: Partial<AccessContext> = {}): AccessContext {
@@ -139,7 +140,7 @@ describe("read-only church partner website", () => {
     expect(result.previewHtml).not.toContain("applicationId");
     expect(Object.keys(result).sort()).toEqual([
       "approvedAcademicCount", "approvedEnrichmentCount", "approvedPhotoCount", "canPrepareWebsite", "canPublish",
-      "contentChannelConfig", "currentRevision", "demonstration", "draftStorageReady", "editingContent", "host", "localContentStatus",
+      "contentChannelConfig", "currentBrandConfiguration", "currentBrandRevision", "currentBrandVersionId", "currentRevision", "demonstration", "draftStorageReady", "editingContent", "host", "localContentStatus",
       "localHistory", "mediaUploadsEnabled", "organizationName", "parentInformation", "previewHtml", "previewPages",
       "publicInformationReadiness", "siteId", "siteInformation", "siteName",
       "siteStoryCopyCandidates", "siteStoryRecommendation", "siteStoryRevision", "siteStorySourceChoices",
