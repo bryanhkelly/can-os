@@ -1,3 +1,4 @@
+import { WebsiteCopyField } from "@/components/launch-studio/WebsiteCopyField";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
 import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
 import { siteBrandDirections, brandRecommendedLayout } from "@/domain/site-brand-direction";
@@ -7,10 +8,6 @@ import { SiteContentChannelEditor } from "@/components/launch-studio/SiteContent
 import { privateWebsitePreviewUrl } from "@/domain/private-website-preview";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
@@ -23,7 +20,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import {
-  prepareWebsiteEditorContent, restoreOriginalWebsiteField, websiteStarterFieldIds, siteLocalContentLimits, siteLocalImageMaxBytes,
+  prepareWebsiteEditorContent, restoreOriginalWebsiteField, websiteStarterFieldIds, siteLocalImageMaxBytes,
   siteLocalImagePublicationGaps, type SiteLocalContent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
@@ -652,56 +649,12 @@ function LocalWebsiteCopyEditor({
     churchFields.find(field => field.key === key)!);
   const additionalStoryFields = churchFields.filter(field =>
     ["churchHistory", "leadershipWelcome", "localTraditions", "denomination", "statementOfFaith", "spiritualFormation"].includes(field.key));
-  const textField = (field: typeof churchFields[number]) => {
-    const starter = content.editorialBaseline?.fields[field.key as typeof websiteStarterFieldIds[number]];
-    const suggested = data.siteStoryCopyCandidates.find(item => item.field === field.key);
-    const changed = typeof starter === "string" && (content[field.key] ?? "") !== starter;
-    const sequence = websiteStarterFieldIds.indexOf(field.key as typeof websiteStarterFieldIds[number]);
-    return <div key={field.key} className="border-b border-border pb-5 last:border-0">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <Label className="min-w-0 flex-1 text-sm" htmlFor={`website-copy-${field.key}`}>
-          <span className="flex items-center gap-3 font-semibold">
-            {sequence >= 0 && <span aria-hidden="true" className="font-mono text-xs font-normal text-muted-foreground">
-              {String(sequence + 1).padStart(2, "0")}
-            </span>}
-            {field.label}
-          </span>
-          <span className="mt-1 block text-xs leading-5 text-muted-foreground">{field.help}</span>
-        </Label>
-        {typeof starter === "string" && <Button variant="outline" type="button"
-          aria-label={`Reset ${field.label} to original suggested copy`}
-          disabled={!changed || busy || !data.canPublish}
-          onClick={() => setContent(old => restoreOriginalWebsiteField(old, field.key))}
-          className="min-h-11 shrink-0 border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
-          Reset to original
-        </Button>}
-      </div>
-      {field.multi
-        ? <Textarea id={`website-copy-${field.key}`} rows={field.key === "statementOfFaith" ? 6 : field.key === "heroHeadline" ? 2 : 4}
-            maxLength={siteLocalContentLimits[field.key]} disabled={busy || !data.canPublish}
-            value={content[field.key] ?? ""} onChange={event => setContent(old =>
-              ({ ...old, [field.key]: event.target.value }))}
-            className="mt-3 w-full border border-border bg-background p-3 text-sm leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-        : <Input id={`website-copy-${field.key}`} type="text" maxLength={siteLocalContentLimits[field.key]}
-            disabled={busy || !data.canPublish} value={content[field.key] ?? ""} onChange={event => setContent(old =>
-              ({ ...old, [field.key]: event.target.value }))}
-            className="mt-3 min-h-11 w-full border border-border bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />}
-      {suggested && <div className="mt-3 border bg-muted/20 p-3">
-        <p className="text-xs font-semibold">Suggested from Site Information</p>
-        <p className="mt-1 text-xs text-muted-foreground">{suggested.reason}</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm">{suggested.text}</p>
-        <Button variant="outline" type="button" className="mt-3 min-h-11"
-          disabled={busy || !data.canPublish || content[field.key] === suggested.text}
-          onClick={()=>setContent(old=>({...old,[field.key]:suggested.text}))}>
-          {content[field.key] === suggested.text ? "Suggestion applied" : "Apply suggestion"}
-        </Button>
-      </div>}
-      {typeof starter === "string" && <p className="mt-2 text-xs text-muted-foreground">
-        {changed ? "Personalized copy. Reset restores the original prepared wording for this field." :
-          "Prepared starting copy. Edit anything, or keep it as written after review."}
-      </p>}
-    </div>;
-  };
+  const textField = (field: typeof churchFields[number]) =>
+    <WebsiteCopyField key={field.key} field={field} content={content}
+      candidate={data.siteStoryCopyCandidates.find(item=>item.field===field.key)}
+      disabled={busy||!data.canPublish}
+      onChange={value=>setContent(old=>({...old,[field.key]:value}))}
+      onRestore={()=>setContent(old=>restoreOriginalWebsiteField(old,field.key))}/>;
 
   return <section aria-label="Website content setup">
     {data.demonstration && !data.editingContent && <div role="note" className="mt-3  border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
