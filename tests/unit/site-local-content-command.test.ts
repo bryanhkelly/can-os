@@ -275,17 +275,21 @@ describe("transactional church-local publication", () => {
 });
 
 
-describe("Site Administrator publication through the canonical Site publisher",()=>{
-  it("publishes the school shell in the same transaction as reviewed local content",async()=>{
-    const updatedAt=new Date("2026-11-06T00:00:00Z");
-    state.rows.push([{siteId:"site-a",updatedAt}],[]);
-    await publishPartnerLocalContent({...actor,role:"site_admin"},{operation:"save",expectedRevision:0,content:copy});
-    expect(state.publishSite).toHaveBeenCalledWith(expect.objectContaining({role:"site_admin"}),expect.objectContaining({siteId:"site-a",action:"publish",expectedRevision:updatedAt.toISOString(),contentReviewed:true}),tx);
+describe("Site publication is independent from Establish website saves", () => {
+  it("keeps Site publication unchanged when a Site Admin saves reviewed local copy", async () => {
+    state.rows.push([{siteId:"site-a",updatedAt:new Date("2026-11-06T00:00:00Z")}], []);
+    await expect(publishPartnerLocalContent({...actor, role:"site_admin"}, {
+      operation:"save", expectedRevision:0, content:copy,
+    })).resolves.toMatchObject({ status:"published", revision:1 });
+    expect(state.publishSite).not.toHaveBeenCalled();
   });
-  it("does not publish a private draft or a revision requiring institutional review",async()=>{
-    for(const operation of ["draft","save"] as const){
-      state.rows.push([{siteId:"site-a",updatedAt:new Date()}],[]);
-      await publishPartnerLocalContent({...actor,role:"site_admin"},{operation,expectedRevision:0,content:{...copy,welcomeMessage:"We are fully accredited."}});
+  it("does not publish a Site from a private draft or protected claim", async () => {
+    for (const operation of ["draft","save"] as const) {
+      state.rows.push([{siteId:"site-a",updatedAt:new Date()}], []);
+      await publishPartnerLocalContent({...actor, role:"site_admin"}, {
+        operation, expectedRevision:0,
+        content:{...copy,welcomeMessage:"We are fully accredited."},
+      });
     }
     expect(state.publishSite).not.toHaveBeenCalled();
   });
