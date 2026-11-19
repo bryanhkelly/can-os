@@ -56,6 +56,7 @@ export const EventTypes = {
   SchoolYearCreated: "SchoolYearCreated",
   SchoolYearActivated: "SchoolYearActivated",
   SiteCreated: "SiteCreated",
+  SiteInformationUpdated: "SiteInformationUpdated",
   ChurchSourceReferenceSaved: "ChurchSourceReferenceSaved",
   ChurchSourceReferenceRemoved: "ChurchSourceReferenceRemoved",
   ChurchContentSuggestionSubmitted: "ChurchContentSuggestionSubmitted",

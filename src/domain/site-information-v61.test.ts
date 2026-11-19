@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  applySiteEnvironmentDeliveryV61, cleanSiteEnvironmentV61, cleanSiteHostingV61, emptySiteStoryV61,
+  applySiteEnvironmentDeliveryV61, cleanSiteEnvironmentV61, cleanSiteHostingV61, emptySiteStoryV61, siteStoryAuditSummaryV61,
   siteEnvironmentV61Schema, siteHostingV61Schema, siteStoryV61Schema,
 } from "./site-information-v61";
 
@@ -61,6 +61,22 @@ describe("Site Information V6.1 planning source", () => {
     }, { delivery: "both", physicalSpaceArrangement: "planned" })).toThrow(
       /need review/,
     );
+  });
+
+  it("does not copy private narrative text into audit summaries", () => {
+    const story = {
+      ...emptySiteStoryV61(),
+      foundingStory: "My confidential founding narrative",
+      communityNeed: "Private details",
+      motivations: ["access"] as const,
+    };
+    const summary = siteStoryAuditSummaryV61({
+      ...story, motivations: [...story.motivations],
+    });
+    expect(summary.fieldsAnswered.foundingStory).toBe(true);
+    expect(summary.fieldsAnswered.communityNeed).toBe(true);
+    expect(JSON.stringify(summary)).not.toContain("confidential");
+    expect(JSON.stringify(summary)).not.toContain("Private details");
   });
 
   it("never accepts unsupported values or extraneous publishing authority", () => {

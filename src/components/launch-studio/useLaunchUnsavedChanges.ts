@@ -22,7 +22,7 @@ export function useLaunchUnsavedChanges(dirty: boolean | (() => boolean),
       return isDirty() && launchNavigationLosesInput(current, next,{includeStep:includeStepChanges})
         && !window.confirm(message);
     },
-    enableBeforeUnload: isDirty,
+    enableBeforeUnload: () => isDirty() && !released.current,
     withResolver: false,
   });
   return () => { released.current = true; };

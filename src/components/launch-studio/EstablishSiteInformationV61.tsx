@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
-import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   cleanSiteEnvironmentV61, cleanSiteHostingV61,
   siteEnvironmentV61Schema, siteHostingV61Schema, siteStoryV61Schema,
@@ -173,6 +173,13 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   const [error, setError] = useState("");
   const revision = useRef(initial.revision);
   const lock = useRef(false);
+  const saveAttempted = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstStepRender = useRef(true);
+  useEffect(() => {
+    if (firstStepRender.current) { firstStepRender.current = false; return; }
+    panelRef.current?.focus();
+  }, [step]);
 
   const hostDirty = snapshot(cleanSiteHostingV61(host)) !== savedHost;
   const environmentDirty = snapshot(environment.delivery === "digital"
@@ -195,6 +202,8 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         ? { siteId, expectedRevision: revision.current, section, environment: draft as SiteEnvironmentV61 }
         : { siteId, expectedRevision: revision.current, section, story: draft as SiteStoryV61 };
     // Discriminant is narrowed at the API boundary; the server revalidates all fields.
+    // Even a rejected/failed response may hide a committed mutation. Reconcile first.
+    saveAttempted.current = true;
     const result = await saveSiteInformationV61({ data });
     if (!result.revision) throw new Error("Save returned no Site revision. Reload before retrying.");
     revision.current = result.revision;
@@ -235,7 +244,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   async function act(mode: "next" | "exit") {
     if (lock.current || reloadRequired) return;
     lock.current = true; setBusy(true); setError("");
-    let anyWrite = false;
+    saveAttempted.current = false;
     try {
       // Validate every section we intend to write before starting sequential commits.
       // A missing required answer must not leave a partial database update.
@@ -262,13 +271,13 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       // Saving multiple sections is sequential, with Site revision threading.
       // A failed later section must never be retried blindly.
       if (mode === "exit") {
-        if (step === 0 || hostDirty) { await saveHosting(step === 0); anyWrite = true; }
-        if (step === 1 || environmentDirty) { await saveEnvironment(step === 1); anyWrite = true; }
-        if (step === 3 || storyDirty) { await saveStory(step === 3); anyWrite = true; }
+        if (step === 0 || hostDirty) await saveHosting(step === 0);
+        if (step === 1 || environmentDirty) await saveEnvironment(step === 1);
+        if (step === 3 || storyDirty) await saveStory(step === 3);
       } else if (step === 0) {
-        await saveHosting(true); anyWrite = true;
+        await saveHosting(true);
       } else if (step === 1) {
-        await saveEnvironment(true); anyWrite = true;
+        await saveEnvironment(true);
       } else if (step === 3) {
         // Finishing out of order must still save and validate required earlier answers.
         await saveHosting(true); anyWrite = true;
@@ -284,7 +293,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         else onContinueToPrograms();
       }
     } catch (cause) {
-      if (anyWrite) setReloadRequired(true);
+      if (saveAttempted.current) setReloadRequired(true);
       setError(cause instanceof Error ? cause.message : "Unable to save Site Information. Reload and review your answers.");
     } finally {
       lock.current = false; setBusy(false);
@@ -298,25 +307,26 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           const saved = index === 0 ? hostSaved && !hostDirty :
             index === 1 ? environmentSaved && !environmentDirty :
               index === 3 ? storySaved && !storyDirty : false;
-          return <button key={item.title} type="button" disabled={busy || reloadRequired}
+          return <Button key={item.title} type="button" variant="outline" disabled={busy || reloadRequired}
             aria-current={index === step ? "step" : undefined}
             onClick={() => selectStep(index as Step)}
-            className={"min-w-0 border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-              (index === step ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted/30")}>
+            className={"flex min-h-16 min-w-0 w-full shrink flex-col items-stretch justify-center gap-1 border p-3 text-left text-xs " +
+              (index === step ? "border-primary bg-accent" : "border-border bg-card")}>
             <span className="flex items-center gap-2 text-xs font-bold">
               <span>{index + 1}.</span><span>{item.title}</span>
-              {saved && <Check className="ml-auto size-3 shrink-0 text-primary" aria-label="Saved" />}
+              {saved && <><Check aria-hidden="true" className="ml-auto size-3 shrink-0 text-primary" /><span className="sr-only">Saved</span></>}
             </span>
             <span className="mt-1 hidden text-xs text-muted-foreground xl:block">{item.description}</span>
-          </button>;
+          </Button>;
         })}
       </nav>
     </div>
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {step + 1} of 4</p>
-    {step === 0 && <section id="site-information-step-0" aria-labelledby="site-info-host-title" className="border bg-card">
-      <header className="border-b p-5"><h2 id="site-info-host-title" className="text-lg font-semibold">Hosting & Organization</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Who is responsible for your Site, and who hosts its activities?</p></header>
-      <div className="space-y-5 p-5">
+    <div ref={panelRef} role="region" tabIndex={-1} aria-label={steps[step].title}
+      className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    {step === 0 && <WorkspacePanel id="site-information-step-0" title="Hosting & Organization"
+      description="Who is responsible for your Site, and who hosts its activities?">
+      <div className="space-y-5">
         <div className="border bg-muted/30 p-4">
           <p className="text-xs text-muted-foreground">Responsible organization · Site Profile (read-only)</p>
           <p className="mt-1 font-semibold">{responsibleOrganizationName ?? "Organization unavailable. Refresh your Site."}</p>
@@ -347,11 +357,10 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         </div>}
         <WorkspaceNotice>A self-reported host does not create a verified organizational relationship, ownership or authorization.</WorkspaceNotice>
       </div>
-    </section>}
-    {step === 1 && <section id="site-information-step-1" aria-labelledby="site-info-env-title" className="border bg-card">
-      <header className="border-b p-5"><h2 id="site-info-env-title" className="text-lg font-semibold">Learning Environment</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Choose how learners may participate. Specific Solutions and requirements come later.</p></header>
-      <div className="space-y-5 p-5">
+    </WorkspacePanel>}
+    {step === 1 && <WorkspacePanel id="site-information-step-1" title="Learning Environment"
+      description="Choose how learners may participate. Specific Solutions and requirements come later.">
+      <div className="space-y-5">
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">How will learners participate?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
@@ -374,11 +383,10 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         </Field>}
         <WorkspaceNotice>Your Site address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
       </div>
-    </section>}
-    {step === 2 && <section id="site-information-step-2" aria-labelledby="site-info-network-title" className="border bg-card">
-      <header className="border-b p-5"><h2 id="site-info-network-title" className="text-lg font-semibold">Network Affiliation</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Optional. You can operate independently while you establish your Site.</p></header>
-      <div className="space-y-5 p-5">
+    </WorkspacePanel>}
+    {step === 2 && <WorkspacePanel id="site-information-step-2" title="Network Affiliation"
+      description="Optional. You can operate independently while you establish your Site.">
+      <div className="space-y-5">
         <fieldset className="space-y-3"><legend className="text-sm font-semibold">Would you like to explore network affiliation?</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             <SingleChoice name="site-network" title="Not at this time" detail="Continue independently"
@@ -390,11 +398,10 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         {networkChoice === "request" && <SiteAffiliationPanel siteId={siteId} />}
         <WorkspaceNotice>Only eligible denomination network requests are currently supported. Submitting a request is a separate explicit action and does not grant membership, private access or enrollment authority.</WorkspaceNotice>
       </div>
-    </section>}
-    {step === 3 && <section id="site-information-step-3" aria-labelledby="site-info-story-title" className="border bg-card">
-      <header className="border-b p-5"><h2 id="site-info-story-title" className="text-lg font-semibold">Your Story</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Optional. Tell us what matters to your learning community.</p></header>
-      <div className="space-y-6 p-5">
+    </WorkspacePanel>}
+    {step === 3 && <WorkspacePanel id="site-information-step-3" title="Your Story"
+      description="Optional. Tell us what matters to your learning community.">
+      <div className="space-y-6">
         <WorkspaceNotice><strong>How CAN OS will use your answers</strong><p className="mt-2">
           Your original answers remain a private Site Story. They can guide suggested About Us, mission, vision, website messaging, imagery and outreach materials.
           You can review, edit or decline each suggestion. <strong>Nothing is published automatically.</strong>
@@ -419,20 +426,29 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
         <WorkspaceNotice>The original private Story remains separate from generated or published website copy. A separate review is required before publication or sending.</WorkspaceNotice>
       </div>
-    </section>}
-    {error && <WorkspaceNotice tone="danger">{error}{reloadRequired &&
-      <span className="block">A save may have succeeded. Reload this Site to reconcile the latest record before retrying.</span>}</WorkspaceNotice>}
-    <footer aria-label="Site Information actions" className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+    </WorkspacePanel>}
+    </div>
+    {error && <WorkspaceNotice tone={reloadRequired ? "attention" : "danger"}>{error}
+      {reloadRequired && <span className="block">A save may have succeeded. Reload this Site to reconcile the current record before retrying.</span>}
+    </WorkspaceNotice>}
+    {reloadRequired && <Button type="button" variant="outline" onClick={() => {
+      releaseNavigation();
+      window.location.reload();
+    }}>Reload Site and review saved answers</Button>}
+    <footer aria-label="Site Information actions">
+      <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
       <Button type="button" variant="outline" disabled={busy} onClick={() => {
         if (step === 0) onBackToSiteProfile(); else selectStep((step - 1) as Step);
       }}><ArrowLeft className="size-4" />{step === 0 ? "Back to Site Profile" : "Previous step"}</Button>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="ghost" disabled={busy || reloadRequired} onClick={() => void act("exit")}>
           Save & Exit</Button>
-        <Button type="button" disabled={busy || reloadRequired} onClick={() => void act("next")}>
-          {busy ? "Saving…" : step === 3 ? "Finish Site Information" : "Save & Continue"}<ArrowRight className="size-4" />
+        <Button type="button" disabled={reloadRequired} loading={busy}
+          loadingLabel="Saving Site Information…" onClick={() => void act("next")}>
+          {step === 3 ? "Finish Site Information" : "Save & Continue"}<ArrowRight aria-hidden="true" className="size-4" />
         </Button>
       </div>
+      </ActionFooter>
     </footer>
   </section>;
 }
