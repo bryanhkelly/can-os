@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
 import {
   activePreviewShare, createPreviewShareToken, hashPreviewShareToken,
-  readSitePreviewShares, renderSharedSitePreview, sitePreviewShareHeaders,
+  projectShareableSitePreview, readSitePreviewShares, renderSharedSitePreview, sitePreviewShareHeaders,
   validPreviewShareToken,
 } from "@/domain/site-preview-sharing";
 
@@ -63,6 +64,29 @@ describe("Site website share preview safety", () => {
     expect(html).toContain('<meta name="robots" content="noindex,nofollow">');
     expect(sitePreviewShareHeaders["Referrer-Policy"]).toBe("no-referrer");
     expect(sitePreviewShareHeaders["Cache-Control"]).toBe("private, no-store");
+  });
+
+  it("projects only public-safe Site copy and excludes unconsented artwork", () => {
+    const content = createSchoolWebsiteStarterContent("Example Site");
+    const page = projectShareableSitePreview({
+      siteName: "Example Site", organizationName: "Example Community",
+      content: {
+        ...content,
+        branding: { ...content.branding, heroImage: {
+          dataUrl: "data:image/png;base64,AAAA",
+          altText: "Unconsented image",
+          rightsConfirmed: false,
+          childImageConsent: "unconfirmed",
+        } },
+      },
+    });
+    expect(page.localContent?.editorialBaseline).toBeUndefined();
+    expect(page.localContent?.branding.heroImage).toBeNull();
+    expect(page.academicPrograms).toEqual([]);
+    expect(page.noncreditReleases).toEqual([]);
+    expect(page.enrollmentOpportunities).toEqual([]);
+    expect(page.contentBlocks).toEqual([]);
+    expect(page.media).toEqual({});
   });
 
   it("rejects invalid persisted share metadata rather than displaying private content", () => {
