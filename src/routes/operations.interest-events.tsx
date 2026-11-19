@@ -67,6 +67,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   const selectedProgramId = scopedPrograms.some(program => program.id === programId)
     ? programId : defaultProgramId;
   const selectedProgram = scopedPrograms.find(program => program.id === selectedProgramId);
+  const defaultProgramTimezone = scopedPrograms.find(program => program.id === defaultProgramId)?.timezone;
   const timezone = siteTimezoneSchema.safeParse(selectedProgram?.timezone).success ? selectedProgram!.timezone : null;
   const [title, setTitle] = useState("Parent information session");
   const [description, setDescription] = useState("");
@@ -77,11 +78,11 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   const [endsAt, setEndsAt] = useState(() => timezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), timezone) : "");
   useEffect(() => {
     setProgramId(defaultProgramId);
-    const nextTimezone = scopedPrograms.find(program => program.id === defaultProgramId)?.timezone;
-    const validTimezone = siteTimezoneSchema.safeParse(nextTimezone).success ? nextTimezone : null;
+    const validTimezone = siteTimezoneSchema.safeParse(defaultProgramTimezone).success
+      ? defaultProgramTimezone : null;
     setStartsAt(validTimezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000), validTimezone) : "");
     setEndsAt(validTimezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), validTimezone) : "");
-  }, [search.siteId, search.programId]);
+  }, [defaultProgramId, defaultProgramTimezone, search.siteId, search.programId]);
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
   const [createdEventId, setCreatedEventId] = useState("");
   const [attempted, setAttempted] = useState(false);
