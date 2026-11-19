@@ -97,7 +97,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
       <Share2 className="size-4" aria-hidden="true" /> Share preview
     </Button>
     <Modal open={open} onClose={close} label="Share Site website preview"
-      className="max-w-2xl">
+      dismissible={!busy} busy={busy} className="max-w-2xl">
       <div className="flex items-start justify-between gap-4 border-b p-5">
         <div>
           <h2 className="font-serif text-xl">Share your website preview</h2>
@@ -105,7 +105,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
             Invite leadership, families or partners to view the proposed website before official publication.
           </p>
         </div>
-        <Button size="sm" variant="ghost" aria-label="Close sharing" onClick={close}>
+        <Button size="sm" variant="ghost" aria-label="Close sharing" disabled={busy} onClick={close}>
           <X className="size-5" />
         </Button>
       </div>
