@@ -65,7 +65,7 @@ const guardedBatchFiles=[
 function guardedTableNames(file,expected,arity){
   const source=readFileSync(file,"utf8");
   if(arity==="json"){
-    const match=source.match(/(?:snapshot|tables)\\s+jsonb\\s*:=\\s*'([^']+)'::jsonb/);
+    const match=source.match(/(?:snapshot|tables)\s+jsonb\s*:=\s*'([^']+)'::jsonb/);
     if(!match)throw new Error("Missing pinned snapshot: "+file);
     const rows=JSON.parse(match[1]);
     if(rows.length!==expected||new Set(rows.map(x=>x.name)).size!==expected)
