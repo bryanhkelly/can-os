@@ -1,3 +1,5 @@
+import { contrastRatio } from "@/domain/color-contrast";
+export { contrastRatio } from "@/domain/color-contrast";
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -14,23 +16,6 @@ export const defaultBrandTokens: BrandTokens = {
   accent: "#eaf1ff",
   accentForeground: "#101d39",
 };
-
-function channel(value: string, start: number) {
-  return Number.parseInt(value.slice(start, start + 2), 16) / 255;
-}
-
-function luminance(hex: string) {
-  const values = [channel(hex, 1), channel(hex, 3), channel(hex, 5)].map(value =>
-    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
-  );
-  return values[0]! * 0.2126 + values[1]! * 0.7152 + values[2]! * 0.0722;
-}
-
-export function contrastRatio(foreground: string, background: string) {
-  const first = luminance(foreground);
-  const second = luminance(background);
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
-}
 
 export function resolveBrandTokens(input: Partial<BrandTokens> = {}) {
   const tokens = { ...defaultBrandTokens, ...input };
