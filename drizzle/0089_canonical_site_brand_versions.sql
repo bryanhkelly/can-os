@@ -41,6 +41,7 @@ ALTER TABLE "sites" ADD CONSTRAINT "sites_current_brand_same_site_fk"
   ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 --> statement-breakpoint
 ALTER TABLE "site_marketing_packages" ADD COLUMN "brand_version_id" uuid;
+ALTER TABLE "site_marketing_packages" ADD CONSTRAINT "site_marketing_packages_site_id_uq" UNIQUE ("site_id","id");
 ALTER TABLE "site_marketing_packages" ADD CONSTRAINT "site_marketing_package_brand_scope_fk"
   FOREIGN KEY ("site_id","brand_version_id") REFERENCES "site_brand_versions"("site_id","id")
   ON DELETE RESTRICT;
@@ -56,7 +57,7 @@ ALTER TABLE "site_publications" ADD CONSTRAINT "site_publication_brand_scope_fk"
 CREATE TABLE "site_artifact_releases" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "site_id" uuid NOT NULL REFERENCES "sites"("id") ON DELETE RESTRICT,
-  "package_id" uuid REFERENCES "site_marketing_packages"("id") ON DELETE RESTRICT,
+  "package_id" uuid,
   "brand_version_id" uuid NOT NULL REFERENCES "site_brand_versions"("id") ON DELETE RESTRICT,
   "source_package_revision" integer,
   "artifact_kind" text NOT NULL,
@@ -68,6 +69,8 @@ CREATE TABLE "site_artifact_releases" (
   "output_checksum" text NOT NULL,
   "created_by_person_id" uuid NOT NULL REFERENCES "people"("id") ON DELETE RESTRICT,
   "created_at" timestamptz DEFAULT now() NOT NULL,
+  CONSTRAINT "site_artifact_releases_package_scope_fk"
+    FOREIGN KEY ("site_id","package_id") REFERENCES "site_marketing_packages"("site_id","id") ON DELETE RESTRICT,
   CONSTRAINT "site_artifact_releases_brand_scope_fk"
     FOREIGN KEY ("site_id","brand_version_id") REFERENCES "site_brand_versions"("site_id","id") ON DELETE RESTRICT,
   CONSTRAINT "site_artifact_releases_checksum_ck" CHECK ("output_checksum" ~ '^[a-f0-9]{64}$'),

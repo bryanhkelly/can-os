@@ -45,7 +45,7 @@ export const siteBrandVersions=pgTable("site_brand_versions",{
 export const siteArtifactReleases=pgTable("site_artifact_releases",{
   id:id(),
   siteId:uuid("site_id").notNull().references(()=>sites.id,{onDelete:"restrict"}),
-  packageId:uuid("package_id").references(()=>siteMarketingPackages.id,{onDelete:"restrict"}),
+  packageId:uuid("package_id"),
   brandVersionId:uuid("brand_version_id").notNull().references(()=>siteBrandVersions.id,{onDelete:"restrict"}),
   sourcePackageRevision:integer("source_package_revision"),
   artifactKind:text("artifact_kind").notNull(),
@@ -60,6 +60,8 @@ export const siteArtifactReleases=pgTable("site_artifact_releases",{
 },t=>[
   index("site_artifact_releases_site_idx").on(t.siteId,t.createdAt),
   index("site_artifact_releases_package_idx").on(t.packageId),
+  foreignKey({name:"site_artifact_releases_package_scope_fk",columns:[t.siteId,t.packageId],
+    foreignColumns:[siteMarketingPackages.siteId,siteMarketingPackages.id]}),
   foreignKey({name:"site_artifact_releases_brand_scope_fk",columns:[t.siteId,t.brandVersionId],
     foreignColumns:[siteBrandVersions.siteId,siteBrandVersions.id]}),
   check("site_artifact_releases_checksum_ck",sql`${t.outputChecksum} ~ '^[a-f0-9]{64}$'`),
