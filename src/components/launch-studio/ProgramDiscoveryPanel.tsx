@@ -155,7 +155,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
             <h3 className="mt-3 text-base font-semibold">{offering.title}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               {planEligible
-                ? "This Offering may be included in a private Blueprint plan. Independent qualification and approval still apply."
+                ? "This Offering may be included in a private Site plan. Independent qualification and approval still apply."
                 : unavailable
                   ? "The current availability policies do not permit this Offering to be planned for the selected Site and delivery model."
                   : "The current availability policies require additional review before this Offering may be planned."}
@@ -186,7 +186,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
                     Class configuration requires a separate verified Site permission.
                   </p>}
                 </div> : <p className="text-xs text-muted-foreground">
-                  {planEligible ? "Blueprint planning requires an authorized canonical Site." : "Not available for planning in the current context."}
+                  {planEligible ? "Planning requires an authorized Site." : "Not available for planning in the current context."}
                 </p>}
             </div>
           </article>;
