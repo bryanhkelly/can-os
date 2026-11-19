@@ -589,7 +589,7 @@ function LocalWebsiteCopyEditor({
     if (busy) return;
     setError("");
     if (artworkGaps.length) {
-      setError("Complete the artwork description, usage rights and child-privacy confirmations before publishing.");
+      setError("Complete the artwork description, usage rights and child-privacy confirmations before approving website copy.");
       return;
     }
     if (revisionConflict) return;
@@ -598,7 +598,7 @@ function LocalWebsiteCopyEditor({
         data: { content: submitted, expectedRevision: editor.revision,siteId:data.siteId },
       }), { successMessage: result => result.status === "review_required"
         ? "Protected institutional language was held for CAN review. Previously published church content remains unchanged."
-        : "Church content published. If this Site is publicly active, the new copy is available without separate CAN editorial approval.",
+        : "Reviewed church-owned website copy saved. Official Site publication remains a separate Prepare decision. If this Site is already public, approved copy may update its live website.",
       commandErrorMessage: "Could not save church content." });
     if (outcome.status === "saved" || outcome.status === "refresh-failed")
       markSaved(submitted, outcome.value.revision);
