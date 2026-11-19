@@ -1,3 +1,7 @@
+import { readSavedBrandVersion } from "./site-brand.functions";
+import { siteBrandPresentationIdentity } from "@/domain/site-brand";
+import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-local-content";
+import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { db } from "@/db/client";
 import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sites } from "@/db/schema";
@@ -99,6 +103,13 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     readAcademicProgramCatalog(site.id),
     readCurrentLocalContent(site.id),
   ]);
+  const brand=await readSavedBrandVersion(site.id);
+  const templateId=resolveSiteTemplateId(localCopy?.content.branding?.templateId);
+  const websiteCopy=brand
+    ? {...normalizeSiteLocalContent(localCopy?.content??emptySiteLocalContent),
+        branding:siteBrandPresentationIdentity(brand.resolved,templateId)}
+    : localCopy?.content??null;
+  const displayName=brand?.resolved.displayName??site.name;
   const publicOfferings = publishedOfferings.map(toPublicSiteEnrichment);
   const approvedPhotos=address[0] ? await readApprovedSchoolSitePhotos(site.id) : [];
   const media=address[0] ? projectApprovedSchoolSiteMedia(site.id,publicSiteHost(address[0].slug),approvedPhotos) : {};
@@ -110,9 +121,9 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   const authorizedPrograms=withVerifiedPublicApplications(approvedAcademicListings,
     parentExtras.admissions);
   const parentInformation = projectApprovedParentInformation({
-    site: {name: site.name, organizationName: site.organizationName},
+    site: {name: displayName, organizationName: site.organizationName},
     academicPrograms: authorizedPrograms, offerings: publicOfferings,
-    localContent: localCopy?.content ?? null, ...parentExtras,
+    localContent: websiteCopy, ...parentExtras,
   });
   // Institutional publishing preview must use the exact published-channel
   // configuration and approved Course/Class feeds as the anonymous Site.
@@ -136,9 +147,9 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   const publisherPreview = address[0] ? withIllustrativeLocalPreview({
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host: publicSiteHost(address[0].slug),
-    site: {name: site.name, organizationName: site.organizationName},
+    site: {name: displayName, organizationName: site.organizationName},
     academicPrograms: authorizedPrograms,
-    localContent: localCopy?.content ?? null,
+    localContent: websiteCopy,
     offerings: publicOfferings,
     parentInformation,
     media,noncreditReleases,enrollmentAppOrigin,
