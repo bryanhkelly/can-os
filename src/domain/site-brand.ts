@@ -65,10 +65,11 @@ export function assertSiteBrandMediaRights(asset:SiteBrandAsset|null):boolean {
 export function siteBrandPresentationIdentity(
   brand:ResolvedSiteBrand,
   templateId:import("./site-theme").SiteTemplateId="heritage",
+  includeUnapprovedMedia=false,
 ):import("./site-local-content").SiteLocalBranding{
   const image=(asset:SiteBrandAsset|null)=>{
-    if(!assertSiteBrandMediaRights(asset)||!asset)return null;
-    return {dataUrl:asset.dataUrl,altText:asset.altText,rightsConfirmed:true,
+    if(!asset || asset.revokedAt || (!includeUnapprovedMedia && !assertSiteBrandMediaRights(asset)))return null;
+    return {dataUrl:asset.dataUrl,altText:asset.altText,rightsConfirmed:asset.rightsConfirmed,
       childImageConsent:asset.childImageConsent};
   };
   const config=siteBrandConfigurationSchema.parse({

@@ -79,9 +79,9 @@ export const readSiteBrandVersionView=createServerFn({method:"GET"})
 
 export const assetInputSchema=z.object({
   dataUrl:z.string().max(220000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/),
-  altText:z.string().trim().min(1).max(180),
-  rightsConfirmed:z.literal(true),
-  childImageConsent:z.enum(["no_identifiable_children","guardian_consent_confirmed"]),
+  altText:z.string().trim().max(180),
+  rightsConfirmed:z.boolean(),
+  childImageConsent:z.enum(["unconfirmed","no_identifiable_children","guardian_consent_confirmed"]),
 }).strict();
 const mutationSchema=z.object({
   siteId:z.string().uuid(),
@@ -123,7 +123,7 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
         if(!assetId){
           const [created]=await tx.insert(siteBrandAssets).values({
             siteId:site.id,dataUrl:input.dataUrl,checksum,altText:input.altText,
-            rightsConfirmed:"true",childImageConsent:input.childImageConsent,
+            rightsConfirmed:input.rightsConfirmed?"true":"false",childImageConsent:input.childImageConsent,
             createdByPersonId:actor.actorPersonId,
           }).returning({id:siteBrandAssets.id});
           assetId=created?.id;
@@ -137,8 +137,8 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
           revoked:siteBrandAssets.revokedAt,consent:siteBrandAssets.childImageConsent})
           .from(siteBrandAssets).where(and(
             eq(siteBrandAssets.id,assetId),eq(siteBrandAssets.siteId,site.id))).limit(1);
-        if(!asset || asset.revoked || asset.rights!=="true" || asset.consent==="unconfirmed")
-          throw new DomainError("FORBIDDEN","Brand asset is unavailable or lacks current usage permission.");
+        if(!asset || asset.revoked)
+          throw new DomainError("FORBIDDEN","Brand media is missing or its usage rights were withdrawn.");
       }
       const fingerprint=brandFingerprint(config);
       const previous=site.currentBrandVersionId

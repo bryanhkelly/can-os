@@ -76,7 +76,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // stores the structural wireframe, not colors, logo, fonts or direction.
   const editingContent:SiteLocalContent|null=rawEditingContent && savedBrand
     ? {...rawEditingContent,branding:siteBrandPresentationIdentity(savedBrand.resolved,
-        resolveSiteTemplateId(rawEditingContent.branding.templateId))}
+        resolveSiteTemplateId(rawEditingContent.branding.templateId),true)}
     : rawEditingContent;
   // Editor and full-page private previews use the latest saved immutable draft,
   // never the last published revision by accident. Unapproved child artwork
