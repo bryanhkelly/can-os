@@ -86,6 +86,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   }, [defaultProgramId, defaultProgramTimezone, search.siteId, search.programId]);
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
   const [createdEventId, setCreatedEventId] = useState("");
+  const [createdProgramId, setCreatedProgramId] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [timeValidationError, setTimeValidationError] = useState("");
   const mutation = useMutationFeedback(() => router.invalidate());
@@ -122,6 +123,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       } });
       const rsvpUrl = result.rsvpUrl;
       setCreatedEventId(result.eventId);
+      setCreatedProgramId(selectedProgram.id);
       if (rsvpUrl) setShareLinks(current => ({ ...current, [result.eventId]: rsvpUrl }));
       return result;
     }, {
@@ -169,9 +171,10 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
         <Select value={selectedProgramId} onChange={event => {
           const next = scopedPrograms.find(program => program.id === event.target.value);
           setProgramId(event.target.value);
-          if (next?.timezone) {
-            setStartsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000), next.timezone));
-            setEndsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), next.timezone));
+          const parsedZone=siteTimezoneSchema.safeParse(next?.timezone);
+          if (parsedZone.success) {
+            setStartsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000), parsedZone.data));
+            setEndsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), parsedZone.data));
           } else { setStartsAt(""); setEndsAt(""); }
         }}>
           {scopedPrograms.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
@@ -203,7 +206,8 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       </div>
       {timeValidationError&&<FieldError>{timeValidationError}</FieldError>}
       {timezone ? <p className="text-xs text-muted-foreground">Times use the selected Site's timezone: {timezone}.</p>
-        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/launch/site" search={{ siteId: selectedProgram?.siteId, programId: selectedProgramId }} className="underline">Configure school timezone</Link></p>}
+        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/launch/site" search={{ siteId: selectedProgram?.siteId??selection.siteId, module:"site-profile" }}
+          className="underline">Configure school timezone</Link></p>}
       <Field label="Location or meeting details">
         <Input maxLength={300} value={location} onChange={event => setLocation(event.target.value)} />
       </Field>
@@ -218,7 +222,9 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       </Button>
     </form>}
     {mode==="create"&&createdEventId&&<div className="space-y-3 border-t pt-4">
-      <Link to="/operations/interest-events/$eventId" params={{eventId:createdEventId}} search={selection} className="underline">Open created event</Link>
+      <Link to="/operations/interest-events/$eventId" params={{eventId:createdEventId}}
+          search={{siteId:siteForProgram(createdProgramId),programId:createdProgramId}}
+          className="underline">Open created event</Link>
       {shareLinks[createdEventId]&&<p className="break-all text-sm">Invite-only RSVP link: <a className="underline" href={shareLinks[createdEventId]}>{shareLinks[createdEventId]}</a></p>}
     </div>}
     {mode==="directory"&&<DirectoryTable label="Interest events" caption="Events in your authorized school scope."
