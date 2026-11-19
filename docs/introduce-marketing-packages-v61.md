@@ -6,7 +6,9 @@
 - **Promote, Recruit Families / Learners, and Interest Events all use one Site-scoped Marketing Package library.** `launch-introduce-v61.ts` provides only module-specific labels, purpose filters, and handoffs. It does not add a new data store, Brand reader, prospect CRM, event source, or enrollment authority.
 - Promote offers all four editorial purposes; Recruit focuses on interest invitations and program ideas; Interest Events focuses on event invitations. Existing saved packages remain reusable and Brand-pinned across modules. Module changes remount the editor so unsaved working state cannot leak between destinations.
 - The Launch route loads the same authorized `listSiteMarketingPackagesV61` and `readSiteMarketingSuggestionsV61` for all three. Optional suggestion failure is reported separately instead of hiding saved packages. Package read failure shows an explicit retry state, not a fabricated empty library.
-- The focused modules include existing governed handoffs to the admissions invitations and Program-linked Interest Events workspaces, without claiming campaign send or event creation occurs inside Marketing Packages.
+- Recruit's handoff now opens the **existing preopening interest invitation** mode for the exact selected Site. That service already supports consent-aware adult interest invitations for eligible developing Programs, retains the saved Site Brand through `readSiteFamilyBrand`, and applies independent registrar/Program/Site authorization. The invitation editor starts with the same Site Story/Programs editorial suggestion and requires an explicit send confirmation.
+- Interest Events uses the existing Program-linked event service. Package-generated event collateral is separate from event creation and does not invent dates or registrations.
+- The focused modules do not imply a new Site-wide prospect CRM, marketing distribution service, or event store.
 - Promote is a Site-scoped, server-authorized package library and four-step content workflow: Menu, Audience, Messages, Collateral & Assets.
 - Operators can create, save, reopen, duplicate, archive, restore and permanently delete draft package content.
 - Dedicated site_marketing_packages table (migration 0088) with revision checks, exact Site/organization ownership, actor attribution and append-only audit metadata. Marketing Package records now select a canonical immutable Site Brand version through migrations 0089/0090.
@@ -24,7 +26,7 @@
 
 ## Not implemented (outside this slice)
 - Production server-generated PDF/ZIP exports and a fully unified R2 media-library interface. Initial SVG collateral, browser PNG conversion, and HTML email generation with immutable release snapshots are implemented in source but remain unverified.
-- Recipients, contact importing, consent, unsubscribe, marketing email delivery, scheduling.
+- A Marketing Package-specific audience/contact CRM, recipient import, opt-out subscription management, campaign sending and scheduling. The **existing** authorized family-invitation service handles its separate, consent-aware preopening interest and application workflows; it is not replaced or duplicated by Marketing Packages.
 - Creation of public interest forms or enrollment claims.
 - No pretend asset thumbnails, send metrics, delivery status or fake public links. The live collateral preview uses the exact production SVG/HTML renderer, with typing debounced. Material previews use the real SVG/email templates; native email sending is still out of scope.
 
@@ -45,3 +47,6 @@ Package records remain mutable while their selected canonical Brand version is e
 4. Verify the canonical Brand resolver, initial SVG/HTML collateral renderer and immutable release snapshots, then add production print/PNG/ZIP exports and separately authorized distribution.
 
 Changing these components does not apply a migration or modify a production database.
+
+## Interest Events Site-scoping correction
+The existing Program-linked Interest Events workspace now filters its Program chooser by the exact Site from Launch Studio and never submits a Program belonging to a different selected Site. A dedicated regression test covers multiple authorized Sites and empty Site scope. The server remains authoritative.
