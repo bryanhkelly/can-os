@@ -7,6 +7,7 @@ export const prepareStageModulesV61 = [
   { id: "schedules-capacity", title: "Schedules & Capacity", subtitle: "Define dates, days, sessions, rooms and available seats." },
   { id: "funding-enrollment", title: "Funding & Enrollment", subtitle: "Prepare funding decisions, capacity and admissions rules." },
   { id: "opening-compliance", title: "Safety & Readiness", subtitle: "Collect evidence and request independent opening decisions." },
+  { id: "publish-site", title: "Publish Site", subtitle: "Review and launch your official public website without opening enrollment." },
 ] as const;
 
 export type PrepareStageModuleIdV61 = (typeof prepareStageModulesV61)[number]["id"];
