@@ -4,7 +4,7 @@
  * Do not persist user-visible checkboxes as readiness or infer regulatory fit.
  */
 import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
-import { prepareStageModulesV61, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
+import { prepareStageModulesV61, preferredCatalogDelivery, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
@@ -141,10 +141,11 @@ function PrepareModuleHandoffs({ siteId, handoffs }: { siteId: string; handoffs:
   </WorkspacePanel>;
 }
 
-export function LaunchPrepareV61({ module, siteId, intent, intentUnavailable = false }: {
+export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnavailable = false }: {
   module: PrepareModuleIdV61;
   siteId: string;
   intent?: SiteProgramsAudiencesV61 | null;
+  delivery?: "physical" | "digital" | "both" | null;
   intentUnavailable?: boolean;
 }) {
   const index = prepareModulesV61.findIndex(item => item.id === module);
@@ -153,6 +154,7 @@ export function LaunchPrepareV61({ module, siteId, intent, intentUnavailable = f
   const next = prepareModulesV61[index + 1];
   const previous = prepareModulesV61[index - 1];
   const Icon = definition.icon;
+  const discoveryDelivery = preferredCatalogDelivery(delivery);
   return <WorkspaceShell width="wide" title={definition.title}
     eyebrow={"Prepare to Open / " + (index + 1) + " of " + prepareModulesV61.length}
     subtitle={definition.subtitle}
@@ -222,7 +224,7 @@ export function LaunchPrepareV61({ module, siteId, intent, intentUnavailable = f
           </div>
         </WorkspacePanel>
         <SolutionCatalogV61 key={siteId} siteId={siteId} />
-        <ProgramDiscoveryPanel key={siteId} siteId={siteId} />
+        <ProgramDiscoveryPanel key={`${siteId}:${discoveryDelivery}`} siteId={siteId} initialDelivery={discoveryDelivery} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
           Discovery returns published Offerings and their availability policies, not a complete verified Solution fit.
           Adoption intent is recorded in the existing Blueprint workspace; no duplicate selection record is created here.
