@@ -7,6 +7,7 @@
  */
 import { ArrowRight, BookOpen, Building2, ClipboardCheck, Globe, Info, Megaphone, Rocket, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { prepareStageModulesV61 } from "@/domain/launch-prepare-v61";
 import { WorkspaceShell, WorkspacePanel, WorkspaceNotice, StatusBadge, type StatusTone } from "@/components/workspace";
 
 export type LaunchOverviewProps = {
@@ -27,12 +28,7 @@ export const siteLaunchModules = [
   { stage: "Introduce", id: "promote", title: "Promote" },
   { stage: "Introduce", id: "recruit", title: "Recruit Families / Learners" },
   { stage: "Introduce", id: "interest-events", title: "Interest Events" },
-  { stage: "Prepare", id: "program-catalog", title: "Programs & Solutions" },
-  { stage: "Prepare", id: "facilities-resources", title: "Facilities & Resources" },
-  { stage: "Prepare", id: "invite-team", title: "Team & Responsibilities" },
-  { stage: "Prepare", id: "schedules-capacity", title: "Schedules & Capacity" },
-  { stage: "Prepare", id: "funding-enrollment", title: "Funding & Enrollment" },
-  { stage: "Prepare", id: "opening-compliance", title: "Safety & Readiness" },
+  ...prepareStageModulesV61.map(module => ({ stage: "Prepare" as const, id: module.id, title: module.title })),
   { stage: "Open", id: "open", title: "Open" },
 ] as const;
 
