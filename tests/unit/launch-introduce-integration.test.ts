@@ -61,11 +61,21 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     const events = introduceModuleConfigV61["interest-events"];
     expect(recruit.defaultPurpose).toBe("interest-invitation");
     expect(events.purposes).toEqual(["event-invitation"]);
-    expect(recruit.handoffs[0]?.href(siteId)).toBe("/admissions/invite-families");
+    expect(recruit.handoffs[0]?.href(siteId)).toBe(
+      "/admissions/invite-families?siteId=" + siteId + "&purpose=interest",
+    );
     expect(events.handoffs[0]?.href(siteId)).toBe(
       "/operations/interest-events?siteId=" + siteId,
     );
     expect(recruit.guidance).toContain("No contacts");
     expect(events.guidance).toContain("does not create an event");
+    const invitations = source("src/routes/admissions.invite-families.tsx");
+    expect(invitations).toContain('purpose: z.enum(["interest", "application"])');
+    expect(invitations).toContain("readSiteMarketingSuggestionsV61");
+    expect(invitations).toContain("program.siteId === selection.siteId");
+    expect(invitations).toContain("purpose:selection.purpose");
+    expect(invitations).toContain("confirmed:true");
+    expect(source("src/modules/sites/site-family-brand.server.ts"))
+      .toContain("readSavedBrandVersion(site.id)");
   });
 });
