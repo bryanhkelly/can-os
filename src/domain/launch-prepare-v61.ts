@@ -5,7 +5,7 @@ export const prepareStageModulesV61 = [
   { id: "facilities-resources", title: "Facilities & Resources", subtitle: "Confirm the spaces, equipment and technology you can provide." },
   { id: "invite-team", title: "Team & Responsibilities", subtitle: "Bring people into the right scoped roles and verify qualifications." },
   { id: "schedules-capacity", title: "Schedules & Capacity", subtitle: "Define dates, days, sessions, rooms and available seats." },
-  { id: "funding-enrollment", title: "Funding & Enrollment", subtitle: "Prepare funding decisions, capacity and admissions rules." },
+  { id: "funding-enrollment", title: "Funding & Admissions Setup", subtitle: "Prepare funding, tuition, admissions policies and capacity before enrollment can open." },
   { id: "opening-compliance", title: "Safety & Readiness", subtitle: "Collect evidence and request independent opening decisions." },
   { id: "publish-site", title: "Publish Site", subtitle: "Review and launch your official public website without opening enrollment." },
 ] as const;
