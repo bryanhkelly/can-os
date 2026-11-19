@@ -60,10 +60,10 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     const publisherReleaseRows=await db.execute(sql`
       SELECT ov.id AS "offeringVersionId",o.title AS "offeringTitle",
         ov.version_no AS "versionNo",ov.lifecycle,
-        (SELECT count(*)::int FROM education_v30.offering_courses oc
+        (SELECT count(*)::int FROM public.offering_courses oc
           WHERE oc.offering_version_id=ov.id) AS "courseCount",
-        (SELECT count(*)::int FROM education_v30.offering_courses oc
-          JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_versions cv ON cv.id=oc.course_version_id
           WHERE oc.offering_version_id=ov.id
             AND cv.lifecycle='published' AND cv.published_at IS NOT NULL)
           AS "publishedCourses",
@@ -84,8 +84,8 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             AND a.email_verified_at IS NOT NULL
             AND g.role='academic_content_reviewer') AS "reviewerMemberships",
         (SELECT count(DISTINCT a.course_id)::int
-          FROM education_v30.offering_courses oc
-          JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
+          FROM public.offering_courses oc
+          JOIN public.course_versions cv ON cv.id=oc.course_version_id
           JOIN education_v30.professional_role_assignments a ON a.course_id=cv.course_id
           WHERE oc.offering_version_id=ov.id
             AND a.organization_id=o.publisher_organization_id
@@ -95,8 +95,8 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             AND (a.ends_at IS NULL OR a.ends_at>clock_timestamp()))
           AS "creatorAppointedCourses",
         (SELECT count(DISTINCT a.course_id)::int
-          FROM education_v30.offering_courses oc
-          JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
+          FROM public.offering_courses oc
+          JOIN public.course_versions cv ON cv.id=oc.course_version_id
           JOIN education_v30.professional_role_assignments a ON a.course_id=cv.course_id
           WHERE oc.offering_version_id=ov.id
             AND a.organization_id=o.publisher_organization_id
