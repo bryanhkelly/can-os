@@ -19,9 +19,9 @@ SPA navigation retains exact Site scope; the active stage re-expands on module c
 | Establish / Site Information | Four internal steps and scoped revised Site metadata, private Story, explicit affiliation request | Live 390 px/keyboard/screen-reader review; prove private Story is not exposed in public projections |
 | Establish / Programs & Audiences | Two-step V6.1 intent form, scoped revised canonical Site preferences and separate timing/audience controls | Live save/reload/legacy-upgrade and navigation acceptance |
 | Establish / Website & Brand | Direct entry to existing `/launch/website` studio; exact selected Site and return to Launch | Live editor/save/preview/return path and publishing-role checks |
-| Introduce / Promote | Intentional planned landing; saved brand and private website preview handoffs | Campaign generation, review and distribution are not implemented |
-| Introduce / Recruit Families / Learners | Intentional planned landing; links to separately governed receiving-Program invitations and private prospect preview | Site-level prospect CRM/campaigns not implemented |
-| Introduce / Interest Events | Existing Program-linked events and registrations workspace | General pre-Program Site event capability not implemented |
+| Introduce / Promote | Site-scoped Marketing Package library, purpose-specific Story/intent suggestions, immutable Brand-pinned output and downloads | Sending/distribution and recipient management are not implemented |
+| Introduce / Recruit Families / Learners | Reuses the same Marketing Packages and source projection, focused on interest invitations and program ideas; existing authorized admissions handoff | Site-level CRM and contact collection are not implemented; sending/Program invitations remain separate |
+| Introduce / Interest Events | Reuses the same Marketing Packages for event invitation materials; existing Program-linked event and registration handoff | Generic pre-Program Site events and automatic messaging/distribution are not implemented |
 | Prepare / Invite Your Team | Existing exact-Site verified staff invitation/access workspace | Test verified role acceptance; no implicit appointment |
 | Prepare / Program Catalog | Source-backed canonical published-Offering discovery panel plus Blueprint/Class handoffs | Requires independently verified canonical grant and enabled catalog; Solution adoption, requirements and readiness are independent |
 | Prepare / Opening & Compliance | Existing authenticated compliance and canonical qualification review destinations | Site-specific evidence and jurisdiction review acceptance |
@@ -51,7 +51,7 @@ revision locks, guarded Program discovery and no auto-opening claims. All 24
 conditions evaluated true. These are **source predicates**, not tests of runtime
 behavior or accessibility.
 
-Added `tests/unit/launch-v61-module-handoffs.test.ts` and
+Added `tests/unit/launch-v61-module-handoffs.test.ts`, `tests/unit/launch-introduce-integration.test.ts` and
 `src/components/launch-studio/LaunchStudioDestinations.stories.tsx` as regression
 and visual-review surfaces. Their execution is not claimed.
 
@@ -79,3 +79,7 @@ that provider must not be reported as a TypeScript/build result.
 navigation or implementation, but Launch Studio V6.1 remains **unreleased/
 unaccepted** until executable gates pass. Planned modules remain explicitly
 planned, not silently reclassified as complete.
+
+## Follow-on source integration, 2026-11-19
+
+Introduced one presentation-only `launch-introduce-v61.ts` configuration, routed all three Introduce modules through the existing Marketing Packages and Site Story/Programs/Brand services, removed the obsolete Introduce placeholder destinations and Storybook fixtures, and preserved permission-checked operational handoffs. No database migrations were run, no changes were made to main, and no build, browser, or deployment verification is asserted by this follow-on work.
