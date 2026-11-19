@@ -3,23 +3,28 @@
  * engine. The actual Site, Blueprint, Class and admissions services own writes.
  * Do not persist user-visible checkboxes as readiness or infer regulatory fit.
  */
-import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, HardHat, Info, ShieldCheck, Users, Wallet } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
+import { prepareStageModulesV61, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 
-export const prepareModulesV61 = [
-  { id: "program-catalog", title: "Programs & Solutions", subtitle: "Find available learning experiences and their operating requirements.", icon: BookOpen },
-  { id: "facilities-resources", title: "Facilities & Resources", subtitle: "Confirm the spaces, equipment and technology you can provide.", icon: HardHat },
-  { id: "invite-team", title: "Team & Responsibilities", subtitle: "Bring people into the right scoped roles and verify qualifications.", icon: Users },
-  { id: "schedules-capacity", title: "Schedules & Capacity", subtitle: "Define dates, days, sessions, rooms and available seats.", icon: CalendarDays },
-  { id: "funding-enrollment", title: "Funding & Enrollment", subtitle: "Prepare funding decisions, capacity and admissions rules.", icon: Wallet },
-  { id: "opening-compliance", title: "Safety & Readiness", subtitle: "Collect evidence and request independent opening decisions.", icon: ShieldCheck },
-] as const;
+const prepareModuleIcons: Record<PrepareStageModuleIdV61, LucideIcon> = {
+  "program-catalog": BookOpen,
+  "facilities-resources": HardHat,
+  "invite-team": Users,
+  "schedules-capacity": CalendarDays,
+  "funding-enrollment": Wallet,
+  "opening-compliance": ShieldCheck,
+};
 
-export type PrepareModuleIdV61 = (typeof prepareModulesV61)[number]["id"];
+export const prepareModulesV61 = prepareStageModulesV61.map(module => ({
+  ...module, icon: prepareModuleIcons[module.id],
+}));
+
+export type PrepareModuleIdV61 = PrepareStageModuleIdV61;
 export function isPrepareModuleV61(id: string): id is PrepareModuleIdV61 {
   return prepareModulesV61.some(module => module.id === id);
 }
