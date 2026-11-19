@@ -163,3 +163,33 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
       return {changed:true,brandVersionId:saved.id,revision:nextRevision};
     });
   });
+
+/** Revocation does not rewrite historical Brand versions, but blocks future
+ * use and authenticated downloads that incorporate the withdrawn image.
+ */
+export const revokeSiteBrandAsset=createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({
+    siteId:z.string().uuid(),assetId:z.string().uuid(),
+    reason:z.string().trim().min(8).max(500),
+  }).strict().parse(value))
+  .handler(async ({data})=>db.transaction(async tx=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const site=await authorizeReader(actor,data.siteId,true,tx);
+    if(!actor.actorPersonId)throw new DomainError("FORBIDDEN","Verified Site identity required.");
+    const [asset]=await tx.select({id:siteBrandAssets.id,revokedAt:siteBrandAssets.revokedAt})
+      .from(siteBrandAssets).where(and(eq(siteBrandAssets.siteId,site.id),
+        eq(siteBrandAssets.id,data.assetId))).for("update").limit(1);
+    if(!asset)throw new DomainError("UNAVAILABLE","Brand media not found.");
+    if(asset.revokedAt)return {changed:false,revokedAt:asset.revokedAt.toISOString()};
+    const timestamp=new Date();
+    await tx.update(siteBrandAssets).set({revokedAt:timestamp})
+      .where(and(eq(siteBrandAssets.siteId,site.id),eq(siteBrandAssets.id,asset.id)));
+    await writeAudit(tx,actor,{
+      action:"site.brand.asset.rights_withdrawn",entityType:"site",entityId:site.id,
+      scope:{siteId:site.id,organizationId:site.organizationId},
+      before:{assetId:asset.id,revoked:false},
+      after:{assetId:asset.id,revoked:true,reason:data.reason},
+    });
+    return {changed:true,revokedAt:timestamp.toISOString()};
+  }));
