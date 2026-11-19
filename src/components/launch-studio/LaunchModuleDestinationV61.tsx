@@ -6,13 +6,13 @@
 import { ArrowRight, CircleAlert, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
-import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 import type { siteLaunchModules } from "./LaunchStudioOverviewV61";
+import type { PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 
 type ModuleId = typeof siteLaunchModules[number]["id"];
 export type DestinationModuleId = Exclude<ModuleId,
   "site-profile" | "site-information" | "programs-audiences" | "website-brand" |
-  "facilities-resources" | "schedules-capacity" | "funding-enrollment">;
+  PrepareStageModuleIdV61>;
 
 type ModuleLink = { label: string; path: (siteId: string) => string; detail: string };
 type Destination = {
@@ -51,36 +51,6 @@ export const launchModuleDestinationsV61: Record<DestinationModuleId, Destinatio
     note: "Event creation requires an eligible Program and Site/timezone authority; attendance never becomes enrollment automatically.",
     links: [
       { label: "Manage Interest Events", path: id => `/operations/interest-events?siteId=${scope(id)}`, detail: "Actual events and registrations for the selected Site" },
-    ],
-  },
-  "invite-team": {
-    subtitle: "Invite staff to the exact Site, with reviewed permissions.",
-    intro: "Use existing scoped staff invitations and access management. An invitation is not an appointment, verified credential or approval to supervise learners.",
-    state: "operational",
-    note: "Only authorized Site administrators and registrars may invite or change staff grants.",
-    links: [
-      { label: "Invite a team member", path: id => `/admin/invite?siteId=${scope(id)}`, detail: "Exact-Site authorized invitation" },
-      { label: "Manage access", path: id => `/admin?siteId=${scope(id)}`, detail: "Review members and current grants" },
-    ],
-  },
-  "program-catalog": {
-    subtitle: "Explore packaged offerings matching your Site's intended programs.",
-    intro: "The existing canonical catalog shows published Offering versions when your account has independently verified Site access. Selection alone never adopts a Blueprint or opens enrollment.",
-    state: "governed",
-    note: "Only canonical, authorized offerings can be configured. A proposal is not a deployable Solution until site fit, staffing, facilities, safety and release requirements are satisfied.",
-    links: [
-      { label: "Review canonical Blueprints", path: id => `/canonical/blueprints?siteId=${scope(id)}`, detail: "Requires independently authorized canonical Site access" },
-      { label: "Manage approved Classes", path: id => `/class?view=manage&siteId=${scope(id)}`, detail: "Existing native Class configuration and eligibility gates" },
-    ],
-  },
-  "opening-compliance": {
-    subtitle: "Review the evidence and independently governed requirements to open.",
-    intro: "Site facilities, staffing, jurisdiction, safeguarding, academic delivery, publication and enrollment release have separate readiness gates. Review the authoritative operational records rather than marking planning selections as complete.",
-    state: "governed",
-    note: "Launch Studio cannot approve an institution, bypass safeguarding or release enrollment by itself.",
-    links: [
-      { label: "Review opening and compliance", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Actual authorized institutional preparation and evidence" },
-      { label: "Review qualification records", path: () => "/canonical/lab/site-qualification", detail: "Canonical capability inspection, not automatic approval" },
     ],
   },
   open: {
@@ -136,7 +106,6 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
           </div>)}
         </div>
       </WorkspacePanel>
-      {module === "program-catalog" && <ProgramDiscoveryPanel siteId={siteId} />}
       {destination.state === "planned"
         ? <WorkspaceNotice><Info aria-hidden="true" className="mr-2 inline size-4"/>
             These are current handoffs, not a promise that this module can create or distribute campaigns.
