@@ -85,3 +85,15 @@ planned, not silently reclassified as complete.
 Introduced one presentation-only `launch-introduce-v61.ts` configuration, routed all three Introduce modules through the existing Marketing Packages and Site Story/Programs/Brand services, removed the obsolete Introduce placeholder destinations and Storybook fixtures, and preserved permission-checked operational handoffs. No database migrations were run, no changes were made to main, and no build, browser, or deployment verification is asserted by this follow-on work.
 
 Follow-on integration also enables the existing `purpose=interest` family invitation mode, with exact-Site Program filtering, editable saved Story/intent suggestions and the existing canonical family Brand resolver. The preexisting Program-linked Interest Events workspace now filters available Programs to its selected Site. This is application source work only; send/run and authorization tests remain pending.
+
+
+## 2026-11-19 · Continued Launch product integration (source)
+
+- Corrected Interest Events links to retain the actual Site ID and Program Catalog context. Verified that a selected Site filters the Event Program chooser; the selector now derives a valid timezone through the schema result.
+- Fixed shared family-invitation form validation so the first submit checks contacts, subject, introduction and that the Program is among the current authorized Site/purpose choices.
+- Prepare / Publish Site now allows authorized Site Admins to inspect status using draft-read authority, but independently evaluates the actual Site publisher assignment before exposing publication controls. Network-governed/local publisher approval remains separately checked.
+- The authenticated Launch topbar Site preview now uses `readSavedBrandVersion` and `siteBrandPresentationIdentity` for the saved immutable Brand instead of treating legacy embedded website fields as the authoritative palette, fonts or media. The structural template still comes from the saved website revision. Rights/consent filters apply to both media slots.
+- First-visit preview now uses the same saved Purpose & Story candidate/starter helpers as the Website editor, without persisting suggested copy or overwriting saved revisions. The read-only preview uses exact Site `program.read` authority; launch mutation capability is not necessary.
+- Added or updated focused regression tests for navigation, invitation validation, canonical preview behavior and publication permission projections.
+- No migrations, production commands or `main` changes have been made. Build, TypeScript checks, database acceptance, authenticated browser tests and actual network-delivery checks remain unexecuted.
+
