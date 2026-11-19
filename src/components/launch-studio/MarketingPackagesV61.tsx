@@ -47,19 +47,24 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
   const [notice,setNotice]=useState("");
   const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
   const [currentBrand,setCurrentBrand]=useState<{id:string;revision:number}|null>(null);
+  const [selectedBrandRevision,setSelectedBrandRevision]=useState<number|null>(null);
   useEffect(()=>{
     if(view!=="detail"||!record)return;
     let live=true;
     void Promise.all([
       listSiteMarketingReleases({data:{siteId,packageId:record.id}}),
       readSiteBrandVersionView({data:{siteId}}),
-    ]).then(([records,brand])=>{
+      record.brandVersionId
+        ? readSiteBrandVersionView({data:{siteId,versionId:record.brandVersionId}})
+        : Promise.resolve(null),
+    ]).then(([records,brand,selected])=>{
       if(live){setReleases(records);
         setCurrentBrand(brand.current?.version
-          ? {id:brand.current.version.id,revision:brand.current.version.revision}:null);}
+          ? {id:brand.current.version.id,revision:brand.current.version.revision}:null);
+        setSelectedBrandRevision(selected?.current?.version.revision??null);}
     }).catch(error=>{if(live)setError(message(error));});
     return ()=>{live=false;};
-  },[view,record?.id,siteId]);
+  },[view,record?.id,record?.brandVersionId,siteId]);
   const dirty=view==="wizard" && (!record || title!==record.title ||
     JSON.stringify(content)!==JSON.stringify(record.content));
   const releaseNavigation=useLaunchUnsavedChanges(()=>dirty||busy,
@@ -360,7 +365,11 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
           description="Generated files retain their original Brand and message.">
           <div className="space-y-3">
             <p className="text-sm">Selected identity:
-              <strong>{record.brandVersionId?" Brand "+record.brandVersionId.slice(0,8):" No saved Brand selected"}</strong>
+              <strong>{record.brandVersionId
+                ? selectedBrandRevision!==null
+                  ? " Brand v"+selectedBrandRevision
+                  : " Selected saved Brand"
+                : " No saved Brand selected"}</strong>
             </p>
             {currentBrand&&currentBrand.id!==record.brandVersionId&&
               <div className="flex flex-wrap items-center justify-between gap-3 border p-3">

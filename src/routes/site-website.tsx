@@ -767,6 +767,17 @@ function LocalWebsiteCopyEditor({
             later will not alter older flyers or released website pages.
           </span>
         </label>
+        <div className="border bg-muted/20 p-3 text-sm">
+          <p className="font-semibold">
+            {data.currentBrandRevision>0
+              ? `Current saved Site Brand: v${data.currentBrandRevision}`
+              : "Site Brand not saved yet"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Brand changes create immutable saved versions. Previously generated materials
+            retain their original identity until you explicitly update and regenerate them.
+          </p>
+        </div>
         <fieldset disabled={busy || !data.canPublish}>
           <legend className="text-sm font-semibold">Choose your brand direction</legend>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
