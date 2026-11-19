@@ -38,8 +38,7 @@ export const evidenceDocuments = educationV30.table("evidence_documents", {
   owningOrganizationId: uuid("owning_organization_id"),
 });
 
-export const educationOperationOrganizationRoles = educationV30.table(
-  "education_operation_organization_roles",
+export const educationOperationOrganizationRoles = pgTable("education_operation_organization_roles",
   {
     id: id(),
     operationId: uuid("operation_id").notNull(),
@@ -67,8 +66,7 @@ export const serviceCapabilities = educationV30.table("service_capabilities", {
   code: text("code").notNull(),
 });
 
-export const professionalCapabilityAuthorizations = educationV30.table(
-  "professional_capability_authorizations",
+export const professionalCapabilityAuthorizations = pgTable("professional_capability_authorizations",
   {
     id: id(),
     personId: uuid("person_id").notNull(),
@@ -85,8 +83,7 @@ export const professionalCapabilityAuthorizations = educationV30.table(
   },
 );
 
-export const professionalRoleAssignments = educationV30.table(
-  "professional_role_assignments",
+export const professionalRoleAssignments = pgTable("professional_role_assignments",
   {
     id: id(),
     personId: uuid("person_id").notNull(),
@@ -166,8 +163,7 @@ export const contentAssets = pgTable("content_assets", {
   createdAt: createdAt(),
 });
 
-export const contentAssetVersions = educationV30.table(
-  "content_asset_versions",
+export const contentAssetVersions = pgTable("content_asset_versions",
   {
     id: id(),
     assetId: uuid("asset_id").notNull(),
@@ -331,8 +327,7 @@ export const publishedAssetReviews = pgTable("published_asset_reviews", {
   evidenceVersionId: uuid("evidence_version_id"),
 });
 
-export const contentPublicationManifests = educationV30.table(
-  "content_publication_manifests",
+export const contentPublicationManifests = pgTable("content_publication_manifests",
   {
     id: id(),
     ownerOrganizationId: uuid("owner_organization_id").notNull(),
@@ -349,8 +344,7 @@ export const contentPublicationManifests = educationV30.table(
   ],
 );
 
-export const contentPublicationManifestItems = educationV30.table(
-  "content_publication_manifest_items",
+export const contentPublicationManifestItems = pgTable("content_publication_manifest_items",
   {
     id: id(),
     manifestId: uuid("manifest_id").notNull(),
@@ -370,8 +364,7 @@ export const contentPublicationManifestItems = educationV30.table(
   ],
 );
 
-export const contentManifestReviewDecisions = educationV30.table(
-  "content_manifest_review_decisions",
+export const contentManifestReviewDecisions = pgTable("content_manifest_review_decisions",
   {
     id: id(),
     manifestId: uuid("manifest_id").notNull(),
@@ -388,7 +381,7 @@ export const contentManifestReviewDecisions = educationV30.table(
   ],
 );
 
-export const contentWithdrawals = educationV30.table("content_withdrawals", {
+export const contentWithdrawals = pgTable("content_withdrawals", {
   id: id(),
   assetVersionId: uuid("asset_version_id"),
   courseVersionId: uuid("course_version_id"),
@@ -668,7 +661,7 @@ export const learnerTrackSelections = pgTable("learner_track_selections",
   ],
 );
 
-export const formativePracticeAttempts = educationV30.table("formative_practice_attempts", {
+export const formativePracticeAttempts = pgTable("formative_practice_attempts", {
   id: id(),
   courseAttemptId: uuid("course_attempt_id").notNull(),
   courseVersionId: uuid("course_version_id").notNull(),
