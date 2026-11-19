@@ -25,6 +25,12 @@ type IntroduceConfig = {
   purposes: readonly MarketingPurpose[];
   handoffDescription: string;
   handoffs: readonly IntroduceHandoff[];
+  /** Optional handoff for one reviewed, saved, active Package. Navigation
+   * carries a reference to the canonical record, not a copy of its message. */
+  packageHandoff?: IntroduceHandoff & {
+    purpose: MarketingPurpose;
+    href: (siteId:string,packageId:string)=>string;
+  };
 };
 
 const scoped = (siteId: string) => encodeURIComponent(siteId);
@@ -64,6 +70,12 @@ export const introduceModuleConfigV61: Record<IntroduceModuleV61, IntroduceConfi
         description: "Use the existing consent-aware preopening interest workflow when an eligible Program exists.",
         href: id => `/admissions/invite-families?siteId=${scoped(id)}&purpose=interest` },
     ],
+    packageHandoff: {
+      purpose: "interest-invitation",
+      title: "Invite families with this saved message",
+      description: "Reuse the package headline and introduction in the existing consent-aware outreach form. Recipient contacts and delivery consent are never copied from a Marketing Package.",
+      href: (siteId,packageId)=>`/admissions/invite-families?siteId=${scoped(siteId)}&purpose=interest&packageId=${scoped(packageId)}`,
+    },
   },
   "interest-events": {
     title: "Interest Events",
@@ -80,6 +92,12 @@ export const introduceModuleConfigV61: Record<IntroduceModuleV61, IntroduceConfi
         description: "Create or manage verified events for this Site in the existing workspace.",
         href: id => `/operations/interest-events?siteId=${scoped(id)}` },
     ],
+    packageHandoff: {
+      purpose: "event-invitation",
+      title: "Create an Interest Event",
+      description: "Use the saved invitation headline as a starting title. Confirm the Program, date, time, location and description in the separately authorized event workspace.",
+      href: (siteId,packageId)=>`/operations/interest-events/new?siteId=${scoped(siteId)}&packageId=${scoped(packageId)}`,
+    },
   },
 };
 
