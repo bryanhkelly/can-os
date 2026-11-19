@@ -12,7 +12,11 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import {
   listFamilyInvitations, sendFamilyInvitations, retryFamilyInvitationBatch,
 } from "@/modules/enrollment/family-invitations.functions";
-import { readSiteMarketingSuggestionsV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
+import {
+  readSiteMarketingSuggestionsV61, listSiteMarketingPackagesV61,
+} from "@/modules/programs/site-marketing-packages-v61.functions";
+import { containsProtectedInstitutionalClaim } from "@/domain/site-local-content";
+import { DomainError } from "@/domain/errors";
 import { plural } from "@/lib/format";
 
 /**
@@ -23,17 +27,44 @@ import { plural } from "@/lib/format";
 const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
   purpose: z.enum(["interest", "application"]).default("application"),
+  packageId: z.string().uuid().optional(),
 });
 
 export const Route = createFileRoute("/admissions/invite-families")({
   validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
-  loaderDeps: ({ search }) => ({ siteId: search.siteId, purpose: search.purpose }),
+  loaderDeps: ({ search }) => ({
+    siteId: search.siteId, purpose: search.purpose, packageId: search.packageId,
+  }),
   loader: ({ deps }) => safeLoader(async () => {
     const data = await listFamilyInvitations();
-    const suggestions = deps.siteId && deps.purpose === "interest"
+    if (deps.packageId && (!deps.siteId || deps.purpose!=="interest"))
+      throw new DomainError("UNAVAILABLE","A family interest Package requires its exact Site and interest mode.");
+    if (deps.packageId && !data.programs.some(program=>
+      program.siteId===deps.siteId && program.purpose==="interest"))
+      throw new DomainError("UNAVAILABLE","No authorized Program can send interest invitations for this Site.");
+    // A saved, active interest Package is referenced by ID, not copied into
+    // another marketing store. An unrelated or archived Package never silently
+    // falls back to generic words for a live messaging operation.
+    const packages = deps.packageId
+      ? await listSiteMarketingPackagesV61({data:{siteId:deps.siteId!}})
+      : null;
+    const selectedPackage = packages?.find(item=>item.id===deps.packageId &&
+      item.siteId===deps.siteId && item.status==="draft" &&
+      item.content.purpose==="interest-invitation");
+    if(deps.packageId && !selectedPackage)
+      throw new DomainError("UNAVAILABLE","This family invitation Package is no longer available for the selected Site.");
+    const packageStarter=selectedPackage
+      ? {headline:selectedPackage.content.headline.trim(),
+         message:selectedPackage.content.message.trim()} : null;
+    if(packageStarter && (packageStarter.headline.length<3 ||
+      packageStarter.headline.length>120 || !packageStarter.message ||
+      containsProtectedInstitutionalClaim(packageStarter.headline+" "+packageStarter.message)))
+      throw new DomainError("VALIDATION_FAILED",
+        "Review the saved Package for protected claims or missing email details before sending.");
+    const suggestions = deps.siteId && deps.purpose === "interest" && !packageStarter
       ? await readSiteMarketingSuggestionsV61({ data: { siteId: deps.siteId } }).catch(() => null)
       : null;
-    return { ...data, suggestions };
+    return { ...data, suggestions, packageStarter };
   }, {
     authMessage: "Sign in with an authorized receiving-school registrar grant to manage family invitations.",
   })(),
@@ -42,6 +73,7 @@ export const Route = createFileRoute("/admissions/invite-families")({
 
 type Data = Awaited<ReturnType<typeof listFamilyInvitations>> & {
   suggestions: Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>> | null;
+  packageStarter:{headline:string;message:string}|null;
 };
 type Selection = z.infer<typeof searchSchema>;
 
@@ -51,7 +83,7 @@ function FamilyInvitationsPage() {
   if (!result.ok) return <LoaderFailure eyebrow="Admissions"
     title="Invite prospective families" outcome={result}/>;
   return <FamilyInvitationsWorkspace
-    key={(selection.siteId ?? "all") + ":" + selection.purpose}
+    key={(selection.siteId ?? "all") + ":" + selection.purpose + ":" + (selection.packageId??"")}
     data={result.data} selection={selection}/>;
 }
 
@@ -63,7 +95,9 @@ function FamilyInvitationsWorkspace({data,selection}:{data:Data;selection:Select
   const [programId,setProgramId] = useState(eligible[0]?.id ?? "");
   const selectedProgramId = eligible.some(program => program.id === programId)
     ? programId : eligible[0]?.id ?? "";
-  const starter = isInterest ? data.suggestions?.["interest-invitation"].content : null;
+  const starter = isInterest
+    ? data.packageStarter ?? data.suggestions?.["interest-invitation"].content
+    : null;
   const [contacts,setContacts] = useState("");
   const [introduction,setIntroduction] = useState(starter?.message ??
     (isInterest
@@ -122,9 +156,11 @@ function FamilyInvitationsWorkspace({data,selection}:{data:Data;selection:Select
     </div>}>
     <MutationFeedback state={mutation} pendingMessage="Queuing invitations..."/>
     {isInterest&&<p className="mt-4 text-sm text-muted-foreground">
-      {starter
-        ? "The editable introduction below is suggested from your saved Site Story and intended audiences. Review it and identify consenting adults before sending."
-        : "A safe starter message is provided. Review the details and identify consenting adults before sending."}
+      {data.packageStarter
+        ? "The editable subject and introduction below came from the selected saved Marketing Package. Review every claim and identify consenting adults before sending."
+        : starter
+          ? "The editable introduction below is suggested from your saved Site Story and intended audiences. Review it and identify consenting adults before sending."
+          : "A safe starter message is provided. Review the details and identify consenting adults before sending."}
       {" "}The email presentation uses the existing saved Site Brand and independently authorized delivery service.
     </p>}
     <FamilyInvitationForm purpose={selection.purpose} programs={eligible}
