@@ -8,7 +8,7 @@
 - One existing canonical website editor, displayed through `/launch/website` and `/site-website`; five steps with compatible historical step links.
 - Shared Launch Studio sidebar, guidance rail and common `ActionFooter`.
 - **Save & Exit** follows the established Site Information pattern: use immutable website-draft revision command, keep unsaved edits on failure, and navigate only after successful persistence and loader refresh. Step 5 saves a private draft, not a public Site release.
-- **Brand UI is website-local only.** Shared Site-level Brand Direction infrastructure and Introduce token integration are intentionally out of scope for this pass and remain owned by their other workstreams.
+- **Canonical Brand cutover added in this workstream:** current saved identity resolves from `site_brand_versions`, independent of immutable website-content versions. See `docs/site-brand-v61-immutable-cutover.md` for current implementation and verification gaps.
 - Shared V6.1 `DisclosureSection` pattern with independent expansion, keyboard-accessible buttons, rectangular panels and Storybook fixture.
 - `WebsiteVisualIdentityStep` extracted from the route: Colors (all 13 approved palettes); Typography (live font stacks resolved by `resolveSiteTheme`); Wordmark & Logo; Imagery.
 - Reused `WebsiteArtworkField` for logo and hero imagery. Existing strict PNG conversion, rights and child-consent rules remain in the authoritative Site data model.
@@ -41,7 +41,7 @@
 3. Browser-check all five steps, desktop/mobile templates, four independent disclosure panels, full palette selection, live font previews, save/resume and Site switching; compare generated thumbnails to supplied reference wireframes.
 4. Verify save and conflict behavior with two editors, baseline immutability, source suggestion Apply/Restore and no private Purpose & Story answer leakage to anonymous previews. Verify the full proposed Site includes Programs & Audiences on Home and Programs pages (without enrollment or application actions).
 5. Share link acceptance: authorized create/revoke, token non-disclosure after issue, expiry and no-expiry semantics, cross-Site isolation, revoked/closed Site, complete exclusion of private data and active enrollment actions. Shared link must display only a fixed public-safe snapshot, not latest mutable draft.
-6. Shared Site-level brand authority and Introduce package brand token consumer contract are **deferred by explicit instruction**. Do not introduce duplicate brand source data or call this cross-module integration finished.
+6. Shared Site Brand storage, authorized resolver, and Introduce Brand-version pins are implemented in source. They are **not operationally accepted** until migrations, build, integration tests and legacy writer inventory are verified. Do not introduce another persisted Brand source.
 7. Full Site publication belongs to Prepare and now has its own branch UI. The non-Launch legacy editor still has its original scoped publisher pathway; a separate cutover decision remains before removing it. Confirm that public share preview never makes Program intent look like approved/enrollable content.
 
 No changes to `main`, production database, live Site publication status or enrollment were made in this task.
