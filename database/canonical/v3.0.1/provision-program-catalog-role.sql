@@ -1,3 +1,9 @@
+-- This is an explicitly reviewed, operator-run grant script, not an app migration.
+-- Canonical Site, Offering, reference, qualification and geographic records now
+-- live in public. The availability function remains in education_v30.
+-- Requires the scoped public.sites RLS policy before any privileges are granted.
+-- Never use an owner/bypass-RLS login for the application or catalog role.
+
 \set ON_ERROR_STOP on
 
 \if :{?organization_id}
@@ -21,7 +27,7 @@ SELECT (
   AND :'application_role' <> :'program_catalog_role'
   AND EXISTS (
     SELECT 1
-    FROM education_v30.organizations
+    FROM public.organizations
     WHERE id = :'organization_id'::uuid
   )
   AND EXISTS (
@@ -44,22 +50,27 @@ SELECT (
         SELECT 1
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname IN ('education_v30', 'education_v30_secure')
+        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
           AND c.relowner = pg_roles.oid
       )
       AND NOT EXISTS (
         SELECT 1
         FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname IN ('education_v30', 'education_v30_secure')
+        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
           AND p.proowner = pg_roles.oid
       )
       AND NOT EXISTS (
         SELECT 1
         FROM pg_namespace n
-        WHERE n.nspname IN ('education_v30', 'education_v30_secure')
+        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
           AND n.nspowner = pg_roles.oid
       )
+  )
+  AND EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'sites'
+      AND policyname = 'sites_canonical_catalog_operator_read'
   )
   AND EXISTS (
     SELECT 1
@@ -81,20 +92,20 @@ SELECT (
         SELECT 1
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname IN ('education_v30', 'education_v30_secure')
+        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
           AND c.relowner = app_role.oid
       )
       AND NOT EXISTS (
         SELECT 1
         FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname IN ('education_v30', 'education_v30_secure')
+        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
           AND p.proowner = app_role.oid
       )
       AND NOT EXISTS (
         SELECT 1
         FROM pg_namespace n
-        WHERE n.nspname IN ('education_v30', 'education_v30_secure')
+        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
           AND n.nspowner = app_role.oid
       )
   )
@@ -125,7 +136,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(
   :'program_catalog_role' || ':' || :'application_role' || ':' || :'organization_id' || ':program_catalog', 0
 ));
 
-SELECT format('GRANT USAGE ON SCHEMA education_v30 TO %I', :'program_catalog_role')
+SELECT format('GRANT USAGE ON SCHEMA public, education_v30 TO %I', :'program_catalog_role')
 \gexec
 SELECT format(
   'GRANT %I TO %I WITH INHERIT FALSE, SET TRUE',
@@ -134,52 +145,52 @@ SELECT format(
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id, geographic_area_id, status) ON education_v30.sites TO %I',
+  'GRANT SELECT (id, geographic_area_id, lifecycle_status) ON public.sites TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (site_id, organization_id, role_code, valid_from, valid_through) ON education_v30.site_organization_roles TO %I',
+  'GRANT SELECT (site_id, organization_id, role_code, valid_from, valid_through) ON public.site_organization_roles TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id) ON education_v30.geographic_areas TO %I',
+  'GRANT SELECT (id) ON public.geographic_areas TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id, code, reference_kind, category, status, sort_order) ON education_v30.blueprint_reference_items TO %I',
+  'GRANT SELECT (id, code, reference_kind, category, status, sort_order) ON public.blueprint_reference_items TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id, item_id, version_no, title, summary, lifecycle) ON education_v30.blueprint_reference_item_versions TO %I',
+  'GRANT SELECT (id, item_id, version_no, title, summary, lifecycle) ON public.blueprint_reference_item_versions TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id, code, title, status) ON education_v30.offerings TO %I',
+  'GRANT SELECT (id, code, title, status) ON public.offerings TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id, offering_id, version_no, lifecycle) ON education_v30.offering_versions TO %I',
+  'GRANT SELECT (id, offering_id, version_no, lifecycle) ON public.offering_versions TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id, status) ON education_v30.qualification_program_fit_policies TO %I',
+  'GRANT SELECT (id, status) ON public.qualification_program_fit_policies TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (id, policy_id, offering_version_id, lifecycle) ON education_v30.qualification_program_fit_policy_versions TO %I',
+  'GRANT SELECT (id, policy_id, offering_version_id, lifecycle) ON public.qualification_program_fit_policy_versions TO %I',
   :'program_catalog_role'
 )
 \gexec
 SELECT format(
-  'GRANT SELECT (policy_version_id, effective_at) ON education_v30.qualification_program_fit_policy_version_withdrawals TO %I',
+  'GRANT SELECT (policy_version_id, effective_at) ON public.qualification_program_fit_policy_version_withdrawals TO %I',
   :'program_catalog_role'
 )
 \gexec
