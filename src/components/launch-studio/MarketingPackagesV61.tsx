@@ -60,7 +60,23 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   const [notice,setNotice]=useState("");
   const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
   const [currentBrand,setCurrentBrand]=useState<{id:string;revision:number}|null>(null);
+  const [brandReadiness,setBrandReadiness]=useState<"loading"|"available"|"missing"|"unavailable">("loading");
   const [selectedBrandRevision,setSelectedBrandRevision]=useState<number|null>(null);
+  // Shared prerequisite for Promote, Recruit and Interest Events. Brand edits
+  // stay in Establish; a Marketing Package only selects an immutable version.
+  useEffect(()=>{
+    let live=true;
+    setBrandReadiness("loading");
+    void readSiteBrandVersionView({data:{siteId}})
+      .then(brand=>{
+        if(!live)return;
+        const version=brand.current?.version;
+        setCurrentBrand(version?{id:version.id,revision:version.revision}:null);
+        setBrandReadiness(version?"available":"missing");
+      })
+      .catch(()=>{if(live)setBrandReadiness("unavailable");});
+    return ()=>{live=false;};
+  },[siteId]);
   useEffect(()=>{
     if(view!=="detail"||!record)return;
     let live=true;
@@ -249,15 +265,27 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
       {suggestionsUnavailable&&<WorkspaceNotice tone="attention">
         Current Site Story and program suggestions could not be loaded. Saved packages remain
         available. Review the source information in Establish before using suggested wording.
-      </WorkspaceNotice>
+      </WorkspaceNotice>}
+      {view==="library"&&brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
+        Save your Site identity in Establish before building branded materials.
+        {" "}<a href={`/launch/site?siteId=${encodeURIComponent(siteId)}&module=website-brand`}
+          className="font-semibold underline">Open Website &amp; Brand</a>
+      </WorkspaceNotice>}
+      {view==="library"&&brandReadiness==="unavailable"&&<WorkspaceNotice tone="attention">
+        Site Brand status could not be checked. Existing packages remain available;
+        the server will verify the selected Brand before creating any new materials.
+      </WorkspaceNotice>}
 
       {view==="library"&&<>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">{context.libraryDescription}</p>
-          <Button onClick={start}><Plus aria-hidden="true"/> New package</Button>
+          <Button disabled={busy||brandReadiness==="missing"} onClick={start}>
+            <Plus aria-hidden="true"/> New package
+          </Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {purposeOptions.map(option=><button key={option.id} type="button"
+            disabled={busy||brandReadiness==="missing"}
             className="border bg-card p-5 text-left hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
             onClick={()=>{start();setTitle(option.label);setContent(starter(option.id));}}>
             <Megaphone className="mb-3 size-5 text-primary" aria-hidden="true"/>
