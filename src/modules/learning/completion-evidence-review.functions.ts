@@ -78,7 +78,7 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
              training.provider_organization_id AS "providerOrganizationId",
              attribution.delivery_site_id AS "deliverySiteId"
       FROM public.noncredit_registrations r
-      JOIN education_v30.noncredit_training_versions training
+      JOIN public.noncredit_training_versions training
         ON training.id=r.training_version_id
       JOIN public.participation_attributions attribution
         ON attribution.noncredit_registration_id=r.id
