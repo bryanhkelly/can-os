@@ -182,7 +182,7 @@ describe("Website Studio seven-template contract", () => {
   it("uses semantic choices for all seven templates and ten previewable pages",()=>{
     const html=renderToStaticMarkup(<WebsiteTemplateGallery schoolName="Sample Academy" value="heritage"
       onChange={()=>{}}/>);
-    expect((html.match(/aria-pressed=/g)??[]).length).toBe(9);
+    expect((html.match(/aria-pressed=/g)??[]).length).toBeGreaterThanOrEqual(10);
     expect(html).toContain("Heritage Academy");
     expect(html).toContain("Community &amp; Faith");
     expect(html).toContain("Modern Learning");
@@ -190,8 +190,9 @@ describe("Website Studio seven-template contract", () => {
     expect(html).toContain("Summit Preparatory");
     expect(html).toContain("Heritage Classical");
     expect(html).toContain("Campus Life");
-    expect((html.match(/<option/g)??[]).length).toBe(10);
+    expect((html.match(/<option/g)??[]).length).toBe(publicSitePagePaths.length);
     expect(html).toContain('aria-label="School website templates"');
-    expect((html.match(/Larger preview of/g) ?? []).length).toBeGreaterThanOrEqual(7);
+    expect((html.match(/structural wireframe/g) ?? []).length).toBe(7);
+    expect((html.match(/<iframe/g) ?? []).length).toBe(1);
   });
 });

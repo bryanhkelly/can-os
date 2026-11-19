@@ -141,7 +141,9 @@ describe("read-only church partner website", () => {
       "approvedAcademicCount", "approvedEnrichmentCount", "approvedPhotoCount", "canPrepareWebsite", "canPublish",
       "contentChannelConfig", "currentRevision", "demonstration", "draftStorageReady", "editingContent", "host", "localContentStatus",
       "localHistory", "mediaUploadsEnabled", "organizationName", "parentInformation", "previewHtml", "previewPages",
-      "publicInformationReadiness", "siteId", "siteInformation", "siteName", "sourceMapping", "status",
+      "publicInformationReadiness", "siteId", "siteInformation", "siteName",
+      "siteStoryCopyCandidates", "siteStoryRecommendation", "siteStoryRevision", "siteStorySourceChoices",
+      "sourceMapping", "status",
     ]);
     expect(result.contentChannelConfig).toMatchObject({ version: 2, revision: 0 });
     expect(result.sourceMapping).toMatchObject({
