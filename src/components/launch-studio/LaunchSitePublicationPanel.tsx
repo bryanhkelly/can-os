@@ -1,0 +1,186 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Globe2, ShieldCheck } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { WorkspaceNotice, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { normalizeClientError } from "@/lib/client-error";
+import { readLaunchSitePublication } from "@/modules/sites/launch-site-publication.functions";
+import { setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
+
+type Publication = Awaited<ReturnType<typeof readLaunchSitePublication>>;
+type Reachability = Awaited<ReturnType<typeof verifySitePublicationReachability>>["status"];
+
+/** Prepare orchestrates the existing Site publication command. Never infer
+ * accreditation, approval to operate, or authority to enroll from this result.
+ */
+export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
+  const [state, setState] = useState<Publication | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [reviewed, setReviewed] = useState(false);
+  const [reason, setReason] = useState("");
+  const [reachability, setReachability] = useState<Reachability | null>(null);
+  const [checking, setChecking] = useState(false);
+  const requestId = useRef(0);
+
+  const load = useCallback(async () => {
+    const current = ++requestId.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await readLaunchSitePublication({ data: { siteId } });
+      if (current === requestId.current) setState(result);
+    } catch (cause) {
+      if (current === requestId.current) {
+        setState(null);
+        setError(normalizeClientError(cause,
+          "Site publication status is unavailable or you do not have publishing permission.").message);
+      }
+    } finally {
+      if (current === requestId.current) setLoading(false);
+    }
+  }, [siteId]);
+
+  useEffect(() => {
+    void load();
+    return () => { requestId.current += 1; };
+  }, [load]);
+
+  async function change(action: "publish" | "unpublish") {
+    if (!state?.address || busy || reason.trim().length < 10 || reason.trim().length > 500) return;
+    if (action === "publish" && (!reviewed || !state.publishingPrerequisitesPresent)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setSitePublicationStatus({ data: {
+        siteId,
+        action,
+        expectedRevision: state.address.revision,
+        reason: reason.trim(),
+        contentReviewed: action === "publish" && reviewed,
+      } });
+      setReason("");
+      setReviewed(false);
+      setReachability(null);
+      await load();
+    } catch (cause) {
+      setError(normalizeClientError(cause,
+        "Publication was not changed. Review the Site and retry.").message);
+    } finally { setBusy(false); }
+  }
+
+  async function checkLive() {
+    if (checking) return;
+    setChecking(true);
+    setError(null);
+    try {
+      const result = await verifySitePublicationReachability({ data: { siteId } });
+      setReachability(result.status);
+    } catch (cause) {
+      setError(normalizeClientError(cause, "Public website reachability could not be checked.").message);
+      setReachability(null);
+    } finally { setChecking(false); }
+  }
+
+  return <WorkspacePanel title="Publish your Site website"
+    description="This is the official public Site decision. Your shared preview, website publication and learner enrollment are independent.">
+    {loading ? <p role="status" className="text-sm text-muted-foreground">Checking your Site publication authorization…</p>
+      : state ? <div className="space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border bg-background p-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{state.siteName}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {state.address ? state.address.host : "No official website address reserved"}
+            </p>
+          </div>
+          <StatusBadge tone={state.address?.status === "published" ? "info" : "neutral"}>
+            {state.address?.status === "published" ? "Publication recorded" : "Not published"}
+          </StatusBadge>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="border p-3">
+            <p className="text-xs font-semibold">Website content</p>
+            <p className="mt-2 text-sm">{state.reviewedLocalContentAvailable ? "Approved local revision available" : "No approved local revision"}</p>
+          </div>
+          <div className="border p-3">
+            <p className="text-xs font-semibold">Reviewed learning listings</p>
+            <p className="mt-2 text-sm">{state.approvedAcademicCount} academic · {state.approvedEnrichmentCount} enrichment</p>
+          </div>
+          <div className="border p-3">
+            <p className="text-xs font-semibold">Public hosting</p>
+            <p className="mt-2 text-sm">{state.hostingConfigured ? "Configured · verify reachability" : "Not enabled in this deployment"}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline">
+            <Link to="/launch/website" search={{ siteId, returnToHub: true }}>Review website design</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <a href={`/launch/site-preview?siteId=${encodeURIComponent(siteId)}`}
+              target="_blank" rel="noopener noreferrer">Preview privately <ArrowUpRight className="size-4" /></a>
+          </Button>
+        </div>
+        {!state.address ? <WorkspaceNotice tone="attention">
+          Reserve the Site website address in Website & Brand before requesting official publication.
+        </WorkspaceNotice> : <>
+          {state.address.status === "published" ? <>
+            <WorkspaceNotice tone="info">
+              The public Site publication is recorded. This alone does not prove that the hostname is live,
+              authorize institutional claims, approve an Offering or enable registration.
+            </WorkspaceNotice>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="outline" disabled={checking || busy} onClick={() => void checkLive()}>
+                <Globe2 className="size-4" /> {checking ? "Checking…" : "Verify public website"}
+              </Button>
+              {reachability === "live" && <a className="text-sm font-semibold text-primary underline"
+                href={`https://${state.address.host}/`} target="_blank" rel="noopener noreferrer">
+                Open verified website <ArrowUpRight className="inline size-4" /></a>}
+              {reachability && <p role="status" className="text-sm text-muted-foreground">
+                {reachability === "live" ? "Public HTTPS website is reachable."
+                  : reachability === "hosting_disabled" ? "Website hosting is disabled."
+                  : reachability === "not_published" ? "Site publication is not active."
+                  : "Public HTTPS reachability could not be verified."}
+              </p>}
+            </div>
+          </> : !state.publishingPrerequisitesPresent ? <WorkspaceNotice tone="attention">
+            Official publication requires reviewed Site-owned content or at least one independently
+            eligible academic or enrichment listing. Your design can still be privately previewed.
+          </WorkspaceNotice> : <WorkspaceNotice tone="info">
+            Publication requires an explicit review and recorded decision. It never publishes unpublished
+            programs, establishes accreditation or turns on enrollment.
+          </WorkspaceNotice>}
+          <div className="border-t pt-5">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <ShieldCheck className="size-4 text-primary" />
+              {state.address.status === "published" ? "Withdraw public publication" : "Review and publish"}
+            </h3>
+            <div className="mt-3 space-y-4">
+              {state.address.status !== "published" && <Checkbox checked={reviewed}
+                onCheckedChange={checked => setReviewed(checked === true)}>
+                I have reviewed the exact public-facing content, identity, images, and claims,
+                including consent and any required independent approval.
+              </Checkbox>}
+              <Field label="Decision reason" description="10–500 characters. This is recorded with the publication audit.">
+                <Textarea value={reason} onChange={event => setReason(event.target.value)}
+                  maxLength={500} rows={3} placeholder="Document what was reviewed and why this decision is appropriate." />
+              </Field>
+              <Button disabled={busy || reason.trim().length < 10 ||
+                (state.address.status !== "published" && (!reviewed || !state.publishingPrerequisitesPresent))}
+                variant={state.address.status === "published" ? "outline" : "default"}
+                onClick={() => void change(state.address!.status === "published" ? "unpublish" : "publish")}>
+                {busy ? "Saving decision…" : state.address.status === "published" ? "Unpublish Site" : "Publish Site website"}
+              </Button>
+            </div>
+          </div>
+        </>}
+      </div> : <WorkspaceNotice tone="attention">
+        {error ?? "The Site publication information could not be retrieved."}
+        <div className="mt-3"><Button variant="outline" onClick={() => void load()}>Try again</Button></div>
+      </WorkspaceNotice>}
+    {state && error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
+  </WorkspacePanel>;
+}
