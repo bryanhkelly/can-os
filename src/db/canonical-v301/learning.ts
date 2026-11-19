@@ -54,7 +54,7 @@ export const educationOperationOrganizationRoles = pgTable(
   },
 );
 
-export const courses = educationV30.table("courses", {
+export const courses = pgTable("courses", {
   id: id(),
   publisherOrganizationId: uuid("publisher_organization_id").notNull(),
   courseCode: text("course_code").notNull(),
@@ -62,12 +62,12 @@ export const courses = educationV30.table("courses", {
   subject: text("subject"),
 });
 
-export const serviceCapabilities = educationV30.table("service_capabilities", {
+export const serviceCapabilities = pgTable("service_capabilities", {
   id: id(),
   code: text("code").notNull(),
 });
 
-export const professionalCapabilityAuthorizations = educationV30.table(
+export const professionalCapabilityAuthorizations = pgTable(
   "professional_capability_authorizations",
   {
     id: id(),
@@ -85,7 +85,7 @@ export const professionalCapabilityAuthorizations = educationV30.table(
   },
 );
 
-export const professionalRoleAssignments = educationV30.table(
+export const professionalRoleAssignments = pgTable(
   "professional_role_assignments",
   {
     id: id(),
@@ -108,7 +108,7 @@ export const professionalRoleAssignments = educationV30.table(
   },
 );
 
-export const courseVersions = educationV30.table(
+export const courseVersions = pgTable(
   "course_versions",
   {
     id: id(),
@@ -124,7 +124,7 @@ export const courseVersions = educationV30.table(
   ],
 );
 
-export const courseUnits = educationV30.table(
+export const courseUnits = pgTable(
   "course_units",
   {
     id: id(),
@@ -140,7 +140,7 @@ export const courseUnits = educationV30.table(
   ],
 );
 
-export const courseLessons = educationV30.table(
+export const courseLessons = pgTable(
   "course_lessons",
   {
     id: id(),
@@ -166,7 +166,7 @@ export const contentAssets = pgTable("content_assets", {
   createdAt: createdAt(),
 });
 
-export const contentAssetVersions = educationV30.table(
+export const contentAssetVersions = pgTable(
   "content_asset_versions",
   {
     id: id(),
@@ -183,7 +183,7 @@ export const contentAssetVersions = educationV30.table(
   ],
 );
 
-export const instructionalTracks = educationV30.table(
+export const instructionalTracks = pgTable(
   "instructional_tracks",
   {
     id: id(),
@@ -195,7 +195,7 @@ export const instructionalTracks = educationV30.table(
   (table) => [uniqueIndex("instructional_tracks_id_course_uq").on(table.id, table.courseId)],
 );
 
-export const instructionalTrackVersions = educationV30.table(
+export const instructionalTrackVersions = pgTable(
   "instructional_track_versions",
   {
     id: id(),
@@ -227,7 +227,7 @@ export const instructionalTrackVersions = educationV30.table(
   ],
 );
 
-export const instructionalTrackMaterials = educationV30.table(
+export const instructionalTrackMaterials = pgTable(
   "instructional_track_materials",
   {
     id: id(),
@@ -242,7 +242,7 @@ export const instructionalTrackMaterials = educationV30.table(
   },
 );
 
-export const instructionalTrackReviews = educationV30.table(
+export const instructionalTrackReviews = pgTable(
   "instructional_track_reviews",
   {
     decisionOrder: bigint("decision_order", { mode: "bigint" }).generatedAlwaysAsIdentity().notNull(),
@@ -265,7 +265,7 @@ export const instructionalTrackReviews = educationV30.table(
   ],
 );
 
-export const trackDistributionAuthorizations = educationV30.table(
+export const trackDistributionAuthorizations = pgTable(
   "track_distribution_authorizations",
   {
     id: id(),
@@ -300,7 +300,7 @@ export const deploymentOrganizationRoles = pgTable("deployment_organization_role
   evidenceVersionId: uuid("evidence_version_id"),
 });
 
-export const trackLessonPresentations = educationV30.table(
+export const trackLessonPresentations = pgTable(
   "track_lesson_presentations",
   {
     id: id(),
@@ -337,7 +337,7 @@ export const publishedAssetReviews = pgTable("published_asset_reviews", {
   evidenceVersionId: uuid("evidence_version_id"),
 });
 
-export const contentPublicationManifests = educationV30.table(
+export const contentPublicationManifests = pgTable(
   "content_publication_manifests",
   {
     id: id(),
@@ -355,7 +355,7 @@ export const contentPublicationManifests = educationV30.table(
   ],
 );
 
-export const contentPublicationManifestItems = educationV30.table(
+export const contentPublicationManifestItems = pgTable(
   "content_publication_manifest_items",
   {
     id: id(),
@@ -376,7 +376,7 @@ export const contentPublicationManifestItems = educationV30.table(
   ],
 );
 
-export const contentManifestReviewDecisions = educationV30.table(
+export const contentManifestReviewDecisions = pgTable(
   "content_manifest_review_decisions",
   {
     id: id(),
@@ -394,7 +394,7 @@ export const contentManifestReviewDecisions = educationV30.table(
   ],
 );
 
-export const contentWithdrawals = educationV30.table("content_withdrawals", {
+export const contentWithdrawals = pgTable("content_withdrawals", {
   id: id(),
   assetVersionId: uuid("asset_version_id"),
   courseVersionId: uuid("course_version_id"),
@@ -410,7 +410,7 @@ export const contentWithdrawals = educationV30.table("content_withdrawals", {
   authorizedByPersonId: uuid("authorized_by_person_id").notNull(),
 });
 
-export const instructionalTrackPolicyVersions = educationV30.table(
+export const instructionalTrackPolicyVersions = pgTable(
   "instructional_track_policy_versions",
   {
     id: id(),
@@ -447,7 +447,7 @@ export const instructionalTrackPolicyVersions = educationV30.table(
   ],
 );
 
-export const instructionalTrackPolicyWithdrawals = educationV30.table(
+export const instructionalTrackPolicyWithdrawals = pgTable(
   "instructional_track_policy_withdrawals",
   {
     id: id(),
@@ -479,7 +479,7 @@ export const officialCourseRequirementVersions = pgTable("official_course_requir
   ],
 );
 
-export const officialCourseAssignmentVersions = educationV30.table(
+export const officialCourseAssignmentVersions = pgTable(
   "official_course_assignment_versions",
   {
     id: id(),
@@ -644,7 +644,7 @@ export const learnerLessonProgress = educationV30.table(
   ],
 );
 
-export const learnerTrackSelections = educationV30.table(
+export const learnerTrackSelections = pgTable(
   "learner_track_selections",
   {
     id: id(),
@@ -677,7 +677,7 @@ export const learnerTrackSelections = educationV30.table(
   ],
 );
 
-export const formativePracticeAttempts = educationV30.table("formative_practice_attempts", {
+export const formativePracticeAttempts = pgTable("formative_practice_attempts", {
   id: id(),
   courseAttemptId: uuid("course_attempt_id").notNull(),
   courseVersionId: uuid("course_version_id").notNull(),
@@ -715,7 +715,7 @@ export const formativePracticeResponses = educationV30Secure.table(
   },
 );
 
-export const assessmentDefinitions = educationV30.table(
+export const assessmentDefinitions = pgTable(
   "assessment_definitions",
   {
     id: id(),
@@ -737,7 +737,7 @@ export const assessmentDefinitions = educationV30.table(
   ],
 );
 
-export const assessmentVersions = educationV30.table(
+export const assessmentVersions = pgTable(
   "assessment_versions",
   {
     id: id(),
