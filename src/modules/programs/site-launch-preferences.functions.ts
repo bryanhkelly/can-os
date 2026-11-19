@@ -38,6 +38,8 @@ export const saveSiteLaunchPreferences = createServerFn({method:"POST"})
       if(!address)await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:site.id,organizationId:site.organizationId,slug:site.slug,
       });
+      if(data.preferences.planningVersion === 2)
+        throw new Error("V6.1 Site planning requires the revision-aware Programs & Audiences command.");
       const previous=site.metadata.launchPreferences;
       const current=previous == null ? null : siteLaunchPreferencesSchema.parse(previous);
       // The older command has no expected revision; never let it mutate a V2
