@@ -36,7 +36,7 @@ try {
       has_table_privilege(current_user,
         'education_v30.canonical_account_grants','SELECT') AS can_read_native_grants,
       has_table_privilege(current_user,
-        'education_v30.canonical_sensitive_capability_approvals','SELECT') AS can_read_approvals,
+        'public.canonical_sensitive_capability_approvals','SELECT') AS can_read_approvals,
       education_v30.v301_can_sensitive_capability(repeat('0',64),'credential.issue') AS unknown_issuer,
       education_v30.v301_can_sensitive_capability(repeat('0',64),'blueprint.review') AS unknown_other_capability
   `);
