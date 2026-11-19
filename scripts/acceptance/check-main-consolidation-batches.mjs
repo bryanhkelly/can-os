@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Read-only reconciliation for thirteen applied main batches (8 + 46 + 51 + 22 + 8 + 12 + 38 + 9 + 10 + 10 + 3 + 6 + 12).
+ * Read-only reconciliation for eighteen applied main batches (8 + 46 + 51 + 22 + 8 + 12 + 38 + 9 + 10 + 10 + 3 + 6 + 12 + 10 + 2 + 5 + 4 + 8).
  * Does not run a migration or modify a database.
  *
  * CAN_MAIN_CONSOLIDATION_CHECK=1 DATABASE_URL=<main Neon URL> \
@@ -25,6 +25,11 @@ const sources=[
   ["applied-three-course-children","database/production/2026-11-19-consolidate-three-populated-course-child-tables.sql",3,"json"],
   ["applied-six-assessment-parents","database/production/2026-11-19-consolidate-six-assessment-parent-tables.sql",6,"json"],
   ["applied-twelve-native-class","database/production/2026-11-19-consolidate-12-native-class-lifecycle-tables.sql",12,"json"],
+  ["applied-ten-learner-rollout","database/production/2026-11-19-consolidate-10-learner-award-rollout-tables.sql",10,"json"],
+  ["applied-two-evidence","database/production/2026-11-19-consolidate-evidence-document-roots.sql",2,"json"],
+  ["applied-five-assurance","database/production/2026-11-19-consolidate-five-assurance-noncredit-survey-tables.sql",5,"json"],
+  ["applied-four-view-roots","database/production/2026-11-19-consolidate-four-view-backed-publisher-and-resource-tables.sql",4,"json"],
+  ["applied-eight-learner-views","database/production/2026-11-19-consolidate-eight-learner-noncredit-view-backed-tables.sql",8,"json"],
 ];
 if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
   throw new Error("Explicit read-only opt-in and production DATABASE_URL required");
@@ -32,7 +37,7 @@ if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
 function parseBatch([label,file,expected,arity]){
   const source=readFileSync(file,"utf8");
   if(arity==="json"){
-    const match=source.match(/snapshot\s+jsonb\s*:=\s*'([^']+)'::jsonb/);
+    const match=source.match(/(?:snapshot|tables)\\s+jsonb\\s*:=\\s*'([^']+)'::jsonb/);
     if(!match)throw new Error("Expected a pinned JSON snapshot in "+file);
     const records=JSON.parse(match[1]).map(x=>({
       name:x.name,oid:x.oid,rls:x.rls,force:x.force_rls??x.forced,policies:x.pol,
@@ -141,7 +146,7 @@ async function main(){
     verifiedAppliedTables:all.length,liveSchemaTables:relationCounts,
     remainingPublicToLegacyForeignKeys:crossings[0]?.foreign_keys??null,discrepancies};
   console.log(JSON.stringify(report,null,2));
-  if(discrepancies.length||all.length!==235)process.exitCode=2;
+  if(discrepancies.length||all.length!==264)process.exitCode=2;
 }
 
 main().catch(e=>{console.error("CAN OS consolidation reconciliation FAILED:",e.message);process.exitCode=1;});
