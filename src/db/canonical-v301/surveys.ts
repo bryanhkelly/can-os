@@ -45,7 +45,7 @@ export const surveyVersionReviews = pgTable("survey_version_reviews", {
   decisionOrder: bigint("decision_order", { mode: "bigint" }).generatedAlwaysAsIdentity().notNull(),
   evidenceVersionId: uuid("evidence_version_id"),
 });
-export const surveyCampaigns = educationV30.table("survey_campaigns", {
+export const surveyCampaigns = pgTable("survey_campaigns", {
   id:id(),surveyVersionId:uuid("survey_version_id").notNull(),
   operatingOrganizationId:uuid("operating_organization_id").notNull(),
   deploymentId:uuid("deployment_id"),offeringId:uuid("offering_id"),
@@ -61,7 +61,7 @@ export const surveyInvitations = pgTable("survey_invitations", {
   sentAt:timestamp("sent_at",{withTimezone:true}),
   dueAt:timestamp("due_at",{withTimezone:true}),
 });
-export const surveyResponses = educationV30.table("survey_responses", {
+export const surveyResponses = pgTable("survey_responses", {
   id:id(),campaignId:uuid("campaign_id").notNull(),
   surveyVersionId:uuid("survey_version_id").notNull(),
   respondentMode:text("respondent_mode").$type<"identified"|"confidential"|"anonymous">().notNull(),
