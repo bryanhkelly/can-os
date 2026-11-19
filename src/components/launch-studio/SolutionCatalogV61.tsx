@@ -104,10 +104,10 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
                       <span className="text-sm font-medium capitalize">{readable(component.key)}</span>
                       <span className="text-xs text-muted-foreground">{readable(component.requirementMode)} · {readable(component.kind)}</span>
                     </div>)}
-                    {selected.components.length === 0 && <p className="text-sm text-muted-foreground">No components are listed on this recipe.</p>}
+                    {selected.components.length === 0 && <p className="text-sm text-muted-foreground">This Solution does not currently list any operating components.</p>}
                   </div>
                 </div>
-                <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the owning Solution/Blueprint and Site qualification workflows. This preview does not infer missing requirements.</p>
+                <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the governed Solution and Site qualification workflows. This preview does not infer missing requirements.</p>
                 {workspace.canConfigure ? <Button asChild>
                   <Link to="/canonical/blueprints" search={{siteId}}>
                     Configure this Solution <ArrowRight aria-hidden="true" className="size-4" />
