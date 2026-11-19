@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Read-only reconciliation for four applied main batches (8 + 46 + 51 + 22).
+ * Read-only reconciliation for six applied main batches (8 + 46 + 51 + 22 + 8 + 12).
  * Does not run a migration or modify a database.
  *
  * CAN_MAIN_CONSOLIDATION_CHECK=1 DATABASE_URL=<main Neon URL> \
@@ -16,6 +16,8 @@ const sources=[
   ["applied-forty-six","database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
   ["applied-fifty-one","database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
   ["applied-twenty-two","database/production/2026-11-19-consolidate-22-empty-foundation-funding-qualification-tables.sql",22,"json"],
+  ["applied-eight-assessments","database/production/2026-11-19-consolidate-eight-assessment-grading-tables.sql",8,"json"],
+  ["applied-twelve-blueprints","database/production/2026-11-19-consolidate-12-blueprint-tables.sql",12,"json"],
 ];
 if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
   throw new Error("Explicit read-only opt-in and production DATABASE_URL required");
@@ -128,7 +130,7 @@ async function main(){
     verifiedAppliedTables:all.length,liveSchemaTables:relationCounts,
     remainingPublicToLegacyForeignKeys:crossings[0]?.foreign_keys??null,discrepancies};
   console.log(JSON.stringify(report,null,2));
-  if(discrepancies.length||all.length!==127)process.exitCode=2;
+  if(discrepancies.length||all.length!==147)process.exitCode=2;
 }
 
 main().catch(e=>{console.error("CAN OS consolidation reconciliation FAILED:",e.message);process.exitCode=1;});
