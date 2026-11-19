@@ -46,6 +46,8 @@ const guardedBatchFiles=[
   ["database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
   ["database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
   ["database/production/2026-11-19-consolidate-22-empty-foundation-funding-qualification-tables.sql",22,"json"],
+  ["database/production/2026-11-19-consolidate-eight-assessment-grading-tables.sql",8,"json"],
+  ["database/production/2026-11-19-consolidate-12-blueprint-tables.sql",12,"json"],
 ];
 
 function guardedTableNames(file,expected,arity){
