@@ -76,7 +76,7 @@ export const educationOperationSites = pgTable("education_operation_sites", {
   validThrough: timestamp("valid_through", { withTimezone: true }),
 });
 
-export const qualificationApplications = educationV30.table("qualification_applications", {
+export const qualificationApplications = pgTable("qualification_applications", {
   id: id(),
   applicantOrganizationId: uuid("applicant_organization_id").notNull(),
   subjectId: uuid("subject_id").notNull(),
