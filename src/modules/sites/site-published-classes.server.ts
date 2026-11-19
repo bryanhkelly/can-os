@@ -64,7 +64,7 @@ export async function readLinkedSitePublishedClasses(
       AND cv.state='published' AND cv.visibility='public'
       AND cv.published_at IS NOT NULL
       AND EXISTS (
-        SELECT 1 FROM education_v30.education_operation_organization_roles role
+        SELECT 1 FROM public.education_operation_organization_roles role
         WHERE role.operation_id=pd.operation_id
           AND role.organization_id=c.operating_organization_id
           AND role.role_code='operator' AND role.status='approved'
@@ -78,7 +78,7 @@ export async function readLinkedSitePublishedClasses(
           AND (os.valid_through IS NULL OR os.valid_through>CURRENT_TIMESTAMP)
       )
       AND EXISTS (
-        SELECT 1 FROM education_v30.site_organization_roles sr
+        SELECT 1 FROM public.site_organization_roles sr
         WHERE sr.site_id=c.site_id
           AND sr.organization_id=c.operating_organization_id
           AND sr.role_code IN ('operator','host')
