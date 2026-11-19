@@ -18,14 +18,16 @@ test("school administrator reviews, publishes and renames a standalone school we
   const name = `Website School ${suffix}`;
   const renamedName = `Renamed School ${suffix}`;
 
-  await page.goto("/schools/new");
-  await expect(page.getByRole("button", { name: "Create demo school" })).toBeEnabled();
-  await page.getByLabel("School name", { exact: true }).fill(name);
-  await page.getByLabel("School domain").fill(domain);
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Create demo school" }).click();
-  await expect(page.getByRole("heading", { name: "Your demo school is ready" })).toBeVisible();
-  await page.getByRole("link", { name: "Sign in and continue setup" }).click();
+  // Synthetic school provisioning is test infrastructure, not a second public signup UI.
+  // The legacy endpoint remains guarded and will be retired when fixtures use a direct setup adapter.
+  await page.goto("/site/new");
+  const origin = new URL(page.url()).origin;
+  const setupResponse = await request.post("/schools/new", {
+    headers: { Origin: origin },
+    data: { mode: "demo", name, domain, timezone: "UTC", syntheticOnly: true },
+  });
+  expect(setupResponse.status()).toBe(201);
+  await page.goto("/access");
   await page.getByLabel("Email", { exact: true }).fill(`admin.demo@${domain}`);
   await page.getByLabel("Demo access code (000000)").fill("000000");
   const verificationRequest = page.waitForRequest(request =>

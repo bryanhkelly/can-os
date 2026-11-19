@@ -66,10 +66,10 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
   const { session } = useWorkspaceSession();
   const verified = engagementVerifiedRoute(journey, session?.authenticated ? session.role : undefined);
   const sample = mayTryIsolatedSchoolDemo(journey.id);
-  const primaryTarget = verified ?? (sample ? "/schools/new" :
+  const primaryTarget = verified ?? (sample ? "/site/new" :
     new URL(journey.editorialLinks[0]?.href ?? "/story/explore-can", publicMarketingOrigin).toString());
   const primaryLabel = verified ? journey.launch!.label :
-    sample ? "Try an isolated demo school" : "Explore the CAN model";
+    sample ? "Create your learning Site" : "Explore the CAN model";
   const Icon = accents[journey.category];
   return <PageFrame width="wide">
     <section className="bg-foreground text-background">

@@ -31,13 +31,13 @@ test("@public sign-in shows an accessible email input", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Email me an access link/i })).toBeVisible();
 });
 
-test("@public create-school entry point renders without sending data", async ({ page }) => {
-  await expectHealthyPage(page, "/schools/new");
-  await expect(page.getByRole("heading", { name: /Create a school/i })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Real school" })).toBeChecked();
-  await page.getByRole("radio", { name: "Demo school" }).check();
-  await expect(page.getByRole("textbox", { name: "School demo domain" })).toBeVisible();
-  await expect(page.getByText("I will use synthetic data only.", { exact: false })).toBeVisible();
+test("@public Site signup renders the verified flow without submitting data", async ({ page }) => {
+  await expectHealthyPage(page, "/site/new");
+  await expect(page.getByRole("heading", { name: /Create your Site/i })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /Site name/i })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /Organization name/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Verify email & continue/i })).toBeEnabled();
+  await expect(page.getByRole("radio", { name: "Demo school" })).toHaveCount(0);
 });
 
 test("@public sign-in prefill and error correction are accessible without submitting", async ({ page }) => {

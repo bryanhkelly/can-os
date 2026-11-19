@@ -90,6 +90,13 @@ describe("real school signup validation", () => {
     expect(realSchoolSetupSignupSchema.safeParse({name:"Example School",email:"admin@example.demo",
       firstName:"Alex",lastName:"Admin"}).success).toBe(false);
   });
+  it("accepts an optional responsible Organization name without granting affiliation", () => {
+    expect(realSchoolSetupSignupSchema.parse({name:"Example School", organizationName:"  Grace Community Church  ",
+      email:"admin@example.org",firstName:"Alex",lastName:"Admin"}).organizationName)
+      .toBe("Grace Community Church");
+    expect(realSchoolSetupSignupSchema.safeParse({name:"Example School", organizationName:"A",
+      email:"admin@example.org",firstName:"Alex",lastName:"Admin"}).success).toBe(false);
+  });
   it("rejects caller-supplied identity and malformed signup fields", () => {
     expect(realSchoolSetupSignupSchema.safeParse({name:"Example School",email:"admin@example.org",
       firstName:"Alex",lastName:"Admin",role:"site_admin"}).success).toBe(false);
@@ -178,6 +185,21 @@ describe("verified real-school signup provisioning", () => {
     expect(state.writes.some(row => ["demo_school_tenants", "programs", "site_publications"].includes(row.table))).toBe(false);
     expect(state.audit).toHaveBeenCalledOnce();
     expect(state.event).toHaveBeenCalledTimes(2);
+  });
+  it("uses the optional Organization name without changing the Site identity", async () => {
+    const now = new Date("2026-11-07T12:00:00Z");
+    const signup = {
+      id: "00000000-0000-4000-8000-000000000001", accountId: "account-real",
+      schoolName: "Valor Learning Center", organizationName: "Grace Community Church",
+      firstName: "Alex", lastName: "Admin",
+      expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
+      organizationId: null, siteId: null, createdAt: now, updatedAt: now,
+    } as never;
+    await testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now));
+    expect(state.writes.find(row => row.table === "organizations")?.value)
+      .toMatchObject({name: "Grace Community Church"});
+    expect(state.writes.find(row => row.table === "sites")?.value)
+      .toMatchObject({name: "Valor Learning Center"});
   });
   it.each(["expired", "consumed"]) ("refuses an %s signup without provisioning records", async condition => {
     const now = new Date("2026-11-07T12:00:00Z");

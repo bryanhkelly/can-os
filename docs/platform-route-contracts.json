@@ -301,6 +301,24 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/canonical.assessment-publications.tsx",
+      "route": "/canonical/assessment-publications",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.assessment-reviews.tsx",
+      "route": "/canonical/assessment-reviews",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
       "file": "src/routes/canonical.blueprint-reviews.tsx",
       "route": "/canonical/blueprint-reviews",
       "owner": "blueprints",
@@ -380,6 +398,24 @@
       "roleJourney": "Staged review URL redirects to /class?view=reviews; independent reviewers retain their existing authority boundary",
       "readBoundary": "Redirect only; promoted component reads current authorized provider appointment via the existing source service",
       "writeBoundary": "No writes in the staging route; original author/reviewer commands remain separately authorized, audited and independently reviewed"
+    },
+    {
+      "file": "src/routes/canonical.course-activities.tsx",
+      "route": "/canonical/course-activities",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Staged publisher Course activity editor now redirects bookmarked URLs to /class?view=activities",
+      "readBoundary": "Redirect only; promoted publisher editor rechecks current organization, owner and Course publisher scope on each read",
+      "writeBoundary": "No writes at /canonical; assessment and survey authoring uses existing purpose-bound commands and independent review"
+    },
+    {
+      "file": "src/routes/canonical.issuer-access.tsx",
+      "route": "/canonical/issuer-access",
+      "owner": "credentials",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     },
     {
       "file": "src/routes/canonical.lab.credentials.tsx",
@@ -535,6 +571,15 @@
       "writeBoundary": "Read-only dashboard; Class mutation and publisher approval require existing separately authorized commands"
     },
     {
+      "file": "src/routes/centers.demo.tsx",
+      "route": "/centers/demo",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Synthetic community-center planning preview links to /class for authorized teaching, management, and enrollment",
+      "readBoundary": "Fixed synthetic Site only; draft planning rows do not grant registration or reveal learner data",
+      "writeBoundary": "No writes, no Class construction, and no approval attestations"
+    },
+    {
       "file": "src/routes/church.apply.tsx",
       "route": "/church/apply",
       "owner": "network",
@@ -542,6 +587,24 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/class.tsx",
+      "route": "/class",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "One production /class experience for discovery, enrollment, Class management, publisher activities, recorded instruction draft production, and independent content review",
+      "readBoundary": "Each view uses its original authorized source reader and exact current role, organization, Course and independent provider appointment checks",
+      "writeBoundary": "Each create, edit, submit, review and publish command retains existing server-side author/reviewer separation, idempotency and audit"
+    },
+    {
+      "file": "src/routes/class_.$classId.tsx",
+      "route": "/class_/$classId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "One native Class workspace for learner, teacher, facilitator and manager, including governed completion and evidence reporting",
+      "readBoundary": "Native Class workspace validates current relationship, active staff authorization and current Site scope independently of URL view",
+      "writeBoundary": "Each existing Class command separately checks actor, Site, Course adoption, session and independent review requirements"
     },
     {
       "file": "src/routes/classes.tsx",
@@ -697,15 +760,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/guardian.native-classes.tsx",
-      "route": "/guardian/native-classes",
-      "owner": "enrollment",
-      "verification": "pending",
-      "roleJourney": "Verified CAN guardian to canonical Person bridge, staff-reviewed minor Class approval and guardian consent",
-      "writeBoundary": "Server-verified guardian authority, exact published Class, independent staff decision, one locked Enrollment and Course Attempt",
-      "readBoundary": "Only currently verified canonical guardian relationships and their own approved family participation"
-    },
-    {
       "file": "src/routes/guardian.experiences.tsx",
       "route": "/guardian/experiences",
       "owner": "student-experience",
@@ -740,6 +794,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.native-classes.tsx",
+      "route": "/guardian/native-classes",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "Verified CAN guardian to canonical Person bridge, staff-reviewed minor Class approval and guardian consent",
+      "writeBoundary": "Server-verified guardian authority, exact published Class, independent staff decision, one locked Enrollment and Course Attempt",
+      "readBoundary": "Only currently verified canonical guardian relationships and their own approved family participation"
     },
     {
       "file": "src/routes/guardian.report-cards.tsx",
@@ -1282,6 +1345,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/platform.tsx",
+      "route": "/platform",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "Verified non-demo account with independently provisioned app_admin grant",
+      "readBoundary": "Platform aggregate counts only; exact current grant and verified session",
+      "writeBoundary": "No platform mutations exposed"
+    },
+    {
       "file": "src/routes/profiles.tsx",
       "route": "/profiles",
       "owner": "profiles",
@@ -1394,9 +1466,9 @@
       "route": "/schools/new",
       "owner": "identity",
       "verification": "pending",
-      "roleJourney": "Shared school-name entry for real verified-email signup and isolated .demo shared-code setup; both resume the same canonical Launch Hub",
+      "roleJourney": "Legacy GET redirects to /site/new. The former .demo POST boundary remains temporarily for isolated synthetic fixture compatibility; no demo choice is displayed in the signup UI.",
       "writeBoundary": "Same-origin and anonymous-admission guarded; demo tenant transaction remains isolated; real Organization/Site/Site Admin are provisioned only when the single-use email challenge is redeemed",
-      "readBoundary": "Public form reads no existing tenant or account state and returns generic email acceptance without account enumeration"
+      "readBoundary": "No legacy form is rendered; navigation redirects to the authoritative /site/new screen."
     },
     {
       "file": "src/routes/settings.tsx",
@@ -1433,6 +1505,15 @@
       "roleJourney": "Site-specific partner previews private website only; denies registrar and unrelated Site roles",
       "readBoundary": "verified active Site grant + matching organization membership and explicit site website editor role assignment; approved public-safe catalog only",
       "writeBoundary": "verified site.website.local.publish capability and same-Site role assignment only; immutable local content versions, protected claims held, audited rollback; CAN institutional fields never writable"
+    },
+    {
+      "file": "src/routes/site.new.tsx",
+      "route": "/site/new",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "Public entry for verified Site signup. After email verification, the existing identity service provisions the canonical Site and initial Site Admin.",
+      "writeBoundary": "Same-origin and anonymous-admission gated; strict public input; pending signup stores optional responsible Organization display name; transactional Site provisioning happens only on single-use email challenge redemption.",
+      "readBoundary": "Public page does not expose account, Site, tenant, or invitation state; response is generic to prevent account enumeration."
     },
     {
       "file": "src/routes/sites.index.tsx",
@@ -1721,78 +1802,6 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/canonical.assessment-publications.tsx",
-      "route": "/canonical/assessment-publications",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
-    },
-    {
-      "file": "src/routes/canonical.assessment-reviews.tsx",
-      "route": "/canonical/assessment-reviews",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
-    },
-    {
-      "file": "src/routes/canonical.course-activities.tsx",
-      "route": "/canonical/course-activities",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Staged publisher Course activity editor now redirects bookmarked URLs to /class?view=activities",
-      "readBoundary": "Redirect only; promoted publisher editor rechecks current organization, owner and Course publisher scope on each read",
-      "writeBoundary": "No writes at /canonical; assessment and survey authoring uses existing purpose-bound commands and independent review"
-    },
-    {
-      "file": "src/routes/canonical.issuer-access.tsx",
-      "route": "/canonical/issuer-access",
-      "owner": "credentials",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
-    },
-    {
-      "file": "src/routes/class_.$classId.tsx",
-      "route": "/class_/$classId",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "One native Class workspace for learner, teacher, facilitator and manager, including governed completion and evidence reporting",
-      "readBoundary": "Native Class workspace validates current relationship, active staff authorization and current Site scope independently of URL view",
-      "writeBoundary": "Each existing Class command separately checks actor, Site, Course adoption, session and independent review requirements"
-    },
-    {
-      "file": "src/routes/class.tsx",
-      "route": "/class",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "One production /class experience for discovery, enrollment, Class management, publisher activities, recorded instruction draft production, and independent content review",
-      "readBoundary": "Each view uses its original authorized source reader and exact current role, organization, Course and independent provider appointment checks",
-      "writeBoundary": "Each create, edit, submit, review and publish command retains existing server-side author/reviewer separation, idempotency and audit"
-    },
-    {
-      "file": "src/routes/platform.tsx",
-      "route": "/platform",
-      "owner": "identity",
-      "verification": "pending",
-      "roleJourney": "Verified non-demo account with independently provisioned app_admin grant",
-      "readBoundary": "Platform aggregate counts only; exact current grant and verified session",
-      "writeBoundary": "No platform mutations exposed"
-    },
-    {
-      "file": "src/routes/centers.demo.tsx",
-      "route": "/centers/demo",
-      "owner": "sites",
-      "verification": "pending",
-      "roleJourney": "Synthetic community-center planning preview links to /class for authorized teaching, management, and enrollment",
-      "readBoundary": "Fixed synthetic Site only; draft planning rows do not grant registration or reveal learner data",
-      "writeBoundary": "No writes, no Class construction, and no approval attestations"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
