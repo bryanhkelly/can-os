@@ -38,7 +38,7 @@ try {
        FROM pg_class c
        JOIN pg_namespace n ON n.oid=c.relnamespace
        LEFT JOIN pg_policy p ON p.polrelid=c.oid
-       WHERE n.nspname='education_v30' AND c.relkind='r'
+       WHERE n.nspname='public' AND c.relkind='r'
          AND c.relname = ANY($1::text[])
        GROUP BY c.relname,c.relrowsecurity,c.relforcerowsecurity`,
       [critical],
@@ -64,7 +64,7 @@ try {
       `SELECT c.relname AS name,count(t.oid)::integer AS triggers
        FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
        LEFT JOIN pg_trigger t ON t.tgrelid=c.oid AND NOT t.tgisinternal
-       WHERE n.nspname='education_v30'
+       WHERE n.nspname='public'
          AND c.relname IN ('class_outcomes','noncredit_completion_decisions',
            'learning_award_issuance_events')
        GROUP BY c.relname`,
@@ -96,7 +96,7 @@ try {
     ];
     const {rows:columnRows}=requireProposed?await client.query(
       `SELECT attname FROM pg_attribute
-       WHERE attrelid='education_v30.class_outcomes'::regclass
+       WHERE attrelid='public.class_outcomes'::regclass
          AND attnum>0 AND NOT attisdropped AND attname=ANY($1::text[])`,
       [proposedOutcomeColumns],
     ):{rows:[]};
@@ -105,10 +105,10 @@ try {
       :[];
     const {rows:counts}=await client.query(
       `SELECT
-       (SELECT count(*) FROM education_v30.class_enrollments) AS class_participants,
-       (SELECT count(*) FROM education_v30.noncredit_registrations) AS noncredit_participants,
-       (SELECT count(*) FROM education_v30.noncredit_completion_decisions) AS noncredit_decisions,
-       (SELECT count(*) FROM education_v30.learning_award_issuances) AS issued_awards`,
+       (SELECT count(*) FROM public.class_enrollments) AS class_participants,
+       (SELECT count(*) FROM public.noncredit_registrations) AS noncredit_participants,
+       (SELECT count(*) FROM public.noncredit_completion_decisions) AS noncredit_decisions,
+       (SELECT count(*) FROM public.learning_award_issuances) AS issued_awards`,
     );
     await client.query("COMMIT");
     const f=functions[0]??{};
