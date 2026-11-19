@@ -1,5 +1,5 @@
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Building2, Globe2, HelpCircle, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ export function LaunchSiteFrame({ site, active, children }: {
 }) {
   const [drawer, setDrawer] = useState(false);
   const [expanded, setExpanded] = useState<string>(siteLaunchModules.find(item=>item.id===active)?.stage ?? "Establish");
+  // The route remains mounted while modules change; reveal the new active stage.
+  useEffect(() => {
+    setExpanded(siteLaunchModules.find(item => item.id === active)?.stage ?? "Establish");
+  }, [active]);
   const sidebar = (
     <div className="flex h-full flex-col bg-card">
       <div className="border-b px-4 py-5">
