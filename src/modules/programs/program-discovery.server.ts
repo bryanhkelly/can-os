@@ -56,7 +56,7 @@ export async function getAvailableOfferings(
       }).from(catalogSites)
         .where(eq(catalogSites.id, input.subject.siteId))
         .limit(1);
-      if (!site || site.status === "closed") {
+      if (!site?.status || site.status === "closed") {
         throw new DomainError("UNAVAILABLE", "The selected Site is unavailable for program discovery.");
       }
       geographicAreaId = site.geographicAreaId;
