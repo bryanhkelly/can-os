@@ -1,44 +1,63 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SiteFirstLaunch } from "@/components/launch-studio/SiteFirstLaunch";
-import { listLaunchOptions, listLaunches } from "@/modules/programs/launch.functions";
-import { supplementaryRead } from "@/lib/supplementary-read";
-import { readSiteLaunchPreferences } from "@/modules/programs/site-launch-preferences.functions";
-import { getSiteContentChannels } from "@/modules/sites/site-content-channels.functions";
-import { defaultSiteContentChannelConfig } from "@/domain/site-content-channels";
-import { siteFirstLaunchSearch } from "@/domain/launch-studio";
+import { z } from "zod";
+import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { siteLaunchModules, LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
+import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 
-/** Reauthorize an exact selected Site for each reload. Do not silently replace
- * inaccessible Sites with a different account's default. */
+const searchSchema = z.object({
+  siteId: z.string().uuid().optional(),
+  module: z.enum(siteLaunchModules.map(item=>item.id) as [string, ...string[]]).optional(),
+});
+
+/** One authorized Site, one new Launch Studio. No legacy wizard or redirect. */
 export const Route = createFileRoute("/launch/site")({
-  validateSearch: (search: Record<string, unknown>) => siteFirstLaunchSearch.parse(search),
+  validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
   loaderDeps: ({ search }) => ({ siteId: search.siteId }),
   loader: ({ deps }) => safeLoader(async () => {
     const options = await listLaunchOptions();
-    const siteId = deps.siteId ?? (!options.canCreateSite && options.sites.length === 1 ? options.sites[0]?.id : undefined);
-    if (!siteId) return { options, selectedSiteId: "", preferences: null, selectionError: null, sitePrograms: null, programsState: "empty" as const, contentChannels: defaultSiteContentChannelConfig };
-    if (!options.sites.some(item => item.id === siteId))
-      return { options, selectedSiteId: siteId, preferences: null, sitePrograms: null, programsState: "unauthorized" as const, contentChannels: defaultSiteContentChannelConfig,
-        selectionError: "This Site is not available to your active account or role. Choose an authorized Site explicitly." };
-    const preferences = await readSiteLaunchPreferences({ data: { siteId } });
-    const contentChannels = await getSiteContentChannels({data:{siteId}});
-    // The private website remains available even when a program reader fails.
-    const recordRead = await supplementaryRead(
-      () => listLaunches({data:{includeActive:true}}), data=>data.launches.length===0);
-    return { options, selectedSiteId: siteId, preferences, contentChannels, selectionError: null,
-      sitePrograms: recordRead.data?.launches.filter(record=>record.siteId===siteId)??null,
-      programsState: recordRead.state };
+    const site = deps.siteId
+      ? options.sites.find(candidate => candidate.id === deps.siteId)
+      : options.sites.length === 1 ? options.sites[0] : null;
+    return {
+      site: site ? { id: site.id, name: site.name } : null,
+      sites: options.sites.map(item=>({id:item.id,name:item.name})),
+      error: deps.siteId && !site ? "You do not have access to the selected Site." : null,
+    };
   })(),
   component: SiteLaunchPage,
 });
+
 function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
-  if (!outcome.ok) return <LoaderFailure title="Launch your Site" outcome={outcome}/>;
-  return <SiteFirstLaunch key={outcome.data.selectedSiteId || "new"}
-    options={outcome.data.options} selectedSiteId={outcome.data.selectedSiteId}
-    initialStep={search.step ?? "site"} initialPreferences={outcome.data.preferences}
-    selectionError={outcome.data.selectionError} initialChannels={outcome.data.contentChannels} sitePrograms={outcome.data.sitePrograms}
-    programsState={outcome.data.programsState}/>
+  if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
+  const { site, sites, error } = outcome.data;
+  if (!site) return <main className="mx-auto max-w-3xl space-y-5 px-5 py-12">
+    <h1 className="font-serif text-4xl">Choose your Site</h1>
+    <p className="text-sm text-muted-foreground">{error ?? "Select an authorized Site to continue its launch."}</p>
+    <div className="space-y-3">{sites.map(item=><a key={item.id}
+      href={"/launch/site?siteId="+encodeURIComponent(item.id)} className="block border bg-card p-4">{item.name}</a>)}</div>
+    {!sites.length && <a href="/site/new" className="font-semibold text-primary">Create your Site</a>}
+  </main>;
+  const base = "/launch/site?siteId=" + encodeURIComponent(site.id);
+  const selected = siteLaunchModules.find(item=>item.id===search.module);
+  return <LaunchSiteFrame site={site} active={search.module}>
+    {selected ? <main className="mx-auto max-w-6xl space-y-5 p-5 sm:p-8">
+      <p className="text-2xs font-bold uppercase tracking-eyebrow text-primary">{selected.stage} / {selected.title}</p>
+      <h1 className="font-serif text-4xl">{selected.title}</h1>
+      <p className="text-sm text-muted-foreground">This section will be connected using the approved V6.1 content contract.</p>
+      <div role="status" className="border bg-card p-5 text-sm">
+        This module is not yet connected. Nothing on this page creates or publishes records.
+      </div>
+      <a href={base} className="inline-flex min-h-11 items-center border px-4 text-sm font-semibold">Back to Overview</a>
+    </main> : <LaunchStudioOverview
+      site={{ ...site, statusLabel: "Preparing", statusTone: "info" }}
+      mode="first-visit"
+      nextAction={{ title: "Begin with Site Profile", description: "Confirm the Site identity you already created.", href: base + "&module=site-profile" }}
+      previewUrl={"/launch/site-preview?siteId=" + encodeURIComponent(site.id)}
+      workspaceUrl={"/sites/" + encodeURIComponent(site.id)}
+    />}
+  </LaunchSiteFrame>;
 }
