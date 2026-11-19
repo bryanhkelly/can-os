@@ -29,6 +29,8 @@ const version:SavedSiteBrandVersion={
 describe("Launch private website preview uses saved Site Brand",()=>{
   it("reads the exact canonical Brand after Site authorization and retains only the wireframe in website copy",()=>{
     const route=source();
+    expect(route).toContain('assertSiteSetupScope(actor,site,"program.read")');
+    expect(route).not.toContain('assertSiteSetupScope(actor,site,"program.launch.start")');
     expect(route.indexOf("assertSiteSetupScope(actor,site")).toBeLessThan(
       route.indexOf("readSavedBrandVersion(site.id)"));
     expect(route).toContain("siteBrandPresentationIdentity(savedBrand.resolved");
