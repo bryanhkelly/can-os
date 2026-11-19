@@ -6,9 +6,9 @@ import { EmptyState, FilterBar, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
+import { filterPublishedSolutionRecipes, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
 
 type BlueprintWorkspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
-type Recipe = BlueprintWorkspace["templates"][number];
 
 function readable(code: string): string {
   return code.replaceAll("_", " ").replaceAll("-", " ");
@@ -43,11 +43,8 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
   }, [siteId, reload]);
 
   const templates = workspace?.templates ?? [];
-  const visible = templates.filter(template =>
-    [template.title, ...template.components.map(component => component.key)]
-      .some(value => value.toLowerCase().includes(query.trim().toLowerCase())));
-  const selected: Recipe | undefined = visible.find(template => template.blueprintVersionId === selectedId)
-    ?? visible[0];
+  const visible = filterPublishedSolutionRecipes(templates, query);
+  const selected = resolveVisibleSolutionRecipe(visible, selectedId);
 
   return <WorkspacePanel title="Packaged Solution recipes"
     description="Browse the real published Blueprint models CAN makes available to your authorized Site.">
@@ -74,7 +71,7 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
         {visible.length === 0 ? <EmptyState kind="matches" className="mt-4"
           title="No matching Solution recipes" description="Try another title or component." /> :
           <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            <div className="grid max-h-[34rem] gap-2 overflow-y-auto" aria-label="Published Blueprint models">
+            <div role="group" className="grid max-h-[34rem] gap-2 overflow-y-auto" aria-label="Published Blueprint models">
               {visible.map(template => {
                 const active = selected?.blueprintVersionId === template.blueprintVersionId;
                 return <Button key={template.blueprintVersionId} type="button"
