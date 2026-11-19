@@ -1,3 +1,4 @@
+import { isCanonicalSiteDiscoverable } from "@/domain/canonical-site-availability";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -44,7 +45,7 @@ export async function getCanonicalBlueprintWorkspace(
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [site] = await tx.select({ id: catalogSites.id, status: catalogSites.status })
       .from(catalogSites).where(eq(catalogSites.id, siteId)).limit(1);
-    if (!site?.status || site.status === "closed") {
+    if (!isCanonicalSiteDiscoverable(site?.status)) {
       throw new DomainError("UNAVAILABLE", "The selected canonical Site is unavailable.");
     }
     const now = new Date();
