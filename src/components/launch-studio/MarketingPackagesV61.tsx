@@ -507,6 +507,15 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
               {record.content.formats.map(id=>marketingFormatOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
           </dl>
         </WorkspacePanel>
+        {module==="interest-events" && record.content.purpose==="event-invitation" &&
+          <WorkspacePanel title="Create an Interest Event"
+            description="Reuse this saved invitation's headline as a starting title. Confirm the Program, date, time, location and event description in the separately authorized event workspace.">
+            {record.status==="archived"
+              ? <WorkspaceNotice tone="attention">Restore this package before using it for a new event.</WorkspaceNotice>
+              : <Button asChild variant="outline"><a href={
+                `/operations/interest-events/new?siteId=${encodeURIComponent(siteId)}&packageId=${encodeURIComponent(record.id)}`
+              }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
+          </WorkspacePanel>}
         <WorkspaceNotice tone="info">The package's content is saved. New branded releases are available to download. Sending marketing email requires separate authorization.</WorkspaceNotice>
         <WorkspacePanel title="Brand version and generated materials"
           description="Generated files retain their original Brand and message.">
