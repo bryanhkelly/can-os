@@ -7,14 +7,16 @@ export function SiteTimezoneField({
   value,
   onChange,
   required = true,
+  disabled = false,
 }: {
   label?: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  disabled?: boolean;
 }) {
   return <Field label={label} required={required}>
-    <Select value={value} onChange={event => onChange(event.target.value)}>
+    <Select value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>
       <option value="">Choose a time zone...</option>
       {siteTimezoneOptions(value).map(zone => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}
     </Select>
