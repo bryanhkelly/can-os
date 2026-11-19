@@ -30,9 +30,9 @@ async function main(){
   const sql=neon(url);
   const [row]=await sql`
     SELECT
-      EXISTS(SELECT 1 FROM education_v30.course_versions
+      EXISTS(SELECT 1 FROM public.course_versions
         WHERE lifecycle='published' AND published_at IS NOT NULL) AS published_course,
-      EXISTS(SELECT 1 FROM education_v30.deployment_offering_adoptions
+      EXISTS(SELECT 1 FROM public.deployment_offering_adoptions
         WHERE approval_status='approved') AS approved_adoption,
       EXISTS(SELECT 1 FROM public.sites WHERE id=${siteId}::uuid)
         AS has_site
