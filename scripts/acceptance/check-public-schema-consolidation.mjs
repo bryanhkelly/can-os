@@ -45,10 +45,19 @@ const guardedBatchFiles=[
   ["database/production/2026-11-18-consolidate-eight-unmapped-tables.sql",8,7],
   ["database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
   ["database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
+  ["database/production/2026-11-19-consolidate-22-empty-foundation-funding-qualification-tables.sql",22,"json"],
 ];
 
 function guardedTableNames(file,expected,arity){
   const source=readFileSync(file,"utf8");
+  if(arity==="json"){
+    const match=source.match(/snapshot jsonb := '([^']+)'::jsonb/);
+    if(!match)throw new Error("Missing pinned snapshot: "+file);
+    const rows=JSON.parse(match[1]);
+    if(rows.length!==expected||new Set(rows.map(x=>x.name)).size!==expected)
+      throw new Error("Invalid table snapshot in "+file);
+    return rows.map(x=>x.name);
+  }
   const tuple=new RegExp(
     "\\('([a-z_]+)'\\s*,\\s*(\\d+)\\s*,\\s*(true|false)\\s*,"+
     (arity===9?"\\s*(true|false)\\s*,":"")+
