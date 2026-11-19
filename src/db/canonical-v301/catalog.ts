@@ -13,8 +13,7 @@ import { educationV30 } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 
-export const qualificationProgramFitPolicies = pgTable(
-  "qualification_program_fit_policies",
+export const qualificationProgramFitPolicies = pgTable("qualification_program_fit_policies",
   {
     id: id(),
     ownerOrganizationId: uuid("owner_organization_id").notNull(),
@@ -88,8 +87,7 @@ export const qualificationApplications = pgTable("qualification_applications", {
     .notNull(),
 });
 
-export const qualificationProgramFitPolicyVersions = pgTable(
-  "qualification_program_fit_policy_versions",
+export const qualificationProgramFitPolicyVersions = pgTable("qualification_program_fit_policy_versions",
   {
     id: id(),
     policyId: uuid("policy_id").notNull(),
@@ -119,8 +117,7 @@ export const qualificationProgramFitPolicyVersions = pgTable(
   ],
 );
 
-export const qualificationProgramFitPolicyWithdrawals = pgTable(
-  "qualification_program_fit_policy_version_withdrawals",
+export const qualificationProgramFitPolicyWithdrawals = pgTable("qualification_program_fit_policy_version_withdrawals",
   {
     policyVersionId: uuid("policy_version_id").primaryKey(),
     withdrawnByPersonId: uuid("withdrawn_by_person_id").notNull(),
@@ -130,8 +127,7 @@ export const qualificationProgramFitPolicyWithdrawals = pgTable(
   },
 );
 
-export const qualificationProgramFitPolicyRequirements = pgTable(
-  "qualification_program_fit_policy_requirements",
+export const qualificationProgramFitPolicyRequirements = pgTable("qualification_program_fit_policy_requirements",
   {
     id: id(),
     policyVersionId: uuid("policy_version_id").notNull(),
@@ -165,8 +161,7 @@ export const qualificationProgramFitPolicyRequirements = pgTable(
   ],
 );
 
-export const qualificationProgramAvailabilityRules = pgTable(
-  "qualification_program_availability_rules",
+export const qualificationProgramAvailabilityRules = pgTable("qualification_program_availability_rules",
   {
     id: id(),
     policyVersionId: uuid("policy_version_id").notNull(),
@@ -187,8 +182,7 @@ export const qualificationProgramAvailabilityRules = pgTable(
   },
 );
 
-export const qualificationProgramFitAssessments = pgTable(
-  "qualification_program_fit_assessments",
+export const qualificationProgramFitAssessments = pgTable("qualification_program_fit_assessments",
   {
     id: id(),
     subjectId: uuid("subject_id").notNull(),
@@ -238,8 +232,7 @@ export const qualificationSubjects = pgTable("qualification_subjects", {
   siteId: uuid("site_id"),
 });
 
-export const qualificationProgramFitRequirementResults = pgTable(
-  "qualification_program_fit_requirement_results",
+export const qualificationProgramFitRequirementResults = pgTable("qualification_program_fit_requirement_results",
   {
     id: id(),
     assessmentId: uuid("assessment_id").notNull(),
@@ -272,8 +265,7 @@ export const qualificationProgramFitRequirementResults = pgTable(
   ],
 );
 
-export const qualificationProgramFitReviewerAuthorizations = pgTable(
-  "qualification_program_fit_reviewer_authorizations",
+export const qualificationProgramFitReviewerAuthorizations = pgTable("qualification_program_fit_reviewer_authorizations",
   {
     id: id(),
     policyId: uuid("policy_id").notNull(),
@@ -289,8 +281,7 @@ export const qualificationProgramFitReviewerAuthorizations = pgTable(
   },
 );
 
-export const qualificationProgramFitReviewerRevocations = pgTable(
-  "qualification_program_fit_reviewer_revocations",
+export const qualificationProgramFitReviewerRevocations = pgTable("qualification_program_fit_reviewer_revocations",
   {
     authorizationId: uuid("authorization_id").primaryKey(),
     revokedByPersonId: uuid("revoked_by_person_id").notNull(),
@@ -300,8 +291,7 @@ export const qualificationProgramFitReviewerRevocations = pgTable(
   },
 );
 
-export const qualificationProgramFitReviews = pgTable(
-  "qualification_program_fit_reviews",
+export const qualificationProgramFitReviews = pgTable("qualification_program_fit_reviews",
   {
     id: id(),
     assessmentId: uuid("assessment_id").notNull(),
