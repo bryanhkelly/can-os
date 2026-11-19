@@ -32,6 +32,11 @@ describe("Launch private website preview uses saved Site Brand",()=>{
     expect(route.indexOf("assertSiteSetupScope(actor,site")).toBeLessThan(
       route.indexOf("readSavedBrandVersion(site.id)"));
     expect(route).toContain("siteBrandPresentationIdentity(savedBrand.resolved");
+    expect(route).toContain("siteStorySourceV61Schema.safeParse(site.metadata.siteStoryV61)");
+    expect(route).toContain("suggestWebsiteCopyFromStory(sourceStory.data.answers,site.name)");
+    expect(route).toContain("prepareWebsiteCopyFromSiteInformation(");
+    expect(route).toContain("createSchoolWebsiteStarterContent(site.name)");
+    expect(route).toContain("stored\n          ?normalizeSiteLocalContent");
     expect(route).toContain("resolveSiteTemplateId(copy.branding.templateId)");
     expect(route).toContain("displaySiteName=savedBrand?.resolved.displayName??site.name");
     expect(route).toContain("siteLocalImagePublicationGaps(selectedBranding.logoImage");
