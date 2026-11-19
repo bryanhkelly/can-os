@@ -47,7 +47,7 @@ const scoped = (siteId: string) => encodeURIComponent(siteId);
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {
     question: "Which published Solutions support the programs your community wants to offer?",
-    decision: "Explore published Offerings and reference models. Record an adoption intent only inside the authorized Blueprint planning workflow.",
+    decision: "Explore published Solutions and available Offerings. Configure your choices only in the existing governed Site planning workflow.",
     canSupplies: "Published Solution models, Offering availability guidance and governed configuration workflows.",
     siteProvides: "A selected operating model, physical capabilities, staff coverage, local constraints and evidence.",
     status: "governed",
@@ -225,7 +225,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
         <ProgramDiscoveryPanel key={`${siteId}:${discoveryDelivery}`} siteId={siteId} initialDelivery={discoveryDelivery} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
           Discovery returns published Offerings and their availability policies, not a complete verified Solution fit.
-          Adoption intent is recorded in the existing Blueprint workspace; no duplicate selection record is created here.
+          Selection is recorded only in the existing authorized configuration workflow. Browsing does not create another record.
         </WorkspaceNotice>
       </>}
       {module === "publish-site" && <LaunchSitePublicationPanel key={siteId} siteId={siteId} />}
