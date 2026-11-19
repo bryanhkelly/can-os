@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
-import { filterPublishedSolutionRecipes, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
+import { filterPublishedSolutionRecipes, preferredCatalogDelivery, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, search, ...props }: {
@@ -38,6 +38,13 @@ describe("V6.1 Prepare to Open", () => {
     expect(new Set(prepareModulesV61.map(module => module.id)).size).toBe(6);
     expect(isPrepareModuleV61("schedules-capacity")).toBe(true);
     expect(isPrepareModuleV61("website-brand")).toBe(false);
+  });
+
+  it("uses Establish delivery only as a discovery default", () => {
+    expect(preferredCatalogDelivery("physical")).toBe("onsite");
+    expect(preferredCatalogDelivery("digital")).toBe("remote");
+    expect(preferredCatalogDelivery("both")).toBe("hybrid");
+    expect(preferredCatalogDelivery(null)).toBe("onsite");
   });
 
   it("filters published recipes without leaving an out-of-filter selection visible", () => {
