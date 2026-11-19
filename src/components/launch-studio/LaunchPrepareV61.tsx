@@ -161,15 +161,12 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
   delivery?: "physical" | "digital" | "both" | null;
   intentUnavailable?: boolean;
 }) {
-  const index = prepareModulesV61.findIndex(item => item.id === module);
-  const definition = prepareModulesV61[index]!; // The public module union is derived from this registry.
+  const definition = prepareModulesV61.find(item => item.id === module)!; // Module navigation is owned by LaunchSiteFrame.
   const plan = modulePlans[module];
-  const next = prepareModulesV61[index + 1];
-  const previous = prepareModulesV61[index - 1];
   const Icon = definition.icon;
   const discoveryDelivery = preferredCatalogDelivery(delivery);
   return <WorkspaceShell width="wide" title={definition.title}
-    eyebrow={"Prepare to Open / " + (index + 1) + " of " + prepareModulesV61.length}
+    eyebrow="Launch Studio / Prepare"
     subtitle={definition.subtitle}
     rail={<div className="space-y-4">
       <WorkspacePanel title="The decision to make">
@@ -191,18 +188,6 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
           ? "Independent review is required for the applicable decisions"
           : "Complete the required actions in the existing authorized workspaces"}
       </p>
-      <nav aria-label="Prepare modules" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {prepareModulesV61.map((item, position) => {
-          const StepIcon = item.icon;
-          return <Link key={item.id} to="/launch/site" search={{siteId, module:item.id}}
-            aria-current={module === item.id ? "page" : undefined}
-            className={"flex min-h-14 items-start gap-3 border p-3 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring " +
-              (module === item.id ? "border-primary bg-accent font-semibold" : "border-border bg-card")}>
-            <StepIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            <span><span className="block text-xs text-muted-foreground">{String(position + 1).padStart(2, "0")}</span>{item.title}</span>
-          </Link>;
-        })}
-      </nav>
       {module === "program-catalog" && <>
         <WorkspacePanel title="Begin with your vision"
           description="Your interests from Establish guide discovery, not automatic qualification.">
@@ -258,12 +243,6 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
       <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
         A shared preview is not Site publication. Publishing the Site is not approval to operate, publish an Offering, or enroll learners.
       </WorkspaceNotice>
-      <nav aria-label="Prepare module navigation" className="flex flex-wrap justify-between gap-3 border-t pt-5">
-        {previous ? <Button asChild variant="outline"><Link to="/launch/site" search={{siteId, module:previous.id}}>Previous: {previous.title}</Link></Button>
-          : <Button asChild variant="outline"><Link to="/launch/site" search={{siteId}}>Back to overview</Link></Button>}
-        {next ? <Button asChild><Link to="/launch/site" search={{siteId, module:next.id}}>Continue: {next.title}<ArrowRight aria-hidden="true" /></Link></Button>
-          : <Button asChild><Link to="/launch/site" search={{siteId, module:"open"}}>Review Launch requirements<ArrowRight aria-hidden="true" /></Link></Button>}
-      </nav>
     </div>
   </WorkspaceShell>;
 }
