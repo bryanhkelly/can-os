@@ -271,7 +271,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
       <div className="rounded-xl border-2 border-primary/30 p-5">
         <p className="font-semibold">Your school is not set up yet.</p>
         <p className="mt-1 text-sm text-muted-foreground">There are no academic school programs in this scope. Launch Mode creates the canonical Program and Launch Journey, then guides the remaining setup; it never authorizes opening by itself.</p>
-        <Link to="/launch/school" search={{siteId:undefined,programId:undefined}}
+        <Link to="/launch/site" search={{siteId:undefined,programId:undefined}}
           className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
           Launch a school →
         </Link>

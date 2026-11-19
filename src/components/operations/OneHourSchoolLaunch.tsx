@@ -65,14 +65,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       It may have opened or your access may have changed.</p>
     <Link to="/home" search={{ siteId: selectedSiteId, programId: selectedProgramId }}
       className="mt-4 inline-block font-semibold underline">Review the operating workspace →</Link>
-    <Link to="/launch/school" search={{ siteId: selectedSiteId, programId: undefined }}
+    <Link to="/launch/site" search={{ siteId: selectedSiteId, programId: undefined }}
       className="ml-4 mt-4 inline-block font-semibold underline">Choose an available launch →</Link>
   </section>;
   if (!launch && launches.length > 1) return <section className="mt-8 rounded-2xl border bg-card p-6">
     <h2 className="font-serif text-2xl">Choose the school to continue</h2>
     <p className="mt-3 text-sm">Each school resumes its own saved Program and Launch Journey.</p>
     <nav aria-label="Available school launches" className="mt-4 flex flex-wrap gap-3">
-      {launches.map(item => <Link key={item.id} to="/launch/school"
+      {launches.map(item => <Link key={item.id} to="/launch/site"
         search={{ siteId: item.siteId ?? undefined, programId: item.id }}
         className="min-h-11 rounded-xl border px-4 py-3 text-sm font-semibold">
         Continue {item.name}
@@ -181,7 +181,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       <Select value={launch.id} onChange={event => {
         const selected = launches.find(item => item.id === event.target.value);
         void router.navigate({
-          to: "/launch/school",
+          to: "/launch/site",
           search: { programId: event.target.value, siteId: selected?.siteId ?? undefined },
         });
       }} className="mt-1 block w-full rounded-lg border bg-background p-2">
