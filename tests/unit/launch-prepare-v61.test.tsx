@@ -123,7 +123,7 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("From Program to Solution to Offering");
     expect(html).toContain("Browse available Offerings");
     expect(html).toContain("Available Solutions");
-    expect(html).toContain("Adoption intent is recorded in the existing Blueprint workspace");
+    expect(html).toContain("Selection is recorded only in the existing authorized configuration workflow");
     expect(html).not.toContain("Approved for enrollment");
   });
 
