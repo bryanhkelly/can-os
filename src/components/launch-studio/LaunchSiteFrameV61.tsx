@@ -1,5 +1,5 @@
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Building2, Globe2, HelpCircle, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,13 @@ export function LaunchSiteFrame({ site, active, children }: {
 }) {
   const [drawer, setDrawer] = useState(false);
   const stagePanelBaseId = useId();
-  const [expanded, setExpanded] = useState<string>(siteLaunchModules.find(item=>item.id===active)?.stage ?? "Establish");
-  // The route remains mounted while modules change; reveal the new active stage.
-  useEffect(() => {
-    setExpanded(siteLaunchModules.find(item => item.id === active)?.stage ?? "Establish");
-  }, [active]);
+  const activeStage = siteLaunchModules.find(item => item.id === active)?.stage ?? "Establish";
+  // Derive active-stage expansion immediately on navigation. A prior manual
+  // collapse only applies while its corresponding module remains active.
+  const [stageChoice, setStageChoice] = useState<{ active?: string; stage: string }>({
+    active, stage: activeStage,
+  });
+  const expanded = stageChoice.active === active ? stageChoice.stage : activeStage;
   const renderSidebar = (instance: "desktop" | "drawer") => (
     <div className="flex h-full flex-col bg-card">
       <div className="border-b px-4 py-5">
@@ -37,7 +39,7 @@ export function LaunchSiteFrame({ site, active, children }: {
         {stages.map((stage, index) => (
           <div key={stage} className="border-b py-1">
             <Button type="button" variant="ghost" aria-expanded={expanded===stage}
-              aria-controls={`${stagePanelBaseId}-${instance}-${stage}`} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
+              aria-controls={`${stagePanelBaseId}-${instance}-${stage}`} onClick={()=>setStageChoice({active, stage: expanded===stage ? "" : stage})}
               className="flex min-h-11 w-full justify-between px-3 py-3 text-left text-sm font-semibold">
               <span>{index+1}. {stage}</span><span aria-hidden="true">{expanded===stage ? "−" : "+"}</span>
             </Button>
@@ -88,7 +90,7 @@ export function LaunchSiteFrame({ site, active, children }: {
             <Button size="sm" variant="ghost" onClick={() => setDrawer(false)}
               aria-label="Close launch menu"><X className="size-5"/></Button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{renderSidebar("drawer")}</div>
+          <div className="min-h-0 flex-1 overflow-hidden">{renderSidebar("drawer")}</div>
         </div>
       </Modal>
       <div id="launch-help">{children}</div>
