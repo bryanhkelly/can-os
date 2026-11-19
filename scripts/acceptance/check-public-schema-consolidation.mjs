@@ -54,6 +54,7 @@ const guardedBatchFiles=[
   ["database/production/2026-11-19-consolidate-10-course-offering-active-tables.sql",10,"json"],
   ["database/production/2026-11-19-consolidate-three-populated-course-child-tables.sql",3,"json"],
   ["database/production/2026-11-19-consolidate-six-assessment-parent-tables.sql",6,"json"],
+  ["database/production/2026-11-19-consolidate-12-native-class-lifecycle-tables.sql",12,"json"],
 ];
 
 function guardedTableNames(file,expected,arity){
