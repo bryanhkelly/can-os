@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { z } from "zod";
 import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { safeLoader } from "@/lib/safe-loader";
@@ -6,6 +7,8 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules, LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { EstablishSiteProfileUnified, EstablishSiteProfileGuidance } from "@/components/launch-studio/EstablishSiteProfileUnified";
+import { EstablishSiteInformationV61, SiteInformationV61Guidance, type SiteInformationV61Initial } from "@/components/launch-studio/EstablishSiteInformationV61";
+import { readSiteInformationV61 } from "@/modules/programs/site-information-v61.functions";
 import { WorkspaceShell } from "@/components/workspace";
 
 const searchSchema = z.object({
@@ -17,7 +20,7 @@ const searchSchema = z.object({
 /** One authorized Site, one new Launch Studio. No legacy wizard or redirect. */
 export const Route = createFileRoute("/launch/site")({
   validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
-  loaderDeps: ({ search }) => ({ siteId: search.siteId }),
+  loaderDeps: ({ search }) => ({ siteId: search.siteId, module: search.module }),
   loader: ({ deps }) => safeLoader(async () => {
     const options = await listLaunchOptions();
     const site = deps.siteId
@@ -27,6 +30,8 @@ export const Route = createFileRoute("/launch/site")({
       site: site ?? null,
       organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
+      siteInformation: site && deps.module === "site-information"
+        ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
       error: deps.siteId && !site ? "You do not have access to the selected Site." : null,
     };
   })(),
@@ -38,7 +43,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -60,7 +65,12 @@ function SiteLaunchPage() {
         onBackToOverview={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
         onSaveAndExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
         onContinueToSiteInformation={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })} />
-    </WorkspaceShell> : selected ? <WorkspaceShell title={selected.title}
+    </WorkspaceShell> : selected?.id === "site-information" && siteInformation ? <SiteInformationBody
+      site={site} initial={siteInformation} organizations={organizations}
+      onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-profile" } })}
+      onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
+      onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "programs-audiences" } })} />
+    : selected ? <WorkspaceShell title={selected.title}
       eyebrow={`${selected.stage} / ${selected.title}`}
       subtitle="This section will be connected using the approved V6.1 content contract."
       width="wide">
@@ -78,4 +88,24 @@ function SiteLaunchPage() {
       workspaceUrl={"/sites/" + encodeURIComponent(site.id)}
     />}
   </LaunchSiteFrame>;
+}
+
+/** Owns guidance state without adding another shell or left-navigation step. */
+function SiteInformationBody({ site, initial, organizations, onBack, onExit, onContinue }: {
+  site: { id: string; organizationId: string };
+  initial: SiteInformationV61Initial;
+  organizations: Array<{ id: string; name: string }>;
+  onBack: () => void; onExit: () => void; onContinue: () => void;
+}) {
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const organization = organizations.find(item => item.id === site.organizationId);
+  return <WorkspaceShell title="Site Information" eyebrow="Establish / Site Information"
+    subtitle="Shape your learning environment and introduce the community behind your Site."
+    width="wide" rail={<SiteInformationV61Guidance step={step} />}>
+    <EstablishSiteInformationV61 key={site.id + ":" + initial.revision}
+      siteId={site.id} responsibleOrganizationName={organization?.name ?? null}
+      initial={initial} onInternalStepChange={setStep}
+      onBackToSiteProfile={onBack} onSaveAndExit={onExit}
+      onContinueToPrograms={onContinue} />
+  </WorkspaceShell>;
 }
