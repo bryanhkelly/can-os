@@ -1,3 +1,5 @@
+import { readSitePreviewShares } from "@/domain/site-preview-sharing";
+import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -193,6 +195,22 @@ export const revokeSiteBrandAsset=createServerFn({method:"POST"})
     const timestamp=new Date();
     await tx.update(siteBrandAssets).set({revokedAt:timestamp})
       .where(and(eq(siteBrandAssets.siteId,site.id),eq(siteBrandAssets.id,asset.id)));
+    // A shared preview is a frozen HTML snapshot, possibly embedding the old
+    // logo. Revoke all active preview links for this Site on rights withdrawal.
+    // This is safer than guessing which historical share carries the asset.
+    const [siteRecord]=await tx.select({metadata:sites.metadata,updatedAt:sites.updatedAt})
+      .from(sites).where(eq(sites.id,site.id)).for("update").limit(1);
+    if(siteRecord){
+      const shares=readSitePreviewShares(siteRecord.metadata);
+      const active=shares.filter(share=>!share.revokedAt);
+      if(active.length){
+        await tx.update(sites).set({
+          metadata:{...siteRecord.metadata,websitePreviewSharesV1:shares.map(share=>
+            share.revokedAt?share:{...share,revokedAt:timestamp.toISOString()})},
+          updatedAt:nextSiteConfigurationRevision(siteRecord.updatedAt),
+        }).where(eq(sites.id,site.id));
+      }
+    }
     await writeAudit(tx,actor,{
       action:"site.brand.asset.rights_withdrawn",entityType:"site",entityId:site.id,
       scope:{siteId:site.id,organizationId:site.organizationId},
