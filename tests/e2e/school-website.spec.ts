@@ -214,8 +214,7 @@ test("a new Site Administrator prepares a school website directly in Website Stu
   if (!tenant) throw new Error("The synthetic Site must be persisted before editing.");
   const siteId = String(tenant.site_id);
 
-  await page.goto(`/launch/hub/school?siteId=${siteId}`);
-  await page.getByRole("link", { name: "Open Website Studio" }).click();
+  await page.goto(`/launch/website?siteId=${siteId}`);
   await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
   await page.getByRole("button", { name: "Prepare school website" }).click();
   await expect(page.getByRole("heading", { name: "Find the right first impression." })).toBeVisible();
