@@ -37,7 +37,7 @@ export const Route = createFileRoute("/operations/interest-events_/new")({
       throw new DomainError("UNAVAILABLE","The requested Program does not belong to the selected Site.");
     if(deps.packageId && !deps.siteId)
       throw new DomainError("UNAVAILABLE","Choose the Marketing Package's Site before creating an event.");
-    if(!deps.siteId)return {data,suggestedTitle:null,source:null};
+    if(!deps.siteId)return {data,suggestedTitle:null,suggestedDescription:null,source:null};
     const packages=deps.packageId
       ? await listSiteMarketingPackagesV61({data:{siteId:deps.siteId!}}).catch(()=>null)
       : null;
@@ -46,13 +46,28 @@ export const Route = createFileRoute("/operations/interest-events_/new")({
       item.status==="draft" && item.content.purpose==="event-invitation");
     if(deps.packageId && !selected)
       throw new DomainError("UNAVAILABLE","This event invitation Package is unavailable or archived at the selected Site.");
-    const savedHeadline=selected?.content.headline?.trim()??"";
-    if(savedHeadline && !containsProtectedInstitutionalClaim(savedHeadline))
-      return {data,suggestedTitle:savedHeadline,source:"saved-package" as const};
-    const suggestions=await readSiteMarketingSuggestionsV61({data:{siteId:deps.siteId!}})
+    const savedHeadline=selected?.content.headline.trim()??"";
+    const savedMessage=selected?.content.message.trim()??"";
+    const safeTitle=(value:string)=>value.length>=3 && value.length<=160 &&
+      !/[<>\\r\\n]/.test(value) && !containsProtectedInstitutionalClaim(value);
+    const safeMessage=(value:string)=>value.length<=2000 &&
+      !/[<>]/.test(value) && !containsProtectedInstitutionalClaim(value);
+    // A requested package must be usable as authored; do not replace a
+    // protected or incomplete saved message with unrelated generic content.
+    if(selected){
+      if(!safeTitle(savedHeadline) || !safeMessage(savedMessage))
+        throw new DomainError("VALIDATION_FAILED",
+          "Review the invitation Package wording before creating an event.");
+      return {data,suggestedTitle:savedHeadline,suggestedDescription:savedMessage,
+        source:"saved-package" as const};
+    }
+    const suggestions=await readSiteMarketingSuggestionsV61({data:{siteId:deps.siteId}})
       .catch(()=>null);
-    const suggestion=suggestions?.["event-invitation"].content.headline??null;
-    return {data,suggestedTitle:suggestion,source:suggestion?"establish":"none"};
+    const candidate=suggestions?.["event-invitation"].content;
+    const suggestedTitle=candidate && safeTitle(candidate.headline)?candidate.headline:null;
+    const suggestedDescription=candidate && safeMessage(candidate.message)?candidate.message:null;
+    return {data,suggestedTitle,suggestedDescription,
+      source:suggestedTitle?"establish" as const:"none" as const};
   },{authMessage:"Sign in as an authorized school administrator to create an event."})(),
   component: CreateInterestEventPage,
 });
@@ -64,5 +79,6 @@ function CreateInterestEventPage() {
   return <InterestEventsWorkspace key={JSON.stringify(selection)}
     data={outcome.data.data} selection={selection} mode="create"
     suggestedTitle={outcome.data.suggestedTitle}
+    suggestedDescription={outcome.data.suggestedDescription}
     titleSource={outcome.data.source}/>;
 }
