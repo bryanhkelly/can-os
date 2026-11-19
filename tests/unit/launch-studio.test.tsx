@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { isLaunchStudioPath, launchRequirementProgress, schoolLaunchSearch, familyLaunchSearch } from "@/domain/launch-studio";
 import { LaunchStudioChrome, LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
+import { prepareStageModulesV61 } from "@/domain/launch-prepare-v61";
 import { launchDraftValueSchema, saveLaunchDraftSchema, assertLaunchDraftAudience } from "@/domain/launch-draft";
 import { resolveAccessContext } from "@/domain/access-context";
 import { GuardianApplicationForm } from "@/components/enrollment/GuardianApplicationForm";
@@ -51,7 +52,7 @@ describe("canonical standalone Launch Studio", () => {
     expect(frame).toContain("Preview Website");
     expect(frame).toContain("Site Workspace");
     expect(overview).toContain("Website & Brand");
-    expect(overview).toContain("Programs & Solutions");
+    expect(prepareStageModulesV61.some(module => module.title === "Programs & Solutions")).toBe(true);
     expect(existsSync(new URL("../../src/components/launch-studio/SiteFirstLaunch.tsx", import.meta.url))).toBe(false);
   });
   it("never treats unconfigured requirements or a visited step as completion", () => {
