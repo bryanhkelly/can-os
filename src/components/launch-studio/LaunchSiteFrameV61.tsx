@@ -5,6 +5,7 @@ import { Building2, Globe2, HelpCircle, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { siteLaunchModules } from "./LaunchStudioOverviewV61";
+import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
 
 const stages = ["Establish", "Introduce", "Prepare", "Open"] as const;
 
@@ -76,7 +77,8 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
           <strong className="text-sm">Launch Studio</strong>
           <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Site setup</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+          <LaunchPreviewSharing siteId={site.id} />
           <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-xs font-semibold text-primary">
             <Globe2 className="size-4"/> Preview Website
