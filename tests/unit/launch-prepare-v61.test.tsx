@@ -1,6 +1,19 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, search, ...props }: {
+    children: ReactNode; to: string; search?: Record<string, string | undefined>;
+    "aria-current"?: "page" | "step";
+  }) => {
+    const params = new URLSearchParams(
+      Object.entries(search ?? {}).filter((entry): entry is [string, string] => entry[1] !== undefined));
+    const suffix = params.size ? `?${params.toString()}` : "";
+    return <a href={to + suffix} aria-current={props["aria-current"]}>{children}</a>;
+  },
+}));
 
 vi.mock("@/modules/programs/program-discovery.functions", () => ({
   discoverLaunchSitePrograms: vi.fn(),
