@@ -61,6 +61,7 @@ export const sites = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
+    currentBrandVersionId: uuid("current_brand_version_id"),
     slug: text("slug").notNull(),
     address: jsonb("address").$type<Record<string, unknown>>(),
     timezone: text("timezone").default("America/Los_Angeles").notNull(),

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, updatedAt } from "./common";
 import { sites } from "./organizations";
 
@@ -12,6 +12,10 @@ export const sitePublications = pgTable("site_publications", {
   slug: text("slug").notNull(),
   status: text("status").notNull().default("draft"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
+  brandVersionId: uuid("brand_version_id"),
+  websiteContentRevision: integer("website_content_revision"),
+  websiteTemplateId: text("website_template_id"),
+  websiteTemplateVersion: integer("website_template_version"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, table => [

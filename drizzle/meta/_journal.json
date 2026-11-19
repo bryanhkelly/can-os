@@ -624,6 +624,13 @@
       "when": 1795100000000,
       "tag": "0088_site_marketing_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1795120500000,
+      "tag": "0089_canonical_site_brand_versions",
+      "breakpoints": true
     }
   ]
 }

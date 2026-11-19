@@ -13,6 +13,7 @@ export const siteMarketingPackages = pgTable("site_marketing_packages", {
   createdByPersonId: uuid("created_by_person_id").notNull().references(() => people.id, {onDelete:"restrict"}),
   title: text("title").notNull(),
   content: jsonb("content").$type<MarketingPackageContent>().notNull(),
+  brandVersionId: uuid("brand_version_id"),
   status: text("status").$type<"draft" | "archived">().notNull().default("draft"),
   revision: integer("revision").notNull().default(1),
   createdAt: createdAt(),
