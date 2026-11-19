@@ -20,7 +20,7 @@ export function LaunchSiteFrame({ site, active, children }: {
   useEffect(() => {
     setExpanded(siteLaunchModules.find(item => item.id === active)?.stage ?? "Establish");
   }, [active]);
-  const sidebar = (
+  const renderSidebar = (instance: "desktop" | "drawer") => (
     <div className="flex h-full flex-col bg-card">
       <div className="border-b px-4 py-5">
         <p className="text-base font-extrabold">CAN OS</p>
@@ -37,11 +37,11 @@ export function LaunchSiteFrame({ site, active, children }: {
         {stages.map((stage, index) => (
           <div key={stage} className="border-b py-1">
             <Button type="button" variant="ghost" aria-expanded={expanded===stage}
-              aria-controls={`${stagePanelBaseId}-${stage}`} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
+              aria-controls={`${stagePanelBaseId}-${instance}-${stage}`} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
               className="flex min-h-11 w-full justify-between px-3 py-3 text-left text-sm font-semibold">
               <span>{index+1}. {stage}</span><span aria-hidden="true">{expanded===stage ? "−" : "+"}</span>
             </Button>
-            {expanded===stage && <div id={`${stagePanelBaseId}-${stage}`} className="space-y-1 pb-2 pl-4">
+            <div id={`${stagePanelBaseId}-${instance}-${stage}`} hidden={expanded !== stage} className="space-y-1 pb-2 pl-4">
               {siteLaunchModules.filter(item=>item.stage===stage).map(item=>(
                 <Link key={item.id} to="/launch/site" search={{ siteId: site.id, module: item.id }}
                   onClick={() => setDrawer(false)}
@@ -51,7 +51,7 @@ export function LaunchSiteFrame({ site, active, children }: {
                   {item.title}
                 </Link>
               ))}
-            </div>}
+            </div>
           </div>
         ))}
       </nav>
@@ -63,7 +63,7 @@ export function LaunchSiteFrame({ site, active, children }: {
     </div>
   );
   return <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[14rem_minmax(0,1fr)]">
-    <aside className="hidden min-h-0 border-r bg-card lg:sticky lg:top-0 lg:block lg:h-dvh">{sidebar}</aside>
+    <aside className="hidden min-h-0 border-r bg-card lg:sticky lg:top-0 lg:block lg:h-dvh">{renderSidebar("desktop")}</aside>
     <div className="min-w-0">
       <header className="flex min-h-16 items-center justify-between gap-3 border-b bg-card px-4 sm:px-7">
         <div className="flex items-center gap-3">
@@ -88,7 +88,7 @@ export function LaunchSiteFrame({ site, active, children }: {
             <Button size="sm" variant="ghost" onClick={() => setDrawer(false)}
               aria-label="Close launch menu"><X className="size-5"/></Button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{sidebar}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{renderSidebar("drawer")}</div>
         </div>
       </Modal>
       <div id="launch-help">{children}</div>
