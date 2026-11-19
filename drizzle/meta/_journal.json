@@ -631,6 +631,13 @@
       "when": 1795120500000,
       "tag": "0089_canonical_site_brand_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1795120700000,
+      "tag": "0090_brand_current_and_published_backfill",
+      "breakpoints": true
     }
   ]
 }
