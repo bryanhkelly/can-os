@@ -29,9 +29,10 @@ function svgText(lines:readonly string[],x:number,y:number,gap:number,size:numbe
     fill="${color}">${escape(line)}</text>`).join("");
 }
 const printable=(format:"flyer"|"handout"|"social",brand:ResolvedSiteBrand,content:MarketingPackageContent,websiteUrl:string|null)=>{
-  const social=format==="social";const handout=format==="handout";
+  const social=format==="social";
   const width=social?1080:816,height=social?1080:1056,padding=social?78:70;
   const ink=brand.theme.ink,canvas=brand.theme.canvas,accent=brand.theme.accent;
+  const logo=brand.logo?.rightsConfirmed&&!brand.logo.revokedAt ? brand.logo : null;
   const headline=wrap(content.headline,social?26:33,social?4:3);
   const message=wrap(content.message,social?39:56,social?11:14);
   const headerY=social?185:160;
@@ -42,9 +43,10 @@ const printable=(format:"flyer"|"handout"|"social",brand:ResolvedSiteBrand,conte
   <rect width="${width}" height="${height}" fill="${canvas}"/>
   <rect x="0" y="0" width="${width}" height="18" fill="${ink}"/>
   <rect x="${padding}" y="76" width="55" height="55" fill="${ink}"/>
-  <text x="${padding+27}" y="113" fill="${canvas}" text-anchor="middle" font-size="26"
-    font-family="Georgia,serif">${escape(brand.displayName.slice(0,1).toUpperCase())}</text>
-  <g font-family="Arial,Helvetica,sans-serif">
+  ${logo?`<image href="${escape(logo.dataUrl)}" x="${padding}" y="76" width="55" height="55"/>`
+    :`<text x="${padding+27}" y="113" fill="${canvas}" text-anchor="middle" font-size="26"
+      font-family="Georgia,serif">${escape(brand.displayName.slice(0,1).toUpperCase())}</text>`}
+  <g font-family="${escape(brand.theme.bodyFont)}">
     <text x="${padding+78}" y="111" font-size="26" font-weight="bold" fill="${ink}">${escape(brand.displayName.slice(0,43))}</text>
     ${svgText(headline,padding,headerY+50,social?75:60,social?65:51,ink)}
     <rect x="${padding}" y="${messageY-38}" width="95" height="8" fill="${accent}"/>
@@ -69,6 +71,9 @@ export function renderSiteMarketingArtifact(input:{
       extension:"svg",body:input.qrSvg};
   }
   const ink=brand.theme.ink,canvas=brand.theme.canvas;
+  const mailLogo=brand.logo&&brand.logo.rightsConfirmed&&!brand.logo.revokedAt
+    ? `<img src="${escape(brand.logo.dataUrl)}" alt="${escape(brand.logo.altText)}"
+       width="56" height="56" style="display:inline-block;vertical-align:middle;margin-right:12px"/>`:"";
   const head=`<html lang="en"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1"></head>`;
   const action=websiteUrl
@@ -76,14 +81,14 @@ export function renderSiteMarketingArtifact(input:{
       color:${canvas};display:inline-block;padding:14px 22px;text-decoration:none">
       ${escape(content.callToAction||"Learn more")}</a></p>`:"";
   const html=`<!doctype html>${head}<body style="margin:0;background:${canvas};
-    color:${ink};font-family:Arial,Helvetica,sans-serif">
+    color:${ink};font-family:${escape(brand.theme.bodyFont)}">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
     <tr><td style="padding:28px 16px">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
       style="max-width:600px;margin:auto;border-collapse:collapse;background:#ffffff">
     <tr><td style="padding:28px 32px;border-top:8px solid ${ink}">
-      <p style="font-size:18px;font-weight:bold">${escape(brand.displayName)}</p>
-      <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.2">${escape(content.headline)}</h1>
+      <p style="font-size:18px;font-weight:bold">${mailLogo}${escape(brand.displayName)}</p>
+      <h1 style="font-family:${escape(brand.theme.displayFont)};font-size:32px;line-height:1.2">${escape(content.headline)}</h1>
       <p style="font-size:16px;line-height:1.6;white-space:pre-wrap">${escape(content.message)}</p>
       ${action}
       <p style="font-size:13px;color:#334155">${escape(proposed)}</p>
