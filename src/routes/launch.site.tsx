@@ -37,8 +37,16 @@ export const Route = createFileRoute("/launch/site")({
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
         ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
-      programsAudiences: site && (deps.module === "programs-audiences" || deps.module === "program-catalog")
+      programsAudiences: site && deps.module === "programs-audiences"
         ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
+      // Establish preferences are optional context for catalog discovery. The
+      // separately authorized catalog must remain navigable if this read is
+      // unavailable or its data needs repair. Never pretend it loaded empty.
+      prepareIntent: site && deps.module === "program-catalog"
+        ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } })
+            .then(result => ({ kind: "ready" as const, intent: result.intent }))
+            .catch(() => ({ kind: "unavailable" as const }))
+        : null,
       error: deps.siteId && !site ? "You do not have access to the selected Site." : null,
     };
   })(),
@@ -50,7 +58,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, siteInformation, programsAudiences, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, programsAudiences, prepareIntent, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -85,7 +93,9 @@ function SiteLaunchPage() {
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
     : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61 key={site.id}
-      module={selected.id} siteId={site.id} intent={programsAudiences?.intent ?? null} />
+      module={selected.id} siteId={site.id}
+      intent={prepareIntent?.kind === "ready" ? prepareIntent.intent : null}
+      intentUnavailable={prepareIntent?.kind === "unavailable"} />
     : selected && isDestinationModuleV61(selected.id) ? <LaunchModuleDestinationV61
       module={selected.id} title={selected.title} stage={selected.stage} siteId={site.id} />
     : selected ? <WorkspaceShell title="Module unavailable" eyebrow="Launch Studio"
