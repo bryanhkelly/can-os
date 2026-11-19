@@ -7,6 +7,7 @@ import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, HardHat, Info, Shie
 import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
+import { SolutionCatalogV61 } from "./SolutionCatalogV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 
 export const prepareModulesV61 = [
@@ -57,7 +58,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     siteProvides: "Accurate facility information, equipment inventory, accessibility details, and requested proof.",
     status: "governed",
     handoffs: [
-      { title: "Review Learning Environment", detail: "Update the existing Site-owned learning environment and delivery information.", href: id => prepareHref(id, "facilities-resources").replace("&module=facilities-resources", "&module=site-information") },
+      { title: "Review Learning Environment", detail: "Update the existing Site-owned learning environment and delivery information.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=site-information" },
       { title: "Inspect qualification evidence", detail: "Open the authorized canonical qualification inspection, where available.", href: () => "/canonical/lab/site-qualification" },
       { title: "Review opening requirements", detail: "Required safeguards and evidence remain governed by the actual opening process.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
     ],
@@ -214,6 +215,7 @@ export function LaunchPrepareV61({ module, siteId, intent }: {
             </div>)}
           </div>
         </WorkspacePanel>
+        <SolutionCatalogV61 siteId={siteId} />
         <ProgramDiscoveryPanel siteId={siteId} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
           Discovery returns published Offerings and their availability policies, not a complete verified Solution fit.
