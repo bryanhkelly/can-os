@@ -150,9 +150,9 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
             onClick={()=>onChange(template.id)} disabled={disabled}
             className={cn("h-auto w-full min-w-0 items-start gap-3 whitespace-normal border p-2 text-left",
               selected?"border-primary ring-2 ring-primary/40":"border-border")}>
-            <div className="w-24 shrink-0 overflow-hidden">
+            <span className="block w-24 shrink-0 overflow-hidden">
               <WireframeThumbnail id={template.id} name={template.name}/>
-            </div>
+            </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-bold">{template.name}</span>
               <span className="mt-1 block text-xs text-muted-foreground">{template.character}</span>
