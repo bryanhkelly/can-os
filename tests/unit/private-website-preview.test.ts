@@ -50,6 +50,8 @@ describe("authenticated school full-page preview", () => {
     expect(fullPage).toContain(`href="${privateWebsitePreviewUrl(siteId,"/about")}"`);
     expect(fullPage).toContain('href="#main-content"');
     expect(fullPage).toContain("Return to Website &amp; Brand Studio");
+    expect(fullPage).toContain("&amp;returnToHub=true&amp;step=review");
+    expect(fullPage).not.toContain("step=preview");
     expect(fullPage).not.toContain("<form");
     expect(fullPage).not.toContain("<script");
     expect(fullPage).not.toContain('href="/about"');
