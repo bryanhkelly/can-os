@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Read-only reconciliation for the three applied main batches (8 + 46 + 51).
+ * Read-only reconciliation for four applied main batches (8 + 46 + 51 + 22).
  * Does not run a migration or modify a database.
  *
  * CAN_MAIN_CONSOLIDATION_CHECK=1 DATABASE_URL=<main Neon URL> \
@@ -15,12 +15,24 @@ const sources=[
   ["applied-eight","database/production/2026-11-18-consolidate-eight-unmapped-tables.sql",8,7],
   ["applied-forty-six","database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
   ["applied-fifty-one","database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
+  ["applied-twenty-two","database/production/2026-11-19-consolidate-22-empty-foundation-funding-qualification-tables.sql",22,"json"],
 ];
 if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
   throw new Error("Explicit read-only opt-in and production DATABASE_URL required");
 
 function parseBatch([label,file,expected,arity]){
   const source=readFileSync(file,"utf8");
+  if(arity==="json"){
+    const match=source.match(/snapshot jsonb := '([^']+)'::jsonb/);
+    if(!match)throw new Error("Expected a pinned JSON snapshot in "+file);
+    const records=JSON.parse(match[1]).map(x=>({
+      name:x.name,oid:x.oid,rls:x.rls,force:x.force_rls,policies:x.pol,
+      triggers:x.trg,outf:x.out_fks,inf:x.in_fks,indexes:x.indexes,
+    }));
+    if(records.length!==expected||new Set(records.map(x=>x.name)).size!==expected)
+      throw new Error("Pinned JSON migration inventory mismatch in "+file);
+    return {label,file,records,state:"applied"};
+  }
   const tuple=new RegExp(
     "\\('([a-z_]+)'\\s*,\\s*(\\d+)\\s*,\\s*(true|false)\\s*,"+
     (arity===9?"\\s*(true|false)\\s*,":"")+
@@ -116,7 +128,7 @@ async function main(){
     verifiedAppliedTables:all.length,liveSchemaTables:relationCounts,
     remainingPublicToLegacyForeignKeys:crossings[0]?.foreign_keys??null,discrepancies};
   console.log(JSON.stringify(report,null,2));
-  if(discrepancies.length||all.length!==105)process.exitCode=2;
+  if(discrepancies.length||all.length!==127)process.exitCode=2;
 }
 
 main().catch(e=>{console.error("CAN OS consolidation reconciliation FAILED:",e.message);process.exitCode=1;});
