@@ -92,7 +92,7 @@ export const canonicalPersons = educationV30.table("persons",{
 });
 
 /** Canonical Offering membership is source-of-truth for the chosen Course. */
-export const canonicalOfferingCourses = educationV30.table("offering_courses", {
+export const canonicalOfferingCourses = pgTable("offering_courses", {
   offeringVersionId: uuid("offering_version_id").notNull(),
   courseVersionId: uuid("course_version_id").notNull(),
   isRequired: boolean("is_required").notNull(),
