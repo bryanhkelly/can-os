@@ -30,8 +30,7 @@ export const canonicalAccountGrants = educationV30.table("canonical_account_gran
 ]);
 
 /** Independently approved time-bounded staff capability, not a role grant. */
-export const canonicalSensitiveCapabilityApprovals = educationV30.table(
-  "canonical_sensitive_capability_approvals", {
+export const canonicalSensitiveCapabilityApprovals = pgTable("canonical_sensitive_capability_approvals", {
     id: id(),
     canonicalGrantId: uuid("canonical_grant_id").notNull(),
     capabilityCode: text("capability_code").$type<"credential.issue">().notNull(),
