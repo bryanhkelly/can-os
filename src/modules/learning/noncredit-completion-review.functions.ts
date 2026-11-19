@@ -55,9 +55,9 @@ export const getNoncreditCompletionReview = createServerFn({ method: "GET" })
                education_v30.v301_credential_is_current(issuance.id)
                  AS "currentlyValid"
         FROM education_v30.noncredit_completion_decisions source
-        JOIN education_v30.learner_achievement_decisions achievement
+        JOIN public.learner_achievement_decisions achievement
           ON achievement.noncredit_completion_decision_id=source.id
-        JOIN education_v30.learning_award_issuances issuance
+        JOIN public.learning_award_issuances issuance
           ON issuance.achievement_decision_id=achievement.id
         WHERE source.registration_id=${registration.id}::uuid
           AND issuance.issuer_organization_id=${training.providerOrganizationId}::uuid
