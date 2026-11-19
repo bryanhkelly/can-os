@@ -23,7 +23,7 @@ export const noncreditCompletionPolicies = pgTable("noncredit_completion_policie
   approvedByPersonId:uuid("approved_by_person_id").notNull(),
   publishedAt:timestamp("published_at",{withTimezone:true}).notNull(),
 });
-export const noncreditCompletionDecisions = educationV30.table("noncredit_completion_decisions",{
+export const noncreditCompletionDecisions = pgTable("noncredit_completion_decisions",{
   id:id(),registrationId:uuid("registration_id").notNull(),
   policyId:uuid("policy_id").notNull(),assessmentResultId:uuid("assessment_result_id"),
   outcome:text("outcome").$type<"completed"|"not_yet_completed"|"voided">().notNull(),
