@@ -31,6 +31,13 @@ Status: **Implemented in feature-branch source. NOT migration-applied, built, br
 5. Retire obsolete writers after conversion, not before. Only current Site Brand versions are authoritative; historical website revisions remain valid operational records.
 6. **Do not run destructive SQL, apply migrations, or merge to main without DB read-only inventory and test gates.** No production tables were dropped in this turn.
 
+## Website draft permission cutover
+
+- V6.1 adds "site.website.draft.write" for exact Site-scoped Site Administrators and explicitly appointed website editors. It does not grant official Site publication.
+- Network-governed Site Administrators can read and save private Site Brand/website drafts, while the existing independent publisher continues denying unauthorized public release.
+- The editor still requires the active account grant, membership and Site-specific role assignment. Migration 0091 upgrades existing appointed website editor grants that already had local copy write authority. It does not grant any new academic, enrollment or network permissions.
+- Apply and verify migration 0091 before enabling draft editing for previously appointed editors. Keep public copy review and Site publication independent.
+
 ## Remaining acceptance gates and limitations
 
 - **Not verified:** TypeScript, lint/6.1 design checks, Vitest, full build, authenticated browser tests and screenshot comparison. No GitHub Actions run was available for this branch; Netlify account deployment checks have been skipped due account build usage.

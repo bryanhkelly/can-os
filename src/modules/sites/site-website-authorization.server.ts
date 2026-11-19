@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import { accountPersonGrants, memberships, organizations, people, roleAssignments, sites, siteAffiliations } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
-import { assertPartnerWebsitePreviewScope, siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
+import { assertPartnerWebsitePreviewScope, siteWebsiteDraftReadCapability, siteWebsiteDraftWriteCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 
 /**
@@ -14,7 +14,7 @@ type Reader = Pick<typeof db, "select">;
 
 export async function requirePartnerWebsiteEditor(
   actor: AccessContext, executor: Reader = db,
-  capability: typeof siteWebsiteDraftReadCapability | typeof siteWebsiteLocalPublishCapability = siteWebsiteDraftReadCapability,
+  capability: typeof siteWebsiteDraftReadCapability | typeof siteWebsiteDraftWriteCapability | typeof siteWebsiteLocalPublishCapability = siteWebsiteDraftReadCapability,
 ) {
   const siteId = actor.grantSiteId;
   if (!siteId || !actor.actorPersonId || !["site_website_editor", "site_admin"].includes(actor.role)) {
@@ -30,7 +30,7 @@ export async function requirePartnerWebsiteEditor(
     .where(eq(sites.id, siteId)).limit(1);
   if (!site) throw new AuthorizationError("partner website Site does not exist");
   assertPartnerWebsitePreviewScope(actor, site);
-  if (!actor.capabilities.has(capability)) throw new AuthorizationError("partner website publishing permission");
+  if (!actor.capabilities.has(capability)) throw new AuthorizationError("partner website capability");
 
   if (actor.role === "site_admin") {
     // Site Admin authority comes from the exact active account grant and local
@@ -49,8 +49,7 @@ export async function requirePartnerWebsiteEditor(
     if (!administrator) throw new AuthorizationError("active Site Administrator relationship");
     const [affiliation] = await executor.select({ id: siteAffiliations.id }).from(siteAffiliations)
       .where(and(eq(siteAffiliations.siteId, site.id), eq(siteAffiliations.status, "approved"))).limit(1);
-    if (affiliation || ["denomination", "can_network"].includes(site.organizationType))
-      throw new AuthorizationError("Network-governed schools retain their existing website approval workflow");
+    let networkGoverned=Boolean(affiliation)||["denomination","can_network"].includes(site.organizationType);
     const visited=new Set([site.organizationId]);
     let parentId=site.parentOrganizationId;
     while(parentId) {
@@ -58,11 +57,15 @@ export async function requirePartnerWebsiteEditor(
       visited.add(parentId);
       const [parent]=await executor.select({type:organizations.type,parentOrganizationId:organizations.parentOrganizationId})
         .from(organizations).where(eq(organizations.id,parentId)).limit(1);
-      if(!parent || ["denomination","can_network"].includes(parent.type))
-        throw new AuthorizationError("Network ownership requires the existing website approval workflow");
+      if(!parent)throw new AuthorizationError("school ownership relationship requires review");
+      if(["denomination","can_network"].includes(parent.type))networkGoverned=true;
       parentId=parent.parentOrganizationId;
     }
-    return { ...site, canPublish: actor.capabilities.has(siteWebsiteLocalPublishCapability) };
+    // Network governance restricts publishing, not preparing a private draft.
+    if(networkGoverned && capability===siteWebsiteLocalPublishCapability)
+      throw new AuthorizationError("Network-governed Sites require independent website publication approval");
+    return {...site,canEdit:actor.capabilities.has(siteWebsiteDraftWriteCapability),
+      canPublish:!networkGoverned&&actor.capabilities.has(siteWebsiteLocalPublishCapability)};
   }
 
   const [assignment] = await executor.select({ id: roleAssignments.id, capabilities: roleAssignments.capabilities })
@@ -83,7 +86,8 @@ export async function requirePartnerWebsiteEditor(
       sql`${roleAssignments.capabilities} @> ${JSON.stringify([capability])}::jsonb`,
     )).limit(1);
   if (!assignment) throw new AuthorizationError("explicit Site website editor assignment");
-  return { ...site, canPublish: assignment.capabilities.includes(siteWebsiteLocalPublishCapability) };
+  return {...site,canEdit:assignment.capabilities.includes(siteWebsiteDraftWriteCapability),
+    canPublish:assignment.capabilities.includes(siteWebsiteLocalPublishCapability)};
 
 }
 

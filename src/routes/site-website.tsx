@@ -37,19 +37,6 @@ import {siteProgramSelectionSchema} from "@/lib/route-search";
 import { z } from "zod";
 
 export const websiteStudioStepIds = ["brand", "wireframe", "visual", "content", "review"] as const;
-const legacyWebsiteSteps = ["welcome","template","identity","photos","preview"] as const;
-type LegacyWebsiteStep = (typeof legacyWebsiteSteps)[number];
-function resolveWebsiteStep(step:typeof websiteStudioStepIds[number] | LegacyWebsiteStep | undefined):
-  typeof websiteStudioStepIds[number] {
-  if (!step) return "brand";
-  switch(step) {
-    case "welcome": return "brand";
-    case "template": return "wireframe";
-    case "identity": case "photos": return "visual";
-    case "preview": return "review";
-    default: return step;
-  }
-}
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
   // an invalid Site and open the editor under a different active membership.
@@ -58,7 +45,7 @@ export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   returnGrantId:z.string().optional(),
   returnToHub:z.boolean().optional(),
   returnToSettings:z.boolean().optional(),
-  step:z.union([z.enum(websiteStudioStepIds),z.enum(legacyWebsiteSteps)]).optional(),
+  step:z.enum(websiteStudioStepIds).optional(),
 });
 
 export const loadWebsiteHome = (siteId?: string) => {
@@ -68,7 +55,7 @@ export const loadWebsiteHome = (siteId?: string) => {
       retryable:false});
   return safeLoader(
     () => getPartnerWebsitePreviewView({data:{siteId}}),
-    { authMessage: "This website requires a verified Site editor or unaffiliated Site Administrator." },
+    { authMessage: "This website requires an authorized Site editor or Site Administrator." },
   )();
 };
 
@@ -96,13 +83,12 @@ function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare
 
 export function WebsiteHome({ outcome, selection, studio = false, onStepChange }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
-  selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] | LegacyWebsiteStep };
+  selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] };
   studio?: boolean;
   onStepChange?: (step:number)=>void;
 }) {
   const [localStep,setLocalStep]=useState(0);
-  const requestedStep=websiteStudioStepIds.indexOf(resolveWebsiteStep(selection.step));
-  // Re-entry starts at Brand Identity, legacy bookmarked steps resolve to the new flow.
+  const requestedStep=websiteStudioStepIds.indexOf(selection.step??"brand");
   const step=selection.step ? Math.max(0,requestedStep) : localStep;
   const changeStep=onStepChange??setLocalStep;
   const returnToLaunch=selection.returnToSettings && selection.siteId
@@ -578,7 +564,7 @@ function LocalWebsiteCopyEditor({
   }
 
   async function saveDraft(mode: "stay" | "exit" = "stay") {
-    if (busy || !data.canPublish || !data.draftStorageReady || revisionConflict) return;
+    if (busy || !data.canEdit || !data.draftStorageReady || revisionConflict) return;
     if (contentBlocksDirty) {
       setError("Save your website section layout using 'Save private blocks' before saving or exiting.");
       return;
@@ -708,7 +694,7 @@ function LocalWebsiteCopyEditor({
   const textField = (field: typeof churchFields[number]) =>
     <WebsiteCopyField key={field.key} field={field} content={content}
       candidate={data.siteStoryCopyCandidates.find(item=>item.field===field.key)}
-      disabled={busy||!data.canPublish}
+      disabled={busy||!data.canEdit}
       onChange={value=>setContent(old=>({...old,[field.key]:value}))}
       onRestore={()=>setContent(old=>restoreOriginalWebsiteField(old,field.key))}/>;
 
@@ -728,10 +714,9 @@ function LocalWebsiteCopyEditor({
       <Button variant="outline" type="button" onClick={loadLatestRevision}
         className="min-h-11 border px-3 py-2 font-semibold">Discard my edits and load latest</Button>
     </div>}
-    {!data.canPublish && <WorkspaceNotice tone="attention" className="mt-3">
-      You can preview this Site, but your current verified Site assignment has not
-      been granted local website publishing. Ask the Site administrator to assign
-      that specific capability; CAN academic approval is not required for church copy.
+    {!data.canEdit && <WorkspaceNotice tone="attention" className="mt-3">
+      This Site is view-only for your current assignment. A private Site Brand and
+      website draft require an authorized editor. Public publication is reviewed separately.
     </WorkspaceNotice>}
     {data.localContentStatus === "review_required" && <WorkspaceNotice tone="attention" className="mt-3">
       Your latest proposed wording includes a protected claim. It is held for review;
@@ -759,7 +744,7 @@ function LocalWebsiteCopyEditor({
         <label className="block space-y-2 text-sm font-semibold">
           <span>Public-facing Site name</span>
           <Input type="text" maxLength={120} value={brandDisplayName}
-            disabled={busy||!data.canPublish}
+            disabled={busy||!data.canEdit}
             onChange={event=>setBrandDisplayName(event.target.value)}
             placeholder="Your learning community name" className="min-h-11 w-full"/>
           <span className="block text-xs font-normal text-muted-foreground">
@@ -778,7 +763,7 @@ function LocalWebsiteCopyEditor({
             retain their original identity until you explicitly update and regenerate them.
           </p>
         </div>
-        <fieldset disabled={busy || !data.canPublish}>
+        <fieldset disabled={busy || !data.canEdit}>
           <legend className="text-sm font-semibold">Choose your brand direction</legend>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {siteBrandDirections.map(direction=>{
@@ -810,7 +795,7 @@ function LocalWebsiteCopyEditor({
         <p className="text-sm text-muted-foreground">Compare seven structures in grayscale. Colors, typography and imagery come next.</p>
         {brandDirection && <div className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
           <span>Suggested structure: <strong>{schoolBrandDesigns[brandRecommendedLayout(brandDirection)].name}</strong></span>
-          <Button type="button" variant="outline" disabled={busy || !data.canPublish}
+          <Button type="button" variant="outline" disabled={busy || !data.canEdit}
             onClick={()=>setContent(old=>({...old,branding:{...old.branding,templateId:brandRecommendedLayout(brandDirection)}}))}>
             Use suggested layout
           </Button>
@@ -822,7 +807,7 @@ function LocalWebsiteCopyEditor({
           }))}
           paletteId={content.branding.paletteId} typographyId={content.branding.typographyId}
           headingFontId={content.branding.headingFontId} bodyFontId={content.branding.bodyFontId}
-          disabled={busy || !data.canPublish}/>
+          disabled={busy || !data.canEdit}/>
         <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps Site copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
       </div>}
 
@@ -848,7 +833,7 @@ function LocalWebsiteCopyEditor({
           <span className="text-sm">
             {data.siteStoryCopyCandidates.length} source-based drafts available from Site Information.
           </span>
-          <Button type="button" variant="outline" disabled={busy || !data.canPublish}
+          <Button type="button" variant="outline" disabled={busy || !data.canEdit}
             onClick={()=>setContent(old=>prepareWebsiteCopyFromSiteInformation(old,data.siteStoryCopyCandidates))}>
             Use Site Information in unchanged starter fields
           </Button>
@@ -992,11 +977,11 @@ function LocalWebsiteCopyEditor({
           onClick={()=>onStepChange(Math.max(0,step-1))}>Back</Button>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" type="button"
-            disabled={busy || !data.canPublish || !data.draftStorageReady || revisionConflict}
+            disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
             onClick={()=>void saveDraft("exit")}>Save & Exit</Button>
           {step < 4 ? <Button type="button"
             onClick={()=>onStepChange(Math.min(4,step+1))}>Continue</Button>
-            : <Button type="button" disabled={busy || !data.canPublish || !data.draftStorageReady || revisionConflict}
+            : <Button type="button" disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
               loading={busy} loadingLabel="Saving private draft…"
               onClick={()=>void saveDraft("stay")}>Save private draft & finish</Button>}
         </div>

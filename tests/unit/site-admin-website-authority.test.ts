@@ -12,11 +12,23 @@ describe("unaffiliated Site Administrator website authority",()=>{
   await expect(requirePartnerWebsiteEditor(actor,db as any,"site.website.local.publish")).resolves.toMatchObject({id:"site",canPublish:true});
   expect(db.select).toHaveBeenCalledTimes(3);
  });
- it.each(["membership","affiliation","parent","denomination"])("rejects missing or network-governed %s authority",async kind=>{
-  const scoped={...site,...(kind==="parent"?{parentOrganizationId:"network"}:{}),...(kind==="denomination"?{organizationType:"denomination"}:{})};
-  const db=reader([[scoped],kind==="membership"?[]:[{id:"grant"}],kind==="affiliation"?[{id:"affiliation"}]:[]]);
-  await expect(requirePartnerWebsiteEditor(actor,db as any)).rejects.toThrow();
+ it("requires an active verified Site Admin grant before reading any draft",async()=>{
+  await expect(requirePartnerWebsiteEditor(actor,reader([[site],[]]) as any))
+    .rejects.toThrow("active Site Administrator relationship");
  });
+ it.each(["affiliation","parent","denomination"])(
+  "permits private draft work under %s governance but denies local publication",async kind=>{
+    const scoped={...site,...(kind==="parent"?{parentOrganizationId:"network"}:{}),
+      ...(kind==="denomination"?{organizationType:"denomination"}:{})};
+    const rows=()=>[[scoped],[{id:"grant"}],
+      kind==="affiliation"?[{id:"affiliation"}]:[],
+      ...(kind==="parent"?[[{type:"denomination",parentOrganizationId:null}]]:[])];
+    await expect(requirePartnerWebsiteEditor(actor,reader(rows()) as any,
+      "site.website.draft.write")).resolves.toMatchObject({id:"site",canEdit:true,canPublish:false});
+    await expect(requirePartnerWebsiteEditor(actor,reader(rows()) as any,
+      "site.website.local.publish")).rejects.toThrow();
+  });
+
  it.each(["site","organization","capability","role"])("denies mismatched %s context",async kind=>{
   const context={...actor,...(kind==="site"?{grantSiteId:"sibling"}:{}),...(kind==="organization"?{scope:{organizationIds:["foreign"],siteIds:["site"]}}:{}),...(kind==="capability"?{capabilities:new Set<string>()}:{}),...(kind==="role"?{role:"registrar"}:{})};
   await expect(requirePartnerWebsiteEditor(context,reader([[site]]) as any)).rejects.toThrow();
@@ -34,6 +46,11 @@ it("does not mistake an ordinary local parent organization for a denominational 
 });
 
 it("recognizes network ownership through an ancestor organization",async()=>{
- const db=reader([[{...site,parentOrganizationId:"local-church"}],[{id:"grant"}],[],[{type:"church",parentOrganizationId:"denomination"}],[{type:"denomination",parentOrganizationId:null}]]);
- await expect(requirePartnerWebsiteEditor(actor,db as any)).rejects.toThrow("Network ownership");
+ const rows=()=>[[{...site,parentOrganizationId:"local-church"}],[{id:"grant"}],[],
+   [{type:"church",parentOrganizationId:"denomination"}],
+   [{type:"denomination",parentOrganizationId:null}]];
+ await expect(requirePartnerWebsiteEditor(actor,reader(rows()) as any,
+   "site.website.draft.write")).resolves.toMatchObject({canPublish:false,canEdit:true});
+ await expect(requirePartnerWebsiteEditor(actor,reader(rows()) as any,
+   "site.website.local.publish")).rejects.toThrow("Network-governed");
 });

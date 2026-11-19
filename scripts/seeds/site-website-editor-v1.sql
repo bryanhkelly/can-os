@@ -34,7 +34,7 @@ INSERT INTO role_assignments
 VALUES ('fd000000-0000-4000-8000-000000000013','fd000000-0000-4000-8000-000000000010',
  'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003',NULL,
  'site_website_editor',
- '["site.website.draft.read","site.website.local.publish"]'::jsonb,
+ '["site.website.draft.read","site.website.draft.write","site.website.local.publish"]'::jsonb,
  '{"synthetic":true}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 

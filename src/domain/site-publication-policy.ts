@@ -27,6 +27,8 @@ export function assertSitePublicationScope(
  * The server also checks a matching current role assignment and membership.
  */
 export const siteWebsiteDraftReadCapability = "site.website.draft.read";
+/** Save a private website or Site Brand draft. Never grants publication. */
+export const siteWebsiteDraftWriteCapability = "site.website.draft.write";
 export const siteWebsiteLocalPublishCapability = "site.website.local.publish";
 
 export function assertPartnerWebsitePreviewScope(

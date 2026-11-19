@@ -185,6 +185,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     siteStoryRevision:siteStorySource.success ? siteStorySource.data.revision : null,
     siteName: site.name,
     organizationName: site.organizationName,
+    canEdit: site.canEdit,
     canPublish: site.canPublish,
     draftStorageReady,
     canPrepareWebsite: actor.role === "site_admin",

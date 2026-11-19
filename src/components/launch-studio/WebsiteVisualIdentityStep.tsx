@@ -14,7 +14,7 @@ import type { SiteLocalContent } from "@/domain/site-local-content";
 
 /** Feature presentation only. The route owns revision, draft persistence and authorization. */
 export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setContent,onSelectArtwork}:{
-  data:{siteId:string;siteName:string;canPublish:boolean;mediaUploadsEnabled:boolean};
+  data:{siteId:string;siteName:string;canEdit:boolean;canPublish:boolean;mediaUploadsEnabled:boolean};
   content:SiteLocalContent;brandDirection:SiteBrandDirectionId|null;busy:boolean;
   setContent:Dispatch<SetStateAction<SiteLocalContent>>;
   onSelectArtwork:(event:ChangeEvent<HTMLInputElement>,field:"heroImage"|"logoImage")=>void;
@@ -35,7 +35,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
               Use the palette and type pairing curated for {schoolBrandDesigns[content.branding.templateId ?? "heritage"].name}.
             </p>
           </div>
-          <Button type="button" variant="outline" disabled={busy || !data.canPublish}
+          <Button type="button" variant="outline" disabled={busy || !data.canEdit}
             onClick={()=>setContent(old=>{
               const design=schoolBrandDesigns[old.branding.templateId ?? "heritage"];
               return {...old,branding:{...old.branding,paletteId:design.recommendedPalette,
@@ -43,7 +43,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
             })}>Apply suggested style</Button>
         </div>
         <DisclosureSection title="Colors" description="All thirteen curated and contrast-checked palettes" defaultOpen>
-          <fieldset disabled={busy || !data.canPublish}>
+          <fieldset disabled={busy || !data.canEdit}>
             <legend className="sr-only">Choose a color palette</legend>
             <div role="group" aria-label="Site color palettes" className="grid grid-cols-2 gap-3 md:grid-cols-3">
               {sitePaletteIds.map(id=>{
@@ -76,7 +76,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
           </fieldset>
         </DisclosureSection>
         <DisclosureSection title="Typography" description="Actual rendered font stacks and pairing choices" defaultOpen>
-          <fieldset disabled={busy || !data.canPublish} className="space-y-4">
+          <fieldset disabled={busy || !data.canEdit} className="space-y-4">
             <legend className="sr-only">Choose typography</legend>
             <Label className="block text-sm">
               <span className="font-medium">Curated typography pairing</span>
@@ -123,7 +123,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
           <div className="space-y-4">
             <SchoolBrandPreview siteId={data.siteId} schoolName={data.siteName} branding={content.branding}/>
             <WebsiteArtworkField field="logoImage" value={content.branding.logoImage ?? null}
-              disabled={busy || !data.canPublish} onSelect={selectArtwork}
+              disabled={busy || !data.canEdit} onSelect={selectArtwork}
               onChange={next=>setContent(old=>({...old,branding:{...old.branding,logoImage:next}}))}/>
           </div>
         </DisclosureSection>

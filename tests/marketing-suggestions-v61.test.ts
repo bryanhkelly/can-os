@@ -29,6 +29,15 @@ describe("Introduce V6.1 reuses established Site information",()=>{
       "Establish · Programs & Audiences",
     ]);
   });
+  it("reuses intended learner audiences without importing contacts",()=>{
+    const intent={...emptySiteProgramsAudiencesV61(),interestIds:["summer"] as ["summer"],
+      audienceIds:["children","adults","older_adults"] as ["children","adults","older_adults"]};
+    const result=suggestMarketingStarterV61("Riverbend","interest-invitation",{
+      story:null,intent,websiteCopy:null,
+    });
+    expect(result.content.audiences).toEqual(["families","adult-learners","older-adults"]);
+    expect(result.content).not.toHaveProperty("recipients");
+  });
   it("provides saved Website copy as an explicit alternative, not an automatic override",()=>{
     const websiteCopy={heroHeadline:"A new kind of community",schoolVision:"An editable, saved Site vision"};
     const result=suggestMarketingStarterV61("Riverbend","interest-invitation",{

@@ -44,7 +44,7 @@ const baseRoleCapabilities = {
  // Partner website review is deliberately NOT registration, academic approval,
  // institutional publication, Site operations or access to family records.
  // A same-Site role assignment is additionally required on each server read.
- site_website_editor: ["launch.draft.manage", "site.website.draft.read", "site.website.local.publish"],
+ site_website_editor: ["launch.draft.manage", "site.website.draft.read", "site.website.draft.write", "site.website.local.publish"],
  // First-observer site personnel: report-only capability, NEVER incident.read,
  // counseling access, enrollment editing or automatic emergency dispatch.
  room_facilitator: ["launch.draft.manage", "safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit","communication.send"],
@@ -65,7 +65,7 @@ const baseRoleCapabilities = {
 
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
  ...baseRoleCapabilities,
- site_admin: [...baseRoleCapabilities.registrar, "school.setup.manage", "site.website.draft.read", "site.website.local.publish"],
+ site_admin: [...baseRoleCapabilities.registrar, "school.setup.manage", "site.website.draft.read", "site.website.draft.write", "site.website.local.publish"],
 });
 
 /**

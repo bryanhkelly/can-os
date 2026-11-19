@@ -11,7 +11,7 @@ import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
-import { siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
+import { siteWebsiteDraftReadCapability, siteWebsiteDraftWriteCapability } from "@/domain/site-publication-policy";
 import { writeAudit } from "@/platform/mutation";
 import {
   initialSiteBrandConfiguration, resolveSiteBrandVersion, siteBrandConfigurationSchema,
@@ -57,7 +57,7 @@ async function authorizeReader(actor:Awaited<ReturnType<typeof getCommandContext
  siteId:string,write:boolean,reader:Reader=db){
   if(actor.role==="site_website_editor" || actor.role==="site_admin"){
     const site=await requirePartnerWebsiteEditor(actor,reader,
-      write?siteWebsiteLocalPublishCapability:siteWebsiteDraftReadCapability);
+      write?siteWebsiteDraftWriteCapability:siteWebsiteDraftReadCapability);
     if(site.id!==siteId)throw new DomainError("FORBIDDEN","Site Brand belongs to another Site.");
     return site;
   }
