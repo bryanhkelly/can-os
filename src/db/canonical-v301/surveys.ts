@@ -17,7 +17,7 @@ export const surveyVersions = pgTable("survey_versions", {
   lifecycle:text("lifecycle").$type<"draft"|"published">().notNull(),
   publishedAt:timestamp("published_at",{withTimezone:true}),
 });
-export const surveyQuestions = educationV30.table("survey_questions", {
+export const surveyQuestions = pgTable("survey_questions", {
   id:id(),surveyVersionId:uuid("survey_version_id").notNull(),
   questionKey:text("question_key").notNull(),promptText:text("prompt_text").notNull(),
   ordinal:integer("ordinal").notNull(),
