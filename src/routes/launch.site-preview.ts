@@ -22,6 +22,7 @@ import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { linkPrivateSitePreviewPages } from "@/domain/site-private-preview-navigation";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
+import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
 import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
@@ -163,7 +164,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           noncredit:noncreditReleases,classes,
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
         });
-        page.contentBlocks=resolveSiteContentBlocks(config,{
+        const baseContentBlocks=resolveSiteContentBlocks(config,{
           mode:"private",
           preferences:parsed.success?parsed.data:null,
           siteSetup:{name:displaySiteName,organizationName:site.organizationName,
@@ -174,6 +175,15 @@ export const Route=createFileRoute("/launch/site-preview")({
           noncredit:noncreditReleases,classes,classTimezone:site.timezone,
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
         });
+        // Both private preview entry points must use the same public-safe
+        // proposal cards from saved Programs & Audiences. Proposed intent
+        // never implies an authorized Solution, Offering or enrollment.
+        const proposedPrograms=projectPlannedSiteProgramsForPreview(
+          parsed.success?parsed.data:null,baseContentBlocks);
+        page.contentBlocks=[
+          ...baseContentBlocks.filter(block=>block.channel!=="learning.interests"),
+          ...proposedPrograms,
+        ];
         const availablePages=availablePublicSitePaths(page);
         // Authorized operators can inspect a page before it becomes publicly
         // eligible, without publishing a false Program or enrollment action.
