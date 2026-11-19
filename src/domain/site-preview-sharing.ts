@@ -1,3 +1,4 @@
+import type { SiteContentBlockProjection } from "./site-content-channels";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { escapePublicHtml, type PublicSitePage } from "./public-site-html";
@@ -101,6 +102,7 @@ export function projectShareableSitePreview(input: {
   siteName: string;
   organizationName: string;
   content: SiteLocalContent;
+  plannedPrograms?: readonly SiteContentBlockProjection[];
 }): PublicSitePage {
   const { editorialBaseline: _privateOriginalCopy, ...copy } = input.content;
   return {
@@ -120,7 +122,10 @@ export function projectShareableSitePreview(input: {
     academicPrograms: [],
     noncreditReleases: [],
     enrollmentOpportunities: [],
-    contentBlocks: [],
+    // The Site's intended Programs are visible, clearly proposed, and have
+    // no links, application actions, or adopted Solution claims.
+    contentBlocks: (input.plannedPrograms ?? []).filter(block =>
+      block.channel === "learning.interests" && block.items.every(item => !item.link)),
     media: {},
   };
 }

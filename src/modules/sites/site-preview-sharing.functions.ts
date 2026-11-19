@@ -1,3 +1,6 @@
+import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
+import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -116,10 +119,23 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       // family contacts, unapproved imagery, or private editorial baseline.
       const [organization] = await tx.select({ name: organizations.name })
         .from(organizations).where(eq(organizations.id, site.organizationId)).limit(1);
+      // Saved Programs & Audiences are part of the proposed website, not merely
+      // private configuration. Use the existing bounded planning content channel
+      // for display, with zero independent enrollment or publication actions.
+      const preferences = siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+      const authored = preferences.success
+        ? resolveSiteContentBlocks(
+            safeReadSiteContentChannelConfig(site.metadata.websiteContentChannels),
+            { mode: "private", preferences: preferences.data },
+          )
+        : [];
+      const plannedPrograms = projectPlannedSiteProgramsForPreview(
+        preferences.success ? preferences.data : null, authored);
       const page = projectShareableSitePreview({
         siteName: site.name,
         organizationName: organization?.name ?? "Proposed learning community",
         content,
+        plannedPrograms,
       });
       const pages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
         path, renderPublicSiteHtml(page, { path, localPreview: true }),

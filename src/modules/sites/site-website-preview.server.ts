@@ -1,3 +1,4 @@
+import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
@@ -121,7 +122,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     (["pending","approved","rejected","revoked"] as const).includes(
       row.status as "pending"|"approved"|"rejected"|"revoked")
       ? [{name:row.name,status:row.status as "pending"|"approved"|"rejected"|"revoked"}] : []) ?? null;
-  const contentBlocks = resolveSiteContentBlocks(
+  const baseContentBlocks = resolveSiteContentBlocks(
     contentConfig, {
       mode: "private", preferences: preferences.success ? preferences.data : null,
       siteSetup:{name:site.name,organizationName:site.organizationName,
@@ -133,6 +134,15 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
       noncredit: noncreditReleases, classes, classTimezone:siteConfiguration?.timezone??null,
       enrollmentOrigin: noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
     });
+
+  // Website previews show the full Site vision, including planned Program categories.
+  // They do not require an adopted Solution or grant registration authority.
+  const proposedPrograms = projectPlannedSiteProgramsForPreview(
+    preferences.success ? preferences.data : null, baseContentBlocks);
+  const contentBlocks = [
+    ...baseContentBlocks.filter(block => block.channel !== "learning.interests"),
+    ...proposedPrograms,
+  ];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
