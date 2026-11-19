@@ -71,8 +71,8 @@ async function main(){
   // are included in the serialized report.
   const eligible=await sql`
     SELECT DISTINCT a.course_id,a.person_id,a.role_code
-    FROM education_v30.professional_role_assignments a
-    JOIN education_v30.professional_capability_authorizations ca
+    FROM public.professional_role_assignments a
+    JOIN public.professional_capability_authorizations ca
       ON ca.id=a.capability_authorization_id
       AND ca.person_id=a.person_id AND ca.capability_id=a.capability_id
     JOIN public.service_capabilities capability
@@ -132,7 +132,7 @@ async function main(){
        WHERE organization_id=${offering.publisher_organization_id}::uuid
          AND active AND site_id IS NULL AND
          role='academic_content_reviewer') reviewer_grants,
-      (SELECT count(*)::int FROM education_v30.professional_role_assignments
+      (SELECT count(*)::int FROM public.professional_role_assignments
        WHERE course_id IN (
          SELECT cv.course_id FROM public.course_versions cv
          JOIN public.offering_courses oc ON oc.course_version_id=cv.id
@@ -142,8 +142,8 @@ async function main(){
        WHERE con.contype='f'
          AND con.confrelid='education_v30.persons'::regclass
          AND con.conrelid IN (
-           'education_v30.professional_role_assignments'::regclass,
-           'education_v30.professional_capability_authorizations'::regclass
+           'public.professional_role_assignments'::regclass,
+           'public.professional_capability_authorizations'::regclass
          )) legacy_provider_person_fks
   `;
 
@@ -183,12 +183,12 @@ async function main(){
           AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE)
           AND (v.valid_through IS NULL OR v.valid_through>=CURRENT_DATE)
       ) AS verified_publisher_evidence,
-      (SELECT count(*)::int FROM education_v30.content_asset_versions v
+      (SELECT count(*)::int FROM public.content_asset_versions v
         JOIN public.content_assets a ON a.id=v.asset_id
         JOIN target t ON t.publisher_organization_id=a.owner_organization_id
       ) AS publisher_asset_versions,
-      (SELECT count(*)::int FROM education_v30.professional_capability_authorizations ca
-        JOIN education_v30.professional_role_assignments a
+      (SELECT count(*)::int FROM public.professional_capability_authorizations ca
+        JOIN public.professional_role_assignments a
           ON a.capability_authorization_id=ca.id AND a.person_id=ca.person_id
         JOIN public.offering_courses oc
           ON oc.offering_version_id=(SELECT id FROM target)
@@ -208,7 +208,7 @@ async function main(){
       (SELECT count(*)::int FROM public.deployment_offering_adoptions adoption
         JOIN public.program_deployments deployment
           ON deployment.id=adoption.deployment_id
-        JOIN education_v30.education_operation_organization_roles relation
+        JOIN public.education_operation_organization_roles relation
           ON relation.operation_id=deployment.operation_id
         JOIN target t ON t.id=adoption.offering_version_id
         WHERE relation.role_code='operator' AND relation.status='approved'
@@ -219,11 +219,11 @@ async function main(){
       (SELECT count(*)::int FROM public.deployment_offering_adoptions adoption
         JOIN public.program_deployments deployment
           ON deployment.id=adoption.deployment_id
-        JOIN education_v30.education_operation_organization_roles relation
+        JOIN public.education_operation_organization_roles relation
           ON relation.operation_id=deployment.operation_id
         JOIN public.education_operation_sites os
           ON os.operation_id=deployment.operation_id
-        JOIN education_v30.site_organization_roles site_role
+        JOIN public.site_organization_roles site_role
           ON site_role.site_id=os.site_id
           AND site_role.organization_id=relation.organization_id
         JOIN target t ON t.id=adoption.offering_version_id
@@ -243,7 +243,7 @@ async function main(){
         FROM (
           SELECT DISTINCT ON (rr.deployment_id,rr.review_kind)
             rr.deployment_id,rr.review_kind,rr.outcome,rr.expires_at
-          FROM education_v30.deployment_readiness_reviews rr
+          FROM public.deployment_readiness_reviews rr
           JOIN public.deployment_offering_adoptions a
             ON a.deployment_id=rr.deployment_id
           WHERE a.offering_version_id=(SELECT id FROM target)
@@ -268,14 +268,14 @@ async function main(){
   `;
   const [manifest]=await sql`
     SELECT m.id,m.manifest_status,
-      (SELECT count(*)::int FROM education_v30.content_publication_manifest_items i
+      (SELECT count(*)::int FROM public.content_publication_manifest_items i
        WHERE i.manifest_id=m.id) asset_uses,
       (SELECT count(DISTINCT d.review_kind)::int FROM (
         SELECT DISTINCT ON (review_kind) review_kind,decision
-        FROM education_v30.content_manifest_review_decisions
+        FROM public.content_manifest_review_decisions
         WHERE manifest_id=m.id ORDER BY review_kind,decision_order DESC
       ) d WHERE d.decision='approved') approved_review_categories
-    FROM education_v30.content_publication_manifests m
+    FROM public.content_publication_manifests m
     WHERE m.offering_version_id=${offeringVersionId}::uuid
     ORDER BY m.created_at DESC,m.id DESC LIMIT 1
   `;
