@@ -94,6 +94,10 @@ export const launchModuleDestinationsV61: Record<DestinationModuleId, Destinatio
   },
 };
 
+export function isDestinationModuleV61(id: ModuleId): id is DestinationModuleId {
+  return Object.prototype.hasOwnProperty.call(launchModuleDestinationsV61, id);
+}
+
 export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
   module: DestinationModuleId; title: string; stage: string; siteId: string;
 }) {
