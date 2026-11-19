@@ -80,7 +80,9 @@ BEGIN
  ON k.conrelid=expected_fk.child_oid::oid AND k.conname=expected_fk.conname
  WHERE k.contype='f' AND k.confrelid='public.people'::regclass
    AND k.convalidated AND NOT k.condeferrable AND NOT k.condeferred
-   AND pg_get_constraintdef(k.oid)=replace(expected_fk.definition,
+   AND replace(pg_get_constraintdef(k.oid),
+       'REFERENCES people(id)','REFERENCES public.people(id)')
+       =replace(expected_fk.definition,
        'REFERENCES education_v30.persons(id)','REFERENCES public.people(id)');
  IF matches<>14 THEN RAISE EXCEPTION 'Person rebind postflight failed (% constraints)',matches; END IF;
  IF (SELECT count(*) FROM education_v30.persons)<>0
