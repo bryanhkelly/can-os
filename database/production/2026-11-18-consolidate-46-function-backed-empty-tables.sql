@@ -143,7 +143,7 @@ BEGIN
     ('readiness_requirement_evidence',410791,true,true,1,1,4,0,5),
     ('workforce_compensation_agreements',409145,true,true,1,0,4,1,5),
     ('workforce_compensation_terms',409182,true,true,1,0,3,3,6)
-) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) v ON p.prosrc ILIKE '%'||v.name||'%';
+) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) candidate ON p.prosrc ILIKE '%'||candidate.name||'%';
   IF fcount<>34 THEN RAISE EXCEPTION 'Expected 34 referencing routines, found %',fcount; END IF;
   FOR fn IN
     SELECT DISTINCT p.oid,p.oid::regprocedure AS proc_id,p.proconfig,ns.nspname AS fn_schema,
@@ -196,7 +196,7 @@ BEGIN
     ('readiness_requirement_evidence',410791,true,true,1,1,4,0,5),
     ('workforce_compensation_agreements',409145,true,true,1,0,4,1,5),
     ('workforce_compensation_terms',409182,true,true,1,0,3,3,6)
-) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) v ON p.prosrc ILIKE '%'||v.name||'%'
+) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) candidate ON p.prosrc ILIKE '%'||candidate.name||'%'
   LOOP
     IF fn.fn_schema<>'education_v30' OR fn.function_owner<>'neondb_owner'
       OR fn.proconfig IS DISTINCT FROM ARRAY['search_path=education_v30, pg_catalog']::text[]
@@ -302,7 +302,7 @@ BEGIN
     ('readiness_requirement_evidence',410791,true,true,1,1,4,0,5),
     ('workforce_compensation_agreements',409145,true,true,1,0,4,1,5),
     ('workforce_compensation_terms',409182,true,true,1,0,3,3,6)
-) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) v ON p.prosrc ILIKE '%'||v.name||'%'
+) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) candidate ON p.prosrc ILIKE '%'||candidate.name||'%'
   LOOP
     EXECUTE format('ALTER FUNCTION %s SET search_path TO education_v30, pg_catalog, public',fn.proc_id);
   END LOOP;
@@ -418,7 +418,7 @@ BEGIN
     ('readiness_requirement_evidence',410791,true,true,1,1,4,0,5),
     ('workforce_compensation_agreements',409145,true,true,1,0,4,1,5),
     ('workforce_compensation_terms',409182,true,true,1,0,3,3,6)
-) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) v ON p.prosrc ILIKE '%'||v.name||'%'
+) snapshot(name,source_oid,rls,force_rls,policy_count,trigger_count,outbound_fks,inbound_fks,index_count)) candidate ON p.prosrc ILIKE '%'||candidate.name||'%'
   LOOP
     IF fn.proconfig IS DISTINCT FROM ARRAY['search_path=education_v30, pg_catalog, public']::text[]
     THEN RAISE EXCEPTION 'Function search path was not rebound: %',fn.proc_id; END IF;
