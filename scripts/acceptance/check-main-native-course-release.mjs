@@ -196,10 +196,10 @@ async function main(){
           ON cv.id=oc.course_version_id AND cv.course_id=a.course_id
         WHERE ca.decision='approved'
       ) AS approved_publisher_capability_assignments,
-      (SELECT count(*)::int FROM education_v30.blueprint_outputs bo
-        JOIN education_v30.blueprint_execution_batches batch
+      (SELECT count(*)::int FROM public.blueprint_outputs bo
+        JOIN public.blueprint_execution_batches batch
           ON batch.id=bo.execution_batch_id
-        JOIN education_v30.blueprint_configuration_offering_intents intent
+        JOIN public.blueprint_configuration_offering_intents intent
           ON intent.configuration_version_id=batch.configuration_version_id
         JOIN target t ON intent.offering_version_id=t.id
         WHERE batch.execution_status='executed'
