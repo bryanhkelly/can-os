@@ -42,8 +42,11 @@ function InterestEventsPage() {
   return <InterestEventsWorkspace data={result.data} selection={selection} />;
 }
 
-export function InterestEventsWorkspace({ data, selection={}, mode="directory", eventId }: {
+export function InterestEventsWorkspace({
+  data, selection={}, mode="directory", eventId, suggestedTitle=null, titleSource=null,
+}: {
   data: Data; selection?: { siteId?: string; programId?: string }; mode?: "directory"|"create"|"detail"; eventId?: string;
+  suggestedTitle?:string|null;titleSource?:string|null;
 }) {
   const router = useRouter();
   const search = selection;
@@ -70,7 +73,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   const selectedProgram = scopedPrograms.find(program => program.id === selectedProgramId);
   const defaultProgramTimezone = scopedPrograms.find(program => program.id === defaultProgramId)?.timezone;
   const timezone = siteTimezoneSchema.safeParse(selectedProgram?.timezone).success ? selectedProgram!.timezone : null;
-  const [title, setTitle] = useState("Parent information session");
+  const [title, setTitle] = useState(suggestedTitle?.trim() || "Parent information session");
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<"information_session" | "open_house" | "campus_tour" | "family_experience" | "other">("information_session");
   const [visibility, setVisibility] = useState<"public" | "invitation_only">("invitation_only");
@@ -165,6 +168,13 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
     <MutationFeedback state={mutation} pendingMessage="Saving event..." />
     {mode==="create"&&<form noValidate onSubmit={event => void submit(event)} className="mt-6 space-y-4">
       <h2 className="font-semibold">Create an interest event</h2>
+      {titleSource && titleSource!=="none" && <p className="text-sm text-muted-foreground">
+        {titleSource==="saved-package"
+          ? "The event title was started from your saved Marketing Package."
+          : "The event title was suggested from your saved Site Story and planned Programs & Audiences."}
+        {" "}Review and edit the title. Dates, description, location and actual event permissions
+        are managed here, not by the Marketing Package.
+      </p>}
       {!scopedPrograms.length && <p role="status" className="text-sm">No Programs are available for this selected Site.</p>}
       <Field label="School Program" required
         error={attempted&&!selectedProgram?"Choose a Program with a valid Site timezone.":undefined}>
