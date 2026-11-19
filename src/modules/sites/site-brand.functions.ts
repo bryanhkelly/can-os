@@ -144,7 +144,7 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
       const previous=site.currentBrandVersionId
         ? await tx.select().from(siteBrandVersions).where(and(eq(siteBrandVersions.id,site.currentBrandVersionId),
           eq(siteBrandVersions.siteId,site.id))).limit(1) : [];
-      if(previous[0]?.fingerprint===fingerprint)
+      if(previous[0] && canonicalJson(previous[0].configuration)===canonicalJson(config))
         return {changed:false,brandVersionId:previous[0].id,revision:previous[0].revision};
       const nextRevision=previous[0]?previous[0].revision+1:1;
       const [saved]=await tx.insert(siteBrandVersions).values({

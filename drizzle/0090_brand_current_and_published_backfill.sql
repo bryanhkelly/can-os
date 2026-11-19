@@ -4,7 +4,7 @@
 -- Do not erase legacy JSON until a separate checked cutover has passed.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 --> statement-breakpoint
-CREATE TEMP TABLE can_brand_source ON COMMIT DROP AS
+CREATE TEMP TABLE can_brand_source AS
 WITH published AS (
   SELECT DISTINCT ON (site_id)
     site_id, revision, content, created_by_person_id
@@ -119,3 +119,9 @@ END $$;
 -- SELECT count(*) FROM site_publications
 --   WHERE status='published' AND brand_version_id IS NULL;
 -- No destructive delete of Brand content is authorized in this migration.
+
+--> statement-breakpoint
+UPDATE site_marketing_packages p SET brand_version_id=s.current_brand_version_id
+FROM sites s WHERE p.site_id=s.id AND p.brand_version_id IS NULL AND s.current_brand_version_id IS NOT NULL;
+--> statement-breakpoint
+DROP TABLE can_brand_source;
