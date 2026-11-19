@@ -791,7 +791,7 @@ function LocalWebsiteCopyEditor({
                 key={data.siteId + ":" + data.contentChannelConfig.revision}
                 siteId={data.siteId}
                 initialConfig={data.contentChannelConfig}
-                canPublish={data.canPublish}
+                canPublish={allowPublication && data.canPublish}
                 onSaved={() => { void router.invalidate(); }} />
               </div>
             : <WorkspaceNotice tone="attention" className="mt-4">
@@ -824,10 +824,10 @@ function LocalWebsiteCopyEditor({
               new URL(privateWebsitePreviewUrl(data.siteId), window.location.origin).href,
             ).then(() => setShareMessage("Preview link copied. Reviewers must sign in with their own authorized Site account."))
               .catch(() => setShareMessage("Copy the address from Open full-page preview; clipboard permission was unavailable."))}>
-            Copy preview link
+            Copy private preview link
           </Button>}
         </div>
-        <p className="text-xs text-muted-foreground">The full-page link uses your existing CAN OS sign-in. It never publishes a draft. {data.currentRevision > 0 ? "It shows the latest saved revision." : "Until the first save, it shows a clearly marked sample, not your unsaved edits."} {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
+        <p className="text-xs text-muted-foreground">This private full-page link requires a CAN OS sign-in; use Share preview for external reviewers. It never publishes a draft. {data.currentRevision > 0 ? "It shows the latest saved revision." : "Until the first save, it shows a clearly marked sample, not your unsaved edits."} {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
         {data.currentRevision === 0 && <p className="border p-3 text-sm" role="status">No saved website draft exists yet. The full-page preview shows an illustrative sample. You can test unsaved changes below; sharing your customized design requires saving.</p>}
         {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>}
         {previewError&&<WorkspaceNotice tone="danger">{previewError}</WorkspaceNotice>}
@@ -876,7 +876,7 @@ function LocalWebsiteCopyEditor({
               className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
               <span>Revision {version.revision} · {version.status === "published" ? "Published" : version.status === "draft" ? "Private draft" : "Held for review"}
                 {" · "}{new Date(version.createdAt).toLocaleString()}</span>
-              {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
+              {allowPublication && data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
                 <Button variant="outline" type="button" disabled={busy || revisionConflict} onClick={() => void restore(version.revision)}
                   className=" border px-3 py-1 text-xs disabled:opacity-50">
                   Restore as new revision
