@@ -93,6 +93,9 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
               setDeliveryContext(selected.value);
               setOfferings(null);
               setCanonicalSiteId(null);
+              setError(null);
+              setQuery("");
+              setAvailabilityFilter("all");
             }
           }}>
           {deliveryOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
