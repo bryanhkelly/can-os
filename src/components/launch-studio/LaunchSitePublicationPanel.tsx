@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceNotice, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
-import { readLaunchSitePublication } from "@/modules/sites/launch-site-publication.functions";
+import { readLaunchSitePublication, reviewLaunchSiteWebsiteCopy } from "@/modules/sites/launch-site-publication.functions";
 import { setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
 
 type Publication = Awaited<ReturnType<typeof readLaunchSitePublication>>;
@@ -23,6 +23,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reviewed, setReviewed] = useState(false);
+  const [copyReviewed, setCopyReviewed] = useState(false);
   const [reason, setReason] = useState("");
   const [reachability, setReachability] = useState<Reachability | null>(null);
   const [checking, setChecking] = useState(false);
@@ -53,7 +54,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
 
   async function change(action: "publish" | "unpublish") {
     if (!state?.address || busy || reason.trim().length < 10 || reason.trim().length > 500) return;
-    if (action === "publish" && (!reviewed || !state.publishingPrerequisitesPresent)) return;
+    if (action === "publish" && (!reviewed || !state.publishingPrerequisitesPresent ||
+      state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required")) return;
     setBusy(true);
     setError(null);
     try {
@@ -71,6 +73,25 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
     } catch (cause) {
       setError(normalizeClientError(cause,
         "Publication was not changed. Review the Site and retry.").message);
+    } finally { setBusy(false); }
+  }
+
+  async function reviewCopy() {
+    if (!state?.canReviewWebsiteCopy || state.latestWebsiteStatus !== "draft" ||
+      !copyReviewed || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await reviewLaunchSiteWebsiteCopy({ data: {
+        siteId, expectedRevision: state.latestWebsiteRevision, contentReviewed: true,
+      } });
+      setCopyReviewed(false);
+      if (result.status !== "published") {
+        setError("The website copy contains protected claims that require independent review.");
+      }
+      await load();
+    } catch (cause) {
+      setError(normalizeClientError(cause, "Website copy could not be approved.").message);
     } finally { setBusy(false); }
   }
 
@@ -116,6 +137,39 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
             <p className="mt-2 text-sm">{state.hostingConfigured ? "Configured · verify reachability" : "Not enabled in this deployment"}</p>
           </div>
         </div>
+        {state.latestWebsiteStatus === "draft" && <section className="space-y-3 border p-4"
+          aria-label="Approve saved website copy">
+          <div>
+            <h3 className="text-sm font-semibold">Review the latest website copy</h3>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Website revision {state.latestWebsiteRevision} is still private.
+              Review its claims, image rights, consent, and exact saved wording before submitting
+              it through the existing protected-claim screening workflow.
+              Approving local copy does not publish the Site.
+            </p>
+          </div>
+          {state.canReviewWebsiteCopy ? <>
+            <div className="flex items-start gap-3">
+              <Checkbox id="site-copy-reviewed" checked={copyReviewed}
+                onChange={event => setCopyReviewed(event.currentTarget.checked)} />
+              <Label htmlFor="site-copy-reviewed" className="text-sm leading-6">
+                I inspected the latest saved website content and confirmed it is appropriate
+                for public review, including images and required consent.
+              </Label>
+            </div>
+            <Button disabled={busy || !copyReviewed}
+              onClick={() => void reviewCopy()} variant="outline">
+              {busy ? "Reviewing copy…" : "Approve reviewed website copy"}
+            </Button>
+          </> : <WorkspaceNotice tone="attention">
+            An authorized Site website editor must approve the local website copy.
+          </WorkspaceNotice>}
+        </section>}
+        {state.latestWebsiteStatus === "review_required" && <WorkspaceNotice tone="attention">
+          The newest website revision contains protected institutional claims awaiting independent
+          review. Revise the copy in Website & Brand or complete the existing institutional review.
+          Do not publish the Site based on an unresolved draft.
+        </WorkspaceNotice>}
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="outline">
             <Link to="/launch/website" search={{ siteId, returnToHub: true }}>Review website design</Link>
@@ -147,7 +201,11 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                   : "Public HTTPS reachability could not be verified."}
               </p>}
             </div>
-          </> : !state.publishingPrerequisitesPresent ? <WorkspaceNotice tone="attention">
+          </> : (state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required")
+          ? <WorkspaceNotice tone="attention">
+            Finish reviewing or resolving the latest Site website revision before publishing
+            the public Site. Existing approved listings remain separate from website copy.
+          </WorkspaceNotice> : !state.publishingPrerequisitesPresent ? <WorkspaceNotice tone="attention">
             Official publication requires reviewed Site-owned content or at least one independently
             eligible academic or enrichment listing. Your design can still be privately previewed.
           </WorkspaceNotice> : <WorkspaceNotice tone="info">
@@ -173,7 +231,9 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                   maxLength={500} rows={3} placeholder="Document what was reviewed and why this decision is appropriate." />
               </Field>
               <Button disabled={busy || reason.trim().length < 10 ||
-                (state.address.status !== "published" && (!reviewed || !state.publishingPrerequisitesPresent))}
+                (state.address.status !== "published" &&
+                  (!reviewed || !state.publishingPrerequisitesPresent ||
+                   state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required"))}
                 variant={state.address.status === "published" ? "outline" : "default"}
                 onClick={() => void change(state.address!.status === "published" ? "unpublish" : "publish")}>
                 {busy ? "Saving decision…" : state.address.status === "published" ? "Unpublish Site" : "Publish Site website"}
