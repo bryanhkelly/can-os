@@ -10,7 +10,7 @@ import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import {
-  cleanSiteEnvironmentV61, cleanSiteHostingV61, emptySiteHostingV61, emptySiteStoryV61,
+  applySiteEnvironmentDeliveryV61, cleanSiteEnvironmentV61, cleanSiteHostingV61, emptySiteHostingV61, emptySiteStoryV61,
   siteEnvironmentV61Schema, siteHostingV61Schema, siteStorySourceV61Schema, siteStoryV61Schema,
 } from "@/domain/site-information-v61";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -81,14 +81,8 @@ export const saveSiteInformationV61 = createServerFn({ method: "POST" })
         nextMetadata = { ...metadata, siteHostingV61: host };
       } else if (data.section === "environment") {
         const environment = cleanSiteEnvironmentV61(data.environment);
-        const previous = siteLaunchPreferencesSchema.safeParse(metadata.launchPreferences);
-        // Existing interest IDs must not be erased by an unrelated delivery edit.
-        if (metadata.launchPreferences != null && !previous.success)
-          throw new Error("Existing Site interests need review. Refresh before editing the learning environment.");
-        const preferences = siteLaunchPreferencesSchema.parse({
-          delivery: environment.delivery,
-          interestIds: previous.success ? previous.data.interestIds : [],
-        });
+        // Keep unrelated Program interests intact; malformed legacy data fails closed.
+        const preferences = applySiteEnvironmentDeliveryV61(metadata.launchPreferences, environment);
         before = { environment: metadata.siteEnvironmentV61 ?? null, preferences: metadata.launchPreferences ?? null };
         after = { environment, preferences };
         nextMetadata = { ...metadata, siteEnvironmentV61: environment, launchPreferences: preferences };

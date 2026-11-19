@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { siteLaunchPreferencesSchema } from "./site-launch-preferences";
 
 /** Private Site Information planning records. No public or institutional approval follows from these. */
 export const siteHostingV61Schema = z.object({
@@ -63,4 +64,16 @@ export function cleanSiteHostingV61(value: SiteHostingV61): SiteHostingV61 {
 }
 export function cleanSiteEnvironmentV61(value: SiteEnvironmentV61): SiteEnvironmentV61 {
   return value.delivery === "digital" ? { delivery: "digital", physicalSpaceArrangement: "" } : value;
+}
+
+/** Update delivery without erasing existing Site Program interests. Invalid legacy
+ * preferences fail closed instead of being replaced by an empty selection. */
+export function applySiteEnvironmentDeliveryV61(previous: unknown, environment: SiteEnvironmentV61) {
+  const parsed = siteLaunchPreferencesSchema.safeParse(previous);
+  if (previous != null && !parsed.success)
+    throw new Error("Existing Site interests need review. Refresh before editing the learning environment.");
+  return siteLaunchPreferencesSchema.parse({
+    delivery: environment.delivery,
+    interestIds: parsed.success ? parsed.data.interestIds : [],
+  });
 }

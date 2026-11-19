@@ -300,7 +300,6 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
               index === 3 ? storySaved && !storyDirty : false;
           return <button key={item.title} type="button" disabled={busy || reloadRequired}
             aria-current={index === step ? "step" : undefined}
-            aria-controls={"site-information-step-" + index}
             onClick={() => selectStep(index as Step)}
             className={"min-w-0 border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
               (index === step ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted/30")}>

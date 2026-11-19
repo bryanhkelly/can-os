@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  cleanSiteEnvironmentV61, cleanSiteHostingV61, emptySiteStoryV61,
+  applySiteEnvironmentDeliveryV61, cleanSiteEnvironmentV61, cleanSiteHostingV61, emptySiteStoryV61,
   siteEnvironmentV61Schema, siteHostingV61Schema, siteStoryV61Schema,
 } from "./site-information-v61";
 
@@ -48,6 +48,19 @@ describe("Site Information V6.1 planning source", () => {
       ...emptySiteStoryV61(),
       communityNeed: "a".repeat(1001),
     }).success).toBe(false);
+  });
+
+  it("preserves saved Program interests during a delivery-only change", () => {
+    expect(applySiteEnvironmentDeliveryV61({
+      delivery: "physical", interestIds: ["grades-6-8", "summer"],
+    }, { delivery: "digital", physicalSpaceArrangement: "" })).toEqual({
+      delivery: "digital", interestIds: ["grades-6-8", "summer"],
+    });
+    expect(() => applySiteEnvironmentDeliveryV61({
+      delivery: "physical", interestIds: ["unsupported-program"],
+    }, { delivery: "both", physicalSpaceArrangement: "planned" })).toThrow(
+      /need review/,
+    );
   });
 
   it("never accepts unsupported values or extraneous publishing authority", () => {
