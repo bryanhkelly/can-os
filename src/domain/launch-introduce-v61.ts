@@ -58,7 +58,7 @@ export const introduceModuleConfigV61: Record<IntroduceModuleV61, IntroduceConfi
     guidance: "Planned learning interests are not approved Offerings. No contacts, submissions, application invitations or email sends are created by these materials.",
     defaultPurpose: "interest-invitation",
     purposes: ["interest-invitation", "program-interest"],
-    handoffDescription: "Application invitations are a separate, permission-checked workflow for an eligible receiving Program. A Site-wide prospect CRM is not implemented.",
+    handoffDescription: "Preopening interest outreach is a separate, permission-checked workflow for eligible developing Programs. Applications and enrollment require their own authority. A Site-wide prospect CRM is not implemented.",
     handoffs: [
       { title: "Invite families to express interest",
         description: "Use the existing consent-aware preopening interest workflow when an eligible Program exists.",
