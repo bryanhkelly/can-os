@@ -6,7 +6,7 @@ import {
   listSiteMarketingPackagesV61, readSiteMarketingSuggestionsV61,
 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { containsProtectedInstitutionalClaim } from "@/domain/site-local-content";
-import { siteProgramSelectionSchema } from "@/lib/route-search";
+import { DomainError } from "@/domain/errors";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
@@ -16,23 +16,36 @@ import { LoaderFailure } from "@/lib/loader-failure";
  * reviewed editorial projection used in Launch Studio. Nothing is sent or
  * created by this read; no campaign, event or Story is copied into a new store.
  */
-const eventCreateSearchSchema=siteProgramSelectionSchema.extend({
+const eventCreateSearchSchema=z.object({
+  siteId:z.string().uuid().optional(),
+  programId:z.string().uuid().optional(),
   packageId:z.string().uuid().optional(),
 });
 export const Route = createFileRoute("/operations/interest-events_/new")({
   validateSearch: (search: Record<string, unknown>) => eventCreateSearchSchema.parse(search),
-  loaderDeps: ({search})=>({siteId:search.siteId,packageId:search.packageId}),
+  loaderDeps: ({search})=>({
+    siteId:search.siteId,programId:search.programId,packageId:search.packageId,
+  }),
   loader: ({deps})=>safeLoader(async()=>{
     const data=await listSchoolInterestEvents();
-    const authorizedSite=deps.siteId &&
-      data.programs.some(program=>program.siteId===deps.siteId);
-    if(!authorizedSite)return {data,suggestedTitle:null,source:null};
+    // A Launch handoff must never silently fall back to a different Site or
+    // Program when its explicit selection is stale or outside the grant.
+    if(deps.siteId && !data.programs.some(program=>program.siteId===deps.siteId))
+      throw new DomainError("UNAVAILABLE","No authorized Programs are available at the requested Site.");
+    if(deps.programId && !data.programs.some(program=>
+      program.id===deps.programId && (!deps.siteId || program.siteId===deps.siteId)))
+      throw new DomainError("UNAVAILABLE","The requested Program does not belong to the selected Site.");
+    if(deps.packageId && !deps.siteId)
+      throw new DomainError("UNAVAILABLE","Choose the Marketing Package's Site before creating an event.");
+    if(!deps.siteId)return {data,suggestedTitle:null,source:null};
     const packages=deps.packageId
       ? await listSiteMarketingPackagesV61({data:{siteId:deps.siteId!}}).catch(()=>null)
       : null;
     const selected=packages?.find(item=>
       item.id===deps.packageId && item.siteId===deps.siteId &&
       item.status==="draft" && item.content.purpose==="event-invitation");
+    if(deps.packageId && !selected)
+      throw new DomainError("UNAVAILABLE","This event invitation Package is unavailable or archived at the selected Site.");
     const savedHeadline=selected?.content.headline?.trim()??"";
     if(savedHeadline && !containsProtectedInstitutionalClaim(savedHeadline))
       return {data,suggestedTitle:savedHeadline,source:"saved-package" as const};
