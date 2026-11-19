@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { CreateAction, DirectoryPagination, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Field, FieldError } from "@/components/ui/field";
@@ -47,7 +47,11 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
 }) {
   const router = useRouter();
   const search = selection;
-  const events = data.events.filter(event => (!search.siteId || data.programs.some(program => program.id === event.programId && program.siteId === search.siteId)) &&
+  // A Launch Studio handoff carries an exact Site. Present only Programs
+  // belonging to that Site, even when this registrar can access several.
+  const scopedPrograms = data.programs.filter(program =>
+    !search.siteId || program.siteId === search.siteId);
+  const events = data.events.filter(event => (!search.siteId || scopedPrograms.some(program => program.id === event.programId)) &&
     (!search.programId || event.programId === search.programId));
   const [eventPage, setEventPage] = useState(1);
   const eventPageSize = 20;
@@ -55,10 +59,14 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   const visibleEventPage = Math.min(eventPage, eventTotalPages);
   const visibleEvents = events.slice((visibleEventPage - 1) * eventPageSize, visibleEventPage * eventPageSize);
   const selectedEvent = mode==="detail" ? events.find(event => event.id===eventId) : undefined;
-  const [programId, setProgramId] = useState(
-    data.programs.find(program => program.id === search.programId)?.id ?? data.programs[0]?.id ?? "",
-  );
-  const selectedProgram = data.programs.find(program => program.id === programId);
+  const defaultProgramId = scopedPrograms.find(program => program.id === search.programId)?.id ??
+    scopedPrograms[0]?.id ?? "";
+  const [programId, setProgramId] = useState(defaultProgramId);
+  // Derive selection immediately if the route changes to another Site without
+  // remounting the workspace. Never submit the previous Site's stale ID.
+  const selectedProgramId = scopedPrograms.some(program => program.id === programId)
+    ? programId : defaultProgramId;
+  const selectedProgram = scopedPrograms.find(program => program.id === selectedProgramId);
   const timezone = siteTimezoneSchema.safeParse(selectedProgram?.timezone).success ? selectedProgram!.timezone : null;
   const [title, setTitle] = useState("Parent information session");
   const [description, setDescription] = useState("");
@@ -67,6 +75,13 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   const [location, setLocation] = useState("");
   const [startsAt, setStartsAt] = useState(() => timezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000), timezone) : "");
   const [endsAt, setEndsAt] = useState(() => timezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), timezone) : "");
+  useEffect(() => {
+    setProgramId(defaultProgramId);
+    const nextTimezone = scopedPrograms.find(program => program.id === defaultProgramId)?.timezone;
+    const validTimezone = siteTimezoneSchema.safeParse(nextTimezone).success ? nextTimezone : null;
+    setStartsAt(validTimezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000), validTimezone) : "");
+    setEndsAt(validTimezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), validTimezone) : "");
+  }, [search.siteId, search.programId]);
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
   const [createdEventId, setCreatedEventId] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -93,7 +108,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
     await mutation.run(async () => {
       const result = await createSchoolInterestEvent({ data: {
         requestId: crypto.randomUUID(),
-        programId,
+        programId:selectedProgram.id,
         title:title.trim(),
         description,
         kind,
@@ -146,18 +161,18 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
     <MutationFeedback state={mutation} pendingMessage="Saving event..." />
     {mode==="create"&&<form noValidate onSubmit={event => void submit(event)} className="mt-6 space-y-4">
       <h2 className="font-semibold">Create an interest event</h2>
-      {!data.programs.length && <p role="status" className="text-sm">No school programs are available in your authorized scope.</p>}
+      {!scopedPrograms.length && <p role="status" className="text-sm">No Programs are available for this selected Site.</p>}
       <Field label="School Program" required
         error={attempted&&!selectedProgram?"Choose a Program with a valid Site timezone.":undefined}>
-        <Select value={programId} onChange={event => {
-          const next = data.programs.find(program => program.id === event.target.value);
+        <Select value={selectedProgramId} onChange={event => {
+          const next = scopedPrograms.find(program => program.id === event.target.value);
           setProgramId(event.target.value);
           if (next?.timezone) {
             setStartsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000), next.timezone));
             setEndsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), next.timezone));
           } else { setStartsAt(""); setEndsAt(""); }
         }}>
-          {data.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
+          {scopedPrograms.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
         </Select>
       </Field>
       <Field label="Event name" required
@@ -186,7 +201,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       </div>
       {timeValidationError&&<FieldError>{timeValidationError}</FieldError>}
       {timezone ? <p className="text-xs text-muted-foreground">Times use the selected Site's timezone: {timezone}.</p>
-        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/launch/site" search={{ siteId: selectedProgram?.siteId, programId }} className="underline">Configure school timezone</Link></p>}
+        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/launch/site" search={{ siteId: selectedProgram?.siteId, programId: selectedProgramId }} className="underline">Configure school timezone</Link></p>}
       <Field label="Location or meeting details">
         <Input maxLength={300} value={location} onChange={event => setLocation(event.target.value)} />
       </Field>
