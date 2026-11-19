@@ -44,15 +44,15 @@ export const launchModuleDestinationsV61: Record<DestinationModuleId, Destinatio
     ],
   },
   open: {
-    subtitle: "Open only the experiences independently approved to welcome learners.",
-    intro: "Publishing the Site website makes public marketing possible, not enrollment. Check each Offering's approved operating model, available seats, required safeguards, receiving Program and separately authorized registration before accepting learners.",
+    subtitle: "Enable Enrollment only for Offerings independently authorized to receive learners."
+    intro: "Funding and admissions are prepared before opening. Publishing the Site website does not enable enrollment. Each Offering must have an approved operating model, required safeguards, capacity and a receiving Program before its registration may be activated."
     state: "governed",
-    note: "Activation happens only in the receiving authorized enrollment service. This page never infers readiness from a published website or a completed setup step.",
+    note: "Enable Enrollment is an independent action in the authorized receiving service, not a Site-wide toggle. Publishing the website or completing Prepare never activates registration."
     links: [
       { label: "Review readiness and opening authority", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Independent approval and operational requirements" },
       { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Official website publication and independent HTTPS reachability" },
       { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Approved receiving Programs and capacity, not automatic enrollment" },
-      { label: "Configure eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Only separately authorized noncredit releases may be open for enrollment" },
+      { label: "Manage eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Enable enrollment only for independently approved noncredit releases" },
       { label: "Open your Site workspace", path: id => `/sites/${scope(id)}`, detail: "Existing Site operations, subject to active membership" },
     ],
   },
@@ -84,8 +84,10 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
         </StatusBadge>
         <span className="text-xs text-muted-foreground">Your Site remains the same; no new Site is created.</span>
       </div>
-      <WorkspacePanel title="Continue with existing capabilities"
-        description="Open the existing authorized workspace, retaining the selected Site where that destination supports it.">
+      <WorkspacePanel title={module === "open" ? "Enable Enrollment" : "Continue with existing capabilities"}
+        description={module === "open"
+          ? "Review readiness, then use each Offering’s authorized registration workspace to enable enrollment independently."
+          : "Open the existing authorized workspace, retaining the selected Site where that destination supports it."}>
         <div className="grid gap-3">
           {destination.links.map(item => <div key={item.label}
             className="flex flex-wrap items-center justify-between gap-3 border bg-background p-4">
