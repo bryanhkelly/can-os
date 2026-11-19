@@ -44,7 +44,7 @@ BEGIN
    EXECUTE format('SELECT count(*) FROM education_v30.%I',t.name) INTO n;
    IF n<>0 THEN RAISE EXCEPTION 'Source has rows: %',t.name; END IF;
  END LOOP;
- SELECT count(DISTINCT f.oid)::int INTO dep_count FROM pg_proc f JOIN jsonb_array_elements(tables) AS lookup(value) ON f.prosrc ILIKE '%'||(lookup.value->>'name')||'%';
+ SELECT count(DISTINCT p.oid)::int INTO dep_count FROM pg_proc p JOIN jsonb_array_elements(tables) AS lookup(value) ON p.prosrc ILIKE '%'||(lookup.value->>'name')||'%';
  IF dep_count<>21 THEN RAISE EXCEPTION 'Unexpected stored routine set: %',dep_count; END IF;
  FOR f IN SELECT DISTINCT p.oid,p.oid::regprocedure AS identity,p.proconfig,p.prosecdef,
     pg_get_userbyid(p.proowner) owner,n.nspname AS ns
@@ -88,7 +88,7 @@ BEGIN
    replaced:=replaced+1;
  END LOOP;
  FOR f IN SELECT DISTINCT p.oid,p.oid::regprocedure AS identity,p.proconfig
-     FROM pg_proc p JOIN jsonb_array_elements(tables) AS lookup(value) ON f.prosrc ILIKE '%'||(lookup.value->>'name')||'%'
+     FROM pg_proc p JOIN jsonb_array_elements(tables) AS lookup(value) ON p.prosrc ILIKE '%'||(lookup.value->>'name')||'%'
  LOOP
    IF f.proconfig=ARRAY['search_path=education_v30, pg_catalog']::text[]
    THEN EXECUTE format('ALTER FUNCTION %s SET search_path TO education_v30, pg_catalog, public',f.identity);
