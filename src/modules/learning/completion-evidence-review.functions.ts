@@ -80,7 +80,7 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
       FROM education_v30.noncredit_registrations r
       JOIN education_v30.noncredit_training_versions training
         ON training.id=r.training_version_id
-      JOIN education_v30.participation_attributions attribution
+      JOIN public.participation_attributions attribution
         ON attribution.noncredit_registration_id=r.id
       JOIN education_v30.noncredit_completion_decisions prior
         ON prior.registration_id=r.id AND prior.id=${intent.expectedDecisionId}::uuid
@@ -98,7 +98,7 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
              attribution.delivery_site_id AS "deliverySiteId"
       FROM public.class_enrollments e
       JOIN public.classes cls ON cls.id=e.class_id
-      JOIN education_v30.participation_attributions attribution
+      JOIN public.participation_attributions attribution
         ON attribution.class_enrollment_id=e.id
           AND (cls.site_id IS NULL OR attribution.delivery_site_id=cls.site_id)
       JOIN public.class_enrollment_completion_pins pin
@@ -134,14 +134,14 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
       SELECT decision.recipient_person_id AS "participantPersonId",
              issuance.issuer_organization_id AS "providerOrganizationId",
              attribution.delivery_site_id AS "deliverySiteId"
-      FROM education_v30.learning_award_issuances issuance
-      JOIN education_v30.learner_achievement_decisions decision
+      FROM public.learning_award_issuances issuance
+      JOIN public.learner_achievement_decisions decision
         ON decision.id=issuance.achievement_decision_id
       JOIN education_v30.noncredit_completion_decisions completion
         ON completion.id=decision.noncredit_completion_decision_id
       JOIN education_v30.noncredit_registrations registration
         ON registration.id=completion.registration_id
-      JOIN education_v30.participation_attributions attribution
+      JOIN public.participation_attributions attribution
         ON attribution.noncredit_registration_id=registration.id
       WHERE issuance.id=${intent.issuanceId}::uuid
         AND NOT EXISTS(
