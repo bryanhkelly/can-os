@@ -37,7 +37,7 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
       .then(result => { if (active) setWorkspace(result); })
       .catch(caught => { if (active) setError(normalizeClientError(caught,
-        "Published Blueprint recipes could not be loaded for this Site.").message); })
+        "Published Solutions could not be loaded for this Site.").message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [siteId, reload]);
@@ -46,32 +46,32 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
   const visible = filterPublishedSolutionRecipes(templates, query);
   const selected = resolveVisibleSolutionRecipe(visible, selectedId);
 
-  return <WorkspacePanel title="Packaged Solution recipes"
-    description="Browse the real published Blueprint models CAN makes available to your authorized Site.">
-    {loading && <p role="status" className="text-sm">Loading published Solution recipes…</p>}
+  return <WorkspacePanel title="Available Solutions"
+    description="Explore published Solution models and the operational components they include.">
+    {loading && <p role="status" className="text-sm">Loading published Solutions…</p>}
     {error && <div role="alert" className="border border-destructive/30 bg-card p-4 text-sm">
-      <p className="font-semibold">Unable to load Solution recipes</p>
+      <p className="font-semibold">Unable to load Solutions</p>
       <p className="mt-2 text-muted-foreground">{error}</p>
       <p className="mt-2 text-muted-foreground">Published Offerings below have a separate access check.</p>
       <Button type="button" variant="outline" size="sm" className="mt-3"
-        onClick={() => setReload(value => value + 1)}>Retry Solution catalog</Button>
+        onClick={() => setReload(value => value + 1)}>Retry Program Catalog</Button>
     </div>
     {workspace && <>
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{templates.length} published {templates.length === 1 ? "recipe" : "recipes"}</span>
+        <span>{templates.length} published {templates.length === 1 ? "Solution" : "Solutions"}</span>
         <span>{workspace.configurations.length} saved Site {workspace.configurations.length === 1 ? "configuration" : "configurations"}</span>
       </div>
-      {templates.length === 0 ? <EmptyState title="No published Solution recipes"
-        description="CAN must publish a Blueprint recipe before this Site can configure one." className="mt-4" /> : <>
-        <FilterBar label="Published Solution recipes" query={query}
+      {templates.length === 0 ? <EmptyState title="No published Solutions"
+        description="A Solution must be published and available to this Site before it can be configured." className="mt-4" /> : <>
+        <FilterBar label="Published Solutions" query={query}
           onQueryChange={value => { setQuery(value); setSelectedId(null); }}
-          searchLabel="Search published models"
+          searchLabel="Search published Solutions"
           searchPlaceholder="Search titles or components" className="mt-5" />
-        <p role="status" className="mt-3 text-xs text-muted-foreground">{visible.length} matching published models</p>
+        <p role="status" className="mt-3 text-xs text-muted-foreground">{visible.length} matching published Solutions</p>
         {visible.length === 0 ? <EmptyState kind="matches" className="mt-4"
-          title="No matching Solution recipes" description="Try another title or component." /> :
+          title="No matching Solutions" description="Try another title or component." /> :
           <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            <div role="group" className="grid max-h-[34rem] gap-2 overflow-y-auto" aria-label="Published Blueprint models">
+            <div role="group" className="grid max-h-[34rem] gap-2 overflow-y-auto" aria-label="Published Solutions">
               {visible.map(template => {
                 const active = selected?.blueprintVersionId === template.blueprintVersionId;
                 return <Button key={template.blueprintVersionId} type="button"
@@ -89,16 +89,16 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
                 </Button>;
               })}
             </div>
-            {selected && <article className="border bg-background" aria-label="Selected Blueprint recipe detail">
+            {selected && <article className="border bg-background" aria-label="Selected Solution detail">
               <div className="border-b bg-muted p-5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><BookOpen aria-hidden="true" className="size-4" /> Published Blueprint recipe</div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><BookOpen aria-hidden="true" className="size-4" /> Published Solution model</div>
                 <h3 className="mt-3 font-serif text-2xl">{selected.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">Version {selected.versionNo} · {selected.components.length} components in this published configuration</p>
               </div>
               <div className="space-y-5 p-5">
                 <div>
                   <h4 className="text-sm font-semibold">Included operating components</h4>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Required refers to the published recipe, not a completed Site requirement or legal approval.</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">A required component comes from the published Solution model. It does not mean your Site has met that requirement or received legal approval.</p>
                   <div className="mt-3 space-y-2">
                     {selected.components.map(component => <div key={component.id} className="flex flex-wrap items-center justify-between gap-3 border p-3">
                       <span className="text-sm font-medium capitalize">{readable(component.key)}</span>
@@ -110,10 +110,10 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
                 <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the owning Solution/Blueprint and Site qualification workflows. This preview does not infer missing requirements.</p>
                 {workspace.canConfigure ? <Button asChild>
                   <Link to="/canonical/blueprints" search={{siteId}}>
-                    Open Blueprint configuration <ArrowRight aria-hidden="true" className="size-4" />
+                    Configure this Solution <ArrowRight aria-hidden="true" className="size-4" />
                   </Link>
                 </Button> : <p role="status" className="border bg-muted p-3 text-sm">
-                  Your account can view recipes but does not hold Blueprint configuration permission for this Site.
+                  You can review Solutions but are not authorized to configure them for this Site.
                 </p>}
               </div>
             </article>}
