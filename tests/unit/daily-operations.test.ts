@@ -51,7 +51,7 @@ describe("launch to daily operations", () => {
 
   it("keeps site-less programs on their canonical launch record", () => {
     expect(postLaunchOperationsDestination({ programId: "program 1", siteId: null }))
-      .toBe("/launch/school?programId=program%201");
+      .toBe("/launch/school/program%201");
   });
 
   it("uses Site Today for an active site program without changing launch history elsewhere", () => {

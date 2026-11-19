@@ -24,7 +24,7 @@ describe("school website preparation handoff", () => {
     expect(html).toContain("Family invitations can continue");
     expect(html).toContain("Suggested wording remains private");
     expect(html).toContain('href="/launch/website"');
-    expect(html).toContain('href="/launch/school"');
+    expect(html).toContain('href="/launch/site?siteId=site&amp;programId=program&amp;module=recruit"');
     expect(html).toContain("Invite a website editor");
     expect(html).not.toContain("<iframe");
     expect(html).not.toContain('sandbox=""');

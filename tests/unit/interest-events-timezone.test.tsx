@@ -36,6 +36,6 @@ describe("interest event timezone", () => {
         title: "Open house", description: "", kind: "open_house", location: "", visibility: "public",
         startsAt: "2026-11-11T18:00:00Z", endsAt: "2026-11-11T19:00:00Z", timezone: "America/New_York", registrations: [] }],
     }} />);
-    expect(html).toContain('href="/launch/school">East School</a>');
+    expect(html).toContain('href="/launch/site?programId=program">East School</a>');
   });
 });
