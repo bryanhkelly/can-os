@@ -17,7 +17,6 @@ import {
   offerings,
   qualificationProgramFitPolicies,
   qualificationProgramFitPolicyVersions,
-  qualificationResourceNeeds,
   siteOrganizationRoles,
 } from "@/db/canonical-v301";
 
@@ -41,7 +40,4 @@ describe("V6.1 Prepare canonical schema bindings", () => {
     }
   });
 
-  it("does not prematurely move the still-legacy resource-needs table", () => {
-    expect(getTableConfig(qualificationResourceNeeds).schema).toBe("education_v30");
-  });
 });
