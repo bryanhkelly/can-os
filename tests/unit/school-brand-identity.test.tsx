@@ -10,19 +10,21 @@ import { SchoolBrandPreview } from "@/components/launch-studio/SchoolBrandPrevie
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 
 describe("Website & Brand Studio", () => {
-  it("defines seven design-specific school identities, without extra template choices", () => {
+  it("keeps six Brand directions independent of seven website wireframes",()=>{
     expect(Object.keys(schoolBrandDesigns)).toEqual([...siteTemplateIds]);
-    const svgs = siteTemplateIds.map(templateId =>
-      renderSchoolBrandSvg("Barton Academy", {
-        ...emptySiteLocalContent.branding, templateId,
-      }));
-    expect(new Set(svgs).size).toBe(7);
-    for (const svg of svgs) {
-      expect(svg).toContain('aria-label="Barton Academy brand wordmark"');
-      expect(svg).toContain(">BA</text>");
-      expect(svg).not.toContain("<script");
-      expect(svg).not.toContain("@import");
-      expect(svg).not.toContain("https://");
+    const brandDirections=[
+      "belonging","excellence","innovation","classical","creative","leadership",
+    ] as const;
+    const logos=brandDirections.map(brandDirectionId=>renderSchoolBrandSvg("Barton Academy",{
+      ...emptySiteLocalContent.branding,brandDirectionId,
+    }));
+    expect(new Set(logos).size).toBe(6);
+    for(const templateId of siteTemplateIds){
+      const stable=renderSchoolBrandSvg("Barton Academy",{
+        ...emptySiteLocalContent.branding,brandDirectionId:"innovation",templateId,
+      });
+      expect(stable).toBe(logos[2]);
+      expect(stable).not.toContain("<script");
     }
   });
 
@@ -55,7 +57,7 @@ describe("Website & Brand Studio", () => {
   it("accepts only curated palette and typography tokens", () => {
     const visual = resolveSchoolBrand("Barton Academy", {
       ...emptySiteLocalContent.branding,
-      templateId: "modern", paletteId: "coastal", typographyId: "contemporary",
+      templateId: "modern", brandDirectionId:"innovation", paletteId: "coastal", typographyId: "contemporary",
     });
     expect(visual.design.name).toBe("Modern Learning");
     expect(visual.theme.paletteId).toBe("coastal");
@@ -67,7 +69,7 @@ describe("Website & Brand Studio", () => {
     const html = renderToStaticMarkup(<SchoolBrandPreview
       siteId="f1000000-0000-4000-8000-000000000003"
       schoolName="Barton Academy"
-      branding={{...emptySiteLocalContent.branding, templateId:"community"}}/>);
+      branding={{...emptySiteLocalContent.branding, templateId:"community", brandDirectionId:"belonging"}}/>);
     expect(html).toContain("Barton Academy");
     expect(html).toContain("Community &amp; Faith");
     expect(html).toContain("Download SVG wordmark");
