@@ -96,19 +96,19 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
       SELECT e.learner_person_id AS "participantPersonId",
              cls.operating_organization_id AS "providerOrganizationId",
              attribution.delivery_site_id AS "deliverySiteId"
-      FROM education_v30.class_enrollments e
-      JOIN education_v30.classes cls ON cls.id=e.class_id
+      FROM public.class_enrollments e
+      JOIN public.classes cls ON cls.id=e.class_id
       JOIN education_v30.participation_attributions attribution
         ON attribution.class_enrollment_id=e.id
           AND (cls.site_id IS NULL OR attribution.delivery_site_id=cls.site_id)
-      JOIN education_v30.class_enrollment_completion_pins pin
+      JOIN public.class_enrollment_completion_pins pin
         ON pin.class_enrollment_id=e.id
       WHERE e.id=${intent.classEnrollmentId}::uuid
         AND ((
           ${intent.expectedClassOutcomeId}::uuid IS NULL
           AND e.status='active'
           AND NOT EXISTS(
-            SELECT 1 FROM education_v30.class_outcomes existing
+            SELECT 1 FROM public.class_outcomes existing
             WHERE existing.class_enrollment_id=e.id
               AND existing.outcome_kind='completion'
               AND existing.source_kind='ws3_governed'
@@ -116,13 +116,13 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
         ) OR (
           ${intent.expectedClassOutcomeId}::uuid IS NOT NULL
           AND EXISTS(
-            SELECT 1 FROM education_v30.class_outcomes prior
+            SELECT 1 FROM public.class_outcomes prior
             WHERE prior.id=${intent.expectedClassOutcomeId}::uuid
               AND prior.class_enrollment_id=e.id
               AND prior.outcome_kind='completion'
               AND prior.source_kind='ws3_governed'
               AND NOT EXISTS(
-                SELECT 1 FROM education_v30.class_outcomes newer
+                SELECT 1 FROM public.class_outcomes newer
                 WHERE newer.supersedes_outcome_id=prior.id
               )
           )
