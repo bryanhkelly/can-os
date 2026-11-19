@@ -90,6 +90,10 @@ export function InterestEventsWorkspace({
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
   const [createdEventId, setCreatedEventId] = useState("");
   const [createdProgramId, setCreatedProgramId] = useState("");
+  // Preserve the same idempotency key across uncertain transport failures.
+  // The server deduplicates by requestId; a new key is issued only after an
+  // acknowledged create, preventing duplicate events on manual retry.
+  const [createRequestId, setCreateRequestId] = useState(()=>crypto.randomUUID());
   const [attempted, setAttempted] = useState(false);
   const [timeValidationError, setTimeValidationError] = useState("");
   const mutation = useMutationFeedback(() => router.invalidate());
@@ -113,7 +117,7 @@ export function InterestEventsWorkspace({
     }
     await mutation.run(async () => {
       const result = await createSchoolInterestEvent({ data: {
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId,
         programId:selectedProgram.id,
         title:title.trim(),
         description,
@@ -127,6 +131,7 @@ export function InterestEventsWorkspace({
       const rsvpUrl = result.rsvpUrl;
       setCreatedEventId(result.eventId);
       setCreatedProgramId(selectedProgram.id);
+      setCreateRequestId(crypto.randomUUID());
       if (rsvpUrl) setShareLinks(current => ({ ...current, [result.eventId]: rsvpUrl }));
       return result;
     }, {
