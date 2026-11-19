@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import type { JsonObject, JsonValue } from "./core";
+import { educationV30, type JsonObject, type JsonValue } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
@@ -45,8 +45,7 @@ export const blueprints = pgTable(
   ],
 );
 
-export const blueprintVersions = pgTable(
-  "blueprint_versions",
+export const blueprintVersions = pgTable("blueprint_versions",
   {
     id: id(),
     blueprintId: uuid("blueprint_id").notNull(),
@@ -66,8 +65,7 @@ export const blueprintVersions = pgTable(
   ],
 );
 
-export const blueprintComponents = pgTable(
-  "blueprint_components",
+export const blueprintComponents = pgTable("blueprint_components",
   {
     id: id(),
     blueprintVersionId: uuid("blueprint_version_id").notNull(),
@@ -88,8 +86,7 @@ export const blueprintComponents = pgTable(
   ],
 );
 
-export const blueprintConfigurations = pgTable(
-  "blueprint_configurations",
+export const blueprintConfigurations = pgTable("blueprint_configurations",
   {
     id: id(),
     blueprintId: uuid("blueprint_id").notNull(),
@@ -102,8 +99,7 @@ export const blueprintConfigurations = pgTable(
   ],
 );
 
-export const blueprintConfigurationVersions = pgTable(
-  "blueprint_configuration_versions",
+export const blueprintConfigurationVersions = pgTable("blueprint_configuration_versions",
   {
     id: id(),
     configurationId: uuid("configuration_id").notNull(),
@@ -140,8 +136,7 @@ export const blueprintConfigurationVersions = pgTable(
   ],
 );
 
-export const blueprintConfigurationComponents = pgTable(
-  "blueprint_configuration_components",
+export const blueprintConfigurationComponents = pgTable("blueprint_configuration_components",
   {
     configurationVersionId: uuid("configuration_version_id").notNull(),
     blueprintVersionId: uuid("blueprint_version_id").notNull(),
@@ -159,8 +154,7 @@ export const blueprintConfigurationComponents = pgTable(
   ],
 );
 
-export const blueprintConfigurationLocalExperiences = pgTable(
-  "blueprint_configuration_local_experiences",
+export const blueprintConfigurationLocalExperiences = pgTable("blueprint_configuration_local_experiences",
   {
     id: id(),
     configurationVersionId: uuid("configuration_version_id").notNull(),
@@ -180,8 +174,7 @@ export const blueprintConfigurationLocalExperiences = pgTable(
   ],
 );
 
-export const blueprintConfigurationOfferingIntents = pgTable(
-  "blueprint_configuration_offering_intents",
+export const blueprintConfigurationOfferingIntents = pgTable("blueprint_configuration_offering_intents",
   {
     configurationVersionId: uuid("configuration_version_id").notNull(),
     componentId: uuid("component_id").notNull(),
@@ -200,8 +193,7 @@ export const blueprintConfigurationOfferingIntents = pgTable(
   ],
 );
 
-export const configurationReviews = pgTable(
-  "configuration_reviews",
+export const configurationReviews = pgTable("configuration_reviews",
   {
     id: id(),
     configurationVersionId: uuid("configuration_version_id").notNull(),
@@ -221,8 +213,7 @@ export const configurationReviews = pgTable(
   ],
 );
 
-export const blueprintComponentApprovalDecisions = pgTable(
-  "blueprint_component_approval_decisions",
+export const blueprintComponentApprovalDecisions = pgTable("blueprint_component_approval_decisions",
   {
     id: id(),
     configurationVersionId: uuid("configuration_version_id").notNull(),
@@ -244,8 +235,7 @@ export const blueprintComponentApprovalDecisions = pgTable(
   ],
 );
 
-export const blueprintExecutionBatches = pgTable(
-  "blueprint_execution_batches",
+export const blueprintExecutionBatches = pgTable("blueprint_execution_batches",
   {
     id: id(),
     configurationVersionId: uuid("configuration_version_id").notNull(),
@@ -321,8 +311,7 @@ export const blueprintReferenceItemVersions = pgTable(
   ],
 );
 
-export const blueprintConfigurationComponentReferences = pgTable(
-  "blueprint_configuration_component_references",
+export const blueprintConfigurationComponentReferences = pgTable("blueprint_configuration_component_references",
   {
     configurationVersionId: uuid("configuration_version_id").notNull(),
     componentId: uuid("component_id").notNull(),
@@ -340,8 +329,7 @@ export const blueprintConfigurationComponentReferences = pgTable(
   ],
 );
 
-export const blueprintOutputs = pgTable(
-  "blueprint_outputs",
+export const blueprintOutputs = pgTable("blueprint_outputs",
   {
     id: id(),
     blueprintVersionId: uuid("blueprint_version_id").notNull(),
@@ -369,8 +357,7 @@ export const blueprintOutputs = pgTable(
   ],
 );
 
-export const offerings = pgTable(
-  "offerings",
+export const offerings = pgTable("offerings",
   {
     id: id(),
     publisherOrganizationId: uuid("publisher_organization_id").notNull(),
@@ -384,8 +371,7 @@ export const offerings = pgTable(
   ],
 );
 
-export const offeringVersions = pgTable(
-  "offering_versions",
+export const offeringVersions = pgTable("offering_versions",
   {
     id: id(),
     offeringId: uuid("offering_id").notNull(),
@@ -403,8 +389,7 @@ export const offeringVersions = pgTable(
 
 /** Existing publisher-defined, immutable-after-publication release policy.
  * Each required Course needs an explicit record before Offering release. */
-export const offeringReleaseRequirements = pgTable(
-  "offering_release_requirements",
+export const offeringReleaseRequirements = pgTable("offering_release_requirements",
   {
     id: id(),
     offeringVersionId: uuid("offering_version_id").notNull(),
@@ -421,8 +406,7 @@ export const offeringReleaseRequirements = pgTable(
   ],
 );
 
-export const programDeployments = pgTable(
-  "program_deployments",
+export const programDeployments = pgTable("program_deployments",
   {
     id: id(),
     operationId: uuid("operation_id").notNull(),
@@ -444,8 +428,7 @@ export const programDeployments = pgTable(
 );
 
 /** Existing native deployment readiness evidence; not a new table or approval system. */
-export const deploymentReadinessReviews = pgTable(
-  "deployment_readiness_reviews", {
+export const deploymentReadinessReviews = pgTable("deployment_readiness_reviews", {
     id: id(),
     deploymentId: uuid("deployment_id").notNull(),
     reviewKind: text("review_kind").$type<"operating"|"registration"|"delivery">().notNull(),
