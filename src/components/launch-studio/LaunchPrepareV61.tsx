@@ -93,14 +93,14 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "funding-enrollment": {
-    question: "What will families pay, what funding is allowed, and who may enroll?",
-    decision: "Evaluate applicable funding programs and tuition outside the admissions decision. Configure actual seat pools, receiving Program and enrollment workflow only when authorized.",
-    canSupplies: "Governed admissions, application invitations, eligibility and capacity records where supported.",
-    siteProvides: "An approved budget, funding documentation, pricing decisions and accountable enrollment staff.",
+    question: "How will your Site fund its learning experiences and prepare admissions?"
+    decision: "Document funding sources, tuition and pricing, admissions policies and seat capacity. Prepare the receiving Program and application process here. Actual registration is enabled independently in Open, only for authorized Offerings."
+    canSupplies: "Authorized admissions setup, application invitations, eligibility records and capacity management where supported."
+    siteProvides: "An approved budget, documented funding, pricing and admissions decisions, and responsible staff."
     status: "governed",
     handoffs: [
       { title: "Review admissions", detail: "View authorized applications and the Program-specific admissions pipeline.", href: id => "/admissions?siteId=" + scoped(id) },
-      { title: "Configure enrollment capacity", detail: "Review seat pools rather than assuming intended capacity is enrollable.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
+      { title: "Prepare admissions capacity", detail: "Configure and verify seat pools without activating registration.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
     ],
   },
   "opening-compliance": {
