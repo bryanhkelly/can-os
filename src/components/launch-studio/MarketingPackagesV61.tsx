@@ -507,13 +507,13 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
               {record.content.formats.map(id=>marketingFormatOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
           </dl>
         </WorkspacePanel>
-        {module==="interest-events" && record.content.purpose==="event-invitation" &&
-          <WorkspacePanel title="Create an Interest Event"
-            description="Reuse this saved invitation's headline as a starting title. Confirm the Program, date, time, location and event description in the separately authorized event workspace.">
+        {context.packageHandoff && context.packageHandoff.purpose===record.content.purpose &&
+          <WorkspacePanel title={context.packageHandoff.title}
+            description={context.packageHandoff.description}>
             {record.status==="archived"
-              ? <WorkspaceNotice tone="attention">Restore this package before using it for a new event.</WorkspaceNotice>
+              ? <WorkspaceNotice tone="attention">Restore this package before using it for a new activity.</WorkspaceNotice>
               : <Button asChild variant="outline"><a href={
-                `/operations/interest-events/new?siteId=${encodeURIComponent(siteId)}&packageId=${encodeURIComponent(record.id)}`
+                context.packageHandoff.href(siteId,record.id)
               }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
           </WorkspacePanel>}
         <WorkspaceNotice tone="info">The package's content is saved. New branded releases are available to download. Sending marketing email requires separate authorization.</WorkspaceNotice>
