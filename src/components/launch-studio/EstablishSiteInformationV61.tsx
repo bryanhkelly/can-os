@@ -280,7 +280,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         await saveEnvironment(true);
       } else if (step === 3) {
         // Finishing out of order must still save and validate required earlier answers.
-        await saveHosting(true); anyWrite = true;
+        await saveHosting(true);
         await saveEnvironment(true);
         await saveStory(true);
       }
