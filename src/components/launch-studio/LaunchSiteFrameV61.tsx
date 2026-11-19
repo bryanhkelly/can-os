@@ -1,5 +1,5 @@
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Building2, Globe2, HelpCircle, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ export function LaunchSiteFrame({ site, active, children }: {
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
+  const stagePanelBaseId = useId();
   const [expanded, setExpanded] = useState<string>(siteLaunchModules.find(item=>item.id===active)?.stage ?? "Establish");
   // The route remains mounted while modules change; reveal the new active stage.
   useEffect(() => {
@@ -29,17 +30,18 @@ export function LaunchSiteFrame({ site, active, children }: {
         <p className="text-sm font-semibold">{site.name}</p>
         <p className="mt-1 text-xs text-muted-foreground">Preparing · Site setup</p>
       </div>
-      <nav aria-label="Launch Studio navigation" className="flex-1 space-y-1 px-3">
+      <nav aria-label="Launch Studio navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-3">
         <Link to="/launch/site" search={{ siteId: site.id }} onClick={() => setDrawer(false)}
           className={"block border-b px-3 py-3 text-sm font-semibold " + (!active ? "text-primary" : "")}
           aria-current={!active ? "page" : undefined}>Overview</Link>
         {stages.map((stage, index) => (
           <div key={stage} className="border-b py-1">
-            <Button type="button" variant="ghost" aria-expanded={expanded===stage} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
+            <Button type="button" variant="ghost" aria-expanded={expanded===stage}
+              aria-controls={`${stagePanelBaseId}-${stage}`} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
               className="flex min-h-11 w-full justify-between px-3 py-3 text-left text-sm font-semibold">
               <span>{index+1}. {stage}</span><span aria-hidden="true">{expanded===stage ? "−" : "+"}</span>
             </Button>
-            {expanded===stage && <div className="space-y-1 pb-2 pl-4">
+            {expanded===stage && <div id={`${stagePanelBaseId}-${stage}`} className="space-y-1 pb-2 pl-4">
               {siteLaunchModules.filter(item=>item.stage===stage).map(item=>(
                 <Link key={item.id} to="/launch/site" search={{ siteId: site.id, module: item.id }}
                   onClick={() => setDrawer(false)}
@@ -61,7 +63,7 @@ export function LaunchSiteFrame({ site, active, children }: {
     </div>
   );
   return <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[14rem_minmax(0,1fr)]">
-    <aside className="hidden min-h-screen border-r bg-card lg:block">{sidebar}</aside>
+    <aside className="hidden min-h-0 border-r bg-card lg:sticky lg:top-0 lg:block lg:h-dvh">{sidebar}</aside>
     <div className="min-w-0">
       <header className="flex min-h-16 items-center justify-between gap-3 border-b bg-card px-4 sm:px-7">
         <div className="flex items-center gap-3">
