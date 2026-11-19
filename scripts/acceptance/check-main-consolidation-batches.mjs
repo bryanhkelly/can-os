@@ -6,7 +6,7 @@
  * CAN_MAIN_CONSOLIDATION_CHECK=1 DATABASE_URL=<main Neon URL> \
  * node scripts/acceptance/check-main-consolidation-batches.mjs
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
 
 const project="sweet-hall-62441909";
@@ -69,11 +69,40 @@ function parseBatch([label,file,expected,arity]){
   return {label,file,records:[...catalog.values()],state:"applied"};
 }
 
+// The production batch inventory is authoritative for retired table names.
+ // Any new raw SQL referencing one of those tables in education_v30 is a
+ // build-time regression, even if the current database has zero records.
+function activeSourceFiles(dir){
+  return readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
+    const path=dir+"/"+entry.name;
+    if(entry.isDirectory())return activeSourceFiles(path);
+    return entry.isFile() && /\\.(?:ts|tsx|js|mjs)$/.test(entry.name)?[path]:[];
+  });
+}
+function migratedSourceReferences(names){
+  const stale=[];
+  const pattern=/\\beducation_v30\\.([a-z_][a-z0-9_]*)\\b/g;
+  for(const path of activeSourceFiles("src")){
+    const body=readFileSync(path,"utf8");
+    for(const match of body.matchAll(pattern)){
+      if(names.has(match[1])){
+        const line=body.slice(0,match.index).split("\\n").length;
+        stale.push({path,line,table:match[1]});
+      }
+    }
+  }
+  return stale;
+}
+
 async function main(){
   const batches=sources.map(parseBatch);
   const all=batches.flatMap(b=>b.records.map(r=>({...r,batch:b.label,state:b.state})));
   if(new Set(all.map(r=>r.name)).size!==all.length)
     throw new Error("The migration batches contain duplicate table names");
+  const staleSourceReferences=migratedSourceReferences(new Set(all.map(x=>x.name)));
+  if(staleSourceReferences.length)
+    throw new Error("Active source still queries relocated education_v30 tables: "+
+      JSON.stringify(staleSourceReferences.slice(0,25)));
   const sql=neon(process.env.DATABASE_URL);
   const [identity]=await sql`
     SELECT current_setting('neon.project_id',true) AS project,
