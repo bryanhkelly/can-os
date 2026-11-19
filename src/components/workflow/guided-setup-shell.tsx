@@ -24,8 +24,8 @@ export function GuidedSetupShell({ title, description, steps, aside, children, o
       <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
       {description && <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
     </header>
-    <ol aria-label="Setup progress" className={cn("grid grid-cols-2 gap-2 border-b bg-muted/25 p-4",
-      steps.length > 2 && "lg:grid-cols-4")}>
+    <ol aria-label="Setup progress" className={cn("grid gap-2 border-b bg-muted/25 p-4",
+      steps.length === 2 ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4")}>
       {steps.map((step, index) => {
         const item = <>
           <span aria-hidden="true" className={cn("flex size-7 shrink-0 items-center justify-center border text-xs font-semibold",
