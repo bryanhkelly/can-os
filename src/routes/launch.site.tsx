@@ -9,6 +9,9 @@ import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { EstablishSiteProfileUnified, EstablishSiteProfileGuidance } from "@/components/launch-studio/EstablishSiteProfileUnified";
 import { EstablishSiteInformationV61, SiteInformationV61Guidance, type SiteInformationV61Initial } from "@/components/launch-studio/EstablishSiteInformationV61";
 import { readSiteInformationV61 } from "@/modules/programs/site-information-v61.functions";
+import { EstablishProgramsAudiencesV61, ProgramsAudiencesV61Guidance,
+  type ProgramsAudiencesV61Initial } from "@/components/launch-studio/EstablishProgramsAudiencesV61";
+import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { WorkspaceShell } from "@/components/workspace";
 
 const searchSchema = z.object({
@@ -32,6 +35,8 @@ export const Route = createFileRoute("/launch/site")({
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
         ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
+      programsAudiences: site && deps.module === "programs-audiences"
+        ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
       error: deps.siteId && !site ? "You do not have access to the selected Site." : null,
     };
   })(),
@@ -43,7 +48,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, siteInformation, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, programsAudiences, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -70,6 +75,11 @@ function SiteLaunchPage() {
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-profile" } })}
       onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "programs-audiences" } })} />
+    : selected?.id === "programs-audiences" && programsAudiences ? <ProgramsAudiencesBody
+      siteId={site.id} initial={programsAudiences}
+      onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })}
+      onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
+      onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected ? <WorkspaceShell title={selected.title}
       eyebrow={`${selected.stage} / ${selected.title}`}
       subtitle="This section will be connected using the approved V6.1 content contract."
@@ -107,5 +117,23 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
       initial={initial} onInternalStepChange={setStep}
       onBackToSiteProfile={onBack} onSaveAndExit={onExit}
       onContinueToPrograms={onContinue} />
+  </WorkspaceShell>;
+}
+
+/** Local two-step state changes only the shared guidance rail, not the Launch sidebar. */
+function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: {
+  siteId: string;
+  initial: ProgramsAudiencesV61Initial;
+  onBack: () => void; onExit: () => void; onContinue: () => void;
+}) {
+  const [step, setStep] = useState<0 | 1>(0);
+  return <WorkspaceShell title="What could your community learn?"
+    eyebrow="Establish / Programs & Audiences"
+    subtitle="Choose what you hope to offer and who you hope to serve. Saved intentions can shape your private website and guide preparation."
+    width="wide" rail={<ProgramsAudiencesV61Guidance step={step} />}>
+    <EstablishProgramsAudiencesV61 key={siteId + ":" + initial.revision}
+      siteId={siteId} initial={initial} onInternalStepChange={setStep}
+      onBackToSiteInformation={onBack} onSaveAndExit={onExit}
+      onContinueToWebsiteBrand={onContinue} />
   </WorkspaceShell>;
 }
