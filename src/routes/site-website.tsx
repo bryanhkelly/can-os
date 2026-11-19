@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
-import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
+import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
@@ -120,26 +120,64 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     {id:"visual",title:"Visual Identity"}, {id:"content",title:"Your Content"},
     {id:"review",title:"Review & Finish"},
   ];
-  if (studio) return <LaunchStudioShell role="Website & Brand Studio" subject={data.siteName}
-    title={data.host ? ["Choose how your Site will be known.","Select a website structure.","Bring your identity to life.",
-      "Shape your Site's story.","Review and save your private draft."][step] : "Prepare your private website address."}
-    description={data.host ? "One school brand, one hosted website. Draft branding does not authorize school opening, academic claims or admissions." :
-      "Create a private address before choosing a design. Nothing is published yet."}
-    steps={data.host ? steps : [{id:"address",title:"Prepare private address",disabled:true}]}
-    currentId={data.host ? websiteStudioStepIds[step]??"brand" : "address"}
-    onStepChange={id=>{if(data.host)changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]));}}
-    help={<p>Unaffiliated Site Administrators manage their school website directly. Contributors need a verified Site website editor invitation. Previewing and saving a draft do not publish it.</p>}
-    status={data.host ? <div className="space-y-2">
-      <p className="font-semibold">School website address</p>
-      <p className="break-all font-mono text-xs">{data.host}</p>
-      <p>{data.status==="published" ? "Published in CAN OS. External host reachability is verified separately." : "Private draft address. Content is not published."}</p>
-      <p>Saved revision: {data.currentRevision}</p>
-    </div> : <p>No website address is reserved yet. Prepare an address to start the design workflow.</p>}
-    exit={returnToLaunch ?? <Link to="/home" className="underline">Exit to your workspace</Link>}>
-    {data.host
-      ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep}/>
-      : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/> }
-  </LaunchStudioShell>;
+  if (studio) return <LaunchSiteFrame
+    site={{id:data.siteId,name:data.siteName}} active="website-brand"
+    previewHref={privateWebsitePreviewUrl(data.siteId)}>
+    <div className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-7">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
+        <main className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Establish / Website &amp; Brand</p>
+          <h1 className="mt-2 font-serif text-3xl font-semibold">
+            {data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
+              "Tell Your Story","Review & Finish"][step]:"Prepare your private website address"}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            One Site-owned, revisioned private website. Draft changes never open enrollment, approve a school or publish content.
+          </p>
+          {data.host && <nav aria-label="Website & Brand steps" className="mt-5 flex min-w-0 gap-2 overflow-x-auto border-y py-3">
+            {steps.map((item,index)=><Button key={item.id} type="button"
+              variant={step===index?"default":"outline"}
+              aria-current={step===index?"step":undefined}
+              onClick={()=>changeStep(index)}
+              className="h-auto min-h-12 min-w-28 shrink-0 flex-col items-start border px-3 py-2 text-left text-xs">
+              <span className="text-2xs opacity-80">Step {index+1}</span>
+              <span>{item.title}</span>
+            </Button>)}
+          </nav>}
+          <div className="mt-5">
+            {data.host
+              ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep}/>
+              : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/>}
+          </div>
+          <div className="mt-5 border-t pt-4 text-sm">{returnToLaunch??<Link to="/home" className="font-semibold text-primary">Exit to workspace</Link>}</div>
+        </main>
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Website and Brand guidance">
+          <section className="bg-foreground p-5 text-background">
+            <h2 className="font-serif text-xl font-semibold">What you can do</h2>
+            <p className="mt-3 text-sm leading-6">Choose your identity, explore seven website structures,
+              apply approved colors and fonts, add rights-cleared media, and edit your story.</p>
+            <p className="mt-3 text-xs leading-5">Your Site's tools, approved catalog and learning experiences
+              can later appear on the website through the existing content channels.</p>
+          </section>
+          <section className="border bg-card p-5">
+            <h2 className="text-sm font-semibold">Your private website</h2>
+            {data.host?<><p className="mt-2 break-all font-mono text-xs">{data.host}</p>
+              <p className="mt-3 text-xs text-muted-foreground">Saved revision {data.currentRevision} · {data.status==="published"?"Some content is already published":"Private draft, not published"}</p>
+              <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
+                className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-4">
+                Open saved private preview
+              </a></>:<p className="mt-2 text-sm text-muted-foreground">Prepare a private address before editing.</p>}
+          </section>
+          <section className="border bg-card p-5">
+            <h2 className="text-sm font-semibold">What happens next</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Save an editable website draft. Any public release or protected school claim follows its separate review and approval process.
+            </p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </LaunchSiteFrame>;
   return <WorkspaceShell
     eyebrow="Website & Brand Studio"
     title={data.siteName + " · website & brand"}
