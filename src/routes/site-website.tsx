@@ -700,10 +700,10 @@ function LocalWebsiteCopyEditor({
       {step === 0 && <section aria-label="Brand Identity" className="space-y-5">
         <div>
           <h3 className="font-serif text-2xl font-semibold">What should families feel about your Site?</h3>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">Choose an editorial direction. Your saved Site Story can guide a suggestion, but this choice never verifies programs, staff or academic outcomes.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">Choose an editorial direction. Your saved Site Information can guide a suggestion, but this choice never verifies programs, staff or academic outcomes.</p>
           {data.siteStoryRevision
-            ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Story source: {new Date(data.siteStoryRevision).toLocaleDateString()}</p>
-            : <p className="mt-2 text-xs text-muted-foreground">No saved Site Story available. You can still choose a direction.</p>}
+            ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Information: {new Date(data.siteStoryRevision).toLocaleDateString()}</p>
+            : <p className="mt-2 text-xs text-muted-foreground">No optional purpose answers saved in Site Information. You can still choose a direction.</p>}
         </div>
         <fieldset disabled={busy || !data.canPublish}>
           <legend className="text-sm font-semibold">Choose your brand direction</legend>
@@ -718,7 +718,7 @@ function LocalWebsiteCopyEditor({
                 <span className="mt-2 text-xs leading-5 text-muted-foreground">{direction.description}</span>
                 {(selected || brandRecommendation===direction.id) && <span className="mt-3 text-xs font-semibold text-primary">
                   {selected?"Selected":""}{selected && brandRecommendation===direction.id?" · ":""}
-                  {brandRecommendation===direction.id?"Suggested from your Story":""}
+                  {brandRecommendation===direction.id?"Suggested from Site Information":""}
                 </span>}
               </Button>;
             })}
@@ -752,7 +752,7 @@ function LocalWebsiteCopyEditor({
 
       {step === 3 && <div className="space-y-5">
         <div>
-          <h3 className="font-serif text-2xl">Your Site story is ready to make your own.</h3>
+          <h3 className="font-serif text-2xl">Make your website content your own.</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Prepared copy uses your Site name. Optional suggestions draw on saved Site Information
             and never overwrite a field until you explicitly apply them. Restore Original affects only that field.
@@ -763,11 +763,12 @@ function LocalWebsiteCopyEditor({
           </p>
         </div>
         {data.siteStorySourceChoices && <div className="border bg-muted/20 p-4 text-sm" role="note">
-          <p className="font-semibold">Your original Site Story remains private</p>
+          <p className="font-semibold">Suggestions from Site Information</p>
           <p className="mt-2 text-muted-foreground">
             Values: {data.siteStorySourceChoices.values.join(", ") || "not selected"}.
             Priorities: {data.siteStorySourceChoices.motivations.join(", ") || "not selected"}.
-            Website copy suggestions are editable aspirations, not verified claims.
+            These suggestions use your selected values and goals. Your original written
+            answers remain private, and are not added to the website automatically.
           </p>
           <Link to="/launch/site" search={{siteId:data.siteId,module:"site-information"}}
             className="mt-3 inline-block font-semibold text-primary underline">Review Site Information</Link>

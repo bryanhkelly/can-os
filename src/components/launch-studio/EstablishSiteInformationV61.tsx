@@ -36,7 +36,7 @@ const steps = [
   { title: "Hosting & Organization", description: "Who supports your Site" },
   { title: "Learning Environment", description: "How learning will happen" },
   { title: "Network Affiliation", description: "Optional connections" },
-  { title: "Your Story", description: "Purpose and vision" },
+  { title: "Purpose & Story", description: "Why this community exists" },
 ] as const;
 
 export const siteInformationV61Guidance = [
@@ -235,7 +235,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     if (!storySaved && isEmptyStory(clean)) return; // Entire Story step is optional.
     const validated = siteStoryV61Schema.safeParse(clean);
     if (!validated.success) {
-      selectStep(3); throw new Error(validated.error.issues[0]?.message ?? "Review Your Story.");
+      selectStep(3); throw new Error(validated.error.issues[0]?.message ?? "Review Purpose & Story.");
     }
     await persist("story", validated.data);
     setStorySaved(true); setSavedStory(snapshot(clean));
@@ -266,7 +266,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       }
       if ((mode === "next" && step === 3 || mode === "exit" && (step === 3 || storyDirty))
           && !siteStoryV61Schema.safeParse(normalizeStory(story)).success) {
-        selectStep(3); throw new Error("Review the optional Site Story answers.");
+        selectStep(3); throw new Error("Review the optional Purpose & Story answers.");
       }
       // Saving multiple sections is sequential, with Site revision threading.
       // A failed later section must never be retried blindly.
@@ -399,13 +399,15 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <WorkspaceNotice>Only eligible denomination network requests are currently supported. Submitting a request is a separate explicit action and does not grant membership, private access or enrollment authority.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
-    {step === 3 && <WorkspacePanel id="site-information-step-3" title="Your Story"
+    {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
       description="Optional. Tell us what matters to your learning community.">
       <div className="space-y-6">
         <WorkspaceNotice><strong>How CAN OS will use your answers</strong><p className="mt-2">
-          Your original answers remain a private Site Story. They can guide suggested About Us, mission, vision, website messaging, imagery and outreach materials.
-          You can review, edit or decline each suggestion. <strong>Nothing is published automatically.</strong>
-          Your answers do not establish program approval or enrollment authority.
+          These optional answers are saved with Site Information. Your selected goals, values,
+          and aspirations can produce editable website-copy suggestions in Website &amp; Brand.
+          Your written community need, origin story, and future vision are not automatically
+          copied to the website. <strong>Nothing is published automatically.</strong>
+          Your answers are not evidence of Program approval or enrollment authority.
           Please avoid including identifiable learners or confidential third-party information.</p></WorkspaceNotice>
         <MultiChoice title="1. Why are you creating this learning community?" hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
@@ -424,7 +426,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <Field label="7. What do you hope this community becomes?" description="Your long-term vision. Optional.">
           <Textarea rows={4} maxLength={2000} value={story.futureVision}
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
-        <WorkspaceNotice>The original private Story remains separate from generated or published website copy. A separate review is required before publication or sending.</WorkspaceNotice>
+        <WorkspaceNotice>This is source information, not a second website editor. You will shape the public-facing About Us and website message later in Website &amp; Brand, and can choose exactly what to share.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
     </div>
