@@ -1,4 +1,4 @@
-import { WebsiteSharePanel } from "@/components/launch-studio/WebsiteSharePanel";
+import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
 import { siteBrandDirections, brandRecommendedLayout, brandRecommendedPalette } from "@/domain/site-brand-direction";
 import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
@@ -1002,9 +1002,19 @@ function LocalWebsiteCopyEditor({
         {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>}
         {previewError&&<WorkspaceNotice tone="danger">{previewError}</WorkspaceNotice>}
         <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
-        <WebsiteSharePanel siteId={data.siteId} revision={editor.revision}
-          enabled={data.previewSharingReady} canManage={data.canPublish}
-          saved={!dirty && editor.revision>0 && !revisionConflict}/>
+        {!dirty && editor.revision > 0 && !revisionConflict
+          ? <div className="flex flex-wrap items-center justify-between gap-3 border p-4">
+              <div>
+                <p className="text-sm font-semibold">Ready to show your proposed website?</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Share the latest saved snapshot without publishing the Site or opening enrollment.
+                </p>
+              </div>
+              <LaunchPreviewSharing siteId={data.siteId}/>
+            </div>
+          : <p role="status" className="border p-3 text-sm">
+              Save your latest website edits before sharing a review link.
+            </p>}
         <WebsiteSourceMappingPanel data={data} />
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
