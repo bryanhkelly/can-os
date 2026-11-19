@@ -18,8 +18,8 @@ const previewLabels: Record<PublicSitePath, string> = {
 };
 
 /** Keep the complete preview in view at every card width instead of clipping a fixed thumbnail. */
-function TemplatePreviewFrame({ html, name, tall = false, viewport = "desktop" }: {
-  html: string; name: string; tall?: boolean; viewport?: "desktop" | "mobile";
+function TemplatePreviewFrame({ html, name, tall = false, viewport = "desktop", grayscale = false }: {
+  html: string; name: string; tall?: boolean; viewport?: "desktop" | "mobile"; grayscale?: boolean;
 }) {
   const previewWidth = viewport === "mobile" ? 390 : 1280;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,7 +35,7 @@ function TemplatePreviewFrame({ html, name, tall = false, viewport = "desktop" }
   }, []);
   return <div ref={containerRef} aria-hidden="true"
     className={cn("relative overflow-hidden border border-border pointer-events-none",
-      tall ? "h-[32rem]" : viewport === "mobile" ? "h-72" : "h-56")}>
+      tall ? "h-[32rem]" : viewport === "mobile" ? "h-72" : "h-56", grayscale && "grayscale")}>
     <iframe title={name} srcDoc={html} sandbox="" tabIndex={-1} loading="lazy"
       className="absolute left-0 top-0 border-0"
       style={{ width: previewWidth, height: viewport === "mobile" ? 960 : 960,
@@ -56,7 +56,7 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
 }) {
   const [previewPage, setPreviewPage] = useState<PublicSitePath>("/");
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
-  const [expanded, setExpanded] = useState<SiteTemplateId | null>(null);
+  const [styledPreview, setStyledPreview] = useState(false);
   const renderSample = (templateId: SiteTemplateId) => renderPublicSiteHtml({
     host: "sample.can-os.com",
     demonstration: true,
@@ -90,7 +90,7 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
       branding: { theme: "classic", heroImage: null, templateId,
         paletteId, typographyId, headingFontId, bodyFontId } },
   }, { path: previewPage, localPreview: true, templateGallery: true });
-  const enlarged = siteTemplateCatalog.find(template => template.id === expanded);
+  const chosen = siteTemplateCatalog.find(template => template.id === value) ?? siteTemplateCatalog[0]!;
   return <fieldset disabled={disabled} className="min-w-0">
     <legend className="text-sm font-semibold">Choose your school's public website design</legend>
     <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -114,51 +114,49 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
         </Button>)}
       </div>
     </div>
+    <Button type="button" variant="outline" aria-pressed={styledPreview}
+      onClick={()=>setStyledPreview(value=>!value)} className="mt-3 min-h-11 border px-3 text-sm">
+      {styledPreview?"Return to grayscale wireframe":"Show styled example"}
+    </Button>
     <p className="mt-2 text-xs text-muted-foreground">
       Fictional sample imagery illustrates each design. These images are not your school’s facilities
       or students and will not be saved to its photo library.
     </p>
-    <div role="group" aria-label="School website templates"
-      className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-      {siteTemplateCatalog.map(template => {
-        const selected = template.id === value;
-        return <div key={template.id}
-          className={cn("min-w-0 border bg-card p-2 transition-colors",
-            selected ? "border-primary ring-2 ring-primary/50" : "border-border")}>
-          <Button type="button" variant="ghost" aria-pressed={selected} onClick={() => onChange(template.id)}
-            className="w-full min-w-0 flex-col items-stretch justify-start gap-0 whitespace-normal p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <TemplatePreviewFrame html={renderSample(template.id)} name={`${template.name} sample ${previewPage}`} viewport={viewport} />
-            <span className="flex flex-wrap items-start justify-between gap-2 p-3">
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">{template.name}</span>
-                <span className="mt-1 block text-xs text-muted-foreground">{template.character}</span>
-                <span className="mt-2 block text-xs leading-5 text-muted-foreground">{template.description}</span>
-              </span>
-              <span className={cn("border px-2 py-1 text-2xs font-semibold",
-                selected ? "border-primary text-primary" : "border-border text-muted-foreground")}>
-                {selected ? "Selected" : "Choose"}
-              </span>
+    <div className="mt-5 grid min-w-0 gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
+      <div role="group" aria-label="School website templates" className="min-w-0 space-y-2">
+        {siteTemplateCatalog.map(template=>{
+          const selected=template.id===value;
+          return <Button key={template.id} type="button" variant="outline" aria-pressed={selected}
+            onClick={()=>onChange(template.id)} disabled={disabled}
+            className={cn("h-auto w-full min-w-0 items-start gap-3 whitespace-normal border p-2 text-left",
+              selected?"border-primary ring-2 ring-primary/40":"border-border")}>
+            <span className="w-24 shrink-0 overflow-hidden">
+              <TemplatePreviewFrame html={renderSample(template.id)}
+                name={`${template.name} layout thumbnail`} viewport="desktop" grayscale={!styledPreview}/>
             </span>
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setExpanded(template.id)}
-            className="min-h-11 w-full border-t px-3 py-2 text-left text-xs font-semibold underline underline-offset-4">
-            Larger preview of {template.name}
-          </Button>
-        </div>;
-      })}
-    </div>
-    {enlarged && <section aria-label={`Larger preview of ${enlarged.name}`}
-      className="mt-5 border bg-card p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-semibold">{enlarged.name} · {previewLabels[previewPage]} · {viewport}</h3>
-        <Button type="button" variant="outline" onClick={() => setExpanded(null)}
-          className="min-h-11 border px-3 py-2 text-sm">Close larger preview</Button>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold">{template.name}</span>
+              <span className="mt-1 block text-xs text-muted-foreground">{template.character}</span>
+              <span className="mt-2 block text-xs leading-5 text-muted-foreground">{template.description}</span>
+              {selected && <span className="mt-2 block text-xs font-semibold text-primary">Selected</span>}
+            </span>
+          </Button>;
+        })}
       </div>
-      <TemplatePreviewFrame html={renderSample(enlarged.id)}
-        name={`${enlarged.name} enlarged ${previewPage}`} viewport={viewport} tall />
-      <p className="mt-2 text-xs text-muted-foreground">
-        This is a fictional layout preview. The selected template is unchanged until you choose it above.
-      </p>
-    </section>}
+      <section className="min-w-0 border bg-card p-4" aria-label="Selected full-size wireframe" aria-live="polite">
+        <h3 className="font-serif text-xl font-semibold">{chosen.name}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{chosen.description}</p>
+        <p className="my-3 text-xs text-muted-foreground">
+          {styledPreview?"Styled example. Select colors and type separately in Visual Identity.":
+            "Grayscale layout preview, not a finished school website."}
+        </p>
+        <TemplatePreviewFrame key={`${value}:${previewPage}:${viewport}:${styledPreview}`}
+          html={renderSample(value)} name={`${chosen.name} ${previewLabels[previewPage]}`}
+          viewport={viewport} tall grayscale={!styledPreview}/>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Changing a layout does not change your website copy, colors, fonts or photos.
+        </p>
+      </section>
+    </div>
   </fieldset>;
 }
