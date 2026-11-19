@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import {
+  canonicalClasses,
+  canonicalClassOfferings,
   blueprintComponents,
   blueprintConfigurations,
   blueprintConfigurationVersions,
@@ -9,6 +11,7 @@ import {
   educationOperationOrganizationRoles,
   educationOperationSites,
   educationOperations,
+  courses, courseVersions, courseUnits, courseLessons,
   geographicAreas,
   offeringVersions,
   offerings,
@@ -26,7 +29,8 @@ import {
 describe("V6.1 Prepare canonical schema bindings", () => {
   it("maps Site, Blueprint, Offering, geographic and operator records to public", () => {
     const sourceTables = {
-      catalogSites, siteOrganizationRoles, geographicAreas,
+      catalogSites, siteOrganizationRoles, geographicAreas, canonicalClasses, canonicalClassOfferings,
+      courses, courseVersions, courseUnits, courseLessons,
       educationOperations, educationOperationSites, educationOperationOrganizationRoles,
       blueprintVersions, blueprintComponents, blueprintConfigurations,
       blueprintConfigurationVersions, offerings, offeringVersions,
