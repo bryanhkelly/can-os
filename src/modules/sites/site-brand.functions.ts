@@ -53,6 +53,17 @@ export async function readSavedBrandVersion(siteId:string,brandVersionId?:string
   return {version:saved,resolved:resolveSiteBrandVersion(saved,assets)};
 }
 
+/** Pre-opening outreach must have a saved canonical Site identity before
+ * a recipient is contacted. Historical application workflows retain their
+ * original authorization and are not retroactively forced into Launch Studio.
+ */
+export async function requireSavedSiteBrand(siteId:string,reader:Reader=db){
+  const brand=await readSavedBrandVersion(siteId,undefined,reader);
+  if(!brand)throw new DomainError("UNAVAILABLE",
+    "Save your Site Brand in Establish → Website & Brand before sending interest outreach.");
+  return brand;
+}
+
 async function authorizeReader(actor:Awaited<ReturnType<typeof getCommandContext>>,
  siteId:string,write:boolean,reader:Reader=db){
   if(actor.role==="site_website_editor" || actor.role==="site_admin"){
