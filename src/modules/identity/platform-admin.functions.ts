@@ -114,7 +114,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE)
             AND (v.valid_through IS NULL OR v.valid_through>=CURRENT_DATE))
           AS "currentEvidenceRecords",
-        (SELECT count(*)::int FROM education_v30.offering_release_requirements r
+        (SELECT count(*)::int FROM public.offering_release_requirements r
           WHERE r.offering_version_id=ov.id) AS "releasePolicies",
         (SELECT m.manifest_status FROM education_v30.content_publication_manifests m
           WHERE m.offering_version_id=ov.id
@@ -127,8 +127,8 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
         (SELECT count(*)::int FROM public.deployment_offering_adoptions a
           WHERE a.offering_version_id=ov.id AND a.approval_status='approved')
           AS "approvedAdoptions"
-      FROM education_v30.offering_versions ov
-      JOIN education_v30.offerings o ON o.id=ov.offering_id
+      FROM public.offering_versions ov
+      JOIN public.offerings o ON o.id=ov.offering_id
       ORDER BY o.title,ov.version_no DESC,ov.id
       LIMIT 26
     `);
