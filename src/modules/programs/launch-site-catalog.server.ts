@@ -28,7 +28,7 @@ export async function resolveLaunchSiteCatalogContext(
 
   // A legacy unclassified or closed Site cannot claim native readiness.
   // Do not read or provision a second Site. Operating grants are below.
-  if(!isCanonicalSiteDiscoverable(site.lifecycleStatus))
+  if(!isCanonicalSiteDiscoverable(site?.lifecycleStatus))
     return {kind:"not_provisioned"};
 
   let actor:CommandContext;
