@@ -6,7 +6,7 @@ WITH legacy AS (
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname='education_v30' AND c.relkind IN ('r','p')
 ),
-references AS (
+fk_references AS (
  SELECT fk.confrelid AS target_oid,
         count(*)::integer AS inbound_fks,
         count(*) FILTER (WHERE n.nspname='public')::integer AS public_inbound_fks,
@@ -41,6 +41,6 @@ SELECT l.table_name,
        COALESCE(m.routine_names,'[]'::jsonb) AS routine_names,
        to_regclass('public.'||quote_ident(l.table_name))::text AS exact_public_table
 FROM legacy l
-LEFT JOIN references r ON r.target_oid=l.oid
+LEFT JOIN fk_references r ON r.target_oid=l.oid
 LEFT JOIN routine_mentions m ON m.oid=l.oid
 ORDER BY l.table_name;
