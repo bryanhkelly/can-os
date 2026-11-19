@@ -11,6 +11,9 @@ import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.s
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/sites/site-local-content.server";
+import { readSavedBrandVersion } from "@/modules/sites/site-brand.functions";
+import { siteBrandPresentationIdentity } from "@/domain/site-brand";
+import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
 import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
@@ -67,11 +70,12 @@ export const Route=createFileRoute("/launch/site-preview")({
         if(!publication) return failure(409,"Website address needed",
           "A private website address must be reserved by an authorized Site operator.");
 
-        const [academics,enrichment,published,history]=await Promise.all([
+        const [academics,enrichment,published,history,savedBrand]=await Promise.all([
           readAcademicProgramCatalog(site.id),
           readEnrichmentCatalog(site.id),
           readCurrentLocalContent(site.id),
           readLocalContentHistory(site.id),
+          readSavedBrandVersion(site.id),
         ]);
         const stored=history[0]?.content ?? published?.content;
         const copy:SiteLocalContent=stored ? normalizeSiteLocalContent(stored,{allowIncompleteImage:true}) : {
@@ -81,12 +85,23 @@ export const Route=createFileRoute("/launch/site-preview")({
           localDescription:"Our learning Site is taking shape. We are exploring educational experiences for our community.",
           branding:{...emptySiteLocalBranding,templateId:"modern" as const,paletteId:"brand-modern" as const},
         };
-        const localContent={
+        // Mirror the Website & Brand editor: structural template and copy
+        // come from the saved website draft, but the visual identity comes
+        // ONLY from the canonical immutable Site Brand version. The old
+        // embedded branding JSON is a read-only legacy fallback.
+        const selectedBranding=savedBrand
+          ? siteBrandPresentationIdentity(savedBrand.resolved,
+              resolveSiteTemplateId(copy.branding.templateId),true)
+          : copy.branding;
+        const displaySiteName=savedBrand?.resolved.displayName??site.name;
+        const localContent:SiteLocalContent={
           ...copy,
           branding:{
-            ...copy.branding,
-            heroImage:siteLocalImagePublicationGaps(copy.branding.heroImage).length?null:copy.branding.heroImage,
-            logoImage:siteLocalImagePublicationGaps(copy.branding.logoImage??null).length?null:copy.branding.logoImage??null,
+            ...selectedBranding,
+            heroImage:siteLocalImagePublicationGaps(selectedBranding.heroImage).length
+              ?null:selectedBranding.heroImage,
+            logoImage:siteLocalImagePublicationGaps(selectedBranding.logoImage??null).length
+              ?null:selectedBranding.logoImage??null,
           },
         };
         // Share the same reviewed parent-facing and school-media projections
@@ -98,7 +113,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           academics.map(program=>program.programId),site.metadata);
         const authorizedPrograms=withVerifiedPublicApplications(academics,parentExtras.admissions);
         const parentInformation=projectApprovedParentInformation({
-          site:{name:site.name,organizationName:site.organizationName},
+          site:{name:displaySiteName,organizationName:site.organizationName},
           academicPrograms:authorizedPrograms,offerings:publicOfferings,
           localContent,...parentExtras,
         });
@@ -109,7 +124,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         const classes=await readOptionalSitePublishedClasses(site.id);
         const page:PublicSitePage={
           host:publicSiteHost(publication.slug),
-          site:{name:site.name,organizationName:site.organizationName},
+          site:{name:displaySiteName,organizationName:site.organizationName},
           academicPrograms:authorizedPrograms,
           offerings:publicOfferings,
           parentInformation,media,
@@ -143,7 +158,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         page.contentBlocks=resolveSiteContentBlocks(config,{
           mode:"private",
           preferences:parsed.success?parsed.data:null,
-          siteSetup:{name:site.name,organizationName:site.organizationName,
+          siteSetup:{name:displaySiteName,organizationName:site.organizationName,
             city:location.success?location.data.city:null,
             state:location.success?location.data.state:null,timezone:site.timezone},
           networkAffiliations,networkStatusKnown:networkRows!==null,
