@@ -5,23 +5,37 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 export interface FamilyInvitationDraft { programId:string;contacts:string;subject:string;introduction:string }
+
+/** Validate the current draft, not React's previous attempted state.
+ * The Program must be one of the current authorized Site/purpose options.
+ * The server independently verifies every send request.
+ */
+export function familyInvitationDraftIssues(
+  draft:FamilyInvitationDraft, programs:readonly {id:string}[],
+) {
+  return {
+    program:!programs.some(program=>program.id===draft.programId)
+      ? "Choose an eligible Program.":undefined,
+    contacts:!draft.contacts.trim()?"Enter at least one family contact.":undefined,
+    subject:draft.subject.trim().length<3
+      ? "Enter a subject with at least 3 characters.":undefined,
+    introduction:!draft.introduction.trim()?"Enter a school introduction.":undefined,
+  };
+}
 export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit,purpose="application"}:{
  programs:readonly {id:string;name:string}[];draft:FamilyInvitationDraft;busy:boolean;
  purpose?:"interest"|"application";
  onChange:(patch:Partial<FamilyInvitationDraft>)=>void;onSubmit:(event:FormEvent<HTMLFormElement>)=>void;
 }) {
  const [attempted,setAttempted]=useState(false);
- const errors={
-    program:attempted&&!draft.programId?"Choose a school Program.":undefined,
-    contacts:attempted&&!draft.contacts.trim()?"Enter at least one family contact.":undefined,
-    subject:attempted&&draft.subject.trim().length<3?"Enter a subject with at least 3 characters.":undefined,
-    introduction:attempted&&!draft.introduction.trim()?"Enter a school introduction.":undefined,
- };
+ const issues=familyInvitationDraftIssues(draft,programs);
+ const errors=attempted?issues:{program:undefined,contacts:undefined,subject:undefined,introduction:undefined};
  function submit(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAttempted(true);
-    if(Object.values(errors).some(Boolean))return;
-   setAttempted(false);
+    // The first submit must not slip past validation while attempted is false.
+    if(busy||Object.values(issues).some(Boolean))return;
+    setAttempted(false);
     onSubmit(event);
  }
  if(!programs.length)return <p className="mt-6 border p-4 text-sm">{purpose==="interest"
