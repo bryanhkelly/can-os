@@ -44,8 +44,8 @@ async function main(){
   const [offering]=await sql`
     SELECT ov.id,ov.version_no,ov.lifecycle,ov.published_at,
       o.title,o.status,o.publisher_organization_id,o.id AS offering_id
-    FROM education_v30.offering_versions ov
-    JOIN education_v30.offerings o ON o.id=ov.offering_id
+    FROM public.offering_versions ov
+    JOIN public.offerings o ON o.id=ov.offering_id
     WHERE ov.id=${offeringVersionId}::uuid
   `;
   if(!offering)throw new Error("Specified native Offering version does not exist on main.");
@@ -57,7 +57,7 @@ async function main(){
        WHERE l.course_version_id=cv.id) lesson_count
     FROM education_v30.offering_courses oc
     JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
-    JOIN education_v30.courses c ON c.id=cv.course_id
+    JOIN public.courses c ON c.id=cv.course_id
     WHERE oc.offering_version_id=${offeringVersionId}::uuid
       AND c.publisher_organization_id=${offering.publisher_organization_id}::uuid
     ORDER BY oc.sequence_no,cv.id
@@ -75,7 +75,7 @@ async function main(){
     JOIN education_v30.professional_capability_authorizations ca
       ON ca.id=a.capability_authorization_id
       AND ca.person_id=a.person_id AND ca.capability_id=a.capability_id
-    JOIN education_v30.service_capabilities capability
+    JOIN public.service_capabilities capability
       ON capability.id=a.capability_id
     JOIN education_v30.evidence_document_versions authority
       ON authority.id=a.authority_evidence_id
@@ -153,8 +153,8 @@ async function main(){
   const [upstream]=await sql`
     WITH target AS (
       SELECT ov.id, o.publisher_organization_id
-      FROM education_v30.offering_versions ov
-      JOIN education_v30.offerings o ON o.id=ov.offering_id
+      FROM public.offering_versions ov
+      JOIN public.offerings o ON o.id=ov.offering_id
       WHERE ov.id=${offeringVersionId}::uuid
     )
     SELECT
@@ -206,7 +206,7 @@ async function main(){
           AND bo.deployment_id IS NOT NULL
       ) AS offering_blueprint_outputs,
       (SELECT count(*)::int FROM public.deployment_offering_adoptions adoption
-        JOIN education_v30.program_deployments deployment
+        JOIN public.program_deployments deployment
           ON deployment.id=adoption.deployment_id
         JOIN education_v30.education_operation_organization_roles relation
           ON relation.operation_id=deployment.operation_id
@@ -217,7 +217,7 @@ async function main(){
             relation.valid_through>clock_timestamp())
       ) AS current_approved_operation_operators,
       (SELECT count(*)::int FROM public.deployment_offering_adoptions adoption
-        JOIN education_v30.program_deployments deployment
+        JOIN public.program_deployments deployment
           ON deployment.id=adoption.deployment_id
         JOIN education_v30.education_operation_organization_roles relation
           ON relation.operation_id=deployment.operation_id
@@ -262,7 +262,7 @@ async function main(){
     SELECT course_version_id,minimum_approved_primary_tracks,
       complete_lesson_coverage_required,independent_academic_review_required,
       rights_clearance_required,accessibility_review_required
-    FROM education_v30.offering_release_requirements
+    FROM public.offering_release_requirements
     WHERE offering_version_id=${offeringVersionId}::uuid
     ORDER BY course_version_id LIMIT 51
   `;
@@ -283,7 +283,7 @@ async function main(){
     SELECT adoption.approval_status, p.status deployment_status,
       o.status operation_status
     FROM public.deployment_offering_adoptions adoption
-    JOIN education_v30.program_deployments p ON p.id=adoption.deployment_id
+    JOIN public.program_deployments p ON p.id=adoption.deployment_id
     JOIN public.education_operations o ON o.id=p.operation_id
     WHERE adoption.offering_version_id=${offeringVersionId}::uuid
     LIMIT 51
