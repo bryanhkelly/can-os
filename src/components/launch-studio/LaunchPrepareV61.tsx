@@ -46,13 +46,13 @@ const scoped = (siteId: string) => encodeURIComponent(siteId);
 /** These destinations are existing authorized operations, not new task stores. */
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {
-    question: "Which packaged learning experiences fit the community you want to serve?",
+    question: "Which published Solutions support the programs your community wants to offer?",
     decision: "Explore published Offerings and reference models. Record an adoption intent only inside the authorized Blueprint planning workflow.",
-    canSupplies: "Published Offering versions, delivery eligibility guidance, and governed Blueprint planning.",
+    canSupplies: "Published Solution models, Offering availability guidance and governed configuration workflows.",
     siteProvides: "A selected operating model, physical capabilities, staff coverage, local constraints and evidence.",
     status: "governed",
     handoffs: [
-      { title: "Plan in the canonical Blueprint workspace", detail: "Select published Offerings in a private Blueprint draft; approval and adoption remain separate.", href: id => "/canonical/blueprints?siteId=" + scoped(id) },
+      { title: "Configure a Solution", detail: "Plan a published Solution using the existing governed configuration workflow. Site approval and learner enrollment remain separate.", href: id => "/canonical/blueprints?siteId=" + scoped(id) },
       { title: "Manage authorized Classes", detail: "Configure actual Classes only where the existing Course and Site gates allow it.", href: id => "/class?view=manage&siteId=" + scoped(id) },
     ],
   },
