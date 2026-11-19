@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getTableConfig } from "drizzle-orm/pg-core";
+import { isCanonicalSiteDiscoverable } from "@/domain/canonical-site-availability";
 import {
   canonicalClasses,
   canonicalClassOfferings,
@@ -26,6 +27,14 @@ import {
  * or database acceptance tests.
  */
 describe("V6.1 Prepare canonical schema bindings", () => {
+  it("requires a classified, nonclosed Site before any catalog discovery", () => {
+    expect(isCanonicalSiteDiscoverable("planning")).toBe(true);
+    expect(isCanonicalSiteDiscoverable("active")).toBe(true);
+    expect(isCanonicalSiteDiscoverable("closed")).toBe(false);
+    expect(isCanonicalSiteDiscoverable(null)).toBe(false);
+    expect(isCanonicalSiteDiscoverable(undefined)).toBe(false);
+  });
+
   it("maps Site, Blueprint, Offering, geographic and operator records to public", () => {
     const sourceTables = {
       catalogSites, siteOrganizationRoles, geographicAreas, canonicalClasses, canonicalClassOfferings,
