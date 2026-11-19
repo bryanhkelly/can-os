@@ -88,11 +88,13 @@ describe("V6.1 Prepare to Open", () => {
     expect(resolveVisibleSolutionRecipe([], "one")).toBeUndefined();
   });
 
-  it("preserves the requested Site across internal navigation and links to existing owners", () => {
+  it("links to authorized workspaces without duplicating sidebar module navigation", () => {
     const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="facilities-resources" />);
     expect(html).toContain("Facilities &amp; Resources");
-    expect(html).toContain('aria-label="Prepare modules"');
-    expect(html).toContain("siteId=" + siteId + "&amp;module=schedules-capacity");
+    expect(html).not.toContain('aria-label="Prepare modules"');
+    expect(html).not.toContain('aria-label="Prepare module navigation"');
+    expect(html).not.toContain("module=schedules-capacity");
+    expect(html).toContain("Launch Studio / Prepare");
     expect(html).toContain("siteId=" + siteId + "&amp;module=site-information");
     expect(html).toContain("/canonical/lab/site-qualification");
     expect(html).toContain("This page does not claim that any requirement has passed.");
@@ -121,11 +123,13 @@ describe("V6.1 Prepare to Open", () => {
 
   it("keeps Site publication an explicit Prepare decision, separate from enrollment", () => {
     const safety = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="opening-compliance" />);
-    expect(safety).toContain("Continue: Publish Site");
+    expect(safety).not.toContain("Continue: Publish Site");
+    expect(safety).not.toContain('aria-label="Prepare modules"');
     expect(safety).toContain("settings/school/compliance?siteId=");
     const publish = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="publish-site" />);
     expect(publish).toContain("Publish your Site website");
-    expect(publish).toContain("Review Launch requirements");
+    expect(publish).not.toContain("Review Launch requirements");
+    expect(publish).not.toContain('aria-label="Prepare module navigation"');
     expect(publish).toContain("A shared preview is not Site publication");
     expect(publish).not.toContain("Activate enrollment");
   });
