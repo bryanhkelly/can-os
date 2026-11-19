@@ -79,7 +79,7 @@ export const networkReportingGrants = pgTable("network_reporting_grants",{
 
 /** Append-only attribution referencing one native Class enrollment OR one
  * existing noncredit registration, never creating another learning source. */
-export const participationAttributions = educationV30.table("participation_attributions",{
+export const participationAttributions = pgTable("participation_attributions",{
   id:id(),
   noncreditRegistrationId:uuid("noncredit_registration_id"),
   classEnrollmentId:uuid("class_enrollment_id"),
