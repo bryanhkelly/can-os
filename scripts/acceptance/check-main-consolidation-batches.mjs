@@ -37,7 +37,7 @@ if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
 function parseBatch([label,file,expected,arity]){
   const source=readFileSync(file,"utf8");
   if(arity==="json"){
-    const match=source.match(/(?:snapshot|tables)\\s+jsonb\\s*:=\\s*'([^']+)'::jsonb/);
+    const match=source.match(/(?:snapshot|tables)\s+jsonb\s*:=\s*'([^']+)'::jsonb/);
     if(!match)throw new Error("Expected a pinned JSON snapshot in "+file);
     const records=JSON.parse(match[1]).map(x=>({
       name:x.name,oid:x.oid,rls:x.rls,force:x.force_rls??x.forced,policies:x.pol,
