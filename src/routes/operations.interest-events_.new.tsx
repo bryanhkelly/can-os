@@ -11,8 +11,8 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
 /**
- * An event is independently governed and Program-linked. Only its editable
- * starting title comes from the same saved Site Marketing Package or the
+ * An event is independently governed and Program-linked. The editable
+ * starting copy comes from the same saved Site Marketing Package or the
  * reviewed editorial projection used in Launch Studio. Nothing is sent or
  * created by this read; no campaign, event or Story is copied into a new store.
  */
@@ -49,7 +49,7 @@ export const Route = createFileRoute("/operations/interest-events_/new")({
     const savedHeadline=selected?.content.headline.trim()??"";
     const savedMessage=selected?.content.message.trim()??"";
     const safeTitle=(value:string)=>value.length>=3 && value.length<=160 &&
-      !/[<>\\r\\n]/.test(value) && !containsProtectedInstitutionalClaim(value);
+      !/[<>\r\n]/.test(value) && !containsProtectedInstitutionalClaim(value);
     const safeMessage=(value:string)=>value.length<=2000 &&
       !/[<>]/.test(value) && !containsProtectedInstitutionalClaim(value);
     // A requested package must be usable as authored; do not replace a
