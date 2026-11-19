@@ -40,7 +40,7 @@ const repoFiles=[
 ];
 // These later migrations use guarded PL/pgSQL ALTER TABLE statements rather
 // than literal ALTER TABLE lines. Read their pinned relation snapshots and
-// reject name/row-contract drift, rather than silently omitting 105 moves.
+// reject name/row-contract drift, rather than silently omitting guarded moves.
 const guardedBatchFiles=[
   ["database/production/2026-11-18-consolidate-eight-unmapped-tables.sql",8,7],
   ["database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
@@ -48,6 +48,7 @@ const guardedBatchFiles=[
   ["database/production/2026-11-19-consolidate-22-empty-foundation-funding-qualification-tables.sql",22,"json"],
   ["database/production/2026-11-19-consolidate-eight-assessment-grading-tables.sql",8,"json"],
   ["database/production/2026-11-19-consolidate-12-blueprint-tables.sql",12,"json"],
+  ["database/production/2026-11-19-consolidate-38-assessment-survey-qualification-completion-tables.sql",38,"json"],
 ];
 
 function guardedTableNames(file,expected,arity){
