@@ -48,6 +48,7 @@ async function authorizedShareSite(siteId: string) {
     id: sites.id, organizationId: sites.organizationId, name: sites.name,
     lifecycleStatus: sites.lifecycleStatus, metadata: sites.metadata,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
+  if (!site) throw new AuthorizationError("Site preview sharing scope");
   await assertPreviewSharingScope(actor, site);
   if (site.lifecycleStatus === "closed")
     throw new DomainError("UNAVAILABLE", "A closed Site cannot share a new preview.");
@@ -88,6 +89,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         lifecycleStatus: sites.lifecycleStatus, metadata: sites.metadata,
         updatedAt: sites.updatedAt,
       }).from(sites).where(eq(sites.id, data.siteId)).for("update").limit(1);
+      if (!site) throw new AuthorizationError("Site preview sharing scope");
       await assertPreviewSharingScope(actor, site, tx);
       if (site.lifecycleStatus === "closed") throw new AuthorizationError("closed Site");
       const existing = readSitePreviewShares(site.metadata);
@@ -195,6 +197,7 @@ export const revokeSitePreviewShare = createServerFn({ method: "POST" })
     return db.transaction(async tx => {
       const [site] = await tx.select().from(sites)
         .where(eq(sites.id, data.siteId)).for("update").limit(1);
+      if (!site) throw new AuthorizationError("Site preview sharing scope");
       await assertPreviewSharingScope(actor, site, tx);
       const shares = readSitePreviewShares(site.metadata);
       const match = shares.find(entry => entry.id === data.shareId);
