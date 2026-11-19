@@ -14,6 +14,7 @@ import { EstablishProgramsAudiencesV61, ProgramsAudiencesV61Guidance,
 import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { WorkspaceShell } from "@/components/workspace";
 import { LaunchModuleDestinationV61, isDestinationModuleV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
+import { LaunchPrepareV61, isPrepareModuleV61 } from "@/components/launch-studio/LaunchPrepareV61";
 
 const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/launch/site")({
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
         ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
-      programsAudiences: site && deps.module === "programs-audiences"
+      programsAudiences: site && (deps.module === "programs-audiences" || deps.module === "program-catalog")
         ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
       error: deps.siteId && !site ? "You do not have access to the selected Site." : null,
     };
@@ -83,6 +84,8 @@ function SiteLaunchPage() {
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
+    : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61
+      module={selected.id} siteId={site.id} intent={programsAudiences?.intent ?? null} />
     : selected && isDestinationModuleV61(selected.id) ? <LaunchModuleDestinationV61
       module={selected.id} title={selected.title} stage={selected.stage} siteId={site.id} />
     : selected ? <WorkspaceShell title="Module unavailable" eyebrow="Launch Studio"
