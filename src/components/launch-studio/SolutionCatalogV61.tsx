@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Layers3, Search } from "lucide-react";
+import { ArrowRight, BookOpen, Layers3 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { StatusBadge, WorkspacePanel } from "@/components/workspace";
+import { EmptyState, FilterBar, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
@@ -25,6 +24,7 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,44 +40,39 @@ export function SolutionCatalogV61({ siteId }: { siteId: string }) {
         "Published Blueprint recipes could not be loaded for this Site.").message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [siteId]);
+  }, [siteId, reload]);
 
   const templates = workspace?.templates ?? [];
   const visible = templates.filter(template =>
     [template.title, ...template.components.map(component => component.key)]
       .some(value => value.toLowerCase().includes(query.trim().toLowerCase())));
-  const selected: Recipe | undefined = templates.find(template => template.blueprintVersionId === selectedId)
+  const selected: Recipe | undefined = visible.find(template => template.blueprintVersionId === selectedId)
     ?? visible[0];
 
   return <WorkspacePanel title="Packaged Solution recipes"
     description="Browse the real published Blueprint models CAN makes available to your authorized Site.">
     {loading && <p role="status" className="text-sm">Loading published Solution recipes…</p>}
-    {error && <div role="status" className="border bg-muted p-4 text-sm">
-      <p className="font-semibold">Solution recipes are unavailable in this account or Site scope.</p>
+    {error && <div role="alert" className="border border-destructive/30 bg-card p-4 text-sm">
+      <p className="font-semibold">Unable to load Solution recipes</p>
       <p className="mt-2 text-muted-foreground">{error}</p>
-      <p className="mt-2 text-muted-foreground">You may still explore published Offerings below, subject to their own authorization checks.</p>
-    </div>}
+      <p className="mt-2 text-muted-foreground">Published Offerings below have a separate access check.</p>
+      <Button type="button" variant="outline" size="sm" className="mt-3"
+        onClick={() => setReload(value => value + 1)}>Retry Solution catalog</Button>
+    </div>
     {workspace && <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <StatusBadge tone="info">{templates.length} published {templates.length === 1 ? "recipe" : "recipes"}</StatusBadge>
-        <span className="text-xs text-muted-foreground">
-          {workspace.configurations.length} Site planning {workspace.configurations.length === 1 ? "draft or submission" : "drafts or submissions"}
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <span>{templates.length} published {templates.length === 1 ? "recipe" : "recipes"}</span>
+        <span>{workspace.configurations.length} saved Site {workspace.configurations.length === 1 ? "configuration" : "configurations"}</span>
       </div>
-      {templates.length === 0 ? <p role="status" className="mt-4 border bg-muted p-4 text-sm">
-        No published Blueprint recipes are available to this Site. CAN must publish a recipe before you can configure one.
-      </p> : <>
-        <label htmlFor="solution-recipe-search" className="mt-5 block text-xs font-semibold">
-          Search published models
-          <span className="relative mt-2 block">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
-            <Input id="solution-recipe-search" className="pl-9" value={query}
-              maxLength={120} onChange={event => { setQuery(event.target.value); setSelectedId(null); }}
-              placeholder="Search titles or components" />
-          </span>
-        </label>
+      {templates.length === 0 ? <EmptyState title="No published Solution recipes"
+        description="CAN must publish a Blueprint recipe before this Site can configure one." className="mt-4" /> : <>
+        <FilterBar label="Published Solution recipes" query={query}
+          onQueryChange={value => { setQuery(value); setSelectedId(null); }}
+          searchLabel="Search published models"
+          searchPlaceholder="Search titles or components" className="mt-5" />
         <p role="status" className="mt-3 text-xs text-muted-foreground">{visible.length} matching published models</p>
-        {visible.length === 0 ? <p className="mt-4 border bg-muted p-4 text-sm">No recipe matches your search.</p> :
+        {visible.length === 0 ? <EmptyState kind="matches" className="mt-4"
+          title="No matching Solution recipes" description="Try another title or component." /> :
           <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
             <div className="grid max-h-[34rem] gap-2 overflow-y-auto" aria-label="Published Blueprint models">
               {visible.map(template => {
