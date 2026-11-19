@@ -115,8 +115,15 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
         const { validateInlinePng }=await import("@/domain/site-local-content");
         validateInlinePng(input.dataUrl);
         const checksum=createHash("sha256").update(canonicalJson(input)).digest("hex");
+        // Identity can come from the one-time JSONB backfill, whose old
+        // checksum encoding differs from this stable JSON serializer. Match
+        // immutable content and permissions as well to avoid a false v2.
         const [existing]=await tx.select().from(siteBrandAssets).where(and(
-          eq(siteBrandAssets.siteId,site.id),eq(siteBrandAssets.checksum,checksum))).limit(1);
+          eq(siteBrandAssets.siteId,site.id),
+          eq(siteBrandAssets.dataUrl,input.dataUrl),
+          eq(siteBrandAssets.altText,input.altText),
+          eq(siteBrandAssets.rightsConfirmed,input.rightsConfirmed?"true":"false"),
+          eq(siteBrandAssets.childImageConsent,input.childImageConsent))).limit(1);
         if(existing?.revokedAt)
           throw new DomainError("FORBIDDEN","The rights for this media have been withdrawn. Upload an authorized replacement.");
         let assetId=existing?.id;
