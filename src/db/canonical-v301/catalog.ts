@@ -387,7 +387,7 @@ export type QualificationProgramFitReviewRow =
  * qualification definitions and Site observations, not a hard-coded form.
  * These are reported needs, never independently verified grant claims.
  */
-export const qualificationResourceNeeds=educationV30.table("qualification_resource_needs",{
+export const qualificationResourceNeeds=pgTable("qualification_resource_needs",{
   id:id(),
   assessmentId:uuid("assessment_id").notNull(),
   policyRequirementId:uuid("policy_requirement_id"),
