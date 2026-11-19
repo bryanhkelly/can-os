@@ -149,7 +149,7 @@ export function LaunchPrepareV61({ module, siteId, intent }: {
   intent?: SiteProgramsAudiencesV61 | null;
 }) {
   const index = prepareModulesV61.findIndex(item => item.id === module);
-  const definition = prepareModulesV61[index];
+  const definition = prepareModulesV61[index]!; // The public module union is derived from this registry.
   const plan = modulePlans[module];
   const next = prepareModulesV61[index + 1];
   const previous = prepareModulesV61[index - 1];
@@ -220,8 +220,8 @@ export function LaunchPrepareV61({ module, siteId, intent }: {
             </div>)}
           </div>
         </WorkspacePanel>
-        <SolutionCatalogV61 siteId={siteId} />
-        <ProgramDiscoveryPanel siteId={siteId} />
+        <SolutionCatalogV61 key={siteId} siteId={siteId} />
+        <ProgramDiscoveryPanel key={siteId} siteId={siteId} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
           Discovery returns published Offerings and their availability policies, not a complete verified Solution fit.
           Adoption intent is recorded in the existing Blueprint workspace; no duplicate selection record is created here.
