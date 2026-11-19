@@ -38,6 +38,36 @@ const repoFiles=[
   "database/production/2026-11-18-consolidate-approved-deployment-adoptions.sql",
   "database/production/2026-11-18-consolidate-deployment-sites.sql",
 ];
+// These later migrations use guarded PL/pgSQL ALTER TABLE statements rather
+// than literal ALTER TABLE lines. Read their pinned relation snapshots and
+// reject name/row-contract drift, rather than silently omitting 105 moves.
+const guardedBatchFiles=[
+  ["database/production/2026-11-18-consolidate-eight-unmapped-tables.sql",8,7],
+  ["database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
+  ["database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
+];
+
+function guardedTableNames(file,expected,arity){
+  const source=readFileSync(file,"utf8");
+  const tuple=new RegExp(
+    "\\('([a-z_]+)'\\s*,\\s*(\\d+)\\s*,\\s*(true|false)\\s*,"+
+    (arity===9?"\\s*(true|false)\\s*,":"")+
+    "\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)"+
+    (arity===9?",\\s*(\\d+)":"")+"\\s*\\)","g");
+  const names=new Map();
+  for(const record of source.matchAll(tuple)){
+    const name=record[1];
+    const identity=record.slice(2).join(",");
+    if(names.has(name) && names.get(name)!==identity)
+      throw new Error("Contradictory guarded migration snapshot: "+file+" "+name);
+    names.set(name,identity);
+  }
+  if(names.size!==expected)
+    throw new Error("Expected "+expected+" guarded relation identities in "+file+
+      ", got "+names.size);
+  return [...names.keys()];
+}
+
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
   vocabularies:12,vocabulary_terms:80,facility_capability_types:6,
@@ -67,6 +97,12 @@ function migratedTableNames(){
     const matches=[...text.matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm)];
     if(!matches.length)throw new Error("No reviewed table moves in "+file);
     for(const [,name] of matches){
+      if(tables.includes(name))throw new Error("Duplicate migration of "+name);
+      tables.push(name);
+    }
+  }
+  for(const [file,count,arity] of guardedBatchFiles){
+    for(const name of guardedTableNames(file,count,arity)){
       if(tables.includes(name))throw new Error("Duplicate migration of "+name);
       tables.push(name);
     }
