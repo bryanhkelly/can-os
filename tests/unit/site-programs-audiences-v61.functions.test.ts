@@ -55,10 +55,11 @@ vi.mock("@/db/client", () => {
         where: () => ({
           returning: async () => {
             state.update(values);
-            if (!state.site) return [];
+            const previous = state.site;
+            if (!previous) return [];
             state.saved = values;
-            state.site = { ...state.site, ...values } as typeof state.site;
-            return [{ updatedAt: state.site.updatedAt }];
+            state.site = { ...previous, ...values };
+            return [{ updatedAt: values.updatedAt as Date }];
           },
         }),
       }),
