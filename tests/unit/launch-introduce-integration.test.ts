@@ -51,6 +51,8 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     expect(component).toContain("context.handoffs.map");
     expect(component).toContain("setContent(workingDraft)");
     expect(component).toContain('brandReadiness==="missing"');
+    expect(component).toContain('brandReadiness!=="available"');
+    expect(component).toContain("Retry Brand check");
     expect(component).toContain("Open Website &amp; Brand");
     expect(component).toContain("createSiteMarketingRelease");
     expect(component).toContain("readSiteBrandVersionView");
