@@ -1,3 +1,4 @@
+import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
 import { recommendBrandDirection } from "@/domain/site-brand-direction";
@@ -149,6 +150,13 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   return {
     siteId:site.id,
     siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
+    siteStoryCopyCandidates:siteStorySource.success ? suggestWebsiteCopyFromStory(siteStorySource.data.answers, site.name) : [],
+    siteStorySourceChoices:siteStorySource.success ? {
+      motivations:siteStorySource.data.answers.motivations,
+      distinctives:siteStorySource.data.answers.distinctives,
+      values:siteStorySource.data.answers.values,
+      experiences:siteStorySource.data.answers.experiences,
+    } : null,
     siteStoryRevision:siteStorySource.success ? siteStorySource.data.revision : null,
     siteName: site.name,
     organizationName: site.organizationName,
