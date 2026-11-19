@@ -1,3 +1,4 @@
+import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { WebsiteCopyField } from "@/components/launch-studio/WebsiteCopyField";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
 import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
@@ -495,8 +496,12 @@ function LocalWebsiteCopyEditor({
 }) {
   const router = useRouter();
   const [editor, setEditor] = useState(() => {
-    const initial = prepareWebsiteEditorContent(data.editingContent, data.siteName);
-    return { content: initial, saved: initial, revision: data.currentRevision, siteId: data.siteId };
+    const starter = prepareWebsiteEditorContent(data.editingContent, data.siteName);
+    // Source-derived copy is an editable, unsaved first draft, never an
+    // automatic update of an already saved website revision.
+    const initial = data.currentRevision === 0
+      ? prepareWebsiteCopyFromSiteInformation(starter,data.siteStoryCopyCandidates) : starter;
+    return { content: initial, saved: starter, revision: data.currentRevision, siteId: data.siteId };
   });
   const content = editor.content;
   const brandRecommendation = data.siteStoryRecommendation;
@@ -752,23 +757,38 @@ function LocalWebsiteCopyEditor({
 
       {step === 3 && <div className="space-y-5">
         <div>
-          <h3 className="font-serif text-2xl">Make your website content your own.</h3>
+          <h3 className="font-serif text-2xl">Build your website from what you have already shared.</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Prepared copy uses your Site name. Optional suggestions draw on saved Site Information
-            and never overwrite a field until you explicitly apply them. Restore Original affects only that field.
+            Your Site Information provides the foundation, including the origin story,
+            community needs, values, learner experiences and future vision.
+            New websites start with source-based copy; existing saved edits are never overwritten automatically.
           </p>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Prepared words are suggestions, not verified promises about programs, services, leaders or opening status.
-            Please review them before publishing. Your actual academic and admissions information comes from CAN OS.
+            Review them before sharing. Approved academic and admissions facts still come from CAN OS.
           </p>
         </div>
+        <p className="text-xs italic leading-5 text-muted-foreground">
+          We use your saved Purpose &amp; Story answers to prepare website copy and potential outreach
+          materials. You control what appears publicly. Review names, permissions, personal details
+          and factual claims before sharing. Nothing goes live automatically.
+        </p>
+        {data.siteStoryCopyCandidates.length>0 && <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
+          <span className="text-sm">
+            {data.siteStoryCopyCandidates.length} source-based drafts available from Site Information.
+          </span>
+          <Button type="button" variant="outline" disabled={busy || !data.canPublish}
+            onClick={()=>setContent(old=>prepareWebsiteCopyFromSiteInformation(old,data.siteStoryCopyCandidates))}>
+            Use Site Information in unchanged starter fields
+          </Button>
+        </div>}
         {data.siteStorySourceChoices && <div className="border bg-muted/20 p-4 text-sm" role="note">
           <p className="font-semibold">Suggestions from Site Information</p>
           <p className="mt-2 text-muted-foreground">
             Values: {data.siteStorySourceChoices.values.join(", ") || "not selected"}.
             Priorities: {data.siteStorySourceChoices.motivations.join(", ") || "not selected"}.
-            These suggestions use your selected values and goals. Your original written
-            answers remain private, and are not added to the website automatically.
+            Suggestions also draw on your written origin, community need and future vision.
+            All proposed wording remains editable and reviewable.
           </p>
           <Link to="/launch/site" search={{siteId:data.siteId,module:"site-information"}}
             className="mt-3 inline-block font-semibold text-primary underline">Review Site Information</Link>
