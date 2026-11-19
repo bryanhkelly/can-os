@@ -58,20 +58,25 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
     setCanonicalSiteId(null);
     setClassManagementAllowed(false);
     try {
-      // Permission is a secondary read. Never hold up the catalog on a slow
-      // Class scope probe, and ignore stale responses after a Site/mode change.
-      const classScope = getLaunchSiteClassScope({ data: { siteId } })
-        .then(result => result.kind === "ready")
-        .catch(() => false);
       const result = await discoverLaunchSitePrograms({
         data: { publicSiteId: siteId, deliveryContext },
       });
       if (version !== requestVersion.current) return;
       setOfferings(result.items);
       setCanonicalSiteId(result.canonicalSiteId);
-      void classScope.then(allowed => {
-        if (version === requestVersion.current) setClassManagementAllowed(allowed);
-      });
+      // Class permission is independent from catalog access. Do not perform
+      // the secondary privileged read if discovery fails, and never block
+      // Offering results while that read completes.
+      if (result.items.some(canPlanOffering)) {
+        void getLaunchSiteClassScope({ data: { siteId } })
+          .then(scope => {
+            if (version === requestVersion.current)
+              setClassManagementAllowed(scope.kind === "ready");
+          })
+          .catch(() => {
+            if (version === requestVersion.current) setClassManagementAllowed(false);
+          });
+      }
     } catch (caught) {
       if (version === requestVersion.current)
         setError(normalizeClientError(caught, "Program discovery could not be completed. Try again.").message);
