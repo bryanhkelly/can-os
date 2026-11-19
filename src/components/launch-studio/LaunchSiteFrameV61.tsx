@@ -29,10 +29,10 @@ export function LaunchSiteFrame({ site, active, children }: {
           aria-current={!active ? "page" : undefined}>Overview</a>
         {stages.map((stage, index) => (
           <div key={stage} className="border-b py-1">
-            <button type="button" aria-expanded={expanded===stage} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
+            <Button type="button" variant="ghost" aria-expanded={expanded===stage} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
               className="flex min-h-11 w-full justify-between px-3 py-3 text-left text-sm font-semibold">
               <span>{index+1}. {stage}</span><span aria-hidden="true">{expanded===stage ? "−" : "+"}</span>
-            </button>
+            </Button>
             {expanded===stage && <div className="space-y-1 pb-2 pl-4">
               {siteLaunchModules.filter(item=>item.stage===stage).map(item=>(
                 <a key={item.id} href={base+"&module="+item.id}
