@@ -4,7 +4,7 @@
 
 Valor is an ordinary canonical Organization/Site tenant, not a separate workflow engine. Account/person grants no longer carry `is_synthetic`. Historical migrations and optional fixture provenance metadata remain historical evidence, not authorization. Ordinary accounts retain one-time email links via Resend, which is a transport provider, not session authority. Restricted Valor accounts and explicitly provisioned public `.demo` school accounts use the shared-code paths described below.
 
-**Valor is a fully operating demonstration school.** Its single academic Program is `active` with a published, current marketing snapshot, so its public site presents an operating school with applications open. Valor never carries `launching` Programs or in-progress program-launch journeys; school-launch workflows are demonstrated on the separate Barton demo tenant (`demo-barton`, provisioned through the ordinary `/schools/new` bootstrap), which stays mid-launch. Test fixtures mirror this split: the launch-wizard fixture in `scripts/seeds/new-experiences-v1.sql` seeds a Barton fixture tenant, never a launching Program inside Valor.
+**Valor is a fully operating demonstration school.** Its single academic Program is `active` with a published, current marketing snapshot, so its public site presents an operating school with applications open. Valor never carries `launching` Programs or in-progress program-launch journeys; school-launch workflows are demonstrated on the separate Barton demo tenant (`demo-barton`, provisioned in a guarded synthetic test fixture), which stays mid-launch. Test fixtures mirror this split: the launch-wizard fixture in `scripts/seeds/new-experiences-v1.sql` seeds a Barton fixture tenant, never a launching Program inside Valor.
 
 ## Required boundaries
 
@@ -43,23 +43,26 @@ controls enabled while that submission is pending; disabling their fieldset
 removes credentials from the browser's form payload. Only the submit button
 is disabled to prevent repeat clicks.
 
-## Public `.demo` school setup
+## Public Site signup and isolated synthetic fixtures
 
-Anyone may submit `/schools/new` with a school name, an unused single-label
-`.demo` domain, a valid IANA timezone and explicit synthetic-only confirmation.
-This provisions a **new**, separate canonical Organization and Site, never
-another school within Valor or an existing authentic organization. It does
-not register DNS or publish a public website. Non-demo domains are not supported
-by this anonymous bootstrap; `valorschool.demo` remains reserved.
+The authoritative public entry is `/site/new`. It accepts Site name, optional
+responsible Organization name, and administrator name and email. Site creation,
+initial exact-Site administrator grant and audit/domain events occur only after
+redeeming a one-time verified-email challenge. Signup never publishes a website,
+authorizes enrollment, or creates a Program.
 
-The transaction creates the initial Site-bound `site_admin`, membership,
-institutional assignment, exact identity registry, AuditEvent and DomainEvents.
-The administrator signs in as `admin.demo@<school>.demo` with `000000` and resumes
-the normal `/launch/school?siteId=...` workflow. No Program or enrollment is
-fabricated by bootstrap. Identical retries reuse the existing setup; mismatched,
-disabled or revoked bindings conflict rather than silently repairing access.
-Same-origin checks, a bounded JSON submission and anonymous admission limiting
-apply. Trusted-edge per-source abuse protection remains an operational concern.
+The previous anonymous `/schools/new` demo provisioning endpoint and its
+competing public screen are deleted. Synthetic `.demo` tenants used by approved
+browser tests are created only by guarded disposable-database fixtures. Their
+exact registered Site, Person, Account and grant bindings still govern access
+through the existing shared-code demo sign-in service. No public form may create
+or adopt a synthetic tenant. The standalone local provisioner is test support,
+not a new application route.
+
+After verification, an authorized Site administrator lands in the V6.1
+`/launch/site?siteId=...` Overview. Establish contains Website & Brand;
+Prepare contains Program Catalog for selecting actual Solutions. Opening and
+enrollment remain independently authorized decisions.
 
 **Site Admin is above registrar within the assigned Site.** It has registrar
 workflow capabilities plus school setup management, while retaining the actual
