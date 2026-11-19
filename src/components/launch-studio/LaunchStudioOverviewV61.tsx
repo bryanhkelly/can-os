@@ -27,16 +27,19 @@ export const siteLaunchModules = [
   { stage: "Introduce", id: "promote", title: "Promote" },
   { stage: "Introduce", id: "recruit", title: "Recruit Families / Learners" },
   { stage: "Introduce", id: "interest-events", title: "Interest Events" },
-  { stage: "Prepare", id: "invite-team", title: "Invite Your Team" },
-  { stage: "Prepare", id: "program-catalog", title: "Program Catalog" },
-  { stage: "Prepare", id: "opening-compliance", title: "Opening & Compliance" },
+  { stage: "Prepare", id: "program-catalog", title: "Programs & Solutions" },
+  { stage: "Prepare", id: "facilities-resources", title: "Facilities & Resources" },
+  { stage: "Prepare", id: "invite-team", title: "Team & Responsibilities" },
+  { stage: "Prepare", id: "schedules-capacity", title: "Schedules & Capacity" },
+  { stage: "Prepare", id: "funding-enrollment", title: "Funding & Enrollment" },
+  { stage: "Prepare", id: "opening-compliance", title: "Safety & Readiness" },
   { stage: "Open", id: "open", title: "Open" },
 ] as const;
 
 const stages = [
   { id: "Establish", icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
   { id: "Introduce", icon: Megaphone, summary: "Promote your community, connect with prospective learners and host events." },
-  { id: "Prepare", icon: ClipboardCheck, summary: "Bring in your team, prepare learning experiences and meet opening requirements." },
+  { id: "Prepare", icon: ClipboardCheck, summary: "Choose packaged learning experiences, prepare facilities, team, schedules and funding, then verify requirements." },
   { id: "Open", icon: Rocket, summary: "Review verified readiness and activate offerings when separately authorized." },
 ] as const;
 
