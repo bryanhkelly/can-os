@@ -147,7 +147,7 @@ BEGIN
 ('qualification_questionnaire_bindings',416667,true,true,1,1,2,2,5),
 ('qualification_requirement_conditions',416735,true,true,1,1,3,0,5),
 ('site_spaces',402554,false,false,0,0,1,3,3)
-) AS snap(name,source_oid,rls,force_rls,pol,trg,outf,inf,idx) candidate ON p.prosrc ILIKE '%'||candidate.name||'%'
+) AS candidate(name,source_oid,rls,force_rls,pol,trg,outf,inf,idx) ON p.prosrc ILIKE '%'||candidate.name||'%'
  LOOP
     IF fn.routine_owner<>'neondb_owner' OR fn.routine_schema<>'education_v30'
       OR (fn.proconfig IS DISTINCT FROM ARRAY['search_path=education_v30, pg_catalog']::text[]
@@ -264,7 +264,7 @@ BEGIN
 ('qualification_questionnaire_bindings',416667,true,true,1,1,2,2,5),
 ('qualification_requirement_conditions',416735,true,true,1,1,3,0,5),
 ('site_spaces',402554,false,false,0,0,1,3,3)
-) AS snap(name,source_oid,rls,force_rls,pol,trg,outf,inf,idx) candidate ON p.prosrc ILIKE '%'||candidate.name||'%'
+) AS candidate(name,source_oid,rls,force_rls,pol,trg,outf,inf,idx) ON p.prosrc ILIKE '%'||candidate.name||'%'
     WHERE p.proconfig=ARRAY['search_path=education_v30, pg_catalog']::text[]
  LOOP
     EXECUTE format('ALTER FUNCTION %s SET search_path TO education_v30, pg_catalog, public',fn.proc_id);
