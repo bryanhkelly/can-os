@@ -40,7 +40,7 @@ export const canonicalClassOfferings = pgTable("class_offerings", {
 },t=>[uniqueIndex("canonical_class_offerings_class_uq").on(t.classId)]);
 
 /** A Class Offering is optional. It publishes access to a Class, not its identity. */
-export const canonicalClassOfferingVersions = educationV30.table("class_offering_versions", {
+export const canonicalClassOfferingVersions = pgTable("class_offering_versions", {
   id:id(),classOfferingId:uuid("class_offering_id").notNull(),
   classId:uuid("class_id").notNull(),
   versionNo:integer("version_no").notNull(),
