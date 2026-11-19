@@ -1,4 +1,4 @@
-import { boolean, index, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { and, isNull, sql } from "drizzle-orm";
 import { educationV30 } from "./core";
 
