@@ -340,6 +340,11 @@ export async function changeSitePublicationWithinTransaction(
     // explicit institutional publishing authority; local copy is never an
     // enrollment or accreditation approval.
     const local = needsReadiness ? await readCurrentLocalContent(site.id, tx) : null;
+    const [currentBrand]=needsReadiness ? await tx.select({
+      id:sites.currentBrandVersionId,
+    }).from(sites).where(eq(sites.id,site.id)).for("update").limit(1) : [];
+    if(needsReadiness&&!currentBrand?.id)
+      throw new DomainError("UNAVAILABLE","Save your Site Brand before publishing the website.");
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
       reason: input.reason, contentReviewed: input.contentReviewed,
@@ -351,9 +356,16 @@ export async function changeSitePublicationWithinTransaction(
         updatedAt: decision.updatedAt.toISOString(), changed: false };
     }
 
+    const layoutId=local?.content.branding?.templateId??"heritage";
     const [updated] = await tx.update(sitePublications).set({
       status: decision.status, publishedAt: decision.publishedAt,
       updatedAt: decision.updatedAt,
+      ...(needsReadiness&&currentBrand?.id?{
+        brandVersionId:currentBrand.id,
+        websiteContentRevision:local?.revision??null,
+        websiteTemplateId:layoutId,
+        websiteTemplateVersion:1,
+      }:{}),
     }).where(eq(sitePublications.siteId, site.id))
       .returning({ siteId: sitePublications.siteId });
     if (!updated) throw new Error("Site publication update failed");
@@ -367,7 +379,9 @@ export async function changeSitePublicationWithinTransaction(
       after: { status: decision.status, publishedAt: decision.publishedAt?.toISOString() ?? null,
         updatedAt: decision.updatedAt.toISOString(), reason: input.reason.trim(),
         contentReviewed: input.action === "publish" && input.contentReviewed,
-        eligibleOfferingCount: input.action === "publish" ? eligibleCount : null },
+        eligibleOfferingCount: input.action === "publish" ? eligibleCount : null,
+        brandVersionId:needsReadiness?currentBrand?.id??null:null,
+        websiteContentRevision:needsReadiness?local?.revision??null:null },
     });
     await emitEvent(tx, {
       eventType: input.action === "publish" ? EventTypes.SitePublished : EventTypes.SiteUnpublished,
