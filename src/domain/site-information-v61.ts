@@ -77,3 +77,18 @@ export function applySiteEnvironmentDeliveryV61(previous: unknown, environment: 
     interestIds: parsed.success ? parsed.data.interestIds : [],
   });
 }
+
+/** Audit only field-presence metadata. Never copy private Story answers into audit JSON. */
+export function siteStoryAuditSummaryV61(value: SiteStoryV61) {
+  return {
+    fieldsAnswered: {
+      motivations: value.motivations.length > 0,
+      communityNeed: Boolean(value.communityNeed.trim()),
+      distinctives: value.distinctives.length > 0,
+      foundingStory: Boolean(value.foundingStory.trim()),
+      values: value.values.length > 0,
+      experiences: value.experiences.length > 0,
+      futureVision: Boolean(value.futureVision.trim()),
+    },
+  };
+}
