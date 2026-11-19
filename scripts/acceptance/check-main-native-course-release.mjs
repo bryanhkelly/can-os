@@ -77,7 +77,7 @@ async function main(){
       AND ca.person_id=a.person_id AND ca.capability_id=a.capability_id
     JOIN public.service_capabilities capability
       ON capability.id=a.capability_id
-    JOIN education_v30.evidence_document_versions authority
+    JOIN public.evidence_document_versions authority
       ON authority.id=a.authority_evidence_id
     JOIN public.account_person_grants g ON g.person_id=a.person_id
       AND g.organization_id=a.organization_id AND g.role=a.role_code
@@ -111,7 +111,7 @@ async function main(){
       AND (authority.valid_from IS NULL OR authority.valid_from<=CURRENT_DATE)
       AND (authority.valid_through IS NULL OR authority.valid_through>=CURRENT_DATE)
       AND (ca.evidence_version_id IS NULL OR EXISTS(
-        SELECT 1 FROM education_v30.evidence_document_versions ev
+        SELECT 1 FROM public.evidence_document_versions ev
         WHERE ev.id=ca.evidence_version_id AND ev.verified_at IS NOT NULL
           AND ev.verified_by_person_id IS NOT NULL
           AND ev.verified_at<=clock_timestamp()
@@ -174,8 +174,8 @@ async function main(){
           AND g.role='academic_content_reviewer'
           AND acc.email_verified_at IS NOT NULL AND NOT acc.disabled
       ) AS verified_reviewer_grants,
-      (SELECT count(*)::int FROM education_v30.evidence_document_versions v
-        JOIN education_v30.evidence_documents d ON d.id=v.document_id
+      (SELECT count(*)::int FROM public.evidence_document_versions v
+        JOIN public.evidence_documents d ON d.id=v.document_id
         JOIN target t ON t.publisher_organization_id=d.owning_organization_id
         WHERE v.verified_at IS NOT NULL
           AND v.verified_by_person_id IS NOT NULL
