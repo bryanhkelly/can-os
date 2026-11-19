@@ -22,8 +22,11 @@ function readableStatus(value: string): string {
 }
 
 /** Real catalog discovery and governed planning handoff, with no parallel selection store. */
-export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
-  const [deliveryContext, setDeliveryContext] = useState<DeliveryContext>("onsite");
+export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
+  siteId: string;
+  initialDelivery?: DeliveryContext;
+}) {
+  const [deliveryContext, setDeliveryContext] = useState<DeliveryContext>(initialDelivery);
   const [offerings, setOfferings] = useState<AvailableOffering[] | null>(null);
   const [canonicalSiteId, setCanonicalSiteId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
