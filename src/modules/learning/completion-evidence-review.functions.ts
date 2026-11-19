@@ -77,17 +77,17 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
       SELECT r.participant_person_id AS "participantPersonId",
              training.provider_organization_id AS "providerOrganizationId",
              attribution.delivery_site_id AS "deliverySiteId"
-      FROM education_v30.noncredit_registrations r
+      FROM public.noncredit_registrations r
       JOIN education_v30.noncredit_training_versions training
         ON training.id=r.training_version_id
       JOIN public.participation_attributions attribution
         ON attribution.noncredit_registration_id=r.id
-      JOIN education_v30.noncredit_completion_decisions prior
+      JOIN public.noncredit_completion_decisions prior
         ON prior.registration_id=r.id AND prior.id=${intent.expectedDecisionId}::uuid
       WHERE r.id=${intent.registrationId}::uuid
         AND r.completion_policy_id=prior.policy_id
         AND NOT EXISTS(
-          SELECT 1 FROM education_v30.noncredit_completion_decisions newer
+          SELECT 1 FROM public.noncredit_completion_decisions newer
           WHERE newer.supersedes_id=prior.id)
       LIMIT 2
     `);
@@ -137,9 +137,9 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
       FROM public.learning_award_issuances issuance
       JOIN public.learner_achievement_decisions decision
         ON decision.id=issuance.achievement_decision_id
-      JOIN education_v30.noncredit_completion_decisions completion
+      JOIN public.noncredit_completion_decisions completion
         ON completion.id=decision.noncredit_completion_decision_id
-      JOIN education_v30.noncredit_registrations registration
+      JOIN public.noncredit_registrations registration
         ON registration.id=completion.registration_id
       JOIN public.participation_attributions attribution
         ON attribution.noncredit_registration_id=registration.id
