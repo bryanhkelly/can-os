@@ -35,8 +35,8 @@ export const siteLaunchModules = [
 const stages = [
   { id: "Establish", icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
   { id: "Introduce", icon: Megaphone, summary: "Promote your community, connect with prospective learners and host events." },
-  { id: "Prepare", icon: ClipboardCheck, summary: "Choose packaged learning experiences, prepare facilities, team, schedules and funding, then verify requirements." },
-  { id: "Open", icon: Rocket, summary: "Review verified readiness and activate offerings when separately authorized." },
+  { id: "Prepare", icon: ClipboardCheck, summary: "Select Solutions, verify facilities, people, safeguards and funding, then explicitly publish the public Site website." },
+  { id: "Open", icon: Rocket, summary: "Activate registration only for independently approved, enrollable Offerings." },
 ] as const;
 
 /**
@@ -52,7 +52,7 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
       <div className="mt-5 border-t pt-4"><h3 className="text-sm font-semibold">Work at your own pace</h3><p className="mt-2 text-sm text-muted-foreground">The same Site capabilities remain in your permanent workspace.</p></div>
     </WorkspacePanel>
     <WorkspacePanel title="Your website, as it grows">
-      <p className="text-sm leading-6 text-muted-foreground">Preview the latest saved website from the shared top bar. Viewing a preview never publishes information or opens enrollment.</p>
+      <p className="text-sm leading-6 text-muted-foreground">Preview the latest saved website from the shared top bar. Create a revocable, unlisted share link to show a proposed Site before approval. Official publication is a separate Prepare step.</p>
       <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Available to your authorized account" : "Not available yet"}</div>
     </WorkspacePanel>
   </div>;
