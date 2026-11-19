@@ -15,5 +15,5 @@ export type SchoolSettingsModule=keyof typeof schoolSettingsModules;
 export function schoolConfigurationNavigation(context:SchoolConfigurationContext){
  return context==="settings"
   ? {context,homePath:"/settings" as const,modulePath:"/settings/school/$module" as const,homeLabel:"School Settings",websitePath:"/launch/website" as const}
-  : {context,homePath:"/launch/hub/school" as const,modulePath:"/launch/hub/school/$module" as const,homeLabel:"Launch Hub",websitePath:"/launch/website" as const};
+  : {context,homePath:"/launch/site" as const,modulePath:"/settings/school/$module" as const,homeLabel:"Launch Studio",websitePath:"/launch/website" as const};
 }

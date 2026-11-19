@@ -922,24 +922,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/launch.hub.school.tsx",
-      "route": "/launch/hub/school",
-      "owner": "programs",
-      "verification": "pending",
-      "roleJourney": "Exact-Site Launch Hub orders School Profile, Site Information, Website, community modules, then academics and opening requirements",
-      "writeBoundary": "Hub itself is read-only; profile, Site Information, website, team, Program and compliance commands enforce their owning server capabilities and Site scope",
-      "readBoundary": "Verified registrar-capable membership and exact selected Site; invalid or unauthorized selectors return the authorized picker"
-    },
-    {
-      "file": "src/routes/launch.hub.school_.$module.tsx",
-      "route": "/launch/hub/school_/$module",
-      "owner": "programs",
-      "verification": "pending",
-      "roleJourney": "Exact-Site module routes reuse canonical School Profile and Site Information editors; Website redirects to Website Studio only after access verification",
-      "writeBoundary": "Profile/contact/location and Site Information use revision-checked Site commands; operational modules use their existing scoped domain commands",
-      "readBoundary": "Verified registrar-capable membership and exact Site; Program selection is separately constrained to Programs at that Site"
-    },
-    {
       "file": "src/routes/launch.school.tsx",
       "route": "/launch/school",
       "owner": "programs",

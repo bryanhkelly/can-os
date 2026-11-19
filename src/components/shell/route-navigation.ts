@@ -76,8 +76,6 @@ export const routeNavigation = {
   "/launch": publicPage,
   "/launch/site": page("/launch/site", admins),
   "/launch/site-preview": endpoint,
-  "/launch/hub/school": hidden("Standalone school Launch Hub", admins),
-  "/launch/hub/school/$module": hidden("School Launch Hub module home", admins),
   "/landing": publicPage,
   "/landing/$journeyId": publicPage,
   "/next/$journeyId": publicPage,
