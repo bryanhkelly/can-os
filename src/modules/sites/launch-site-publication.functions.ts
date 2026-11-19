@@ -21,10 +21,23 @@ export const readLaunchSitePublication = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getCommandContext(getRequest());
-    const site = actor.role === "site_admin" || actor.role === "site_website_editor"
-      ? await requirePartnerWebsiteEditor(actor, db, "site.website.local.publish")
+    const isLocalEditor = actor.role === "site_admin" || actor.role === "site_website_editor";
+    // Reading Prepare must not require the power to approve website copy.
+    // This also permits network-governed Site Admins to inspect blockers
+    // without claiming they can independently approve or publish.
+    const site = isLocalEditor
+      ? await requirePartnerWebsiteEditor(actor, db, "site.website.draft.read")
       : await requireSitePublisher(actor, data.siteId);
     if (site.id !== data.siteId) throw new AuthorizationError("exact Site publication scope");
+    let canPublishSite = false;
+    try {
+      // The actual Site publisher requires an independent active Person role
+      // assignment, not merely a Site Admin or registrar capability.
+      await requireSitePublisher(actor, data.siteId);
+      canPublishSite = true;
+    } catch (error) {
+      if (!(error instanceof AuthorizationError)) throw error;
+    }
 
     const [[address], latest, localCopy, academic, enrichment, [brandPointer]] = await Promise.all([
       db.select({
@@ -63,10 +76,10 @@ export const readLaunchSitePublication = createServerFn({ method: "GET" })
           (localCopy?.content.branding?.templateId??"heritage")!==(address.websiteTemplateId??"heritage"))),
       approvedEnrichmentCount: enrichment.length,
       reviewedLocalContentAvailable: Boolean(localCopy),
-      canReviewWebsiteCopy: actor.role === "site_admin" || actor.role === "site_website_editor",
-      // Editors may approve local copy, but Site publication has an independent
-      // assignment checked by the existing Site publisher command.
-      canPublishSite: actor.role !== "site_website_editor",
+      // The draft reader resolves the real local-publish capability,
+      // including network governance and the exact active editor assignment.
+      canReviewWebsiteCopy: isLocalEditor && "canPublish" in site && site.canPublish === true,
+      canPublishSite,
       latestWebsiteRevision: latest?.revision ?? 0,
       latestWebsiteStatus: latest?.status ?? null,
       publishingPrerequisitesPresent: Boolean(localCopy) || academic.length + enrichment.length > 0,
