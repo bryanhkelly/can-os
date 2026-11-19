@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Read-only reconciliation for the two applied main batches (8 + 46) and
- * the pending 51-table batch. Does not run a migration or modify a database.
+ * Read-only reconciliation for the three applied main batches (8 + 46 + 51).
+ * Does not run a migration or modify a database.
  *
  * CAN_MAIN_CONSOLIDATION_CHECK=1 DATABASE_URL=<main Neon URL> \
  * node scripts/acceptance/check-main-consolidation-batches.mjs
@@ -14,7 +14,7 @@ const branch="br-restless-sea-ar9ooo55";
 const sources=[
   ["applied-eight","database/production/2026-11-18-consolidate-eight-unmapped-tables.sql",8,7],
   ["applied-forty-six","database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
-  ["staged-fifty-one","database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
+  ["applied-fifty-one","database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
 ];
 if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
   throw new Error("Explicit read-only opt-in and production DATABASE_URL required");
@@ -40,7 +40,7 @@ function parseBatch([label,file,expected,arity]){
   }
   if(catalog.size!==expected)throw new Error("Migration inventory mismatch: "+label+
     " expected "+expected+", parsed "+catalog.size);
-  return {label,file,records:[...catalog.values()],state:label.startsWith("applied")?"applied":"staged"};
+  return {label,file,records:[...catalog.values()],state:"applied"};
 }
 
 async function main(){
@@ -92,26 +92,31 @@ async function main(){
       discrepancies.push({name:item.name,batch:item.batch,error:"Unexpected table ACL"});
   }
 
-  // Metadata is checked separately from exact row counts; staged tables must
-  // remain empty before applying the prepared, zero-row-only migration.
-  const staged=batches.find(b=>b.state==="staged").records.map(r=>r.name);
-  const quote=name=>'"'+name.replaceAll('"','""')+'"';
-  const counts=[];
-  for(let i=0;i<staged.length;i+=25){
-    const part=staged.slice(i,i+25);
-    const query=part.map(name=>"SELECT '"+name.replaceAll("'","''")+
-      "' AS name, count(*)::bigint AS rows FROM education_v30."+quote(name)).join(" UNION ALL ");
-    counts.push(...await sql.query(query));
-  }
-  const nonempty=counts.filter(x=>BigInt(x.rows)!==0n)
-    .map(x=>({name:x.name,rows:String(x.rows)}));
-  const report={readOnly:true,project,branch,batches:batches.map(b=>({
-    name:b.label,state:b.state,expectedTables:b.records.length
-  })),verifiedAppliedTables:54,stagedEmptyTables:counts.length-nonempty.length,
-    nonemptyStagedTables:nonempty,discrepancies};
+  // Live rows may be written to public after cutover; do not incorrectly
+  // require these migrated tables to remain empty forever.
+  const relationCounts=await sql`
+    SELECT n.nspname AS schema, count(*) FILTER(WHERE c.relkind IN ('r','p'))::int AS tables
+    FROM pg_namespace n JOIN pg_class c ON c.relnamespace=n.oid
+    WHERE n.nspname IN ('public','education_v30','education_v30_secure')
+    GROUP BY n.nspname ORDER BY n.nspname
+  `;
+  const crossings=await sql`
+    SELECT count(*)::int AS foreign_keys
+    FROM pg_constraint con
+    JOIN pg_class source ON source.oid=con.conrelid
+    JOIN pg_namespace source_ns ON source_ns.oid=source.relnamespace
+    JOIN pg_class target ON target.oid=con.confrelid
+    JOIN pg_namespace target_ns ON target_ns.oid=target.relnamespace
+    WHERE con.contype='f'
+      AND source_ns.nspname='public'
+      AND target_ns.nspname IN ('education_v30','education_v30_secure')
+  `;
+  const report={readOnly:true,project,branch,
+    batches:batches.map(b=>({name:b.label,state:b.state,expectedTables:b.records.length})),
+    verifiedAppliedTables:all.length,liveSchemaTables:relationCounts,
+    remainingPublicToLegacyForeignKeys:crossings[0]?.foreign_keys??null,discrepancies};
   console.log(JSON.stringify(report,null,2));
-  if(discrepancies.length||nonempty.length||counts.length!==51)
-    process.exitCode=2;
+  if(discrepancies.length||all.length!==105)process.exitCode=2;
 }
 
 main().catch(e=>{console.error("CAN OS consolidation reconciliation FAILED:",e.message);process.exitCode=1;});
