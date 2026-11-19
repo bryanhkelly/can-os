@@ -18,15 +18,26 @@ test("school administrator reviews, publishes and renames a standalone school we
   const name = `Website School ${suffix}`;
   const renamedName = `Renamed School ${suffix}`;
 
-  // Synthetic school provisioning is test infrastructure, not a second public signup UI.
-  // The legacy endpoint remains guarded and will be retired when fixtures use a direct setup adapter.
-  await page.goto("/site/new");
-  const origin = new URL(page.url()).origin;
-  const setupResponse = await request.post("/schools/new", {
-    headers: { Origin: origin },
-    data: { mode: "demo", name, domain, timezone: "UTC", syntheticOnly: true },
+  // Provision synthetic identity exclusively in this guarded disposable test database.
+  // No public demo-school signup endpoint or legacy redirect is used.
+  const orgId = await insertFixtureId(sql,
+    "INSERT INTO organizations (type,name,slug,metadata) VALUES ('christian_school',$1,$2,'{}'::jsonb) RETURNING id",
+    [name, "demo-"+domain.slice(0,-5)]);
+  const siteId = await insertFixtureId(sql,
+    "INSERT INTO sites (organization_id,name,slug,timezone,metadata) VALUES ($1,$2,$3,'UTC','{}'::jsonb) RETURNING id",
+    [orgId, name, "demo-"+domain.slice(0,-5)]);
+  const personId = await insertFixtureId(sql,
+    "INSERT INTO people (legal_first_name,legal_last_name,metadata) VALUES ('Demo','Administrator','{}'::jsonb) RETURNING id", []);
+  const accountId = await createVerifiedAccessAccount(sql, "admin.demo@"+domain);
+  const grantId = await createSyntheticPersonaGrant(sql, {
+    accountId, personId, role: "site_admin", organizationId: orgId, siteId,
   });
-  expect(setupResponse.status()).toBe(201);
+  await sql.query("INSERT INTO memberships(person_id,organization_id,title) VALUES ($1,$2,'Site Administrator')",
+    [personId, orgId]);
+  await sql.query("INSERT INTO role_assignments(person_id,organization_id,site_id,role_key,capabilities) VALUES ($1,$2,$3,'site_admin',$4)",
+    [personId, orgId, siteId, ["site.publication.manage"]]);
+  await sql.query("INSERT INTO demo_school_tenants (domain,organization_id,site_id,admin_account_id,admin_person_id,admin_grant_id) VALUES ($1,$2,$3,$4,$5,$6)",
+    [domain,orgId,siteId,accountId,personId,grantId]);
   await page.goto("/access");
   await page.getByLabel("Email", { exact: true }).fill(`admin.demo@${domain}`);
   await page.getByLabel("Demo access code (000000)").fill("000000");
@@ -39,9 +50,7 @@ test("school administrator reviews, publishes and renames a standalone school we
   await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible();
 
   const [tenant] = await sql`SELECT organization_id, site_id FROM demo_school_tenants WHERE domain = ${domain}`;
-  if (!tenant) throw new Error("The browser-created school was not persisted.");
-  const orgId = String(tenant.organization_id);
-  const siteId = String(tenant.site_id);
+  expect(tenant).toMatchObject({ organization_id: orgId, site_id: siteId });
   // Browser acceptance of exact-Site Launch Hub and Website Studio navigation.
   const navigationErrors: string[] = [];
   page.on("pageerror", error => navigationErrors.push(error.message));
