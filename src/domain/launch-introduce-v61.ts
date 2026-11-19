@@ -60,9 +60,9 @@ export const introduceModuleConfigV61: Record<IntroduceModuleV61, IntroduceConfi
     purposes: ["interest-invitation", "program-interest"],
     handoffDescription: "Application invitations are a separate, permission-checked workflow for an eligible receiving Program. A Site-wide prospect CRM is not implemented.",
     handoffs: [
-      { title: "Manage authorized family invitations",
-        description: "Continue in the existing admissions service when a receiving Program is authorized.",
-        href: () => "/admissions/invite-families" },
+      { title: "Invite families to express interest",
+        description: "Use the existing consent-aware preopening interest workflow when an eligible Program exists.",
+        href: id => `/admissions/invite-families?siteId=${scoped(id)}&purpose=interest` },
     ],
   },
   "interest-events": {
