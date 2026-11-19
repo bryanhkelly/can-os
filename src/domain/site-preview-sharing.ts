@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { escapePublicHtml } from "./public-site-html";
+import { escapePublicHtml, type PublicSitePage } from "./public-site-html";
+import { siteLocalImagePublicationGaps, type SiteLocalContent } from "./site-local-content";
 import { isPublicSitePagePath } from "./public-site-paths";
 
 const uuid = z.string().uuid();
@@ -89,6 +90,39 @@ export function renderSharedSitePreview(
   return rewritten.replace("</head>", `<meta name="robots" content="noindex,nofollow">${style}</head>`)
     .replace(/(<body\b[^>]*>)/, `$1${banner}`)
     .replace("</title>", ` · Proposed website preview</title>`);
+}
+
+/**
+ * A frozen external preview is a minimal projection of the canonical website
+ * renderer, not an export of Site metadata. It cannot include Site Story,
+ * contact directories, unapproved media, academic claims or enrollment URLs.
+ */
+export function projectShareableSitePreview(input: {
+  siteName: string;
+  organizationName: string;
+  content: SiteLocalContent;
+}): PublicSitePage {
+  const { editorialBaseline: _privateOriginalCopy, ...copy } = input.content;
+  return {
+    host: "preview.can-os.com",
+    site: { name: input.siteName, organizationName: input.organizationName },
+    localContent: {
+      ...copy,
+      branding: {
+        ...copy.branding,
+        heroImage: siteLocalImagePublicationGaps(copy.branding.heroImage).length
+          ? null : copy.branding.heroImage,
+        logoImage: siteLocalImagePublicationGaps(copy.branding.logoImage ?? null).length
+          ? null : copy.branding.logoImage ?? null,
+      },
+    },
+    offerings: [],
+    academicPrograms: [],
+    noncreditReleases: [],
+    enrollmentOpportunities: [],
+    contentBlocks: [],
+    media: {},
+  };
 }
 
 export const sitePreviewShareHeaders = {
