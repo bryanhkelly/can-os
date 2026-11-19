@@ -130,17 +130,21 @@ export function EstablishSiteProfileUnified({
         address: validAddress.data, changeReason: locationReason.trim(),
       } }));
     }
+    let mutationsSucceeded = false;
     try {
       await saveSiteProfileSequentially(site.updatedAt, operations);
+      mutationsSucceeded = true;
       // Even with no changes, read the currently authorized Site before handoff.
       await router.invalidate();
       releaseNavigation();
       navigate();
     } catch (cause) {
       setReloadRequired(true);
-      setError(cause instanceof SiteProfileSaveError && cause.completed > 0
-        ? "Some changes may have saved, but the full update did not finish. Reload the Site and review its values before retrying."
-        : cause instanceof Error ? cause.message : "Site Profile could not be saved. Reload and retry.");
+      setError(mutationsSucceeded
+        ? "Your changes were submitted, but fresh Site information could not be loaded. Reload and review the saved values before continuing."
+        : cause instanceof SiteProfileSaveError && cause.completed > 0
+          ? "Some changes may have saved, but the full update did not finish. Reload the Site and review its values before retrying."
+          : cause instanceof Error ? cause.message : "Site Profile could not be saved. Reload and retry.");
     } finally {
       busy.current = false;
       setSaving(false);
