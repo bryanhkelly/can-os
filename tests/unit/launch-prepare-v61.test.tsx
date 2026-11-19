@@ -24,10 +24,23 @@ vi.mock("@/modules/blueprints/blueprint-studio.functions", () => ({
   readCanonicalBlueprintWorkspace: vi.fn(() => new Promise(() => {})),
 }));
 
+vi.mock("@/modules/sites/site-preview-sharing.functions", () => ({
+  createSitePreviewShare: vi.fn(),
+  listSitePreviewShares: vi.fn().mockResolvedValue([]),
+  revokeSitePreviewShare: vi.fn(),
+}));
+vi.mock("@/modules/sites/launch-site-publication.functions", () => ({
+  readLaunchSitePublication: vi.fn(),
+}));
+vi.mock("@/modules/sites/site-publication.functions", () => ({
+  setSitePublicationStatus: vi.fn(),
+  verifySitePublicationReachability: vi.fn(),
+}));
+
 const siteId = "00000000-0000-4000-8000-000000000001";
 
 describe("V6.1 Prepare to Open", () => {
-  it("has six distinct, stable modules without inventing a parallel readiness engine", () => {
+  it("has seven distinct, stable modules without inventing a parallel readiness engine", () => {
     expect(prepareModulesV61.map(module => module.id)).toEqual([
       "program-catalog",
       "facilities-resources",
@@ -35,8 +48,9 @@ describe("V6.1 Prepare to Open", () => {
       "schedules-capacity",
       "funding-enrollment",
       "opening-compliance",
+      "publish-site",
     ]);
-    expect(new Set(prepareModulesV61.map(module => module.id)).size).toBe(6);
+    expect(new Set(prepareModulesV61.map(module => module.id)).size).toBe(7);
     expect(isPrepareModuleV61("schedules-capacity")).toBe(true);
     expect(isPrepareModuleV61("website-brand")).toBe(false);
   });
@@ -104,10 +118,14 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).not.toContain("You have not saved any learning interests");
   });
 
-  it("maintains independent authorization handoff at the end of Prepare", () => {
-    const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="opening-compliance" />);
-    expect(html).toContain("Review Launch requirements");
-    expect(html).toContain("settings/school/compliance?siteId=");
-    expect(html).toContain("Site planning is not approval to operate");
+  it("keeps Site publication an explicit Prepare decision, separate from enrollment", () => {
+    const safety = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="opening-compliance" />);
+    expect(safety).toContain("Continue: Publish Site");
+    expect(safety).toContain("settings/school/compliance?siteId=");
+    const publish = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="publish-site" />);
+    expect(publish).toContain("Publish your Site website");
+    expect(publish).toContain("Review Launch requirements");
+    expect(publish).toContain("A shared preview is not Site publication");
+    expect(publish).not.toContain("Activate enrollment");
   });
 });
