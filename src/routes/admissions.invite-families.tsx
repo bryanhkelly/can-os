@@ -53,14 +53,17 @@ export const Route = createFileRoute("/admissions/invite-families")({
       item.content.purpose==="interest-invitation");
     if(deps.packageId && !selectedPackage)
       throw new DomainError("UNAVAILABLE","This family invitation Package is no longer available for the selected Site.");
-    const packageStarter=selectedPackage
-      ? {headline:selectedPackage.content.headline.trim(),
-         message:selectedPackage.content.message.trim()} : null;
-    if(packageStarter && (packageStarter.headline.length<3 ||
-      packageStarter.headline.length>120 || !packageStarter.message ||
-      containsProtectedInstitutionalClaim(packageStarter.headline+" "+packageStarter.message)))
+    const originalHeadline=selectedPackage?.content.headline.trim()??"";
+    const originalMessage=selectedPackage?.content.message.trim()??"";
+    // Check the FULL saved content before shortening a headline to the
+    // invitation service's 120-character email subject bound.
+    if(selectedPackage && (originalHeadline.length<3 || !originalMessage ||
+      containsProtectedInstitutionalClaim(originalHeadline+" "+originalMessage)))
       throw new DomainError("VALIDATION_FAILED",
         "Review the saved Package for protected claims or missing email details before sending.");
+    const packageStarter=selectedPackage
+      ? {headline:originalHeadline.slice(0,120),message:originalMessage}
+      : null;
     const suggestions = deps.siteId && deps.purpose === "interest" && !packageStarter
       ? await readSiteMarketingSuggestionsV61({ data: { siteId: deps.siteId } }).catch(() => null)
       : null;
