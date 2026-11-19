@@ -31,6 +31,51 @@ async function checkSite(siteId:string,write:boolean,reader:Pick<typeof db,"sele
   assertSiteSetupScope(actor,site,write?"program.launch.start":"program.read");
   return {site,actor};
 }
+
+/**
+ * Read-only, brand-correct working preview using the exact final artifact renderer.
+ * A preview is not a release, distribution, publication or proof of approval.
+ * POST keeps private draft messages out of URLs and server-side caches.
+ */
+const previewInputSchema=z.object({
+  siteId:uuid,
+  brandVersionId:uuid.nullable().optional(),
+  format:z.enum(marketingFormatIds),
+  content:marketingPackageContentSchema,
+}).strict();
+
+export const previewSiteMarketingArtifact=createServerFn({method:"POST"})
+  .validator((value:unknown)=>previewInputSchema.parse(value))
+  .handler(async ({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const {site}=await checkSite(data.siteId,false);
+    const brand=await readSavedBrandVersion(site.id,data.brandVersionId??null);
+    if(!brand)return {state:"missing-brand" as const};
+    // Never preview unpublished claims or unconsented media as if distributable.
+    const copy=[data.content.headline,data.content.message,data.content.callToAction].join(" ");
+    if(containsProtectedInstitutionalClaim(copy))
+      return {state:"claims-review-required" as const};
+    const resolvedBrand={...brand.resolved,
+      logo:assertSiteBrandMediaRights(brand.resolved.logo)?brand.resolved.logo:null,
+      hero:assertSiteBrandMediaRights(brand.resolved.hero)?brand.resolved.hero:null,
+    };
+    const [publication]=await db.select({status:sitePublications.status,slug:sitePublications.slug})
+      .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
+    const websiteUrl=publication?.status==="published"&&publication.slug
+      ? "https://"+publicSiteHost(publication.slug):null;
+    if(data.format==="qr-card"&&!websiteUrl)
+      return {state:"requires-public-destination" as const};
+    const qrSvg=data.format==="qr-card"&&websiteUrl
+      ? await QRCode.toString(websiteUrl,{type:"svg",margin:2,
+          color:{dark:resolvedBrand.theme.ink,light:"#ffffff"}}):undefined;
+    const rendered=renderSiteMarketingArtifact({
+      format:data.format,brand:resolvedBrand,content:data.content,websiteUrl,qrSvg,
+    });
+    return {state:"ready" as const,format:rendered.format,
+      mimeType:rendered.mimeType,body:rendered.body,
+      brandRevision:brand.version.revision,templateVersion:rendered.templateVersion};
+  });
+
 /** Release format inputs are snapshotted with the exact frozen Brand and immutable media IDs. */
 export const createSiteMarketingRelease=createServerFn({method:"POST"})
   .validator((value:unknown)=>createSchema.parse(value))

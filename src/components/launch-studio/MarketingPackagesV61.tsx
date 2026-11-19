@@ -1,4 +1,5 @@
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
+import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 import { createSiteMarketingRelease, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
@@ -12,7 +13,7 @@ import { ActionDialog, ActionFooter, WorkspaceNotice, WorkspacePanel, WorkspaceS
 import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
   marketingPackageContentSchema, marketingPurposeOptions, marketingStepIssue,
-  type MarketingPackageContent, type MarketingPackageStep,
+  type MarketingFormat, type MarketingPackageContent, type MarketingPackageStep,
 } from "@/domain/marketing-package-v61";
 import {
   archiveSiteMarketingPackageV61, createSiteMarketingPackageV61,
@@ -40,6 +41,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
   const [content,setContent]=useState<MarketingPackageContent>(()=>
     initialMarketingContent(siteName,"site-announcement"));
   const [step,setStep]=useState(0);
+  const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("flyer");
   const [showArchived,setShowArchived]=useState(false);
   const [busy,setBusy]=useState(false);
   const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
@@ -201,6 +203,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
   }
 
   const visible=packages.filter(item=>showArchived?item.status==="archived":item.status!=="archived");
+  const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
   const titleText=view==="library"?"Marketing Packages":view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
   const rail=<div className="space-y-4">
     <WorkspacePanel title="Why this matters">
@@ -321,18 +324,58 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
           </div>
         </WorkspacePanel>}
 
-        {step===3&&<WorkspacePanel title="Choose the materials" description="Save which formats you want. Visual generation will use the shared Site Brand after the engine is connected.">
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {marketingFormatOptions.map(option=><label key={option.id}
-              className="flex cursor-pointer gap-3 border bg-card p-4 text-sm">
-              <Checkbox className="mt-1" checked={content.formats.includes(option.id)}
-                onChange={event=>patch({formats:event.target.checked
-                  ? [...new Set([...content.formats,option.id])]
-                  : content.formats.filter(id=>id!==option.id)})}/>
-              <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
-            </label>)}
+        {step===3&&<WorkspacePanel title="Choose and preview your materials"
+          description="Your saved Site Brand is applied automatically. Review the real layout for each format before saving the package.">
+          <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-[minmax(12rem,0.8fr)_minmax(0,1.2fr)]">
+            <fieldset className="min-w-0 space-y-3">
+              <legend className="text-sm font-semibold">Available formats</legend>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Select the materials you need, then preview each one.
+              </p>
+              {marketingFormatOptions.map(option=>{
+                const selected=content.formats.includes(option.id);
+                return <div key={option.id} className={"flex min-w-0 flex-wrap items-start gap-2 border p-3 "+
+                  (selected?"border-primary/60 bg-accent/25":"border-border bg-card")}>
+                  <Checkbox id={"marketing-format-"+option.id} className="mt-1"
+                    checked={selected}
+                    onChange={event=>{
+                      patch({formats:event.target.checked
+                        ? [...new Set([...content.formats,option.id])]
+                        : content.formats.filter(id=>id!==option.id)});
+                      if(event.target.checked)setPreviewFormat(option.id);
+                    }}/>
+                  <label htmlFor={"marketing-format-"+option.id}
+                    className="min-w-0 flex-1 cursor-pointer text-sm">
+                    <strong className="block">{option.label}</strong>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {option.description}
+                    </span>
+                  </label>
+                  <Button type="button" size="sm" variant="outline" disabled={!selected}
+                    aria-pressed={activePreviewFormat===option.id}
+                    onClick={()=>setPreviewFormat(option.id)}>Preview</Button>
+                </div>;
+              })}
+            </fieldset>
+            <div className="min-w-0">
+              {activePreviewFormat
+                ? <MarketingMaterialPreviewV61
+                    siteId={siteId}
+                    brandVersionId={record?.brandVersionId??null}
+                    format={activePreviewFormat}
+                    content={content}/>
+                : <div className="flex min-h-72 items-center justify-center border bg-muted/25 p-6">
+                    <p className="text-center text-sm text-muted-foreground">
+                      Select a material format to preview your design.
+                    </p>
+                  </div>}
+            </div>
           </div>
-          <WorkspaceNotice tone="info">Save selected formats, then generate immutable branded files. This does not send messages.</WorkspaceNotice>
+          <div className="mt-4"><WorkspaceNotice tone="info">
+            This is a private working preview, not a public release.
+            Save your package to generate immutable, downloadable materials.
+            Email sending is a separate authorization.
+          </WorkspaceNotice></div>
         </WorkspacePanel>}
 
         <ActionFooter>
