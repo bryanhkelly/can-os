@@ -8,6 +8,7 @@ import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 
 const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
+  programId: z.string().uuid().optional(),
   module: z.enum(siteLaunchModules.map(item=>item.id) as [string, ...string[]]).optional(),
 });
 

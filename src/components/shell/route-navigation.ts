@@ -195,7 +195,6 @@ export const routeNavigation = {
   "/sites/$siteId/profile": page(schoolMemberProfileOwners, schoolMembers),
   "/sites/$siteId/publish": page(schoolProfile, admins),
   "/staff/students/$personId": page("/staff/students", staff),
-  "/launch/school": hidden("Former school wizard: not a navigation destination", admins),
   "/sites/$siteId": page("/home", [...admins, "site_leader", "site_staff"]),
   "/staff/students": page("/staff/students", staff),
   "/canonical/assessment-publications": hidden("Independent assessment publication workspace", []),

@@ -922,15 +922,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/launch.school.tsx",
-      "route": "/launch/school",
-      "owner": "programs",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/launch.school_.$programId.tsx",
       "route": "/launch/school_/$programId",
       "owner": "programs",

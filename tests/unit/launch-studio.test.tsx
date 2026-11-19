@@ -36,9 +36,10 @@ describe("canonical standalone Launch Studio", () => {
     expect(schoolLaunchSearch.parse({ step: "approve" }).step).toBe("welcome");
     expect(familyLaunchSearch.parse({ programId: "program", application: "child", familyStart: "invite", step: "documents" }))
       .toEqual({ programId: "program", application: "child", familyStart: "invite", step: "documents" });
-    const school = source("src/routes/launch.school.tsx");
-    expect(school).toContain("staleTime: Infinity");
-    expect(school).toContain("loaderDeps: ({ search }) => ({ siteId: search.siteId, programId: search.programId })");
+    const site = source("src/routes/launch.site.tsx");
+    expect(site).toContain("listLaunchOptions");
+    expect(site).toContain("LaunchSiteFrame");
+    expect(existsSync(new URL("../../src/routes/launch.school.tsx", import.meta.url))).toBe(false);
   });
   it("uses the new V6.1 Site-scoped Overview without legacy launch wizards", () => {
     const route = source("src/routes/launch.site.tsx");
