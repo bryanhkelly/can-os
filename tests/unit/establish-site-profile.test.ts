@@ -35,6 +35,15 @@ describe("Establish / Site Profile canonical handoff", () => {
     expect(frame).not.toMatch(/<button(?:\s|>)/);
   });
 
+  it("keeps the Launch entry route and Storybook free of deleted Studio imports", () => {
+    const index = source("src/routes/launch.index.tsx");
+    const stories = source("src/components/launch-studio/LaunchStudio.stories.tsx");
+    expect(index).toContain("<WorkspaceShell");
+    expect(index).not.toMatch(/<(?:main|h1)(?:\s|>)/);
+    expect(stories).toContain('import { LaunchStudioOverview }');
+    expect(stories).not.toContain('from "./LaunchStudioEntry"');
+  });
+
   it("locks shared time zone and location editors during save and reconciliation", () => {
     const form = source("src/components/launch-studio/EstablishSiteProfileUnified.tsx");
     const zone = source("src/components/workspace/SiteTimezoneField.tsx");
