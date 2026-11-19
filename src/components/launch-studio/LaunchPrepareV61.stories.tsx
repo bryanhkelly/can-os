@@ -46,3 +46,5 @@ export const Team: Story = { args: { module: "invite-team" } };
 export const Scheduling: Story = { args: { module: "schedules-capacity" } };
 export const Funding: Story = { args: { module: "funding-enrollment" } };
 export const Safety: Story = { args: { module: "opening-compliance" } };
+
+export const PublishSite: Story = { args: { module: "publish-site" } };
