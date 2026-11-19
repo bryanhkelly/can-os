@@ -18,7 +18,7 @@ export const learningAwardDefinitionVersions = pgTable("learning_award_definitio
   approvedByPersonId: uuid("approved_by_person_id"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
 });
-export const learnerAchievementDecisions = educationV30.table("learner_achievement_decisions", {
+export const learnerAchievementDecisions = pgTable("learner_achievement_decisions", {
   id: id(), credentialDefinitionVersionId: uuid("credential_definition_version_id").notNull(),
   recipientPersonId: uuid("recipient_person_id").notNull(),
   noncreditCompletionDecisionId: uuid("noncredit_completion_decision_id"),
@@ -26,7 +26,7 @@ export const learnerAchievementDecisions = educationV30.table("learner_achieveme
   decidedByPersonId: uuid("decided_by_person_id").notNull(),
   decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
 });
-export const learningAwardIssuances = educationV30.table("learning_award_issuances", {
+export const learningAwardIssuances = pgTable("learning_award_issuances", {
   id: id(), achievementDecisionId: uuid("achievement_decision_id").notNull(),
   issuerOrganizationId: uuid("issuer_organization_id").notNull(),
   legacyNoncreditCertificateId: uuid("legacy_noncredit_certificate_id"),
