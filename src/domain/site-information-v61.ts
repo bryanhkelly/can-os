@@ -73,6 +73,7 @@ export function applySiteEnvironmentDeliveryV61(previous: unknown, environment: 
   if (previous != null && !parsed.success)
     throw new Error("Existing Site interests need review. Refresh before editing the learning environment.");
   return siteLaunchPreferencesSchema.parse({
+    ...(parsed.success ? parsed.data : {}),
     delivery: environment.delivery,
     interestIds: parsed.success ? parsed.data.interestIds : [],
   });
