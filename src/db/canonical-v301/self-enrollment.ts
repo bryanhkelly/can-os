@@ -29,7 +29,7 @@ export const noncreditSelfEnrollmentReleases = pgTable("noncredit_self_enrollmen
   index("noncredit_self_enroll_registering_idx").on(t.registeringOrganizationId,t.status,t.createdAt),
 ]);
 
-export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_enrollment_claims", {
+export const noncreditSelfEnrollmentClaims = pgTable("noncredit_self_enrollment_claims", {
   id: id(),
   releaseId: uuid("release_id").notNull(),
   registrationId: uuid("registration_id").notNull(),
