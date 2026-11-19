@@ -15,11 +15,11 @@ export type PrepareStageModuleIdV61 = (typeof prepareStageModulesV61)[number]["i
 export function filterPublishedSolutionRecipes<T extends {
   title: string; components: readonly { key: string }[];
 }>(templates: readonly T[], query: string): T[] {
-  const term = query.trim().toLocaleLowerCase();
+  const term = query.trim().toLowerCase();
   if (!term) return [...templates];
   return templates.filter(template =>
     [template.title, ...template.components.map(component => component.key)]
-      .some(value => value.toLocaleLowerCase().includes(term)));
+      .some(value => value.toLowerCase().includes(term)));
 }
 
 /** A hidden/out-of-filter recipe must never remain in the visible detail pane. */
