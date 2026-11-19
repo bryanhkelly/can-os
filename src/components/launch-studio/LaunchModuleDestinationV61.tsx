@@ -11,7 +11,8 @@ import type { siteLaunchModules } from "./LaunchStudioOverviewV61";
 
 type ModuleId = typeof siteLaunchModules[number]["id"];
 export type DestinationModuleId = Exclude<ModuleId,
-  "site-profile" | "site-information" | "programs-audiences" | "website-brand">;
+  "site-profile" | "site-information" | "programs-audiences" | "website-brand" |
+  "facilities-resources" | "schedules-capacity" | "funding-enrollment">;
 
 type ModuleLink = { label: string; path: (siteId: string) => string; detail: string };
 type Destination = {
