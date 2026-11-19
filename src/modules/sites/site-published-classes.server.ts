@@ -23,14 +23,14 @@ export async function readLinkedSitePublishedClasses(
     SELECT DISTINCT c.id AS "classId",c.title AS "title",
       c.delivery_mode AS "deliveryMode",
       (SELECT MIN(ds.starts_at)
-       FROM education_v30.class_sessions cs
-       INNER JOIN education_v30.delivery_sessions ds
+       FROM public.class_sessions cs
+       INNER JOIN public.delivery_sessions ds
          ON ds.id=cs.delivery_session_id AND ds.site_id=c.site_id
-       INNER JOIN education_v30.facilitated_classroom_plans fp
+       INNER JOIN public.facilitated_classroom_plans fp
          ON fp.id=cs.classroom_plan_id AND fp.state<>'cancelled'
        WHERE cs.class_id=c.id AND ds.starts_at>=CURRENT_TIMESTAMP
       ) AS "nextStartsAt"
-    FROM education_v30.classes c
+    FROM public.classes c
     INNER JOIN public.class_offerings co ON co.class_id=c.id
     INNER JOIN public.class_offering_versions cv
       ON cv.class_id=c.id AND cv.class_offering_id=co.id
