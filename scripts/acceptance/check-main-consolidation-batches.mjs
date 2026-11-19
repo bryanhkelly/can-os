@@ -76,17 +76,17 @@ function activeSourceFiles(dir){
   return readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
     const path=dir+"/"+entry.name;
     if(entry.isDirectory())return activeSourceFiles(path);
-    return entry.isFile() && /\\.(?:ts|tsx|js|mjs)$/.test(entry.name)?[path]:[];
+    return entry.isFile() && /\.(?:ts|tsx|js|mjs)$/.test(entry.name)?[path]:[];
   });
 }
 function migratedSourceReferences(names){
   const stale=[];
-  const pattern=/\\beducation_v30\\.([a-z_][a-z0-9_]*)\\b/g;
+  const pattern=/\beducation_v30\.([a-z_][a-z0-9_]*)\b/g;
   for(const path of activeSourceFiles("src")){
     const body=readFileSync(path,"utf8");
     for(const match of body.matchAll(pattern)){
       if(names.has(match[1])){
-        const line=body.slice(0,match.index).split("\\n").length;
+        const line=body.slice(0,match.index).split("\n").length;
         stale.push({path,line,table:match[1]});
       }
     }
