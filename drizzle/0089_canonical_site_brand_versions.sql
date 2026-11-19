@@ -99,9 +99,11 @@ CREATE TRIGGER site_artifact_releases_immutable
   FOR EACH ROW EXECUTE FUNCTION can_site_brand_immutable_guard();
 CREATE FUNCTION can_site_brand_asset_immutable_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
- IF TG_OP='DELETE' OR
-    (to_jsonb(OLD)-'revoked_at') IS DISTINCT FROM (to_jsonb(NEW)-'revoked_at')
- THEN RAISE EXCEPTION 'Immutable Site Brand media cannot be overwritten or deleted'; END IF;
+ IF TG_OP='DELETE' THEN
+   RAISE EXCEPTION 'Immutable Site Brand media cannot be deleted';
+ END IF;
+ IF (to_jsonb(OLD)-'revoked_at') IS DISTINCT FROM (to_jsonb(NEW)-'revoked_at')
+ THEN RAISE EXCEPTION 'Immutable Site Brand media cannot be overwritten'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER site_brand_assets_immutable
