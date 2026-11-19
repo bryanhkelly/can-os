@@ -607,8 +607,7 @@ export const learnerUnitProgress = pgTable(
   ],
 );
 
-export const learnerLessonProgress = educationV30.table(
-  "learner_lesson_progress",
+export const learnerLessonProgress = pgTable("learner_lesson_progress",
   {
     id: id(),
     courseAttemptId: uuid("course_attempt_id").notNull(),
