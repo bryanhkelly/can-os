@@ -68,7 +68,7 @@ export async function publishPartnerLocalContentWithinTransaction(
     // Relationship authorization runs inside the write transaction.
     const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
     const [sitePublication] = await tx.select({
-      siteId: sitePublications.siteId, updatedAt: sitePublications.updatedAt,
+      siteId: sitePublications.siteId,
     }).from(sitePublications)
       .where(eq(sitePublications.siteId, site.id)).for("update").limit(1);
     if (!sitePublication) {
