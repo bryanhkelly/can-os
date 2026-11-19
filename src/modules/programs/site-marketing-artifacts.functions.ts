@@ -46,8 +46,12 @@ export const createSiteMarketingRelease=createServerFn({method:"POST"})
     if(!pkg.brandVersionId)throw new DomainError("UNAVAILABLE","Select a saved Site Brand before generating.");
     const brand=await readSavedBrandVersion(site.id,pkg.brandVersionId,tx);
     if(!brand)throw new DomainError("UNAVAILABLE","Selected Site Brand could not be resolved.");
-    if(!assertSiteBrandMediaRights(brand.resolved.logo) || !assertSiteBrandMediaRights(brand.resolved.hero))
-      throw new DomainError("FORBIDDEN","Brand imagery must have valid rights and consent before release.");
+    // Reuse the approved identity even if a draft logo is still awaiting
+    // rights/alt-text confirmation. Unapproved media is excluded, never copied.
+    const resolvedBrand={...brand.resolved,
+      logo:assertSiteBrandMediaRights(brand.resolved.logo)?brand.resolved.logo:null,
+      hero:assertSiteBrandMediaRights(brand.resolved.hero)?brand.resolved.hero:null,
+    };
     const content=marketingPackageContentSchema.parse(pkg.content);
     if(!content.formats.includes(data.format))throw new DomainError("VALIDATION_FAILED",
       "Select this output format in the saved package first.");
@@ -68,12 +72,12 @@ export const createSiteMarketingRelease=createServerFn({method:"POST"})
       ? await QRCode.toString(destination,{type:"svg",margin:2,
           color:{dark:brand.resolved.theme.ink,light:"#ffffff"}}):undefined;
     const rendered=renderSiteMarketingArtifact({
-      format:data.format,brand:brand.resolved,content,websiteUrl:destination,qrSvg,
+      format:data.format,brand:resolvedBrand,content,websiteUrl:destination,qrSvg,
     });
     const outputChecksum=createHash("sha256").update(rendered.body).digest("hex");
     const assetManifest={
-      logo:brand.resolved.logo?{id:brand.resolved.logo.id,sha256:brand.resolved.logo.checksum}:null,
-      hero:brand.resolved.hero?{id:brand.resolved.hero.id,sha256:brand.resolved.hero.checksum}:null,
+      logo:resolvedBrand.logo?{id:resolvedBrand.logo.id,sha256:resolvedBrand.logo.checksum}:null,
+      hero:resolvedBrand.hero?{id:resolvedBrand.hero.id,sha256:resolvedBrand.hero.checksum}:null,
     };
     const outputManifest={mimeType:rendered.mimeType,extension:rendered.extension,
       body:rendered.body,plainText:rendered.plainText??null,contentLength:Buffer.byteLength(rendered.body)};

@@ -1,5 +1,5 @@
 import { readSavedBrandVersion } from "./site-brand.functions";
-import { siteBrandPresentationIdentity, assertSiteBrandMediaRights } from "@/domain/site-brand";
+import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
@@ -117,10 +117,8 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       const brand=await readSavedBrandVersion(site.id,undefined,tx);
       if(!brand)throw new DomainError("UNAVAILABLE",
         "Save your Site Brand before sharing your website preview.");
-      if(!assertSiteBrandMediaRights(brand.resolved.logo) ||
-          !assertSiteBrandMediaRights(brand.resolved.hero))
-        throw new DomainError("FORBIDDEN",
-          "Confirm Site Brand image rights and child-image consent before sharing.");
+      // A Site may share its full proposed website before image approvals.
+      // The canonical projection omits incomplete or withdrawn artwork.
       const websiteContent={...content,branding:siteBrandPresentationIdentity(
         brand.resolved,content.branding.templateId)};
       if (latest?.status === "review_required" || classifySiteLocalContent(websiteContent).status !== "published")
