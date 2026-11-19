@@ -32,11 +32,11 @@ export async function readLinkedSitePublishedClasses(
       ) AS "nextStartsAt"
     FROM education_v30.classes c
     INNER JOIN public.class_offerings co ON co.class_id=c.id
-    INNER JOIN education_v30.class_offering_versions cv
+    INNER JOIN public.class_offering_versions cv
       ON cv.class_id=c.id AND cv.class_offering_id=co.id
     INNER JOIN public.sites s
       ON s.id=c.site_id AND s.lifecycle_status='active'
-    INNER JOIN education_v30.program_deployments pd
+    INNER JOIN public.program_deployments pd
       ON pd.id=c.deployment_id AND pd.status='active'
     INNER JOIN public.education_operations op
       ON op.id=pd.operation_id AND op.status='active'
@@ -47,10 +47,10 @@ export async function readLinkedSitePublishedClasses(
       AND adoption.approval_status='approved'
       AND adoption.valid_from<=CURRENT_TIMESTAMP
       AND (adoption.valid_through IS NULL OR adoption.valid_through>CURRENT_TIMESTAMP)
-    INNER JOIN education_v30.offering_versions ov
+    INNER JOIN public.offering_versions ov
       ON ov.id=c.offering_version_id AND ov.lifecycle='published'
       AND ov.published_at IS NOT NULL
-    INNER JOIN education_v30.offerings catalog
+    INNER JOIN public.offerings catalog
       ON catalog.id=ov.offering_id AND catalog.status='active'
       AND catalog.id=pd.offering_id
     INNER JOIN education_v30.offering_courses pairing
