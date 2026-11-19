@@ -5,6 +5,9 @@ import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/compo
 vi.mock("@/modules/programs/program-discovery.functions", () => ({
   discoverLaunchSitePrograms: vi.fn(),
 }));
+vi.mock("@/modules/blueprints/blueprint-studio.functions", () => ({
+  readCanonicalBlueprintWorkspace: vi.fn(() => new Promise(() => {})),
+}));
 
 const siteId = "00000000-0000-4000-8000-000000000001";
 
@@ -41,6 +44,7 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("After-School");
     expect(html).toContain("From Program to Solution to Offering");
     expect(html).toContain("Browse available Offerings");
+    expect(html).toContain("Packaged Solution recipes");
     expect(html).toContain("Adoption intent is recorded in the existing Blueprint workspace");
     expect(html).not.toContain("Approved for enrollment");
   });
