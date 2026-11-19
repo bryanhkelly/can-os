@@ -1,4 +1,5 @@
 import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Additive canonical model. A Class is an instance of one Course version;
