@@ -15,11 +15,13 @@ async function main() {
   const sql=neon(process.env.DATABASE_URL);
   const [target]=await sql`
     SELECT current_setting('neon.project_id',true) AS project,
-           current_setting('neon.branch_id',true) AS branch
+           current_setting('neon.branch_id',true) AS branch,
+           current_database() AS database, current_user AS role
   `;
   if(target.project!=="sweet-hall-62441909"||
-     target.branch!=="br-restless-sea-ar9ooo55")
-    throw new Error("Only the production Neon main branch may be assessed");
+     target.branch!=="br-restless-sea-ar9ooo55"||
+     target.database!=="neondb"||target.role!=="neondb_owner")
+    throw new Error("Production Neon main and its owner role are required for exact row counts");
   const [inventory]=await sql`
     SELECT
       (SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -76,6 +78,8 @@ async function main() {
     ).join(' UNION ALL ');
     counts.push(...await sql.query(query));
   }
+  if(counts.length!==inventory.native_tables)
+    throw new Error("Legacy inventory count changed during verification");
   const populated=counts
     .filter(row=>BigInt(row.record_count)>0n)
     .map(row=>({name:row.name,rows:String(row.record_count)}))
