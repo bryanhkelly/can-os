@@ -32,20 +32,20 @@ export const noncreditCompletionDecisions = educationV30.table("noncredit_comple
   decidedAt:timestamp("decided_at",{withTimezone:true}).notNull().defaultNow(),
   evidenceVersionId:uuid("evidence_version_id"),supersedesId:uuid("supersedes_id"),
 });
-export const assessmentAdministrations = educationV30.table("assessment_administrations",{
+export const assessmentAdministrations = pgTable("assessment_administrations",{
   id:id(),assessmentVersionId:uuid("assessment_version_id").notNull(),
   deploymentId:uuid("deployment_id"),courseVersionId:uuid("course_version_id"),
 });
-export const assessmentAccessGrants = educationV30.table("assessment_access_grants",{
+export const assessmentAccessGrants = pgTable("assessment_access_grants",{
   id:id(),administrationId:uuid("administration_id").notNull(),
   learnerId:uuid("learner_id").notNull(),courseAttemptId:uuid("course_attempt_id"),
   accessStatus:text("access_status").notNull(),
 });
-export const assessmentAttempts = educationV30.table("assessment_attempts",{
+export const assessmentAttempts = pgTable("assessment_attempts",{
   id:id(),administrationId:uuid("administration_id").notNull(),
   accessGrantId:uuid("access_grant_id").notNull(),learnerId:uuid("learner_id").notNull(),
 });
-export const assessmentAttemptResults = educationV30.table("assessment_attempt_results",{
+export const assessmentAttemptResults = pgTable("assessment_attempt_results",{
   id:id(),attemptId:uuid("attempt_id").notNull(),
   resultRevision:integer("result_revision").notNull(),
   resultStatus:text("result_status").$type<"provisional"|"reviewed"|"finalized"|"voided">().notNull(),
