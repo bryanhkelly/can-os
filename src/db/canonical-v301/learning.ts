@@ -461,8 +461,7 @@ export const officialCourseRequirementVersions = pgTable("official_course_requir
   ],
 );
 
-export const officialCourseAssignmentVersions = educationV30.table(
-  "official_course_assignment_versions",
+export const officialCourseAssignmentVersions = pgTable("official_course_assignment_versions",
   {
     id: id(),
     courseVersionId: uuid("course_version_id").notNull(),
