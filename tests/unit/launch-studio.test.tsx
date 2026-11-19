@@ -51,7 +51,7 @@ describe("canonical standalone Launch Studio", () => {
     expect(frame).toContain("Preview Website");
     expect(frame).toContain("Site Workspace");
     expect(overview).toContain("Website & Brand");
-    expect(overview).toContain("Program Catalog");
+    expect(overview).toContain("Programs & Solutions");
     expect(existsSync(new URL("../../src/components/launch-studio/SiteFirstLaunch.tsx", import.meta.url))).toBe(false);
   });
   it("never treats unconfigured requirements or a visited step as completion", () => {
