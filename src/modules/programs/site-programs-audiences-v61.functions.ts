@@ -9,7 +9,7 @@ import { EventTypes } from "@/domain/event-types";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { siteEnvironmentV61Schema } from "@/domain/site-information-v61";
 import {
-  applySiteProgramsAudiencesV61, readSiteProgramsAudiencesV61,
+  applySiteProgramsAudiencesV61, readSiteProgramsAudiencesV61 as normalizeSiteProgramsAudiencesV61,
   siteLaunchPreferencesSchema, siteProgramsAudiencesV61Schema,
 } from "@/domain/site-launch-preferences";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
@@ -38,7 +38,7 @@ export const readSiteProgramsAudiencesV61 = createServerFn({ method: "GET" })
     assertSiteSetupScope(actor, site, "program.read");
     const raw = site.metadata.launchPreferences;
     // A damaged persisted Site record must be corrected, not shown as a blank form.
-    const intent = readSiteProgramsAudiencesV61(raw);
+    const intent = normalizeSiteProgramsAudiencesV61(raw);
     const preferences = raw == null ? null : siteLaunchPreferencesSchema.parse(raw);
     return {
       siteId: site.id,
