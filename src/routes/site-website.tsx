@@ -1,3 +1,4 @@
+import { siteBrandDirections, recommendBrandDirection, brandRecommendedLayout, brandRecommendedPalette } from "@/domain/site-brand-direction";
 import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
 import { SiteContentChannelEditor } from "@/components/launch-studio/SiteContentChannelEditor";
@@ -30,13 +31,20 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { prepareSchoolWebsite, getPartnerWebsitePreviewView, previewChurchWebsiteDraft, saveChurchWebsiteDraft, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
-import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourceReferenceEditor";
 import {SchoolMediaFolderManager} from "@/components/operations/SchoolMediaFolderManager";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {siteProgramSelectionSchema} from "@/lib/route-search";
 import { z } from "zod";
 
-export const websiteStudioStepIds = ["welcome", "template", "identity", "photos", "content", "preview"] as const;
+export const websiteStudioStepIds = ["brand", "wireframe", "visual", "content", "review"] as const;
+const legacyWebsiteSteps = ["welcome","template","identity","photos","preview"] as const;
+type LegacyWebsiteStep = (typeof legacyWebsiteSteps)[number];
+function resolveWebsiteStep(step:typeof websiteStudioStepIds[number] | LegacyWebsiteStep | undefined) {
+  const previous:Record<LegacyWebsiteStep,typeof websiteStudioStepIds[number]>={
+    welcome:"brand",template:"wireframe",identity:"visual",photos:"visual",preview:"review",
+  };
+  return step && step in previous ? previous[step as LegacyWebsiteStep] : step ?? "brand";
+}
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
   // an invalid Site and open the editor under a different active membership.
@@ -45,7 +53,7 @@ export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   returnGrantId:z.string().optional(),
   returnToHub:z.boolean().optional(),
   returnToSettings:z.boolean().optional(),
-  step:z.enum(websiteStudioStepIds).optional(),
+  step:z.union([z.enum(websiteStudioStepIds),z.enum(legacyWebsiteSteps)]).optional(),
 });
 
 export const loadWebsiteHome = (siteId?: string) => {
@@ -83,16 +91,14 @@ function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare
 
 export function WebsiteHome({ outcome, selection, studio = false, onStepChange }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
-  selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] };
+  selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] | LegacyWebsiteStep };
   studio?: boolean;
   onStepChange?: (step:number)=>void;
 }) {
   const [localStep,setLocalStep]=useState(0);
-  const requestedStep=websiteStudioStepIds.indexOf(selection.step??"welcome");
-  // Re-entry skips the optional orientation, but the first Site visit without an
-  // address always stays in a single preparation stage until it is reserved.
-  const step=selection.step ? Math.max(0,requestedStep)
-    : studio && (selection.returnToHub || selection.returnToSettings) ? 1 : localStep;
+  const requestedStep=websiteStudioStepIds.indexOf(resolveWebsiteStep(selection.step));
+  // Re-entry starts at Brand Identity, legacy bookmarked steps resolve to the new flow.
+  const step=selection.step ? Math.max(0,requestedStep) : localStep;
   const changeStep=onStepChange??setLocalStep;
   const returnToLaunch=selection.returnToSettings && selection.siteId
     ? <Link to="/settings" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Settings</Link>
@@ -105,17 +111,17 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
 
   const data = outcome.data;
   const steps = [
-    {id:"welcome",title:"Welcome"}, {id:"template",title:"Choose your design"},
-    {id:"identity",title:"Your school brand"}, {id:"photos",title:"School photography"},
-    {id:"content",title:"School story"}, {id:"preview",title:"Review & publish"},
+    {id:"brand",title:"Brand Identity"}, {id:"wireframe",title:"Choose Wireframe"},
+    {id:"visual",title:"Visual Identity"}, {id:"content",title:"Your Content"},
+    {id:"review",title:"Review & Finish"},
   ];
   if (studio) return <LaunchStudioShell role="Website & Brand Studio" subject={data.siteName}
-    title={data.host ? ["Create a recognizable school identity.","Choose your school design.","Make the brand your own.",
-      "Bring your school to life.","Tell your school story.","Review your brand and website."][step] : "Prepare your private website address."}
+    title={data.host ? ["Choose how your Site will be known.","Select a website structure.","Bring your identity to life.",
+      "Shape your Site's story.","Review and save your private draft."][step] : "Prepare your private website address."}
     description={data.host ? "One school brand, one hosted website. Draft branding does not authorize school opening, academic claims or admissions." :
       "Create a private address before choosing a design. Nothing is published yet."}
     steps={data.host ? steps : [{id:"address",title:"Prepare private address",disabled:true}]}
-    currentId={data.host ? websiteStudioStepIds[step]??"welcome" : "address"}
+    currentId={data.host ? websiteStudioStepIds[step]??"brand" : "address"}
     onStepChange={id=>{if(data.host)changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]));}}
     help={<p>Unaffiliated Site Administrators manage their school website directly. Contributors need a verified Site website editor invitation. Previewing and saving a draft do not publish it.</p>}
     status={data.host ? <div className="space-y-2">
@@ -135,10 +141,10 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     subtitle={data.organizationName + " · one local identity for your hosted website and reusable school materials"} actions={returnToLaunch}>
     <GuidedSetupShell
       title="Build your school website and brand together"
-      description="Choose one of seven designs, personalize its identity, add the school's story and approved photos, then save a draft or publish when authorized."
+      description="Choose Brand Identity, a grayscale wireframe, visual identity and your content before saving a private draft."
       steps={data.host ? steps.map((item,index)=>({
-        id:item.id,title:item.title,description:index===0?"Bring current sources":index===1?"Choose a design":
-          index===2?"Customize and preview your school brand":index===3?"School content and media":"Review before publishing",
+        id:item.id,title:item.title,description:index===0?"Choose your editorial direction":index===1?"Choose a structure":
+          index===2?"Colors, fonts and rights-cleared media":index===3?"Edit website content":"Review private draft",
         status:step===index?"current":step>index?"complete":"upcoming",
       })) : [
         { id: "address", title: "Site address", description: "Prepare a private website address", status: "current" },
@@ -453,6 +459,8 @@ function LocalWebsiteCopyEditor({
     return { content: initial, saved: initial, revision: data.currentRevision, siteId: data.siteId };
   });
   const content = editor.content;
+  const brandRecommendation = recommendBrandDirection(data.siteStoryV61?.answers ?? null);
+  const brandDirection = content.branding.brandDirectionId ?? null;
   const setContent: Dispatch<SetStateAction<SiteLocalContent>> = update =>
     setEditor(previous => ({ ...previous, content: typeof update === "function"
       ? update(previous.content) : update }));
@@ -673,28 +681,48 @@ function LocalWebsiteCopyEditor({
     {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website changes..."/>
     <div className="space-y-5">
-      {step === 0 && <div className="space-y-5">
-        <div className="border bg-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Before you begin</p>
-          <h3 className="mt-2 font-serif text-3xl">Your school's website, made personal.</h3>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one of seven distinct designs, customize the school wordmark, colors and fonts, then build a website using approved information CAN OS already has.</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Have ready:</strong> an existing public church or school website, social links if applicable, a logo, a rights-cleared photo folder and a short school welcome. All source links and imagery are optional.</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Your outcome:</strong> a private, revisable school brand and website draft, with a downloadable wordmark. Publishing and hosting require separate authorization.</p>
+      {step === 0 && <section aria-label="Brand Identity" className="space-y-5">
+        <div>
+          <h3 className="font-serif text-2xl font-semibold">What should families feel about your Site?</h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">Choose an editorial direction. Your saved Site Story can guide a suggestion, but this choice never verifies programs, staff or academic outcomes.</p>
+          {data.siteStoryV61
+            ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Story source: {new Date(data.siteStoryV61.revision).toLocaleDateString()}</p>
+            : <p className="mt-2 text-xs text-muted-foreground">No saved Site Story available. You can still choose a direction.</p>}
         </div>
-        {data.siteInformation && (data.siteInformation.contexts.length > 0 || data.siteInformation.hostChurchName || data.siteInformation.currentWebsiteUrl) && <section className="border bg-card p-5">
-          <h3 className="font-semibold">Saved Site Information</h3>
-          {data.siteInformation.contexts.length > 0 && <p className="mt-2 text-sm">{data.siteInformation.contexts.map(context=>context.replaceAll("_"," ")).join(" · ")}</p>}
-          {data.siteInformation.hostChurchName && <p className="mt-1 text-sm">Host church or community: {data.siteInformation.hostChurchName}</p>}
-          {data.siteInformation.currentWebsiteUrl && <a className="mt-2 inline-block text-sm font-semibold text-primary underline" href={data.siteInformation.currentWebsiteUrl} target="_blank" rel="noopener noreferrer">Open current website reference</a>}
-          <p className="mt-2 text-xs text-muted-foreground">These private setup details do not verify school facts or publish content.</p>
-        </section>}
-        <details className="border border-border bg-card p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Use your existing church website or social profiles (optional)</summary>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">These are the existing private Site source-reference controls. Social posts and media are not imported. Optional church website suggestions require a separate, enabled and approved discovery process.</p>
-          <div className="mt-3"><ChurchSourceReferenceEditor suggestedSchoolWebsiteUrl={data.siteInformation?.currentWebsiteUrl}/></div>
-        </details>
-      </div>}
+        <fieldset disabled={busy || !data.canPublish}>
+          <legend className="text-sm font-semibold">Choose your brand direction</legend>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {siteBrandDirections.map(direction=>{
+              const selected=brandDirection===direction.id;
+              return <Button key={direction.id} type="button" variant="outline" aria-pressed={selected}
+                onClick={()=>setContent(old=>({...old,branding:{...old.branding,brandDirectionId:direction.id}}))}
+                className={`h-auto min-h-32 w-full flex-col items-start whitespace-normal border p-5 text-left ${selected?"border-primary ring-2 ring-primary/40":""}`}>
+                <span className="w-full text-sm font-bold">{direction.name}</span>
+                <span className="mt-1 text-xs text-muted-foreground">{direction.character}</span>
+                <span className="mt-2 text-xs leading-5 text-muted-foreground">{direction.description}</span>
+                {(selected || brandRecommendation===direction.id) && <span className="mt-3 text-xs font-semibold text-primary">
+                  {selected?"Selected":""}{selected && brandRecommendation===direction.id?" · ":""}
+                  {brandRecommendation===direction.id?"Suggested from your Story":""}
+                </span>}
+              </Button>;
+            })}
+          </div>
+        </fieldset>
+        <p className="text-xs text-muted-foreground">{brandRecommendation
+          ?"A keyword suggestion from your saved Story is not a required choice or verified school claim."
+          :"No recommendation appears without matching Story evidence."}</p>
+        <p className="text-xs text-muted-foreground">Brand Identity is saved with this Site's versioned website draft. A broader Site-brand service is not connected yet.</p>
+      </section>}
       {step === 1 && <div className="space-y-5">
+        <h3 className="font-serif text-2xl font-semibold">Choose your wireframe</h3>
+        <p className="text-sm text-muted-foreground">Compare seven structures in grayscale. Colors, typography and imagery come next.</p>
+        {brandDirection && <div className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
+          <span>Suggested structure: <strong>{schoolBrandDesigns[brandRecommendedLayout(brandDirection)].name}</strong></span>
+          <Button type="button" variant="outline" disabled={busy || !data.canPublish}
+            onClick={()=>setContent(old=>({...old,branding:{...old.branding,templateId:brandRecommendedLayout(brandDirection)}}))}>
+            Use suggested layout
+          </Button>
+        </div>}
         <WebsiteTemplateGallery schoolName={data.siteName}
           value={content.branding.templateId ?? "heritage"}
           onChange={(templateId: SiteTemplateId) => setContent(old => ({
@@ -706,7 +734,7 @@ function LocalWebsiteCopyEditor({
         <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps school copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
       </div>}
 
-      {step === 4 && <div className="space-y-5">
+      {step === 3 && <div className="space-y-5">
         <div>
           <h3 className="font-serif text-2xl">Your school story is ready to make your own.</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -824,9 +852,17 @@ function LocalWebsiteCopyEditor({
             no logo, third-party font, photograph or CSS is copied automatically.</p>
         </div>
       </fieldset>
-      <SchoolBrandPreview siteId={data.siteId} schoolName={data.siteName} branding={content.branding}/>
+      {brandDirection && <div className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
+        <span>Suggested palette: <strong>{brandRecommendedPalette(brandDirection)}</strong></span>
+        <Button type="button" variant="outline" disabled={busy || !data.canPublish}
+          onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:brandRecommendedPalette(brandDirection)}}))}>
+          Use suggested palette
+        </Button>
       </div>}
-      {step === 3 && <div className="space-y-5">
+      <SchoolBrandPreview siteId={data.siteId} schoolName={data.siteName} branding={content.branding}/>
+      <details className="border p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Wordmark, logo &amp; imagery</summary>
+        <div className="mt-4 space-y-4">
       <h3 className="font-serif text-2xl">Photos &amp; artwork</h3>
       <p className="text-sm">Gallery images are fictional template samples. They are not photos of your school and are never added to your school media library.</p>
       <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
@@ -883,8 +919,11 @@ function LocalWebsiteCopyEditor({
         <div className="mt-4"><SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
           enabled={data.mediaUploadsEnabled}/></div>
       </details>
-      </div>}
-      {step === 5 && <div className="space-y-4">
+
+        </div>
+      </details>
+      </div>
+      {step === 4 && <div className="space-y-4">
         <div>
           <h3 className="text-lg font-semibold">Review your website</h3>
           <p className="mt-1 text-sm text-muted-foreground">Preview your pages. Family information and institutional approvals are managed separately.</p>
@@ -928,7 +967,7 @@ function LocalWebsiteCopyEditor({
         </p>}
         <Button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}
           className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-          {busy ? "Publishing…" : "Publish church-owned content"}
+          {busy ? "Publishing…" : "Separately publish reviewed church-owned content"}
         </Button>
         <p className="text-xs text-muted-foreground">
           Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links are not supported.
@@ -965,8 +1004,8 @@ function LocalWebsiteCopyEditor({
           className="min-h-11 border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">
           {busy?"Saving...":"Save private draft"}
         </Button>
-        {step < 5 && <Button type="button"
-          onClick={() => onStepChange(Math.min(5, step + 1))}
+        {step < 4 && <Button type="button"
+          onClick={() => onStepChange(Math.min(4, step + 1))}
           className=" bg-foreground px-4 py-2 text-sm font-semibold text-background">
           Continue
         </Button>}
