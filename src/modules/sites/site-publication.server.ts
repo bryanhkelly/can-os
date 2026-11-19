@@ -342,7 +342,8 @@ export async function changeSitePublicationWithinTransaction(
     // This queries the canonical published Seasons inside the same transaction.
     // Unpublishing is never prevented by empty or expired offerings.
     // Keep queries sequential on the same transactional connection.
-    const needsReadiness = input.action === "publish" && current.status === "draft";
+    const needsReadiness = (input.action === "publish" && current.status === "draft") ||
+      (input.action === "republish" && current.status === "published");
     const enrichmentListings = needsReadiness ? await readEnrichmentCatalog(site.id, tx) : [];
     const academicListings = needsReadiness ? await readAcademicProgramCatalog(site.id, tx) : [];
     const eligibleCount = enrichmentListings.length + academicListings.length;
@@ -383,14 +384,15 @@ export async function changeSitePublicationWithinTransaction(
 
     const scope = { organizationId: site.organizationId, siteId: site.id };
     await writeAudit(tx, actor, {
-      action: input.action === "publish" ? "site.publication.publish" : "site.publication.unpublish",
+      action: input.action === "republish" ? "site.publication.republish" :
+        input.action === "publish" ? "site.publication.publish" : "site.publication.unpublish",
       entityType: "site", entityId: site.id, scope,
       before: { status: current.status, publishedAt: current.publishedAt?.toISOString() ?? null,
         updatedAt: current.updatedAt.toISOString() },
       after: { status: decision.status, publishedAt: decision.publishedAt?.toISOString() ?? null,
         updatedAt: decision.updatedAt.toISOString(), reason: input.reason.trim(),
-        contentReviewed: input.action === "publish" && input.contentReviewed,
-        eligibleOfferingCount: input.action === "publish" ? eligibleCount : null,
+        contentReviewed: input.action !== "unpublish" && input.contentReviewed,
+        eligibleOfferingCount: input.action !== "unpublish" ? eligibleCount : null,
         brandVersionId:needsReadiness?currentBrand?.id??null:null,
         websiteContentRevision:needsReadiness?local?.revision??null:null },
     });

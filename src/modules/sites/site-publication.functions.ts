@@ -44,7 +44,7 @@ export const reserveSitePublicationAddress = createServerFn({ method: "POST" })
 export const setSitePublicationStatus = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     siteId: uuid,
-    action: z.enum(["publish", "unpublish"]),
+    action: z.enum(["publish", "unpublish", "republish"]),
     expectedRevision: z.string().datetime({ offset: true }),
     reason: z.string().trim().min(10).max(500),
     contentReviewed: z.boolean(),
