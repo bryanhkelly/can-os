@@ -54,7 +54,7 @@ export const assessmentItemSecureKeys = pgTable("assessment_item_secure_keys",{
   encryptedKey:bytea("encrypted_key").notNull(),
   encryptionKeyRef:text("encryption_key_ref").notNull(),
 });
-export const assessmentFormAdministrations = educationV30.table("assessment_administrations",{
+export const assessmentFormAdministrations = pgTable("assessment_administrations",{
   id:id(),administeringOrganizationId:uuid("administering_organization_id").notNull(),
   assessmentVersionId:uuid("assessment_version_id").notNull(),
   formVersionId:uuid("form_version_id").notNull(),
@@ -65,7 +65,7 @@ export const assessmentFormAdministrations = educationV30.table("assessment_admi
   attemptLimit:integer("attempt_limit").notNull(),
   proctorPolicy:text("proctor_policy").notNull(),
 });
-export const assessmentAccess = educationV30.table("assessment_access_grants",{
+export const assessmentAccess = pgTable("assessment_access_grants",{
   id:id(),administrationId:uuid("administration_id").notNull(),
   learnerId:uuid("learner_id").notNull(),courseAttemptId:uuid("course_attempt_id"),
   grantedByPersonId:uuid("granted_by_person_id").notNull(),
@@ -78,7 +78,7 @@ export const assessmentAccommodations = pgTable("assessment_accommodation_decisi
   extraAttempts:integer("extra_attempts").notNull().default(0),
   approvalStatus:text("approval_status").notNull(),
 });
-export const assessmentExecutionAttempts = educationV30.table("assessment_attempts",{
+export const assessmentExecutionAttempts = pgTable("assessment_attempts",{
   id:id(),accessGrantId:uuid("access_grant_id").notNull(),
   administrationId:uuid("administration_id").notNull(),
   learnerId:uuid("learner_id").notNull(),formVersionId:uuid("form_version_id").notNull(),
@@ -123,7 +123,7 @@ export const assessmentAutoScores = pgTable("assessment_item_scoring_decisions",
   score:numeric("score",{precision:12,scale:4}).notNull(),
   rubricEvidence:jsonb("rubric_evidence").$type<Record<string,unknown>>().notNull().default({}),
 });
-export const assessmentExecutionResults = educationV30.table("assessment_attempt_results",{
+export const assessmentExecutionResults = pgTable("assessment_attempt_results",{
   id:id(),attemptId:uuid("attempt_id").notNull(),
   resultRevision:integer("result_revision").notNull(),
   resultStatus:text("result_status").$type<"provisional"|"reviewed"|"finalized"|"voided">().notNull(),
