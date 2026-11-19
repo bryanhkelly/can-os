@@ -60,6 +60,13 @@ export async function getAvailableOfferings(
       if (!isCanonicalSiteDiscoverable(site?.status)) {
         throw new DomainError("UNAVAILABLE", "The selected Site is unavailable for program discovery.");
       }
+      // A missing classification is unknown, not a location where an
+      // Offering is supported. Never evaluate jurisdiction-dependent policy
+      // against NULL and inadvertently suggest availability.
+      if (!site.geographicAreaId) {
+        throw new DomainError("UNAVAILABLE",
+          "This Site needs a geographic area classification before Offering availability can be checked.");
+      }
       geographicAreaId = site.geographicAreaId;
     } else {
       if (!context.scope.organizationIds?.length) {
