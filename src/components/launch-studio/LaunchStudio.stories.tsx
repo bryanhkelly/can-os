@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { expect, userEvent, within } from "storybook/test";
 import { LaunchStudioChrome, LaunchStudioShell, JourneyWelcome } from "./LaunchStudioShell";
-import { LaunchStudioEntry } from "./LaunchStudioEntry";
+import { LaunchStudioOverview } from "./LaunchStudioOverviewV61";
 import { Button } from "@/components/ui/button";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
 
@@ -37,7 +37,14 @@ function Journey({ state = "welcome" }: { state?: "welcome" | "pending" | "error
       </p>}
   </LaunchStudioShell></LaunchStudioChrome>;
 }
-export const Entry: Story = { render: () => <LaunchStudioChrome><LaunchStudioEntry /></LaunchStudioChrome> };
+export const Entry: Story = { render: () => <LaunchStudioOverview
+  site={{ id: "storybook-site", name: "Example Learning Center", statusLabel: "Preparing", statusTone: "info" }}
+  mode="first-visit"
+  nextAction={{ title: "Begin with Site Profile", description: "Confirm your Site identity.",
+    href: "#site-profile" }}
+  previewUrl={null}
+  workspaceUrl="#site-workspace"
+/> };
 export const Welcome: Story = {
   render: () => <Journey />,
   play: async ({ canvasElement }) => {
