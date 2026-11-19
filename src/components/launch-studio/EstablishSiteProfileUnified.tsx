@@ -182,7 +182,8 @@ export function EstablishSiteProfileUnified({
             <Input value={name} minLength={2} maxLength={160} disabled={saving || reloadRequired}
               onChange={event => setName(event.target.value)} />
           </Field>
-          <SiteTimezoneField label="Site time zone" value={timezone} onChange={setTimezone} />
+          <SiteTimezoneField label="Site time zone" value={timezone} onChange={setTimezone}
+            disabled={saving || reloadRequired} />
         </div>
         {identityChanged && <div className="mt-5">
           <Field label="Reason for changing the Site name or time zone" required>
@@ -238,7 +239,8 @@ export function EstablishSiteProfileUnified({
           </span>
         </label>
         {hasAddress && <div className="mt-5 space-y-5 border-t pt-5">
-          <LaunchSiteAddressFields address={address} onChange={setAddress} />
+          <LaunchSiteAddressFields address={address} onChange={setAddress}
+            disabled={saving || reloadRequired} />
           {addressChanged && <Field label="Reason for entering or changing this location" required>
             <Input value={locationReason} minLength={5} maxLength={1000} disabled={saving || reloadRequired}
               onChange={event => setLocationReason(event.target.value)} />
@@ -251,7 +253,7 @@ export function EstablishSiteProfileUnified({
         Reload Site to reconcile changes
       </Button>}
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
-        <Button type="button" variant="outline" disabled={saving} onClick={onBackToOverview}>
+        <Button type="button" variant="outline" disabled={saving || reloadRequired} onClick={onBackToOverview}>
           <ArrowLeft aria-hidden="true" /> Back to Overview
         </Button>
         <div className="flex flex-wrap gap-2">
