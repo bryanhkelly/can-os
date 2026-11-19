@@ -50,7 +50,7 @@ try {
         IS NOT NULL AS staff_reader,
       to_regprocedure('education_v30.v301_can_sensitive_capability(text,text)')
         IS NOT NULL AS sensitive_reader,
-      to_regclass('education_v30.canonical_sensitive_capability_approvals')
+      to_regclass('public.canonical_sensitive_capability_approvals')
         IS NOT NULL AS approvals
   `)).rows;
   assert.equal(objects?.staff_reader,true);
@@ -76,7 +76,7 @@ try {
        WHERE id IN ('faab0000-0000-4000-8000-000000000001',
         'faab0000-0000-4000-8000-000000000009')) AS accounts,
       (SELECT count(*)::int
-       FROM education_v30.canonical_sensitive_capability_approvals
+       FROM public.canonical_sensitive_capability_approvals
        WHERE requested_by_can_account_id IN
          ('faab0000-0000-4000-8000-000000000001',
           'faab0000-0000-4000-8000-000000000009')) AS approvals
