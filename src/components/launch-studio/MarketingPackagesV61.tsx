@@ -61,6 +61,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
   const [currentBrand,setCurrentBrand]=useState<{id:string;revision:number}|null>(null);
   const [brandReadiness,setBrandReadiness]=useState<"loading"|"available"|"missing"|"unavailable">("loading");
+  const [brandRefreshKey,setBrandRefreshKey]=useState(0);
   const [selectedBrandRevision,setSelectedBrandRevision]=useState<number|null>(null);
   // Shared prerequisite for Promote, Recruit and Interest Events. Brand edits
   // stay in Establish; a Marketing Package only selects an immutable version.
@@ -76,7 +77,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
       })
       .catch(()=>{if(live)setBrandReadiness("unavailable");});
     return ()=>{live=false;};
-  },[siteId]);
+  },[siteId,brandRefreshKey]);
   useEffect(()=>{
     if(view!=="detail"||!record)return;
     let live=true;
@@ -271,21 +272,26 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
         {" "}<a href={`/launch/site?siteId=${encodeURIComponent(siteId)}&module=website-brand`}
           className="font-semibold underline">Open Website &amp; Brand</a>
       </WorkspaceNotice>}
+      {view==="library"&&brandReadiness==="loading"&&<WorkspaceNotice tone="info">
+        Checking your saved Site Brand before enabling new Marketing Packages.
+      </WorkspaceNotice>}
       {view==="library"&&brandReadiness==="unavailable"&&<WorkspaceNotice tone="attention">
-        Site Brand status could not be checked. Existing packages remain available;
-        the server will verify the selected Brand before creating any new materials.
+        Site Brand status could not be checked. Existing packages remain available,
+        but no new marketing work can start until the saved Brand is verified.
+        <div className="mt-3"><Button type="button" variant="outline" size="sm"
+          onClick={()=>setBrandRefreshKey(value=>value+1)}>Retry Brand check</Button></div>
       </WorkspaceNotice>}
 
       {view==="library"&&<>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">{context.libraryDescription}</p>
-          <Button disabled={busy||brandReadiness==="missing"} onClick={start}>
+          <Button disabled={busy||brandReadiness!=="available"} onClick={start}>
             <Plus aria-hidden="true"/> New package
           </Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {purposeOptions.map(option=><button key={option.id} type="button"
-            disabled={busy||brandReadiness==="missing"}
+            disabled={busy||brandReadiness!=="available"}
             className="border bg-card p-5 text-left hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
             onClick={()=>{start();setTitle(option.label);setContent(starter(option.id));}}>
             <Megaphone className="mb-3 size-5 text-primary" aria-hidden="true"/>
