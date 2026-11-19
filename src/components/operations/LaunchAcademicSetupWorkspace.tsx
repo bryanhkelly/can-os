@@ -74,11 +74,11 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
   steps={schoolLaunchSteps.map(id=>({id,title:{welcome:"Welcome",school:"School details",academics:"Academics",website:"School website",families:"Families & staff",readiness:"Readiness review",next:"What's next"}[id]}))}
   currentId="academics" onStepChange={id=>{
     const step=schoolLaunchSteps.find(item=>item===id);
-    if(step)void router.navigate({to:"/launch/school",search:{siteId:data.program.siteId??undefined,programId:data.program.id,step}});
+    if(step)void router.navigate({to:"/launch/site",search:{siteId:data.program.siteId??undefined,programId:data.program.id,step}});
   }}
   exit={hubMode ? <Link to={navigation.homePath} search={{siteId:data.program.siteId??undefined}} className="text-primary">Back to {navigation.homeLabel}</Link> : <Link to="/home" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Skip to dashboard</Link>}
   actions={!hubMode && <Button asChild variant="outline" size="sm">
-   <Link to="/launch/school" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
+   <Link to="/launch/site" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
   </Button>}>
   {error&&<WorkspaceNotice tone="danger" className="mt-5">{error}</WorkspaceNotice>}
   {mutation.refreshError&&<Button type="button" variant="outline" className="mt-3"
@@ -297,7 +297,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
      <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Set enrollment policies</Link>
     </Button>
     <Button asChild variant="outline" size="sm">
-     <Link {...(hubMode?{to:navigation.modulePath,params:{module:"compliance"},search:{siteId:data.program.siteId??undefined,programId:data.program.id}}:{to:"/launch/school" as const,search:{siteId:data.program.siteId??undefined,programId:data.program.id}})}>{navigation.context==="settings" ? "Review compliance" : "Return to launch checklist"}</Link>
+     <Link {...(hubMode?{to:navigation.modulePath,params:{module:"compliance"},search:{siteId:data.program.siteId??undefined,programId:data.program.id}}:{to:"/launch/site" as const,search:{siteId:data.program.siteId??undefined,programId:data.program.id}})}>{navigation.context==="settings" ? "Review compliance" : "Return to launch checklist"}</Link>
     </Button>
    </div>
   </div>}
