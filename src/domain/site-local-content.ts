@@ -1,3 +1,4 @@
+import { siteBrandDirectionIds, type SiteBrandDirectionId } from "./site-brand-direction";
 import { isSiteFontId, type SiteFontId, sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
@@ -60,6 +61,8 @@ export function siteLocalImagePublicationGaps(image: SiteLocalImage | null): str
 }
 export type SiteLocalBranding = {
   theme: SiteLocalTheme;
+  /** Versioned with the existing Site website draft, never an unversioned sidecar. */
+  brandDirectionId?: SiteBrandDirectionId;
   /** Structural template is versioned with local branding, not Program facts. */
   templateId?: SiteTemplateId;
   heroImage: SiteLocalImage | null;
@@ -280,6 +283,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   }
   const branding = input.branding ?? emptySiteLocalBranding;
   if (!siteLocalThemes.includes(branding.theme)) throw new Error("Choose an approved website theme");
+  if (branding.brandDirectionId !== undefined && !siteBrandDirectionIds.includes(branding.brandDirectionId))
+    throw new Error("Choose an approved Site brand direction");
   const paletteId = branding.paletteId ?? "signature";
   const typographyId = branding.typographyId ?? "editorial";
   const templateId = branding.templateId ?? "heritage";
@@ -304,7 +309,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
     if (!options.allowIncompleteImage && gaps.length) throw new Error(gaps[0]);
     return validatedImage;
   };
-  result.branding = { theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides,
+  result.branding = { theme: branding.theme, paletteId, typographyId, templateId,
+    ...(branding.brandDirectionId ? {brandDirectionId:branding.brandDirectionId} : {}), ...fontOverrides,
     heroImage: normalizeArtwork(branding.heroImage),
     ...(branding.logoImage !== undefined ? { logoImage: normalizeArtwork(branding.logoImage) } : {}),
   };

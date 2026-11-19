@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
@@ -77,6 +78,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
+  const siteStorySource=siteStorySourceV61Schema.safeParse(siteConfiguration?.metadata?.siteStoryV61);
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
     academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
   const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
@@ -145,6 +147,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ])) : {};
   return {
     siteId:site.id,
+    siteStoryV61:siteStorySource.success ? {answers:siteStorySource.data.answers,revision:siteStorySource.data.revision} : null,
     siteName: site.name,
     organizationName: site.organizationName,
     canPublish: site.canPublish,

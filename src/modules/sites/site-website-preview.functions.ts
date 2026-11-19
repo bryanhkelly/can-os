@@ -1,3 +1,4 @@
+import { siteBrandDirectionIds } from "@/domain/site-brand-direction";
 import { sitePaletteIds, siteTypographyIds, siteTemplateIds, siteFontCatalog, type SiteFontId } from "@/domain/site-theme";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -48,6 +49,7 @@ const localContentSchema = z.object({
   }).strict().optional(),
   branding: z.object({
     theme: z.enum(siteLocalThemes),
+    brandDirectionId: z.enum(siteBrandDirectionIds).optional(),
     paletteId: z.enum(sitePaletteIds).optional(),
     typographyId: z.enum(siteTypographyIds).optional(),
     templateId: z.enum(siteTemplateIds).optional(),
