@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
 import { realSchoolSetupSignupSchema, schoolSetupSchema, type SchoolSetupResult } from "@/domain/school-setup";
@@ -10,6 +10,8 @@ import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
 import { WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/schools/new")({
+  // Legacy URL no longer presents a competing school-creation experience.
+  loader: () => { throw redirect({ to: "/site/new" }); },
   server: { handlers: {
     POST: createServerOnlyFn(async ({ request }) => {
       const headers = { "Cache-Control": "no-store" };

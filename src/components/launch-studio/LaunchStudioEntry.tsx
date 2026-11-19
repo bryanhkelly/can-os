@@ -48,7 +48,7 @@ export function LaunchStudioEntry() {
     <section id="launch-help" className="mt-6 text-sm leading-6 text-muted-foreground">
       <h2 className="font-semibold text-foreground">Have an invitation?</h2>
       <p>Use the exact account your school invited. <Link to="/access" className="font-semibold underline">Sign in</Link> to continue.
-        {" "}New demonstration school? <Link to="/schools/new" className="underline">Create an isolated .demo school</Link>. This is not a production-school registration.</p>
+        {" "}Starting a new learning Site? <Link to="/site/new" className="underline">Create your Site</Link>.</p>
     </section>
   </PageFrame>;
 }

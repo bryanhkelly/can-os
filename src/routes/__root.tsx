@@ -74,6 +74,7 @@ function RootComponent() {
   const session = Route.useLoaderData();
   const pathname = useLocation({ select: location => location.pathname });
   const standalone = isLaunchStudioPath(pathname);
+  const publicSiteSignup = pathname === "/site/new";
   const engagement = isEngagementPath(pathname);
 
   return (
@@ -81,6 +82,8 @@ function RootComponent() {
       <WorkspaceSessionProvider initial={session}>
         {engagement
           ? <EngagementChrome><Outlet /></EngagementChrome>
+          : publicSiteSignup
+            ? <AccessReturnRecovery><Outlet /></AccessReturnRecovery>
           : standalone
             ? <LaunchStudioChrome><AccessReturnRecovery><Outlet /></AccessReturnRecovery></LaunchStudioChrome>
             : <><WorkspaceNavigation><AccessReturnRecovery><Outlet /></AccessReturnRecovery></WorkspaceNavigation><CommandPalette /></>}

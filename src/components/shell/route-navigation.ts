@@ -169,6 +169,7 @@ export const routeNavigation = {
   "/published-site/family-start": publicPage,
   "/published-site/inquiry": publicPage,
   "/schools/new": publicPage,
+  "/site/new": publicPage,
   "/staff/attendance": page({ registrar: "/home", site_admin: "/home", teacher: "/home", room_facilitator: "/staff/attendance", site_leader: "/staff/attendance", site_staff: "/home" }, [...admins, "teacher", "room_facilitator", "site_leader", "site_staff"]),
   "/staff/teachers": page("/staff/teachers", ["site_leader"]),
   "/student/assignments": page("/student/courses", ["student"]),

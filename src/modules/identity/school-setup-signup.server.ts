@@ -21,7 +21,7 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
 
   const slug = uniqueSlug(signup.schoolName, signup.id);
   const [organization] = await tx.insert(organizations).values({
-    type: "christian_school", name: signup.schoolName, slug,
+    type: "christian_school", name: signup.organizationName?.trim() || signup.schoolName, slug,
   }).returning({ id: organizations.id });
   if (!organization) throw new Error("School organization could not be created");
 

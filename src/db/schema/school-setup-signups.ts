@@ -8,6 +8,7 @@ export const schoolSetupSignups = pgTable("school_setup_signups", {
   id: id(),
   accountId: uuid("account_id").notNull().references(() => accessAccounts.id, { onDelete: "cascade" }),
   schoolName: text("school_name").notNull(),
+  organizationName: text("organization_name"),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
