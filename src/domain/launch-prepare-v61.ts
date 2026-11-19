@@ -28,3 +28,12 @@ export function resolveVisibleSolutionRecipe<T extends { blueprintVersionId: str
 ): T | undefined {
   return visible.find(template => template.blueprintVersionId === selectedId) ?? visible[0];
 }
+
+/** An Establish delivery preference guides catalog discovery; it is not
+ * a verified delivery configuration or a restriction on available options. */
+export function preferredCatalogDelivery(
+  delivery: "physical" | "digital" | "both" | null | undefined,
+): "onsite" | "remote" | "hybrid" {
+  return delivery === "digital" ? "remote"
+    : delivery === "both" ? "hybrid" : "onsite";
+}
