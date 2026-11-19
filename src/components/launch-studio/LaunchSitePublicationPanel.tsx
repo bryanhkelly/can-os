@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceNotice, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
@@ -159,11 +160,14 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
               {state.address.status === "published" ? "Withdraw public publication" : "Review and publish"}
             </h3>
             <div className="mt-3 space-y-4">
-              {state.address.status !== "published" && <Checkbox checked={reviewed}
-                onCheckedChange={checked => setReviewed(checked === true)}>
-                I have reviewed the exact public-facing content, identity, images, and claims,
-                including consent and any required independent approval.
-              </Checkbox>}
+              {state.address.status !== "published" && <div className="flex items-start gap-3">
+                <Checkbox id="site-publication-reviewed" checked={reviewed}
+                  onChange={event => setReviewed(event.currentTarget.checked)} />
+                <Label htmlFor="site-publication-reviewed" className="text-sm leading-6">
+                  I have reviewed the exact public-facing content, identity, images, and claims,
+                  including consent and any required independent approval.
+                </Label>
+              </div>}
               <Field label="Decision reason" description="10–500 characters. This is recorded with the publication audit.">
                 <Textarea value={reason} onChange={event => setReason(event.target.value)}
                   maxLength={500} rows={3} placeholder="Document what was reviewed and why this decision is appropriate." />
