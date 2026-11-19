@@ -3,13 +3,14 @@
  * engine. The actual Site, Blueprint, Class and admissions services own writes.
  * Do not persist user-visible checkboxes as readiness or infer regulatory fit.
  */
-import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, Globe2, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
 import { prepareStageModulesV61, preferredCatalogDelivery, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
+import { LaunchSitePublicationPanel } from "./LaunchSitePublicationPanel";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 
 const prepareModuleIcons: Record<PrepareStageModuleIdV61, LucideIcon> = {
@@ -19,6 +20,7 @@ const prepareModuleIcons: Record<PrepareStageModuleIdV61, LucideIcon> = {
   "schedules-capacity": CalendarDays,
   "funding-enrollment": Wallet,
   "opening-compliance": ShieldCheck,
+  "publish-site": Globe2,
 };
 
 export const prepareModulesV61 = prepareStageModulesV61.map(module => ({
@@ -111,6 +113,17 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
       { title: "Review opening and compliance", detail: "Resolve real opening blockers in the institutional preparation workflow.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
       { title: "Review Site qualification", detail: "Inspect recorded facility and program-fit evidence, where authorized.", href: () => "/canonical/lab/site-qualification" },
       { title: "Return to Blueprint planning", detail: "Verify the selected operating model, not just the intended Program.", href: id => "/canonical/blueprints?siteId=" + scoped(id) },
+    ],
+  },
+  "publish-site": {
+    question: "Is the public-facing Site website reviewed and ready to go live?",
+    decision: "Review the Site identity, published local copy, licensed imagery, approved claims and live hosting. Record explicit Site publication separately from Offering releases and enrollment.",
+    canSupplies: "The canonical Site publisher, review checks, audit history, and public-host reachability verification.",
+    siteProvides: "Accurate public information, photo rights and consent, responsible publication authority, and an explicit decision reason.",
+    status: "governed",
+    handoffs: [
+      { title: "Edit Website & Brand", detail: "Return to Establish to revise and save the Site website without automatically publishing it.", href: id => "/launch/website?siteId=" + scoped(id) + "&returnToHub=true" },
+      { title: "Review full publishing details", detail: "See the existing institutional publication and approved content workflows.", href: id => "/sites/" + scoped(id) + "/publish" },
     ],
   },
 };
@@ -230,7 +243,8 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
           Adoption intent is recorded in the existing Blueprint workspace; no duplicate selection record is created here.
         </WorkspaceNotice>
       </>}
-      {module !== "program-catalog" && <WorkspacePanel title="What to prepare"
+      {module === "publish-site" && <LaunchSitePublicationPanel key={siteId} siteId={siteId} />}
+      {module !== "program-catalog" && module !== "publish-site" && <WorkspacePanel title="What to prepare"
         description="Use requirements from the chosen Solution and applicable jurisdiction, rather than a generic checklist.">
         <div className="flex gap-3">
           <ClipboardCheck aria-hidden="true" className="mt-1 size-5 shrink-0 text-primary" />
@@ -242,7 +256,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
       </WorkspacePanel>}
       <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}/>
       <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
-        Site planning is not approval to operate, publish an Offering, or enroll learners.
+        A shared preview is not Site publication. Publishing the Site is not approval to operate, publish an Offering, or enroll learners.
       </WorkspaceNotice>
       <nav aria-label="Prepare module navigation" className="flex flex-wrap justify-between gap-3 border-t pt-5">
         {previous ? <Button asChild variant="outline"><Link to="/launch/site" search={{siteId, module:previous.id}}>Previous: {previous.title}</Link></Button>
