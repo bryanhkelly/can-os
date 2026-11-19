@@ -85,21 +85,30 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // saved draft. The starter is never persisted or published by this GET.
   const candidate = proposedContent ?? editingContent ?? local?.content
     ?? prepareWebsiteCopyFromSiteInformation(createSchoolWebsiteStarterContent(site.name),storyCandidates);
+  // A newly established Site can save its Brand before its first website
+  // revision. Apply that canonical Brand to the first-visit starter, not the
+  // legacy default palette. In-editor unsaved previews retain their proposed
+  // visual choices, without persisting a second Brand source.
+  const renderedCandidate = savedBrand && !proposedContent
+    ? {...candidate,branding:siteBrandPresentationIdentity(savedBrand.resolved,
+        resolveSiteTemplateId(candidate.branding.templateId),true)}
+    : candidate;
+  const displaySiteName = savedBrand?.resolved.displayName ?? site.name;
   // The same rights gate applies to both artwork slots, including saved private drafts.
   // Unsigned logos must never bypass the hero-image gate in a private HTML preview.
-  const previewContent = candidate ? { ...candidate, branding: {
-    ...candidate.branding,
-    heroImage: siteLocalImagePublicationGaps(candidate.branding.heroImage).length
-      ? null : candidate.branding.heroImage,
-    logoImage: siteLocalImagePublicationGaps(candidate.branding.logoImage ?? null).length
-      ? null : candidate.branding.logoImage ?? null,
-  } } : candidate;
+  const previewContent = { ...renderedCandidate, branding: {
+    ...renderedCandidate.branding,
+    heroImage: siteLocalImagePublicationGaps(renderedCandidate.branding.heroImage).length
+      ? null : renderedCandidate.branding.heroImage,
+    logoImage: siteLocalImagePublicationGaps(renderedCandidate.branding.logoImage ?? null).length
+      ? null : renderedCandidate.branding.logoImage ?? null,
+  } };
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
     academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
   const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
     parentExtras?.admissions);
   const parentInformation = projectApprovedParentInformation({
-    site: { name: site.name, organizationName: site.organizationName },
+    site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     ...(parentExtras ?? {}),
   });
@@ -137,7 +146,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const baseContentBlocks = resolveSiteContentBlocks(
     contentConfig, {
       mode: "private", preferences: preferences.success ? preferences.data : null,
-      siteSetup:{name:site.name,organizationName:site.organizationName,
+      siteSetup:{name:displaySiteName,organizationName:site.organizationName,
         city:planningLocation.success?planningLocation.data.city:null,
         state:planningLocation.success?planningLocation.data.state:null,
         timezone:siteConfiguration?.timezone??null},
@@ -157,7 +166,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   ];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
-    host, site: { name: site.name, organizationName: site.organizationName },
+    host, site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media, contentBlocks, enrollmentOpportunities,
     ...(noncreditReleases.length ? {
