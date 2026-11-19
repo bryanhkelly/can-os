@@ -145,7 +145,7 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
         ON attribution.noncredit_registration_id=registration.id
       WHERE issuance.id=${intent.issuanceId}::uuid
         AND NOT EXISTS(
-          SELECT 1 FROM education_v30.learning_award_issuance_events revocation
+          SELECT 1 FROM public.learning_award_issuance_events revocation
           WHERE revocation.issuance_id=issuance.id
             AND revocation.event_kind='revoked')
       LIMIT 2
