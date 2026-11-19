@@ -53,8 +53,8 @@ BEGIN
   SELECT count(DISTINCT p.oid)::int INTO routine_count
   FROM pg_proc p JOIN jsonb_array_elements(snapshot) AS dep(value)
     ON p.prosrc ILIKE '%'||(dep.value->>'name')||'%';
-  IF routine_count<>41 THEN
-    RAISE EXCEPTION 'Routine dependency count changed: expected 41 found %',routine_count;
+  IF routine_count<>51 THEN
+    RAISE EXCEPTION 'Routine dependency count changed: expected 51 found %',routine_count;
   END IF;
   FOR routine IN
     SELECT DISTINCT p.oid,p.oid::regprocedure AS identity,p.proconfig,
