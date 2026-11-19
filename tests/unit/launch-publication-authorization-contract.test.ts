@@ -31,6 +31,6 @@ describe("Launch Studio Prepare publication authorization projection", () => {
     expect(prepare).toContain('requirePartnerWebsiteEditor(actor, db, "site.website.local.publish")');
     expect(panel).toContain("reviewLaunchSiteWebsiteCopy");
     expect(panel).toContain("setSitePublicationStatus");
-    expect(panel).toContain("Publishing");
+    expect(panel).toContain("This is the official public Site decision.");
   });
 });
