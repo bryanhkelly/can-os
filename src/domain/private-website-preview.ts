@@ -38,7 +38,7 @@ export function renderPrivateWebsitePreviewHtml(
     isPublicSitePagePath(path) && links.has(path)
       ? `href="${kind==="site"?siteFirstUrl(path):privateWebsitePreviewUrl(siteId, path)}"`
       : 'aria-disabled="true"');
-  const editor = `/launch/website?siteId=${encodeURIComponent(siteId)}&returnToHub=true&step=review`;
+  const editor = `/launch/website?siteId=${encodeURIComponent(siteId)}&amp;returnToHub=true&amp;step=review`;
   const banner = `<aside class="can-private-preview" role="status">
   <strong>Private ${kind === "site" ? "Site" : "school"} website preview</strong>
   <span>${saved ? "Saved design" : kind === "site" ? "Unsaved Site starter · illustrative only" : "Unsaved school starter · illustrative only"} · not published · sign-in required</span>
