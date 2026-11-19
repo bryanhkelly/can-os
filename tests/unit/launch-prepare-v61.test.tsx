@@ -75,6 +75,14 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).not.toContain("Approved for enrollment");
   });
 
+  it("keeps catalog exploration available when Establish preferences are unavailable", () => {
+    const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="program-catalog"
+      intentUnavailable />);
+    expect(html).toContain("Saved Programs &amp; Audiences could not be loaded");
+    expect(html).toContain("Packaged Solution recipes");
+    expect(html).not.toContain("You have not saved any learning interests");
+  });
+
   it("maintains independent authorization handoff at the end of Prepare", () => {
     const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="opening-compliance" />);
     expect(html).toContain("Review Launch requirements");
