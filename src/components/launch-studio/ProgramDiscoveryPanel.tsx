@@ -176,7 +176,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
                 <div className="grid gap-2">
                   <Link to="/canonical/blueprints" search={{siteId: canonicalSiteId}}
                     className="inline-flex min-h-11 items-center justify-center border border-primary bg-primary px-4 py-2 text-center text-sm font-semibold text-primary-foreground">
-                    Plan in Blueprint workspace
+                    Plan this Offering
                   </Link>
                   {classManagementAllowed ? <Link to="/class" search={{view:"manage",siteId:canonicalSiteId,
                     offeringVersionId:offering.offeringVersionId}}
@@ -194,7 +194,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
       </div>}
     </>}
     <p className="mt-5 text-xs leading-5 text-muted-foreground" role="note">
-      Browsing never creates a Program, Solution, Blueprint adoption, Class or enrollment. Only the receiving authorized workflow records those decisions.
+      Browsing never creates a Program, Solution configuration, Class or enrollment. Only the receiving authorized workflow records those decisions.
     </p>
   </section>;
 }
