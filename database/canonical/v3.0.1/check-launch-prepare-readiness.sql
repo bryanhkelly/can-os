@@ -29,6 +29,7 @@ SELECT 'client_site_denial',
     WHERE schemaname='public' AND tablename='sites'
       AND policyname='sites_no_direct_client_access'
       AND permissive='RESTRICTIVE' AND qual='false'
+      AND 'authenticated' = ANY(roles) AND 'anonymous' = ANY(roles)
   ) THEN 'ready' ELSE 'blocked' END,
   'Authenticated and anonymous direct Site access remains denied'
 UNION ALL
@@ -38,8 +39,10 @@ SELECT 'scoped_catalog_site_rls',
     WHERE schemaname='public' AND tablename='sites'
       AND policyname='sites_canonical_catalog_operator_read'
       AND cmd='SELECT' AND permissive='PERMISSIVE'
+      AND 'public' = ANY(roles)
       AND qual LIKE '%v28_role_can_access_org%'
       AND qual LIKE '%site_organization_roles%'
+      AND qual LIKE '%program_catalog%' AND qual LIKE '%blueprint_author%'
   ) THEN 'ready' ELSE 'blocked' END,
   'Restricted-purpose roles may read only their current operator Sites'
 UNION ALL
