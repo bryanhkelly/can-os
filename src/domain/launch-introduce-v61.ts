@@ -27,7 +27,7 @@ type IntroduceConfig = {
   handoffs: readonly IntroduceHandoff[];
   /** Optional handoff for one reviewed, saved, active Package. Navigation
    * carries a reference to the canonical record, not a copy of its message. */
-  packageHandoff?: IntroduceHandoff & {
+  packageHandoff?: Omit<IntroduceHandoff,"href"> & {
     purpose: MarketingPurpose;
     href: (siteId:string,packageId:string)=>string;
   };
