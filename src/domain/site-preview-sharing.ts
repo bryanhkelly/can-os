@@ -21,6 +21,7 @@ export const sitePreviewShareSchema = z.object({
   expiresAt: iso.nullable(),
   revokedAt: iso.nullable(),
   sourceRevision: z.number().int().nonnegative(),
+  brandVersionId:z.string().uuid().optional(),
   pages: snapshotPages,
 }).strict();
 export type SitePreviewShare = z.infer<typeof sitePreviewShareSchema>;

@@ -1,3 +1,5 @@
+import { readSavedBrandVersion } from "./site-brand.functions";
+import { siteBrandPresentationIdentity, assertSiteBrandMediaRights } from "@/domain/site-brand";
 import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
@@ -61,6 +63,7 @@ function overview(shares: readonly SitePreviewShare[]) {
   return shares.map(share => ({
     id: share.id, createdAt: share.createdAt, expiresAt: share.expiresAt,
     revokedAt: share.revokedAt, sourceRevision: share.sourceRevision,
+    brandVersionId:share.brandVersionId??null,
   }));
 }
 
@@ -111,7 +114,16 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         throw new DomainError("UNAVAILABLE",
           "Save your website design in Establish before creating a shareable preview.");
       const content = normalizeSiteLocalContent(latest.content, { allowIncompleteImage: true });
-      if (latest?.status === "review_required" || classifySiteLocalContent(content).status !== "published")
+      const brand=await readSavedBrandVersion(site.id,undefined,tx);
+      if(!brand)throw new DomainError("UNAVAILABLE",
+        "Save your Site Brand before sharing your website preview.");
+      if(!assertSiteBrandMediaRights(brand.resolved.logo) ||
+          !assertSiteBrandMediaRights(brand.resolved.hero))
+        throw new DomainError("FORBIDDEN",
+          "Confirm Site Brand image rights and child-image consent before sharing.");
+      const websiteContent={...content,branding:siteBrandPresentationIdentity(
+        brand.resolved,content.branding.templateId)};
+      if (latest?.status === "review_required" || classifySiteLocalContent(websiteContent).status !== "published")
         throw new DomainError("UNAVAILABLE",
           "This website revision contains protected claims needing review. Update your website copy before sharing.");
 
@@ -132,9 +144,9 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       const plannedPrograms = projectPlannedSiteProgramsForPreview(
         preferences.success ? preferences.data : null, authored);
       const page = projectShareableSitePreview({
-        siteName: site.name,
+        siteName: brand.resolved.displayName,
         organizationName: organization?.name ?? "Proposed learning community",
-        content,
+        content:websiteContent,
         plannedPrograms,
       });
       const pages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
@@ -149,7 +161,8 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         createdAt: now.toISOString(),
         expiresAt: data.expiresAfterDays === null ? null
           : new Date(now.getTime() + data.expiresAfterDays * 86_400_000).toISOString(),
-        revokedAt: null, sourceRevision: latest.revision, pages,
+        revokedAt: null, sourceRevision: latest.revision,
+        brandVersionId:brand.version.id,pages,
       };
       // Keep a bounded number of recorded links. Old revocations remain in
       // the canonical audit trail, not unlimited Site metadata.
@@ -165,6 +178,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         entityType: "site", entityId: site.id,
         scope: { organizationId: site.organizationId, siteId: site.id },
         after: { shareId: entry.id, sourceRevision: entry.sourceRevision,
+          brandVersionId:brand.version.id,
           expiresAt: entry.expiresAt, proposed: true, officialPublication: false },
       });
       await emitEvent(tx, {
