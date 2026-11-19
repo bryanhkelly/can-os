@@ -105,8 +105,7 @@ export const professionalRoleAssignments = pgTable("professional_role_assignment
   },
 );
 
-export const courseVersions = educationV30.table(
-  "course_versions",
+export const courseVersions = pgTable("course_versions",
   {
     id: id(),
     courseId: uuid("course_id").notNull(),
@@ -136,8 +135,7 @@ export const courseUnits = pgTable("course_units",
   ],
 );
 
-export const courseLessons = educationV30.table(
-  "course_lessons",
+export const courseLessons = pgTable("course_lessons",
   {
     id: id(),
     courseVersionId: uuid("course_version_id").notNull(),
