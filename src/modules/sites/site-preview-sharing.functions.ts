@@ -11,11 +11,10 @@ import { DomainError } from "@/domain/errors";
 import { EventTypes } from "@/domain/event-types";
 import {
   classifySiteLocalContent, createSchoolWebsiteStarterContent, normalizeSiteLocalContent,
-  siteLocalImagePublicationGaps,
 } from "@/domain/site-local-content";
-import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
+import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import {
-  createPreviewShareToken, readSitePreviewShares, type SitePreviewShare,
+  createPreviewShareToken, projectShareableSitePreview, readSitePreviewShares, type SitePreviewShare,
 } from "@/domain/site-preview-sharing";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
@@ -112,30 +111,15 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         throw new DomainError("UNAVAILABLE",
           "This website revision contains protected claims needing review. Update your website copy before sharing.");
 
-      // Consent and licensing gaps never leave the editor. Editorial baseline,
-      // private Site Story, contacts, network claims and admissions are excluded.
-      const safeContent = {
-        ...content,
-        editorialBaseline: undefined,
-        branding: {
-          ...content.branding,
-          heroImage: siteLocalImagePublicationGaps(content.branding.heroImage).length ? null : content.branding.heroImage,
-          logoImage: siteLocalImagePublicationGaps(content.branding.logoImage ?? null).length ? null : content.branding.logoImage ?? null,
-        },
-      };
+      // The shared public-safe projection never exports the Site Story,
+      // family contacts, unapproved imagery, or private editorial baseline.
       const [organization] = await tx.select({ name: organizations.name })
         .from(organizations).where(eq(organizations.id, site.organizationId)).limit(1);
-      const page: PublicSitePage = {
-        host: "preview.can-os.com",
-        site: { name: site.name, organizationName: organization?.name ?? "Proposed learning community" },
-        localContent: safeContent,
-        offerings: [],
-        academicPrograms: [],
-        noncreditReleases: [],
-        enrollmentOpportunities: [],
-        contentBlocks: [],
-        media: {},
-      };
+      const page = projectShareableSitePreview({
+        siteName: site.name,
+        organizationName: organization?.name ?? "Proposed learning community",
+        content,
+      });
       const pages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
         path, renderPublicSiteHtml(page, { path, localPreview: true }),
       ]));
