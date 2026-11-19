@@ -695,8 +695,7 @@ export const formativePracticeResponses = educationV30Secure.table(
   },
 );
 
-export const assessmentDefinitions = educationV30.table(
-  "assessment_definitions",
+export const assessmentDefinitions = pgTable("assessment_definitions",
   {
     id: id(),
     ownerOrganizationId: uuid("owner_organization_id").notNull(),
@@ -717,8 +716,7 @@ export const assessmentDefinitions = educationV30.table(
   ],
 );
 
-export const assessmentVersions = educationV30.table(
-  "assessment_versions",
+export const assessmentVersions = pgTable("assessment_versions",
   {
     id: id(),
     assessmentId: uuid("assessment_id").notNull(),
