@@ -404,7 +404,8 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       <div className="space-y-6">
         <WorkspaceNotice><strong>How CAN OS will use your answers</strong><p className="mt-2">
           The answers you provide here, including your written origin story, community need,
-          values and future vision, are used to draft your website and outreach materials.
+          values and future vision, are used to draft your website and may be used to
+          prepare future outreach materials.
           Review, change or decline the drafts before sharing them. <strong>Nothing is published automatically.</strong>
           These answers do not establish Program approval or enrollment authority.
           Avoid including sensitive details or information about others that you cannot share.</p></WorkspaceNotice>

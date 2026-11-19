@@ -25,6 +25,20 @@ export function projectPlannedSiteProgramsForPreview(
   }).filter(block => block.channel === "learning.interests");
   if (!source || !source.items.length) return [];
 
+  const delivery = preferences.delivery === "both" ? "a combination of in-person and online learning"
+    : preferences.delivery === "digital" ? "online learning" : "in-person learning";
+  const timingNames:Record<string,string> = {
+    weekdays:"weekdays",weekends:"weekends",daytime:"daytime sessions",evenings:"evening sessions",
+  };
+  const audienceNames:Record<string,string> = {
+    children:"children",teens:"teens",adults:"adults",older_adults:"older adults",
+  };
+  const timing = (preferences.timingIds ?? []).map(id=>timingNames[id]??"").filter(Boolean);
+  const audiences = (preferences.audienceIds ?? []).map(id=>audienceNames[id]??"").filter(Boolean);
+  const description = "We are exploring " + delivery +
+    (audiences.length ? " for " + audiences.join(", ") : "") +
+    (timing.length ? " with possible " + timing.join(", ") : "") +
+    ". These are proposed learning options, not approved or open for enrollment.";
   const homepage = authoredBlocks.find(block => block.channel === "learning.interests" &&
     (block.page === "/" || block.page === undefined));
   const programsPage = authoredBlocks.find(block => block.channel === "learning.interests" &&
@@ -33,8 +47,8 @@ export function projectPlannedSiteProgramsForPreview(
     id: string): SiteContentBlockProjection => ({
     ...source,
     ...(block ? { eyebrow: block.eyebrow, title: block.title,
-      description: block.description, layout: block.layout } : {}),
-    id, page, placement: "learning", enabled: true,
+      layout: block.layout } : {}),
+    description, id, page, placement: "learning", enabled: true,
     // Source-controlled card content; never copy a draft link or claim.
     items: source.items.map(item => ({
       id: item.id, title: item.title, description: item.description,
