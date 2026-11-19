@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import { actions, siteLocalContentVersions, sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import {
-  classifySiteLocalContent, normalizeSiteLocalContent, type SiteLocalContent,
+  classifySiteLocalContent, normalizeSiteLocalContent, websiteCopyOnlyForStorage, type SiteLocalContent,
 } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
@@ -123,8 +123,10 @@ export async function publishPartnerLocalContentWithinTransaction(
     // Return the exact normalized restored snapshot to this already-authorized
     // editor. A router refresh alone cannot safely replace dirty local form
     // state, and a restore may need independent claim review before publication.
-    const restored = input.operation === "restore" ? { restoredContent: content } : {};
-    if (latest && canonicalJson(latest.content) === canonicalJson(content) &&
+    const stored=websiteCopyOnlyForStorage(content);
+    const restored = input.operation === "restore" ? { restoredContent: stored } : {};
+    if (latest && canonicalJson(websiteCopyOnlyForStorage(
+      normalizeSiteLocalContent(latest.content,{allowIncompleteImage:true}))) === canonicalJson(stored) &&
       latest.status === decision.status) {
       return { changed: false, revision: currentRevision, status: latest.status,
         flaggedFields: latest.flaggedFields, ...restored };
@@ -132,7 +134,7 @@ export async function publishPartnerLocalContentWithinTransaction(
 
     const revision = currentRevision + 1;
     const [created] = await tx.insert(siteLocalContentVersions).values({
-      siteId: site.id, revision, content, status: decision.status,
+      siteId: site.id, revision, content:stored, status: decision.status,
       flaggedFields: decision.flaggedFields,
       createdByPersonId: actor.actorPersonId!,
       restoredFromRevision,

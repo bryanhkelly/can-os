@@ -123,6 +123,19 @@ export function createSchoolWebsiteEditorialBaseline(schoolName: string): SiteEd
 
 /** Starts real school sites with useful editable copy, not blank fields.
  * No save, publication or approval occurs until the editor acts. */
+
+/** Canonical database shape for website copy and structural layout.
+ * Identity colors, typography, logo and hero imagery are NOT serialized
+ * into site_local_content_versions; only Site Brand versions own them.
+ * This projection is for storage, not public rendering.
+ */
+export function websiteCopyOnlyForStorage(content:SiteLocalContent):SiteLocalContent {
+  return {...content, branding:{
+    theme:"classic", templateId:content.branding.templateId??"heritage",
+    heroImage:null,
+  }};
+}
+
 export function createSchoolWebsiteStarterContent(schoolName: string): SiteLocalContent {
   const editorialBaseline = createSchoolWebsiteEditorialBaseline(schoolName);
   return {
