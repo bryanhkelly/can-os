@@ -480,7 +480,7 @@ export const officialCourseAssignmentVersions = pgTable("official_course_assignm
   ],
 );
 
-export const learnerProfiles = educationV30.table("learner_profiles", {
+export const learnerProfiles = pgTable("learner_profiles", {
   id: id(),
   personId: uuid("person_id").notNull(),
   createdAt: createdAt(),
@@ -521,8 +521,7 @@ export const enrollments = educationV30.table(
   ],
 );
 
-export const learnerCourseAttempts = educationV30.table(
-  "learner_course_attempts",
+export const learnerCourseAttempts = pgTable("learner_course_attempts",
   {
     id: id(),
     enrollmentId: uuid("enrollment_id"),
@@ -571,7 +570,7 @@ export const noncreditTrainingVersions = pgTable("noncredit_training_versions", 
   baselineAssessmentVersionId: uuid("baseline_assessment_version_id"),
 });
 
-export const noncreditRegistrations = educationV30.table("noncredit_registrations", {
+export const noncreditRegistrations = pgTable("noncredit_registrations", {
   id: id(),
   deploymentId: uuid("deployment_id").notNull(),
   trainingVersionId: uuid("training_version_id").notNull(),
