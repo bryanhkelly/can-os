@@ -1,9 +1,9 @@
-import { boolean, integer, numeric, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** SQL v3.0.1 remains authoritative for evidence, decisions and publication. */
-export const noncreditParticipationEvents = educationV30.table("noncredit_participation_events",{
+export const noncreditParticipationEvents = pgTable("noncredit_participation_events",{
   id:id(),registrationId:uuid("registration_id").notNull(),
   eventKind:text("event_kind").$type<"lesson_completed"|"session_attended"|"skill_practiced"|"activity_completed"|"attendance_corrected">().notNull(),
   occurredAt:timestamp("occurred_at",{withTimezone:true}).notNull(),
@@ -11,7 +11,7 @@ export const noncreditParticipationEvents = educationV30.table("noncredit_partic
   evidenceVersionId:uuid("evidence_version_id"),recordedByPersonId:uuid("recorded_by_person_id").notNull(),
   supersedesId:uuid("supersedes_id"),
 });
-export const noncreditCompletionPolicies = educationV30.table("noncredit_completion_policies",{
+export const noncreditCompletionPolicies = pgTable("noncredit_completion_policies",{
   id:id(),trainingVersionId:uuid("training_version_id").notNull(),
   policyVersion:integer("policy_version").notNull(),
   minParticipationMinutes:integer("min_participation_minutes").notNull(),
@@ -56,7 +56,7 @@ export const assessmentAttemptResults = educationV30.table("assessment_attempt_r
 });
 
 /** Existing canonical v3.0.1 certificate issuance, not a second award ledger. */
-export const noncreditCompletionCertificates = educationV30.table("noncredit_completion_certificates", {
+export const noncreditCompletionCertificates = pgTable("noncredit_completion_certificates", {
   id: id(), decisionId: uuid("decision_id").notNull(),
   issuerOrganizationId: uuid("issuer_organization_id").notNull(),
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
