@@ -249,6 +249,8 @@ for (const eventType of [
   EventTypes.SitePublicIdentityChanged,
   EventTypes.SitePublished,
   EventTypes.SiteUnpublished,
+  EventTypes.SiteWebsitePreviewShared,
+  EventTypes.SiteWebsitePreviewRevoked,
   EventTypes.SiteLocalWebsiteContentPublished,
   EventTypes.SiteLocalWebsiteContentReviewRequested,
   EventTypes.QualificationDefinitionCreated,
