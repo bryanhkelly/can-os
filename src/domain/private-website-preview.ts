@@ -38,11 +38,17 @@ export function renderPrivateWebsitePreviewHtml(
     isPublicSitePagePath(path) && links.has(path)
       ? `href="${kind==="site"?siteFirstUrl(path):privateWebsitePreviewUrl(siteId, path)}"`
       : 'aria-disabled="true"');
-  const editor = `/launch/website?siteId=${encodeURIComponent(siteId)}&amp;returnToHub=true&amp;step=review`;
+  // The Site-first preview is also available to authorized registrar readers,
+  // who may not hold the separately granted website-editor role. Return them
+  // to their actual Launch destination instead of linking to a forbidden editor.
+  const returnHref = kind==="site"
+    ? `/launch/site?siteId=${encodeURIComponent(siteId)}`
+    : `/launch/website?siteId=${encodeURIComponent(siteId)}&amp;returnToHub=true&amp;step=review`;
+  const returnLabel = kind==="site"?"Return to Launch Studio":"Return to Website &amp; Brand Studio";
   const banner = `<aside class="can-private-preview" role="status">
   <strong>Private ${kind === "site" ? "Site" : "school"} website preview</strong>
   <span>${saved ? "Saved design" : kind === "site" ? "Unsaved Site starter · illustrative only" : "Unsaved school starter · illustrative only"} · not published · sign-in required</span>
-  <a href="${editor}">Return to Website &amp; Brand Studio</a>
+  <a href="${returnHref}">${returnLabel}</a>
   </aside>`;
   const style = `<style>
   .can-private-preview{position:relative;z-index:99;display:flex;align-items:center;justify-content:center;
