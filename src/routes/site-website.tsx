@@ -843,7 +843,7 @@ function LocalWebsiteCopyEditor({
               <div>
                 <p className="text-sm font-semibold">Ready to show your proposed website?</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Share the latest saved snapshot without publishing the Site or opening enrollment.
+                  Share your proposed Site website, including planned Programs, without publishing the Site or opening enrollment.
                 </p>
               </div>
               <LaunchPreviewSharing siteId={data.siteId}/>

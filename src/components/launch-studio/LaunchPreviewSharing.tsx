@@ -111,9 +111,11 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
       </div>
       <div className="space-y-5 p-5">
         <WorkspaceNotice tone="info">
-          Recipients do not need a CAN OS account. Links are unlisted but can be forwarded.
-          The fixed snapshot excludes private Site Story answers, contacts, unconsented imagery,
-          and unpublished institutional or enrollment claims. Sharing does not publish your Site.
+          Recipients do not need CAN OS accounts. They can explore the proposed website,
+          including your saved Programs &amp; Audiences as clearly labeled plans, not enrollment offers.
+          Links are unlisted but can be forwarded. Private Site Information answers, contacts,
+          unconsented imagery and unapproved institutional claims are excluded.
+          Sharing does not publish the Site.
         </WorkspaceNotice>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-44 flex-1 space-y-2">
