@@ -71,6 +71,6 @@ describe("V6.1 Launch Studio module integration", () => {
     expect(introduce).toContain("No contacts, submissions");
     expect(introduce).toContain("not yet a pre-Program Site-wide event builder");
     expect(destinations).toContain('state: "governed"');
-    expect(destinations).toContain("permission");
+    expect(destinations).toContain("Permission checks");
   });
 });
