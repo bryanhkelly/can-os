@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
+import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { filterPublishedSolutionRecipes, preferredCatalogDelivery, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -38,6 +39,19 @@ describe("V6.1 Prepare to Open", () => {
     expect(new Set(prepareModulesV61.map(module => module.id)).size).toBe(6);
     expect(isPrepareModuleV61("schedules-capacity")).toBe(true);
     expect(isPrepareModuleV61("website-brand")).toBe(false);
+  });
+
+  it("keeps a long Prepare sidebar scrollable and the current accordion identified", () => {
+    const html = renderToStaticMarkup(<LaunchSiteFrame
+      site={{ id: siteId, name: "Example Site" }} active="funding-enrollment">
+      <p>Prepared content</p>
+    </LaunchSiteFrame>);
+    expect(html).toContain("overflow-y-auto overscroll-contain");
+    expect(html).toContain("lg:h-dvh");
+    expect(html).toContain("aria-expanded=\"true\"");
+    expect(html).toContain("aria-controls=");
+    expect(html).toContain("funding-enrollment");
+    expect(html).toContain("Prepared content");
   });
 
   it("uses Establish delivery only as a discovery default", () => {
