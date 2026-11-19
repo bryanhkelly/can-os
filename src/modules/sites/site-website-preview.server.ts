@@ -1,5 +1,5 @@
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
-import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
+import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
 import { recommendBrandDirection } from "@/domain/site-brand-direction";
@@ -59,6 +59,12 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   `);
   const draftStorageReady = draftConstraint.rows.some(row =>
     typeof row.definition === "string" && row.definition.includes("'draft'"));
+  const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
+    .from(sites).where(eq(sites.id, site.id)).limit(1);
+  const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
+  const siteStorySource=siteStorySourceV61Schema.safeParse(siteConfiguration?.metadata?.siteStoryV61);
+  const storyCandidates=siteStorySource.success
+    ? suggestWebsiteCopyFromStory(siteStorySource.data.answers,site.name) : [];
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
@@ -68,7 +74,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // A new Site can explore a complete read-only design even before its first
   // saved draft. The starter is never persisted or published by this GET.
   const candidate = proposedContent ?? editingContent ?? local?.content
-    ?? createSchoolWebsiteStarterContent(site.name);
+    ?? prepareWebsiteCopyFromSiteInformation(createSchoolWebsiteStarterContent(site.name),storyCandidates);
   // The same rights gate applies to both artwork slots, including saved private drafts.
   // Unsigned logos must never bypass the hero-image gate in a private HTML preview.
   const previewContent = candidate ? { ...candidate, branding: {
@@ -78,10 +84,6 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     logoImage: siteLocalImagePublicationGaps(candidate.branding.logoImage ?? null).length
       ? null : candidate.branding.logoImage ?? null,
   } } : candidate;
-  const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
-    .from(sites).where(eq(sites.id, site.id)).limit(1);
-  const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
-  const siteStorySource=siteStorySourceV61Schema.safeParse(siteConfiguration?.metadata?.siteStoryV61);
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
     academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
   const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
@@ -160,7 +162,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   return {
     siteId:site.id,
     siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
-    siteStoryCopyCandidates:siteStorySource.success ? suggestWebsiteCopyFromStory(siteStorySource.data.answers, site.name) : [],
+    siteStoryCopyCandidates:storyCandidates,
     siteStorySourceChoices:siteStorySource.success ? {
       motivations:siteStorySource.data.answers.motivations,
       distinctives:siteStorySource.data.answers.distinctives,
