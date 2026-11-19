@@ -19,7 +19,11 @@ SELECT (
    WHERE id=:'organization_id'::uuid)
  AND EXISTS(SELECT 1 FROM pg_policies p
    WHERE p.schemaname='public' AND p.tablename='sites'
-     AND p.policyname='sites_canonical_catalog_operator_read')
+     AND p.policyname='sites_canonical_catalog_operator_read'
+     AND p.permissive='PERMISSIVE' AND p.cmd='SELECT'
+     AND 'public' = ANY(p.roles)
+     AND p.qual LIKE '%v28_role_can_access_org%'
+     AND p.qual LIKE '%site_organization_roles%')
  AND EXISTS(SELECT 1 FROM pg_roles r WHERE r.rolname=:'application_role'
    AND r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
    AND NOT r.rolcreatedb AND NOT r.rolcreaterole AND NOT r.rolinherit
