@@ -44,6 +44,26 @@ function TemplatePreviewFrame({ html, name, tall = false, viewport = "desktop", 
   </div>;
 }
 
+/** Structural previews are static SVGs, never seven nested website iframes. */
+function WireframeThumbnail({ id, name }: {id:SiteTemplateId; name:string}) {
+  type Rect=readonly [number,number,number,number,number?];
+  const layouts:Record<SiteTemplateId,readonly Rect[]>={
+    heritage:[[0,0,200,18,0],[12,27,92,7,2],[12,40,79,4,1],[12,50,65,4,1],[111,25,77,58],[12,91,54,26],[73,91,54,26],[134,91,54,26]],
+    community:[[0,0,200,18,0],[12,26,83,59],[106,30,78,7,2],[106,44,64,4,1],[106,55,73,4,1],[12,92,54,25],[73,92,54,25],[134,92,54,25]],
+    modern:[[0,0,44,126,2],[55,15,122,9,1],[55,30,132,52],[55,90,110,4,2],[55,100,95,4,1],[8,15,28,6,0],[8,40,25,4,0],[8,54,25,4,0]],
+    "bright-futures":[[0,0,200,20,0],[0,20,200,70],[12,38,115,8,2],[12,52,101,4,1],[12,61,89,4,1],[12,97,54,24],[73,97,54,24],[134,97,54,24]],
+    summit:[[0,0,200,83],[12,22,112,11,2],[12,39,102,4,1],[12,48,86,4,1],[12,88,176,30,0]],
+    classic:[[0,0,200,10,2],[52,21,96,8,1],[35,37,130,4,0],[16,51,168,49],[45,108,110,4,1]],
+    campus:[[0,0,200,18,0],[12,27,93,10,2],[12,45,78,4,1],[110,28,78,59],[12,62,86,25],[12,95,53,25],[73,95,53,25],[134,95,54,25]],
+  };
+  const fills=["#f1f5f9","#94a3b8","#475569","#e2e8f0"];
+  return <svg role="img" aria-label={name+" structural wireframe"} viewBox="0 0 200 126"
+    className="block h-auto w-full border bg-card">
+    {layouts[id].map(([x,y,w,h,tone],i)=><rect key={i} x={x} y={y}
+      width={w} height={h} fill={fills[tone??3]} stroke="#cbd5e1" strokeWidth=".5"/>)}
+  </svg>;
+}
+
 /** Seven public designs share the approved renderer. Samples never become school media. */
 export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyId, schoolName, headingFontId, bodyFontId, disabled = false }: {
   value: SiteTemplateId;
@@ -131,8 +151,7 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
             className={cn("h-auto w-full min-w-0 items-start gap-3 whitespace-normal border p-2 text-left",
               selected?"border-primary ring-2 ring-primary/40":"border-border")}>
             <div className="w-24 shrink-0 overflow-hidden">
-              <TemplatePreviewFrame html={renderSample(template.id)}
-                name={`${template.name} layout thumbnail`} viewport="desktop" grayscale={!styledPreview} tiny/>
+              <WireframeThumbnail id={template.id} name={template.name}/>
             </div>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-bold">{template.name}</span>
