@@ -90,9 +90,9 @@ try{
       const {rows:appointments}=await client.query(
         `SELECT assignment.role_code,count(*)::integer AS current_count
          FROM education_v30.professional_role_assignments assignment
-         JOIN education_v30.evidence_document_versions e
+         JOIN public.evidence_document_versions e
            ON e.id=assignment.authority_evidence_id
-         JOIN education_v30.evidence_documents document
+         JOIN public.evidence_documents document
            ON document.id=e.document_id
          WHERE assignment.appointing_organization_id=$1::uuid
            AND assignment.organization_id=$1::uuid
