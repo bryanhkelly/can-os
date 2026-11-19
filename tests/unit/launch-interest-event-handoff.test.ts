@@ -63,6 +63,8 @@ describe("Introduce Interest Event handoff uses exact authorized Site and saved 
     const outcome=await load({siteId:siteA,programId:programA,packageId});
     expect(outcome.ok).toBe(true);
     expect(outcome.data?.suggestedTitle).toBe("Community learning open house");
+    expect((outcome.data as {suggestedDescription?:string})?.suggestedDescription)
+      .toBe("Meet our neighbors.");
     expect(outcome.data?.source).toBe("saved-package");
     expect(calls.listPackages).toHaveBeenCalledWith({data:{siteId:siteA}});
     expect(calls.readSuggestions).not.toHaveBeenCalled();
@@ -80,6 +82,17 @@ describe("Introduce Interest Event handoff uses exact authorized Site and saved 
     const outcome=await load({siteId:siteA,programId:programB,packageId});
     expect(outcome.ok).toBe(false);
     expect(calls.listPackages).not.toHaveBeenCalled();
+  });
+
+  it("rejects protected saved package wording rather than silently substituting a suggestion",async()=>{
+    calls.listPackages.mockResolvedValue([{
+      ...eventPackage(siteA),
+      content:{purpose:"event-invitation",headline:"Our accredited program",
+        message:"Meet our neighbors."},
+    }]);
+    const result=await load({siteId:siteA,packageId});
+    expect(result.ok).toBe(false);
+    expect(calls.readSuggestions).not.toHaveBeenCalled();
   });
 
   it("rejects archived and foreign packages instead of silently suggesting unrelated copy",async()=>{
