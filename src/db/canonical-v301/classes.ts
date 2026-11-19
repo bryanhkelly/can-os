@@ -4,7 +4,7 @@ const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Additive canonical model. A Class is an instance of one Course version;
  * creating it never grants adoption, Site authority, enrollment or awards. */
-export const canonicalClasses = educationV30.table("classes", {
+export const canonicalClasses = pgTable("classes", {
   id: id(),
   deploymentId: uuid("deployment_id").notNull(),
   adoptionId: uuid("adoption_id").notNull(),
@@ -27,7 +27,7 @@ export const canonicalClasses = educationV30.table("classes", {
 /** Immutable attribution of a canonical identified survey campaign to one
  * authorized Class. A published Survey definition remains reusable across Sites.
  */
-export const canonicalClassSurveyCampaigns = educationV30.table("class_survey_campaigns",{
+export const canonicalClassSurveyCampaigns = pgTable("class_survey_campaigns",{
   campaignId:uuid("campaign_id").primaryKey(),
   classId:uuid("class_id").notNull(),
   linkedByPersonId:uuid("linked_by_person_id").notNull(),
@@ -64,7 +64,7 @@ export const canonicalClassOfferingVersions = pgTable("class_offering_versions",
 
 /** Same enrollment contract for school assignment, invitations, adult training
  * and auditing. The Class Enrollment is the native participation record. */
-export const canonicalClassEnrollments = educationV30.table("class_enrollments", {
+export const canonicalClassEnrollments = pgTable("class_enrollments", {
   id:id(),classId:uuid("class_id").notNull(),
   classOfferingVersionId:uuid("class_offering_version_id"),
   learnerPersonId:uuid("learner_person_id").notNull(),
@@ -82,7 +82,7 @@ export const canonicalClassEnrollments = educationV30.table("class_enrollments",
   index("canonical_class_enroll_class_idx").on(t.classId,t.status),
 ]);
 
-export const canonicalClassOutcomes = educationV30.table("class_outcomes", {
+export const canonicalClassOutcomes = pgTable("class_outcomes", {
   id:id(),classEnrollmentId:uuid("class_enrollment_id").notNull(),
   outcomeKind:text("outcome_kind").$type<"grade"|"competency"|"completion"|"assessment">().notNull(),
   resultCode:text("result_code").notNull(),
@@ -130,7 +130,7 @@ export const canonicalClassStaffAssignments = pgTable("class_staff_assignments",
 /** A Class owns dated delivery by reference to the canonical Session and
  * its existing facilitated classroom plan. Scheduling never creates a second
  * learner identity, gradebook or Class Enrollment. */
-export const canonicalClassSessions=educationV30.table("class_sessions",{
+export const canonicalClassSessions=pgTable("class_sessions",{
   id:id(),
   classId:uuid("class_id").notNull(),
   classroomPlanId:uuid("classroom_plan_id").notNull(),
