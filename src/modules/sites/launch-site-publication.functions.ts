@@ -3,7 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { siteLocalContentVersions, sitePublications } from "@/db/schema";
+import { siteLocalContentVersions, sitePublications, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -26,12 +26,15 @@ export const readLaunchSitePublication = createServerFn({ method: "GET" })
       : await requireSitePublisher(actor, data.siteId);
     if (site.id !== data.siteId) throw new AuthorizationError("exact Site publication scope");
 
-    const [[address], latest, localCopy, academic, enrichment] = await Promise.all([
+    const [[address], latest, localCopy, academic, enrichment, [brandPointer]] = await Promise.all([
       db.select({
         slug: sitePublications.slug,
         status: sitePublications.status,
         updatedAt: sitePublications.updatedAt,
         publishedAt: sitePublications.publishedAt,
+        brandVersionId: sitePublications.brandVersionId,
+        websiteContentRevision:sitePublications.websiteContentRevision,
+        websiteTemplateId:sitePublications.websiteTemplateId,
       }).from(sitePublications).where(eq(sitePublications.siteId, site.id)).limit(1),
       db.select({ revision: siteLocalContentVersions.revision, status: siteLocalContentVersions.status })
         .from(siteLocalContentVersions).where(eq(siteLocalContentVersions.siteId, site.id))
@@ -39,6 +42,8 @@ export const readLaunchSitePublication = createServerFn({ method: "GET" })
       readCurrentLocalContent(site.id),
       readAcademicProgramCatalog(site.id),
       readEnrichmentCatalog(site.id),
+      db.select({currentBrandVersionId:sites.currentBrandVersionId}).from(sites)
+        .where(eq(sites.id,site.id)).limit(1),
     ]);
     return {
       siteId: site.id,
@@ -50,6 +55,12 @@ export const readLaunchSitePublication = createServerFn({ method: "GET" })
         publishedAt: address.publishedAt?.toISOString() ?? null,
       } : null,
       approvedAcademicCount: academic.length,
+      currentBrandVersionId:brandPointer?.currentBrandVersionId??null,
+      publishedBrandVersionId:address?.brandVersionId??null,
+      canRepublish:Boolean(address?.status==="published" && brandPointer?.currentBrandVersionId &&
+        (brandPointer.currentBrandVersionId!==address.brandVersionId ||
+          (localCopy?.revision??null)!==(address.websiteContentRevision??null) ||
+          (localCopy?.content.branding?.templateId??"heritage")!==(address.websiteTemplateId??"heritage"))),
       approvedEnrichmentCount: enrichment.length,
       reviewedLocalContentAvailable: Boolean(localCopy),
       canReviewWebsiteCopy: actor.role === "site_admin" || actor.role === "site_website_editor",

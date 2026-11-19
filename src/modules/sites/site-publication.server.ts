@@ -1,4 +1,5 @@
 import { readSavedBrandVersion } from "./site-brand.functions";
+import { assertSiteBrandMediaRights } from "@/domain/site-brand";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-local-content";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
@@ -357,6 +358,12 @@ export async function changeSitePublicationWithinTransaction(
     }).from(sites).where(eq(sites.id,site.id)).for("update").limit(1) : [];
     if(needsReadiness&&!currentBrand?.id)
       throw new DomainError("UNAVAILABLE","Save your Site Brand before publishing the website.");
+    if(needsReadiness && currentBrand?.id){
+      const brand=await readSavedBrandVersion(site.id,currentBrand.id,tx);
+      if(!brand || !assertSiteBrandMediaRights(brand.resolved.logo) ||
+          !assertSiteBrandMediaRights(brand.resolved.hero))
+        throw new DomainError("FORBIDDEN","Complete Brand media rights and consent before publication.");
+    }
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
       reason: input.reason, contentReviewed: input.contentReviewed,
