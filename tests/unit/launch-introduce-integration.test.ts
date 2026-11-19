@@ -61,13 +61,20 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     const packages=source("src/components/launch-studio/MarketingPackagesV61.tsx");
     const create=source("src/routes/operations.interest-events_.new.tsx");
     const workspace=source("src/routes/operations.interest-events.tsx");
-    expect(packages).toContain("module===\"interest-events\"");
-    expect(packages).toContain("packageId=${encodeURIComponent(record.id)}");
+    expect(packages).toContain("context.packageHandoff.purpose===record.content.purpose");
+    expect(packages).toContain("context.packageHandoff.href(siteId,record.id)");
+    expect(introduceModuleConfigV61["interest-events"].packageHandoff?.href(
+      "64af46d5-1fbb-4b12-ae27-56c31570e392","4e1490f9-f422-4be7-b14e-58958a5f57ae",
+    )).toBe("/operations/interest-events/new?siteId=64af46d5-1fbb-4b12-ae27-56c31570e392&packageId=4e1490f9-f422-4be7-b14e-58958a5f57ae");
     expect(create).toContain("listSiteMarketingPackagesV61");
     expect(create).toContain("readSiteMarketingSuggestionsV61");
     expect(create).toContain('item.content.purpose==="event-invitation"');
     expect(create).toContain("containsProtectedInstitutionalClaim(savedHeadline)");
     expect(create).toContain("data.programs.some(program=>program.siteId===deps.siteId)");
+    expect(create).toContain('if(deps.packageId && !selected)');
+    expect(create).toContain("program.id===deps.programId");
+    expect(workspace).toContain("requestId: createRequestId");
+    expect(workspace).toContain("setCreateRequestId(crypto.randomUUID())");
     expect(workspace).toContain("suggestedTitle?.trim()");
     expect(workspace).toContain("titleSource===\"saved-package\"");
     expect(workspace).toContain("programId:selectedProgram.id");
