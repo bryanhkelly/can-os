@@ -1,30 +1,34 @@
 # Website & Brand V6.1 integration status
 
-**Branch:** `feature/launch-studio-v61-clean-cutover-20261118`  
-**Source handoff:** `CAN_OS_Website_Brand_V61_Complete_Implementation_Package(1).zip`, specifically `MD/02_Canonical_Integration_and_Cutover.md` and `MD/03_Acceptance_Test_Plan.md`.
+**Branch:** `feature/launch-studio-v61-clean-cutover-20261118`
+**Source:** `CAN_OS_Website_Brand_V61_Complete_Implementation_Package(1).zip` and canonical CAN OS V6.1 design system.
 
-## Implemented in this branch
+## Implemented (feature branch only)
 
-- Single canonical `/site-website` editor reused by `/launch/website`, with five stages: Brand Identity, Choose Wireframe, Visual Identity, Your Content, Review & Finish.
-- Older bookmarked six-stage query values map to the current five-stage presentation.
-- Launch entry shares the V6.1 `LaunchSiteFrame` instead of rendering an independent nested global sidebar.
-- Six curated brand directions with optional keyword-based recommendation using a saved Site Story, without forwarding private Story answers in the website loader.
-- An optional `brandDirectionId` field on the existing revisioned `SiteLocalBranding` payload, server-validated along with legacy palette, font, template, copy and artwork fields.
-- Canonical seven site templates remain the authoritative structural renderer. The wireframe chooser presents grayscale thumbnails on the left and a large center preview with an optional styled example.
-- Visual Identity incorporates the former photos step, uses the existing school wordmark, curated palette/fonts and rights/guardian-consent media editor.
-- Existing authenticated preview, revision-checked draft save, protected-claim review and separate publish actions remain the sole backend controls; no duplicate editor database was added.
-- A first-time private draft must include Brand Identity; historical drafts without the new optional field can still load.
-- New domain tests cover finite directions and normalization, though the tests have not been executed.
+- One existing canonical website editor, displayed through `/launch/website` and `/site-website`; five steps with compatible historical step links.
+- Shared Launch Studio sidebar, guidance rail and common `ActionFooter`.
+- **Save & Exit** follows the established Site Information pattern: use immutable website-draft revision command, keep unsaved edits on failure, and navigate only after successful persistence and loader refresh. Step 5 saves a private draft, not a public Site release.
+- **Brand UI is website-local only.** Shared Site-level Brand Direction infrastructure and Introduce token integration are intentionally out of scope for this pass and remain owned by their other workstreams.
+- Shared V6.1 `DisclosureSection` pattern with independent expansion, keyboard-accessible buttons, rectangular panels and Storybook fixture.
+- `WebsiteVisualIdentityStep` extracted from the route: Colors (all 13 approved palettes); Typography (live font stacks resolved by `resolveSiteTheme`); Wordmark & Logo; Imagery.
+- Reused `WebsiteArtworkField` for logo and hero imagery. Existing strict PNG conversion, rights and child-consent rules remain in the authoritative Site data model.
+- `WebsiteCopyField` extracted from the route: individual website fields retain their canonical baseline, optional candidate, Apply and Restore Original actions.
+- Read-only Site Story candidate copy generated exclusively from Site Information's saved enumerated priorities and values. Private founding story/narrative, contact details and community-need free text are not copied or returned to the editor as source data. Suggestions never overwrite edits or publish automatically.
+- Template chooser shows seven lightweight, static structural SVG thumbnails, preserving one sandboxed iframe using the canonical HTML renderer for the large selected preview. The thumbnails are simplified structural diagrams, not pixel-perfect imports of the handoff's SVG screenshots.
+- Removed non-V6.1 rounded corners from `SchoolBrandPreview` application surfaces. Emblem geometry remains part of brand artwork.
+- The **existing** audited and revocable `LaunchPreviewSharing` flow is reused in the review step, alongside its presence in the shared Launch topbar. It creates immutable, unlisted, externally viewable Site preview snapshots through the existing Site metadata implementation and separate `/site-preview-share` reader, with no Site publication or enrollment.
+- A duplicate sharing table, server API, route, and draft migration introduced during integration were completely reverted. There is **no** website sharing migration `0088` in this work.
+- Existing Site website publisher command remains for the standalone editing route. In Launch Studio Review, the publish action is hidden; moving all publishing UX to Prepare is a separately planned cutover, **not** implemented here.
+- Updated existing template/preview DTO tests, added source-copy and disclosure/field component tests; automated tests were authored but not run.
 
-## Unfinished acceptance gates (do not describe as complete)
+## Required validation before merge/release
 
-1. **Shared Site-level Brand Direction authority:** A brand choice currently persists inside the existing website draft, **not yet** as the required independently versioned, audited and authorized `sites.metadata` source. Implement the canonical scoped source and reconciliation before claiming cross-tool reuse in Promote, Recruit, Interest Events, emails or other tools. Preserve editor choice versus algorithmic suggestion, revision/actor and Site Story source revision. Do not silently promote a website-only revision into Site authority.
-2. **Website copy suggestions:** No new governed candidate-copy generation service was introduced. Existing Site-created starter copy and reset controls remain. Do not add a working Regenerate button until it can return a read-only candidate and apply only the explicitly selected field.
-3. **Custom colors:** Only finite curated palettes can be saved. A custom-color preview requires an explicit server persistence decision and contrast and publication checks; do not accept raw CSS strings.
-4. **Exact design acceptance:** Current wireframe previews render through `renderPublicSiteHtml` instead of checking the handoff's seven separate SVG wireframes into the repository. Confirm visual fidelity against the supplied desktop and mobile PNGs. Check 13 palette displays, six font pair experiences, and independent expanded panel behavior.
-5. **Runtime and security validation:** No local repository build, full TypeScript check, Playwright acceptance, persistent database preview/draft exercise, two-editor conflict check or cross-Site authorization test has been completed. GitHub returned no checks or workflow runs on the branch head when inspected. This is **not** a passing CI result.
-6. **Production release:** Nothing in this integration authorizes school opening, academic/admissions claims, public publication, an unreviewed child image, a database migration, or a deploy. The branch has not been merged to `main`.
+1. `npm run typecheck`, `npm run lint`, relevant Vitest tests, `npm run build`, authenticated Playwright/browser tests. No passing CI is asserted; GitHub Actions runs were not available for the investigated heads.
+2. Netlify PR deployment was **skipped because account build usage was exceeded**, not because an app build/test actually ran. Fix build capacity before relying on deploy preview.
+3. Browser-check all five steps, desktop/mobile templates, four independent disclosure panels, full palette selection, live font previews, save/resume and Site switching; compare generated thumbnails to supplied reference wireframes.
+4. Verify save and conflict behavior with two editors, baseline immutability, source suggestion Apply/Restore and no private Story leakage to anonymous previews.
+5. Share link acceptance: authorized create/revoke, token non-disclosure after issue, expiry and no-expiry semantics, cross-Site isolation, revoked/closed Site, complete exclusion of private data and active enrollment actions. Shared link must display only a fixed public-safe snapshot, not latest mutable draft.
+6. Shared Site-level brand authority and Introduce package brand token consumer contract are **deferred by explicit instruction**. Do not introduce duplicate brand source data or call this cross-module integration finished.
+7. Full Site publication belongs to Prepare. The non-Launch legacy editor still has its original scoped publisher pathway, and the Plan/Prepare UX cutover must be handled in its own workstream.
 
-## Before merge
-
-Run `typecheck`, lint, affected unit tests, app build, responsive/browser tests, rights/consent and RLS-capability checks. Verify the latest saved private website preview, unsaved in-memory preview and published website are distinct. Test Site changes and stale-link normalization; ensure unrelated onboarding remains operational. Finish the shared Site Brand Direction authority and any requested candidate-copy service, then evaluate against the ZIP's twelve browser acceptance scenarios.
+No changes to `main`, production database, live Site publication status or enrollment were made in this task.
