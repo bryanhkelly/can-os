@@ -57,15 +57,18 @@ async function main(){
         'canonical_sessions','canonical_accounts','canonical_account_grants','persons')
     GROUP BY target.relname ORDER BY target.relname
   `;
+  // pg_get_functiondef can reject aggregate/window catalog entries even
+  // when a surrounding aggregate FILTER appears to exclude them. Inspect
+  // function source only after selecting ordinary functions/procedures.
   const [routines]=await sql`
     SELECT count(*) FILTER (
-      WHERE pg_get_functiondef(p.oid) ILIKE '%canonical_sessions%'
+      WHERE p.prosrc ILIKE '%canonical_sessions%'
     )::int AS native_session_readers,
     count(*) FILTER (
-      WHERE pg_get_functiondef(p.oid) ILIKE '%canonical_account_grants%'
+      WHERE p.prosrc ILIKE '%canonical_account_grants%'
     )::int AS native_grant_consumers,
     count(*) FILTER (
-      WHERE pg_get_functiondef(p.oid) ILIKE '%canonical_accounts%'
+      WHERE p.prosrc ILIKE '%canonical_accounts%'
     )::int AS native_account_consumers
     FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace
     WHERE ns.nspname IN ('public','education_v30','education_v30_secure')
