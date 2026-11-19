@@ -23,6 +23,7 @@ import {
 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { downloadOriginalMarketingOutput, downloadMarketingPng } from "./marketing-output-download";
+import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
 type MarketingSuggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
@@ -33,11 +34,15 @@ function message(error:unknown) {
   return error instanceof Error ? error.message : "The package operation could not be completed.";
 }
 
-export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit}:{
+export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit,
+  module="promote",suggestionsUnavailable=false}:{
   siteId:string;siteName:string;initial:PackageRecord[];
   suggestions:MarketingSuggestions|null;onExit:()=>void;
+  module?:IntroduceModuleV61;suggestionsUnavailable?:boolean;
 }) {
   const router=useRouter();
+  const context=introduceModuleConfigV61[module];
+  const purposeOptions=marketingPurposeOptions.filter(option=>context.purposes.includes(option.id));
   const starter=(purpose:MarketingPackageContent["purpose"])=>(
     suggestions?.[purpose]?.content??initialMarketingContent(siteName,purpose));
   const [packages,setPackages]=useState(initial);
@@ -45,7 +50,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   const [record,setRecord]=useState<PackageRecord|null>(null);
   const [title,setTitle]=useState("");
   const [content,setContent]=useState<MarketingPackageContent>(()=>
-    starter("site-announcement"));
+    starter(context.defaultPurpose));
   const [step,setStep]=useState(0);
   const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("flyer");
   const [showArchived,setShowArchived]=useState(false);
@@ -83,7 +88,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
     setStep(0);setView(editing?"wizard":"detail");setError("");setNotice("");
   }
   function start() {
-    setRecord(null);setTitle("");setContent(starter("site-announcement"));
+    setRecord(null);setTitle("");setContent(starter(context.defaultPurpose));
     setStep(0);setView("wizard");setError("");setNotice("");
   }
   function patch(value:Partial<MarketingPackageContent>) {
@@ -121,9 +126,12 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
     }
     await run(async()=>{
       if(!record) {
+        // The server persists the canonical starter. Keep any operator edits made
+        // before creation as a working draft until the next save.
+        const workingDraft=content;
         const created=await createSiteMarketingPackageV61({data:{siteId,title,purpose:content.purpose}});
         updateList(created);
-        setContent(created.content);
+        setContent(workingDraft);
         setStep(1);
         setNotice("Draft package created. Continue adding your audience and message.");
         return;
@@ -218,33 +226,38 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
     onExit();
   }
 
-  const visible=packages.filter(item=>showArchived?item.status==="archived":item.status!=="archived");
+  const visible=packages.filter(item=>context.purposes.includes(item.content.purpose) &&
+    (showArchived?item.status==="archived":item.status!=="archived"));
   const currentSuggestion=suggestions?.[content.purpose]??null;
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
-  const titleText=view==="library"?"Marketing Packages":view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
+  const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
   const rail=<div className="space-y-4">
     <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">You already have trusted community relationships. Start with a clear message and a few materials to share with them.</p>
+      <p className="text-sm leading-6 text-muted-foreground">{context.guidance}</p>
     </WorkspacePanel>
     <WorkspacePanel title="What CAN prepares">
       <p className="text-sm leading-6 text-muted-foreground">Save the audience, message and preferred formats in one reusable package. Generated downloads use the exact saved Site Brand version of their Package.</p>
     </WorkspacePanel>
     <WorkspaceNotice tone="info">Saved package content is private planning information. It does not publish a Site, create an event, open enrollment or send email.</WorkspaceNotice>
   </div>;
-  return <WorkspaceShell title={titleText} eyebrow="Introduce / Promote"
-    subtitle="Make it easy to share what your learning community is becoming."
+  return <WorkspaceShell title={titleText} eyebrow={context.eyebrow}
+    subtitle={context.subtitle}
     width="wide" rail={rail}>
     <div className="mt-6 space-y-5">
       {error&&<p role="alert" className="border border-destructive bg-card p-4 text-sm text-destructive">{error}</p>}
       {notice&&<p role="status" className="border bg-card p-4 text-sm">{notice}</p>}
+      {suggestionsUnavailable&&<WorkspaceNotice tone="attention">
+        Current Site Story and program suggestions could not be loaded. Saved packages remain
+        available. Review the source information in Establish before using suggested wording.
+      </WorkspaceNotice>
 
       {view==="library"&&<>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">Build a reusable starter kit for an announcement or invitation.</p>
+          <p className="text-sm text-muted-foreground">{context.libraryDescription}</p>
           <Button onClick={start}><Plus aria-hidden="true"/> New package</Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          {marketingPurposeOptions.map(option=><button key={option.id} type="button"
+          {purposeOptions.map(option=><button key={option.id} type="button"
             className="border bg-card p-5 text-left hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
             onClick={()=>{start();setTitle(option.label);setContent(starter(option.id));}}>
             <Megaphone className="mb-3 size-5 text-primary" aria-hidden="true"/>
@@ -282,6 +295,21 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
           <Button variant="ghost" size="sm" disabled={busy} onClick={()=>setDeleteCandidate(item)}
             aria-label={"Delete "+item.title}><Trash2 aria-hidden="true"/></Button>
         </article>)}</div>
+        <WorkspacePanel title={module==="promote"?"Continue in Introduce":"Continue with existing capabilities"}
+          description={context.handoffDescription}>
+          <div className="grid gap-3">
+            {context.handoffs.map(item=><div key={item.title}
+              className="flex flex-wrap items-center justify-between gap-3 border bg-background p-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{item.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+              </div>
+              <Button asChild variant="outline" size="sm"><a href={item.href(siteId)}>
+                Continue <ArrowRight aria-hidden="true"/>
+              </a></Button>
+            </div>)}
+          </div>
+        </WorkspacePanel>
         <ActionFooter><Button variant="outline" onClick={()=>void exitLaunch()}>Back to Launch Overview</Button></ActionFooter>
       </>}
 
@@ -298,7 +326,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
 
         {step===0&&<WorkspacePanel title="What would you like to share?" description="Choose a starting point. Your Site brand will be reused automatically later.">
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {marketingPurposeOptions.map(option=><label key={option.id}
+            {purposeOptions.map(option=><label key={option.id}
               className={"flex cursor-pointer gap-3 border p-4 text-sm "+
                 (content.purpose===option.id?"border-primary bg-accent":"bg-card")}>
               <Radio name="package-purpose" className="mt-1"
