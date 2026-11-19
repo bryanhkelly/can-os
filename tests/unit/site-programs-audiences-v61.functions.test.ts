@@ -164,6 +164,27 @@ describe("Programs & Audiences authorized Site save-and-return", () => {
     expect(state.event).toHaveBeenCalledOnce();
   });
 
+  it("uses saved Site Information delivery rather than a conflicting older preference", async () => {
+    state.site!.metadata = {
+      ...state.site!.metadata,
+      launchPreferences: { delivery: "digital", interestIds: ["adult"] },
+    };
+    await saveSiteProgramsAudiencesV61({ data: saveInput() });
+    expect(state.saved?.metadata).toMatchObject({
+      launchPreferences: { delivery: "both", planningVersion: 2 },
+    });
+  });
+
+  it("rejects an invalid stored Learning Environment without changing plans", async () => {
+    state.site!.metadata = {
+      ...state.site!.metadata, siteEnvironmentV61: { delivery: "unrecognized" },
+    };
+    await expect(saveSiteProgramsAudiencesV61({ data: saveInput() }))
+      .rejects.toThrow(/Learning Environment needs review/);
+    expect(state.update).not.toHaveBeenCalled();
+    expect(state.audit).not.toHaveBeenCalled();
+  });
+
   it("fails closed on a stale revision without touching Site metadata", async () => {
     state.site!.updatedAt = new Date("2026-11-19T10:10:00.000Z");
     await expect(saveSiteProgramsAudiencesV61({ data: saveInput() }))
