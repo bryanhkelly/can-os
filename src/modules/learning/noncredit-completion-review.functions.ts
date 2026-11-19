@@ -54,7 +54,7 @@ export const getNoncreditCompletionReview = createServerFn({ method: "GET" })
                issuance.issued_at AS "issuedAt",
                education_v30.v301_credential_is_current(issuance.id)
                  AS "currentlyValid"
-        FROM education_v30.noncredit_completion_decisions source
+        FROM public.noncredit_completion_decisions source
         JOIN public.learner_achievement_decisions achievement
           ON achievement.noncredit_completion_decision_id=source.id
         JOIN public.learning_award_issuances issuance
