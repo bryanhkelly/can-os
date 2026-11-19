@@ -48,8 +48,15 @@ export function WebsiteCopyField({field,content,candidate,disabled,onChange,onRe
           value={content[field.key]??""} onChange={event=>onChange(event.target.value)}
           className="mt-3 min-h-11 w-full border bg-background p-3 text-sm"/>}
     {candidate&&<div className="mt-3 border bg-muted/20 p-3">
-      <p className="text-xs font-semibold">Suggested from Site Information</p>
+      <p className="text-xs font-semibold">Draft from Purpose &amp; Story</p>
       <p className="mt-1 text-xs text-muted-foreground">{candidate.reason}</p>
+      <p className="mt-1 text-2xs italic text-muted-foreground">
+        Source: {candidate.sourceFields.map(item => ({
+          motivations:"Reasons for creating the Site", communityNeed:"Community need",
+          distinctives:"Distinctive approach", foundingStory:"Origin story", values:"Community values",
+          experiences:"Desired learner experiences", futureVision:"Future vision",
+        })[item]).join(", ")}
+      </p>
       <p className="mt-2 whitespace-pre-wrap text-sm">{candidate.text}</p>
       <Button variant="outline" type="button" className="mt-3 min-h-11"
         disabled={disabled||content[field.key]===candidate.text}

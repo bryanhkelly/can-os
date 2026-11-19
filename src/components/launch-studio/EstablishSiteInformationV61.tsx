@@ -403,12 +403,11 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       description="Optional. Tell us what matters to your learning community.">
       <div className="space-y-6">
         <WorkspaceNotice><strong>How CAN OS will use your answers</strong><p className="mt-2">
-          These optional answers are saved with Site Information. Your selected goals, values,
-          and aspirations can produce editable website-copy suggestions in Website &amp; Brand.
-          Your written community need, origin story, and future vision are not automatically
-          copied to the website. <strong>Nothing is published automatically.</strong>
-          Your answers are not evidence of Program approval or enrollment authority.
-          Please avoid including identifiable learners or confidential third-party information.</p></WorkspaceNotice>
+          The answers you provide here, including your written origin story, community need,
+          values and future vision, are used to draft your website and outreach materials.
+          Review, change or decline the drafts before sharing them. <strong>Nothing is published automatically.</strong>
+          These answers do not establish Program approval or enrollment authority.
+          Avoid including sensitive details or information about others that you cannot share.</p></WorkspaceNotice>
         <MultiChoice title="1. Why are you creating this learning community?" hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
         <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
@@ -426,7 +425,11 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <Field label="7. What do you hope this community becomes?" description="Your long-term vision. Optional.">
           <Textarea rows={4} maxLength={2000} value={story.futureVision}
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
-        <WorkspaceNotice>This is source information, not a second website editor. You will shape the public-facing About Us and website message later in Website &amp; Brand, and can choose exactly what to share.</WorkspaceNotice>
+        <p className="text-xs italic leading-5 text-muted-foreground">
+          By saving these optional answers, you authorize CAN OS to use them to prepare editable
+          website and promotional drafts. The original answers remain in Site Information.
+          You decide which wording appears in a shareable website preview or official publication.
+        </p>
       </div>
     </WorkspacePanel>}
     </div>
