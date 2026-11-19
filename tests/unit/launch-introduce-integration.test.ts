@@ -102,7 +102,14 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     expect(invitations).toContain("program.siteId === selection.siteId");
     expect(invitations).toContain("purpose:selection.purpose");
     expect(invitations).toContain("confirmed:true");
-    expect(source("src/modules/sites/site-family-brand.server.ts"))
-      .toContain("readSavedBrandVersion(site.id)");
+    const familyBrand=source("src/modules/sites/site-family-brand.server.ts");
+    const inviteService=source("src/modules/enrollment/family-invitations.server.ts");
+    expect(familyBrand).toContain("readSavedBrandVersion(site.id)");
+    expect(familyBrand).toContain("requireSavedSiteBrand(site.id)");
+    expect(inviteService).toContain('if(data.purpose==="interest")');
+    expect(inviteService).toContain("requireSavedSiteBrand(destination.siteId,tx)");
+    expect(inviteService).toContain("readSiteFamilyBrand(school.siteId,{requireSavedBrand:true})");
+    expect(source("src/modules/sites/site-brand.functions.ts"))
+      .toContain("export async function requireSavedSiteBrand");
   });
 });
