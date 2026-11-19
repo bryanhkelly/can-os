@@ -37,7 +37,7 @@ export async function getBlueprintReferenceCatalog(
       id: catalogSites.id,
       status: catalogSites.status,
     }).from(catalogSites).where(eq(catalogSites.id, siteId)).limit(1);
-    if (!site || site.status === "closed") {
+    if (!site?.status || site.status === "closed") {
       throw new DomainError("UNAVAILABLE", "This Site is unavailable for Blueprint planning.");
     }
 
