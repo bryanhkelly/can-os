@@ -14,6 +14,7 @@ import { LaunchSiteAddressFields } from "@/components/operations/LaunchSiteAddre
 import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
 import { StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { saveSiteProfileSequentially, SiteProfileSaveError } from "./site-profile-persistence";
 import {
   draftSiteContactSchema, physicalSiteAddressSchema, siteAddressEditorDraft,
   siteTimezoneSchema,
@@ -110,40 +111,34 @@ export function EstablishSiteProfileUnified({
     }
     busy.current = true;
     setSaving(true);
-    let revision = site.updatedAt;
-    let completed = 0;
+    const operations: Array<(revision: string) => Promise<{revision: string}>> = [];
+    if (identityChanged) {
+      operations.push(revision => updateLaunchSiteIdentity({ data: {
+        siteId: site.id, expectedRevision: revision,
+        name: name.trim(), timezone, changeReason: identityReason.trim(),
+      } }));
+    }
+    if (contactChanged) {
+      operations.push(revision => updateLaunchSiteContact({ data: {
+        siteId: site.id, expectedRevision: revision,
+        contact: hasContact && validContact?.success ? validContact.data : null,
+      } }));
+    }
+    if (addressChanged && validAddress?.success) {
+      operations.push(revision => updateLaunchSiteAddress({ data: {
+        siteId: site.id, expectedRevision: revision,
+        address: validAddress.data, changeReason: locationReason.trim(),
+      } }));
+    }
     try {
-      if (identityChanged) {
-        const response = await updateLaunchSiteIdentity({ data: {
-          siteId: site.id, expectedRevision: revision,
-          name: name.trim(), timezone, changeReason: identityReason.trim(),
-        } });
-        revision = response.revision;
-        completed++;
-      }
-      if (contactChanged) {
-        const response = await updateLaunchSiteContact({ data: {
-          siteId: site.id, expectedRevision: revision,
-          contact: hasContact && validContact?.success ? validContact.data : null,
-        } });
-        revision = response.revision;
-        completed++;
-      }
-      if (addressChanged && validAddress?.success) {
-        const response = await updateLaunchSiteAddress({ data: {
-          siteId: site.id, expectedRevision: revision,
-          address: validAddress.data, changeReason: locationReason.trim(),
-        } });
-        revision = response.revision;
-        completed++;
-      }
+      await saveSiteProfileSequentially(site.updatedAt, operations);
       // Even with no changes, read the currently authorized Site before handoff.
       await router.invalidate();
       releaseNavigation();
       navigate();
     } catch (cause) {
       setReloadRequired(true);
-      setError(completed > 0
+      setError(cause instanceof SiteProfileSaveError && cause.completed > 0
         ? "Some changes may have saved, but the full update did not finish. Reload the Site and review its values before retrying."
         : cause instanceof Error ? cause.message : "Site Profile could not be saved. Reload and retry.");
     } finally {
