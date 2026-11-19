@@ -57,6 +57,23 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     expect(component).not.toContain("localStorage");
   });
 
+  it("hands off a saved event package without making it an event or another source of truth",()=>{
+    const packages=source("src/components/launch-studio/MarketingPackagesV61.tsx");
+    const create=source("src/routes/operations.interest-events_.new.tsx");
+    const workspace=source("src/routes/operations.interest-events.tsx");
+    expect(packages).toContain("module===\"interest-events\"");
+    expect(packages).toContain("packageId=\\${encodeURIComponent(record.id)}");
+    expect(create).toContain("listSiteMarketingPackagesV61");
+    expect(create).toContain("readSiteMarketingSuggestionsV61");
+    expect(create).toContain('item.content.purpose==="event-invitation"');
+    expect(create).toContain("containsProtectedInstitutionalClaim(savedHeadline)");
+    expect(create).toContain("authorizedSite=deps.siteId");
+    expect(workspace).toContain("suggestedTitle?.trim()");
+    expect(workspace).toContain("titleSource===\"saved-package\"");
+    expect(workspace).toContain("programId:selectedProgram.id");
+    expect(workspace).toContain("setCreatedProgramId(selectedProgram.id)");
+  });
+
   it("preserves distinct governed event and admissions workflows", () => {
     const siteId = "64af46d5-1fbb-4b12-ae27-56c31570e392";
     const recruit = introduceModuleConfigV61.recruit;
