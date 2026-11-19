@@ -557,7 +557,7 @@ export const learnerCourseAttempts = educationV30.table(
   ],
 );
 
-export const noncreditTrainingVersions = educationV30.table("noncredit_training_versions", {
+export const noncreditTrainingVersions = pgTable("noncredit_training_versions", {
   id: id(),
   offeringVersionId: uuid("offering_version_id").notNull(),
   providerOrganizationId: uuid("provider_organization_id").notNull(),
