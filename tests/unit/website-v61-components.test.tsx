@@ -26,7 +26,7 @@ describe("Website & Brand V6.1 shared controls",()=>{
       field={{key:"welcomeMessage",label:"Welcome",help:"Purpose",multi:true}}
       content={content} disabled={false}
       candidate={{field:"welcomeMessage",text:"A future we hope to build.",
-        reason:"Site Information values"}}
+        reason:"Site Information values",sourceFields:["values"]}}
       onChange={()=>{throw new Error("Render must never apply a suggestion");}}
       onRestore={()=>{throw new Error("Render must never reset a field");}}/>);
     expect(html).toContain("A future we hope to build.");
