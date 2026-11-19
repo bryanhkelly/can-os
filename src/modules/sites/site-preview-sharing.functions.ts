@@ -10,7 +10,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { DomainError } from "@/domain/errors";
 import { EventTypes } from "@/domain/event-types";
 import {
-  classifySiteLocalContent, createSchoolWebsiteStarterContent, normalizeSiteLocalContent,
+  classifySiteLocalContent, normalizeSiteLocalContent,
 } from "@/domain/site-local-content";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import {
@@ -104,9 +104,10 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         status: siteLocalContentVersions.status,
       }).from(siteLocalContentVersions).where(eq(siteLocalContentVersions.siteId, site.id))
         .orderBy(desc(siteLocalContentVersions.revision)).limit(1);
-      const content = latest
-        ? normalizeSiteLocalContent(latest.content, { allowIncompleteImage: true })
-        : createSchoolWebsiteStarterContent(site.name);
+      if (!latest)
+        throw new DomainError("UNAVAILABLE",
+          "Save your website design in Establish before creating a shareable preview.");
+      const content = normalizeSiteLocalContent(latest.content, { allowIncompleteImage: true });
       if (latest?.status === "review_required" || classifySiteLocalContent(content).status !== "published")
         throw new DomainError("UNAVAILABLE",
           "This website revision contains protected claims needing review. Update your website copy before sharing.");
@@ -132,7 +133,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         createdAt: now.toISOString(),
         expiresAt: data.expiresAfterDays === null ? null
           : new Date(now.getTime() + data.expiresAfterDays * 86_400_000).toISOString(),
-        revokedAt: null, sourceRevision: latest?.revision ?? 0, pages,
+        revokedAt: null, sourceRevision: latest.revision, pages,
       };
       // Keep a bounded number of recorded links. Old revocations remain in
       // the canonical audit trail, not unlimited Site metadata.
