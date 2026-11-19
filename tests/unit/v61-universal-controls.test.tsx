@@ -34,7 +34,7 @@ describe("V6.1 universal action and surface contracts", () => {
   it("renders the public sign-in links without an invalid Radix Slot child array", () => {
     const html = renderToStaticMarkup(<div>
       <Button asChild variant="outline"><a href="/access/register">Create a personal CAN account</a></Button>
-      <Button asChild variant="outline"><a href="/schools/new">Create a school</a></Button>
+      <Button asChild variant="outline"><a href="/site/new">Create a Site</a></Button>
     </div>);
     expect(html).toContain('href="/access/register"');
     expect(html).toContain('href="/schools/new"');

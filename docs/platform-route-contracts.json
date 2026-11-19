@@ -940,15 +940,6 @@
       "readBoundary": "Verified registrar-capable membership and exact Site; Program selection is separately constrained to Programs at that Site"
     },
     {
-      "file": "src/routes/launch.hub.school_.new.tsx",
-      "route": "/launch/hub/school_/new",
-      "owner": "programs",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/launch.school.tsx",
       "route": "/launch/school",
       "owner": "programs",
@@ -971,9 +962,9 @@
       "route": "/launch/site",
       "owner": "programs",
       "verification": "pending",
-      "roleJourney": "Verified registrar chooses or creates a Site; delivery, network option and private program interest chips lead to the real website preview",
-      "writeBoundary": "New Site creation and private preferences use existing verified organization and Site-scoped commands; no Program, network or enrollment grants",
-      "readBoundary": "Existing Site list is scoped to the active registrar grant; preferences are read and saved for exact authorized Site"
+      "roleJourney": "New canonical V6.1 four-milestone Site Launch Studio Overview and module slots, selected from authorized canonical Sites. Supersedes five-step Site-first wizard.",
+      "writeBoundary": "No write in the frame or Overview; future modules use existing authorized Site commands and revision checks.",
+      "readBoundary": "Only Sites returned from the authorized launch Site loader; explicit Site ID is rejected when not in scoped results."
     },
     {
       "file": "src/routes/launch.site-preview.ts",
@@ -1460,15 +1451,6 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/schools.new.tsx",
-      "route": "/schools/new",
-      "owner": "identity",
-      "verification": "pending",
-      "roleJourney": "Legacy GET redirects to /site/new. The former .demo POST boundary remains temporarily for isolated synthetic fixture compatibility; no demo choice is displayed in the signup UI.",
-      "writeBoundary": "Same-origin and anonymous-admission guarded; demo tenant transaction remains isolated; real Organization/Site/Site Admin are provisioned only when the single-use email challenge is redeemed",
-      "readBoundary": "No legacy form is rendered; navigation redirects to the authoritative /site/new screen."
     },
     {
       "file": "src/routes/settings.tsx",

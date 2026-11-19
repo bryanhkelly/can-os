@@ -5,7 +5,6 @@ import { optionalSearchUuid } from "@/lib/route-search";
 const destinationContextKeys: Record<string, readonly string[]> = {
   "/home": ["siteId", "programId"],
   "/launch/site": ["siteId"],
-  "/launch/hub/school": ["siteId", "programId"],
   "/admissions": ["siteId", "programId"],
   "/staff/students": ["siteId", "programId"],
   "/operations/school-years": ["siteId", "programId"],
