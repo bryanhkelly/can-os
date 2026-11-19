@@ -6,7 +6,8 @@
 import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
 import { prepareStageModulesV61, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 import { Button } from "@/components/ui/button";
-import { StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { Link } from "@tanstack/react-router";
+import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
@@ -171,24 +172,22 @@ export function LaunchPrepareV61({ module, siteId, intent }: {
       <p className="text-xs leading-5 text-muted-foreground">Planning progress, operational readiness and legal authorization are separate. No status on this page grants approval.</p>
     </div>}>
     <div className="mt-6 space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border bg-card p-5">
-        <div className="flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center bg-muted"><Icon aria-hidden="true" className="size-5" /></span>
-          <div><p className="text-sm font-semibold">Prepare your Site</p>
-            <p className="text-xs text-muted-foreground">Step {index + 1} of {prepareModulesV61.length} · Work at your own pace</p></div>
-        </div>
-        <StatusBadge tone="info">{plan.status === "governed" ? "Independent review applies" : "Existing operational workflow"}</StatusBadge>
-      </div>
+      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon aria-hidden="true" className="size-4" />
+        {plan.status === "governed"
+          ? "Independent review is required for the applicable decisions"
+          : "Complete the required actions in the existing authorized workspaces"}
+      </p>
       <nav aria-label="Prepare modules" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {prepareModulesV61.map((item, position) => {
           const StepIcon = item.icon;
-          return <a key={item.id} href={prepareHref(siteId, item.id)}
+          return <Link key={item.id} to="/launch/site" search={{siteId, module:item.id}}
             aria-current={module === item.id ? "page" : undefined}
             className={"flex min-h-14 items-start gap-3 border p-3 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring " +
               (module === item.id ? "border-primary bg-accent font-semibold" : "border-border bg-card")}>
             <StepIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
             <span><span className="block text-xs text-muted-foreground">{String(position + 1).padStart(2, "0")}</span>{item.title}</span>
-          </a>;
+          </Link>;
         })}
       </nav>
       {module === "program-catalog" && <>
@@ -201,10 +200,10 @@ export function LaunchPrepareV61({ module, siteId, intent }: {
             </div>
             {intent.startingFocus && <p className="mt-3 text-sm">Starting focus: <strong>{intentTitles[intent.startingFocus]}</strong></p>}
           </> : <p className="text-sm text-muted-foreground">You have not saved any learning interests. You can explore the catalog now and add your vision later.</p>}
-          <a href={"/launch/site?siteId=" + scoped(siteId) + "&module=programs-audiences"}
+          <Link to="/launch/site" search={{siteId, module:"programs-audiences"}}
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary underline">
             Review Programs &amp; Audiences <ArrowRight aria-hidden="true" className="size-4" />
-          </a>
+          </Link>
         </WorkspacePanel>
         <WorkspacePanel title="From Program to Solution to Offering"
           description="These are different decisions, with different verification responsibilities.">
@@ -242,10 +241,10 @@ export function LaunchPrepareV61({ module, siteId, intent }: {
         Site planning is not approval to operate, publish an Offering, or enroll learners.
       </WorkspaceNotice>
       <nav aria-label="Prepare module navigation" className="flex flex-wrap justify-between gap-3 border-t pt-5">
-        {previous ? <Button asChild variant="outline"><a href={prepareHref(siteId, previous.id)}>Previous: {previous.title}</a></Button>
-          : <Button asChild variant="outline"><a href={"/launch/site?siteId=" + scoped(siteId)}>Back to overview</a></Button>}
-        {next ? <Button asChild><a href={prepareHref(siteId, next.id)}>Continue: {next.title}<ArrowRight aria-hidden="true" /></a></Button>
-          : <Button asChild><a href={"/launch/site?siteId=" + scoped(siteId) + "&module=open"}>Review Launch requirements<ArrowRight aria-hidden="true" /></a></Button>}
+        {previous ? <Button asChild variant="outline"><Link to="/launch/site" search={{siteId, module:previous.id}}>Previous: {previous.title}</Link></Button>
+          : <Button asChild variant="outline"><Link to="/launch/site" search={{siteId}}>Back to overview</Link></Button>}
+        {next ? <Button asChild><Link to="/launch/site" search={{siteId, module:next.id}}>Continue: {next.title}<ArrowRight aria-hidden="true" /></Link></Button>
+          : <Button asChild><Link to="/launch/site" search={{siteId, module:"open"}}>Review Launch requirements<ArrowRight aria-hidden="true" /></Link></Button>}
       </nav>
     </div>
   </WorkspaceShell>;
