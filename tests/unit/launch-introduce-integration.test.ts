@@ -63,8 +63,8 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     const packages=source("src/components/launch-studio/MarketingPackagesV61.tsx");
     const create=source("src/routes/operations.interest-events_.new.tsx");
     const workspace=source("src/routes/operations.interest-events.tsx");
-    expect(packages).toContain("context.packageHandoff.purpose===record.content.purpose");
-    expect(packages).toContain("context.packageHandoff.href(siteId,record.id)");
+    expect(packages).toContain("context.packageHandoff?.purpose===record.content.purpose");
+    expect(packages).toContain("packageHandoff.href(siteId,record.id)");
     expect(introduceModuleConfigV61["interest-events"].packageHandoff?.href(
       "64af46d5-1fbb-4b12-ae27-56c31570e392","4e1490f9-f422-4be7-b14e-58958a5f57ae",
     )).toBe("/operations/interest-events/new?siteId=64af46d5-1fbb-4b12-ae27-56c31570e392&packageId=4e1490f9-f422-4be7-b14e-58958a5f57ae");
