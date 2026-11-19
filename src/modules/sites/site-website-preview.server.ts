@@ -58,6 +58,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   `);
   const draftStorageReady = draftConstraint.rows.some(row =>
     typeof row.definition === "string" && row.definition.includes("'draft'"));
+  const shareTable = await db.execute(sql`SELECT to_regclass('public.site_website_preview_shares') IS NOT NULL AS ready`);
+  const previewSharingReady = shareTable.rows[0]?.ready === true;
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
@@ -162,6 +164,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     organizationName: site.organizationName,
     canPublish: site.canPublish,
     draftStorageReady,
+    previewSharingReady,
     canPrepareWebsite: actor.role === "site_admin",
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     siteInformation:siteInformation.success?siteInformation.data:null,
