@@ -582,7 +582,10 @@ export const createLaunchSite = createServerFn({method:"POST"})
       const publicSiteDraft=data.stubOnly ? null : await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:existing.id,organizationId:data.organizationId,slug:existing.slug,
       });
-      if(data.launchPreferences &&
+      const existingPlanning=siteLaunchPreferencesSchema.safeParse(existing.metadata.launchPreferences);
+      // A retried Site-creation command must never overwrite a configured V6.1
+      // Programs & Audiences draft. Editing belongs to the canonical Site command.
+      if(data.launchPreferences && existingPlanning.success && existingPlanning.data.planningVersion !== 2 &&
          JSON.stringify(existing.metadata.launchPreferences)!==JSON.stringify(data.launchPreferences)){
         await tx.update(s.sites).set({
           metadata:{...existing.metadata,launchPreferences:data.launchPreferences},
