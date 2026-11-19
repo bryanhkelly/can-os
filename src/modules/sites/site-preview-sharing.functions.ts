@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { organizations, siteLocalContentVersions, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import type { AccessContext } from "@/domain/access-context";
 import { DomainError } from "@/domain/errors";
 import { EventTypes } from "@/domain/event-types";
 import {
@@ -19,11 +20,27 @@ import {
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const siteIdSchema = z.string().uuid();
 const shareIdentifier = z.string().uuid();
 const previewParams = z.object({ siteId: siteIdSchema }).strict();
+
+/** A verified Site registrar or explicitly appointed website publisher may
+ * share the Site they control. Organization scope is never inferred from a URL.
+ */
+async function assertPreviewSharingScope(
+  actor: AccessContext, site: { id: string; organizationId: string } | null | undefined,
+  executor: Pick<typeof db, "select"> = db,
+) {
+  if (actor.role === "site_website_editor") {
+    const editor = await requirePartnerWebsiteEditor(actor, executor, "site.website.local.publish");
+    if (editor.id !== site?.id) throw new AuthorizationError("website sharing Site scope");
+    return;
+  }
+  assertSiteSetupScope(actor, site, "program.launch.start");
+}
 
 async function authorizedShareSite(siteId: string) {
   const actor = await getCommandContext(getRequest());
@@ -31,7 +48,7 @@ async function authorizedShareSite(siteId: string) {
     id: sites.id, organizationId: sites.organizationId, name: sites.name,
     lifecycleStatus: sites.lifecycleStatus, metadata: sites.metadata,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
-  assertSiteSetupScope(actor, site, "program.launch.start");
+  await assertPreviewSharingScope(actor, site);
   if (site.lifecycleStatus === "closed")
     throw new DomainError("UNAVAILABLE", "A closed Site cannot share a new preview.");
   return { actor, site };
@@ -71,7 +88,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         lifecycleStatus: sites.lifecycleStatus, metadata: sites.metadata,
         updatedAt: sites.updatedAt,
       }).from(sites).where(eq(sites.id, data.siteId)).for("update").limit(1);
-      assertSiteSetupScope(actor, site, "program.launch.start");
+      await assertPreviewSharingScope(actor, site, tx);
       if (site.lifecycleStatus === "closed") throw new AuthorizationError("closed Site");
       const existing = readSitePreviewShares(site.metadata);
       const now = new Date();
@@ -178,7 +195,7 @@ export const revokeSitePreviewShare = createServerFn({ method: "POST" })
     return db.transaction(async tx => {
       const [site] = await tx.select().from(sites)
         .where(eq(sites.id, data.siteId)).for("update").limit(1);
-      assertSiteSetupScope(actor, site, "program.launch.start");
+      await assertPreviewSharingScope(actor, site, tx);
       const shares = readSitePreviewShares(site.metadata);
       const match = shares.find(entry => entry.id === data.shareId);
       if (!match) throw new DomainError("UNAVAILABLE", "This preview link no longer exists.");
