@@ -72,6 +72,15 @@ export function suggestMarketingStarterV61(
   const name=safeText(siteName,100)||"our learning community";
   const story=source.story;
   const intent=source.intent;
+  // Establish names intended learners, not recipient contacts. Preselect a
+  // suggested communication audience without importing personal information.
+  const audienceFromPlan={
+    children:"families",teens:"students",adults:"adult-learners",
+    older_adults:"older-adults",
+  } as const;
+  if(intent?.audienceIds.length){
+    content.audiences=[...new Set(intent.audienceIds.map(id=>audienceFromPlan[id]))];
+  }
   const priority=intent?.startingFocus ?? intent?.interestIds[0] ?? null;
   const focus=priority ? priorityLabels[priority] : "";
   const secondFocus=intent?.interestIds.filter(id=>id!==priority)

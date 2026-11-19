@@ -22,6 +22,7 @@ import {
   saveSiteMarketingPackageV61, selectSiteMarketingPackageBrandV61,
 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { downloadOriginalMarketingOutput, downloadMarketingPng } from "./marketing-output-download";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
 type MarketingSuggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
@@ -192,13 +193,23 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   async function downloadRelease(id:string){
     await run(async()=>{
       const output=await getSiteMarketingReleaseOutput({data:{siteId,releaseId:id}});
-      const url=URL.createObjectURL(new Blob([output.content],{type:output.mimeType}));
-      const link=document.createElement("a");
-      try{
-        link.href=url;link.download=output.fileName;link.style.display="none";
-        document.body.append(link);link.click();link.remove();
-      }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
+      downloadOriginalMarketingOutput(output);
       setNotice("Original generated file downloaded.");
+    });
+  }
+  async function downloadPng(id:string){
+    await run(async()=>{
+      const output=await getSiteMarketingReleaseOutput({data:{siteId,releaseId:id}});
+      await downloadMarketingPng(output);
+      setNotice("PNG created from this exact saved release.");
+    });
+  }
+  async function copyCaption(id:string){
+    await run(async()=>{
+      const output=await getSiteMarketingReleaseOutput({data:{siteId,releaseId:id}});
+      if(!output.plainText)throw new Error("No caption is saved with this release.");
+      await navigator.clipboard.writeText(output.plainText);
+      setNotice("The original social caption was copied.");
     });
   }
   async function exitLaunch() {
@@ -410,8 +421,8 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
           </div>
           <div className="mt-4"><WorkspaceNotice tone="info">
             This is a private working preview, not a public release.
-            Save your package to generate immutable, downloadable materials.
-            Email sending is a separate authorization.
+            Graphic layouts use a shortened excerpt if the message is long. The full copy stays in your package.
+            Save your package to generate immutable, downloadable materials; email sending is separate.
           </WorkspaceNotice></div>
         </WorkspacePanel>}
 
@@ -469,11 +480,19 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
                 <span className="text-xs">{item.format} · Package revision {item.packageRevision}
                   {" · "}{new Date(item.createdAt).toLocaleDateString()}
                   {item.withdrawnAt?" · Withdrawn":""}</span>
-                <Button type="button" variant="outline" size="sm"
-                  disabled={busy||Boolean(item.withdrawnAt)}
-                  onClick={()=>void downloadRelease(item.id)}>
-                  <Download className="size-4" aria-hidden="true"/> Download original
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm"
+                    disabled={busy||Boolean(item.withdrawnAt)}
+                    onClick={()=>void downloadRelease(item.id)}>
+                    <Download className="size-4" aria-hidden="true"/> Download original
+                  </Button>
+                  {item.format!=="email"&&<Button type="button" variant="outline" size="sm"
+                    disabled={busy||Boolean(item.withdrawnAt)}
+                    onClick={()=>void downloadPng(item.id)}>PNG</Button>}
+                  {item.format==="social"&&<Button type="button" variant="outline" size="sm"
+                    disabled={busy||Boolean(item.withdrawnAt)}
+                    onClick={()=>void copyCaption(item.id)}>Copy caption</Button>}
+                </div>
               </li>)}
             </ul>}
           </div>
@@ -485,7 +504,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
         </ActionFooter>
       </>}
       <ActionDialog open={Boolean(deleteCandidate)} title="Delete Marketing Package"
-        description="Permanently delete this draft package? This cannot be undone."
+        description="Delete unused drafts only. Packages with generated materials must be archived so their released files remain available. This cannot be undone."
         confirmLabel="Delete package" destructive pending={busy}
         onClose={()=>setDeleteCandidate(null)}
         onConfirm={()=>{if(deleteCandidate)void remove(deleteCandidate);}} />
