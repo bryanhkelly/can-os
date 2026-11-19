@@ -277,7 +277,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
       </WorkspaceNotice>}
       {view==="library"&&brandReadiness==="unavailable"&&<WorkspaceNotice tone="attention">
         Site Brand status could not be checked. Existing packages remain available,
-        but no new marketing work can start until the saved Brand is verified.
+        but new packages cannot start until the saved Brand is verified.
         <div className="mt-3"><Button type="button" variant="outline" size="sm"
           onClick={()=>setBrandRefreshKey(value=>value+1)}>Retry Brand check</Button></div>
       </WorkspaceNotice>}
