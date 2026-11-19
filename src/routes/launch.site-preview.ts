@@ -14,7 +14,9 @@ import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/site
 import { readSavedBrandVersion } from "@/modules/sites/site-brand.functions";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
-import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
+import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
+import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
+import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
@@ -78,13 +80,17 @@ export const Route=createFileRoute("/launch/site-preview")({
           readSavedBrandVersion(site.id),
         ]);
         const stored=history[0]?.content ?? published?.content;
-        const copy:SiteLocalContent=stored ? normalizeSiteLocalContent(stored,{allowIncompleteImage:true}) : {
-          ...emptySiteLocalContent,
-          heroHeadline:"A place to learn. A community to grow.",
-          welcomeMessage:"Explore what this learning community could offer.",
-          localDescription:"Our learning Site is taking shape. We are exploring educational experiences for our community.",
-          branding:{...emptySiteLocalBranding,templateId:"modern" as const,paletteId:"brand-modern" as const},
-        };
+        // First-visit Website & Brand and the Launch topbar must derive their
+        // unsaved starter from the same private Site Story editorial projection.
+        // A returning Site's saved website revision always wins; no source
+        // suggestion silently overwrites a saved operator edit.
+        const sourceStory=siteStorySourceV61Schema.safeParse(site.metadata.siteStoryV61);
+        const storyCandidates=sourceStory.success
+          ?suggestWebsiteCopyFromStory(sourceStory.data.answers,site.name):[];
+        const copy:SiteLocalContent=stored
+          ?normalizeSiteLocalContent(stored,{allowIncompleteImage:true})
+          :prepareWebsiteCopyFromSiteInformation(
+            createSchoolWebsiteStarterContent(site.name),storyCandidates);
         // Mirror the Website & Brand editor: structural template and copy
         // come from the saved website draft, but the visual identity comes
         // ONLY from the canonical immutable Site Brand version. The old
