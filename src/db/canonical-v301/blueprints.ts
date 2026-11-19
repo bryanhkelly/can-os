@@ -432,8 +432,7 @@ export const programDeployments = educationV30.table(
 );
 
 /** Existing native deployment readiness evidence; not a new table or approval system. */
-export const deploymentReadinessReviews = educationV30.table(
-  "deployment_readiness_reviews", {
+export const deploymentReadinessReviews = pgTable("deployment_readiness_reviews", {
     id: id(),
     deploymentId: uuid("deployment_id").notNull(),
     reviewKind: text("review_kind").$type<"operating"|"registration"|"delivery">().notNull(),
