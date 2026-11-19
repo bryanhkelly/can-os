@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { DisclosureSection } from "@/components/workspace/disclosure-section";
@@ -26,7 +25,7 @@ import { useEffect, useState, type ChangeEvent, type Dispatch, type SetStateActi
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import {
   prepareWebsiteEditorContent, restoreOriginalWebsiteField, websiteStarterFieldIds, siteLocalContentLimits, siteLocalImageMaxBytes,
-  siteLocalImagePublicationGaps, type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
+  siteLocalImagePublicationGaps, type SiteLocalContent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -850,161 +849,129 @@ function LocalWebsiteCopyEditor({
               </WorkspaceNotice>}
         </details>
       </div>}
-      {step === 2 && <div className="space-y-5">
-      <div>
-        <h3 className="text-lg font-semibold">Make your school brand your own</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Your school name and selected design produce a unique wordmark. Customize the safe palette and fonts below; see the result live before saving.</p>
-      </div>
-      <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
-        <legend className="px-2 text-sm font-semibold">Local branding and approved artwork</legend>
-        <p className="text-xs leading-5 text-muted-foreground">
-          Your chosen website design provides the visual structure. These colors and fonts become the same versioned school identity used by the site and downloadable wordmark.
-        </p>
-        <div className="flex flex-wrap items-center justify-between gap-3  border p-4">
+      {step === 2 && <div className="space-y-4">
+        <div>
+          <h3 className="font-serif text-2xl font-semibold">Create your visual identity</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Expand colors, typography, wordmark and imagery independently. Your chosen wireframe
+            and website text remain unchanged when you adjust a visual option.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border bg-card p-4">
           <div>
-            <p className="font-medium">Recommended brand for {schoolBrandDesigns[content.branding.templateId ?? "heritage"].name}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Apply the matching starter palette and typography without changing your school's name, copy or photos.</p>
+            <p className="text-sm font-semibold">Suggested starting style</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use the palette and type pairing curated for {schoolBrandDesigns[content.branding.templateId ?? "heritage"].name}.
+            </p>
           </div>
-          <Button variant="outline" type="button" className="min-h-11 border" onClick={() => setContent(old => {
-            const design = schoolBrandDesigns[old.branding.templateId ?? "heritage"];
-            return { ...old, branding: { ...old.branding,
-              paletteId: design.recommendedPalette, typographyId: design.recommendedTypography,
-              headingFontId: undefined, bodyFontId: undefined,
-            } };
-          })}>Apply recommended brand</Button>
+          <Button type="button" variant="outline" disabled={busy || !data.canPublish}
+            onClick={()=>setContent(old=>{
+              const design=schoolBrandDesigns[old.branding.templateId ?? "heritage"];
+              return {...old,branding:{...old.branding,paletteId:design.recommendedPalette,
+                typographyId:design.recommendedTypography,headingFontId:undefined,bodyFontId:undefined}};
+            })}>Apply suggested style</Button>
         </div>
-        <div className=" border p-4">
-          <p className="font-medium">Choose your school's visual identity</p>
-          <p className="mt-1 text-xs text-muted-foreground">CAN Signature gives you a complete editorial design.
-            Inspired by your church uses approved palette and typography choices; automatic source discovery
-            is not available until the separate church-reference integration is connected.</p>
-          <div role="group" aria-label="School color palettes" className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
-            {sitePaletteIds.filter(id => !id.startsWith("brand-") ||
-              id === schoolBrandDesigns[content.branding.templateId ?? "heritage"].recommendedPalette ||
-              id === content.branding.paletteId).map(id => {
-              const palette = resolveSiteTheme(id,content.branding.typographyId);
-              return <Button variant="outline" type="button" key={id} aria-pressed={(content.branding.paletteId ?? "signature")===id}
-                onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
-                className="min-h-14 w-full flex-col items-stretch justify-start gap-0 whitespace-normal border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
-                <span aria-hidden="true" className="mb-2 flex h-5 overflow-hidden ">
-                  <span className="flex-1" style={{backgroundColor:palette.ink}}/>
-                  <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
-                  <span className="flex-1" style={{backgroundColor:palette.accent}}/>
-                  <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
-                </span>{id === "signature" ? "CAN Signature" :
-                  id.startsWith("brand-") ? `${schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name ?? "School"} palette` : id}
-              </Button>;
-            })}
-          </div>
-          <Label className="mt-4 block text-sm">
-            <span className="font-medium">Approved typography pairing</span>
-            <Select value={content.branding.typographyId ?? "editorial"}
-              onChange={event=>setContent(old=>({...old,branding:{...old.branding,
-                typographyId:event.target.value as SiteTypographyId, headingFontId:undefined, bodyFontId:undefined}}))}
-              className="mt-2 min-h-11 w-full  border bg-background px-3">
-              {siteTypographyIds.map(id=><option key={id} value={id}>
-                {id === "editorial" ? "Editorial serif + modern sans" :
-                  id === "traditional" ? "Heritage serif + clean sans" : "Contemporary humanist sans"}
-              </option>)}
-            </Select>
-          </Label>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {(["headingFontId", "bodyFontId"] as const).map(key => <Label key={key} className="block text-sm">
-              {key === "headingFontId" ? "Heading font" : "Body font"}
-              <Select className="mt-2 min-h-11 w-full  border bg-background px-3" value={content.branding[key] ?? ""}
-                onChange={event => setContent(old => ({...old, branding:{...old.branding, [key]:event.target.value ? event.target.value as SiteFontId : undefined}}))}>
-                <option value="">Use recommended pairing</option>
-                {Object.entries(siteFontCatalog).map(([id,font]) => <option key={id} value={id}>{font.label}</option>)}
+        <DisclosureSection title="Colors" description="All thirteen curated and contrast-checked palettes" defaultOpen>
+          <fieldset disabled={busy || !data.canPublish}>
+            <legend className="sr-only">Choose a color palette</legend>
+            <div role="group" aria-label="School color palettes" className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {sitePaletteIds.map(id=>{
+                const palette=resolveSiteTheme(id,content.branding.typographyId);
+                const current=(content.branding.paletteId ?? "signature")===id;
+                return <Button type="button" variant="outline" aria-pressed={current} key={id}
+                  onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
+                  className="h-auto min-h-16 w-full flex-col items-stretch gap-1 whitespace-normal border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
+                  <span className="mb-2 flex h-5 overflow-hidden" aria-hidden="true">
+                    <span className="flex-1" style={{backgroundColor:palette.ink}}/>
+                    <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
+                    <span className="flex-1" style={{backgroundColor:palette.accent}}/>
+                    <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
+                  </span>
+                  {id==="signature"?"CAN Signature":id.startsWith("brand-")
+                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"School")+" palette":id}
+                </Button>;
+              })}
+            </div>
+            {brandDirection && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
+              <span>Suggested palette: <strong>{brandRecommendedPalette(brandDirection)}</strong></span>
+              <Button type="button" variant="outline"
+                onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:brandRecommendedPalette(brandDirection)}}))}>
+                Apply suggested palette
+              </Button>
+            </div>}
+            <p className="mt-4 text-xs text-muted-foreground">
+              Custom colors are preview-only until individually validated, versioned and supported by the public renderer.
+            </p>
+          </fieldset>
+        </DisclosureSection>
+        <DisclosureSection title="Typography" description="Actual rendered font stacks and pairing choices" defaultOpen>
+          <fieldset disabled={busy || !data.canPublish} className="space-y-4">
+            <legend className="sr-only">Choose typography</legend>
+            <Label className="block text-sm">
+              <span className="font-medium">Curated typography pairing</span>
+              <Select value={content.branding.typographyId ?? "editorial"}
+                onChange={event=>setContent(old=>({...old,branding:{...old.branding,
+                  typographyId:event.target.value as SiteTypographyId,headingFontId:undefined,bodyFontId:undefined}}))}
+                className="mt-2 min-h-11 w-full border bg-background px-3">
+                {siteTypographyIds.map(id=><option key={id} value={id}>
+                  {id==="editorial"?"Editorial serif + modern sans":
+                    id==="traditional"?"Heritage serif + clean sans":"Contemporary humanist sans"}
+                </option>)}
               </Select>
-            </Label>)}
+            </Label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(["headingFontId","bodyFontId"] as const).map(key=><Label key={key} className="block text-sm">
+                {key==="headingFontId"?"Heading font":"Body font"}
+                <Select className="mt-2 min-h-11 w-full border bg-background px-3"
+                  value={content.branding[key] ?? ""}
+                  onChange={event=>setContent(old=>({...old,branding:{...old.branding,
+                    [key]:event.target.value?event.target.value as SiteFontId:undefined}}))}>
+                  <option value="">Use pairing default</option>
+                  {Object.entries(siteFontCatalog).map(([id,font])=><option key={id} value={id}>{font.label}</option>)}
+                </Select>
+              </Label>)}
+            </div>
+            <div className="grid gap-3 border-t pt-4 sm:grid-cols-2" aria-label="Actual resolved font previews">
+              {(["headingFontId","bodyFontId"] as const).map(key=>{
+                const theme=resolveSiteTheme(content.branding.paletteId,content.branding.typographyId,
+                  content.branding.headingFontId,content.branding.bodyFontId,content.branding.templateId);
+                const chosen=content.branding[key];
+                const fontFamily=key==="headingFontId"?theme.displayFont:theme.bodyFont;
+                return <div key={key} className="min-w-0 border bg-background p-3">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {key==="headingFontId"?"Heading":"Body"} · {chosen?siteFontCatalog[chosen].label:"Curated pairing"}
+                  </p>
+                  <p className="mt-3 break-words text-2xl" style={{fontFamily}}>Learn with purpose.</p>
+                  <p className="mt-2 break-words text-sm" style={{fontFamily}}>Every Site has a story worth sharing.</p>
+                </div>;
+              })}
+            </div>
+          </fieldset>
+        </DisclosureSection>
+        <DisclosureSection title="Wordmark & Logo" description="Preview the Site wordmark and upload approved logo artwork">
+          <div className="space-y-4">
+            <SchoolBrandPreview siteId={data.siteId} schoolName={data.siteName} branding={content.branding}/>
+            <WebsiteArtworkField field="logoImage" value={content.branding.logoImage ?? null}
+              disabled={busy || !data.canPublish} onSelect={selectArtwork}
+              onChange={next=>setContent(old=>({...old,branding:{...old.branding,logoImage:next}}))}/>
           </div>
-          <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2" aria-label="Actual font previews">
-            {(["headingFontId","bodyFontId"] as const).map(key=>{
-              const selectedFont=content.branding[key] ?? (key==="headingFontId"?"georgia":"system");
-              const font=siteFontCatalog[selectedFont];
-              return <div key={key} className="min-w-0 border bg-background p-3">
-                <p className="text-xs font-semibold text-muted-foreground">{key==="headingFontId"?"Heading":"Body"} · {font.label}</p>
-                <p className="mt-2 break-words text-xl" style={{fontFamily:font.css}}>Learn with purpose.</p>
-                <p className="mt-2 break-words text-sm" style={{fontFamily:font.css}}>Every Site has a story worth sharing.</p>
-              </div>;
-            })}
+        </DisclosureSection>
+        <DisclosureSection title="Imagery" description="Site-owned artwork, privacy rights and approved media">
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Template gallery samples are fictional. They will never be added to your real Site's photo library.
+              Uploaded artwork stays out of all previews until the rights and consent checks pass.
+            </p>
+            <WebsiteArtworkField field="heroImage" value={content.branding.heroImage}
+              disabled={busy || !data.canPublish} onSelect={selectArtwork}
+              onChange={next=>setContent(old=>({...old,branding:{...old.branding,heroImage:next}}))}/>
+            <DisclosureSection title="Import photos from a Site folder (optional)">
+              <SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
+                enabled={data.mediaUploadsEnabled}/>
+            </DisclosureSection>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">All choices use a maintained, contrast-checked palette
-            and safe system fonts. Church website colors and fonts, when discovered, are suggestions only;
-            no logo, third-party font, photograph or CSS is copied automatically.</p>
-        </div>
-      </fieldset>
-      {brandDirection && <div className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
-        <span>Suggested palette: <strong>{brandRecommendedPalette(brandDirection)}</strong></span>
-        <Button type="button" variant="outline" disabled={busy || !data.canPublish}
-          onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:brandRecommendedPalette(brandDirection)}}))}>
-          Use suggested palette
-        </Button>
+        </DisclosureSection>
       </div>}
-      <SchoolBrandPreview siteId={data.siteId} schoolName={data.siteName} branding={content.branding}/>
-      <details className="border p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Wordmark, logo &amp; imagery</summary>
-        <div className="mt-4 space-y-4">
-      <h3 className="font-serif text-2xl">Photos &amp; artwork</h3>
-      <p className="text-sm">Gallery images are fictional template samples. They are not photos of your school and are never added to your school media library.</p>
-      <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
-        <legend className="px-2 text-sm">Your school-owned artwork</legend>
-        {(["heroImage", "logoImage"] as const).map(field => {
-          const artwork = content.branding[field];
-          return <div key={field} className="space-y-3">
-        <Label className="block text-sm">
-          <span className="font-medium">{field === "logoImage" ? "School logo (optional)" : "Church or community artwork (optional)"}</span>
-          <span className="mt-1 block text-xs text-muted-foreground">
-            PNG or JPEG, re-encoded locally to a metadata-free PNG. No remote URLs, embeds or tracking.
-          </span>
-          <Input type="file" accept="image/png,image/jpeg" onChange={event => void selectArtwork(event, field)}
-            className="mt-2 block w-full text-sm" />
-        </Label>
-        {artwork && <div className="space-y-3  bg-muted/40 p-3">
-          <img src={artwork.dataUrl} alt={field === "logoImage" ? "Selected logo preview" : "Selected artwork preview"}
-            className="h-52 w-full  object-contain" />
-          <Label className="block text-sm">
-            <span className="font-medium">Artwork description for screen readers</span>
-            <Input type="text" maxLength={180} value={artwork.altText}
-              onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
-                [field]: old.branding[field] ? { ...old.branding[field], altText: event.target.value } : null,
-              } }))} className="mt-2 w-full  border bg-background p-2 text-sm" />
-          </Label>
-          <Label className="flex items-start gap-2 text-sm">
-            <Checkbox checked={artwork.rightsConfirmed}
-              onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
-                [field]: old.branding[field] ? { ...old.branding[field], rightsConfirmed: event.target.checked } : null,
-              } }))} className="mt-1" />
-            <span>I own this image or have documented permission to publish it on the school website and in school communications.</span>
-          </Label>
-          <Label className="block text-sm">
-            <span className="font-medium">Child privacy and consent</span>
-            <Select value={artwork.childImageConsent}
-              onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
-                [field]: old.branding[field] ? { ...old.branding[field],
-                  childImageConsent: event.target.value as SiteLocalImageConsent } : null,
-              } }))} className="mt-2 w-full  border bg-background p-2 text-sm">
-              <option value="unconfirmed">Choose a confirmation</option>
-              <option value="no_identifiable_children">No identifiable children appear</option>
-              <option value="guardian_consent_confirmed">Documented guardian consent covers every identifiable child</option>
-            </Select>
-          </Label>
-          <Button variant="outline" type="button" onClick={() => setContent(old => ({
-            ...old, branding: { ...old.branding, [field]: null },
-          }))} className=" border px-3 py-1 text-xs">{field === "logoImage" ? "Remove logo" : "Remove artwork"}</Button>
-        </div>}
-        </div>;
-        })}
-      </fieldset>
-      <details className="border p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Import photos from a folder (optional)</summary>
-        <div className="mt-4"><SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
-          enabled={data.mediaUploadsEnabled}/></div>
-      </details>
-
-        </div>
-      </details>
-      </div>
       {step === 4 && <div className="space-y-4">
         <div>
           <h3 className="text-lg font-semibold">Review your website</h3>
