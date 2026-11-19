@@ -44,7 +44,7 @@ export async function getCanonicalBlueprintWorkspace(
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [site] = await tx.select({ id: catalogSites.id, status: catalogSites.status })
       .from(catalogSites).where(eq(catalogSites.id, siteId)).limit(1);
-    if (!site || site.status === "closed") {
+    if (!site?.status || site.status === "closed") {
       throw new DomainError("UNAVAILABLE", "The selected canonical Site is unavailable.");
     }
     const now = new Date();
