@@ -31,7 +31,7 @@
 
 - Purpose & Story answers remain in the existing Site-scoped source and now drive the editable Website & Brand first draft.
 - The italic usage notice authorizes drafting website and future promotional materials; it does **not** send a campaign, publish the Site, or independently authorize any public claim.
-- Introduce currently routes to an honest placeholder, so actual promotional asset generation and distribution were **not** implemented as part of this website integration. When Promote is implemented, it should consume the same Site Story source and saved Program intent through a single reviewed editorial projection. Do not fork the Story model or use brand tokens as the source of marketing claims.
+- Introduce now uses one canonical Marketing Packages experience across Promote, Recruit Families / Learners and Interest Events. Those modules consume the same Site Story and saved Program intent via the existing reviewed editorial suggestion projection, and select immutable Site Brand versions for generated outputs. There is no parallel Story or Brand persistence. Real outbound distribution, Site-wide prospect CRM, and generic pre-Program events remain separate, unimplemented capabilities.
 - An operator must review outbound wording and explicit sending recipients/permissions when outreach workflows are enabled.
 
 ## Required validation before merge/release
