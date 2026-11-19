@@ -335,7 +335,11 @@ export async function changeSitePublicationWithinTransaction(
     const enrichmentListings = needsReadiness ? await readEnrichmentCatalog(site.id, tx) : [];
     const academicListings = needsReadiness ? await readAcademicProgramCatalog(site.id, tx) : [];
     const eligibleCount = enrichmentListings.length + academicListings.length;
-    const local = needsReadiness && actor.role === "site_admin" ? await readCurrentLocalContent(site.id, tx) : null;
+    // Site-level publication may rely on reviewed Site-owned website copy
+    // even before academic Offerings exist. The caller still needs its own
+    // explicit institutional publishing authority; local copy is never an
+    // enrollment or accreditation approval.
+    const local = needsReadiness ? await readCurrentLocalContent(site.id, tx) : null;
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
       reason: input.reason, contentReviewed: input.contentReviewed,
