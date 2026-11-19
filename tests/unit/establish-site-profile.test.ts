@@ -23,6 +23,33 @@ describe("Establish / Site Profile canonical handoff", () => {
     expect(form).not.toContain("Promise.all");
   });
 
+  it("uses the shared V6.1 page structure and controls without new native widgets", () => {
+    const route = source("src/routes/launch.site.tsx");
+    const form = source("src/components/launch-studio/EstablishSiteProfileUnified.tsx");
+    const frame = source("src/components/launch-studio/LaunchSiteFrameV61.tsx");
+    expect(route).toContain("<WorkspaceShell");
+    expect(route).not.toMatch(/<(?:main|h1)(?:\\s|>)/);
+    expect(form).toContain("<Label");
+    expect(form).not.toMatch(/<(?:label|button|input|select|textarea)(?:\\s|>)/);
+    expect(frame).toContain('<Button type="button" variant="ghost"');
+    expect(frame).not.toMatch(/<button(?:\\s|>)/);
+  });
+
+  it("locks shared time zone and location editors during save and reconciliation", () => {
+    const form = source("src/components/launch-studio/EstablishSiteProfileUnified.tsx");
+    const zone = source("src/components/workspace/SiteTimezoneField.tsx");
+    const address = source("src/components/operations/LaunchSiteAddressFields.tsx");
+    expect(form).toContain("disabled={saving || reloadRequired}");
+    expect(zone).toContain("disabled={disabled}");
+    expect(address).toContain("disabled={disabled}");
+  });
+
+  it("retains the V6.1 public landing exception only for the current Site route", () => {
+    const eslint = source("eslint.config.mjs");
+    expect(eslint).toContain("site.new}.tsx");
+    expect(eslint).not.toContain("schools.new}.tsx");
+  });
+
   it("chains the three canonical operations in order without parallel writes", async () => {
     const calls: string[] = [];
     const identity = vi.fn(async (revision: string) => {
