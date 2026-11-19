@@ -1,3 +1,6 @@
+import { saveSiteBrandVersion } from "@/modules/sites/site-brand.functions";
+import { type SiteBrandConfiguration } from "@/domain/site-brand";
+import { Input } from "@/components/ui/input";
 import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { WebsiteCopyField } from "@/components/launch-studio/WebsiteCopyField";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
@@ -18,7 +21,7 @@ import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionFooter, type Status
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import {
   prepareWebsiteEditorContent, restoreOriginalWebsiteField, websiteStarterFieldIds, siteLocalImageMaxBytes,
@@ -503,13 +506,18 @@ function LocalWebsiteCopyEditor({
       ? prepareWebsiteCopyFromSiteInformation(starter,data.siteStoryCopyCandidates) : starter;
     return { content: initial, saved: starter, revision: data.currentRevision, siteId: data.siteId };
   });
+  const [brandDisplayName,setBrandDisplayName]=useState(
+    data.currentBrandConfiguration?.displayName??data.siteName);
+  const brandPointerRef=useRef<string|null>(data.currentBrandVersionId);
   const content = editor.content;
+  const brandDisplayNameDirty=brandDisplayName!==
+    (data.currentBrandConfiguration?.displayName??data.siteName);
   const brandRecommendation = data.siteStoryRecommendation;
   const brandDirection = content.branding.brandDirectionId ?? null;
   const setContent: Dispatch<SetStateAction<SiteLocalContent>> = update =>
     setEditor(previous => ({ ...previous, content: typeof update === "function"
       ? update(previous.content) : update }));
-  const dirty = JSON.stringify(content) !== JSON.stringify(editor.saved);
+  const dirty = JSON.stringify(content) !== JSON.stringify(editor.saved) || brandDisplayNameDirty;
   const revisionConflict = editor.siteId === data.siteId && editor.revision !== data.currentRevision;
   const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const [preparingArtwork, setPreparingArtwork] = useState(false);
@@ -525,6 +533,10 @@ function LocalWebsiteCopyEditor({
   const [shareMessage, setShareMessage] = useState("");
   useEffect(() => {
     setDraftPreview(null);
+    if(!dirty){
+      setBrandDisplayName(data.currentBrandConfiguration?.displayName??data.siteName);
+      brandPointerRef.current=data.currentBrandVersionId;
+    }
     setEditor(previous => {
       if (previous.siteId === data.siteId && previous.revision === data.currentRevision) return previous;
       // A loader refresh (including media changes) must never overwrite authored copy.
@@ -533,12 +545,15 @@ function LocalWebsiteCopyEditor({
       const latest = prepareWebsiteEditorContent(data.editingContent, data.siteName);
       return { content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId };
     });
-  }, [data.siteId, data.currentRevision, data.editingContent, data.siteName]);
+  }, [data.siteId, data.currentRevision, data.editingContent, data.siteName,
+      data.currentBrandVersionId]);
 
   function loadLatestRevision() {
-    if (dirty && !window.confirm("Discard your unsaved website changes and load the latest saved revision?")) return;
+    if (dirty && !window.confirm("Discard unsaved Website & Brand changes and load the latest saved revision?")) return;
     const latest = prepareWebsiteEditorContent(data.editingContent, data.siteName);
     setEditor({ content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId });
+    setBrandDisplayName(data.currentBrandConfiguration?.displayName??data.siteName);
+    brandPointerRef.current=data.currentBrandVersionId;
     setDraftPreview(null);
     setError("");
   }
@@ -564,10 +579,33 @@ function LocalWebsiteCopyEditor({
     }
     setError("");
     const submitted = content;
-    const outcome = await mutation.run(() => saveChurchWebsiteDraft({
-      data: { content: submitted, siteId: data.siteId, expectedRevision: editor.revision },
-    }), { successMessage: "Private website draft saved. Publication and enrollment states are unchanged.",
-      commandErrorMessage: "Could not save the private website draft." });
+    const branding=submitted.branding;
+    const configuration:SiteBrandConfiguration={
+      directionId:branding.brandDirectionId??null,
+      paletteId:branding.paletteId??"signature",
+      typographyId:branding.typographyId??"editorial",
+      headingFontId:branding.headingFontId??null,
+      bodyFontId:branding.bodyFontId??null,
+      displayName:brandDisplayName.trim(),
+      logoAssetId:data.currentBrandConfiguration?.logoAssetId??null,
+      heroAssetId:data.currentBrandConfiguration?.heroAssetId??null,
+    };
+    const outcome = await mutation.run(async()=>{
+      // Authoritative Brand save happens first. This may create a new immutable
+      // Brand version, but NEVER updates an existing released artifact.
+      const brandResult=await saveSiteBrandVersion({data:{
+        siteId:data.siteId,expectedBrandVersionId:brandPointerRef.current,
+        configuration,
+        logoImage:branding.logoImage??null,heroImage:branding.heroImage,
+      }});
+      brandPointerRef.current=brandResult.brandVersionId;
+      // Website content is a separate revision and stores only layout/copy.
+      // A failure here is reported; the already-saved Brand is not rolled back.
+      return saveChurchWebsiteDraft({data:{
+        content:submitted,siteId:data.siteId,expectedRevision:editor.revision,
+      }});
+    },{successMessage:"Site Brand and private website draft saved. Publication and enrollment are unchanged.",
+      commandErrorMessage:"The Site Brand or website draft could not be saved. Reload before retrying."});
     if (outcome.status === "saved" || outcome.status === "refresh-failed") {
       markSaved(submitted, outcome.value.revision);
       if (mode === "exit" && outcome.status === "saved") {
@@ -710,6 +748,17 @@ function LocalWebsiteCopyEditor({
             ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Information: {new Date(data.siteStoryRevision).toLocaleDateString()}</p>
             : <p className="mt-2 text-xs text-muted-foreground">No optional purpose answers saved in Site Information. You can still choose a direction.</p>}
         </div>
+        <label className="block space-y-2 text-sm font-semibold">
+          <span>Public-facing Site name</span>
+          <Input type="text" maxLength={120} value={brandDisplayName}
+            disabled={busy||!data.canPublish}
+            onChange={event=>setBrandDisplayName(event.target.value)}
+            placeholder="Your learning community name" className="min-h-11 w-full"/>
+          <span className="block text-xs font-normal text-muted-foreground">
+            This display name is saved with the Brand version. Changing your Site Profile name
+            later will not alter older flyers or released website pages.
+          </span>
+        </label>
         <fieldset disabled={busy || !data.canPublish}>
           <legend className="text-sm font-semibold">Choose your brand direction</legend>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -732,7 +781,10 @@ function LocalWebsiteCopyEditor({
         <p className="text-xs text-muted-foreground">{brandRecommendation
           ?"A keyword suggestion from your saved Story is not a required choice or verified institutional claim."
           :"No recommendation appears without matching Story evidence."}</p>
-        <p className="text-xs text-muted-foreground">Brand Identity is saved with this Site's versioned website draft. A broader Site-brand service is not connected yet.</p>
+        <p className="text-xs text-muted-foreground">
+          Saving creates an immutable Site Brand version only when identity properties change.
+          The website wireframe and content are saved separately.
+        </p>
       </section>}
       {step === 1 && <div className="space-y-5">
         <h3 className="font-serif text-2xl font-semibold">Choose your wireframe</h3>
