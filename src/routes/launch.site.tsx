@@ -16,6 +16,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { LaunchModuleDestinationV61, isDestinationModuleV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
 import { LaunchPrepareV61, isPrepareModuleV61 } from "@/components/launch-studio/LaunchPrepareV61";
 import { MarketingPackagesV61 } from "@/components/launch-studio/MarketingPackagesV61";
+import { isIntroduceModuleV61, introduceModuleConfigV61 } from "@/domain/launch-introduce-v61";
 import { listSiteMarketingPackagesV61, readSiteMarketingSuggestionsV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
 
 const searchSchema = z.object({
@@ -39,10 +40,15 @@ export const Route = createFileRoute("/launch/site")({
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
         ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
-      marketingPackages: site && deps.module === "promote"
-        ? await listSiteMarketingPackagesV61({ data: { siteId: site.id } }) : null,
-      marketingSuggestions: site && deps.module === "promote"
-        ? await readSiteMarketingSuggestionsV61({ data: { siteId: site.id } }) : null,
+      // All three Introduce modules use the same authorized Site package store
+      // and the same editorial projection of saved Establish information.
+      // Failure of optional suggestions must not hide already saved packages.
+      marketingPackages: site && isIntroduceModuleV61(deps.module)
+        ? await listSiteMarketingPackagesV61({ data: { siteId: site.id } })
+            .catch(() => null) : null,
+      marketingSuggestions: site && isIntroduceModuleV61(deps.module)
+        ? await readSiteMarketingSuggestionsV61({ data: { siteId: site.id } })
+            .catch(() => null) : null,
       programsAudiences: site && deps.module === "programs-audiences"
         ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
       // Establish preferences are optional context for catalog discovery. The
@@ -98,9 +104,24 @@ function SiteLaunchPage() {
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
-    : selected?.id === "promote" && marketingPackages ? <MarketingPackagesV61 key={site.id}
-      siteId={site.id} siteName={site.name} initial={marketingPackages} suggestions={marketingSuggestions}
+    : selected && isIntroduceModuleV61(selected.id) && marketingPackages ? <MarketingPackagesV61
+      key={site.id + ":" + selected.id} module={selected.id}
+      siteId={site.id} siteName={site.name} initial={marketingPackages}
+      suggestions={marketingSuggestions} suggestionsUnavailable={!marketingSuggestions}
       onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })} />
+    : selected && isIntroduceModuleV61(selected.id) ? <WorkspaceShell
+      title={introduceModuleConfigV61[selected.id].title}
+      eyebrow={introduceModuleConfigV61[selected.id].eyebrow}
+      subtitle="Your Site's marketing packages could not be loaded."
+      width="wide">
+      <p role="alert" className="mt-6 border bg-card p-4 text-sm">
+        No packages have been changed. Check your Site access and retry this section.
+      </p>
+      <a href={base + "&module=" + selected.id}
+        className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+        Retry this Introduce module
+      </a>
+    </WorkspaceShell>
     : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61 key={site.id}
       module={selected.id} siteId={site.id}
       intent={prepareIntent?.kind === "ready" ? prepareIntent.intent : null}
