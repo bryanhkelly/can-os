@@ -1,7 +1,9 @@
 
 import { useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { Building2, Globe2, HelpCircle, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { siteLaunchModules } from "./LaunchStudioOverviewV61";
 
 const stages = ["Establish", "Introduce", "Prepare", "Open"] as const;
@@ -13,7 +15,6 @@ export function LaunchSiteFrame({ site, active, children }: {
 }) {
   const [drawer, setDrawer] = useState(false);
   const [expanded, setExpanded] = useState<string>(siteLaunchModules.find(item=>item.id===active)?.stage ?? "Establish");
-  const base = "/launch/site?siteId=" + encodeURIComponent(site.id);
   const sidebar = (
     <div className="flex h-full flex-col bg-card">
       <div className="border-b px-4 py-5">
@@ -25,8 +26,9 @@ export function LaunchSiteFrame({ site, active, children }: {
         <p className="mt-1 text-xs text-muted-foreground">Preparing · Site setup</p>
       </div>
       <nav aria-label="Launch Studio navigation" className="flex-1 space-y-1 px-3">
-        <a href={base} className={"block border-b px-3 py-3 text-sm font-semibold " + (!active ? "text-primary" : "")}
-          aria-current={!active ? "page" : undefined}>Overview</a>
+        <Link to="/launch/site" search={{ siteId: site.id }} onClick={() => setDrawer(false)}
+          className={"block border-b px-3 py-3 text-sm font-semibold " + (!active ? "text-primary" : "")}
+          aria-current={!active ? "page" : undefined}>Overview</Link>
         {stages.map((stage, index) => (
           <div key={stage} className="border-b py-1">
             <Button type="button" variant="ghost" aria-expanded={expanded===stage} onClick={()=>setExpanded(expanded===stage ? "" : stage)}
@@ -35,12 +37,13 @@ export function LaunchSiteFrame({ site, active, children }: {
             </Button>
             {expanded===stage && <div className="space-y-1 pb-2 pl-4">
               {siteLaunchModules.filter(item=>item.stage===stage).map(item=>(
-                <a key={item.id} href={base+"&module="+item.id}
+                <Link key={item.id} to="/launch/site" search={{ siteId: site.id, module: item.id }}
+                  onClick={() => setDrawer(false)}
                   aria-current={active===item.id ? "page" : undefined}
                   className={"block border-l-2 px-3 py-2 text-xs " +
-                    (active===item.id ? "border-primary bg-accent font-bold text-primary" : "border-transparent text-muted-foreground")}>
+                    (active===item.id ? "border-primary bg-accent font-bold text-primary" : "border-transparent text-muted-foreground hover:bg-muted")}>
                   {item.title}
-                </a>
+                </Link>
               ))}
             </div>}
           </div>
@@ -72,16 +75,16 @@ export function LaunchSiteFrame({ site, active, children }: {
           <a href="#launch-help" aria-label="Launch help"><HelpCircle className="size-4" /></a>
         </div>
       </header>
-      {drawer && <div className="fixed inset-0 z-50 bg-black/50 lg:hidden">
-        <div className="flex h-full w-72 max-w-[85vw] flex-col bg-card">
+      <Modal open={drawer} onClose={() => setDrawer(false)}
+        label="Launch Studio navigation" className="m-0 ml-0 h-dvh w-[min(85vw,20rem)] max-h-dvh max-w-none overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col bg-card">
           <div className="flex justify-end border-b p-2">
-            <Button size="sm" variant="ghost" onClick={()=>setDrawer(false)} aria-label="Close launch menu">
-              <X className="size-5"/>
-            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDrawer(false)}
+              aria-label="Close launch menu"><X className="size-5"/></Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">{sidebar}</div>
         </div>
-      </div>}
+      </Modal>
       <div id="launch-help">{children}</div>
     </div>
   </div>;
