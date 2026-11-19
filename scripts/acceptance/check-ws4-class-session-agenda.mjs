@@ -34,20 +34,20 @@ try {
        EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
          WHERE a.grantee=0) AS grants_public
        FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-       WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])`,
+       WHERE n.nspname='public' AND c.relname=ANY($1::text[])`,
        [[relation, ...requiredSource]]),
     pool.query(`SELECT column_name, is_nullable FROM information_schema.columns
-       WHERE table_schema='education_v30' AND table_name=$1`,[relation]),
+       WHERE table_schema='public' AND table_name=$1`,[relation]),
     pool.query(`SELECT indexname FROM pg_indexes
-       WHERE schemaname='education_v30' AND tablename=$1`,[relation]),
+       WHERE schemaname='public' AND tablename=$1`,[relation]),
     pool.query(`SELECT tgname, tgenabled FROM pg_trigger t
        JOIN pg_class c ON c.oid=t.tgrelid
        JOIN pg_namespace n ON n.oid=c.relnamespace
-       WHERE n.nspname='education_v30' AND c.relname=$1 AND NOT t.tgisinternal`,[relation]),
+       WHERE n.nspname='public' AND c.relname=$1 AND NOT t.tgisinternal`,[relation]),
     pool.query(`SELECT conname, contype, pg_get_constraintdef(oid) AS definition
-       FROM pg_constraint WHERE conrelid=to_regclass($1)`,["education_v30."+relation]),
+       FROM pg_constraint WHERE conrelid=to_regclass($1)`,["public."+relation]),
     pool.query(`SELECT policyname, roles, cmd FROM pg_policies
-       WHERE schemaname='education_v30' AND tablename=$1`,[relation]),
+       WHERE schemaname='public' AND tablename=$1`,[relation]),
     // Read-only ACL inspection: a broad app-role grant would undermine
     // forced owner-only RLS even if this script never writes data.
     pool.query(`SELECT EXISTS(SELECT 1 FROM pg_roles
@@ -55,7 +55,7 @@ try {
       CASE WHEN EXISTS(SELECT 1 FROM pg_roles
         WHERE rolname='can_os_canonical_auth_app')
       THEN has_table_privilege('can_os_canonical_auth_app',
-        'education_v30.class_session_agenda_revisions','SELECT,INSERT,UPDATE,DELETE')
+        'public.class_session_agenda_revisions','SELECT,INSERT,UPDATE,DELETE')
       ELSE false END AS app_has_direct_dml`),
   ]);
   const byName=new Map(tables.rows.map(row=>[row.relname,row]));
