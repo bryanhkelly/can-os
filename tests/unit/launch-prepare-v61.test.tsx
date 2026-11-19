@@ -42,6 +42,7 @@ const siteId = "00000000-0000-4000-8000-000000000001";
 
 describe("V6.1 Prepare to Open", () => {
   it("has seven distinct, stable modules without inventing a parallel readiness engine", () => {
+    expect(prepareModulesV61[0]?.title).toBe("Program Catalog");
     expect(prepareModulesV61.map(module => module.id)).toEqual([
       "program-catalog",
       "facilities-resources",
@@ -121,7 +122,7 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("After-School");
     expect(html).toContain("From Program to Solution to Offering");
     expect(html).toContain("Browse available Offerings");
-    expect(html).toContain("Packaged Solution recipes");
+    expect(html).toContain("Available Solutions");
     expect(html).toContain("Adoption intent is recorded in the existing Blueprint workspace");
     expect(html).not.toContain("Approved for enrollment");
   });
@@ -130,7 +131,7 @@ describe("V6.1 Prepare to Open", () => {
     const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="program-catalog"
       intentUnavailable />);
     expect(html).toContain("Saved Programs &amp; Audiences could not be loaded");
-    expect(html).toContain("Packaged Solution recipes");
+    expect(html).toContain("Available Solutions");
     expect(html).not.toContain("You have not saved any learning interests");
   });
 
