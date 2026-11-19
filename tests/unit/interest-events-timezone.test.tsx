@@ -60,12 +60,15 @@ describe("interest event timezone", () => {
   it("shows an editable saved-package title without generating dates or registrations", () => {
     const html=renderToStaticMarkup(<InterestEventsWorkspace
       selection={{siteId:"school"}} mode="create"
-      suggestedTitle="Community learning conversation" titleSource="saved-package"
+      suggestedTitle="Community learning conversation"
+      suggestedDescription="Meet us to discuss our planned learning programs."
+      titleSource="saved-package"
       data={{
         programs:[{id:"program",name:"Community Program",siteId:"school",timezone:"America/New_York"}],
         events:[],
       }}/>);
     expect(html).toContain("Community learning conversation");
+    expect(html).toContain("Meet us to discuss our planned learning programs.");
     expect(html).toContain("saved Marketing Package");
     expect(html).toContain('type="datetime-local"');
     expect(html).not.toContain("An event was created");
