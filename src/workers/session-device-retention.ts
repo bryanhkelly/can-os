@@ -25,11 +25,6 @@ export async function runSessionDeviceRetention(
    WHERE network_observed_at < now()-interval '30 days'
   `);
   await tx.execute(sql`
-   UPDATE education_v30.canonical_sessions
-   SET ip_address=NULL,network_observed_at=NULL
-   WHERE network_observed_at < now()-interval '30 days'
-  `);
-  await tx.execute(sql`
    DELETE FROM public.access_session_signals
    WHERE occurred_at < now()-interval '90 days'
   `);
