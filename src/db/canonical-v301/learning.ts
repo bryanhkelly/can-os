@@ -38,7 +38,7 @@ export const evidenceDocuments = educationV30.table("evidence_documents", {
   owningOrganizationId: uuid("owning_organization_id"),
 });
 
-export const educationOperationOrganizationRoles = educationV30.table(
+export const educationOperationOrganizationRoles = pgTable(
   "education_operation_organization_roles",
   {
     id: id(),
