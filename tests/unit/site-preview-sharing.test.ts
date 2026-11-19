@@ -1,3 +1,6 @@
+import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
+import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
+import type { SiteLaunchPreferences } from "@/domain/site-launch-preferences";
 import { describe, expect, it } from "vitest";
 import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
 import {
@@ -87,6 +90,48 @@ describe("Site website share preview safety", () => {
     expect(page.enrollmentOpportunities).toEqual([]);
     expect(page.contentBlocks).toEqual([]);
     expect(page.media).toEqual({});
+  });
+
+  it("renders the full proposed website with Programs from saved intent, never an enrollment offer", () => {
+    const preferences: SiteLaunchPreferences = {
+      delivery: "both",
+      interestIds: ["grades-9-12", "afterschool", "summer"],
+      planningVersion: 2,
+      timingIds: ["weekdays"],
+      audienceIds: ["teens"],
+      startingFocus: "summer",
+    };
+    const planned = projectPlannedSiteProgramsForPreview(preferences);
+    expect(planned).toHaveLength(2);
+    expect(planned.map(block => block.page)).toEqual(["/", "/programs"]);
+    expect(planned.every(block =>
+      block.items.length === 3 &&
+      block.items.every(item => item.label === "Proposed · not enrolling" && !item.link)
+    )).toBe(true);
+    const page = projectShareableSitePreview({
+      siteName: "Proposed Learning Community",
+      organizationName: "Example Host",
+      content: createSchoolWebsiteStarterContent("Proposed Learning Community"),
+      plannedPrograms: planned,
+    });
+    expect(availablePublicSitePaths(page)).toContain("/programs");
+    const homepage = renderPublicSiteHtml(page, { path: "/", localPreview: true });
+    const programsPage = renderPublicSiteHtml(page, { path: "/programs", localPreview: true });
+    for (const label of ["Grades 9–12", "Afterschool", "Summer &amp; Breaks"]) {
+      expect(homepage).toContain(label);
+      expect(programsPage).toContain(label);
+    }
+    expect(programsPage).toContain("Proposed · not enrolling");
+    expect(page.enrollmentOpportunities).toEqual([]);
+    expect(page.academicPrograms).toEqual([]);
+    expect(page.contentBlocks?.some(block => block.channel === "site.setup")).toBe(false);
+  });
+
+  it("does not fabricate Programs when Site planning choices have not been saved", () => {
+    expect(projectPlannedSiteProgramsForPreview(null)).toEqual([]);
+    expect(projectPlannedSiteProgramsForPreview({
+      delivery: "physical", interestIds: [],
+    })).toEqual([]);
   });
 
   it("rejects invalid persisted share metadata rather than displaying private content", () => {
