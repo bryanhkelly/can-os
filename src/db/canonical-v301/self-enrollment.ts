@@ -4,7 +4,7 @@ const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Public-previewable only after an explicit provider publish command and
  * its runtime verification. An Offering alone never invites enrollment. */
-export const noncreditSelfEnrollmentReleases = educationV30.table("noncredit_self_enrollment_releases", {
+export const noncreditSelfEnrollmentReleases = pgTable("noncredit_self_enrollment_releases", {
   id: id(),
   deploymentId: uuid("deployment_id").notNull(),
   adoptionId: uuid("adoption_id").notNull(),
