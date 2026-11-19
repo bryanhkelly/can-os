@@ -18,7 +18,7 @@ export function LaunchPortfolio({ launches, sites, siteId, programId }: {
 }) {
   const visible = launches.filter(launch => (!siteId || launch.siteId === siteId) && (!programId || launch.id === programId));
   return <WorkspacePanel title="Saved launch records" description="Journey counts and blockers below come from the selected Program’s recorded requirements. They are a summary, not opening approval." className="mt-5"
-    actions={programId ? <Link to="/launch/school" search={{ siteId }} className="text-sm underline">View all launches</Link> : undefined}>
+    actions={programId ? <Link to="/launch/site" search={{ siteId }} className="text-sm underline">View all launches</Link> : undefined}>
     <div className="grid gap-3">
       {visible.map(launch => {
           const readiness = launchReadiness(launch.requirements);
@@ -91,7 +91,7 @@ export function LaunchPortfolio({ launches, sites, siteId, programId }: {
                 search={{siteId:launch.siteId,programId:launch.id}}>
                 Open school operations →
               </Link></Button>}
-              <Link to="/launch/school"
+              <Link to="/launch/site"
                 search={{ siteId: launch.siteId ?? siteId, programId: launch.id }}
                 className="underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 Continue guided launch

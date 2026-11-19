@@ -40,7 +40,7 @@ export type EngagementJourney = {
   editorialLinks: readonly { title: string; href: string }[]
   /** Canonical, server-authorized CAN OS route for EXISTING, verified users. */
   launch: {
-    path: '/launch/school' | '/launch/staff' | '/launch/family'
+    path: '/launch/site' | '/launch/staff' | '/launch/family'
     description: string
     label: string
   } | null
@@ -80,7 +80,7 @@ export const engagementJourneys: Record<JourneyId, EngagementJourney> = {
       { title: 'Explore school economics', href: '/economic-breakthrough' },
       { title: 'Understand the launch approach', href: '/launch-approach' },
     ],
-    launch: { path: '/launch/school', label: 'Continue in School Launch Studio',
+    launch: { path: '/launch/site', label: 'Continue in School Launch Studio',
       description: 'Already authorized as a CAN school administrator? Continue your existing school setup with your verified account.' },
     next: {
       title: 'Your school could start with a conversation.',
@@ -189,7 +189,7 @@ export const engagementJourneys: Record<JourneyId, EngagementJourney> = {
       { title: 'Academic pathways', href: '/academics/pathways' },
       { title: 'Launch approach', href: '/launch-approach' },
     ],
-    launch: { path: '/launch/school', label: 'Continue verified school setup',
+    launch: { path: '/launch/site', label: 'Continue verified school setup',
       description: 'Already have a verified CAN Site role? Continue its existing school launch or expansion work.' },
     next: {
       title: 'What would be worth exploring with your school?',

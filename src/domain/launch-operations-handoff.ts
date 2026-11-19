@@ -1,7 +1,7 @@
 /** Successful server activation leads to the operating workspace, never back to setup. */
 export function postLaunchOperationsDestination(input: { programId: string; siteId: string | null }): string {
   if (input.siteId) return "/sites/" + encodeURIComponent(input.siteId);
-  return "/launch/school?programId=" + encodeURIComponent(input.programId);
+  return "/launch/site?programId=" + encodeURIComponent(input.programId);
 }
 
 /** Existing active Programs use the same launch-to-operations destination on reload. */

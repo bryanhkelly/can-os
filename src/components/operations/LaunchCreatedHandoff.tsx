@@ -27,9 +27,9 @@ export function LaunchCreatedHandoff({created}:{created:LaunchCreatedResult|null
                   <Button asChild><Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}>Continue academic configuration →</Link></Button>
                   <Button asChild variant="outline"><Link to="/settings/school/$module" params={{module:"compliance"}} search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}>Review compliance →</Link></Button>
                 </> : <>
-                <Button asChild><Link to="/launch/school" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
+                <Button asChild><Link to="/launch/site" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
                   hash="launch-academic-year">Continue school setup →</Link></Button>
-                <Button asChild variant="outline"><Link to="/launch/school" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
+                <Button asChild variant="outline"><Link to="/launch/site" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
                   hash="invite-families">Invite families →</Link></Button>
                 </>}
               </nav>
