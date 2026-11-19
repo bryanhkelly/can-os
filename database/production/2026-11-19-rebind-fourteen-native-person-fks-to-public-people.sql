@@ -74,13 +74,13 @@ BEGIN
  THEN RAISE EXCEPTION 'Legacy Person FKs remain'; END IF;
  SELECT count(*) INTO matches FROM pg_constraint k
  JOIN jsonb_to_recordset(expected)
-  AS e(oid integer,schema_name text,child_name text,child_oid integer,
+  AS expected_fk(oid integer,schema_name text,child_name text,child_oid integer,
        conname text,convalidated boolean,condeferrable boolean,
        condeferred boolean,definition text)
- ON k.conrelid=e.child_oid::oid AND k.conname=e.conname
+ ON k.conrelid=expected_fk.child_oid::oid AND k.conname=expected_fk.conname
  WHERE k.contype='f' AND k.confrelid='public.people'::regclass
    AND k.convalidated AND NOT k.condeferrable AND NOT k.condeferred
-   AND pg_get_constraintdef(k.oid)=replace(e.definition,
+   AND pg_get_constraintdef(k.oid)=replace(expected_fk.definition,
        'REFERENCES education_v30.persons(id)','REFERENCES public.people(id)');
  IF matches<>14 THEN RAISE EXCEPTION 'Person rebind postflight failed (% constraints)',matches; END IF;
  IF (SELECT count(*) FROM education_v30.persons)<>0
