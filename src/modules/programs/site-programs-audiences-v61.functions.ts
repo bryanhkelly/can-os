@@ -65,9 +65,12 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
       if (site.updatedAt.toISOString() !== data.expectedRevision)
         throw new Error("This Site changed since you opened Programs & Audiences. Reload and review before saving.");
       const old = site.metadata.launchPreferences;
-      const environment = siteEnvironmentV61Schema.safeParse(site.metadata.siteEnvironmentV61);
-      const fallbackDelivery = environment.success ? environment.data.delivery : undefined;
-      const preferences = applySiteProgramsAudiencesV61(old, data.intent, fallbackDelivery);
+      const rawEnvironment = site.metadata.siteEnvironmentV61;
+      const environment = siteEnvironmentV61Schema.safeParse(rawEnvironment);
+      if (rawEnvironment != null && !environment.success)
+        throw new Error("Stored Learning Environment needs review before saving Site plans.");
+      const authoritativeDelivery = environment.success ? environment.data.delivery : undefined;
+      const preferences = applySiteProgramsAudiencesV61(old, data.intent, authoritativeDelivery);
       if (JSON.stringify(old) === JSON.stringify(preferences))
         return { siteId: site.id, revision: site.updatedAt.toISOString(), updated: false };
       const revision = nextSiteConfigurationRevision(site.updatedAt);
