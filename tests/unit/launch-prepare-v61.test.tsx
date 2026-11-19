@@ -69,6 +69,19 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("Prepared content");
   });
 
+  it("reserves center navigation for actual steps within a submodule", () => {
+    for (const module of prepareModulesV61) {
+      const html = renderToStaticMarkup(
+        <LaunchPrepareV61 siteId={siteId} module={module.id} />,
+      );
+      expect(html, module.id).not.toContain('aria-label="Prepare modules"');
+      expect(html, module.id).not.toContain('aria-label="Prepare module navigation"');
+      expect(html, module.id).not.toContain("Continue: " + module.title);
+      expect(html, module.id).not.toContain(" of 7");
+      expect(html, module.id).toContain("Launch Studio / Prepare");
+    }
+  });
+
   it("uses Establish delivery only as a discovery default", () => {
     expect(preferredCatalogDelivery("physical")).toBe("onsite");
     expect(preferredCatalogDelivery("digital")).toBe("remote");
