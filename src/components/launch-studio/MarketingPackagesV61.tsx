@@ -246,6 +246,8 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   const visible=packages.filter(item=>context.purposes.includes(item.content.purpose) &&
     (showArchived?item.status==="archived":item.status!=="archived"));
   const currentSuggestion=suggestions?.[content.purpose]??null;
+  const packageHandoff=record && context.packageHandoff?.purpose===record.content.purpose
+    ?context.packageHandoff:null;
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
   const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
   const rail=<div className="space-y-4">
@@ -513,13 +515,13 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
               {record.content.formats.map(id=>marketingFormatOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
           </dl>
         </WorkspacePanel>
-        {context.packageHandoff && context.packageHandoff.purpose===record.content.purpose &&
-          <WorkspacePanel title={context.packageHandoff.title}
-            description={context.packageHandoff.description}>
+        {packageHandoff &&
+          <WorkspacePanel title={packageHandoff.title}
+            description={packageHandoff.description}>
             {record.status==="archived"
               ? <WorkspaceNotice tone="attention">Restore this package before using it for a new activity.</WorkspaceNotice>
               : <Button asChild variant="outline"><a href={
-                context.packageHandoff.href(siteId,record.id)
+                packageHandoff.href(siteId,record.id)
               }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
           </WorkspacePanel>}
         <WorkspaceNotice tone="info">The package's content is saved. New branded releases are available to download. Sending marketing email requires separate authorization.</WorkspaceNotice>
