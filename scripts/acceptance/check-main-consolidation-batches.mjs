@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Read-only reconciliation for seven applied main batches (8 + 46 + 51 + 22 + 8 + 12 + 38).
+ * Read-only reconciliation for nine applied main batches (8 + 46 + 51 + 22 + 8 + 12 + 38 + 9 + 10).
  * Does not run a migration or modify a database.
  *
  * CAN_MAIN_CONSOLIDATION_CHECK=1 DATABASE_URL=<main Neon URL> \
@@ -19,6 +19,8 @@ const sources=[
   ["applied-eight-assessments","database/production/2026-11-19-consolidate-eight-assessment-grading-tables.sql",8,"json"],
   ["applied-twelve-blueprints","database/production/2026-11-19-consolidate-12-blueprint-tables.sql",12,"json"],
   ["applied-thirty-eight","database/production/2026-11-19-consolidate-38-assessment-survey-qualification-completion-tables.sql",38,"json"],
+  ["applied-nine-instructional","database/production/2026-11-19-consolidate-nine-instructional-track-tables.sql",9,"json"],
+  ["applied-ten-content","database/production/2026-11-19-consolidate-10-content-professional-tables.sql",10,"json"],
 ];
 if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
   throw new Error("Explicit read-only opt-in and production DATABASE_URL required");
@@ -26,11 +28,11 @@ if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
 function parseBatch([label,file,expected,arity]){
   const source=readFileSync(file,"utf8");
   if(arity==="json"){
-    const match=source.match(/snapshot jsonb := '([^']+)'::jsonb/);
+    const match=source.match(/snapshot\s+jsonb\s*:=\s*'([^']+)'::jsonb/);
     if(!match)throw new Error("Expected a pinned JSON snapshot in "+file);
     const records=JSON.parse(match[1]).map(x=>({
-      name:x.name,oid:x.oid,rls:x.rls,force:x.force_rls,policies:x.pol,
-      triggers:x.trg,outf:x.out_fks,inf:x.in_fks,indexes:x.indexes,
+      name:x.name,oid:x.oid,rls:x.rls,force:x.force_rls??x.forced,policies:x.pol,
+      triggers:x.trg,outf:x.out_fks??x.outf,inf:x.in_fks??x.inf,indexes:x.indexes??x.idx,
     }));
     if(records.length!==expected||new Set(records.map(x=>x.name)).size!==expected)
       throw new Error("Pinned JSON migration inventory mismatch in "+file);
@@ -131,7 +133,7 @@ async function main(){
     verifiedAppliedTables:all.length,liveSchemaTables:relationCounts,
     remainingPublicToLegacyForeignKeys:crossings[0]?.foreign_keys??null,discrepancies};
   console.log(JSON.stringify(report,null,2));
-  if(discrepancies.length||all.length!==185)process.exitCode=2;
+  if(discrepancies.length||all.length!==204)process.exitCode=2;
 }
 
 main().catch(e=>{console.error("CAN OS consolidation reconciliation FAILED:",e.message);process.exitCode=1;});
