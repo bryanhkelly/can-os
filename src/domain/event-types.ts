@@ -224,6 +224,8 @@ export const EventTypes = {
   SitePublicIdentityChanged: "SitePublicIdentityChanged",
   SitePublished: "SitePublished",
   SiteUnpublished: "SiteUnpublished",
+  SiteWebsitePreviewShared: "SiteWebsitePreviewShared",
+  SiteWebsitePreviewRevoked: "SiteWebsitePreviewRevoked",
   SiteLocalWebsiteDraftSaved: "SiteLocalWebsiteDraftSaved",
   SiteLocalWebsiteContentPublished: "SiteLocalWebsiteContentPublished",
   SiteLocalWebsiteContentReviewRequested: "SiteLocalWebsiteContentReviewRequested",
