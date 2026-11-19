@@ -1,4 +1,5 @@
-import { index, integer, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createdAt, id, updatedAt } from "./common";
 import { organizations, sites } from "./organizations";
 import { people } from "./identity";
@@ -18,4 +19,6 @@ export const siteMarketingPackages = pgTable("site_marketing_packages", {
   updatedAt: updatedAt(),
 }, table => [
   index("site_marketing_packages_site_status_idx").on(table.siteId,table.status,table.updatedAt),
+  check("site_marketing_packages_revision_ck",sql`${table.revision} >= 1`),
+  check("site_marketing_packages_status_ck",sql`${table.status} IN ('draft','archived')`),
 ]);

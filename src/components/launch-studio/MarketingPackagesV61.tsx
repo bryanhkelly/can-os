@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Archive, ArrowLeft, ArrowRight, Check, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/choice";
+import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionFooter, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { ActionDialog, ActionFooter, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
   marketingPackageContentSchema, marketingPurposeOptions, marketingStepIssue,
@@ -40,6 +40,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
   const [step,setStep]=useState(0);
   const [showArchived,setShowArchived]=useState(false);
   const [busy,setBusy]=useState(false);
+  const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const dirty=view==="wizard" && (!record || title!==record.title ||
@@ -83,6 +84,11 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
   async function next() {
     const issue=marketingStepIssue(steps[step]!,title,content);
     if(issue){setError(issue);return;}
+    if(step===3){
+      const incomplete=steps.map((item,index)=>({index,issue:marketingStepIssue(item,title,content)}))
+        .find(item=>item.issue);
+      if(incomplete){setStep(incomplete.index);setError(incomplete.issue!);return;}
+    }
     await run(async()=>{
       if(!record) {
         const created=await createSiteMarketingPackageV61({data:{siteId,title,purpose:content.purpose}});
@@ -126,13 +132,12 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
     });
   }
   async function remove(selected:PackageRecord) {
-    if(!window.confirm("Permanently delete this package? This cannot be undone."))return;
     await run(async()=>{
       await deleteSiteMarketingPackageV61({data:{
         siteId,packageId:selected.id,expectedRevision:selected.revision,
       }});
       setPackages(current=>current.filter(item=>item.id!==selected.id));
-      setRecord(null);setView("library");setNotice("Package deleted.");
+      setRecord(null);setView("library");setDeleteCandidate(null);setNotice("Package deleted.");
     });
   }
   async function exitLaunch() {
@@ -200,7 +205,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
             aria-label={(item.status==="archived"?"Restore ":"Archive ")+item.title}>
             {item.status==="archived"?<RotateCcw aria-hidden="true"/>:<Archive aria-hidden="true"/>}
           </Button>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void remove(item)}
+          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>setDeleteCandidate(item)}
             aria-label={"Delete "+item.title}><Trash2 aria-hidden="true"/></Button>
         </article>)}</div>
         <ActionFooter><Button variant="outline" onClick={()=>void exitLaunch()}>Back to Launch Overview</Button></ActionFooter>
@@ -208,13 +213,13 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
 
       {view==="wizard"&&<>
         <nav aria-label="Package steps" className="grid gap-2 sm:grid-cols-4">
-          {steps.map((value,index)=><button key={value} type="button" disabled={busy || (!record&&index>0)}
+          {steps.map((value,index)=><div key={value}
             aria-current={index===step?"step":undefined}
             className={"border px-3 py-3 text-left text-xs font-semibold focus-visible:ring-2 focus-visible:ring-ring "+
               (index===step?"border-primary bg-accent text-primary":"bg-card text-muted-foreground")}
-            onClick={()=>{if(!dirty||window.confirm("Switch steps without saving your changes?"))setStep(index);}}>
+>
             <span className="mr-2">{index+1}.</span>{stepLabels[index]}
-          </button>)}
+          </div>)}
         </nav>
 
         {step===0&&<WorkspacePanel title="What would you like to share?" description="Choose a starting point. Your Site brand will be reused automatically later.">
@@ -222,7 +227,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
             {marketingPurposeOptions.map(option=><label key={option.id}
               className={"flex cursor-pointer gap-3 border p-4 text-sm "+
                 (content.purpose===option.id?"border-primary bg-accent":"bg-card")}>
-              <input type="radio" name="package-purpose" className="mt-1 accent-primary"
+              <Radio name="package-purpose" className="mt-1"
                 checked={content.purpose===option.id} onChange={()=>
                   patch({...initialMarketingContent(siteName,option.id),audiences:content.audiences,formats:content.formats})}/>
               <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
@@ -308,6 +313,11 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
           <Button disabled={busy||record.status==="archived"} onClick={()=>open(record,true)}>Edit package</Button>
         </ActionFooter>
       </>}
+      <ActionDialog open={Boolean(deleteCandidate)} title="Delete Marketing Package"
+        description="Permanently delete this draft package? This cannot be undone."
+        confirmLabel="Delete package" destructive pending={busy}
+        onClose={()=>setDeleteCandidate(null)}
+        onConfirm={()=>{if(deleteCandidate)void remove(deleteCandidate);}} />
     </div>
   </WorkspaceShell>;
 }

@@ -26,6 +26,13 @@ const saveInput = revisionInput.extend({
 });
 const archiveInput = revisionInput.extend({ archived: z.boolean() });
 
+function canonicalJson(value:unknown):string {
+  return JSON.stringify(value,(_key,entry:unknown)=>
+    entry && typeof entry==="object" && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([a],[b])=>a.localeCompare(b)))
+      : entry);
+}
+
 function toView(row: typeof siteMarketingPackages.$inferSelect) {
   return {
     id: row.id, siteId: row.siteId, title: row.title,
@@ -95,7 +102,7 @@ export const saveSiteMarketingPackageV61 = createServerFn({method:"POST"})
     if(!current)throw new DomainError("UNAVAILABLE","Package unavailable in this Site");
     if(current.revision!==data.expectedRevision)throw new DomainError("CONFLICT");
     if(current.status==="archived")throw new DomainError("CONFLICT","Restore the package before editing.");
-    if(current.title===data.title&&JSON.stringify(current.content)===JSON.stringify(data.content))
+    if(current.title===data.title&&canonicalJson(current.content)===canonicalJson(data.content))
       return toView(current);
     const [saved]=await tx.update(siteMarketingPackages).set({
       title:data.title,content:data.content,revision:current.revision+1,updatedAt:new Date(),
