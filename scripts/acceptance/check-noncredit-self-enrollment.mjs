@@ -34,14 +34,14 @@ try {
       has_table_privilege('can_os_canonical_auth_app',c.oid,'SELECT') AS canonical_reader_can_select
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE (n.nspname='public' AND c.relname='access_account_noncredit_principals')
-       OR (n.nspname='education_v30' AND c.relname IN (
+       OR (n.nspname='public' AND c.relname IN (
         'noncredit_self_enrollment_releases','noncredit_self_enrollment_claims'))
   `);
   const found=new Map(tables.map(row=>[row.schema_name+"."+row.table_name,row]));
   for(const table of [
     "public.access_account_noncredit_principals",
-    "education_v30.noncredit_self_enrollment_releases",
-    "education_v30.noncredit_self_enrollment_claims",
+    "public.noncredit_self_enrollment_releases",
+    "public.noncredit_self_enrollment_claims",
   ]) {
     const row=found.get(table);
     assert.ok(row,"Missing "+table);
@@ -53,8 +53,8 @@ try {
   const {rows:triggers}=await client.query(`
     SELECT t.tgname FROM pg_trigger t
     WHERE t.tgrelid IN (
-      'education_v30.noncredit_self_enrollment_releases'::regclass,
-      'education_v30.noncredit_self_enrollment_claims'::regclass)
+      'public.noncredit_self_enrollment_releases'::regclass,
+      'public.noncredit_self_enrollment_claims'::regclass)
       AND NOT t.tgisinternal
   `);
   assert.ok(triggers.some(row=>row.tgname==="v301_freeze_noncredit_release"),
@@ -69,8 +69,8 @@ try {
       pg_get_constraintdef(c.oid) AS definition
     FROM pg_constraint c
     WHERE c.conrelid IN (
-      'education_v30.noncredit_self_enrollment_releases'::regclass,
-      'education_v30.noncredit_self_enrollment_claims'::regclass,
+      'public.noncredit_self_enrollment_releases'::regclass,
+      'public.noncredit_self_enrollment_claims'::regclass,
       'public.access_account_noncredit_principals'::regclass)
   `);
   const defs=constraints.map(row=>row.definition).join("\n");
