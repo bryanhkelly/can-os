@@ -31,6 +31,7 @@ vi.mock("@/modules/sites/site-preview-sharing.functions", () => ({
 }));
 vi.mock("@/modules/sites/launch-site-publication.functions", () => ({
   readLaunchSitePublication: vi.fn(),
+  reviewLaunchSiteWebsiteCopy: vi.fn(),
 }));
 vi.mock("@/modules/sites/site-publication.functions", () => ({
   setSitePublicationStatus: vi.fn(),
