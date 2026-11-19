@@ -28,11 +28,11 @@ describe("Establish / Site Profile canonical handoff", () => {
     const form = source("src/components/launch-studio/EstablishSiteProfileUnified.tsx");
     const frame = source("src/components/launch-studio/LaunchSiteFrameV61.tsx");
     expect(route).toContain("<WorkspaceShell");
-    expect(route).not.toMatch(/<(?:main|h1)(?:\\s|>)/);
+    expect(route).not.toMatch(/<(?:main|h1)(?:\s|>)/);
     expect(form).toContain("<Label");
-    expect(form).not.toMatch(/<(?:label|button|input|select|textarea)(?:\\s|>)/);
+    expect(form).not.toMatch(/<(?:label|button|input|select|textarea)(?:\s|>)/);
     expect(frame).toContain('<Button type="button" variant="ghost"');
-    expect(frame).not.toMatch(/<button(?:\\s|>)/);
+    expect(frame).not.toMatch(/<button(?:\s|>)/);
   });
 
   it("locks shared time zone and location editors during save and reconciliation", () => {
