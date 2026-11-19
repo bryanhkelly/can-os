@@ -84,7 +84,7 @@ function SiteLaunchPage() {
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
-    : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61
+    : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61 key={site.id}
       module={selected.id} siteId={site.id} intent={programsAudiences?.intent ?? null} />
     : selected && isDestinationModuleV61(selected.id) ? <LaunchModuleDestinationV61
       module={selected.id} title={selected.title} stage={selected.stage} siteId={site.id} />
