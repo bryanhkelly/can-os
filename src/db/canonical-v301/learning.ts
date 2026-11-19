@@ -53,7 +53,7 @@ export const educationOperationOrganizationRoles = pgTable("education_operation_
   },
 );
 
-export const courses = educationV30.table("courses", {
+export const courses = pgTable("courses", {
   id: id(),
   publisherOrganizationId: uuid("publisher_organization_id").notNull(),
   courseCode: text("course_code").notNull(),
@@ -61,7 +61,7 @@ export const courses = educationV30.table("courses", {
   subject: text("subject"),
 });
 
-export const serviceCapabilities = educationV30.table("service_capabilities", {
+export const serviceCapabilities = pgTable("service_capabilities", {
   id: id(),
   code: text("code").notNull(),
 });
@@ -121,8 +121,7 @@ export const courseVersions = educationV30.table(
   ],
 );
 
-export const courseUnits = educationV30.table(
-  "course_units",
+export const courseUnits = pgTable("course_units",
   {
     id: id(),
     courseVersionId: uuid("course_version_id").notNull(),
