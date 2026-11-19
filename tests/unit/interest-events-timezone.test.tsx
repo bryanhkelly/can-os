@@ -57,6 +57,20 @@ describe("interest event timezone", () => {
     expect(html).not.toContain("Other Site Program");
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
   });
+  it("shows an editable saved-package title without generating dates or registrations", () => {
+    const html=renderToStaticMarkup(<InterestEventsWorkspace
+      selection={{siteId:"school"}} mode="create"
+      suggestedTitle="Community learning conversation" titleSource="saved-package"
+      data={{
+        programs:[{id:"program",name:"Community Program",siteId:"school",timezone:"America/New_York"}],
+        events:[],
+      }}/>);
+    expect(html).toContain("Community learning conversation");
+    expect(html).toContain("saved Marketing Package");
+    expect(html).toContain('type="datetime-local"');
+    expect(html).not.toContain("An event was created");
+  });
+
   it("links an event's program name to that program workspace", () => {
     const html = renderToStaticMarkup(<InterestEventsWorkspace data={{
       programs: [{ id: "program", name: "East School", siteId: "school", timezone: "America/New_York" }],
