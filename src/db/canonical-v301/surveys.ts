@@ -55,7 +55,7 @@ export const surveyCampaigns = educationV30.table("survey_campaigns", {
   endsAt:timestamp("ends_at",{withTimezone:true}),
   surveyPermissionEvidenceId:uuid("survey_permission_evidence_id"),
 });
-export const surveyInvitations = educationV30.table("survey_invitations", {
+export const surveyInvitations = pgTable("survey_invitations", {
   id:id(),campaignId:uuid("campaign_id").notNull(),
   invitedPersonId:uuid("invited_person_id").notNull(),
   sentAt:timestamp("sent_at",{withTimezone:true}),
