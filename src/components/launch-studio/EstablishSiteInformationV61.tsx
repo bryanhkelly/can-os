@@ -335,8 +335,8 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who hosts your learning space or activities?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
-            <SingleChoice name="site-host" selected={host.hostingMode === "same"} title="Our organization"
-              detail="We host our own activities" onSelect={() => setHost(current => ({ ...current, hostingMode: "same" }))} />
+            <SingleChoice name="site-host" selected={host.hostingMode === "same"} title="Your organization"
+              detail="Your organization hosts its own activities" onSelect={() => setHost(current => ({ ...current, hostingMode: "same" }))} />
             <SingleChoice name="site-host" selected={host.hostingMode === "different"} title="Another organization"
               detail="A separate organization hosts us" onSelect={() => setHost(current => ({ ...current, hostingMode: "different" }))} />
             <SingleChoice name="site-host" selected={host.hostingMode === "undecided"} title="Not decided yet"
