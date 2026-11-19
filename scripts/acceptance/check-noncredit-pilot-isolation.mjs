@@ -66,25 +66,25 @@ async function run(){
       const client=clients[i],other=1-i;
       const {rows:courses}=await client.query(`
         SELECT id,noncredit_registration_id,section_id,enrollment_id
-        FROM education_v30.learner_course_attempts WHERE id=ANY($1::uuid[])
+        FROM public.learner_course_attempts WHERE id=ANY($1::uuid[])
       `,[[attempts[i],attempts[other]]]);
       if(courses.length!==1||courses[0].id!==attempts[i]||
          courses[0].noncredit_registration_id!==registrations[i]||
          courses[0].section_id||courses[0].enrollment_id)
         fail("Learner "+i+" could see another Course attempt or the wrong participation source");
       const {rows:regs}=await client.query(`
-        SELECT id FROM education_v30.noncredit_registrations WHERE id=ANY($1::uuid[])
+        SELECT id FROM public.noncredit_registrations WHERE id=ANY($1::uuid[])
       `,[[registrations[i],registrations[other]]]);
       if(regs.length!==1||regs[0].id!==registrations[i])
         fail("Learner "+i+" could see another participant's registration");
       const {rows:grants}=await client.query(`
-        SELECT course_attempt_id FROM education_v30.assessment_access_grants
+        SELECT course_attempt_id FROM public.assessment_access_grants
         WHERE course_attempt_id=ANY($1::uuid[])
       `,[[attempts[i],attempts[other]]]);
       if(grants.some(g=>g.course_attempt_id!==attempts[i]))
         fail("Learner "+i+" could see another participant's assessment authorization");
       const {rows:progress}=await client.query(`
-        SELECT course_attempt_id FROM education_v30.learner_lesson_progress
+        SELECT course_attempt_id FROM public.learner_lesson_progress
         WHERE course_attempt_id=ANY($1::uuid[])
       `,[[attempts[i],attempts[other]]]);
       if(progress.some(p=>p.course_attempt_id!==attempts[i]))
