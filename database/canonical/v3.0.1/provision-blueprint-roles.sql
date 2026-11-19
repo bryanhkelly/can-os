@@ -116,7 +116,7 @@ SELECT format(
  :'author_role')
 \gexec
 
-SELECT format('GRANT INSERT ON education_v30.%I TO %I', t, :'author_role')
+SELECT format('GRANT INSERT ON public.%I TO %I', t, :'author_role')
 FROM unnest(ARRAY[
  'blueprint_configurations','blueprint_configuration_versions',
  'blueprint_configuration_components','blueprint_configuration_component_references',
