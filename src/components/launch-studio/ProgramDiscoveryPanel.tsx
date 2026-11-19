@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { canPlanOffering, type AvailableOffering } from "@/domain/program-discovery";
 import { normalizeClientError } from "@/lib/client-error";
-import { discoverLaunchSitePrograms } from "@/modules/programs/program-discovery.functions";
+import { discoverLaunchSitePrograms, getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
   const [deliveryContext, setDeliveryContext] = useState<DeliveryContext>(initialDelivery);
   const [offerings, setOfferings] = useState<AvailableOffering[] | null>(null);
   const [canonicalSiteId, setCanonicalSiteId] = useState<string | null>(null);
+  const [classManagementAllowed, setClassManagementAllowed] = useState(false);
   const [query, setQuery] = useState("");
   const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>("all");
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
     requestVersion.current += 1;
     setOfferings(null);
     setCanonicalSiteId(null);
+    setClassManagementAllowed(false);
     setError(null);
     setLoading(false);
     setQuery("");
@@ -54,13 +56,19 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
     setError(null);
     setOfferings(null);
     setCanonicalSiteId(null);
+    setClassManagementAllowed(false);
     try {
-      const result = await discoverLaunchSitePrograms({
-        data: { publicSiteId: siteId, deliveryContext },
-      });
+      const [result, classScope] = await Promise.all([
+        discoverLaunchSitePrograms({ data: { publicSiteId: siteId, deliveryContext } }),
+        // Class authority is distinct from catalog planning. An unavailable
+        // capability check must hide this handoff, not block catalog discovery.
+        getLaunchSiteClassScope({ data: { siteId } })
+          .catch(() => ({ kind: "blocked" as const })),
+      ]);
       if (version !== requestVersion.current) return;
       setOfferings(result.items);
       setCanonicalSiteId(result.canonicalSiteId);
+      setClassManagementAllowed(classScope.kind === "ready");
     } catch (caught) {
       if (version === requestVersion.current)
         setError(normalizeClientError(caught, "Program discovery could not be completed. Try again.").message);
@@ -93,6 +101,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
               setDeliveryContext(selected.value);
               setOfferings(null);
               setCanonicalSiteId(null);
+              setClassManagementAllowed(false);
               setError(null);
               setQuery("");
               setAvailabilityFilter("all");
@@ -161,11 +170,13 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
                     className="inline-flex min-h-11 items-center justify-center border border-primary bg-primary px-4 py-2 text-center text-sm font-semibold text-primary-foreground">
                     Plan in Blueprint workspace
                   </Link>
-                  <Link to="/class" search={{view:"manage",siteId:canonicalSiteId,
+                  {classManagementAllowed ? <Link to="/class" search={{view:"manage",siteId:canonicalSiteId,
                     offeringVersionId:offering.offeringVersionId}}
                     className="inline-flex min-h-11 items-center justify-center border px-4 py-2 text-center text-sm font-semibold text-primary">
                     Check Class configuration
-                  </Link>
+                  </Link> : <p className="text-xs leading-5 text-muted-foreground">
+                    Class configuration requires a separate verified Site permission.
+                  </p>}
                 </div> : <p className="text-xs text-muted-foreground">
                   {planEligible ? "Blueprint planning requires an authorized canonical Site." : "Not available for planning in the current context."}
                 </p>}
