@@ -41,9 +41,6 @@ type ModulePlan = {
 };
 
 const scoped = (siteId: string) => encodeURIComponent(siteId);
-const prepareHref = (siteId: string, module: PrepareModuleIdV61) =>
-  "/launch/site?siteId=" + scoped(siteId) + "&module=" + module;
-
 /** These destinations are existing authorized operations, not new task stores. */
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {
@@ -144,10 +141,11 @@ function PrepareModuleHandoffs({ siteId, handoffs }: { siteId: string; handoffs:
   </WorkspacePanel>;
 }
 
-export function LaunchPrepareV61({ module, siteId, intent }: {
+export function LaunchPrepareV61({ module, siteId, intent, intentUnavailable = false }: {
   module: PrepareModuleIdV61;
   siteId: string;
   intent?: SiteProgramsAudiencesV61 | null;
+  intentUnavailable?: boolean;
 }) {
   const index = prepareModulesV61.findIndex(item => item.id === module);
   const definition = prepareModulesV61[index]!; // The public module union is derived from this registry.
@@ -193,13 +191,17 @@ export function LaunchPrepareV61({ module, siteId, intent }: {
       {module === "program-catalog" && <>
         <WorkspacePanel title="Begin with your vision"
           description="Your interests from Establish guide discovery, not automatic qualification.">
+          {intentUnavailable && <WorkspaceNotice tone="attention">
+            Saved Programs & Audiences could not be loaded. You can still browse the published catalog,
+            but return to Establish to review your preferences before planning a Solution.
+          </WorkspaceNotice>}
           {intent && intent.interestIds.length > 0 ? <>
             <p className="text-xs font-medium text-muted-foreground">What you said you want to offer</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {intent.interestIds.map(id => <span key={id} className="border bg-muted px-3 py-2 text-xs font-medium">{intentTitles[id]}</span>)}
             </div>
             {intent.startingFocus && <p className="mt-3 text-sm">Starting focus: <strong>{intentTitles[intent.startingFocus]}</strong></p>}
-          </> : <p className="text-sm text-muted-foreground">You have not saved any learning interests. You can explore the catalog now and add your vision later.</p>}
+          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You have not saved any learning interests. You can explore the catalog now and add your vision later.</p>
           <Link to="/launch/site" search={{siteId, module:"programs-audiences"}}
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary underline">
             Review Programs &amp; Audiences <ArrowRight aria-hidden="true" className="size-4" />
