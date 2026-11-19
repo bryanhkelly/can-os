@@ -54,3 +54,28 @@ export function assertSiteBrandMediaRights(asset:SiteBrandAsset|null):boolean {
   return !asset || asset.revokedAt===null && asset.rightsConfirmed &&
     asset.childImageConsent!=="unconfirmed" && Boolean(asset.altText.trim());
 }
+
+/** This is a one-way presentation projection, never another Brand store.
+ * Existing public renderers consume SiteLocalContent's structural template
+ * together with the exact resolved, immutable Brand version.
+ */
+export function siteBrandPresentationIdentity(
+  brand:ResolvedSiteBrand,
+  templateId:import("./site-theme").SiteTemplateId="heritage",
+):import("./site-local-content").SiteLocalBranding{
+  const image=(asset:SiteBrandAsset|null)=>{
+    if(!assertSiteBrandMediaRights(asset)||!asset)return null;
+    return {dataUrl:asset.dataUrl,altText:asset.altText,rightsConfirmed:true,
+      childImageConsent:asset.childImageConsent};
+  };
+  const config=siteBrandConfigurationSchema.parse({
+    directionId:brand.directionId,paletteId:brand.paletteId,typographyId:brand.typographyId,
+    headingFontId:null,bodyFontId:null,displayName:brand.displayName,
+    logoAssetId:brand.logo?.id??null,heroAssetId:brand.hero?.id??null,
+  });
+  return {
+    theme:"classic",templateId,paletteId:config.paletteId,typographyId:config.typographyId,
+    ...(brand.directionId?{brandDirectionId:brand.directionId}:{}),
+    heroImage:image(brand.hero),logoImage:image(brand.logo),
+  };
+}
