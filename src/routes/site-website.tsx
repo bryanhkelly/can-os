@@ -12,11 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
+import { DisclosureSection } from "@/components/workspace/disclosure-section";
+import { WebsiteArtworkField } from "@/components/launch-studio/WebsiteArtworkField";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkspaceNotice, WorkspacePanel, StatusBadge, type StatusTone } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionFooter, type StatusTone } from "@/components/workspace";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -146,7 +148,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
           </nav>}
           <div className="mt-5">
             {data.host
-              ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep}/>
+              ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio}/>
               : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/>}
           </div>
           <div className="mt-5 border-t pt-4 text-sm">{returnToLaunch??<Link to="/home" className="font-semibold text-primary">Exit to workspace</Link>}</div>
@@ -208,7 +210,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
         </p>
       </div>}>
       {data.host
-        ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} />
+        ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio} />
         : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/>}
     </GuidedSetupShell>
   </WorkspaceShell>;
@@ -490,11 +492,12 @@ const churchFields: ReadonlyArray<{ key: SiteLocalTextField; label: string; help
 ];
 
 function LocalWebsiteCopyEditor({
-  data, step, onStepChange,
+  data, step, onStepChange, allowPublication,
 }: {
   data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
   step: number;
   onStepChange: (step: number) => void;
+  allowPublication: boolean;
 }) {
   const router = useRouter();
   const [editor, setEditor] = useState(() => {
@@ -509,7 +512,7 @@ function LocalWebsiteCopyEditor({
       ? update(previous.content) : update }));
   const dirty = JSON.stringify(content) !== JSON.stringify(editor.saved);
   const revisionConflict = editor.siteId === data.siteId && editor.revision !== data.currentRevision;
-  useLaunchUnsavedChanges(dirty);
+  const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const [preparingArtwork, setPreparingArtwork] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
@@ -553,23 +556,23 @@ function LocalWebsiteCopyEditor({
     setShareMessage("");
   }
 
-  async function saveDraft() {
+  async function saveDraft(mode: "stay" | "exit" = "stay") {
     if (busy || !data.canPublish || !data.draftStorageReady || revisionConflict) return;
     setError("");
-    if (!brandDirection && editor.revision === 0) {
-      setError("Choose a Brand Identity before saving your first private website draft.");
-      return;
-    }
     const submitted = content;
     const outcome = await mutation.run(() => saveChurchWebsiteDraft({
       data: { content: submitted, siteId: data.siteId, expectedRevision: editor.revision },
-    }), { successMessage: "Private website draft saved. The public site and approval statuses have not changed.",
+    }), { successMessage: "Private website draft saved. Publication and enrollment states are unchanged.",
       commandErrorMessage: "Could not save the private website draft." });
-    if (outcome.status === "saved" || outcome.status === "refresh-failed")
+    if (outcome.status === "saved" || outcome.status === "refresh-failed") {
       markSaved(submitted, outcome.value.revision);
-    else if (outcome.status === "failed" &&
+      if (mode === "exit" && outcome.status === "saved") {
+        releaseNavigation();
+        await router.navigate({to:"/launch/site",search:{siteId:data.siteId}});
+      }
+    } else if (outcome.status === "failed" &&
       normalizeClientError(outcome.error).code === "CONFLICT") {
-      // Surface the current revision without discarding what this editor typed.
+      // Keep all typed content; a newer server revision needs explicit review.
       await router.invalidate().catch(() => undefined);
     }
   }
@@ -654,6 +657,7 @@ function LocalWebsiteCopyEditor({
     ["churchHistory", "leadershipWelcome", "localTraditions", "denomination", "statementOfFaith", "spiritualFormation"].includes(field.key));
   const textField = (field: typeof churchFields[number]) => {
     const starter = content.editorialBaseline?.fields[field.key as typeof websiteStarterFieldIds[number]];
+    const suggested = data.siteStoryCopyCandidates.find(item => item.field === field.key);
     const changed = typeof starter === "string" && (content[field.key] ?? "") !== starter;
     const sequence = websiteStarterFieldIds.indexOf(field.key as typeof websiteStarterFieldIds[number]);
     return <div key={field.key} className="border-b border-border pb-5 last:border-0">
@@ -685,6 +689,16 @@ function LocalWebsiteCopyEditor({
             disabled={busy || !data.canPublish} value={content[field.key] ?? ""} onChange={event => setContent(old =>
               ({ ...old, [field.key]: event.target.value }))}
             className="mt-3 min-h-11 w-full border border-border bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />}
+      {suggested && <div className="mt-3 border bg-muted/20 p-3">
+        <p className="text-xs font-semibold">Suggested from Site Information</p>
+        <p className="mt-1 text-xs text-muted-foreground">{suggested.reason}</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm">{suggested.text}</p>
+        <Button variant="outline" type="button" className="mt-3 min-h-11"
+          disabled={busy || !data.canPublish || content[field.key] === suggested.text}
+          onClick={()=>setContent(old=>({...old,[field.key]:suggested.text}))}>
+          {content[field.key] === suggested.text ? "Suggestion applied" : "Apply suggestion"}
+        </Button>
+      </div>}
       {typeof starter === "string" && <p className="mt-2 text-xs text-muted-foreground">
         {changed ? "Personalized copy. Reset restores the original prepared wording for this field." :
           "Prepared starting copy. Edit anything, or keep it as written after review."}
@@ -785,14 +799,24 @@ function LocalWebsiteCopyEditor({
         <div>
           <h3 className="font-serif text-2xl">Your school story is ready to make your own.</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            We've prepared thoughtful starting copy using your school name. You can keep it, personalize it,
-            or reset an individual answer to its original wording. Your changes save only when you choose Save private draft or Publish.
+            Prepared copy uses your Site name. Optional suggestions draw on saved Site Information
+            and never overwrite a field until you explicitly apply them. Restore Original affects only that field.
           </p>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Prepared words are suggestions, not verified promises about programs, services, leaders or opening status.
             Please review them before publishing. Your actual academic and admissions information comes from CAN OS.
           </p>
         </div>
+        {data.siteStorySourceChoices && <div className="border bg-muted/20 p-4 text-sm" role="note">
+          <p className="font-semibold">Your original Site Story remains private</p>
+          <p className="mt-2 text-muted-foreground">
+            Values: {data.siteStorySourceChoices.values.join(", ") || "not selected"}.
+            Priorities: {data.siteStorySourceChoices.motivations.join(", ") || "not selected"}.
+            Website copy suggestions are editable aspirations, not verified claims.
+          </p>
+          <Link to="/launch/site" search={{siteId:data.siteId,module:"site-information"}}
+            className="mt-3 inline-block font-semibold text-primary underline">Review Site Information</Link>
+        </div>}
         {primaryFields.map(textField)}
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Review source-attributed church story suggestions (optional)</summary>
@@ -1023,10 +1047,13 @@ function LocalWebsiteCopyEditor({
         {!data.canPublish && <p role="status" className="border p-3 text-sm">
           You can preview this Site, but your verified Site assignment does not include local website publishing.
         </p>}
-        <Button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}
-          className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-          {busy ? "Publishing…" : "Separately publish reviewed church-owned content"}
-        </Button>
+        {allowPublication && <Button type="button" variant="outline"
+          disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}>
+          {busy ? "Publishing…" : "Publish reviewed church-owned content"}
+        </Button>}
+        {!allowPublication && <p className="text-sm text-muted-foreground">
+          The Launch Studio saves a private draft only. Official Site publication belongs in Prepare.
+        </p>}
         <p className="text-xs text-muted-foreground">
           Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links are not supported.
           Only church-owned content is published here; CAN controls institutional information.
@@ -1052,22 +1079,20 @@ function LocalWebsiteCopyEditor({
         applied website migration 0077. Draft saving is unavailable until an authorized database
         migration is completed. You can still preview the website, but your changes are not saved.
       </p>}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <Button variant="outline" type="button" disabled={step === 0}
-          onClick={() => onStepChange(Math.max(0, step - 1))}
-          className=" border px-4 py-2 text-sm font-semibold disabled:opacity-50">
-          Back
-        </Button>
-        <Button variant="outline" type="button" disabled={busy || !data.canPublish || !data.draftStorageReady || revisionConflict} onClick={()=>void saveDraft()}
-          className="min-h-11 border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">
-          {busy?"Saving...":"Save private draft"}
-        </Button>
-        {step < 4 && <Button type="button"
-          onClick={() => onStepChange(Math.min(4, step + 1))}
-          className=" bg-foreground px-4 py-2 text-sm font-semibold text-background">
-          Continue
-        </Button>}
-      </div>
+      <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
+        <Button type="button" variant="outline" disabled={busy || step === 0}
+          onClick={()=>onStepChange(Math.max(0,step-1))}>Back</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" type="button"
+            disabled={busy || !data.canPublish || !data.draftStorageReady || revisionConflict}
+            onClick={()=>void saveDraft("exit")}>Save & Exit</Button>
+          {step < 4 ? <Button type="button"
+            onClick={()=>onStepChange(Math.min(4,step+1))}>Continue</Button>
+            : <Button type="button" disabled={busy || !data.canPublish || !data.draftStorageReady || revisionConflict}
+              loading={busy} loadingLabel="Saving private draft…"
+              onClick={()=>void saveDraft("stay")}>Save private draft & finish</Button>}
+        </div>
+      </ActionFooter>
     </div>
   </section>;
 }
