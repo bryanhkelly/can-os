@@ -54,12 +54,15 @@ export const launchModuleDestinationsV61: Record<DestinationModuleId, Destinatio
     ],
   },
   open: {
-    subtitle: "Activate only after the appropriate independent approvals.",
-    intro: "Opening is an authorized institutional or Program transition, never the final step of a generic setup wizard. Open the existing approval workspace to review remaining blockers and authorized next actions.",
+    subtitle: "Open only the experiences independently approved to welcome learners.",
+    intro: "Publishing the Site website makes public marketing possible, not enrollment. Check each Offering's approved operating model, available seats, required safeguards, receiving Program and separately authorized registration before accepting learners.",
     state: "governed",
-    note: "No opening, publishing, enrollment or activation command runs on this page.",
+    note: "Activation happens only in the receiving authorized enrollment service. This page never infers readiness from a published website or a completed setup step.",
     links: [
       { label: "Review readiness and opening authority", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Independent approval and operational requirements" },
+      { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Official website publication and independent HTTPS reachability" },
+      { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Approved receiving Programs and capacity, not automatic enrollment" },
+      { label: "Configure eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Only separately authorized noncredit releases may be open for enrollment" },
       { label: "Open your Site workspace", path: id => `/sites/${scope(id)}`, detail: "Existing Site operations, subject to active membership" },
     ],
   },
