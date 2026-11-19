@@ -86,7 +86,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
         (SELECT count(DISTINCT a.course_id)::int
           FROM public.offering_courses oc
           JOIN public.course_versions cv ON cv.id=oc.course_version_id
-          JOIN education_v30.professional_role_assignments a ON a.course_id=cv.course_id
+          JOIN public.professional_role_assignments a ON a.course_id=cv.course_id
           WHERE oc.offering_version_id=ov.id
             AND a.organization_id=o.publisher_organization_id
             AND a.appointing_organization_id=o.publisher_organization_id
@@ -97,7 +97,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
         (SELECT count(DISTINCT a.course_id)::int
           FROM public.offering_courses oc
           JOIN public.course_versions cv ON cv.id=oc.course_version_id
-          JOIN education_v30.professional_role_assignments a ON a.course_id=cv.course_id
+          JOIN public.professional_role_assignments a ON a.course_id=cv.course_id
           WHERE oc.offering_version_id=ov.id
             AND a.organization_id=o.publisher_organization_id
             AND a.appointing_organization_id=o.publisher_organization_id
@@ -116,12 +116,12 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
           AS "currentEvidenceRecords",
         (SELECT count(*)::int FROM public.offering_release_requirements r
           WHERE r.offering_version_id=ov.id) AS "releasePolicies",
-        (SELECT m.manifest_status FROM education_v30.content_publication_manifests m
+        (SELECT m.manifest_status FROM public.content_publication_manifests m
           WHERE m.offering_version_id=ov.id
           ORDER BY m.created_at DESC,m.id DESC LIMIT 1) AS "manifestStatus",
-        (SELECT count(*)::int FROM education_v30.content_publication_manifest_items i
+        (SELECT count(*)::int FROM public.content_publication_manifest_items i
           WHERE i.manifest_id=(
-            SELECT m.id FROM education_v30.content_publication_manifests m
+            SELECT m.id FROM public.content_publication_manifests m
             WHERE m.offering_version_id=ov.id
             ORDER BY m.created_at DESC,m.id DESC LIMIT 1)) AS "releaseAssets",
         (SELECT count(*)::int FROM public.deployment_offering_adoptions a
