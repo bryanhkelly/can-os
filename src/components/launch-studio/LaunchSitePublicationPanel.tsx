@@ -52,10 +52,10 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
     return () => { requestId.current += 1; };
   }, [load]);
 
-  async function change(action: "publish" | "unpublish") {
+  async function change(action: "publish" | "unpublish" | "republish") {
     if (!state?.address || !state.canPublishSite || busy ||
       reason.trim().length < 10 || reason.trim().length > 500) return;
-    if (action === "publish" && (!reviewed || !state.publishingPrerequisitesPresent ||
+    if (action !== "unpublish" && (!reviewed || !state.publishingPrerequisitesPresent ||
       state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required")) return;
     setBusy(true);
     setError(null);
@@ -65,7 +65,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
         action,
         expectedRevision: state.address.revision,
         reason: reason.trim(),
-        contentReviewed: action === "publish" && reviewed,
+        contentReviewed: action !== "unpublish" && reviewed,
       } });
       setReason("");
       setReviewed(false);
@@ -219,7 +219,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
               {state.address.status === "published" ? "Withdraw public publication" : "Review and publish"}
             </h3>
             <div className="mt-3 space-y-4">
-              {state.address.status !== "published" && <div className="flex items-start gap-3">
+              {(state.address.status !== "published" || state.canRepublish) && <div className="flex items-start gap-3">
                 <Checkbox id="site-publication-reviewed" checked={reviewed}
                   onChange={event => setReviewed(event.currentTarget.checked)} />
                 <Label htmlFor="site-publication-reviewed" className="text-sm leading-6">
@@ -231,6 +231,20 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                 <Textarea value={reason} onChange={event => setReason(event.target.value)}
                   maxLength={500} rows={3} placeholder="Document what was reviewed and why this decision is appropriate." />
               </Field>
+              {state.address.status==="published" && state.canRepublish && <div className="space-y-3 border bg-card p-4">
+                <p className="text-sm font-semibold">A newer Site Brand or website revision is available</p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  The live website keeps its pinned version until you deliberately republish.
+                  The latest saved version needs an explicit review and approval.
+                  This does not open enrollment.
+                </p>
+                <Button type="button" disabled={busy||!reviewed||reason.trim().length<10 ||
+                  !state.publishingPrerequisitesPresent ||
+                  state.latestWebsiteStatus==="draft"||state.latestWebsiteStatus==="review_required"}
+                  onClick={()=>void change("republish")}>
+                  {busy?"Saving decision…":"Republish updated Site"}
+                </Button>
+              </div>}
               <Button disabled={busy || reason.trim().length < 10 ||
                 (state.address.status !== "published" &&
                   (!reviewed || !state.publishingPrerequisitesPresent ||
