@@ -29,6 +29,30 @@ describe("interest event timezone", () => {
     expect(html).toContain('value="2026-11-11T01:00"');
     expect(html).not.toContain("America/Los_Angeles");
   });
+  it("keeps a Launch Studio event handoff scoped to its selected Site", () => {
+    const html = renderToStaticMarkup(<InterestEventsWorkspace
+      selection={{siteId:"site-b"}} mode="create" data={{
+        programs: [
+          {id:"program-a",name:"Other Site Program",siteId:"site-a",timezone:"America/New_York"},
+          {id:"program-b",name:"Selected Site Program",siteId:"site-b",timezone:"America/Chicago"},
+        ],
+        events: [],
+      }} />);
+    expect(html).toContain("Selected Site Program");
+    expect(html).not.toContain("Other Site Program");
+    expect(html).toContain("America/Chicago");
+    expect(html).not.toContain("America/New_York");
+  });
+  it("never substitutes another Site's Program if the selected Site has none", () => {
+    const html = renderToStaticMarkup(<InterestEventsWorkspace
+      selection={{siteId:"site-without-programs"}} mode="create" data={{
+        programs: [{id:"other",name:"Other Site Program",siteId:"site-a",timezone:"America/New_York"}],
+        events: [],
+      }} />);
+    expect(html).toContain("No Programs are available for this selected Site.");
+    expect(html).not.toContain("Other Site Program");
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+  });
   it("links an event's program name to that program workspace", () => {
     const html = renderToStaticMarkup(<InterestEventsWorkspace data={{
       programs: [{ id: "program", name: "East School", siteId: "school", timezone: "America/New_York" }],
