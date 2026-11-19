@@ -1,4 +1,3 @@
-import { changeSitePublicationWithinTransaction } from "./site-publication.server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, siteLocalContentVersions, sitePublications } from "@/db/schema";
@@ -46,7 +45,8 @@ export async function readLocalContentHistory(siteId: string, executor: Reader =
  * the last locally published revision untouched. Unsafe markup is rejected.
  *
  * Rollback appends another revision, preserving authorship and evidence.
- * Neither action changes official Site/Program publication or admission.
+ * Saving a website revision never changes the Site publication status,
+ * independently governed Program publication, or admission.
  */
 export type PartnerLocalContentTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type PartnerLocalContentCommand = {
@@ -126,8 +126,6 @@ export async function publishPartnerLocalContentWithinTransaction(
     const restored = input.operation === "restore" ? { restoredContent: content } : {};
     if (latest && canonicalJson(latest.content) === canonicalJson(content) &&
       latest.status === decision.status) {
-      if(actor.role === "site_admin" && decision.status === "published")
-        await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
       return { changed: false, revision: currentRevision, status: latest.status,
         flaggedFields: latest.flaggedFields, ...restored };
     }
@@ -180,8 +178,6 @@ export async function publishPartnerLocalContentWithinTransaction(
       organizationId: site.organizationId, siteId: site.id,
       payload: { revision, status: decision.status },
     });
-    if(actor.role === "site_admin" && decision.status === "published")
-      await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
     return { changed: true, revision, status: decision.status,
       flaggedFields: decision.flaggedFields, ...restored };
 }
