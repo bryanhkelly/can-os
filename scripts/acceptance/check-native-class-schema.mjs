@@ -16,9 +16,9 @@ const allTriggers=["learner_course_attempt_source_gate","class_enrollment_attemp
   "canonical_linked_survey_scope_guard_trg"];
 try{
   const [relations,cols,checks,triggers,functions]=await Promise.all([
-    pool.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity, EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS grants_public FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])",[tables]),
-    pool.query("SELECT table_name,column_name,is_nullable FROM information_schema.columns WHERE table_schema='education_v30' AND table_name=ANY($1::text[])",[[...tables,"learner_course_attempts"]]),
-    pool.query("SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='education_v30.learner_course_attempts'::regclass AND conname='native_course_attempt_one_source_ck'"),
+    pool.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity, EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS grants_public FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])",[tables]),
+    pool.query("SELECT table_name,column_name,is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name=ANY($1::text[])",[[...tables,"learner_course_attempts"]]),
+    pool.query("SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='public.learner_course_attempts'::regclass AND conname='native_course_attempt_one_source_ck'"),
     pool.query("SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('education_v30','education_v30_secure') AND NOT t.tgisinternal AND tgname=ANY($1::text[])",[allTriggers]),
     pool.query("SELECT pg_get_functiondef('education_v30.validate_course_attempt_source()'::regprocedure) AS body"),
 
