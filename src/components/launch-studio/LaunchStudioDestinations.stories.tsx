@@ -27,16 +27,6 @@ export const ExistingEvents: Story = {
     module: "interest-events", title: "Interest Events", stage: "Introduce",
   },
 };
-export const CanonicalCatalog: Story = {
-  args: {
-    module: "program-catalog", title: "Program Catalog", stage: "Prepare",
-  },
-};
-export const GovernedOpening: Story = {
-  args: {
-    module: "opening-compliance", title: "Opening & Compliance", stage: "Prepare",
-  },
-};
 export const FinalGate: Story = {
   args: {
     module: "open", title: "Open", stage: "Open",
