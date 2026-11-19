@@ -508,6 +508,7 @@ function LocalWebsiteCopyEditor({
   const revisionConflict = editor.siteId === data.siteId && editor.revision !== data.currentRevision;
   const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const [preparingArtwork, setPreparingArtwork] = useState(false);
+  const [contentBlocksDirty, setContentBlocksDirty] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
   const artworkGaps = [content.branding.heroImage, content.branding.logoImage ?? null]
@@ -552,6 +553,10 @@ function LocalWebsiteCopyEditor({
 
   async function saveDraft(mode: "stay" | "exit" = "stay") {
     if (busy || !data.canPublish || !data.draftStorageReady || revisionConflict) return;
+    if (contentBlocksDirty) {
+      setError("Save your website section layout using 'Save private blocks' before saving or exiting.");
+      return;
+    }
     setError("");
     const submitted = content;
     const outcome = await mutation.run(() => saveChurchWebsiteDraft({
@@ -792,7 +797,7 @@ function LocalWebsiteCopyEditor({
                 siteId={data.siteId}
                 initialConfig={data.contentChannelConfig}
                 canPublish={allowPublication && data.canPublish}
-                onSaved={() => { void router.invalidate(); }} />
+                onSaved={() => { void router.invalidate(); }} onDirtyChange={setContentBlocksDirty} />
               </div>
             : <WorkspaceNotice tone="attention" className="mt-4">
                 Your verified Site grant allows previewing but not editing website
