@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
+import { filterPublishedSolutionRecipes, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, search, ...props }: {
@@ -37,6 +38,18 @@ describe("V6.1 Prepare to Open", () => {
     expect(new Set(prepareModulesV61.map(module => module.id)).size).toBe(6);
     expect(isPrepareModuleV61("schedules-capacity")).toBe(true);
     expect(isPrepareModuleV61("website-brand")).toBe(false);
+  });
+
+  it("filters published recipes without leaving an out-of-filter selection visible", () => {
+    const recipes = [
+      { blueprintVersionId: "one", title: "After School", components: [{ key: "digital_skills" }] },
+      { blueprintVersionId: "two", title: "Summer Camp", components: [{ key: "creative_arts" }] },
+    ];
+    expect(filterPublishedSolutionRecipes(recipes, " DIGITAL ")).toEqual([recipes[0]]);
+    expect(filterPublishedSolutionRecipes(recipes, "summer")).toEqual([recipes[1]]);
+    expect(filterPublishedSolutionRecipes(recipes, "")).toEqual(recipes);
+    expect(resolveVisibleSolutionRecipe(filterPublishedSolutionRecipes(recipes, "summer"), "one")).toBe(recipes[1]);
+    expect(resolveVisibleSolutionRecipe([], "one")).toBeUndefined();
   });
 
   it("preserves the requested Site across internal navigation and links to existing owners", () => {
