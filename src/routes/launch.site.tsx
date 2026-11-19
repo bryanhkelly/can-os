@@ -15,6 +15,8 @@ import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-a
 import { WorkspaceShell } from "@/components/workspace";
 import { LaunchModuleDestinationV61, isDestinationModuleV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
 import { LaunchPrepareV61, isPrepareModuleV61 } from "@/components/launch-studio/LaunchPrepareV61";
+import { MarketingPackagesV61 } from "@/components/launch-studio/MarketingPackagesV61";
+import { listSiteMarketingPackagesV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
 
 const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
@@ -37,6 +39,8 @@ export const Route = createFileRoute("/launch/site")({
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
         ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
+      marketingPackages: site && deps.module === "promote"
+        ? await listSiteMarketingPackagesV61({ data: { siteId: site.id } }) : null,
       programsAudiences: site && deps.module === "programs-audiences"
         ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
       // Establish preferences are optional context for catalog discovery. The
@@ -58,7 +62,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, siteInformation, programsAudiences, prepareIntent, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, programsAudiences, marketingPackages, prepareIntent, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -92,6 +96,9 @@ function SiteLaunchPage() {
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
+    : selected?.id === "promote" && marketingPackages ? <MarketingPackagesV61 key={site.id}
+      siteId={site.id} siteName={site.name} initial={marketingPackages}
+      onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })} />
     : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61 key={site.id}
       module={selected.id} siteId={site.id}
       intent={prepareIntent?.kind === "ready" ? prepareIntent.intent : null}

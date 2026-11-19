@@ -11,7 +11,7 @@ import type { PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 
 type ModuleId = typeof siteLaunchModules[number]["id"];
 export type DestinationModuleId = Exclude<ModuleId,
-  "site-profile" | "site-information" | "programs-audiences" | "website-brand" |
+  "site-profile" | "site-information" | "programs-audiences" | "website-brand" | "promote" |
   PrepareStageModuleIdV61>;
 
 type ModuleLink = { label: string; path: (siteId: string) => string; detail: string };
@@ -24,16 +24,6 @@ type Destination = {
 };
 const scope = (siteId: string) => encodeURIComponent(siteId);
 export const launchModuleDestinationsV61: Record<DestinationModuleId, Destination> = {
-  promote: {
-    subtitle: "Introduce your learning community with approved, reviewable materials.",
-    intro: "Promotional asset creation and campaign distribution are not yet enabled here. You can edit your saved Site identity and review your private website preview.",
-    state: "planned",
-    note: "Previewing does not approve claims or send a campaign.",
-    links: [
-      { label: "Open Website & Brand", path: id => `/launch/website?siteId=${scope(id)}&returnToHub=true`, detail: "Prepare a draft and review your Site identity" },
-      { label: "Preview Site website", path: id => `/launch/site-preview?siteId=${scope(id)}`, detail: "Private, authenticated preview; no publication" },
-    ],
-  },
   recruit: {
     subtitle: "Connect with interested families and learners without treating interest as enrollment.",
     intro: "A dedicated Site-wide recruitment campaign and prospect CRM are not implemented. The existing admissions service can send verified-email application invitations for an independently authorized receiving-school Program.",

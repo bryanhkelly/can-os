@@ -1,0 +1,313 @@
+import { useState } from "react";
+import { useRouter } from "@tanstack/react-router";
+import { Archive, ArrowLeft, ArrowRight, Check, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ActionFooter, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import {
+  initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
+  marketingPackageContentSchema, marketingPurposeOptions, marketingStepIssue,
+  type MarketingPackageContent, type MarketingPackageStep,
+} from "@/domain/marketing-package-v61";
+import {
+  archiveSiteMarketingPackageV61, createSiteMarketingPackageV61,
+  deleteSiteMarketingPackageV61, duplicateSiteMarketingPackageV61,
+  listSiteMarketingPackagesV61, saveSiteMarketingPackageV61,
+} from "@/modules/programs/site-marketing-packages-v61.functions";
+import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+
+type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
+const steps: readonly MarketingPackageStep[] = ["menu", "audience", "messages", "assets"];
+const stepLabels = ["Menu", "Audience", "Messages", "Collateral & Assets"] as const;
+
+function message(error:unknown) {
+  return error instanceof Error ? error.message : "The package operation could not be completed.";
+}
+
+export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
+  siteId:string;siteName:string;initial:PackageRecord[];onExit:()=>void;
+}) {
+  const router=useRouter();
+  const [packages,setPackages]=useState(initial);
+  const [view,setView]=useState<"library"|"wizard"|"detail">("library");
+  const [record,setRecord]=useState<PackageRecord|null>(null);
+  const [title,setTitle]=useState("");
+  const [content,setContent]=useState<MarketingPackageContent>(()=>
+    initialMarketingContent(siteName,"site-announcement"));
+  const [step,setStep]=useState(0);
+  const [showArchived,setShowArchived]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  const dirty=view==="wizard" && (!record || title!==record.title ||
+    JSON.stringify(content)!==JSON.stringify(record.content));
+  const releaseNavigation=useLaunchUnsavedChanges(()=>dirty||busy,
+    "Leave your Marketing Package? Unsaved changes will be lost.");
+
+  function open(recordToOpen:PackageRecord,editing=false) {
+    setRecord(recordToOpen);setTitle(recordToOpen.title);setContent(recordToOpen.content);
+    setStep(0);setView(editing?"wizard":"detail");setError("");setNotice("");
+  }
+  function start() {
+    setRecord(null);setTitle("");setContent(initialMarketingContent(siteName,"site-announcement"));
+    setStep(0);setView("wizard");setError("");setNotice("");
+  }
+  function patch(value:Partial<MarketingPackageContent>) {
+    setContent(current=>({...current,...value}));setError("");
+  }
+
+  async function run(action:()=>Promise<void>) {
+    if(busy)return;
+    setBusy(true);setError("");setNotice("");
+    try { await action(); }
+    catch(cause){setError(message(cause));}
+    finally {setBusy(false);}
+  }
+  function updateList(saved:PackageRecord) {
+    setPackages(previous=>[saved,...previous.filter(item=>item.id!==saved.id)]);
+    setRecord(saved);
+  }
+  async function saveCurrent() {
+    if(!record)throw new Error("Create the package before saving its details.");
+    const parsed=marketingPackageContentSchema.parse(content);
+    const saved=await saveSiteMarketingPackageV61({data:{
+      siteId,packageId:record.id,expectedRevision:record.revision,title,content:parsed,
+    }});
+    updateList(saved);
+    return saved;
+  }
+
+  async function next() {
+    const issue=marketingStepIssue(steps[step]!,title,content);
+    if(issue){setError(issue);return;}
+    await run(async()=>{
+      if(!record) {
+        const created=await createSiteMarketingPackageV61({data:{siteId,title,purpose:content.purpose}});
+        updateList(created);
+        setContent(created.content);
+        setStep(1);
+        setNotice("Draft package created. Continue adding your audience and message.");
+        return;
+      }
+      await saveCurrent();
+      if(step<3)setStep(value=>value+1);
+      else {setView("detail");setNotice("Package content saved. Creative assets are not generated yet.");}
+    });
+  }
+  async function saveExit() {
+    await run(async()=>{
+      if(record)await saveCurrent();
+      setView("library");setRecord(null);
+      setNotice(record?"Package saved.":"No package created.");
+    });
+  }
+  async function leaveWizard() {
+    if(dirty&&!window.confirm("Discard unsaved changes and return to your packages?"))return;
+    setRecord(null);setView("library");setError("");setNotice("");
+  }
+  async function duplicate(selected:PackageRecord) {
+    await run(async()=>{
+      const copied=await duplicateSiteMarketingPackageV61({data:{siteId,packageId:selected.id}});
+      updateList(copied);setTitle(copied.title);setContent(copied.content);
+      setStep(0);setView("wizard");
+      setNotice("A separate editable draft was created.");
+    });
+  }
+  async function setArchived(selected:PackageRecord) {
+    await run(async()=>{
+      const saved=await archiveSiteMarketingPackageV61({data:{
+        siteId,packageId:selected.id,expectedRevision:selected.revision,archived:selected.status!=="archived",
+      }});
+      updateList(saved);setView("library");setRecord(null);
+      setNotice(saved.status==="archived"?"Package archived.":"Package restored.");
+    });
+  }
+  async function remove(selected:PackageRecord) {
+    if(!window.confirm("Permanently delete this package? This cannot be undone."))return;
+    await run(async()=>{
+      await deleteSiteMarketingPackageV61({data:{
+        siteId,packageId:selected.id,expectedRevision:selected.revision,
+      }});
+      setPackages(current=>current.filter(item=>item.id!==selected.id));
+      setRecord(null);setView("library");setNotice("Package deleted.");
+    });
+  }
+  async function exitLaunch() {
+    releaseNavigation();
+    await router.invalidate().catch(()=>undefined);
+    onExit();
+  }
+
+  const visible=packages.filter(item=>showArchived?item.status==="archived":item.status!=="archived");
+  const titleText=view==="library"?"Marketing Packages":view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
+  const rail=<div className="space-y-4">
+    <WorkspacePanel title="Why this matters">
+      <p className="text-sm leading-6 text-muted-foreground">You already have trusted community relationships. Start with a clear message and a few materials to share with them.</p>
+    </WorkspacePanel>
+    <WorkspacePanel title="What CAN prepares">
+      <p className="text-sm leading-6 text-muted-foreground">Save the audience, message and preferred formats in one reusable package. Branded files will use the shared Website &amp; Brand foundation once connected.</p>
+    </WorkspacePanel>
+    <WorkspaceNotice tone="info">Saved package content is private planning information. It does not publish a Site, create an event, open enrollment or send email.</WorkspaceNotice>
+  </div>;
+  return <WorkspaceShell title={titleText} eyebrow="Introduce / Promote"
+    subtitle="Make it easy to share what your learning community is becoming."
+    width="wide" rail={rail}>
+    <div className="mt-6 space-y-5">
+      {error&&<p role="alert" className="border border-destructive bg-card p-4 text-sm text-destructive">{error}</p>}
+      {notice&&<p role="status" className="border bg-card p-4 text-sm">{notice}</p>}
+
+      {view==="library"&&<>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">Build a reusable starter kit for an announcement or invitation.</p>
+          <Button onClick={start}><Plus aria-hidden="true"/> New package</Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {marketingPurposeOptions.map(option=><button key={option.id} type="button"
+            className="border bg-card p-5 text-left hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={()=>{start();setTitle(option.label);setContent(initialMarketingContent(siteName,option.id));}}>
+            <Megaphone className="mb-3 size-5 text-primary" aria-hidden="true"/>
+            <strong className="block text-sm">{option.label}</strong>
+            <span className="mt-2 block text-xs leading-5 text-muted-foreground">{option.description}</span>
+          </button>)}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+          <h2 className="text-lg font-semibold">Saved packages ({visible.length})</h2>
+          <Button variant="outline" size="sm" onClick={()=>setShowArchived(value=>!value)}>
+            {showArchived?"View active":"View archived"}
+          </Button>
+        </div>
+        {!visible.length&&<WorkspacePanel title="No packages in this view">
+          <p className="text-sm text-muted-foreground">Create a package to save your messaging for future use.</p>
+        </WorkspacePanel>}
+        <div className="space-y-3">{visible.map(item=><article key={item.id}
+          className="flex flex-wrap items-center gap-4 border bg-card p-4">
+          <div className="flex size-11 items-center justify-center bg-muted"><FileText className="size-5"/></div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold">{item.title}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {marketingPurposeOptions.find(option=>option.id===item.content.purpose)?.label}
+              {" · "}{item.status==="archived"?"Archived":"Saved draft"}
+              {" · "}{new Date(item.updatedAt).toLocaleDateString()}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={()=>open(item)}>Open</Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void duplicate(item)}
+            aria-label={"Duplicate "+item.title}><Copy aria-hidden="true"/></Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void setArchived(item)}
+            aria-label={(item.status==="archived"?"Restore ":"Archive ")+item.title}>
+            {item.status==="archived"?<RotateCcw aria-hidden="true"/>:<Archive aria-hidden="true"/>}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void remove(item)}
+            aria-label={"Delete "+item.title}><Trash2 aria-hidden="true"/></Button>
+        </article>)}</div>
+        <ActionFooter><Button variant="outline" onClick={()=>void exitLaunch()}>Back to Launch Overview</Button></ActionFooter>
+      </>}
+
+      {view==="wizard"&&<>
+        <nav aria-label="Package steps" className="grid gap-2 sm:grid-cols-4">
+          {steps.map((value,index)=><button key={value} type="button" disabled={busy || (!record&&index>0)}
+            aria-current={index===step?"step":undefined}
+            className={"border px-3 py-3 text-left text-xs font-semibold focus-visible:ring-2 focus-visible:ring-ring "+
+              (index===step?"border-primary bg-accent text-primary":"bg-card text-muted-foreground")}
+            onClick={()=>{if(!dirty||window.confirm("Switch steps without saving your changes?"))setStep(index);}}>
+            <span className="mr-2">{index+1}.</span>{stepLabels[index]}
+          </button>)}
+        </nav>
+
+        {step===0&&<WorkspacePanel title="What would you like to share?" description="Choose a starting point. Your Site brand will be reused automatically later.">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {marketingPurposeOptions.map(option=><label key={option.id}
+              className={"flex cursor-pointer gap-3 border p-4 text-sm "+
+                (content.purpose===option.id?"border-primary bg-accent":"bg-card")}>
+              <input type="radio" name="package-purpose" className="mt-1 accent-primary"
+                checked={content.purpose===option.id} onChange={()=>
+                  patch({...initialMarketingContent(siteName,option.id),audiences:content.audiences,formats:content.formats})}/>
+              <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
+            </label>)}
+          </div>
+          <div className="mt-5"><Field label="Package name" required>
+            <Input value={title} maxLength={120} onChange={event=>setTitle(event.target.value)}/>
+          </Field></div>
+        </WorkspacePanel>}
+
+        {step===1&&<WorkspacePanel title="Who do you want to reach?" description="Select your intended audiences. This does not add contacts or authorize emails.">
+          <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
+            <legend className="sr-only">Intended audiences</legend>
+            {marketingAudienceOptions.map(option=><label key={option.id}
+              className="flex min-h-11 items-center gap-3 border bg-card p-3 text-sm">
+              <Checkbox checked={content.audiences.includes(option.id)}
+                onChange={event=>patch({audiences:event.target.checked
+                  ? [...new Set([...content.audiences,option.id])]
+                  : content.audiences.filter(id=>id!==option.id)})}/>
+              {option.label}
+            </label>)}
+          </fieldset>
+          <div className="mt-5"><Field label="Geographic focus (optional)">
+            <Input maxLength={120} value={content.geography} placeholder="Your community or neighborhood"
+              onChange={event=>patch({geography:event.target.value})}/>
+          </Field></div>
+        </WorkspacePanel>}
+
+        {step===2&&<WorkspacePanel title="Your message" description="Suggested copy is editable and never asserts school approval or open enrollment.">
+          <div className="mt-4 space-y-5">
+            <Field label="Headline" required><Input maxLength={160} value={content.headline}
+              onChange={event=>patch({headline:event.target.value})}/></Field>
+            <Field label="Your message" required><Textarea rows={7} maxLength={1600}
+              value={content.message} onChange={event=>patch({message:event.target.value})}/></Field>
+            <Field label="Call to action"><Input maxLength={100} value={content.callToAction}
+              onChange={event=>patch({callToAction:event.target.value})}/></Field>
+          </div>
+        </WorkspacePanel>}
+
+        {step===3&&<WorkspacePanel title="Choose the materials" description="Save which formats you want. Visual generation will use the shared Site Brand after the engine is connected.">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {marketingFormatOptions.map(option=><label key={option.id}
+              className="flex cursor-pointer gap-3 border bg-card p-4 text-sm">
+              <Checkbox className="mt-1" checked={content.formats.includes(option.id)}
+                onChange={event=>patch({formats:event.target.checked
+                  ? [...new Set([...content.formats,option.id])]
+                  : content.formats.filter(id=>id!==option.id)})}/>
+              <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
+            </label>)}
+          </div>
+          <WorkspaceNotice tone="info">This step saves format preferences, not downloadable collateral. No emails or public links are generated here yet.</WorkspaceNotice>
+        </WorkspacePanel>}
+
+        <ActionFooter>
+          <Button variant="outline" disabled={busy} onClick={()=>{if(step===0)void leaveWizard();else setStep(value=>value-1);}}>
+            <ArrowLeft aria-hidden="true"/> {step===0?"Cancel":"Back"}
+          </Button>
+          {record&&<Button variant="outline" disabled={busy} onClick={()=>void saveExit()}>Save &amp; Exit</Button>}
+          <Button disabled={busy} onClick={()=>void next()}>
+            {busy?"Saving…":step===3?"Save package":"Save & Continue"}
+            {step===3?<Check aria-hidden="true"/>:<ArrowRight aria-hidden="true"/>}
+          </Button>
+        </ActionFooter>
+      </>}
+
+      {view==="detail"&&record&&<>
+        <WorkspacePanel title={record.title} description="Reusable package content, saved for your Site.">
+          <dl className="mt-3 space-y-4 text-sm">
+            <div><dt className="font-semibold">Purpose</dt><dd className="text-muted-foreground">
+              {marketingPurposeOptions.find(option=>option.id===record.content.purpose)?.label}</dd></div>
+            <div><dt className="font-semibold">Audience</dt><dd className="text-muted-foreground">
+              {record.content.audiences.map(id=>marketingAudienceOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
+            <div><dt className="font-semibold">Headline</dt><dd className="text-muted-foreground">{record.content.headline}</dd></div>
+            <div><dt className="font-semibold">Message</dt><dd className="whitespace-pre-wrap text-muted-foreground">{record.content.message}</dd></div>
+            <div><dt className="font-semibold">Preferred collateral</dt><dd className="text-muted-foreground">
+              {record.content.formats.map(id=>marketingFormatOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
+          </dl>
+        </WorkspacePanel>
+        <WorkspaceNotice tone="info">The package's content is saved. Branded files, external distribution and email sending will become available after their authorized services are connected.</WorkspaceNotice>
+        <ActionFooter>
+          <Button variant="outline" onClick={()=>{setView("library");setRecord(null);}}>All packages</Button>
+          <Button variant="outline" disabled={busy} onClick={()=>void duplicate(record)}><Copy aria-hidden="true"/> Duplicate</Button>
+          <Button disabled={busy||record.status==="archived"} onClick={()=>open(record,true)}>Edit package</Button>
+        </ActionFooter>
+      </>}
+    </div>
+  </WorkspaceShell>;
+}
