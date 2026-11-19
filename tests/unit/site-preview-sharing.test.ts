@@ -104,6 +104,9 @@ describe("Site website share preview safety", () => {
     const planned = projectPlannedSiteProgramsForPreview(preferences);
     expect(planned).toHaveLength(2);
     expect(planned.map(block => block.page)).toEqual(["/", "/programs"]);
+    expect(planned.every(block=>block.description.includes("in-person and online learning")
+      && block.description.includes("teens")
+      && block.description.includes("weekdays"))).toBe(true);
     expect(planned.every(block =>
       block.items.length === 3 &&
       block.items.every(item => item.label === "Proposed · not enrolling" && !item.link)
