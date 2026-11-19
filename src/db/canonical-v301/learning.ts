@@ -23,7 +23,7 @@ import {
 const id = () => uuid("id").defaultRandom().primaryKey();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 
-export const evidenceDocumentVersions = educationV30.table("evidence_document_versions", {
+export const evidenceDocumentVersions = pgTable("evidence_document_versions", {
   id: id(),
   documentId: uuid("document_id").notNull(),
   validFrom: date("valid_from", { mode: "string" }),
@@ -32,7 +32,7 @@ export const evidenceDocumentVersions = educationV30.table("evidence_document_ve
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
 });
 
-export const evidenceDocuments = educationV30.table("evidence_documents", {
+export const evidenceDocuments = pgTable("evidence_documents", {
   id: id(),
   kindCode: text("kind_code").notNull(),
   owningOrganizationId: uuid("owning_organization_id"),
