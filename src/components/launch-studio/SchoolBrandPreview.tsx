@@ -26,9 +26,9 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
     className=" border bg-card p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h3 id="school-brand-preview-title" className="font-serif text-xl font-semibold">Your school brand, in one place</h3>
+        <h3 id="school-brand-preview-title" className="font-serif text-xl font-semibold">Your Site identity, in one place</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {brand.design.name} · School-specific identity from your current template, colors and typography.
+          {brand.design.name} · Site identity from your current template, colors and typography.
         </p>
       </div>
       <a href={wordmark} download={filename}
@@ -37,7 +37,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
       </a>
     </div>
     <div className="mt-5 overflow-hidden  border" style={{background:brand.background}}>
-      <img src={wordmark} alt={`${brand.schoolName} school brand wordmark`}
+      <img src={wordmark} alt={`${brand.schoolName} Site wordmark`}
         className="block h-auto w-full" />
     </div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -91,10 +91,10 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
               {brand.schoolName}
             </p>
             <p className="mt-3 text-xl" style={{fontFamily:brand.theme.displayFont}}>
-              A message from your school
+              A message from your learning community
             </p>
           </div>
-          <p className="p-2 text-xs text-muted-foreground">Branded email header · live invitation transport uses approved school templates</p>
+          <p className="p-2 text-xs text-muted-foreground">Branded email header · actual invitations use approved communication templates</p>
         </div>
       </div>
     </div>
@@ -102,7 +102,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
       <h4 id="brand-family-application-title" className="font-semibold">Family-facing brand applications</h4>
       <p className="mt-1 text-sm text-muted-foreground">
         Open full-page versions of the branded family-interest page, survey, and three email layouts.
-        All seven school designs use the same saved Site colors and typography.
+        All seven Site designs use the same saved colors and typography.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {([
@@ -119,7 +119,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
           </a>)}
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Previews are private and read-only, using the last saved school design (or a starter if none is saved).
+        Previews are private and read-only, using the last saved Site design (or a starter if none is saved).
         Save your current changes before opening them. Previews do not send messages or collect responses.
         Approved Program-linked invitations are sent separately through the existing recruitment service.
       </p>

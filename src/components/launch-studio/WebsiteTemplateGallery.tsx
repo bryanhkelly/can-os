@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 const previewLabels: Record<PublicSitePath, string> = {
-  "/": "Home", "/about": "Our school", "/academics": "Academics",
+  "/": "Home", "/about": "About us", "/academics": "Academics",
   "/school-day": "Learning model", "/student-life": "Student life",
   "/families": "Families", "/admissions": "Admissions", "/tuition": "Tuition & aid",
   "/faq": "FAQs", "/contact": "Contact",
@@ -106,21 +106,21 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
       schoolVision: "Help young people grow in curiosity, confidence, and purpose.",
       churchHistory: "An illustrative community history created to compare school designs.",
       communityOutreach: "Fictional students and mentors imagine meaningful service together.",
-      localDescription: "A fictional school story for comparing templates, not an actual institution.",
+      localDescription: "A fictional learning-community story for comparing templates, not an actual institution.",
       branding: { theme: "classic", heroImage: null, templateId,
         paletteId, typographyId, headingFontId, bodyFontId } },
   }, { path: previewPage, localPreview: true, templateGallery: true });
   const chosen = siteTemplateCatalog.find(template => template.id === value) ?? siteTemplateCatalog[0]!;
   return <fieldset disabled={disabled} className="min-w-0">
-    <legend className="text-sm font-semibold">Choose your school's public website design</legend>
+    <legend className="text-sm font-semibold">Choose your Site website design</legend>
     <p className="mt-2 text-xs leading-5 text-muted-foreground">
-      Structure and page rhythm change with the template. School facts, approved copy, colors,
+      Structure and page rhythm change with the template. Site facts, approved copy, colors,
       fonts and photography are preserved when switching.
     </p>
     <div className="mt-3 flex flex-wrap items-end gap-3">
       <Label className="grid gap-1 text-xs font-semibold">
         Page to preview
-        <Select aria-label="Preview school page" value={previewPage}
+        <Select aria-label="Preview Site page" value={previewPage}
           onChange={event => setPreviewPage(event.target.value as PublicSitePath)}
           className="min-h-11">
           {publicSitePagePaths.map(path => <option key={path} value={path}>{previewLabels[path]}</option>)}
@@ -139,11 +139,11 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
       {styledPreview?"Return to grayscale wireframe":"Show styled example"}
     </Button>
     <p className="mt-2 text-xs text-muted-foreground">
-      Fictional sample imagery illustrates each design. These images are not your school’s facilities
+      Fictional sample imagery illustrates each design. These images are not your Site’s facilities
       or students and will not be saved to its photo library.
     </p>
     <div className="mt-5 grid min-w-0 gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
-      <div role="group" aria-label="School website templates" className="min-w-0 space-y-2">
+      <div role="group" aria-label="Site website templates" className="min-w-0 space-y-2">
         {siteTemplateCatalog.map(template=>{
           const selected=template.id===value;
           return <Button key={template.id} type="button" variant="outline" aria-pressed={selected}
@@ -167,7 +167,7 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
         <p className="mt-1 text-sm text-muted-foreground">{chosen.description}</p>
         <p className="my-3 text-xs text-muted-foreground">
           {styledPreview?"Styled example. Select colors and type separately in Visual Identity.":
-            "Grayscale layout preview, not a finished school website."}
+            "Grayscale layout preview, not a finished Site website."}
         </p>
         <TemplatePreviewFrame key={`${value}:${previewPage}:${viewport}:${styledPreview}`}
           html={renderSample(value)} name={`${chosen.name} ${previewLabels[previewPage]}`}

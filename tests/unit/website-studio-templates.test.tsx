@@ -191,7 +191,7 @@ describe("Website Studio seven-template contract", () => {
     expect(html).toContain("Heritage Classical");
     expect(html).toContain("Campus Life");
     expect((html.match(/<option/g)??[]).length).toBe(publicSitePagePaths.length);
-    expect(html).toContain('aria-label="School website templates"');
+    expect(html).toContain('aria-label="Site website templates"');
     expect((html.match(/structural wireframe/g) ?? []).length).toBe(7);
     expect((html.match(/<iframe/g) ?? []).length).toBe(1);
   });

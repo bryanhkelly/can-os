@@ -45,7 +45,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
         <DisclosureSection title="Colors" description="All thirteen curated and contrast-checked palettes" defaultOpen>
           <fieldset disabled={busy || !data.canPublish}>
             <legend className="sr-only">Choose a color palette</legend>
-            <div role="group" aria-label="School color palettes" className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div role="group" aria-label="Site color palettes" className="grid grid-cols-2 gap-3 md:grid-cols-3">
               {sitePaletteIds.map(id=>{
                 const palette=resolveSiteTheme(id,content.branding.typographyId);
                 const current=(content.branding.paletteId ?? "signature")===id;
@@ -59,7 +59,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
                     <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
                   </span>
                   {id==="signature"?"CAN Signature":id.startsWith("brand-")
-                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"School")+" palette":id}
+                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"Site")+" palette":id}
                 </Button>;
               })}
             </div>
@@ -71,7 +71,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
               </Button>
             </div>}
             <p className="mt-4 text-xs text-muted-foreground">
-              Custom colors are preview-only until individually validated, versioned and supported by the public renderer.
+              Custom colors are not available in this editor yet. Choose a validated palette above.
             </p>
           </fieldset>
         </DisclosureSection>

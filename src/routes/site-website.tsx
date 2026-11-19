@@ -60,7 +60,7 @@ export const websiteSearchSchema=siteProgramSelectionSchema.extend({
 export const loadWebsiteHome = (siteId?: string) => {
   if (siteId && !z.string().uuid().safeParse(siteId).success)
     return Promise.resolve({ok:false as const,authError:null,
-      message:"This website link contains an invalid school identifier. Select an authorized school from the Launch Hub.",
+      message:"This website link contains an invalid Site identifier. Select an authorized Site from Launch Studio.",
       retryable:false});
   return safeLoader(
     () => getPartnerWebsitePreviewView({data:{siteId}}),
@@ -83,8 +83,8 @@ function PartnerSiteWebsitePage() {
 function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare:boolean}) {
   const router=useRouter();
   const mutation=useMutationFeedback(()=>router.invalidate());
-  return <section className="border bg-card p-5"><p className="text-sm">Prepare a private website address to begin designing. This does not publish your school or create a Program.</p>
-    {canPrepare && <Button className="mt-4" disabled={mutation.pending||mutation.refreshFailed} onClick={()=>void mutation.run(()=>prepareSchoolWebsite({data:{siteId}}),{successMessage:"Private website address prepared.",commandErrorMessage:"Unable to prepare the website address."})}>Prepare school website</Button>}
+  return <section className="border bg-card p-5"><p className="text-sm">Prepare a private website address to begin designing. This does not publish your Site or create a Program.</p>
+    {canPrepare && <Button className="mt-4" disabled={mutation.pending||mutation.refreshFailed} onClick={()=>void mutation.run(()=>prepareSchoolWebsite({data:{siteId}}),{successMessage:"Private website address prepared.",commandErrorMessage:"Unable to prepare the website address."})}>Prepare Site website</Button>}
     {!canPrepare && <p className="mt-3 text-sm">Your Site Administrator or publication manager must prepare the website address.</p>}
     <MutationFeedback state={mutation} pendingMessage="Preparing website…"/>
   </section>;
@@ -128,7 +128,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
               "Tell Your Story","Review & Finish"][step]:"Prepare your private website address"}
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            One Site-owned, revisioned private website. Draft changes never open enrollment, approve a school or publish content.
+            One Site-owned, revisioned private website. Draft changes never open enrollment, approve a Site or publish content.
           </p>
           {data.host && <nav aria-label="Website & Brand steps" className="mt-5 flex min-w-0 gap-2 overflow-x-auto border-y py-3">
             {steps.map((item,index)=><Button key={item.id} type="button"
@@ -167,7 +167,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
           <section className="border bg-card p-5">
             <h2 className="text-sm font-semibold">What happens next</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Save an editable website draft. Any public release or protected school claim follows its separate review and approval process.
+              Save an editable website draft. Official publication and protected institutional claims follow separate review and authorization.
             </p>
           </section>
         </aside>
@@ -177,9 +177,9 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   return <WorkspaceShell
     eyebrow="Website & Brand Studio"
     title={data.siteName + " · website & brand"}
-    subtitle={data.organizationName + " · one local identity for your hosted website and reusable school materials"} actions={returnToLaunch}>
+    subtitle={data.organizationName + " · a Site website and reusable communications"} actions={returnToLaunch}>
     <GuidedSetupShell
-      title="Build your school website and brand together"
+      title="Build your Site website and brand together"
       description="Choose Brand Identity, a grayscale wireframe, visual identity and your content before saving a private draft."
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Choose your editorial direction":index===1?"Choose a structure":
@@ -220,10 +220,10 @@ function WebsiteInformationChecklist({ data }: {
     className="mt-6  border border-border/70 bg-card p-6 shadow-sm">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parent information</p>
     <h2 id="website-readiness-title" className="mt-2 font-serif text-2xl font-semibold">
-      What families can learn about this school
+      What families can learn about this Site
     </h2>
     <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-      This checklist is derived from approved public school records and published local
+      This checklist is derived from approved public Site records and published local
       content—not from draft copy or invented example data. It does not establish
       school-opening authority, admissions approval, or live website hosting.
     </p>
@@ -266,7 +266,7 @@ function WebsiteInformationChecklist({ data }: {
           </div>)}
     </div> : <p role="status" className="mt-4 text-sm">
       All represented information categories have reviewed public values. This does
-      not certify school opening or external hosting.
+      not certify Site opening or external hosting.
     </p>}
   </section>;
 }
@@ -290,23 +290,23 @@ function WebsiteSourceMappingPanel({data}: {
       : review === "approved" ? "Reviewed; not displayed"
       : "Independent review required";
   const rows:MappingRow[] = [
-    {label:"School name and organization",source:"Canonical Site profile",
+    {label:"Site name and organization",source:"Canonical Site profile",
       status:sitePublished?"Site identity published":"Saved Site identity",
       tone:sitePublished?"success":"info",
       details:data.siteName+" · "+data.organizationName},
-    {label:"Physical school address",source:"School profile · Location",
+    {label:"Physical Site address",source:"Site profile · Location",
       status:mapping.physicalAddressSaved
         ? approvalStatus(mapping.physicalAddressReview,mapping.publicAddressVisible)
         : "No validated address saved",
       tone:mapping.publicAddressVisible?"success":mapping.physicalAddressSaved?"attention":"neutral",
       details:"A saved location never proves opening authority. Public display requires separate identity review."},
-    {label:"Public contact information",source:"School profile · Contact",
+    {label:"Public contact information",source:"Site profile · Contact",
       status:mapping.contactSaved
         ? approvalStatus(mapping.contactReview,mapping.publicContactVisible)
         : "No public contact channel saved",
       tone:mapping.publicContactVisible?"success":mapping.contactSaved?"attention":"neutral",
-      details:"Only a reviewed school contact is eligible for publication. Private staff contact details are excluded."},
-    {label:"School and community context",source:"Launch · Site information",
+      details:"Only a reviewed Site contact is eligible for publication. Private staff contact details are excluded."},
+    {label:"Site and community context",source:"Launch · Site information",
       status:mapping.schoolContextSaved?"Saved for planning":"Not configured",
       tone:mapping.schoolContextSaved?"info":"neutral",
       details:"Site type, host church and reference website stay private; affiliations are not inferred from these fields."},
@@ -359,12 +359,12 @@ function WebsiteDesignChecklist({data}:{data:Awaited<ReturnType<typeof getPartne
   const content=data.editingContent;
   const publishedPages=Object.keys(data.previewPages??{});
   const items=[
-    {title:"A recognizable school welcome",ready:Boolean(content?.welcomeMessage?.trim()),
+    {title:"A recognizable Site welcome",ready:Boolean(content?.welcomeMessage?.trim()),
       help:"Add a short, distinctive welcome in the local website editor."},
-    {title:"Your school's purpose and story",ready:Boolean(content?.schoolVision?.trim() &&
+    {title:"Your Site's purpose and story",ready:Boolean(content?.schoolVision?.trim() &&
       (content?.localDescription?.trim() || content?.churchHistory?.trim())),
-      help:"Describe why this school exists and the people and community behind it."},
-    {title:"Reviewed school photography",ready:data.approvedPhotoCount>0 || Boolean(content?.branding.heroImage?.rightsConfirmed &&
+      help:"Describe why this learning community exists and the people and community behind it."},
+    {title:"Reviewed Site photography",ready:data.approvedPhotoCount>0 || Boolean(content?.branding.heroImage?.rightsConfirmed &&
       content?.branding.heroImage?.altText?.trim() &&
       content?.branding.heroImage?.childImageConsent !== "unconfirmed"),
       help:"Add one rights-cleared photograph with accessible alt text; the layout works without a photo."},
@@ -379,10 +379,10 @@ function WebsiteDesignChecklist({data}:{data:Awaited<ReturnType<typeof getPartne
   const completed=items.filter(item=>item.ready).length;
   return <section aria-labelledby="school-website-design-readiness" className="mt-6  border border-border/70 bg-card p-6 shadow-sm">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Website quality</p>
-    <h2 id="school-website-design-readiness" className="mt-2 font-serif text-2xl font-semibold">Make this site feel like your school</h2>
+    <h2 id="school-website-design-readiness" className="mt-2 font-serif text-2xl font-semibold">Make this Site feel like your community</h2>
     <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-      A strong school website combines your own story and photography with independently
-      approved programs and family information. These checks are shared by every CAN OS school;
+      A compelling Site website combines your story and rights-cleared imagery with independently
+      approved programs and family information. These checks apply across CAN OS Sites;
       they are editorial guidance, not a publication or operating authorization.
     </p>
     <p className="mt-3 text-sm font-semibold" role="status">{completed} of {items.length} content-quality signals represented</p>
@@ -427,7 +427,7 @@ function WebsitePreviewPanel({ data, draftPreview }: {
       className="mt-4 h-[700px] w-full border bg-white" style={{ maxWidth: device === "mobile" ? 390 : undefined }} />
       : <p role="status" className="mt-4 border p-4 text-sm">{pages.length
         ? "This page is not available in the selected preview. Choose an available page or generate an updated preview."
-        : !saved ? "No website draft has been saved. Choose Preview unsaved changes to see your current design, or save a private draft to enable the full-page link." : "No preview pages are available for this school website. Check the reserved address and Site information."}</p>}
+        : !saved ? "No website draft has been saved. Choose Preview unsaved changes to see your current design, or save a private draft to enable the full-page link." : "No preview pages are available for this Site website. Check the reserved address and Site information."}</p>}
   </section>;
 }
 
@@ -472,14 +472,14 @@ async function prepareWebsiteArtwork(file: File): Promise<string> {
 }
 
 const churchFields: ReadonlyArray<{ key: SiteLocalTextField; label: string; help: string; multi: boolean }> = [
-  { key: "heroHeadline", label: "Homepage headline", help: "The first words families see. Your school name still appears in the website header.", multi: true },
+  { key: "heroHeadline", label: "Homepage headline", help: "The first words families see. Your Site name still appears in the website header.", multi: true },
   { key: "welcomeMessage", label: "Welcome to families", help: "Introduce the kind of community you hope to build.", multi: true },
   { key: "churchHistory", label: "Tell us about your church", help: "When did your church begin? Share its history and important milestones.", multi: true },
-  { key: "communityOutreach", label: "Your community", help: "What relationships, partnerships or hopes connect your school with the people around it? Avoid describing unconfirmed activities.", multi: true },
+  { key: "communityOutreach", label: "Your community", help: "What relationships, partnerships or hopes connect your Site with the people around it? Avoid describing unconfirmed activities.", multi: true },
   { key: "schoolVision", label: "Your vision", help: "What do you hope students will become? You can personalize the prepared wording.", multi: true },
-  { key: "leadershipWelcome", label: "A welcome from your pastor or school leader", help: "Optional words approved by your church leader for families.", multi: true },
+  { key: "leadershipWelcome", label: "A welcome from your host or Site leader", help: "Optional words approved by your church leader for families.", multi: true },
   { key: "localTraditions", label: "Local traditions and experiences", help: "Share real local traditions, service projects and community experiences.", multi: true },
-  { key: "localDescription", label: "Your school story", help: "What makes your school's purpose and community special? Avoid promises about unapproved academic services.", multi: true },
+  { key: "localDescription", label: "Your Site story", help: "What makes your Site's purpose and community special? Avoid promises about unapproved academic services.", multi: true },
   { key: "denomination", label: "Denominational affiliation", help: "Describe your church's identity. Do not claim an endorsement that has not been granted.", multi: false },
   { key: "statementOfFaith", label: "Statement of faith", help: "Your church's own theological statement, not CAN's academic policies.", multi: true },
   { key: "spiritualFormation", label: "Spiritual formation", help: "Prayer, worship, discipleship, chapel or religious observances provided locally.", multi: true },
@@ -658,11 +658,11 @@ function LocalWebsiteCopyEditor({
 
   return <section aria-label="Website content setup">
     {data.demonstration && !data.editingContent && <div role="note" className="mt-3  border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
-      <p className="font-semibold">Fictional sample prepared for this demo school</p>
+      <p className="font-semibold">Fictional sample prepared for this demo Site</p>
       <p className="mt-1">We filled the draft with an example welcome, community story, vision and theme.
         This content has not been saved or published. Review and edit the story, then
-        use the normal publishing action. The school publication and legal gates do not change.</p>
-      <p className="mt-2">To change any suggested wording, go to School story and use the Reset to original action
+        save your private draft. Site publication and legal authorization are separate.</p>
+      <p className="mt-2">To change any suggested wording, go to Your Content and use the Reset to original action
         beside that individual field. No other answers are affected.</p>
     </div>}
     {revisionConflict && <div role="alert" className="mt-3 space-y-2 border border-amber-500 p-4 text-sm">
@@ -681,7 +681,7 @@ function LocalWebsiteCopyEditor({
       Your latest proposed wording includes a protected claim. It is held for review;
       the last published church copy remains unchanged.
     </WorkspaceNotice>}
-    {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">Using illustrative template images. No school photography selected.</p>}
+    {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">Using illustrative template images. No Site photography selected.</p>}
     {artworkGaps.length > 0 &&
       <div role="status" className="mt-3 border p-3 text-sm">
         <p className="font-semibold">Artwork is incomplete. You can save a private draft now.</p>
@@ -720,7 +720,7 @@ function LocalWebsiteCopyEditor({
           </div>
         </fieldset>
         <p className="text-xs text-muted-foreground">{brandRecommendation
-          ?"A keyword suggestion from your saved Story is not a required choice or verified school claim."
+          ?"A keyword suggestion from your saved Story is not a required choice or verified institutional claim."
           :"No recommendation appears without matching Story evidence."}</p>
         <p className="text-xs text-muted-foreground">Brand Identity is saved with this Site's versioned website draft. A broader Site-brand service is not connected yet.</p>
       </section>}
@@ -742,12 +742,12 @@ function LocalWebsiteCopyEditor({
           paletteId={content.branding.paletteId} typographyId={content.branding.typographyId}
           headingFontId={content.branding.headingFontId} bodyFontId={content.branding.bodyFontId}
           disabled={busy || !data.canPublish}/>
-        <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps school copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
+        <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps Site copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
       </div>}
 
       {step === 3 && <div className="space-y-5">
         <div>
-          <h3 className="font-serif text-2xl">Your school story is ready to make your own.</h3>
+          <h3 className="font-serif text-2xl">Your Site story is ready to make your own.</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Prepared copy uses your Site name. Optional suggestions draw on saved Site Information
             and never overwrite a field until you explicitly apply them. Restore Original affects only that field.
@@ -822,7 +822,7 @@ function LocalWebsiteCopyEditor({
           {data.currentRevision > 0 && <Button type="button" variant="outline" className="min-h-11 border"
             onClick={() => void navigator.clipboard.writeText(
               new URL(privateWebsitePreviewUrl(data.siteId), window.location.origin).href,
-            ).then(() => setShareMessage("Preview link copied. Reviewers must sign in with their own authorized school account."))
+            ).then(() => setShareMessage("Preview link copied. Reviewers must sign in with their own authorized Site account."))
               .catch(() => setShareMessage("Copy the address from Open full-page preview; clipboard permission was unavailable."))}>
             Copy preview link
           </Button>}

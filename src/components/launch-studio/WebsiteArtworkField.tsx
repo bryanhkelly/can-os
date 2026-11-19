@@ -12,7 +12,7 @@ export function WebsiteArtworkField({ field, value, disabled, onSelect, onChange
   onSelect: (event: ChangeEvent<HTMLInputElement>, field: "heroImage" | "logoImage") => void;
   onChange: (next: SiteLocalImage | null) => void;
 }) {
-  const label = field === "logoImage" ? "School logo (optional)" : "Site artwork (optional)";
+  const label = field === "logoImage" ? "Site logo (optional)" : "Site artwork (optional)";
   return <fieldset disabled={disabled} className="space-y-3 border p-4">
     <legend className="px-2 text-sm font-semibold">{label}</legend>
     <Label className="block text-sm">
