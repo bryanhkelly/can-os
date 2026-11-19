@@ -40,6 +40,7 @@ import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.s
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { renderFamilyBrandEmail } from "@/domain/school-brand-family";
 import { readSiteFamilyBrand } from "@/modules/sites/site-family-brand.server";
+import { requireSavedSiteBrand } from "@/modules/sites/site-brand.functions";
 import {
   requestPublicFamilyStart,
 } from "./public-family-start.server";
@@ -158,6 +159,11 @@ export async function sendFamilyInvitationBatch(
     assertProgramScope(context, destination.programId);
     if (await isDemoTenantOrganization(destination.organizationId, tx))
       throw new DomainError("FORBIDDEN", "External family outreach is suppressed for demo schools");
+    // Preopening interest is a Launch Studio marketing action. The Site must
+    // have established its real, immutable Brand before any batch is queued.
+    // Application invitations retain their independent institutional gate.
+    if(data.purpose==="interest")
+      await requireSavedSiteBrand(destination.siteId,tx);
 
     const [existing] = await tx.select({
       id: communicationThreads.id,
@@ -603,7 +609,7 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   const responseUrl = new URL("/family/interest", origin);
   responseUrl.searchParams.set("invitationBatchId", batchId);
   responseUrl.searchParams.set("invitationRecipientKey", recipient.key);
-  const brand = await readSiteFamilyBrand(school.siteId);
+  const brand = await readSiteFamilyBrand(school.siteId,{requireSavedBrand:true});
   const message = renderFamilyBrandEmail({
     ...brand, introduction: metadata.introduction,
   }, "survey", {
