@@ -271,7 +271,7 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
           AND native_org.lifecycle_status='active'
           AND native_site.lifecycle_status IN ('planning','active')
           AND EXISTS (
-            SELECT 1 FROM education_v30.site_organization_roles operator_role
+            SELECT 1 FROM public.site_organization_roles operator_role
             WHERE operator_role.organization_id=${grant.organizationId}::uuid
               AND operator_role.site_id=${grant.siteId}::uuid
               AND operator_role.role_code IN ('operator','host')
