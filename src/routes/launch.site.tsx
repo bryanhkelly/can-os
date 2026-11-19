@@ -5,6 +5,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules, LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
+import { EstablishSiteProfileUnified, EstablishSiteProfileGuidance } from "@/components/launch-studio/EstablishSiteProfileUnified";
 
 const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
@@ -22,7 +23,8 @@ export const Route = createFileRoute("/launch/site")({
       ? options.sites.find(candidate => candidate.id === deps.siteId)
       : options.sites.length === 1 ? options.sites[0] : null;
     return {
-      site: site ? { id: site.id, name: site.name } : null,
+      site: site ?? null,
+      organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       error: deps.siteId && !site ? "You do not have access to the selected Site." : null,
     };
@@ -31,10 +33,11 @@ export const Route = createFileRoute("/launch/site")({
 });
 
 function SiteLaunchPage() {
+  const navigate = Route.useNavigate();
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, error } = outcome.data;
+  const { site, sites, organizations, error } = outcome.data;
   if (!site) return <main className="mx-auto max-w-3xl space-y-5 px-5 py-12">
     <h1 className="font-serif text-4xl">Choose your Site</h1>
     <p className="text-sm text-muted-foreground">{error ?? "Select an authorized Site to continue its launch."}</p>
@@ -45,7 +48,22 @@ function SiteLaunchPage() {
   const base = "/launch/site?siteId=" + encodeURIComponent(site.id);
   const selected = siteLaunchModules.find(item=>item.id===search.module);
   return <LaunchSiteFrame site={site} active={search.module}>
-    {selected ? <main className="mx-auto max-w-6xl space-y-5 p-5 sm:p-8">
+    {selected?.id === "site-profile" ? <main className="mx-auto max-w-screen-2xl space-y-6 px-5 py-8 sm:px-8">
+      <div>
+        <p className="text-2xs font-bold uppercase tracking-eyebrow text-primary">Establish / Site Profile</p>
+        <h1 className="mt-2 font-serif text-4xl">Site Profile</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Confirm your Site identity and add contact or location details when available.</p>
+      </div>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <EstablishSiteProfileUnified key={site.id} site={site} organizations={organizations}
+          onBackToOverview={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
+          onSaveAndExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
+          onContinueToSiteInformation={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })} />
+        <aside aria-label="Site Profile guidance" className="min-w-0">
+          <EstablishSiteProfileGuidance />
+        </aside>
+      </div>
+    </main> : selected ? <main className="mx-auto max-w-6xl space-y-5 p-5 sm:p-8">
       <p className="text-2xs font-bold uppercase tracking-eyebrow text-primary">{selected.stage} / {selected.title}</p>
       <h1 className="font-serif text-4xl">{selected.title}</h1>
       <p className="text-sm text-muted-foreground">This section will be connected using the approved V6.1 content contract.</p>
