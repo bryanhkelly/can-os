@@ -314,7 +314,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
               (index === step ? "border-primary bg-accent" : "border-border bg-card")}>
             <span className="flex items-center gap-2 text-xs font-bold">
               <span>{index + 1}.</span><span>{item.title}</span>
-              {saved && <><Check aria-hidden="true" className="ml-auto size-3 shrink-0 text-primary" /><span className="sr-only">Saved</span></>}
+              {saved && <><Check aria-hidden="true" className="ml-auto size-3 shrink-0 text-success" /><span className="sr-only">Saved</span></>}
             </span>
             <span className="mt-1 hidden text-xs text-muted-foreground xl:block">{item.description}</span>
           </Button>;
