@@ -38,6 +38,7 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
     setOfferings(null);
     setCanonicalSiteId(null);
     setError(null);
+    setLoading(false);
     setQuery("");
     setAvailabilityFilter("all");
     return () => { requestVersion.current += 1; };
@@ -107,7 +108,7 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
             onChange={event => setAvailabilityFilter(event.target.value as AvailabilityFilter)}>
             <option value="all">All published results</option>
             <option value="plan">Available for planning</option>
-            <option value="review">Requires further work</option>
+            <option value="review">Not currently plannable</option>
           </Select>
         </Field>} />
       <p className="mt-4 text-xs text-muted-foreground" role="status">
@@ -120,18 +121,21 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
         {visible.map(item => {
           const { offering, availability } = item;
           const planEligible = canPlanOffering(item);
+          const unavailable = !planEligible && availability.every(policy => policy.catalogStatus === "unavailable");
           return <article key={offering.offeringVersionId} className="flex flex-col border bg-background p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium text-muted-foreground">{offering.code} · v{offering.versionNo}</span>
-              <StatusBadge tone={planEligible ? "neutral" : "attention"}>
-                {planEligible ? "Planning possible" : "Review needed"}
+              <StatusBadge tone={planEligible || unavailable ? "neutral" : "attention"}>
+                {planEligible ? "Planning possible" : unavailable ? "Unavailable" : "Review required"}
               </StatusBadge>
             </div>
             <h3 className="mt-3 text-base font-semibold">{offering.title}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               {planEligible
                 ? "This Offering may be included in a private Blueprint plan. Independent qualification and approval still apply."
-                : "The current availability policy does not permit this Offering to be planned for this selection."}
+                : unavailable
+                  ? "The current availability policies do not permit this Offering to be planned for the selected Site and delivery model."
+                  : "The current availability policies require additional review before this Offering may be planned."}
             </p>
             <details className="mt-4 border-t pt-3">
               <summary className="cursor-pointer text-sm font-semibold">Review availability policies</summary>
