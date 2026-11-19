@@ -58,17 +58,20 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
     setCanonicalSiteId(null);
     setClassManagementAllowed(false);
     try {
-      const [result, classScope] = await Promise.all([
-        discoverLaunchSitePrograms({ data: { publicSiteId: siteId, deliveryContext } }),
-        // Class authority is distinct from catalog planning. An unavailable
-        // capability check must hide this handoff, not block catalog discovery.
-        getLaunchSiteClassScope({ data: { siteId } })
-          .catch(() => ({ kind: "blocked" as const })),
-      ]);
+      // Permission is a secondary read. Never hold up the catalog on a slow
+      // Class scope probe, and ignore stale responses after a Site/mode change.
+      const classScope = getLaunchSiteClassScope({ data: { siteId } })
+        .then(result => result.kind === "ready")
+        .catch(() => false);
+      const result = await discoverLaunchSitePrograms({
+        data: { publicSiteId: siteId, deliveryContext },
+      });
       if (version !== requestVersion.current) return;
       setOfferings(result.items);
       setCanonicalSiteId(result.canonicalSiteId);
-      setClassManagementAllowed(classScope.kind === "ready");
+      void classScope.then(allowed => {
+        if (version === requestVersion.current) setClassManagementAllowed(allowed);
+      });
     } catch (caught) {
       if (version === requestVersion.current)
         setError(normalizeClientError(caught, "Program discovery could not be completed. Try again.").message);
