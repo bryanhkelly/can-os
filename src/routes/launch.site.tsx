@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { listLaunchOptions } from "@/modules/programs/launch.functions";
@@ -13,6 +13,7 @@ import { EstablishProgramsAudiencesV61, ProgramsAudiencesV61Guidance,
   type ProgramsAudiencesV61Initial } from "@/components/launch-studio/EstablishProgramsAudiencesV61";
 import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { WorkspaceShell } from "@/components/workspace";
+import { LaunchModuleDestinationV61, isDestinationModuleV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
 
 const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
@@ -80,19 +81,17 @@ function SiteLaunchPage() {
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })}
       onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
-    : selected ? <WorkspaceShell title={selected.title}
-      eyebrow={`${selected.stage} / ${selected.title}`}
-      subtitle="This section will be connected using the approved V6.1 content contract."
-      width="wide">
-      <div role="status" className="mt-6 border bg-card p-5 text-sm">
-        This module is not yet connected. Nothing on this page creates or publishes records.
-      </div>
-      <a href={base} className="mt-6 inline-flex min-h-11 items-center border px-4 text-sm font-semibold">
-        Back to Overview
-      </a>
+    : selected?.id === "website-brand" ? <Navigate
+      to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
+    : selected && isDestinationModuleV61(selected.id) ? <LaunchModuleDestinationV61
+      module={selected.id} title={selected.title} stage={selected.stage} siteId={site.id} />
+    : selected ? <WorkspaceShell title="Module unavailable" eyebrow="Launch Studio"
+      subtitle="This module could not be loaded. Return to the Site overview and try again."
+      width="wide"><a href={base} className="inline-flex min-h-11 items-center text-primary underline">
+        Back to Site overview</a>
     </WorkspaceShell> : <LaunchStudioOverview
-      site={{ ...site, statusLabel: "Preparing", statusTone: "info" }}
-      mode="first-visit"
+      site={{ ...site, statusLabel: "Site established", statusTone: "neutral" }}
+      mode="returning"
       nextAction={{ title: "Begin with Site Profile", description: "Confirm the Site identity you already created.", href: base + "&module=site-profile" }}
       previewUrl={"/launch/site-preview?siteId=" + encodeURIComponent(site.id)}
       workspaceUrl={"/sites/" + encodeURIComponent(site.id)}
