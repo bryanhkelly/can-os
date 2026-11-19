@@ -308,7 +308,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Exit</Button>
         {step === 0
-          ? <Button disabled={busy} onClick={() => selectStep(1)}>Continue to Audiences <ArrowRight aria-hidden="true" /></Button>
+          ? <Button disabled={disabled} onClick={() => selectStep(1)}>Continue to Audiences <ArrowRight aria-hidden="true" /></Button>
           : <Button loading={busy} disabled={disabled} onClick={() => void save(false)}>
             Save & Continue <ArrowRight aria-hidden="true" />
           </Button>}
