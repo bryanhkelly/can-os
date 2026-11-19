@@ -1,3 +1,6 @@
+import { readSavedBrandVersion } from "./site-brand.functions";
+import { siteBrandPresentationIdentity } from "@/domain/site-brand";
+import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
@@ -65,9 +68,16 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const siteStorySource=siteStorySourceV61Schema.safeParse(siteConfiguration?.metadata?.siteStoryV61);
   const storyCandidates=siteStorySource.success
     ? suggestWebsiteCopyFromStory(siteStorySource.data.answers,site.name) : [];
+  const savedBrand=await readSavedBrandVersion(site.id);
   const latestContent = history[0]?.content ?? local?.content;
-  const editingContent: SiteLocalContent | null = latestContent
+  const rawEditingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
+  // The saved identity comes ONLY from site_brand_versions. Website history
+  // stores the structural wireframe, not colors, logo, fonts or direction.
+  const editingContent:SiteLocalContent|null=rawEditingContent && savedBrand
+    ? {...rawEditingContent,branding:siteBrandPresentationIdentity(savedBrand.resolved,
+        resolveSiteTemplateId(rawEditingContent.branding.templateId))}
+    : rawEditingContent;
   // Editor and full-page private previews use the latest saved immutable draft,
   // never the last published revision by accident. Unapproved child artwork
   // remains editable but cannot escape into preview HTML.
@@ -161,6 +171,9 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ])) : {};
   return {
     siteId:site.id,
+    currentBrandVersionId:savedBrand?.version.id??null,
+    currentBrandRevision:savedBrand?.version.revision??0,
+    currentBrandConfiguration:savedBrand?.version.configuration??null,
     siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
     siteStoryCopyCandidates:storyCandidates,
     siteStorySourceChoices:siteStorySource.success ? {
