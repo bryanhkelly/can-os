@@ -78,7 +78,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
           <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Site setup</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-          <LaunchPreviewSharing key={site.id} siteId={site.id} />
+          {active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
           <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-xs font-semibold text-primary">
             <Globe2 className="size-4"/> Preview Website
