@@ -60,7 +60,7 @@ export default tseslint.config(
       "src/components/student/StudentExperience.tsx",
       "src/components/learning/ClassroomWorkspace.tsx",
       "src/router.tsx",
-      "src/routes/{index,access.verify,church.apply,family.join,schools.new}.tsx",
+      "src/routes/{index,access.verify,church.apply,family.join,site.new}.tsx",
       "src/**/*.stories.tsx",
     ],
     rules: { "can-os-design/no-raw-page-structure": "off" },
