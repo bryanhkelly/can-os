@@ -26,11 +26,19 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function close() {
+    setOpen(false);
+    // The raw bearer URL is intentionally shown only in this creation session.
+    setCreatedUrl("");
+    setCopied(false);
+  }
+
   useEffect(() => {
     if (!open) return;
     let active = true;
     setLoading(true);
     setError(null);
+    setShares([]);
     void listSitePreviewShares({ data: { siteId } }).then(result => {
       if (active) setShares(result);
     }).catch(cause => {
@@ -88,7 +96,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
       className="gap-2" onClick={() => setOpen(true)}>
       <Share2 className="size-4" aria-hidden="true" /> Share preview
     </Button>
-    <Modal open={open} onClose={() => setOpen(false)} label="Share Site website preview"
+    <Modal open={open} onClose={close} label="Share Site website preview"
       className="max-w-2xl">
       <div className="flex items-start justify-between gap-4 border-b p-5">
         <div>
@@ -97,7 +105,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
             Invite leadership, families or partners to view the proposed website before official publication.
           </p>
         </div>
-        <Button size="sm" variant="ghost" aria-label="Close sharing" onClick={() => setOpen(false)}>
+        <Button size="sm" variant="ghost" aria-label="Close sharing" onClick={close}>
           <X className="size-5" />
         </Button>
       </div>
