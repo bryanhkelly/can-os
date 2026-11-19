@@ -509,9 +509,11 @@ function LocalWebsiteCopyEditor({
   const [brandDisplayName,setBrandDisplayName]=useState(
     data.currentBrandConfiguration?.displayName??data.siteName);
   const brandPointerRef=useRef<string|null>(data.currentBrandVersionId);
+  const brandConfigRef=useRef<SiteBrandConfiguration|null>(data.currentBrandConfiguration);
+  const [savedBrandName,setSavedBrandName]=useState(
+    data.currentBrandConfiguration?.displayName??data.siteName);
   const content = editor.content;
-  const brandDisplayNameDirty=brandDisplayName!==
-    (data.currentBrandConfiguration?.displayName??data.siteName);
+  const brandDisplayNameDirty=brandDisplayName!==savedBrandName;
   const brandRecommendation = data.siteStoryRecommendation;
   const brandDirection = content.branding.brandDirectionId ?? null;
   const setContent: Dispatch<SetStateAction<SiteLocalContent>> = update =>
@@ -536,6 +538,8 @@ function LocalWebsiteCopyEditor({
     if(!dirty){
       setBrandDisplayName(data.currentBrandConfiguration?.displayName??data.siteName);
       brandPointerRef.current=data.currentBrandVersionId;
+      brandConfigRef.current=data.currentBrandConfiguration;
+      setSavedBrandName(data.currentBrandConfiguration?.displayName??data.siteName);
     }
     setEditor(previous => {
       if (previous.siteId === data.siteId && previous.revision === data.currentRevision) return previous;
@@ -554,6 +558,8 @@ function LocalWebsiteCopyEditor({
     setEditor({ content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId });
     setBrandDisplayName(data.currentBrandConfiguration?.displayName??data.siteName);
     brandPointerRef.current=data.currentBrandVersionId;
+    brandConfigRef.current=data.currentBrandConfiguration;
+    setSavedBrandName(data.currentBrandConfiguration?.displayName??data.siteName);
     setDraftPreview(null);
     setError("");
   }
@@ -587,8 +593,8 @@ function LocalWebsiteCopyEditor({
       headingFontId:branding.headingFontId??null,
       bodyFontId:branding.bodyFontId??null,
       displayName:brandDisplayName.trim(),
-      logoAssetId:data.currentBrandConfiguration?.logoAssetId??null,
-      heroAssetId:data.currentBrandConfiguration?.heroAssetId??null,
+      logoAssetId:brandConfigRef.current?.logoAssetId??null,
+      heroAssetId:brandConfigRef.current?.heroAssetId??null,
     };
     const outcome = await mutation.run(async()=>{
       // Authoritative Brand save happens first. This may create a new immutable
@@ -599,6 +605,8 @@ function LocalWebsiteCopyEditor({
         logoImage:branding.logoImage??null,heroImage:branding.heroImage,
       }});
       brandPointerRef.current=brandResult.brandVersionId;
+      brandConfigRef.current=brandResult.configuration;
+      setSavedBrandName(brandResult.configuration.displayName);
       // Website content is a separate revision and stores only layout/copy.
       // A failure here is reported; the already-saved Brand is not rolled back.
       return saveChurchWebsiteDraft({data:{

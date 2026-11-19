@@ -145,7 +145,8 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
         ? await tx.select().from(siteBrandVersions).where(and(eq(siteBrandVersions.id,site.currentBrandVersionId),
           eq(siteBrandVersions.siteId,site.id))).limit(1) : [];
       if(previous[0] && canonicalJson(previous[0].configuration)===canonicalJson(config))
-        return {changed:false,brandVersionId:previous[0].id,revision:previous[0].revision};
+        return {changed:false,brandVersionId:previous[0].id,revision:previous[0].revision,
+          configuration:siteBrandConfigurationSchema.parse(previous[0].configuration)};
       const nextRevision=previous[0]?previous[0].revision+1:1;
       const [saved]=await tx.insert(siteBrandVersions).values({
         siteId:site.id,revision:nextRevision,configuration:config,fingerprint,
@@ -160,7 +161,7 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
         before:{brandVersionId:site.currentBrandVersionId,revision:previous[0]?.revision??null},
         after:{brandVersionId:saved.id,revision:nextRevision,fingerprint},
       });
-      return {changed:true,brandVersionId:saved.id,revision:nextRevision};
+      return {changed:true,brandVersionId:saved.id,revision:nextRevision,configuration:config};
     });
   });
 
