@@ -53,6 +53,9 @@ export const readLaunchSitePublication = createServerFn({ method: "GET" })
       approvedEnrichmentCount: enrichment.length,
       reviewedLocalContentAvailable: Boolean(localCopy),
       canReviewWebsiteCopy: actor.role === "site_admin" || actor.role === "site_website_editor",
+      // Editors may approve local copy, but Site publication has an independent
+      // assignment checked by the existing Site publisher command.
+      canPublishSite: actor.role !== "site_website_editor",
       latestWebsiteRevision: latest?.revision ?? 0,
       latestWebsiteStatus: latest?.status ?? null,
       publishingPrerequisitesPresent: Boolean(localCopy) || academic.length + enrichment.length > 0,
