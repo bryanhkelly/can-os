@@ -10,11 +10,16 @@
 \quit 3
 \endif
 
--- All three identities are native CAN OS v3.0.1 database objects.
--- This script is run only by a trusted schema administrator.
+-- Trusted-operator provisioning only. Shared Organization, Site and Blueprint
+-- records are in public; legacy evidence labels and audit journals remain in
+-- education_v30. Execute only after scoped public.sites RLS is reviewed.
+-- Committing this script does not execute any database mutation.
 SELECT (
- EXISTS(SELECT 1 FROM education_v30.organizations
-   WHERE id=:'organization_id'::uuid AND status='active')
+ EXISTS(SELECT 1 FROM public.organizations
+   WHERE id=:'organization_id'::uuid)
+ AND EXISTS(SELECT 1 FROM pg_policies p
+   WHERE p.schemaname='public' AND p.tablename='sites'
+     AND p.policyname='sites_canonical_catalog_operator_read')
  AND EXISTS(SELECT 1 FROM pg_roles r WHERE r.rolname=:'application_role'
    AND r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
    AND NOT r.rolcreatedb AND NOT r.rolcreaterole AND NOT r.rolinherit
@@ -54,7 +59,7 @@ SELECT (
 \endif
 
 BEGIN;
-SELECT format('GRANT USAGE ON SCHEMA education_v30 TO %I,%I',
+SELECT format('GRANT USAGE ON SCHEMA public, education_v30 TO %I,%I',
  :'author_role',:'reviewer_role')
 \gexec
 SELECT format('GRANT %I,%I TO %I WITH INHERIT FALSE, SET TRUE',
@@ -67,7 +72,7 @@ SELECT format(
 
 -- Both purposes read the published recipe library and their own configurations.
 SELECT format(
- 'GRANT SELECT ON education_v30.%I TO %I,%I', t,
+ 'GRANT SELECT ON public.%I TO %I,%I', t,
  :'author_role',:'reviewer_role')
 FROM unnest(ARRAY[
  'blueprints','blueprint_versions','blueprint_components',
@@ -76,38 +81,38 @@ FROM unnest(ARRAY[
  'blueprint_configurations','blueprint_configuration_versions',
  'blueprint_configuration_components','blueprint_configuration_component_references',
  'blueprint_configuration_local_experiences','blueprint_configuration_offering_intents',
- 'configuration_reviews','blueprint_component_approval_decisions','audit_events']) AS t
+ 'configuration_reviews','blueprint_component_approval_decisions']) AS t
 \gexec
 -- A reviewed recipe can only create planning-level deployments for an
 -- Operation with a current operator role belonging to this Organization.
-SELECT format('GRANT SELECT ON education_v30.%I TO %I', t, :'author_role')
+SELECT format('GRANT SELECT ON public.%I TO %I', t, :'author_role')
 FROM unnest(ARRAY[
  'education_operations','education_operation_organization_roles',
  'blueprint_execution_batches','blueprint_outputs',
  'program_deployments','deployment_offering_adoptions']) AS t
 \gexec
-SELECT format('GRANT INSERT ON education_v30.%I TO %I', t, :'author_role')
+SELECT format('GRANT INSERT ON public.%I TO %I', t, :'author_role')
 FROM unnest(ARRAY[
  'blueprint_execution_batches','blueprint_outputs',
  'program_deployments','deployment_offering_adoptions']) AS t
 \gexec
 SELECT format(
- 'GRANT UPDATE (execution_status,executed_by_person_id,executed_at) ON education_v30.blueprint_execution_batches TO %I',
+ 'GRANT UPDATE (execution_status,executed_by_person_id,executed_at) ON public.blueprint_execution_batches TO %I',
  :'author_role')
 \gexec
 
 -- Blueprint planning and execution must bind an Operation to the selected Site.
 -- Restrict the author role to the relationship columns needed for this check.
 SELECT format(
- 'GRANT SELECT (id,operation_id,site_id,valid_from,valid_through) ON education_v30.education_operation_sites TO %I',
+ 'GRANT SELECT (id,operation_id,site_id,valid_from,valid_through) ON public.education_operation_sites TO %I',
  :'author_role')
 \gexec
 
 -- Site authoring requires current, verified operator authority.
-SELECT format('GRANT SELECT (id,status) ON education_v30.sites TO %I', :'author_role')
+SELECT format('GRANT SELECT (id,lifecycle_status) ON public.sites TO %I', :'author_role')
 \gexec
 SELECT format(
- 'GRANT SELECT (site_id,organization_id,role_code,valid_from,valid_through) ON education_v30.site_organization_roles TO %I',
+ 'GRANT SELECT (site_id,organization_id,role_code,valid_from,valid_through) ON public.site_organization_roles TO %I',
  :'author_role')
 \gexec
 
@@ -118,7 +123,7 @@ FROM unnest(ARRAY[
  'blueprint_configuration_local_experiences','blueprint_configuration_offering_intents']) AS t
 \gexec
 SELECT format(
- 'GRANT UPDATE (lifecycle,frozen_at) ON education_v30.blueprint_configuration_versions TO %I',
+ 'GRANT UPDATE (lifecycle,frozen_at) ON public.blueprint_configuration_versions TO %I',
  :'author_role')
 \gexec
 
@@ -131,12 +136,18 @@ SELECT format(
  'GRANT SELECT (id,document_id,verified_at,valid_from,valid_through) ON education_v30.evidence_document_versions TO %I',
  :'reviewer_role')
 \gexec
-SELECT format('GRANT INSERT ON education_v30.%I TO %I', t, :'reviewer_role')
+SELECT format('GRANT INSERT ON public.%I TO %I', t, :'reviewer_role')
 FROM unnest(ARRAY['configuration_reviews','blueprint_component_approval_decisions']) AS t
 \gexec
 SELECT format('GRANT USAGE ON SEQUENCE %s TO %I',
- pg_get_serial_sequence('education_v30.blueprint_component_approval_decisions','decision_order'),
+ pg_get_serial_sequence('public.blueprint_component_approval_decisions','decision_order'),
  :'reviewer_role')
+\gexec
+
+-- The native audit journal remains separately in education_v30.
+-- Do not substitute public.audit_events; the schemas and columns differ.
+SELECT format('GRANT SELECT ON education_v30.audit_events TO %I,%I',
+  :'author_role', :'reviewer_role')
 \gexec
 
 -- Trace-only, append-friendly event rights. Neither role can erase history.
