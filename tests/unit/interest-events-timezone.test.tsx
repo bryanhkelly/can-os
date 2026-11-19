@@ -4,7 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => ({ options, useSearch: () => ({}) }),
   useRouter: () => ({ invalidate: vi.fn() }),
-  Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
+  Link: ({ to, search, children }: { to: string; search?: Record<string, string | undefined>; children: ReactNode }) => {
+    const params = new URLSearchParams(Object.entries(search ?? {})
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    return <a href={to + (params.size ? "?" + params.toString() : "")}>{children}</a>;
+  },
 }));
 vi.mock("@/modules/enrollment/interest-events.functions", () => ({
   listSchoolInterestEvents: vi.fn(), createSchoolInterestEvent: vi.fn(), rotateSchoolInterestEventLink: vi.fn(),
@@ -60,6 +64,6 @@ describe("interest event timezone", () => {
         title: "Open house", description: "", kind: "open_house", location: "", visibility: "public",
         startsAt: "2026-11-11T18:00:00Z", endsAt: "2026-11-11T19:00:00Z", timezone: "America/New_York", registrations: [] }],
     }} />);
-    expect(html).toContain('href="/launch/site?programId=program">East School</a>');
+    expect(html).toContain('href="/launch/site?siteId=school&amp;module=program-catalog"');
   });
 });
