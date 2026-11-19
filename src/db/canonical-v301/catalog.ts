@@ -13,7 +13,7 @@ import { educationV30 } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 
-export const qualificationProgramFitPolicies = educationV30.table(
+export const qualificationProgramFitPolicies = pgTable(
   "qualification_program_fit_policies",
   {
     id: id(),
@@ -36,7 +36,7 @@ export const qualificationProgramFitPolicies = educationV30.table(
   ],
 );
 
-export const geographicAreas = educationV30.table("geographic_areas", {
+export const geographicAreas = pgTable("geographic_areas", {
   id: id(),
   code: text("code").notNull(),
   name: text("name").notNull(),
@@ -54,7 +54,7 @@ export const catalogSites = pgTable("sites", {
   status: text("lifecycle_status").$type<"planning" | "active" | "closed">(),
 });
 
-export const siteOrganizationRoles = educationV30.table("site_organization_roles", {
+export const siteOrganizationRoles = pgTable("site_organization_roles", {
   id: id(),
   siteId: uuid("site_id").notNull(),
   organizationId: uuid("organization_id").notNull(),
@@ -77,7 +77,7 @@ export const educationOperationSites = pgTable("education_operation_sites", {
   validThrough: timestamp("valid_through", { withTimezone: true }),
 });
 
-export const qualificationApplications = educationV30.table("qualification_applications", {
+export const qualificationApplications = pgTable("qualification_applications", {
   id: id(),
   applicantOrganizationId: uuid("applicant_organization_id").notNull(),
   subjectId: uuid("subject_id").notNull(),
@@ -88,7 +88,7 @@ export const qualificationApplications = educationV30.table("qualification_appli
     .notNull(),
 });
 
-export const qualificationProgramFitPolicyVersions = educationV30.table(
+export const qualificationProgramFitPolicyVersions = pgTable(
   "qualification_program_fit_policy_versions",
   {
     id: id(),
@@ -119,7 +119,7 @@ export const qualificationProgramFitPolicyVersions = educationV30.table(
   ],
 );
 
-export const qualificationProgramFitPolicyWithdrawals = educationV30.table(
+export const qualificationProgramFitPolicyWithdrawals = pgTable(
   "qualification_program_fit_policy_version_withdrawals",
   {
     policyVersionId: uuid("policy_version_id").primaryKey(),
@@ -130,7 +130,7 @@ export const qualificationProgramFitPolicyWithdrawals = educationV30.table(
   },
 );
 
-export const qualificationProgramFitPolicyRequirements = educationV30.table(
+export const qualificationProgramFitPolicyRequirements = pgTable(
   "qualification_program_fit_policy_requirements",
   {
     id: id(),
@@ -165,7 +165,7 @@ export const qualificationProgramFitPolicyRequirements = educationV30.table(
   ],
 );
 
-export const qualificationProgramAvailabilityRules = educationV30.table(
+export const qualificationProgramAvailabilityRules = pgTable(
   "qualification_program_availability_rules",
   {
     id: id(),
@@ -187,7 +187,7 @@ export const qualificationProgramAvailabilityRules = educationV30.table(
   },
 );
 
-export const qualificationProgramFitAssessments = educationV30.table(
+export const qualificationProgramFitAssessments = pgTable(
   "qualification_program_fit_assessments",
   {
     id: id(),
@@ -220,7 +220,7 @@ export const qualificationProgramFitAssessments = educationV30.table(
   ],
 );
 
-export const qualificationSubjects = educationV30.table("qualification_subjects", {
+export const qualificationSubjects = pgTable("qualification_subjects", {
   id: id(),
   applicantOrganizationId: uuid("applicant_organization_id").notNull(),
   subjectKind: text("subject_kind")
@@ -238,7 +238,7 @@ export const qualificationSubjects = educationV30.table("qualification_subjects"
   siteId: uuid("site_id"),
 });
 
-export const qualificationProgramFitRequirementResults = educationV30.table(
+export const qualificationProgramFitRequirementResults = pgTable(
   "qualification_program_fit_requirement_results",
   {
     id: id(),
@@ -272,7 +272,7 @@ export const qualificationProgramFitRequirementResults = educationV30.table(
   ],
 );
 
-export const qualificationProgramFitReviewerAuthorizations = educationV30.table(
+export const qualificationProgramFitReviewerAuthorizations = pgTable(
   "qualification_program_fit_reviewer_authorizations",
   {
     id: id(),
@@ -289,7 +289,7 @@ export const qualificationProgramFitReviewerAuthorizations = educationV30.table(
   },
 );
 
-export const qualificationProgramFitReviewerRevocations = educationV30.table(
+export const qualificationProgramFitReviewerRevocations = pgTable(
   "qualification_program_fit_reviewer_revocations",
   {
     authorizationId: uuid("authorization_id").primaryKey(),
@@ -300,7 +300,7 @@ export const qualificationProgramFitReviewerRevocations = educationV30.table(
   },
 );
 
-export const qualificationProgramFitReviews = educationV30.table(
+export const qualificationProgramFitReviews = pgTable(
   "qualification_program_fit_reviews",
   {
     id: id(),
