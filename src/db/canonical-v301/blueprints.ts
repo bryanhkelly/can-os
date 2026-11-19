@@ -357,8 +357,7 @@ export const blueprintOutputs = pgTable("blueprint_outputs",
   ],
 );
 
-export const offerings = educationV30.table(
-  "offerings",
+export const offerings = pgTable("offerings",
   {
     id: id(),
     publisherOrganizationId: uuid("publisher_organization_id").notNull(),
@@ -372,8 +371,7 @@ export const offerings = educationV30.table(
   ],
 );
 
-export const offeringVersions = educationV30.table(
-  "offering_versions",
+export const offeringVersions = pgTable("offering_versions",
   {
     id: id(),
     offeringId: uuid("offering_id").notNull(),
@@ -391,8 +389,7 @@ export const offeringVersions = educationV30.table(
 
 /** Existing publisher-defined, immutable-after-publication release policy.
  * Each required Course needs an explicit record before Offering release. */
-export const offeringReleaseRequirements = educationV30.table(
-  "offering_release_requirements",
+export const offeringReleaseRequirements = pgTable("offering_release_requirements",
   {
     id: id(),
     offeringVersionId: uuid("offering_version_id").notNull(),
@@ -409,8 +406,7 @@ export const offeringReleaseRequirements = educationV30.table(
   ],
 );
 
-export const programDeployments = educationV30.table(
-  "program_deployments",
+export const programDeployments = pgTable("program_deployments",
   {
     id: id(),
     operationId: uuid("operation_id").notNull(),
