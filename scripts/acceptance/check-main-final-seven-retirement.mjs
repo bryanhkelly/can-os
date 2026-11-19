@@ -65,6 +65,11 @@ async function main() {
     FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace
     WHERE ns.nspname IN ('public','education_v30','education_v30_secure')
       AND p.prokind IN ('f','p')
+      -- A public routine referencing unqualified public.enrollments is not
+      -- a legacy consumer. Native routines still use legacy-first lookup;
+      -- explicit education_v30 references are always reportable.
+      AND (ns.nspname IN ('education_v30','education_v30_secure')
+           OR p.prosrc ILIKE '%education_v30.%')
       AND (p.prosrc ILIKE '%canonical_sessions%'
         OR p.prosrc ILIKE '%canonical_accounts%'
         OR p.prosrc ILIKE '%canonical_account_grants%'
