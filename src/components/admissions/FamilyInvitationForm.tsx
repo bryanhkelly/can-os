@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 export interface FamilyInvitationDraft { programId:string;contacts:string;subject:string;introduction:string }
-export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit}:{
+export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit,purpose="application"}:{
  programs:readonly {id:string;name:string}[];draft:FamilyInvitationDraft;busy:boolean;
+ purpose?:"interest"|"application";
  onChange:(patch:Partial<FamilyInvitationDraft>)=>void;onSubmit:(event:FormEvent<HTMLFormElement>)=>void;
 }) {
  const [attempted,setAttempted]=useState(false);
@@ -23,10 +24,13 @@ export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit}:{
    setAttempted(false);
     onSubmit(event);
  }
- if(!programs.length)return <p className="mt-6  border p-4 text-sm">No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations.</p>;
+ if(!programs.length)return <p className="mt-6 border p-4 text-sm">{purpose==="interest"
+   ? "No eligible developing school Programs are available for interest outreach at this Site. Creating a Site alone does not authorize invitations."
+   : "No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations."}</p>;
  return <form noValidate onSubmit={submit} className="mt-6 max-w-3xl space-y-4  border bg-card p-5">
-  <h2 className="font-semibold">Send a private receiving-school application invitation</h2>
-    <Field label="Authorized school Program" required error={errors.program}>
+  <h2 className="font-semibold">{purpose==="interest"
+    ? "Invite consenting adults to express interest" : "Send a private receiving-school application invitation"}</h2>
+    <Field label={purpose==="interest"?"Eligible developing Program":"Authorized school Program"} required error={errors.program}>
      <Select value={draft.programId} onChange={e=>onChange({programId:e.target.value})}>
         <option value="">Choose a Program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
      </Select>
