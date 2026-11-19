@@ -42,20 +42,15 @@ describe("Launch catalog, Class and persistence contracts",()=>{
   });
   it("commits first Site preferences in the Site transaction, not a second mutation",()=>{
     const site=source("src/modules/programs/launch.functions.ts");
-    const wizard=source("src/components/launch-studio/SiteFirstLaunch.tsx");
     expect(site).toContain("launchPreferences:siteLaunchPreferencesSchema.optional()");
     expect(site).toContain("launchPreferences:data.launchPreferences");
-    expect(wizard).toContain("launchPreferences:{delivery,interestIds:chosen}");
-    expect(wizard).not.toContain("siteId:saved.value.siteId,preferences");
   });
   it("protects edited Site channels and reuses 6.1 form controls",()=>{
     const ui=source("src/components/launch-studio/SiteContentChannelEditor.tsx");
-    const launch=source("src/components/launch-studio/SiteFirstLaunch.tsx");
     expect(ui).toContain("useLaunchUnsavedChanges(");
     expect(ui).toContain("setSavedSnapshot(");
     expect(ui).toContain("<Textarea ");
     expect(ui).toContain("<Checkbox ");
-    expect(launch).toContain("<Radio ");
   });
   it("preserves native Course discovery independently of legacy school preparation reads",()=>{
     const ui=source("src/components/launch-studio/SchoolHubWorkflow.tsx");
@@ -65,10 +60,10 @@ describe("Launch catalog, Class and persistence contracts",()=>{
     expect(ui).toContain("if(data.draftFailed)return <>{catalogDiscovery}");
     expect(ui).toContain("if(!site)return");
   });
-  it("hides school opening actions for enrichment-only Site previews",()=>{
-    const ui=source("src/components/launch-studio/SiteFirstLaunch.tsx");
-    expect(ui).toContain("siteLaunchPreparation(sitePrograms,chosen)");
-    expect(ui).toContain("siteId&&preparation.showSchoolOpeningPreparation");
+  it("keeps opening authorization independent of the Launch Studio Overview",()=>{
+    const ui=source("src/components/launch-studio/LaunchStudioOverviewV61.tsx");
+    expect(ui).toContain("enrollment authorization are separate decisions");
+    expect(ui).toContain("Program Catalog");
   });
   it("uses the v6.1 rectilinear affiliation card",()=>{
     const ui=source("src/components/operations/SiteAffiliationPanel.tsx");

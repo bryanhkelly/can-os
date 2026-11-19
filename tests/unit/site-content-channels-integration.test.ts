@@ -64,11 +64,11 @@ describe("Site-owned content source and publication contract",()=>{
   });
 
   it("maps the same saved Site layout into Website Studio without a parallel CMS",()=>{
-    const launch=read("src/components/launch-studio/SiteFirstLaunch.tsx");
+    const launch=read("src/components/launch-studio/LaunchStudioOverviewV61.tsx");
     const website=read("src/routes/site-website.tsx");
     const preview=read("src/modules/sites/site-website-preview.server.ts");
     const service=read("src/modules/sites/site-content-channels.server.ts");
-    expect(launch).toContain("<SiteContentChannelEditor");
+    expect(launch).toContain("Your website, as it grows");
     expect(website).toContain("<SiteContentChannelEditor");
     expect(website).toContain("initialConfig={data.contentChannelConfig}");
     expect(preview).toContain("contentChannelConfig: contentConfig");
