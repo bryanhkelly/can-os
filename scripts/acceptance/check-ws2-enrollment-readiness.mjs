@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * WS2 native Class enrollment preflight. READ ONLY. Never creates learners,
+ * WS2 canonical public Class enrollment preflight. READ ONLY. Never creates learners,
  * sessions, grants, invitations, Class rows, or migration ledger entries.
  *
  * Requires an explicit known nonproduction Neon branch attested by PostgreSQL.
@@ -41,17 +41,17 @@ try{
   const relations=await query(`
     SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname='education_v30' AND c.relkind IN ('r','p')
+    WHERE n.nspname='public' AND c.relkind IN ('r','p')
       AND c.relname=ANY($1::text[])
   `,[names]);
-  assert.equal(relations.rows.length,names.length,"Missing canonical Class relation");
+  assert.equal(relations.rows.length,names.length,"Missing canonical public Class relation");
   for(const table of relations.rows){
     assert(table.relrowsecurity && table.relforcerowsecurity,
       "Missing enforced Class RLS: "+table.relname);
   }
 
   const index=await query(`
-    SELECT indexdef FROM pg_indexes WHERE schemaname='education_v30'
+    SELECT indexdef FROM pg_indexes WHERE schemaname='public'
     AND tablename='class_enrollments'
     AND indexname='canonical_class_enroll_active_uq'
   `);
@@ -72,7 +72,7 @@ try{
     SELECT t.tgname FROM pg_trigger t
     JOIN pg_class c ON c.oid=t.tgrelid
     JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname='education_v30' AND t.tgenabled<>'D'
+    WHERE n.nspname='public' AND t.tgenabled<>'D'
       AND NOT t.tgisinternal AND t.tgname=ANY($1::text[])
   `,[guards]);
   for(const name of guards){
@@ -98,7 +98,7 @@ try{
   const consentContract=await query(`
     SELECT pg_get_constraintdef(oid) AS definition
     FROM pg_constraint
-    WHERE conrelid=to_regclass('education_v30.class_enrollments')
+    WHERE conrelid=to_regclass('public.class_enrollments')
       AND conname='canonical_class_enrollment_consent_ck'
   `);
   const nativeConsentMethodsReady=consentContract.rows.length===1&&
@@ -119,10 +119,10 @@ try{
   }
   const facts=await query(`
     SELECT
-      (SELECT count(*)::int FROM education_v30.classes) AS classes,
-      (SELECT count(*)::int FROM education_v30.class_enrollments) AS enrollments,
-      (SELECT count(*)::int FROM education_v30.class_sessions) AS sessions,
-      (SELECT count(*)::int FROM education_v30.learner_course_attempts
+      (SELECT count(*)::int FROM public.classes) AS classes,
+      (SELECT count(*)::int FROM public.class_enrollments) AS enrollments,
+      (SELECT count(*)::int FROM public.class_sessions) AS sessions,
+      (SELECT count(*)::int FROM public.learner_course_attempts
         WHERE class_enrollment_id IS NOT NULL) AS course_attempts
   `);
   const summary=facts.rows[0];
@@ -131,9 +131,9 @@ try{
       SELECT c.site_id,count(DISTINCT c.id)::int AS class_count,
         count(DISTINCT cs.id)::int AS session_count,
         count(DISTINCT e.id)::int AS enrollment_count
-      FROM education_v30.classes c
-      LEFT JOIN education_v30.class_sessions cs ON cs.class_id=c.id
-      LEFT JOIN education_v30.class_enrollments e ON e.class_id=c.id
+      FROM public.classes c
+      LEFT JOIN public.class_sessions cs ON cs.class_id=c.id
+      LEFT JOIN public.class_enrollments e ON e.class_id=c.id
       WHERE c.site_id IS NOT NULL
       GROUP BY c.site_id
       HAVING count(DISTINCT cs.id)>=4 AND count(DISTINCT e.id)>=1
