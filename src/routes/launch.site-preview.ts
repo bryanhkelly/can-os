@@ -65,7 +65,9 @@ export const Route=createFileRoute("/launch/site-preview")({
           timezone:sites.timezone, metadata:sites.metadata, organizationName:organizations.name,
         }).from(sites).innerJoin(organizations,eq(organizations.id,sites.organizationId))
           .where(eq(sites.id,ids[0]!)).limit(1);
-        assertSiteSetupScope(actor,site,"program.launch.start");
+        // A private read-only preview needs exact Site read authority, not permission
+        // to launch or mutate Programs. Publication and enrollment stay separate.
+        assertSiteSetupScope(actor,site,"program.read");
 
         const [publication]=await db.select({slug:sitePublications.slug})
           .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
