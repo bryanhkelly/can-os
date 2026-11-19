@@ -222,7 +222,7 @@ function normalizeText(value: string | undefined, field: SiteLocalTextField): st
 }
 
 /** Accept only PNG critical chunks. This excludes EXIF/text/location metadata. */
-function validateInlinePng(dataUrl: string): void {
+export function validateInlinePng(dataUrl: string): void {
   const match = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
   if (!match || match[1]!.length > siteLocalImageMaxBase64Length || match[1]!.length % 4 !== 0) {
     throw new Error("Website artwork must be a bounded PNG image");
