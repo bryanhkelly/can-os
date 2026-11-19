@@ -71,6 +71,10 @@ SELECT (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'sites'
       AND policyname = 'sites_canonical_catalog_operator_read'
+      AND permissive = 'PERMISSIVE' AND cmd = 'SELECT'
+      AND 'public' = ANY(roles)
+      AND qual LIKE '%v28_role_can_access_org%'
+      AND qual LIKE '%site_organization_roles%'
   )
   AND EXISTS (
     SELECT 1
