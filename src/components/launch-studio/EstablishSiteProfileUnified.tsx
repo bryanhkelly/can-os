@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { LaunchSiteAddressFields } from "@/components/operations/LaunchSiteAddressFields";
 import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
 import { StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
@@ -227,7 +228,7 @@ export function EstablishSiteProfileUnified({
       </WorkspacePanel>
       <WorkspacePanel title="Physical location (optional)"
         description="Provide an address if you have identified your learning location.">
-        <label className="flex min-h-11 items-start gap-3 text-sm">
+        <Label className="flex min-h-11 items-start gap-3 text-sm">
           <Checkbox checked={hasAddress} disabled={saving || reloadRequired || original.hasAddress}
             onChange={event => toggleAddress(event.target.checked)} />
           <span><strong>Add a physical address</strong>
@@ -237,7 +238,7 @@ export function EstablishSiteProfileUnified({
                 : "You can continue without an address. Later program requirements may need one."}
             </span>
           </span>
-        </label>
+        </Label>
         {hasAddress && <div className="mt-5 space-y-5 border-t pt-5">
           <LaunchSiteAddressFields address={address} onChange={setAddress}
             disabled={saving || reloadRequired} />
