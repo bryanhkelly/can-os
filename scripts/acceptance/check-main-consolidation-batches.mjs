@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Read-only reconciliation for nine applied main batches (8 + 46 + 51 + 22 + 8 + 12 + 38 + 9 + 10).
+ * Read-only reconciliation for ten applied main batches (8 + 46 + 51 + 22 + 8 + 12 + 38 + 9 + 10 + 10).
  * Does not run a migration or modify a database.
  *
  * CAN_MAIN_CONSOLIDATION_CHECK=1 DATABASE_URL=<main Neon URL> \
@@ -21,6 +21,7 @@ const sources=[
   ["applied-thirty-eight","database/production/2026-11-19-consolidate-38-assessment-survey-qualification-completion-tables.sql",38,"json"],
   ["applied-nine-instructional","database/production/2026-11-19-consolidate-nine-instructional-track-tables.sql",9,"json"],
   ["applied-ten-content","database/production/2026-11-19-consolidate-10-content-professional-tables.sql",10,"json"],
+  ["applied-ten-active-course","database/production/2026-11-19-consolidate-10-course-offering-active-tables.sql",10,"json"],
 ];
 if(process.env.CAN_MAIN_CONSOLIDATION_CHECK!=="1" || !process.env.DATABASE_URL)
   throw new Error("Explicit read-only opt-in and production DATABASE_URL required");
@@ -32,7 +33,7 @@ function parseBatch([label,file,expected,arity]){
     if(!match)throw new Error("Expected a pinned JSON snapshot in "+file);
     const records=JSON.parse(match[1]).map(x=>({
       name:x.name,oid:x.oid,rls:x.rls,force:x.force_rls??x.forced,policies:x.pol,
-      triggers:x.trg,outf:x.out_fks??x.outf,inf:x.in_fks??x.inf,indexes:x.indexes??x.idx,
+      triggers:x.trg,outf:x.out_fks??x.outf,inf:x.in_fks??x.inf,indexes:x.indexes??x.idx,acl:x.acl,
     }));
     if(records.length!==expected||new Set(records.map(x=>x.name)).size!==expected)
       throw new Error("Pinned JSON migration inventory mismatch in "+file);
@@ -83,7 +84,7 @@ async function main(){
       (SELECT count(*)::int FROM pg_constraint k WHERE k.conrelid=c.oid AND k.contype='f') AS outf,
       (SELECT count(*)::int FROM pg_constraint k WHERE k.confrelid=c.oid AND k.contype='f') AS inf,
       (SELECT count(*)::int FROM pg_index WHERE indrelid=c.oid) AS indexes,
-      c.relacl IS NULL AS no_custom_acl
+      c.relacl IS NULL AS no_custom_acl, c.relacl::text AS acl
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE n.nspname IN ('public','education_v30') AND c.relkind IN ('r','p')
       AND c.relname=ANY(${names}::text[])
@@ -105,8 +106,12 @@ async function main(){
     if(item.indexes!==undefined && item.indexes!==row.indexes)
       discrepancies.push({name:item.name,batch:item.batch,field:"indexes",
         expected:item.indexes,actual:row.indexes});
-    if(!row.no_custom_acl)
+    if(item.acl!==undefined){
+      if(item.acl!==row.acl)
+        discrepancies.push({name:item.name,batch:item.batch,error:"ACL changed",expected:item.acl,actual:row.acl});
+    } else if(!row.no_custom_acl){
       discrepancies.push({name:item.name,batch:item.batch,error:"Unexpected table ACL"});
+    }
   }
 
   // Live rows may be written to public after cutover; do not incorrectly
@@ -133,7 +138,7 @@ async function main(){
     verifiedAppliedTables:all.length,liveSchemaTables:relationCounts,
     remainingPublicToLegacyForeignKeys:crossings[0]?.foreign_keys??null,discrepancies};
   console.log(JSON.stringify(report,null,2));
-  if(discrepancies.length||all.length!==204)process.exitCode=2;
+  if(discrepancies.length||all.length!==214)process.exitCode=2;
 }
 
 main().catch(e=>{console.error("CAN OS consolidation reconciliation FAILED:",e.message);process.exitCode=1;});
