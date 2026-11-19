@@ -18,8 +18,8 @@ const previewLabels: Record<PublicSitePath, string> = {
 };
 
 /** Keep the complete preview in view at every card width instead of clipping a fixed thumbnail. */
-function TemplatePreviewFrame({ html, name, tall = false, viewport = "desktop", grayscale = false }: {
-  html: string; name: string; tall?: boolean; viewport?: "desktop" | "mobile"; grayscale?: boolean;
+function TemplatePreviewFrame({ html, name, tall = false, viewport = "desktop", grayscale = false, tiny = false }: {
+  html: string; name: string; tall?: boolean; viewport?: "desktop" | "mobile"; grayscale?: boolean; tiny?: boolean;
 }) {
   const previewWidth = viewport === "mobile" ? 390 : 1280;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,7 +35,7 @@ function TemplatePreviewFrame({ html, name, tall = false, viewport = "desktop", 
   }, []);
   return <div ref={containerRef} aria-hidden="true"
     className={cn("relative overflow-hidden border border-border pointer-events-none",
-      tall ? "h-[32rem]" : viewport === "mobile" ? "h-72" : "h-56", grayscale && "grayscale")}>
+      tiny ? "h-20" : tall ? "h-[32rem]" : viewport === "mobile" ? "h-72" : "h-56", grayscale && "grayscale")}>
     <iframe title={name} srcDoc={html} sandbox="" tabIndex={-1} loading="lazy"
       className="absolute left-0 top-0 border-0"
       style={{ width: previewWidth, height: viewport === "mobile" ? 960 : 960,
@@ -130,10 +130,10 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
             onClick={()=>onChange(template.id)} disabled={disabled}
             className={cn("h-auto w-full min-w-0 items-start gap-3 whitespace-normal border p-2 text-left",
               selected?"border-primary ring-2 ring-primary/40":"border-border")}>
-            <span className="w-24 shrink-0 overflow-hidden">
+            <div className="w-24 shrink-0 overflow-hidden">
               <TemplatePreviewFrame html={renderSample(template.id)}
-                name={`${template.name} layout thumbnail`} viewport="desktop" grayscale={!styledPreview}/>
-            </span>
+                name={`${template.name} layout thumbnail`} viewport="desktop" grayscale={!styledPreview} tiny/>
+            </div>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-bold">{template.name}</span>
               <span className="mt-1 block text-xs text-muted-foreground">{template.character}</span>

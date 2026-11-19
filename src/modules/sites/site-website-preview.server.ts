@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
+import { recommendBrandDirection } from "@/domain/site-brand-direction";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
@@ -147,7 +148,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ])) : {};
   return {
     siteId:site.id,
-    siteStoryV61:siteStorySource.success ? {answers:siteStorySource.data.answers,revision:siteStorySource.data.revision} : null,
+    siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
+    siteStoryRevision:siteStorySource.success ? siteStorySource.data.revision : null,
     siteName: site.name,
     organizationName: site.organizationName,
     canPublish: site.canPublish,

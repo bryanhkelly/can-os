@@ -1,4 +1,4 @@
-import { siteBrandDirections, recommendBrandDirection, brandRecommendedLayout, brandRecommendedPalette } from "@/domain/site-brand-direction";
+import { siteBrandDirections, brandRecommendedLayout, brandRecommendedPalette } from "@/domain/site-brand-direction";
 import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
 import { SiteContentChannelEditor } from "@/components/launch-studio/SiteContentChannelEditor";
@@ -39,11 +39,16 @@ import { z } from "zod";
 export const websiteStudioStepIds = ["brand", "wireframe", "visual", "content", "review"] as const;
 const legacyWebsiteSteps = ["welcome","template","identity","photos","preview"] as const;
 type LegacyWebsiteStep = (typeof legacyWebsiteSteps)[number];
-function resolveWebsiteStep(step:typeof websiteStudioStepIds[number] | LegacyWebsiteStep | undefined) {
-  const previous:Record<LegacyWebsiteStep,typeof websiteStudioStepIds[number]>={
-    welcome:"brand",template:"wireframe",identity:"visual",photos:"visual",preview:"review",
-  };
-  return step && step in previous ? previous[step as LegacyWebsiteStep] : step ?? "brand";
+function resolveWebsiteStep(step:typeof websiteStudioStepIds[number] | LegacyWebsiteStep | undefined):
+  typeof websiteStudioStepIds[number] {
+  if (!step) return "brand";
+  switch(step) {
+    case "welcome": return "brand";
+    case "template": return "wireframe";
+    case "identity": case "photos": return "visual";
+    case "preview": return "review";
+    default: return step;
+  }
 }
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
@@ -459,7 +464,7 @@ function LocalWebsiteCopyEditor({
     return { content: initial, saved: initial, revision: data.currentRevision, siteId: data.siteId };
   });
   const content = editor.content;
-  const brandRecommendation = recommendBrandDirection(data.siteStoryV61?.answers ?? null);
+  const brandRecommendation = data.siteStoryRecommendation;
   const brandDirection = content.branding.brandDirectionId ?? null;
   const setContent: Dispatch<SetStateAction<SiteLocalContent>> = update =>
     setEditor(previous => ({ ...previous, content: typeof update === "function"
@@ -513,6 +518,10 @@ function LocalWebsiteCopyEditor({
   async function saveDraft() {
     if (busy || !data.canPublish || !data.draftStorageReady || revisionConflict) return;
     setError("");
+    if (!brandDirection && editor.revision === 0) {
+      setError("Choose a Brand Identity before saving your first private website draft.");
+      return;
+    }
     const submitted = content;
     const outcome = await mutation.run(() => saveChurchWebsiteDraft({
       data: { content: submitted, siteId: data.siteId, expectedRevision: editor.revision },
@@ -685,8 +694,8 @@ function LocalWebsiteCopyEditor({
         <div>
           <h3 className="font-serif text-2xl font-semibold">What should families feel about your Site?</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">Choose an editorial direction. Your saved Site Story can guide a suggestion, but this choice never verifies programs, staff or academic outcomes.</p>
-          {data.siteStoryV61
-            ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Story source: {new Date(data.siteStoryV61.revision).toLocaleDateString()}</p>
+          {data.siteStoryRevision
+            ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Story source: {new Date(data.siteStoryRevision).toLocaleDateString()}</p>
             : <p className="mt-2 text-xs text-muted-foreground">No saved Site Story available. You can still choose a direction.</p>}
         </div>
         <fieldset disabled={busy || !data.canPublish}>
@@ -846,6 +855,17 @@ function LocalWebsiteCopyEditor({
                 {Object.entries(siteFontCatalog).map(([id,font]) => <option key={id} value={id}>{font.label}</option>)}
               </Select>
             </Label>)}
+          </div>
+          <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2" aria-label="Actual font previews">
+            {(["headingFontId","bodyFontId"] as const).map(key=>{
+              const selectedFont=content.branding[key] ?? (key==="headingFontId"?"georgia":"system");
+              const font=siteFontCatalog[selectedFont];
+              return <div key={key} className="min-w-0 border bg-background p-3">
+                <p className="text-xs font-semibold text-muted-foreground">{key==="headingFontId"?"Heading":"Body"} · {font.label}</p>
+                <p className="mt-2 break-words text-xl" style={{fontFamily:font.css}}>Learn with purpose.</p>
+                <p className="mt-2 break-words text-sm" style={{fontFamily:font.css}}>Every Site has a story worth sharing.</p>
+              </div>;
+            })}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">All choices use a maintained, contrast-checked palette
             and safe system fonts. Church website colors and fonts, when discovered, are suggestions only;
