@@ -106,8 +106,8 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             AND (a.ends_at IS NULL OR a.ends_at>clock_timestamp()))
           AS "reviewerAppointedCourses",
         (SELECT count(*)::int
-          FROM education_v30.evidence_document_versions v
-          JOIN education_v30.evidence_documents d ON d.id=v.document_id
+          FROM public.evidence_document_versions v
+          JOIN public.evidence_documents d ON d.id=v.document_id
           WHERE d.owning_organization_id=o.publisher_organization_id
             AND v.verified_by_person_id IS NOT NULL AND v.verified_at IS NOT NULL
             AND v.verified_at<=clock_timestamp()
