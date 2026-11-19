@@ -53,6 +53,13 @@ describe("V6.1 private Site planning", () => {
     });
     expect(siteLaunchPreferencesSchema.safeParse(updated).success).toBe(true);
   });
+  it("uses the saved Learning Environment as the authority over stale legacy delivery", () => {
+    const previous = { delivery: "digital", interestIds: ["adult"] };
+    const updated = applySiteProgramsAudiencesV61(previous,
+      siteProgramsAudiencesV61Schema.parse(plan), "physical");
+    expect(updated.delivery).toBe("physical");
+    expect(updated.interestIds).toEqual(["grades-9-12", "senior"]);
+  });
   it("keeps the richer plan when Site Information updates delivery", () => {
     const previous = applySiteProgramsAudiencesV61({ delivery: "physical", interestIds: [] },
       siteProgramsAudiencesV61Schema.parse(plan));
