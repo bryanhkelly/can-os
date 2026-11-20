@@ -139,6 +139,18 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
       }
       return actor;
     }
+    // Direct CAN academic teachers may read ONLY explicitly assigned native
+    // Classes. The Class workspace independently validates current exact
+    // staff assignment, Course publication, Organization and Site on every
+    // request. This is not a room-facilitator or grader authorization.
+    if (actor.role === "teacher" && actor.actorPersonId &&
+        !actor.sessionAccountId && actor.grantSiteId &&
+        actor.scope.siteIds?.length === 1 &&
+        actor.scope.siteIds[0] === actor.grantSiteId &&
+        actor.scope.organizationIds?.length === 1 &&
+        actor.capabilities.has("teacher:read")) {
+      return actor;
+    }
     if (!actor.actorPersonId || actor.sessionAccountId) {
       throw new AuthorizationError("authorized canonical identity for active CAN account");
     }
