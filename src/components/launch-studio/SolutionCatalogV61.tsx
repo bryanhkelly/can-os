@@ -11,6 +11,9 @@ import {
   resolveVisibleSolutionRecipe, selectSavedSolutionPlans,
 } from "@/domain/launch-prepare-v61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
+import { academyReferenceMayBeSelected, noSchoolYearAvailability,
+  type SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { CanonicalBlueprintWorkspace } from "./CanonicalBlueprintWorkspace";
 
 type BlueprintWorkspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
@@ -24,12 +27,14 @@ function readable(code: string): string {
  * Solution/adoption store. The server returns only recipes for an authorized
  * canonical Site and is the sole owner of capability and operator checks.
  */
-export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: {
+export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, schoolYearAvailability, schoolYearAcademyPrograms }: {
   siteId: string;
   /** Deep-link back to a Site-owned, version-pinned plan from other Prepare steps. */
   initialPlanId?: string;
   intent?: SiteProgramsAudiencesV61 | null;
   delivery?: "physical" | "digital" | "both" | null;
+  schoolYearAvailability?: SchoolYearAvailability;
+  schoolYearAcademyPrograms?: readonly BlueprintReferenceCatalogItem[];
 }) {
   const [workspace, setWorkspace] = useState<BlueprintWorkspace | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -100,6 +105,13 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: 
     return () => { active = false; };
   }, [siteId, initialPlanId, reload]);
 
+  const academyPrograms = new Map(
+    (schoolYearAcademyPrograms ?? []).map(item => [item.code,item]));
+  const isSchoolYearBlocked = (template: { programCode?: string | null }) => {
+    const item = template.programCode ? academyPrograms.get(template.programCode) : null;
+    return !!item && !academyReferenceMayBeSelected(
+      item,schoolYearAvailability ?? noSchoolYearAvailability);
+  };
   const templates = workspace?.templates ?? [];
   const filtered = filterPublishedSolutionRecipes(templates, query);
   const visible = orderSolutionsByVision(
@@ -164,12 +176,14 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: 
                 const visionMatches = matchingSolutionInterests(template, intent?.interestIds ?? []);
                 const matchesProgram = !!template.programCode &&
                   !!intent?.programCodes?.includes(template.programCode);
+                const academicBlocked = isSchoolYearBlocked(template);
                 return <Button key={template.blueprintVersionId} type="button"
                   variant="ghost" onClick={() => requestSwitch(() => {
                     setSelectedId(template.blueprintVersionId);
                     closeEditor();
                   })}
-                  aria-pressed={active}
+                  aria-pressed={active} disabled={academicBlocked}
+                  title={academicBlocked ? "School-year academic authorization required" : undefined}
                   className={"h-auto min-h-20 w-full justify-start whitespace-normal border p-4 text-left hover:bg-muted " +
                     (active ? "border-primary bg-accent" : "bg-background")}>
                   <span className="flex w-full items-start gap-3">
@@ -179,6 +193,9 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: 
                       <span className="mt-1 block text-xs text-muted-foreground">
                         Version {template.versionNo} · {template.components.length} components
                       </span>
+                      {academicBlocked && <span className="mt-1 block text-xs font-medium text-muted-foreground">
+                        Grades 6–12 academy · authorization required
+                      </span>}
                       {matchesProgram && <span className="mt-1 block text-xs font-semibold text-primary">
                         Matches a Program selected in Establish
                       </span>}
@@ -220,7 +237,11 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: 
                   </div>
                 </div>
                 <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the governed Solution and Site qualification workflows. This preview does not infer missing requirements.</p>
-                {workspace.canConfigure ? <div className="space-y-3">
+                {isSchoolYearBlocked(selected) ?
+                  <p className="border bg-muted p-3 text-sm text-muted-foreground">
+                    This academic school-year Solution is not enabled for the Site.
+                    Other community learning Solutions remain available for planning.
+                  </p> : workspace.canConfigure ? <div className="space-y-3">
                   <Button type="button" onClick={() => requestSwitch(() => {
                     setEditorState({ unsaved: false, busy: false, reconciliationRequired: false });
                     setResumeConfigurationId(null);
@@ -251,7 +272,9 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: 
           </div>}
       </>}
     </>}
-    {configuringVersionId && workspace?.canConfigure && <>
+    {configuringVersionId && workspace?.canConfigure &&
+      !isSchoolYearBlocked({programCode:templates.find(item =>
+        item.blueprintVersionId===configuringVersionId)?.programCode}) && <>
       <div className="mt-6 border-t pt-5">
         <Button type="button" variant="outline" onClick={() => requestSwitch(closeEditor)}>
           Return to Solution details
