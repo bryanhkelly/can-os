@@ -531,3 +531,56 @@ school year, or staff invitation is legally verified or enrollment-ready.
    created Site may lack the canonical operation relationships required to
    create operational Classes; that must display as a real authorization
    dependency, not be bypassed by a private planning action.
+
+
+## 2026-11-20 · Canonical Class room assignments and complete Site facilities
+
+Both requested Launch Studio Prepare implementations are now in the branch:
+
+1. **Physical spaces and resources:** Facilities & Resources uses existing
+   `public.site_spaces`, not a second editable `site_rooms` directory.
+   Operators can create spaces and revise names, maximum occupancy, declared
+   connectivity and estimated download speed, available device counts,
+   accessibility features, specialized equipment, and notes. All are
+   **self-reported planning records**, not capability assertions or independent
+   facility verifications. The existing `resources` JSONB preserves unrelated
+   qualification metadata, namespaced under `launchPlanningV61`.
+   Writes check the exact Site and organization, use stable room IDs and
+   optimistic `revision`, preserve transactional audit/events, and prevent
+   lowering an occupied room below planned Class seating (or clearing its
+   occupancy limit while Classes reference it).
+2. **Canonical Class physical assignments:** Prepare → Schedules & Capacity
+   now displays a Site-specific physical-room and facilitator planner using
+   `public.classes`, `public.site_spaces`, and existing
+   `public.class_staff_assignments`. It does not use old
+   `public.sections` or `room_coverage_sections`. A Site operator may
+   select one default physical room and an **existing approved Class
+   facilitator assignment** for a draft/approved Class only, after current
+   Deployment, Course, Site, capacity and grant checks. The database enforces
+   composite Site/Space and Class/Staff foreign keys so cross-Site and
+   cross-Class references cannot silently be persisted.
+3. **Shared workflows:** Draft Class creation invalidates the canonical
+   room-planning read, so the newly created Class appears without a second
+   Class store. CAN staff assignment still flows through the existing
+   `assignNativeClassStaff` command; room planning does not issue a
+   facilitator grant. Operational Session scheduling remains canonical and
+   independent.
+4. **Migration isolation:** The additive migration is recorded in
+   `database/production/2026-11-20-launch-v61-canonical-class-physical-space.sql`.
+   It was executed on the **isolated Neon branch**
+   `v61-launch-brand-migration-validation-20261119`
+   (`br-bitter-pine-ar7mjn70`), not production `main`. Read-only checks
+   verified one previous room migrated as a Site Space, three new Class
+   columns, and the composite Class-specific facilitator foreign key.
+   No Class assignment/retirement operations were executed against live
+   records.
+5. **Verification remaining:** Added domain and source-contract regression
+   coverage, but no successful TypeScript/Vitest/production build, role/RLS
+   or authenticated browser tests have been observed for these commits.
+   No merge to `main` is justified yet.
+
+**Important boundary:** Physical-space and facilitator assignment here is a
+*Class-level planning default*, not a dated Session room booking, daily
+presence verification, fire/accessibility approval or enrollment release.
+Room-time collision detection and approval-specific evidence must remain
+independently verified before an operational Class Session opens.
