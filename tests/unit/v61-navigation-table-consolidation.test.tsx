@@ -14,7 +14,7 @@ describe("V6.1 navigation consolidation", () => {
     </WorkspaceLinkNavigation>);
     expect(html).toContain('aria-label="Curriculum workflows"');
     expect(html).toContain('data-workspace-link-navigation="plain"');
-    expect(html.match(/<nav\\b/g)).toHaveLength(1);
+    expect(html.match(/<nav\b/g)).toHaveLength(1);
     expect(html).toContain('href="/resources"');
   });
 
@@ -35,7 +35,7 @@ describe("V6.1 navigation consolidation", () => {
   ])("uses shared link navigation instead of local wrappers: %s", path => {
     const code = source(path);
     expect(code).toContain("<WorkspaceLinkNavigation");
-    expect(code).not.toMatch(/<nav\\b/);
+    expect(code).not.toMatch(/<nav\b/);
   });
 
   it.each([
@@ -46,7 +46,7 @@ describe("V6.1 navigation consolidation", () => {
     const code = source(path);
     expect(code).toContain("<DetailNavigation");
     expect(code).toContain("<SectionTab");
-    expect(code).not.toMatch(/<nav\\b/);
+    expect(code).not.toMatch(/<nav\b/);
   });
 
   it("retains the independent class view and class section selection inputs", () => {
@@ -82,8 +82,8 @@ describe("V6.1 semantic table consolidation", () => {
     expect(gradebook).toContain('<Table scrollLabel="Gradebook student assessment grid"');
     expect(gradebook).toContain("<TableRowHead");
     expect(header).toContain('<TableHead scope="col"');
-    expect(gradebook).not.toMatch(/<table\\b|<thead\\b|<tbody\\b|<td\\b/);
-    expect(header).not.toMatch(/<th\\b/);
+    expect(gradebook).not.toMatch(/<table\b|<thead\b|<tbody\b|<td\b/);
+    expect(header).not.toMatch(/<th\b/);
     expect(gradebook).toContain("data-cell=");
     expect(gradebook).toContain("onCellKeyDown(event, rowIndex, colIndex)");
     expect(gradebook).toContain("No students match the selected gradebook scope.");
