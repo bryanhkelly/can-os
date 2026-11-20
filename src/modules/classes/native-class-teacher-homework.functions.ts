@@ -188,6 +188,57 @@ export const returnNativeClassPracticeFeedback=createServerFn({method:"POST"})
    });
  });
 
+
+/** Exact synthetic Class teacher preview of privately saved draft practice.
+ * Answers remain formative: no scores, official grades, or assessment keys.
+ * RLS and the current named Class teacher appointment are checked on each read.
+ */
+export const getNativeClassTeacherDraftPractice=createServerFn({method:"GET"})
+ .validator((value:unknown)=>input.parse(value))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   setResponseHeader("Referrer-Policy","no-referrer");
+   return db.transaction(async tx=>{
+     const {cls}=await authorizedTeacher(tx,data.classId);
+     if(cls.siteId!=="f1000000-0000-4000-8000-000000000003")
+       return {items:[],partial:false};
+     const result=await tx.execute(sql`
+       SELECT fp.id,fp.recorded_at AS "recordedAt",
+         pr.response,COALESCE(p.preferred_name,
+           concat_ws(' ',p.legal_first_name,p.legal_last_name)) AS "studentName"
+       FROM public.formative_practice_attempts fp
+       JOIN public.learner_course_attempts ca ON ca.id=fp.course_attempt_id
+         AND ca.course_version_id=fp.course_version_id
+       JOIN public.class_enrollments ce ON ce.id=ca.class_enrollment_id
+         AND ce.course_attempt_id=ca.id AND ce.status='active'
+       JOIN public.people p ON p.id=ce.learner_person_id
+       JOIN education_v30_secure.formative_practice_responses pr
+         ON pr.practice_attempt_id=fp.id
+       WHERE ce.class_id=${cls.id}::uuid
+         AND ca.status='active' AND ca.section_id IS NULL
+         AND fp.course_version_id=${cls.courseVersionId}::uuid
+         AND pr.response @> '{"synthetic":true,"practiceOnly":true}'::jsonb
+         AND p.metadata @> '{"synthetic":true}'::jsonb
+       ORDER BY fp.recorded_at DESC,fp.id DESC
+       LIMIT 51
+     `);
+     const items=result.rows.slice(0,50).map(row=>{
+       const raw=asRecord(row.response);
+       const answers=Array.isArray(raw.responses)
+         ?raw.responses.flatMap(answer=>{
+           const value=asRecord(answer);
+           return typeof value.promptText==="string"&&typeof value.response==="string"
+             ?[{prompt:value.promptText,answer:value.response}]:[];
+         }):[];
+       return {
+         id:String(row.id),studentName:String(row.studentName??"Learner"),
+         recordedAt:new Date(String(row.recordedAt)).toISOString(),answers,
+       };
+     });
+     return {items,partial:result.rows.length>50};
+   });
+ });
+
 /** Review readiness only. Draft questions, hidden keys, personal learner
  * attempts and official grading appointments are not exposed here. */
 export const getNativeClassTeacherAssessments=createServerFn({method:"GET"})
