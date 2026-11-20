@@ -87,7 +87,7 @@ describe("V6.1 canonical physical facilities",()=>{
     expect(prepare).toContain("<LaunchClassFacilitiesWorkspaceV61");
     expect(prepare).not.toContain("<RoomCoverageWorkspace");
     expect(migration).toContain("REFERENCES public.site_spaces(id,site_id)");
-    expect(migration).toContain("REFERENCES public.class_staff_assignments(id)");
+    expect(migration).toContain("REFERENCES public.class_staff_assignments(id,class_id)");
     expect(migration).not.toContain("room_coverage_sections");
     expect(migration).toContain("physical_planning_revision");
   });
