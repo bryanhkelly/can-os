@@ -232,6 +232,10 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
   });
   const [creating, setCreating] = useState(false);
   const [yearFormDirty, setYearFormDirty] = useState(false);
+  // Register the existing V6.1 launch-frame navigation guard, rather than a
+  // second browser confirm inside the embedded academic-year form.
+  useLaunchUnsavedChanges(yearFormDirty,
+    "Leave Schedules & Capacity? Unsaved school-year changes will be lost.");
   const [confirmClose, setConfirmClose] = useState(false);
   const siteYears = years.data?.years.filter(year => year.siteId === siteId) ?? [];
   const authorizedSite = years.data?.sites.some(site => site.id === siteId) ?? false;
