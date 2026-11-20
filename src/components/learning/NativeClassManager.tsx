@@ -34,9 +34,10 @@ function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:st
   return [o.deploymentId,o.adoptionId,o.offeringVersionId,o.courseVersionId].join(":");
 }
 
-export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation,embedded=false}: {
+export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation,
+  embedded=false,prepareOnly=false}: {
   preferredSiteId?: string; preferredOfferingVersionId?:string;
-  navigation?: ReactNode; embedded?: boolean;
+  navigation?: ReactNode; embedded?: boolean; prepareOnly?: boolean;
 }) {
   const client=useQueryClient();
   const feedback=useMutationFeedback(refresh);
@@ -225,7 +226,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
     if(!selected||busy||feedback.refreshFailed||
-      (createWithOffering&&(methods.length===0||creditModes.length===0)))return;
+      (!prepareOnly&&createWithOffering&&(methods.length===0||creditModes.length===0)))return;
     setBusy(true);setError("");setNotice("");setCreatedClassId(null);
     try{
       const outcome=await feedback.run(()=>createUnifiedClassDraft({data:{
@@ -236,7 +237,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
           siteId:siteId||null,title:title.trim(),deliveryMode,
           capacity:classCapacity?Number(classCapacity):null,
         },
-        terms:createWithOffering?{
+        // Prepare may create a draft Class, never a registration Offering.
+        terms:!prepareOnly&&createWithOffering?{
           visibility,enrollmentMethods:methods,allowedCreditModes:creditModes,
           opensAt:classOfferingLocalTimeToUtc(opensAt,selectedSiteTimeZone),
           closesAt:classOfferingLocalTimeToUtc(closesAt,selectedSiteTimeZone),
@@ -247,7 +249,9 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       }}),{
         successMessage:result=>result.classOfferingVersionId
           ?"Class and optional draft Class Offering created. Class ID: "+result.classId
-          :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId,
+          :prepareOnly
+            ?"Draft Class saved. Independent activation and enrollment controls are not available in Prepare. Class ID: "+result.classId
+            :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId,
         commandErrorMessage:"Could not create the native Class. Verify adopted Course and current Site authority.",
         refreshErrorMessage:"The Class was saved, but current Class or Course lists could not refresh. Retry refresh without creating another Class.",
       });
@@ -311,7 +315,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   }
   return <WorkspaceShell embedded={embedded} width="wide" eyebrow={embedded ? "Prepare / Classes" : "CAN OS · Classes"} title="Class management"
     subtitle="Create a Class from an adopted Course. Class Offerings are optional: school and private assignment do not require a public or private registration listing."
-    actions={<div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
+    actions={!prepareOnly && <div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
       <Link to="/canonical/program-operations" className="underline underline-offset-4">
         Program setup (staging)
       </Link>
@@ -547,7 +551,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             All launched Classes require an approved canonical physical or virtual Site,
             including self-paced delivery. An unassigned draft cannot be activated.
           </p>
-          <div className="border-t border-border pt-4">
+          {!prepareOnly && <div className="border-t border-border pt-4">
             <Label className="flex items-center gap-3 text-sm font-semibold">
               <Checkbox checked={createWithOffering}
                 onChange={event=>setCreateWithOffering(event.target.checked)}/>
@@ -556,8 +560,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             {createWithOffering&&<ClassOfferingTermsFields value={termsDraft}
               onChange={setTermsDraft} siteTimeZone={selectedSiteTimeZone} />}
 
-          </div>
-          <Button disabled={busy||feedback.refreshFailed||!selected||!siteId||(createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
+          </div>}
+          <Button disabled={busy||feedback.refreshFailed||!selected||!siteId||(!prepareOnly&&createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
             {busy?"Working…":"Create draft Class"}
           </Button>
         </form>
@@ -565,6 +569,10 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       <section className="border border-border bg-card p-5" aria-label="Managed Classes">
         <h2 className="font-serif text-2xl">My Classes</h2>
         <p className="mt-2 text-sm text-muted-foreground">Classes in your authorized organization and Sites, including Classes without an Offering.</p>
+        {prepareOnly && <p className="mt-2 text-xs text-muted-foreground">
+          Prepare can create drafts only. Class activation and enrollment publication occur
+          in independently authorized operations after readiness reviews.
+        </p>}
         {classes.isPending&&<p role="status" className="mt-4 text-sm">Loading Classes…</p>}
         {classes.isError&&<p role="alert" className="mt-4 text-sm">Class records are unavailable or the release is not enabled.</p>}
         <div className="mt-4 space-y-3">
@@ -572,15 +580,15 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"reports"}}
               aria-label={`Class evidence for ${item.title}`}
               className="mt-2 ml-3 inline-block text-sm font-semibold underline">Class evidence</Link>
-            {item.state!=="active"&&<Button disabled={busy||feedback.refreshFailed||!item.siteId} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
+            {!prepareOnly&&item.state!=="active"&&<Button disabled={busy||feedback.refreshFailed||!item.siteId} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
             {!item.siteId&&<p className="mt-2 text-xs text-muted-foreground">No assigned canonical Site. This draft cannot be activated or published.</p>}
-            {!item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed||methods.length===0||creditModes.length===0} className="mt-3 mr-2" variant="outline"
+            {!prepareOnly&&!item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed||methods.length===0||creditModes.length===0} className="mt-3 mr-2" variant="outline"
               onClick={()=>void addOffering(item.classId)}>Create draft Offering from form terms</Button>}
-            {item.offeringState==="draft"&&item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed} className="mt-3"
+            {!prepareOnly&&item.offeringState==="draft"&&item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed} className="mt-3"
               onClick={()=>void action(item.classId,item.classOfferingVersionId!,"publish")}>Publish Class Offering</Button>}
-            {item.offeringState==="published"&&item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed} className="mt-3" variant="outline"
+            {!prepareOnly&&item.offeringState==="published"&&item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed} className="mt-3" variant="outline"
               onClick={()=>void action(item.classId,item.classOfferingVersionId!,"close")}>Close enrollment</Button>}
-            {item.offeringState==="closed"&&item.classOfferingVersionId&&<Button
+            {!prepareOnly&&item.offeringState==="closed"&&item.classOfferingVersionId&&<Button
               disabled={busy||feedback.refreshFailed||methods.length===0||creditModes.length===0}
               className="mt-3 ml-2" variant="outline"
               onClick={()=>void addOffering(item.classId)}>Draft new Offering terms</Button>}
