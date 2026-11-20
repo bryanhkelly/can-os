@@ -55,6 +55,17 @@ describe("website handoff retains the intended Site",()=>{
   }})).rejects.toThrow("website conflict");
   expect(state.brand).not.toHaveBeenCalled();
  });
+ it("propagates a simultaneous Brand-edit conflict within the same transaction",async()=>{
+  state.brand.mockRejectedValueOnce(new Error("This Site Brand changed. Reload"));
+  await expect(saveSiteWebsiteAndBrand({data:{
+    siteId:"site",operation:"draft",expectedRevision:0,
+    expectedBrandVersionId:null,brand:{} as any,
+    content:{branding:{logoImage:null,heroImage:null}} as any,
+  }})).rejects.toThrow("This Site Brand changed");
+  expect(state.transaction).toHaveBeenCalledTimes(1);
+  expect(state.publish).toHaveBeenCalledTimes(1);
+  expect(state.brand).toHaveBeenCalledTimes(1);
+ });
  it("denies restoring a revision to a different Site",async()=>{
   await expect(restoreChurchWebsiteContent({data:{siteId:"other",expectedRevision:2,restoreRevision:1}})).rejects.toThrow("intended church website Site");
   expect(state.publish).not.toHaveBeenCalled();
