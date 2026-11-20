@@ -16,6 +16,7 @@ import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
+import { resolveSiteGeographicAreaId } from "./site-geographic-area.server";
 import { listOpeningOperators } from "./opening-handoff.server";
 
 import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
@@ -610,8 +611,9 @@ export const createLaunchSite = createServerFn({method:"POST"})
     throw new Error(`This church already has the site "${existing.name}" (${existing.slug}). Select its saved record and edit it instead of creating another Site.`);
    }
    const createdAt=new Date();
+   const geographicAreaId=await resolveSiteGeographicAreaId(tx,data.address);
    const [site]=await tx.insert(s.sites).values({organizationId:data.organizationId,name:data.name,
-     slug:data.slug,timezone:data.timezone,address:data.address,
+     slug:data.slug,timezone:data.timezone,address:data.address,geographicAreaId,
      siteKind:data.siteKind,lifecycleStatus:"planning",updatedAt:createdAt,
      metadata:{siteIdentityRevision:createdAt.toISOString(),
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),
@@ -629,7 +631,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
     after:{name:data.name,timezone:data.timezone,siteKind:data.siteKind??null,
-      lifecycleStatus:"planning",address:data.address??null,
+      lifecycleStatus:"planning",address:data.address??null,geographicAreaId,
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),stubOnly:Boolean(data.stubOnly)}});
    // Stub creation has no website reservation dependency. The legacy location
    // flow still reserves a private draft, without publishing or issuing grants.
