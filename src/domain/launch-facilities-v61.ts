@@ -57,7 +57,7 @@ export const saveClassPhysicalPlanV61Schema = z.object({
   spaceId:z.string().uuid().nullable(),
   facilitatorAssignmentId:z.string().uuid().nullable(),
   /** Same Class.updatedAt value returned by the authorized Class workspace. */
-  expectedUpdatedAt:z.string().datetime({offset:true}),
+  expectedRevision:z.number().int().positive(),
 }).strict().refine(value=>value.spaceId!==null||value.facilitatorAssignmentId===null,
   "A physical facilitator assignment requires a physical space");
 
