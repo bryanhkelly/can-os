@@ -17,7 +17,7 @@ import { organizations, siteAffiliations, sitePublications, sites } from "@/db/s
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
-import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
@@ -161,7 +161,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const proposedPrograms = projectPlannedSiteProgramsForPreview(
     preferences.success ? preferences.data : null, baseContentBlocks);
   const contentBlocks = [
-    ...baseContentBlocks.filter(block => block.channel !== "learning.interests"),
+    ...websitePreviewEditorialBlocks(baseContentBlocks),
     ...proposedPrograms,
   ];
   const previewPage = host ? {
