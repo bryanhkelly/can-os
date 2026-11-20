@@ -50,7 +50,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { getOrCreateAnnouncementAttempt, wasAnnouncementAccepted, type ClassAnnouncementAttempt } from "@/domain/class-announcement-attempt";
 import { openClassDownload } from "@/lib/class-download";
-import { LearningActivityTracker } from "@/components/learning/LearningActivityTracker";
+import { LearningActivityTracker, type ClassLearningVideoController } from "@/components/learning/LearningActivityTracker";
 import { deriveClassNextSteps } from "@/domain/student-success";
 import { assessmentsForPublishedLesson } from "@/domain/class-assessment-evidence";
 
@@ -159,6 +159,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   const [retireCandidate,setRetireCandidate]=useState<string|null>(null);
   const announcementAttempt = useRef<ClassAnnouncementAttempt | null>(null);
   const downloadInFlight = useRef(false);
+  const videoActivityController = useRef<ClassLearningVideoController | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const search = { section: data.section.id, student: data.role === "guardian" ? data.studentPersonId ?? undefined : undefined };
@@ -225,8 +226,21 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     return <ClassPublishedResourcesList items={items}
       disabled={busy || downloading} onDownload={download} />;
   }
+  // Only native video playback can produce timing observations. Third-party
+  // iframe playback remains uninstrumented by explicit product decision.
+  function nativeVideoCallbacks(url?: string | null) {
+    if (data.role !== "student" || !lesson || !url ||
+        resolveClassVideo(url)?.kind !== "file") return {};
+    return {
+      onPlaybackEvent: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) =>
+        videoActivityController.current?.observeVideo(kind, resourceId),
+      onVideoEngagement: (durationMs: number) =>
+        videoActivityController.current?.observeNativeVideo(durationMs),
+    };
+  }
   function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
     return <ClassSupplementContent item={item} presentation={presentation}
+      {...nativeVideoCallbacks(item.url)}
       programId={data.section.programId} sectionId={data.section.id}
       disabled={busy || downloading}
       loadPrivateUrl={async supplementId => {
@@ -281,7 +295,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     data.role === "guardian" ? <Link to="/guardian/students" search={{ student: search.student, section: data.section.id }} className="underline">Assignments and released feedback</Link> :
       <Link to="/student/assignments" search={{ section: data.section.id }} className="underline">Class assignments and feedback</Link>;
   const recorded = mainVideoResource?.url ? <ClassVideoPlayer key={mainVideoResource.id} title={mainVideoResource.title}
-    url={mainVideoResource.url} resourceId={mainVideoResource.id} declaredVideo={false} presentation="classroom"/> :
+    url={mainVideoResource.url} resourceId={mainVideoResource.id} declaredVideo={false} presentation="classroom"
+    {...nativeVideoCallbacks(mainVideoResource.url)}/> :
     mainVideoSupplement ? supplementContent(mainVideoSupplement, "classroom") : <ClassVideoPlaceholder
       title={lesson ? "No lesson recording yet" : "No class recording yet"}
       message={lesson ? "Your teacher has not attached a recorded video. Use the published reading and activities below." :
@@ -371,7 +386,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       {!data.content && <p role="status" className=" border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className=" border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <div>
-        {data.role === "student" && <LearningActivityTracker sectionId={data.section.id} lessonId={lesson.id} />}
+        {data.role === "student" && <LearningActivityTracker sectionId={data.section.id} lessonId={lesson.id} controllerRef={videoActivityController} />}
 
         <ClassroomLessonTabs key={`tabs:${lesson.id}`} materials={<>
           <PublishedLessonContent lesson={lesson} />
