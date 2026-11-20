@@ -20,6 +20,10 @@ const canonicalTags = new Set([
   "GuardianEnrollmentNextSteps", "GuardianGradeQuestions", "GuardianChildSummaryCard", "CoachCaseloadList", "CoachStudentTimeline", "PublicInterestRecordCard",
   "PublicInterestTimeline", "MarketingPackageLibraryList", "NoncreditParticipantRoster",
   "SchoolImprovementPanel", "OperationsHealthSummary", "OperationsIssueList",
+  "CoachOutreachPanel", "TeacherLearningParticipationPanel",
+  "StudentDashboardRail", "StudentUpcomingAssignments",
+  "StudentReleasedGradesPanel", "StudentSchoolLifePanel",
+  "ExtendedSeasonDraftForm",
 ]);
 const files = [];
 function walk(directory) {
