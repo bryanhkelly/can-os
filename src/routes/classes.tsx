@@ -5,11 +5,10 @@ import { ClassroomLessonTabs } from "@/components/learning/ClassroomLessonTabs";
 import { PrivateLessonNotes } from "@/components/learning/PrivateLessonNotes";
 import { ClassroomMediaStage, type ClassroomMeetings } from "@/components/learning/ClassroomMediaStage";
 import { ClassVideoPlayer, ClassVideoPlaceholder } from "@/components/learning/ClassVideoPlayer";
-import { SafeClassExternalLink, safeClassExternalHref } from "@/components/learning/SafeClassExternalLink";
+import { safeClassExternalHref } from "@/components/learning/SafeClassExternalLink";
 import { ClassVideoUploadForm } from "@/components/learning/ClassVideoUploadForm";
 import { resolveClassVideo } from "@/domain/class-video";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
-import { CommonCartridgeStaticLesson } from "@/components/learning/CommonCartridgeStaticLesson";
 import { ClassAnnouncementFeed } from "@/components/learning/ClassAnnouncementFeed";
 import { ClassAnnouncementComposer } from "@/components/learning/ClassAnnouncementComposer";
 import { ClassCourseRoadmap } from "@/components/learning/ClassCourseRoadmap";
@@ -27,6 +26,7 @@ import { ClassTeacherGuidePanel } from "@/components/learning/ClassTeacherGuideP
 import { ClassLessonDiscussions } from "@/components/learning/ClassLessonDiscussions";
 import { ClassLessonAssessmentLinks } from "@/components/learning/ClassLessonAssessmentLinks";
 import { ClassPublishedResourcesList } from "@/components/learning/ClassPublishedResourcesList";
+import { ClassSupplementContent } from "@/components/learning/ClassSupplementContent";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
@@ -224,21 +224,16 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       disabled={busy || downloading} onDownload={download} />;
   }
   function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
-    if (item.kind === "video" || (item.url && resolveClassVideo(item.url))) {
-      return <ClassVideoPlayer key={`${item.id}:${item.url ?? item.resourceId}`} title={item.title} presentation={presentation}
-        url={item.url} loadUrl={!item.url ? async () => {
-          const result = await getClassSupplementDownload({ data: {
-            sectionId: data.section.id, studentPersonId: search.student, supplementId: item.id,
-          } });
-          return result.downloadUrl;
-        } : undefined}/>;
-    }
-    if (item.url) return <SafeClassExternalLink url={item.url} title={item.title} kind={item.kind}/>;
-    if (item.kind === "html" && item.resourceId) return <CommonCartridgeStaticLesson
-      programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>;
-    if (item.kind === "pdf") return <Button variant="ghost" size="sm" type="button" disabled={busy || downloading}
-      onClick={() => void downloadSupplement(item.id)} className="underline disabled:opacity-50">{item.title} (private PDF)</Button>;
-    return <span>{item.title} (unavailable document)</span>;
+    return <ClassSupplementContent item={item} presentation={presentation}
+      programId={data.section.programId} sectionId={data.section.id}
+      disabled={busy || downloading}
+      loadPrivateUrl={async supplementId => {
+        const result = await getClassSupplementDownload({data:{
+          sectionId:data.section.id, studentPersonId:search.student, supplementId,
+        }});
+        return result.downloadUrl;
+      }}
+      onDownload={downloadSupplement}/>;
   }
   function supplementActions(item:typeof supplements[number]){
     if(data.role!=="teacher"||!item.canManage)return null;
