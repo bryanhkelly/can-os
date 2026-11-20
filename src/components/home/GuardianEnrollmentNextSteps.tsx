@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { buttonVariants } from "@/components/ui/button";
 import type { getGuardianAdmissionOffers } from "@/modules/enrollment/guardian-admission-offers.functions";
 
 type EnrollmentApplication = Awaited<ReturnType<typeof getGuardianAdmissionOffers>>[number];
@@ -19,7 +20,7 @@ export function GuardianEnrollmentNextSteps({
      <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Getting started</p>
       <h2 className="mt-1 font-serif text-2xl font-semibold">School enrollment</h2></div>
      <Link to="/guardian/admission-offers" search={{student:activeStudent}}
-      className="inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold">View applications and offers</Link>
+      className={buttonVariants({ variant: "outline", size: "lg" })}>View applications and offers</Link>
     </div>
     {enrollmentWarning&&<p role="status" className="mt-3  border p-3 text-sm">{enrollmentWarning}</p>}
     {!enrollmentWarning&&visibleEnrollmentApplications.length>0&&<div className="mt-4 grid gap-3">
