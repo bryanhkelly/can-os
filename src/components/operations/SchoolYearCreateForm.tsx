@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { createStudioGradeScale, createStudioYear, type getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
@@ -13,12 +13,13 @@ type Snapshot = Awaited<ReturnType<typeof getSchoolYearStudio>>;
 type Selection = { siteId?: string; programId?: string };
 
 export function SchoolYearCreateForm({ data, selection, embedded = false,
-  lockedSiteId, onDataChanged, onCreated,
+  lockedSiteId, onDataChanged, onCreated, onDirtyChange,
 }: {
   data: Snapshot; selection: Selection; embedded?: boolean;
   lockedSiteId?: string;
   onDataChanged?: () => Promise<unknown>;
   onCreated?: (schoolYearId: string) => Promise<unknown>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const router = useRouter();
   const navigate = useNavigate();
@@ -40,6 +41,10 @@ export function SchoolYearCreateForm({ data, selection, embedded = false,
     else await router.invalidate();
   });
   const busy = mutation.pending || mutation.refreshFailed;
+  useEffect(() => {
+    onDirtyChange?.(touched || busy);
+    return () => onDirtyChange?.(false);
+  }, [touched, busy, onDirtyChange]);
 
   const scopedPrograms = data.programs.filter(p => p.siteId === siteId);
   const site = data.sites.find(s => s.id === siteId);
