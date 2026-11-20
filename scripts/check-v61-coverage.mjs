@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createInventory, discoverTsx } from "./lib/v61-source-audit.mjs";
@@ -92,7 +93,6 @@ const report = {
     "Storybook canvases and global CSS must be reviewed independently.",
   ],
 };
-console.log(JSON.stringify(report, null, 2));
 if (missingThemeTokens.length) {
   console.error("V6.1 SHARED THEME TOKEN MISSING: " + missingThemeTokens.join(", "));
   process.exitCode = 1;
@@ -106,18 +106,51 @@ if (unresolvedSource.length) {
     " files retain legacy controls, geometry or syntax. See sourceDebt.");
   process.exitCode = 1;
 }
-const independent = [
+const independent = [...new Set([
   ...serverPresentation, ...externalStorybook,
   ...report.independentlyReviewedRequired.css,
-];
-if (independent.length) {
-  console.error("V6.1 COMPONENT OUTSIDE REACT AUDIT: " + independent.length +
-    " independently rendered/configured surfaces need visual review. " +
-    "See independentlyReviewedRequired.");
+])];
+// Evidence is bound to exact source bytes AND existing 3-viewport screenshots.
+// It is not valid to mark a file reviewed merely because its TSX parses.
+const manifestPath = join(root, "docs/verification/v61-visual-evidence.json");
+let manifest = { schemaVersion: 1, reviews: [] };
+try {
+  const loaded = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (loaded.schemaVersion !== 1 || !Array.isArray(loaded.reviews))
+    throw new Error("Invalid schemaVersion or reviews array");
+  manifest = loaded;
+} catch (error) {
+  console.error("V6.1 visual-evidence manifest unreadable: " + String(error));
+  process.exitCode = 1;
 }
-// Strict mode refuses full certification until source debt and independently
-// rendered surfaces are explicitly reviewed, rather than silently omitted.
-if (process.argv.includes("--strict") && (unresolvedSource.length || independent.length)) {
-  console.error("V6.1 strict coverage cannot certify every page/component.");
+const evidenceViewports = ["mobile", "tablet", "desktop"];
+function hasReviewedEvidence(file) {
+  const entry = manifest.reviews.find(review => review.path === file);
+  if (!entry || entry.status !== "reviewed" || typeof entry.reviewer !== "string" ||
+      !entry.reviewer.trim() || !Number.isFinite(Date.parse(entry.reviewedAt)) ||
+      !/^[a-f0-9]{64}$/.test(entry.sourceSha256 ?? "")) return false;
+  const source = join(root, file);
+  if (!existsSync(source) || createHash("sha256").update(readFileSync(source))
+    .digest("hex") !== entry.sourceSha256) return false;
+  return evidenceViewports.every(viewport => {
+    const item = entry.screenshots?.find(image => image.viewport === viewport);
+    const filePath = item?.path;
+    return typeof filePath === "string" &&
+      /^docs\/verification\/screenshots\/[a-zA-Z0-9/_-]+\.png$/.test(filePath) &&
+      existsSync(join(root, filePath));
+  });
+}
+const reviewedVisuals = independent.filter(hasReviewedEvidence);
+const pendingVisuals = independent.filter(file => !hasReviewedEvidence(file));
+report.independentlyReviewedRequired.manifest = "docs/verification/v61-visual-evidence.json";
+report.independentlyReviewedRequired.reviewed = reviewedVisuals;
+report.independentlyReviewedRequired.pending = pendingVisuals;
+console.log(JSON.stringify(report, null, 2));
+if (pendingVisuals.length) {
+  console.error("V6.1 VISUAL EVIDENCE PENDING: " + pendingVisuals.length +
+    " independent renderers/global styling sources lack verified, current mobile/tablet/desktop screenshots.");
+}
+if (process.argv.includes("--strict") && (unresolvedSource.length || pendingVisuals.length)) {
+  console.error("V6.1 strict coverage requires no source debt and current reviewed visual evidence.");
   process.exitCode = 1;
 }
