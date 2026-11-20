@@ -54,7 +54,8 @@ beforeEach(()=>{
   calls.listEvents.mockResolvedValue(data);
   calls.listPackages.mockResolvedValue([eventPackage(siteA)]);
   calls.readSuggestions.mockResolvedValue({
-    "event-invitation":{content:{headline:"Saved Story conversation"}},
+    "event-invitation":{content:{headline:"Saved Story conversation",
+      message:"We are gathering our community to explore future learning."}},
   });
 });
 
