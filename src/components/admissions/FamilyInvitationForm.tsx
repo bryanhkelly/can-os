@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ActionFooter, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, EmptyState, WorkspacePanel } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -39,9 +39,10 @@ export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit,purp
     setAttempted(false);
     onSubmit(event);
  }
- if(!programs.length)return <p className="mt-6 border p-4 text-sm">{purpose==="interest"
-   ? "No eligible developing school Programs are available for interest outreach at this Site. Creating a Site alone does not authorize invitations."
-   : "No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations."}</p>;
+ if(!programs.length)return <EmptyState className="mt-6 max-w-3xl" title="No eligible Programs"
+   description={purpose==="interest"
+     ? "No eligible developing school Programs are available for interest outreach at this Site. Creating a Site alone does not authorize invitations."
+     : "No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations."}/>;
  return <WorkspacePanel className="mt-6 max-w-3xl" title={purpose==="interest"
     ? "Invite consenting adults to express interest" : "Send a private receiving-school application invitation"}>
   <form noValidate onSubmit={submit} className="space-y-4">
