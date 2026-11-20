@@ -24,6 +24,10 @@ describe("Barton and other unapproved Site Profile edits",()=>{
     expect(service).toContain('inArray(programSiteAuthorizations.status,["approved","suspended"])');
     expect(service).toContain('eq(programPublications.status,"published")');
     expect(service).toContain("assertSiteSetupScope(actor,site");
+    // A Site-level registrar is authorized to edit common draft Site fields
+    // regardless of how many unapproved Programs were created first.
+    expect(service).not.toContain("assertSiteLocationProgramScope(actor,attachedIds)");
+    expect(service).not.toContain("assertSiteLocationProgramScope(actor,programIds)");
     expect(service).toContain('action:"site.identity.draft.update"');
     expect(service).toContain('action:"site.location.update"');
     expect(service).not.toContain('sitePublication?.status==="published"');
