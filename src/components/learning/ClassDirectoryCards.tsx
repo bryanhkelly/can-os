@@ -27,7 +27,7 @@ export function ClassDirectoryCards({
             description={role === "guardian" ? section.studentName ?? section.code : section.code}
           >
             <Link
-                to="/classes"
+                to="/class"
                 search={{
                   section: section.id,
                   student: role === "guardian" ? section.studentPersonId ?? undefined : undefined,
