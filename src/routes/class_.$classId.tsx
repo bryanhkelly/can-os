@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
-import { WorkspaceShell, RosterList } from "@/components/workspace";
+import { DetailNavigation, SectionTab, WorkspaceShell, RosterList } from "@/components/workspace";
 import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
 import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline";
 import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
@@ -70,28 +70,24 @@ const viewLabels:Record<ClassView,string>={
 };
 
 function ClassNavigation({workspace}:{workspace:Workspace}){
-  return <nav aria-label="Class navigation" className="border-b border-border bg-card">
-    <div className="flex flex-wrap gap-1 border-b border-border p-2">
-      {workspace.availableViews.map(view=><Link key={view} to="/class/$classId"
-        params={{classId:workspace.classId}}
-        search={{view,tab:undefined,lesson:undefined,session:undefined}}
-        aria-current={view===workspace.view?"page":undefined}
-        className={"px-3 py-2 text-sm font-semibold "+
-          (view===workspace.view?"bg-primary text-primary-foreground":"hover:bg-muted")}>
+  return <div className="space-y-2">
+    <DetailNavigation label="Class views" variant="record">
+      {workspace.availableViews.map(view=><SectionTab key={view}
+        current={view===workspace.view}
+        link={{to:"/class/$classId",params:{classId:workspace.classId},
+          search:{view,tab:undefined,lesson:undefined,session:undefined}}}>
         {viewLabels[view]}
-      </Link>)}
-    </div>
-    <div className="flex flex-wrap gap-1 p-2">
-      {workspace.availableTabs.map(tab=><Link key={tab} to="/class/$classId"
-        params={{classId:workspace.classId}}
-        search={{view:workspace.view,tab,lesson:undefined,session:undefined}}
-        aria-current={workspace.tab===tab?"page":undefined}
-        className={"px-3 py-2 text-sm "+
-          (workspace.tab===tab?"border-b-2 border-primary font-semibold":"text-muted-foreground hover:text-foreground")}>
+      </SectionTab>)}
+    </DetailNavigation>
+    <DetailNavigation label="Class sections" variant="record">
+      {workspace.availableTabs.map(tab=><SectionTab key={tab}
+        current={workspace.tab===tab}
+        link={{to:"/class/$classId",params:{classId:workspace.classId},
+          search:{view:workspace.view,tab,lesson:undefined,session:undefined}}}>
         {tabLabels[tab]??tab}
-      </Link>)}
-    </div>
-  </nav>;
+      </SectionTab>)}
+    </DetailNavigation>
+  </div>;
 }
 function OneClassWorkspace(){
   const {classId}=Route.useParams();
