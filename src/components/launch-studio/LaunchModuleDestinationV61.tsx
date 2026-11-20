@@ -3,9 +3,8 @@
  * honest planned states instead of a shared "not connected" placeholder.
  * These links do not grant Site, Program, Blueprint or publication authority.
  */
-import { ArrowRight, CircleAlert } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { CircleAlert } from "lucide-react";
+import { StatusBadge, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import type { siteLaunchModules } from "./LaunchStudioOverviewV61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import type { PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
@@ -62,16 +61,9 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
           ? "Review readiness, then use each Offering’s authorized registration workspace to enable enrollment independently."
           : "Open the existing authorized workspace, retaining the selected Site where that destination supports it."}>
         <div className="grid gap-3">
-          {destination.links.map(item => <div key={item.label}
-            className="flex flex-wrap items-center justify-between gap-3 border bg-background p-4">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{item.label}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
-            </div>
-            <Button asChild variant="outline">
-              <a href={item.path(siteId)}>{item.label}<ArrowRight aria-hidden="true" /></a>
-            </Button>
-          </div>)}
+          {destination.links.map(item => <WorkspaceActionLink key={item.label}
+            title={item.label} description={item.detail} href={item.path(siteId)}
+            actionLabel={item.label} />)}
         </div>
       </WorkspacePanel>
       <WorkspaceNotice tone="info"><CircleAlert aria-hidden="true" className="mr-2 inline size-4"/>
