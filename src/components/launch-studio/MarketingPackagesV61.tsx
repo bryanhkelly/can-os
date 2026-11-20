@@ -720,7 +720,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
                 <div className="min-w-0 space-y-2">
                   <p className="text-sm font-semibold">Current saved Package preview</p>
                   {record.content.formats.includes(compare.format)
-                    ? <MarketingMaterialPreviewV61 siteId={siteId}
+                    ? <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
                         brandVersionId={record.brandVersionId}
                         format={compare.format} content={record.content}/>
                     : <p className="border p-4 text-sm">This format was removed from the working Package.
