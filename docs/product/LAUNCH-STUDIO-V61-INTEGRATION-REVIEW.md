@@ -433,3 +433,53 @@ signup, retry/conflict tests, and mobile/keyboard/contrast visual review
 against a fixed SHA in an isolated environment. Existing hosted build/CI
 runs are not a proof of success. Production approval and data migrations
 remain separate.
+
+
+## 2026-11-19 · Live Facilities, Team, and Schedules in Prepare
+
+The three operational Prepare modules now reuse actual Site records and
+authorized write services **inside Launch Studio**, rather than rendering
+only links to separate administrative workspaces:
+
+- **Facilities & Resources:** Reads and revision-checks the existing Site
+  Information learning environment. Saves via `saveSiteInformationV61`,
+  retaining the audited canonical Site metadata and Establish delivery.
+  Physical room names and capacities reuse `RoomCoverageWorkspace` and
+  `createRoomAtSiteFn`. An uncertain save is reconciled before replay.
+- **Team & Responsibilities:** Reuses `ScopedAdminConsole` extracted
+  from `/admin`, with `lockedSiteId` enforced in the embedded form
+  and grants presentation. Invitations and onboarding readiness remain in
+  `inviteStaffMember` and `listAccessAccounts`. Staff invitation,
+  acceptance, qualifications, screening, and final assignments are separate.
+- **Schedules & Capacity:** Reuses the existing academic-year reader and
+  creator, room-coverage schedules, and native Class manager. Existing
+  school years can be reviewed and new years created with a fixed Site,
+  while the authoritative year detail retains term/calendar editing.
+  Embedded native Class management is **draft-only**. Activation,
+  Class Offering publication, and enrollment controls are excluded.
+  The original room coverage service currently links `public.sections`;
+  canonical Class drafts have a separate identity and are **not**
+  automatically connected to those room coverage assignments.
+- **Shared components:** The original admin route re-exports its extracted
+  staff component, avoiding a second implementation; room coverage
+  supports distinct rooms and schedules views, with defaults unchanged;
+  original Class and School Year routes retain their normal behavior.
+- **Unsaved work and permissions:** Facilities reload and school-year form
+  dismissal require confirmation when locally dirty. Every existing
+  backend mutation still enforces its own exact Site, role and business
+  readiness constraints; embedded UI does not broaden authority.
+- **Tests:** Updated Prepare SSR coverage and authored focused source
+  contract tests for persisted environment, exact-Site staff invitations,
+  room capacity/coverage, school-year records, and draft-only Class.
+  Read-only source checks completed (20/20). **Executable Vitest,
+  TypeScript, full build and authenticated end-to-end acceptance have
+  not been established.**
+- **Scope:** Feature branch only. No database migration, production write,
+  enrollment authorization, or `main` merge.
+
+### Remaining operator-flow work
+
+A full native-Class-to-room/session assignment model, richer Site evidence
+and capability inspection, and authorized calendar detail editing inside
+Prepare require dedicated integration. Do not claim a saved room, Class,
+school year, or staff invitation is legally verified or enrollment-ready.
