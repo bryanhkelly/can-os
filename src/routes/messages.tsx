@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
-import { MutationFeedback, QueryState, WorkspaceShell } from "@/components/workspace";
+import { ActionFooter, MutationFeedback, QueryState, WorkspaceShell } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { accessReturnToFromLocation } from "@/domain/access-navigation";
@@ -157,9 +157,11 @@ function MessagesPage() {
                 <Textarea rows={5} maxLength={4000} value={composeBody}
                   onChange={event => setComposeBody(event.target.value)} placeholder="Write a thoughtful message..." />
               </Field>
-              <Button type="submit" disabled={busy}>
-                <Send aria-hidden="true" />{mutation.pending ? "Sending..." : "Send message"}
-              </Button>
+              <ActionFooter layout="dialog" className="mt-0">
+                <Button type="submit" disabled={busy} loading={mutation.pending} loadingLabel="Sending message...">
+                  <Send aria-hidden="true" /> Send message
+                </Button>
+              </ActionFooter>
             </fieldset>
           </form>
         </QueryState>
