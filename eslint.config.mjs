@@ -101,6 +101,8 @@ export default tseslint.config(
       "src/components/learning/{ClassCreationRequestForm,TeacherStudentGoalForm}.tsx",
       "src/components/admissions/AdmissionsGuardianActions.tsx",
       "src/components/operations/SchoolRoomsSetup.tsx",
+      "src/routes/{messages,guardian.enrichment,guardian.health,platform}.tsx",
+      "src/routes/operations.{family-alerts,curriculum,field-trips}.tsx",
       "src/routes/operations.interest-events.tsx",
       "src/components/launch-studio/{EstablishSiteProfileUnified,PrepareOperationsV61,NativeOfferingAdoptionReviewPanel,ProgramDiscoveryPanel}.tsx",
     ],
