@@ -33,12 +33,24 @@ function message(error:unknown) {
   return error instanceof Error ? error.message : "The package operation could not be completed.";
 }
 
-export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit,
-  module="promote",suggestionsUnavailable=false}:{
+type MarketingPackagesV61Props = {
   siteId:string;siteName:string;initial:PackageRecord[];
   suggestions:MarketingSuggestions|null;onExit:()=>void;
   module?:IntroduceModuleV61;suggestionsUnavailable?:boolean;
-}) {
+};
+
+/**
+ * Each Site and Introduce module owns a separate working editor session.
+ * React must discard private Package drafts, action dialogs, release previews,
+ * and mutation feedback before rendering another Site's records.
+ */
+export function MarketingPackagesV61(props:MarketingPackagesV61Props) {
+  return <MarketingPackagesV61Scoped
+    key={props.siteId+":"+(props.module??"promote")} {...props}/>;
+}
+
+function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
+  module="promote",suggestionsUnavailable=false}:MarketingPackagesV61Props) {
   const router=useRouter();
   const context=introduceModuleConfigV61[module];
   const purposeOptions=marketingPurposeOptions.filter(option=>context.purposes.includes(option.id));
