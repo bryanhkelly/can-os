@@ -5,7 +5,7 @@ import { isStudentAssessmentVisible } from "./assessment-availability";
  * see its title, metadata, status or evidence before the scheduled release.
  */
 export function visibleClassAssessments<T extends {status: string; availableAt: Date | null}>(
- rows: readonly T[], role: "student" | "guardian" | "teacher", now = new Date(),
+ rows: readonly T[], role: string | undefined, now = new Date(),
 ): T[] {
  return role === "teacher" ? [...rows] : rows.filter(row => isStudentAssessmentVisible(row, now));
 }
