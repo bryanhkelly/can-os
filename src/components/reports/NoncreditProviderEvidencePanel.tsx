@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import {useMemo,useState} from "react";
 import {Button} from "@/components/ui/button";
@@ -124,34 +125,34 @@ export function NoncreditProviderEvidencePanel(){
           <StatCard key={label} label={label} value={value?.toLocaleString()??"Unavailable"}/>
         )}
       </div>
-      <div className="overflow-x-auto border border-border bg-card">
-        <table className="w-full min-w-[40rem] text-left text-sm">
-          <caption className="p-4 text-left font-semibold">Release-level evidence drill-down</caption>
-          <thead className="border-y border-border bg-muted/40">
-            <tr>
-              <th scope="col" className="p-3">Training / Release</th>
-              <th scope="col" className="p-3">Delivery Site</th>
-              <th scope="col" className="p-3">Registered</th>
-              <th scope="col" className="p-3">Attested</th>
-              <th scope="col" className="p-3">Completed</th>
-            </tr>
-          </thead>
-          <tbody>{selectedCohorts.map(c=><tr key={c.releaseId} className="border-b border-border">
-            <th scope="row" className="p-3 font-medium">
+      <div className="border border-border bg-card">
+        <Table scrollLabel="Release-level evidence drill-down" aria-label="Release-level evidence drill-down" className="w-full min-w-[40rem] text-left text-sm"><TableCaption className="sr-only">Release-level evidence drill-down</TableCaption>
+          <TableCaption className="p-4 text-left font-semibold">Release-level evidence drill-down</TableCaption>
+          <TableHeader className="border-y border-border bg-muted/40">
+            <TableRow>
+              <TableHead scope="col" className="p-3">Training / Release</TableHead>
+              <TableHead scope="col" className="p-3">Delivery Site</TableHead>
+              <TableHead scope="col" className="p-3">Registered</TableHead>
+              <TableHead scope="col" className="p-3">Attested</TableHead>
+              <TableHead scope="col" className="p-3">Completed</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>{selectedCohorts.map(c=><TableRow key={c.releaseId} className="border-b border-border">
+            <TableRowHead  className="p-3 font-medium">
               {c.trainingTitle}<span className="mt-1 block font-mono text-xs font-normal text-muted-foreground">
                 {c.releaseId}
               </span>
-            </th>
-            <td className="p-3">{c.siteName}</td>
-            <td className="p-3 tabular-nums">{c.registrations.toLocaleString()}</td>
-            <td className="p-3 tabular-nums">{c.verifiedAttendees.toLocaleString()}</td>
-            <td className="p-3 tabular-nums">{c.completed.toLocaleString()}</td>
-          </tr>)}
-          {!selectedCohorts.length&&<tr><td colSpan={5} className="p-4 text-muted-foreground">
+            </TableRowHead>
+            <TableCell className="p-3">{c.siteName}</TableCell>
+            <TableCell className="p-3 tabular-nums">{c.registrations.toLocaleString()}</TableCell>
+            <TableCell className="p-3 tabular-nums">{c.verifiedAttendees.toLocaleString()}</TableCell>
+            <TableCell className="p-3 tabular-nums">{c.completed.toLocaleString()}</TableCell>
+          </TableRow>)}
+          {!selectedCohorts.length&&<TableRow><TableCell colSpan={5} className="p-4 text-muted-foreground">
             No releases in this authorized Site scope.
-          </td></tr>}
-          </tbody>
-        </table>
+          </TableCell></TableRow>}
+          </TableBody>
+        </Table>
       </div>
       <section className="border border-border bg-card p-4">
         <Button type="button" variant="ghost" aria-expanded={showDefinitions}
@@ -160,17 +161,17 @@ export function NoncreditProviderEvidencePanel(){
           Metric definitions and source interpretation
           <span aria-hidden="true">{showDefinitions?"−":"+"}</span>
         </Button>
-        {showDefinitions&&<div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[36rem] text-left text-sm">
-            <thead className="border-b border-border">
-              <tr><th className="p-3">Metric</th><th className="p-3">Source</th><th className="p-3">Counting rule</th></tr>
-            </thead>
-            <tbody>{definitions.map(item=><tr key={item.label} className="border-b border-border">
-              <th scope="row" className="p-3">{item.label}</th>
-              <td className="p-3 font-mono text-xs">{item.source}</td>
-              <td className="p-3">{item.grain}. {item.meaning}.</td>
-            </tr>)}</tbody>
-          </table>
+        {showDefinitions&&<div className="mt-3">
+          <Table scrollLabel="Metric definitions and source interpretation" aria-label="Metric definitions and source interpretation" className="w-full min-w-[36rem] text-left text-sm"><TableCaption className="sr-only">Metric definitions and source interpretation</TableCaption>
+            <TableHeader className="border-b border-border">
+              <TableRow><TableHead className="p-3">Metric</TableHead><TableHead className="p-3">Source</TableHead><TableHead className="p-3">Counting rule</TableHead></TableRow>
+            </TableHeader>
+            <TableBody>{definitions.map(item=><TableRow key={item.label} className="border-b border-border">
+              <TableRowHead  className="p-3">{item.label}</TableRowHead>
+              <TableCell className="p-3 font-mono text-xs">{item.source}</TableCell>
+              <TableCell className="p-3">{item.grain}. {item.meaning}.</TableCell>
+            </TableRow>)}</TableBody>
+          </Table>
         </div>}
       </section>
       <p className="border-t border-border pt-3 text-xs text-muted-foreground">
