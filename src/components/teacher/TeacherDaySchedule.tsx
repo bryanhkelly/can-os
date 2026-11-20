@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { getCalendarRange } from "@/modules/calendar/calendar.functions";
-import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { dateKeyInTimezone, formatTimestamp } from "@/modules/calendar/timezone";
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { StatusBadge } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
@@ -39,9 +39,11 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
         .sort((a,b)=>Date.parse(a.startsAt)-Date.parse(b.startsAt))[0]
     : undefined;
   const upcomingSection=sections.find(section=>section.id===upcomingClass?.sectionId);
-  const format = (instant: string) => new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone || undefined, month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-  }).format(new Date(instant));
+  // All calendar timestamps use the canonical, timezone-validated display helper.
+  const displayTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const format = (instant: string) => formatTimestamp(instant, displayTimezone, {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  });
   return <DashboardPanel title="Today's schedule"
     action={<Link to="/calendar" search={{ view: "agenda" }} className="text-xs text-primary underline">Open calendar</Link>}>
     {timezone && <p className="mt-2 text-xs text-muted-foreground">Today and times shown in {timezone}.</p>}
