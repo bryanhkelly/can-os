@@ -109,7 +109,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
     subtitle="Explore available programs and register your children, whether or not they attend CAN Academy."
     actions={<Link to="/home" >Family home</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family registration..."/>
-    {error && <p role="alert" className="mt-5  border border-red-500 p-3 text-sm">{error}</p>}
+    {error && <p role="alert" className="mt-5  border border-danger/40 p-3 text-sm">{error}</p>}
     <section className="mt-6  border bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold">Your family</h2>
@@ -244,7 +244,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
                 Selected total: {usd(quotedPrice)}
                 {requestedWaitlist && " · At least one selection is waitlisted"}
               </p>
-              {packageConflict && <p role="alert" className="mt-2 text-xs text-red-700">
+              {packageConflict && <p role="alert" className="mt-2 text-xs text-danger">
                 These packages have overlapping days. Choose non-overlapping options.
               </p>}
             </fieldset>}

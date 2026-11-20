@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -90,18 +92,18 @@ function ClassroomJoinPage() {
         <Link to="/access" search={{returnTo:"/join"}}>Sign in to join</Link>
       </Button>}
       {!loading && choices && <form className="space-y-4" onSubmit={e => void join(e)}>
-        <label htmlFor="classroom-pair-code" className="block text-sm font-medium">Facilitator code</label>
+        <Label htmlFor="classroom-pair-code" className="block text-sm font-medium">Facilitator code</Label>
         <Input id="classroom-pair-code" autoComplete="off" autoCapitalize="characters"
           spellCheck={false} maxLength={11} placeholder="XXXXX-XXXXX" value={code}
           className="font-mono text-xl tracking-wider"
           onChange={e => setCode(e.target.value.toUpperCase())}/>
-        <label htmlFor="classroom-course" className="block text-sm font-medium">Your enrolled Class or course</label>
-        <select id="classroom-course" name="courseAttemptId" required
+        <Label htmlFor="classroom-course" className="block text-sm font-medium">Your enrolled Class or course</Label>
+        <Select id="classroom-course" name="courseAttemptId" required
           className="w-full min-h-10 border border-border bg-background p-2 text-sm">
           <option value="">Choose an active course</option>
           {choices.choices.map(choice => <option key={choice.courseAttemptId}
             value={choice.courseAttemptId}>{choice.courseTitle}</option>)}
-        </select>
+        </Select>
         {!choices.choices.length && <div role="status"
           className="space-y-2 border border-border bg-muted/20 p-4 text-sm">
           <p>No currently enrolled Class or Course Attempt is eligible to pair.</p>
