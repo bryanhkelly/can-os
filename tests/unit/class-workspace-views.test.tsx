@@ -212,6 +212,27 @@ describe("published class workspace", () => {
     expect(html).toContain("Solve carefully");
     expect(html).toContain("Explain how you solved the equation.");
   });
+  it("reuses unit-scoped assignments in the existing lesson workspace without duplicating submissions",()=>{
+    const content={...workspace.content!,modules:[{
+      ...workspace.content!.modules[0]!,id:"u01",
+    }]};
+    const data={...workspace,content,assessmentEvidence:[
+      {id:"unit-hw",title:"Unit 1 practice",unitId:"algebra1-u01",curriculumLessonId:null,
+        curriculumVersionMismatch:false,attemptNumber:1,status:"not_submitted" as const,score:null,pointsPossible:20},
+      {id:"unrelated-hw",title:"Different unit assignment",unitId:"algebra1-u02",curriculumLessonId:null,
+        curriculumVersionMismatch:false,attemptNumber:1,status:"not_submitted" as const,score:null,pointsPossible:20},
+      {id:"class-general",title:"Class-wide assignment",unitId:null,curriculumLessonId:null,
+        curriculumVersionMismatch:false,attemptNumber:1,status:"not_submitted" as const,score:null,pointsPossible:20},
+    ]};
+    const student=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="evidence"/>);
+    expect(student).toContain("Assignments for this lesson or unit");
+    expect(student).toContain("Unit 1 practice");
+    expect(student).toContain('href="/student/assignments?section=english&amp;assessment=unit-hw"');
+    expect(student).not.toContain("Different unit assignment");
+    expect(student).not.toContain("Class-wide assignment");
+    const teacher=renderToStaticMarkup(<ClassWorkspace data={{...data,role:"teacher"}} tab="lessons" lessonId="evidence"/>);
+    expect(teacher).toContain('href="/teacher/gradebook?section=english&amp;assessment=unit-hw"');
+  });
   it("student sees only published work for the selected lesson; teacher gets linked create actions",()=>{
     const evidence=[
       {id:"hw1",title:"Find evidence homework",unitId:null,curriculumLessonId:"evidence",
