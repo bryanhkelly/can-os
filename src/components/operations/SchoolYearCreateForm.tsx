@@ -35,7 +35,9 @@ export function SchoolYearCreateForm({ data, selection, embedded = false,
   const [key, setKey] = useState(suggestedYear.key);
   const [start, setStart] = useState(suggestedYear.startsOn), [end, setEnd] = useState(suggestedYear.endsOn);
   const [touched, setTouched] = useState(false);
-  const release = useUnsavedChangesGuard(touched);
+  // The embedded Launch flow uses its central V6.1 unsaved-changes dialog.
+  // Standalone academic-year pages retain the standard browser guard.
+  const release = useUnsavedChangesGuard(touched && !embedded);
   const mutation = useMutationFeedback(async () => {
     if (onDataChanged) await onDataChanged();
     else await router.invalidate();
