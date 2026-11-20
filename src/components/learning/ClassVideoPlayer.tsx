@@ -4,6 +4,7 @@ import { ClassroomMediaSurface } from "@/components/learning/ClassroomMediaSurfa
 import { normalizeClientError } from "@/lib/client-error";
 import { Play, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { advanceNativeVideoProgress, nativeVideoCoverage, normalizeNativeVideoProgress, type NativeVideoProgress } from "@/domain/native-video-progress";
 
 export function ClassVideoPlaceholder({ title, message, headingLevel = 2 }: {
   title: string; message: string; headingLevel?: 2 | 3;
@@ -27,6 +28,10 @@ type ClassVideoPlayerProps = {
   onPlaybackEvent?: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) => void;
   /** Observational watch-heartbeat from focused, genuinely advancing native playback; never attendance. */
   onVideoEngagement?: (durationMs: number) => void;
+  /** Scoped by course attempt and asset ID; stored locally, never as academic credit. */
+  resumeKey?: string;
+  /** Optional non-sensitive playback failure diagnostic. */
+  onPlaybackError?: (reason: "load" | "media") => void;
 };
 
 export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
@@ -42,7 +47,7 @@ export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
   return <ClassVideoPlayerSession key={sourceIdentity} {...props}/>;
 }
 
-function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard", onPlaybackEvent, onVideoEngagement }: ClassVideoPlayerProps) {
+function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard", onPlaybackEvent, onVideoEngagement, resumeKey, onPlaybackError }: ClassVideoPlayerProps) {
   // Do not fetch third-party media or private signed URLs during SSR or on
   // initial navigation. Even preload="metadata" initiates a network request.
   // All formats, including direct MP4/WebM, require a deliberate Play action.
@@ -53,6 +58,47 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
   const [speed, setSpeed] = useState(1);
   const [playbackRevision, setPlaybackRevision] = useState(0);
   const player = useRef<HTMLVideoElement>(null);
+  const [progress, setProgress] = useState<NativeVideoProgress | null>(null);
+  const lastPosition = useRef<{position:number;at:number} | null>(null);
+  const persistedAt = useRef(0);
+  const progressStorageKey = resumeKey && resourceId
+    ? "can-native-video-progress:" + resumeKey + ":" + resourceId : null;
+  useEffect(() => {
+    lastPosition.current = null;
+    persistedAt.current = 0;
+    if (!progressStorageKey) { setProgress(null); return; }
+    try {
+      const raw = window.localStorage.getItem(progressStorageKey);
+      setProgress(raw ? normalizeNativeVideoProgress(JSON.parse(raw)) : null);
+    } catch { setProgress(null); }
+  }, [progressStorageKey]);
+  function observePosition(element: HTMLVideoElement) {
+    if (!progressStorageKey || !Number.isFinite(element.duration) || element.duration <= 0) return;
+    const now = Date.now(), previous = lastPosition.current;
+    const position = element.currentTime;
+    lastPosition.current = {position,at:now};
+    if (!previous) return;
+    const next = advanceNativeVideoProgress(
+      progress, previous.position, position, element.duration,
+      (now-previous.at)/1000,
+      !element.paused && !element.seeking && document.visibilityState === "visible" && document.hasFocus(), now,
+    );
+    if (!next) return;
+    setProgress(next);
+    if (now - persistedAt.current >= 4000 || element.ended) {
+      persistedAt.current = now;
+      try { window.localStorage.setItem(progressStorageKey, JSON.stringify(next)); }
+      catch { /* Disabled browser storage must never block playback. */ }
+    }
+  }
+  function resumeSavedPosition() {
+    const element = player.current;
+    if (!element || !progress || !Number.isFinite(element.duration) ||
+        Math.abs(progress.duration - element.duration) > 1 ||
+        progress.position < 10 || progress.position >= element.duration - 5) return;
+    element.currentTime = progress.position;
+    lastPosition.current = {position:progress.position,at:Date.now()};
+  }
   const attachPlayer = useCallback((element: HTMLVideoElement | null) => {
     player.current = element;
     setReady(Boolean(element && element.readyState >= 1 && Number.isFinite(element.duration)));
@@ -108,6 +154,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       setReady(false);
       setSpeed(1);
     } catch (failure) {
+      onPlaybackError?.("load");
       setError(normalizeClientError(failure, "Unable to load this video. Retry playback.").message);
     } finally { inFlight.current = false; setPending(false); }
   }
@@ -144,13 +191,21 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       iframeClassName="aspect-video w-full  border"
       videoClassName="aspect-video w-full  bg-black"
       onLoadedMetadata={event => setReady(Number.isFinite(event.currentTarget.duration))}
+      onTimeUpdate={event => observePosition(event.currentTarget)}
+      onSeeked={event => { lastPosition.current = {position:event.currentTarget.currentTime,at:Date.now()}; }}
       onRateChange={event => setSpeed(event.currentTarget.playbackRate)}
       onPlay={() => { if (resourceId) onPlaybackEvent?.("video_played", resourceId); }}
       onEnded={() => { if (resourceId) onPlaybackEvent?.("video_ended", resourceId); }}
       onPause={event => { if (resourceId && !event.currentTarget.ended) onPlaybackEvent?.("video_paused", resourceId); }}
-      onError={() => { setReady(false); setError("This video could not be played. Retry playback or check the source format and permissions."); }}
+      onError={() => { onPlaybackError?.("media"); setReady(false); setError("This video could not be played. Retry playback or check the source format and permissions."); }}
     />}
     </div>
+    {source && video?.kind === "file" && ready && progress && progress.position >= 10 && progress.position < progress.duration - 5 &&
+      Math.abs(progress.duration - (player.current?.duration ?? 0)) <= 1 &&
+      <div className="flex flex-wrap items-center gap-3 border-t px-3 py-2 text-xs">
+        <Button variant="outline" size="sm" type="button" onClick={resumeSavedPosition}>Resume at {Math.floor(progress.position / 60)}:{String(Math.floor(progress.position % 60)).padStart(2, "0")}</Button>
+        <span className="text-muted-foreground">Approximately {nativeVideoCoverage(progress)}% of this video observed in this browser. Not academic completion.</span>
+      </div>}
     {presentation === "classroom" && <div className="classroom-player-footer">
       <div className="min-w-0">{presentation === "classroom" ? <h2 className="text-xs font-semibold">{title}</h2> : <h3 className="text-xs font-semibold">{title}</h3>}
         <p className="mt-1 text-3xs text-muted-foreground">{video?.kind === "embed" ? "Playback controls are provided by the video provider." : "Pause, replay, and review at your own pace."}</p></div>
