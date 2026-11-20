@@ -16,6 +16,7 @@ import {
 } from "@/domain/site-information-v61";
 import { saveSiteInformationV61 } from "@/modules/programs/site-information-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 
 type Step = 0 | 1 | 2 | 3;
 type EnvironmentDraft = Omit<SiteEnvironmentV61, "delivery"> & { delivery: SiteEnvironmentV61["delivery"] | "" };
@@ -63,16 +64,7 @@ export const siteInformationV61Guidance = [
 ] as const;
 
 export function SiteInformationV61Guidance({ step }: { step: Step }) {
-  const guidance = siteInformationV61Guidance[step];
-  return <div className="space-y-4">
-    <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">{guidance.why}</p>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{guidance.tip}</p>
-    </WorkspacePanel>
-    <WorkspacePanel title="What comes next">
-      <p className="text-sm leading-6 text-muted-foreground">{guidance.next}</p>
-    </WorkspacePanel>
-  </div>;
+  return <LaunchGuidancePanels guidance={siteInformationV61Guidance[step]} />;
 }
 
 function SingleChoice({ name, selected, title, detail, onSelect }: {
