@@ -1,0 +1,76 @@
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { normalizeClientError } from "@/lib/client-error";
+import {
+  getNativeValorDraftPractice, submitNativeValorDraftPractice,
+} from "@/modules/classes/native-class-draft-practice.functions";
+
+/** Private, unscored practice using synthetic Valor draft assessment prompts.
+ * Never claims to administer or publish the canonical assessment version.
+ */
+export function NativeValorDraftPracticePanel({classEnrollmentId}:{classEnrollmentId:string}) {
+  const client=useQueryClient();
+  const query=useQuery({
+    queryKey:["native-valor-draft-practice",classEnrollmentId],
+    queryFn:()=>getNativeValorDraftPractice({data:{classEnrollmentId}}),
+    retry:false,
+  });
+  const [answers,setAnswers]=useState<Record<string,string>>({});
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  const data=query.data;
+  if(query.isPending)return <p role="status" className="text-sm text-muted-foreground">
+    Checking for synthetic practice questions…
+  </p>;
+  if(query.isError)return null; // No disclosure of another Site's draft catalog.
+  if(!data?.available || !data.assessmentVersionId || !data.questions.length)return null;
+  const complete=data.questions.every(item=>(answers[item.id]??"").trim().length>=3);
+  async function submit() {
+    if(busy||!data?.available||!data.assessmentVersionId||!complete)return;
+    setBusy(true);setError("");setNotice("");
+    try {
+      await submitNativeValorDraftPractice({data:{
+        classEnrollmentId,assessmentVersionId:data.assessmentVersionId,
+        answers:data.questions.map(item=>({
+          itemVersionId:item.id,response:(answers[item.id]??"").trim(),
+        })),
+      }});
+      setNotice("Practice answers saved privately. This is not a graded assessment or official credit.");
+      setAnswers({});
+      await client.invalidateQueries({queryKey:["native-valor-draft-practice",classEnrollmentId]});
+    }catch(failure){
+      setError(normalizeClientError(failure,"Unable to save this practice attempt.").message);
+    }finally{setBusy(false);}
+  }
+  return <section aria-label="Valor synthetic knowledge-check practice" className="space-y-4 border border-border bg-card p-5">
+    <div>
+      <h3 className="font-serif text-xl">Practice these knowledge-check questions</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Valor School synthetic demonstration. These short-answer prompts come from a draft
+        assessment. You can practice and save your answers now, but this does not publish
+        the assessment, issue a score, or grant academic credit.
+      </p>
+    </div>
+    {data.history.length>0&&<p className="text-sm text-muted-foreground">
+      {data.history.length} practice attempt{data.history.length===1?"":"s"} saved.
+      You can try again without changing your earlier answers.
+    </p>}
+    <div className="space-y-4">
+      {data.questions.map((question,index)=><label className="block space-y-2" key={question.id}>
+        <span className="block text-sm font-semibold">{index+1}. {question.prompt}</span>
+        <Textarea rows={4} maxLength={4000} disabled={busy}
+          value={answers[question.id]??""}
+          onChange={event=>setAnswers(previous=>({...previous,[question.id]:event.target.value}))}
+          aria-label={"Answer for practice question "+(index+1)}/>
+      </label>)}
+    </div>
+    <Button type="button" disabled={!complete||busy} loading={busy} onClick={()=>void submit()}>
+      Save practice answers
+    </Button>
+    {notice&&<p role="status" className="text-sm">{notice}</p>}
+    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+  </section>;
+}
