@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import { writeBlueprintTransition } from "./blueprint-journal.server";
 import {
   blueprintComponents,
@@ -419,7 +420,7 @@ export async function getBlueprintConfiguration(
   assertCanRead(context);
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
     .where(eq(blueprintConfigurations.id, configurationId))
@@ -481,7 +482,7 @@ export async function getBlueprintConfiguration(
       configuration: experience.configuration,
     })),
   };
-  });
+  }));
 }
 
 export async function createBlueprintConfiguration(
@@ -494,7 +495,7 @@ export async function createBlueprintConfiguration(
 
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
-  return db.transaction(async (tx) => {
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     if (isCanPlanning) {
       const siteId = requireBlueprintSiteScope(context, input.version.config);
@@ -576,7 +577,7 @@ export async function createBlueprintConfiguration(
       lifecycle: version.lifecycle,
     });
     return asResult(configuration.id, version);
-  });
+  }));
 }
 
 export async function saveBlueprintConfiguration(
@@ -588,7 +589,7 @@ export async function saveBlueprintConfiguration(
 
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
-  return db.transaction(async (tx) => {
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
@@ -657,7 +658,7 @@ export async function saveBlueprintConfiguration(
       lifecycle: version.lifecycle,
     });
     return asResult(configuration.id, version);
-  });
+  }));
 }
 
 export async function submitBlueprintConfiguration(
@@ -669,7 +670,7 @@ export async function submitBlueprintConfiguration(
 
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
-  return db.transaction(async (tx) => {
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
@@ -718,5 +719,5 @@ export async function submitBlueprintConfiguration(
       lifecycle: frozen.lifecycle,
     });
     return asResult(configuration.id, frozen);
-  });
+  }));
 }
