@@ -28,7 +28,7 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
     <div id="published-lesson-outline" className="scroll-mt-5">
       <UnifiedLessonOutline lessons={published} selectedId={currentLessonId}
         label="Published lesson outline"
-        renderAction={item=><Link to="/classes"
+        renderAction={item=><Link to="/class"
           search={{...search,tab:"lessons",lesson:item.id}}
           className="underline-offset-2 hover:underline">{item.title}</Link>}/>
     </div>
