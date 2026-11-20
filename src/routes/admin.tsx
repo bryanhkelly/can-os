@@ -1,3 +1,6 @@
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { personDisplayName } from "@/domain/person-name";
 import { useEffect, useState } from "react";
@@ -152,7 +155,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
     }
   }
 
-  const fieldClass = "mt-2 w-full rounded-lg border bg-background p-3";
+  const fieldClass = "mt-2 w-full  border bg-background p-3";
 
   return (
     <WorkspaceShell embedded={hubMode}
@@ -165,8 +168,8 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
       </div>}
     >
       <QueryState loading={loading ? "Loading admin console…" : ""} error={authError}>
-        {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-        {notice && <p className="mt-8 rounded-lg border bg-muted p-4 text-sm" role="status">{notice}</p>}
+        {error && <p className="mt-8  border p-4 text-sm" role="alert">{error}</p>}
+        {notice && <p className="mt-8  border bg-muted p-4 text-sm" role="status">{notice}</p>}
 
         {mode==="invite"&&<section id="invite-staff" className="mt-8"><h2 className="font-serif text-2xl font-semibold">Invitation details</h2>
           <p className="mt-1 text-sm text-muted-foreground">Create the person and an inactive exact-Site grant, then email the canonical secure access link. Accepting it establishes the intended local identity and role.</p>
@@ -186,9 +189,9 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">Role</FormLabel>
                   <FormControl>
-                    <select className={`${fieldClass} capitalize`} {...field}>
+                    <Select className={`${fieldClass} capitalize`} {...field}>
                       {roles.map(option => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
-                    </select>
+                    </Select>
                   </FormControl>
                   {field.value === "site_website_editor" && <p className="mt-2 text-xs text-muted-foreground">
                     After secure email acceptance, this publisher can edit only church-owned website copy,
@@ -220,18 +223,18 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
                 <FormItem className="sm:col-span-2">
                   <FormLabel className="text-sm font-semibold">Exact Site (required)</FormLabel>
                   <FormControl>
-                    <select className={fieldClass} required {...field}>
+                    <Select className={fieldClass} required {...field}>
                       <option value="">Select a permitted school</option>
                       {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
-                    </select>
+                    </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <div className="sm:col-span-2">
-                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy}>
+                <Button variant="default" className=" border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy}>
                   {busy ? "Inviting…" : "Invite staff member"}
-                </button>
+                </Button>
               </div>
             </form>
           </Form>
@@ -267,10 +270,10 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
         {mode==="access"&&form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
         {mode==="people"&&<section className="mt-8">
           <h2 className="text-lg font-semibold">People directory</h2>
-          <label className="mt-4 block max-w-sm text-sm font-semibold">
+          <Label className="mt-4 block max-w-sm text-sm font-semibold">
             Search
-            <input className="mt-2 w-full rounded-lg border bg-background p-3" type="search" placeholder="Search by name" value={query} onChange={event => setQuery(event.target.value)} />
-          </label>
+            <Input className="mt-2 w-full  border bg-background p-3" type="search" placeholder="Search by name" value={query} onChange={event => setQuery(event.target.value)} />
+          </Label>
           <DirectoryTable label="People directory" caption="People in the authorized organizational scope."
             rows={people} rowKey={person=>person.personId}
             empty={<p className="p-4 text-sm text-muted-foreground">No people found.</p>}
