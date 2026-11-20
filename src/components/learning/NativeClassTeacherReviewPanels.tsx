@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getNativeClassTeacherHomework, getNativeClassTeacherAssessments,
-  returnNativeClassPracticeFeedback } from
+  returnNativeClassPracticeFeedback, getNativeClassTeacherDraftPractice } from
   "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,6 +108,11 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
 }
 
 export function NativeClassTeacherAssessmentPanel({classId}:{classId:string}){
+  const practice=useQuery({
+    queryKey:["native-class-teacher-draft-practice",classId],
+    queryFn:()=>getNativeClassTeacherDraftPractice({data:{classId}}),
+    retry:false,
+  });
   const readiness=useQuery({
     queryKey:["native-class-teacher-assessments",classId],
     queryFn:()=>getNativeClassTeacherAssessments({data:{classId}}),
@@ -142,5 +147,27 @@ export function NativeClassTeacherAssessmentPanel({classId}:{classId:string}){
       </ul>
       {readiness.data.partial&&<p className="text-xs">Additional entries require pagination.</p>}
     </>}
+    {practice.data?.items.length ? <section className="mt-5 space-y-3 border-t border-border pt-5"
+      aria-label="Synthetic learner practice responses">
+      <h3 className="font-semibold">Student draft practice responses</h3>
+      <p className="text-xs text-muted-foreground">
+        Private synthetic practice only. These are not published exams, official grades,
+        or credit-bearing results.
+      </p>
+      {practice.data.items.map(item=><details key={item.id} className="border border-border p-3">
+        <summary className="cursor-pointer text-sm font-medium">
+          {item.studentName} · {new Date(item.recordedAt).toLocaleString()}
+        </summary>
+        <ol className="mt-3 space-y-3">
+          {item.answers.map((answer,index)=><li key={index} className="text-sm">
+            <p className="font-medium">{answer.prompt}</p>
+            <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{answer.answer}</p>
+          </li>)}
+        </ol>
+      </details>)}
+      {practice.data.partial&&<p className="text-xs text-muted-foreground">
+        Showing the latest 50 practice attempts.
+      </p>}
+    </section> : null}
   </section>;
 }
