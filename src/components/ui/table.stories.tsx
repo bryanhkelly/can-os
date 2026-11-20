@@ -56,7 +56,9 @@ export const ResponsiveGradebookSemantics: Story = {
     await expect(table).toBeVisible();
     await expect(within(table).getAllByRole("columnheader")).toHaveLength(4);
     await expect(within(table).getAllByRole("rowheader")).toHaveLength(2);
-    await userEvent.click(within(table).getAllByRole("button", { name: "Submitted" })[0]);
+    const submitted = within(table).getAllByRole("button", { name: "Submitted" })[0];
+    if (!submitted) throw new Error("Expected a Submitted cell in the sample gradebook.");
+    await userEvent.click(submitted);
     await expect(canvas.getByText("Opened: Jordan Lee: Research paper")).toBeVisible();
     await expect(canvas.getByRole("region", { name: "Gradebook student assessment grid" })).toHaveAttribute("tabindex", "0");
   },
