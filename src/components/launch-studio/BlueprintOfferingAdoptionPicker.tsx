@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { normalizeClientError } from "@/lib/client-error";
 import { canPlanOffering, type AvailableOffering } from "@/domain/program-discovery";
-import type { JsonObject } from "@/db/canonical-v301";
+import type { JsonObject } from "@/domain/json-types";
 import { discoverCanonicalBlueprintOfferings } from "@/modules/blueprints/blueprint-studio.functions";
 
 export type BlueprintOfferingIntent = {
