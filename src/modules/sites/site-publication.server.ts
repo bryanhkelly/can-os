@@ -1,4 +1,4 @@
-import { readSavedBrandVersion } from "./site-brand.functions";
+import { readSavedBrandVersion } from "./site-brand.server";
 import { assertSiteBrandMediaRights } from "@/domain/site-brand";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-local-content";

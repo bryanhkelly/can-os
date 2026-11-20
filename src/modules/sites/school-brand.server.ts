@@ -4,7 +4,7 @@ import { sites, sitePublications } from "@/db/schema";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { resolveSiteTheme } from "@/domain/site-theme";
 import { templateDefaultImage } from "@/domain/template-sample-images";
-import { readSavedBrandVersion } from "./site-brand.functions";
+import { readSavedBrandVersion } from "./site-brand.server";
 
 /** The only email/notification Brand reader.
  * Published Sites use the exact Brand pinned by Site publication. An

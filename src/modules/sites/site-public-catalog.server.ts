@@ -1,5 +1,5 @@
 import { siteLocalContentVersions } from "@/db/schema";
-import { readSavedBrandVersion } from "./site-brand.functions";
+import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-local-content";
 import { resolveSiteTemplateId } from "@/domain/site-theme";

@@ -11,7 +11,7 @@ import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.s
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/sites/site-local-content.server";
-import { readSavedBrandVersion } from "@/modules/sites/site-brand.functions";
+import { readSavedBrandVersion } from "@/modules/sites/site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";

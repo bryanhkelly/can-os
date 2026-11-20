@@ -5,7 +5,7 @@ import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import type { FamilyBrandContext } from "@/domain/school-brand-family";
-import { readSavedBrandVersion, requireSavedSiteBrand } from "./site-brand.functions";
+import { readSavedBrandVersion, requireSavedSiteBrand } from "./site-brand.server";
 
 /** Private family brand is the exact current saved Site Brand, never the
  * published Website's embedded identity or a mutable marketing copy.

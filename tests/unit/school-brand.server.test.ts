@@ -9,7 +9,7 @@ vi.mock("@/db/client",()=>{
   const chain={from:()=>chain,leftJoin:()=>chain,where:()=>chain,limit:async()=>state.rows};
   return {db:{select:()=>chain}};
 });
-vi.mock("@/modules/sites/site-brand.functions",()=>({
+vi.mock("@/modules/sites/site-brand.server",()=>({
   readSavedBrandVersion:state.read,
 }));
 const record=(published:boolean,versionId:string|null="v3")=>({

@@ -82,7 +82,7 @@ vi.mock("@/modules/sites/site-local-content.server", () => ({
   readLocalContentHistory: async () => [],
 }));
 
-vi.mock("@/modules/sites/site-brand.functions",()=>({
+vi.mock("@/modules/sites/site-brand.server",()=>({
   readSavedBrandVersion:async()=>state.brand,
 }));
 import { getPartnerWebsitePreview } from "@/modules/sites/site-website-preview.server";

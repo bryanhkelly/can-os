@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { siteBrandConfigurationSchema } from "@/domain/site-brand";
-import { assetInputSchema, saveSiteBrandVersionWithinTransaction } from "./site-brand.functions";
+import { assetInputSchema } from "./site-brand.functions";
+import { saveSiteBrandVersionWithinTransaction } from "./site-brand.server";
 import { publishPartnerLocalContentWithinTransaction } from "./site-local-content.server";
 import { siteBrandDirectionIds } from "@/domain/site-brand-direction";
 import { sitePaletteIds, siteTypographyIds, siteTemplateIds, siteFontCatalog, type SiteFontId } from "@/domain/site-theme";
