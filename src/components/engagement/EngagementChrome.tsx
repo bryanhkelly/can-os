@@ -5,7 +5,7 @@ import { ArrowRight, BookOpenText, ShieldCheck } from "lucide-react";
 export function EngagementChrome({ children }: { children: ReactNode }) {
   return <div className="min-h-screen bg-background text-foreground">
     <header className="border-b border-border bg-card">
-      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
+      <div className="can-shell-bar mx-auto flex min-h-[var(--topbar-height)] max-w-screen-2xl flex-wrap items-center justify-between gap-3 px-[var(--page-gutter)] py-3">
         <Link to="/landing" className="flex min-h-11 items-center gap-3 text-foreground">
           <span className="flex size-11 items-center justify-center bg-primary text-primary-foreground"><BookOpenText className="size-5"/></span>
           <span className="leading-tight">
@@ -23,7 +23,7 @@ export function EngagementChrome({ children }: { children: ReactNode }) {
     </header>
     {children}
     <footer className="mt-10 border-t border-border">
-      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-start justify-between gap-6 px-5 py-8 text-xs leading-6 text-muted-foreground sm:px-8">
+      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-start justify-between gap-6 px-[var(--page-gutter)] py-8 text-xs leading-6 text-muted-foreground">
         <p>CAN Academy · Explore → Launch → Next Steps</p>
         <p className="flex max-w-xl items-start gap-2"><ShieldCheck className="mt-1 size-4 shrink-0"/>
           Exploration does not authorize a school, approve an application, hire staff, or create a partnership.</p>
