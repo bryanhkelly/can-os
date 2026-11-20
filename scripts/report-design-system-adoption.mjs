@@ -13,7 +13,8 @@ const canonicalTags = new Set([
   "ActionDialog", "FormSection", "FormActions", "EmptyState",
   "RecordHeader", "RecordLayout", "RecordFacts", "EntityCard",
   "FieldTripFacts", "RecordedTime", "DeliveryReceiptFacts", "ActionFooter", "StatCard", "WorkspacePanel",
-  "StatusTimeline", "EvidencePicker",
+  "StatusTimeline", "EvidencePicker", "WorkspaceActionLink",
+  "ClassParticipationAcknowledgments", "LaunchGuidancePanels",
 ]);
 const files = [];
 function walk(directory) {
