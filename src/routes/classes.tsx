@@ -27,7 +27,7 @@ import { ClassLessonDiscussions } from "@/components/learning/ClassLessonDiscuss
 import { ClassLessonAssessmentLinks } from "@/components/learning/ClassLessonAssessmentLinks";
 import { ClassPublishedResourcesList } from "@/components/learning/ClassPublishedResourcesList";
 import { ClassSupplementContent } from "@/components/learning/ClassSupplementContent";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -60,10 +60,9 @@ const searchSchema = z.object({
   section: z.string().uuid().optional(), student: z.string().uuid().optional(),
   tab: z.enum(tabs).optional(), lesson: z.string().max(100).optional(),
 });
-export const Route = createFileRoute("/classes")({
-  validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
-  loaderDeps: ({ search }) => ({ section: search.section, student: search.student }),
-  loader: ({ deps }) => safeLoader(async () => {
+export type LegacySectionSearch = z.infer<typeof searchSchema>;
+export function loadLegacySectionClasses(deps: { section?: string; student?: string }) {
+  return safeLoader(async () => {
     const viewer = await getClassesViewerRole();
     if (viewer.role === "site_admin") {
       const [directory, roster] = await Promise.all([
@@ -89,13 +88,22 @@ export const Route = createFileRoute("/classes")({
       ? await getTeacherClassRequestOptions()
       : null;
     return { mode: "learning" as const, directory, workspace, classRequestOptions, meetings };
-  }, { authMessage: "Sign in with an authorized student, parent or teacher account to open classes." })(),
-  component: ClassesPage,
-});
+  }, { authMessage: "Sign in with an authorized student, parent or teacher account to open classes." })();
+}
 
-function ClassesPage() {
-  const outcome = Route.useLoaderData();
+export const Route = createFileRoute("/classes")({
+  validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
+  component: LegacyClassesRedirect,
+});
+function LegacyClassesRedirect() {
   const search = Route.useSearch();
+  return <Navigate to="/class" search={search} replace />;
+}
+
+export function LegacySectionClassPage({outcome, search}:{
+  outcome: Awaited<ReturnType<typeof loadLegacySectionClasses>>;
+  search: LegacySectionSearch;
+}) {
   if (!outcome.ok) return <LoaderFailure eyebrow="Classes" title="Classes" outcome={outcome}/>;
   if (outcome.data.mode === "site_admin") {
     const { directory, roster } = outcome.data;
