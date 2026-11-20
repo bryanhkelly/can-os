@@ -14,6 +14,7 @@ import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-a
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 
 type InternalStep = 0 | 1;
 type InterestId = SiteProgramsAudiencesV61["interestIds"][number];
@@ -67,16 +68,7 @@ const guidance = [
 ] as const;
 
 export function ProgramsAudiencesV61Guidance({ step }: { step: InternalStep }) {
-  const item = guidance[step];
-  return <div className="space-y-4">
-    <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">{item.why}</p>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.tip}</p>
-    </WorkspacePanel>
-    <WorkspacePanel title="What comes next">
-      <p className="text-sm leading-6 text-muted-foreground">{item.next}</p>
-    </WorkspacePanel>
-  </div>;
+  return <LaunchGuidancePanels guidance={guidance[step]} />;
 }
 
 function ChoiceCard({ id, label, detail, icon, checked, disabled, onChange }: {
