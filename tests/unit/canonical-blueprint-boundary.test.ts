@@ -81,6 +81,19 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(workspaceReader).toContain('eq(blueprintVersions.lifecycle, "published")');
   });
 
+  it("requires reconciliation after an uncertain Solution write rather than blind replay", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const save = editor.slice(editor.indexOf("async function save()"), editor.indexOf("async function submit()"));
+    const submit = editor.slice(editor.indexOf("async function submit()"), editor.indexOf("async function createPlanningDeployment()"));
+    expect(save).toContain("let attemptedWrite = false");
+    expect(submit).toContain("let attemptedWrite = false");
+    expect(submit).toContain("attemptedWrite = true");
+    expect(save).toContain("setReconciliationRequired(true)");
+    expect(submit).toContain("setReconciliationRequired(true)");
+    expect(editor).toContain("reconciliationRequired ||");
+    expect(editor).toContain("Reload before creating or updating another Solution plan");
+  });
+
   it("keeps approved plans read-only until the author explicitly starts a revision", () => {
     const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
     expect(editor).toContain('detail?.lifecycle === "frozen" && !revisingFrozen');
