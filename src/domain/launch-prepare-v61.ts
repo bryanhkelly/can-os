@@ -15,11 +15,13 @@ export type PrepareStageModuleIdV61 = (typeof prepareStageModulesV61)[number]["i
 /** Search and selection are pure UI projections. Never infer Site authorization. */
 export function filterPublishedSolutionRecipes<T extends {
   title: string; components: readonly { key: string }[];
+  programCode?: string | null; offeringCode?: string | null;
 }>(templates: readonly T[], query: string): T[] {
   const term = query.trim().toLowerCase();
   if (!term) return [...templates];
   return templates.filter(template =>
-    [template.title, ...template.components.map(component => component.key)]
+    [template.title, template.programCode ?? "", template.offeringCode ?? "",
+      ...template.components.map(component => component.key)]
       .some(value => value.toLowerCase().includes(term)));
 }
 
@@ -42,10 +44,18 @@ export function matchingSolutionInterests<T extends {
 /** Prefer matches to saved Site vision without suppressing other published options. */
 export function orderSolutionsByVision<T extends {
   title: string; components: readonly { key: string }[];
-}>(recipes: readonly T[], interestIds: readonly string[], startingFocus?: string | null): T[] {
+  programCode?: string | null;
+}>(
+  recipes: readonly T[], interestIds: readonly string[],
+  startingFocus?: string | null, programCodes: readonly string[] = [],
+  startingProgramCode?: string | null,
+): T[] {
   const score = (recipe: T) => {
     const matches = matchingSolutionInterests(recipe, interestIds);
-    return matches.length + (startingFocus && matches.includes(startingFocus) ? 2 : 0);
+    const exactProgramMatch = !!recipe.programCode && programCodes.includes(recipe.programCode);
+    return (exactProgramMatch ? 10 : 0)
+      + (exactProgramMatch && startingProgramCode === recipe.programCode ? 20 : 0)
+      + matches.length + (startingFocus && matches.includes(startingFocus) ? 2 : 0);
   };
   return [...recipes].sort((left, right) => score(right) - score(left));
 }
