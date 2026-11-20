@@ -163,6 +163,12 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
               </StatusBadge>
             </div>
             {!registrationId&&<h2 className="mt-2 font-serif text-2xl">{course.trainingTitle}</h2>}
+            {course.classTitle&&<p className="mt-2 text-sm font-medium">
+              Class: {course.classTitle}
+            </p>}
+            {!course.classId&&<p className="mt-2 text-xs text-muted-foreground">
+              This earlier registration does not yet have an assigned Class.
+            </p>}
             <p className="mt-2 text-xs text-muted-foreground">
               {course.deliveryMode==="facilitated"
                 ? "Facilitated at "+(course.siteName??"an approved learning center")
@@ -171,7 +177,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
             <p className="mt-2 text-xs text-muted-foreground">Registered {new Date(course.registeredAt).toLocaleDateString()}</p>
             {course.upcomingSessions.length>0&&
               <p className="mt-2 text-xs text-muted-foreground">
-                Next meeting: {new Date(course.upcomingSessions[0]!.startsAt).toLocaleString()}
+                Next Session: {new Date(course.upcomingSessions[0]!.startsAt).toLocaleString()}
                 {course.upcomingSessions.length>1?" · "+course.upcomingSessions.length+" upcoming meetings":""}
               </p>}
           </div>
