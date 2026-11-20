@@ -39,7 +39,14 @@ function readable(value: string): string {
  * Canonical Blueprint preparation. A draft is Organization-owned and anchored
  * to a Site; freezing it requests review, not permission to operate.
  */
-export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }: { siteId: string; enableReferences?: boolean }) {
+export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
+  initialBlueprintVersionId, embedded = false,
+}: {
+  siteId: string;
+  enableReferences?: boolean;
+  initialBlueprintVersionId?: string;
+  embedded?: boolean;
+}) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
   const [revisingFrozen, setRevisingFrozen] = useState(false);
@@ -82,13 +89,22 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     setLoading(true);
     setError(null);
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
-      .then(result => { if (!cancelled) setWorkspace(result); })
+      .then(result => {
+        if (cancelled) return;
+        setWorkspace(result);
+        if (initialBlueprintVersionId) {
+          const initial = result.templates.find(template =>
+            template.blueprintVersionId === initialBlueprintVersionId);
+          if (initial) chooseTemplate(initial);
+          else setError("The selected published Solution is no longer available for this Site.");
+        }
+      })
       .catch(caught => {
         if (!cancelled) setError(normalizeClientError(caught, "Blueprint planning could not load.").message);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, initialBlueprintVersionId]);
 
   useEffect(() => {
     if (!enableReferences) {
@@ -296,11 +312,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
 
   return <section className="mt-6 border bg-card p-6" aria-labelledby="canonical-blueprint-title">
     <h2 id="canonical-blueprint-title" className="font-serif text-2xl">
-      Configure your School Blueprint
+      {embedded ? "Configure selected Solution" : "Configure your Solution"}
     </h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Choose a published recipe, select its components, and save your plan.
-      Review and approval are separate from operating authorization.
+      CAN defines and publishes the Blueprint. Your Site selects its available components
+      and saves an implementation plan. Independent approval and enrollment authorization are separate.
     </p>
     {loading && <p className="mt-4" role="status">Loading Blueprint workspace…</p>}
     {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
@@ -328,9 +344,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       {workspace.templates.length > 0 && <div className="mt-5 space-y-4">
         <div className="flex flex-wrap gap-3">
           <Label htmlFor="canonical-blueprint-template" className="min-w-52 flex-1 text-sm">
-            Published Blueprint recipe
+            CAN-published Solution
             <Select id="canonical-blueprint-template" className="mt-2"
-              value={templateId} disabled={busy || Boolean(detail)}
+              value={templateId} disabled={busy || Boolean(detail) || (embedded && Boolean(initialBlueprintVersionId))}
               onChange={event => {
                 const template = workspace.templates.find(item =>
                   item.blueprintVersionId === event.currentTarget.value);
@@ -501,7 +517,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
           <div className="flex flex-wrap gap-3">
             {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
-              {busy ? "Saving…" : detail ? "Save new revision" : "Create Blueprint configuration"}
+              {busy ? "Saving…" : detail ? "Save new revision" : "Save Solution plan"}
             </Button>}
             {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy}
               onClick={() => { setRevisingFrozen(true); setOperationId(""); setExecutedDeployments(null); }}>
