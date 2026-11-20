@@ -212,25 +212,22 @@ export async function getCanonicalBlueprintWorkspace(
         // Do not return unreviewed internal Blueprint spec to Site clients.
         const metadata: Record<string, unknown> = spec && typeof spec === "object"
           && !Array.isArray(spec) ? spec as Record<string, unknown> : {};
+        const offeringCode = typeof metadata.offeringCode === "string"
+          ? metadata.offeringCode : null;
+        const linkedProduct = offeringCode
+          ? linkedByPublisherAndCode.get(publisherOrganizationId + ":" + offeringCode)
+          : null;
         return {
           ...template,
           programCode: typeof metadata.programCode === "string" ? metadata.programCode : null,
-          offeringCode: typeof metadata.offeringCode === "string" ? metadata.offeringCode : null,
-          // Planning-only. A published product is NOT a Site availability
-          // decision, qualified adoption or permission to enroll learners.
-          linkedPublishedOffering: typeof metadata.offeringCode === "string"
-            ? (() => {
-                const product = linkedByPublisherAndCode.get(
-                  publisherOrganizationId + ":" + metadata.offeringCode);
-                // Publisher identity is used only to prove the exact content
-                // relationship; do not leak internal publisher fields.
-                if (!product) return null;
-                return {
-                  code: product.code, title: product.title,
-                  offeringVersionId: product.offeringVersionId,
-                  versionNo: product.versionNo,
-                };
-              })() : null,
+          offeringCode,
+          // Publisher identity is used only to prove the source relationship.
+          // A published product is not an availability or enrollment decision.
+          linkedPublishedOffering: linkedProduct ? {
+            code: linkedProduct.code, title: linkedProduct.title,
+            offeringVersionId: linkedProduct.offeringVersionId,
+            versionNo: linkedProduct.versionNo,
+          } : null,
           components: components
             .filter(component => component.blueprintVersionId === template.blueprintVersionId)
             .map(({ id, key, kind, requirementMode, componentSpec }) => ({
