@@ -164,7 +164,7 @@ describe("canonical v3.0.1 stays net-new", () => {
       review.indexOf("const authors = await tx.select"),
       review.indexOf("const selectedComponents = await tx.select"),
     );
-    expect(independence).toContain("eq(auditEvents.entityId, version.configurationId)");
+    expect(independence).toContain("eq(sharedAuditEvents.resourceId, version.configurationId)");
     expect(independence).toContain("authors.some(author => author.actorPersonId === actorPersonId)");
     expect(independence).not.toContain("payload}->>'versionId'");
     const filterStart = queue.indexOf("return pending");
