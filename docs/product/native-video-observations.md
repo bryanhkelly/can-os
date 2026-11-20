@@ -54,3 +54,39 @@ idempotent retries with a stable client event UUID.
    evidence of student disengagement.
 7. Verify the *actual* Cloudflare Workers deployment and its selected Neon
    branch. A code commit alone does not prove the live URL is running it.
+
+## P0 remediation checkpoint (November 20, 2026)
+The Section lesson tracker now serializes requests and retains the same UUID for
+each bounded retry. After a failed write it stops accepting new observations,
+waits for the serialized writer to settle, and best-effort closes the old session
+before a new tracker generation starts. Unmount during an in-flight start also
+best-effort closes the resulting session. Recording status is shown only after
+the initial `lesson_opened` event is acknowledged.
+
+Pointer engagement is suppressed during native playback. Native heartbeats
+are accepted only from the shared player's visible, focused, genuinely advancing
+media check. The canonical recorded-instructor tracker applies the same
+anti-overlap rule. Player-control interactions never count as reading activity.
+
+Native bookmarks now flush on pause, seek, pagehide, visibility loss, and
+component cleanup. Shared-device mode keeps bookmarks in sessionStorage rather
+than durable localStorage. Enabling shared-device mode removes existing durable
+bookmarks. The existing CAN sign-out/account-handoff cleanup broadcasts an event
+to mounted players before erasing storage, preventing late pagehide from restoring
+private bookmarks.
+
+**Read-only database inspection:** Neon project `can-os`, database `neondb`.
+`main` contained 4 Section learning sessions and 2 Section learning events;
+the newest event was on November 5, 2026. Neon `test01` had both Section
+tables and zero rows. The November 19 Launch validation branch had the same
+four/two record snapshot as main. The canonical session and event tables were
+present on main, but absent on test01. No application writes or schema mutations
+were performed during this inspection.
+
+**Verification boundary:** these database queries establish table existence and
+existing row counts only. They do not establish which Neon branch a currently
+deployed Cloudflare Worker uses, demonstrate live learner request success, or
+validate the feature-branch code. Browser and CI acceptance are still pending.
+Do not merge or claim release readiness until a known deployed commit, its
+runtime database connection, authorized student events, cross-site denial,
+logout cleanup, and refreshed event history have been independently confirmed.
