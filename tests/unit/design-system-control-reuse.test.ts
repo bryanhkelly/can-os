@@ -47,6 +47,26 @@ describe("V6.1 global native-control ownership", () => {
     expect(ownershipErrors(result.messages)).toHaveLength(0);
   });
 
+  it("enforces canonical submit rows in migrated modules", async () => {
+    const [result] = await eslint.lintText(
+      'export function Example(){return <form><div className="flex gap-2"><Button type="submit">Save</Button></div></form>}',
+      { filePath: "src/components/admissions/FamilyInvitationForm.tsx" },
+    );
+    const matched = result.messages.filter(message => message.ruleId === "can-os-design/no-duplicate-form-actions");
+    expect(matched).toHaveLength(1);
+    expect(matched[0]?.severity).toBe(2);
+  });
+
+  it("reports unmigrated submit rows as actionable warnings", async () => {
+    const [result] = await eslint.lintText(
+      'export function Example(){return <form><footer><Button type="submit">Save</Button></footer></form>}',
+      { filePath: "src/components/learning/LearningQuestionnaire.tsx" },
+    );
+    const matched = result.messages.filter(message => message.ruleId === "can-os-design/no-duplicate-form-actions");
+    expect(matched).toHaveLength(1);
+    expect(matched[0]?.severity).toBe(1);
+  });
+
   it("allows native HTML only inside canonical UI primitive implementations", async () => {
     const [primitive] = await eslint.lintText(
       'export function Example(){return <button type="button">Save</button>}',
