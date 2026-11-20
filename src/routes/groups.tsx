@@ -20,7 +20,7 @@ import {
 } from "@/components/workspace";
 import { groupSessionSelectionSchema } from "@/lib/route-search";
 import { groupKindLabel, nextGroupSession } from "@/domain/study-group-display";
-import { Button } from "@/components/ui/button";
+import { GroupMembershipRequestRow, GroupModerationReportRow } from "@/components/groups/GroupReviewRows";
 import {
   getCanonicalGroupWorkspace,
   getStudyGroupAvailability,
@@ -142,68 +142,13 @@ function GroupsView({ data }: { data: Data }) {
             title="Membership requests"
             description="Approvals require current guardian permission."
           >
-            {pendingRequests.map(({ group, member }) => (
-              <div
-                key={member.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-b py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium">
-                    {member.studentName} ·{" "}
-                    <Link
-                      to="/groups/$groupId"
-                      params={{ groupId: group.id }}
-                      className="underline"
-                    >
-                      {group.title}
-                    </Link>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {member.guardianReady
-                      ? "Guardian permission recorded"
-                      : "Awaiting guardian permission"}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline"
-                    disabled={busy || !availability.membershipEnabled}
-                    onClick={() =>
-                      void run(
-                        () =>
-                          decideCanonicalGroupMembership({
-                            data: {
-                              groupId: group.id,
-                              studentPersonId: member.studentPersonId,
-                              approve: false,
-                            },
-                          }),
-                        "Membership declined.",
-                      )
-                    }
-                  >Decline</Button>
-                  <Button type="button" size="sm" variant="default"
-                    disabled={
-                      busy ||
-                      !availability.membershipEnabled ||
-                      !member.guardianReady
-                    }
-                    onClick={() =>
-                      void run(
-                        () =>
-                          decideCanonicalGroupMembership({
-                            data: {
-                              groupId: group.id,
-                              studentPersonId: member.studentPersonId,
-                              approve: true,
-                            },
-                          }),
-                        "Membership approved.",
-                      )
-                    }
-                  >Approve</Button>
-                </div>
-              </div>
-            ))}
+            {pendingRequests.map(({group,member})=>
+              <GroupMembershipRequestRow key={member.id} variant="directory"
+                member={member} groupId={group.id} groupTitle={group.title}
+                busy={busy} membershipEnabled={availability.membershipEnabled}
+                onDecision={(groupId,studentPersonId,approve)=>run(
+                  ()=>decideCanonicalGroupMembership({data:{groupId,studentPersonId,approve}}),
+                  approve?"Membership approved.":"Membership declined.")}/>)}
             {pendingRequests.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 No pending membership requests.
@@ -216,60 +161,13 @@ function GroupsView({ data }: { data: Data }) {
             title="Content moderation"
             description="Reported posts across your facilitated groups."
           >
-            {openReports.map(({ group, report }) => (
-              <div key={report.id} className="border-b py-3">
-                <p className="text-xs font-semibold">
-                  <Link
-                    to="/groups/$groupId"
-                    params={{ groupId: group.id }}
-                    className="underline"
-                  >
-                    {group.title}
-                  </Link>
-                </p>
-                <p className="mt-2 text-sm">Reason: {report.reason}</p>
-                <blockquote className="mt-2 border bg-muted p-3 text-sm whitespace-pre-wrap">
-                  {report.postBody ?? "The reported post is unavailable."}
-                </blockquote>
-                {report.postHidden && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Post already hidden
-                  </p>
-                )}
-                <div className="mt-2 flex gap-2">
-                  <Button type="button" size="sm" variant="outline"
-                    disabled={busy || !availability.moderationEnabled}
-                    onClick={() =>
-                      void run(
-                        () =>
-                          resolveCanonicalGroupReport({
-                            data: {
-                              reportId: report.id,
-                              hidePost: true,
-                            },
-                          }),
-                        "Reported post hidden.",
-                      )
-                    }
-                  >Hide and resolve</Button>
-                  <Button type="button" size="sm" variant="outline"
-                    disabled={busy || !availability.moderationEnabled}
-                    onClick={() =>
-                      void run(
-                        () =>
-                          resolveCanonicalGroupReport({
-                            data: {
-                              reportId: report.id,
-                              hidePost: false,
-                            },
-                          }),
-                        "Report reviewed; content retained.",
-                      )
-                    }
-                  >Resolve only</Button>
-                </div>
-              </div>
-            ))}
+            {openReports.map(({group,report})=>
+              <GroupModerationReportRow key={report.id} variant="directory"
+                report={report} groupId={group.id} groupTitle={group.title}
+                busy={busy} moderationEnabled={availability.moderationEnabled}
+                onResolve={(reportId,hidePost)=>run(
+                  ()=>resolveCanonicalGroupReport({data:{reportId,hidePost}}),
+                  hidePost?"Reported post hidden.":"Report reviewed; content retained.")}/>)}
             {openReports.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 No open content reports.
