@@ -38,6 +38,20 @@ INSERT INTO public.blueprint_reference_item_versions
  ) AS v(code,title,summary,description,schedule,guidance,metadata) ON i.code=v.code
  WHERE i.status='active' ON CONFLICT(item_id,version_no) DO NOTHING;
 
+-- Program display-name revision: preserve immutable v1, publish v2.
+-- STEP 3b
+INSERT INTO public.blueprint_reference_item_versions
+ (item_id,version_no,title,summary,description,grade_range,schedule_suggestion,configuration_guidance,metadata,lifecycle,published_at)
+ SELECT v.item_id,2,
+   CASE i.code WHEN 'can.program.custom_training' THEN 'Custom Training Pilot'
+               WHEN 'can.program.ai_digital_skills' THEN 'AI & Digital Skills Pilot' END,
+   v.summary,v.description,v.grade_range,v.schedule_suggestion,v.configuration_guidance,v.metadata,
+   'published',now()
+ FROM public.blueprint_reference_items i
+ JOIN public.blueprint_reference_item_versions v ON v.item_id=i.id AND v.version_no=1
+ WHERE i.code IN ('can.program.custom_training','can.program.ai_digital_skills')
+ ON CONFLICT (item_id,version_no) DO NOTHING;
+
 -- STEP 4
 INSERT INTO public.courses (publisher_organization_id,course_code,title,subject)
  VALUES ('ca270000-0000-4000-8000-000000000001','CLC-CUSTOM-TRAINING-01','Custom Training · One-Hour Pilot','Noncredit organizational learning')
