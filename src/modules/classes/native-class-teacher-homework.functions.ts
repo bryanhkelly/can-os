@@ -7,6 +7,7 @@ import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { currentClassAuthority } from "./native-class-authority.server";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
 const input=z.object({classId:z.string().uuid()}).strict();
 const asRecord=(value:unknown):Record<string,unknown>=>
@@ -48,7 +49,7 @@ async function authorizedTeacher(tx:Tx,classId:string){
        )).limit(1);
      if(!assignment)throw new AuthorizationError("current specific Class teacher appointment");
   await currentClassAuthority(tx,cls.id,now);
-  return cls;
+  return { cls, actor };
 }
 
 /** Independent academic teacher queue, using only the current native Class
@@ -61,7 +62,7 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
    setResponseHeader("Cache-Control","private, no-store");
    setResponseHeader("Referrer-Policy","no-referrer");
    return db.transaction(async tx=>{
-     const cls=await authorizedTeacher(tx,data.classId);
+     const {cls}=await authorizedTeacher(tx,data.classId);
      const result=await tx.execute(sql`
        SELECT gs.id,gs.status,gs.submitted_at,gs.response,
          ga.assignment_key,ga.assignment_spec,
@@ -102,13 +103,88 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
            responseText:typeof response.text==="string"?response.text:"",
            demoFeedback:response.synthetic===true&&typeof response.teacherFeedback==="string"
               ?response.teacherFeedback:null,
+           isSyntheticPractice:response.synthetic===true&&response.practiceResponse===true,
+           practiceScore:response.synthetic===true&&typeof response.demoScore==="number"?response.demoScore:null,
+           practiceScoreMax:response.synthetic===true&&typeof response.maxDemoScore==="number"?response.maxDemoScore:null,
            submittedAt:row.submitted_at?.toISOString()??null,
          };
        }),
        partial:result.rows.length>100,
        canRecordOfficialGrade:false,
+       canReturnPracticeFeedback:cls.siteId==="f1000000-0000-4000-8000-000000000003",
        notice:"Viewing submitted work does not confer independent grading authority. Official grading requires a verified independent grader appointment and governed Course policy.",
      };
+   });
+ });
+
+
+
+const practiceFeedbackInput=input.extend({
+  submissionId:z.string().uuid(),
+  feedback:z.string().trim().min(3).max(3000),
+  practiceScore:z.number().int().min(0).max(10).nullable(),
+}).strict();
+
+/**
+ * Let verified Valor teachers return practice feedback to synthetic students.
+ * This updates existing Class-linked homework only. Never grants authority
+ * to write official grading_decisions, gradebook or credential records.
+ */
+export const returnNativeClassPracticeFeedback=createServerFn({method:"POST"})
+ .validator((value:unknown)=>practiceFeedbackInput.parse(value))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   return db.transaction(async tx=>{
+     const {cls,actor}=await authorizedTeacher(tx,data.classId);
+     if(cls.siteId!=="f1000000-0000-4000-8000-000000000003")
+       throw new AuthorizationError("synthetic Valor demonstration only");
+     const rows=await tx.execute(sql`
+       SELECT gs.id,gs.status,gs.response
+       FROM public.graded_submissions gs
+       JOIN public.learner_course_attempts ca ON ca.id=gs.course_attempt_id
+        AND ca.course_version_id=gs.course_version_id
+       JOIN public.class_enrollments ce ON ce.id=ca.class_enrollment_id
+        AND ce.course_attempt_id=ca.id AND ce.status='active'
+       JOIN public.graded_assignments ga ON ga.id=gs.assignment_id
+        AND ga.course_version_id=ca.course_version_id AND ga.section_id IS NULL
+       JOIN public.people p ON p.id=ce.learner_person_id
+       JOIN public.sites site ON site.id=${cls.siteId}::uuid
+       WHERE gs.id=${data.submissionId}::uuid
+         AND ce.class_id=${cls.id}::uuid
+         AND ca.status='active' AND ca.section_id IS NULL
+         AND ca.course_version_id=${cls.courseVersionId}::uuid
+         AND gs.status IN ('submitted','returned')
+         AND gs.response @> '{"synthetic":true,"practiceResponse":true}'::jsonb
+         AND p.metadata @> '{"synthetic":true}'::jsonb
+         AND site.metadata @> '{"synthetic":true}'::jsonb
+       FOR UPDATE OF gs
+     `);
+     const row=rows.rows[0] as {id:string;status:string;response:unknown}|undefined;
+     if(!row)throw new AuthorizationError("current synthetic Class submission");
+     const original=asRecord(row.response);
+     const updated=await tx.execute(sql`
+       UPDATE public.graded_submissions
+       SET response=response || jsonb_build_object(
+         'teacherFeedback',${data.feedback}::text,
+         'demoScore',${data.practiceScore}::int,
+         'maxDemoScore',10,
+         'synthetic',true,'noncredit',true,'practiceResponse',true
+       ),status='returned'
+       WHERE id=${row.id}::uuid AND status IN ('submitted','returned')
+       RETURNING id
+     `);
+     if(updated.rows.length!==1)throw new AuthorizationError("submission changed");
+     await writeCanonicalAudit(tx,{
+       actorPersonId:actor.actorPersonId!,owningOrganizationId:cls.operatingOrganizationId,
+       eventCode:"class.homework.practice_feedback.recorded",
+       entityKind:"graded_submission",entityId:row.id,
+       payload:{
+         classId:cls.id,practiceOnly:true,previousStatus:row.status,
+         hadPriorFeedback:typeof original.teacherFeedback==="string",
+         scoreRecorded:data.practiceScore!==null,
+       },
+     });
+     return {submissionId:row.id,status:"returned" as const,practiceOnly:true as const};
    });
  });
 
