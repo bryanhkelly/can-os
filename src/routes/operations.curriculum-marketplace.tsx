@@ -172,7 +172,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
       </ul>}
       </div>}
      <p className="mt-1 text-xs text-muted-foreground">For classroom verification, switch to an assigned teacher or enrolled student account before opening the class.</p>
-     <Link to="/class" search={{section:klass.id}} className="text-sm underline">Open class as an authorized member →</Link>
+     <Link to="/class"  className="text-sm underline">Open class as an authorized member →</Link>
     </div>)}
     {!data.journey.classes.length&&<p className="text-sm">No classes use currently adopted publisher course releases. Provision a class after adopting a pack.</p>}
     <p className="text-xs text-muted-foreground">To certify the workflow, run the isolated database acceptance suite and signed-in browser tests. Nonzero counts establish operational records only.</p>
