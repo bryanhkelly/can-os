@@ -74,7 +74,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
       {(tab === "overview" || tab === "academics") && <WorkspacePanel title="Academics"
         actions={tab === "overview" && sectionLink("academics", `View all ${plural(profile.academics.sections.length, "class", "classes")}`)}>
         <ul className="divide-y">{preview(profile.academics.sections).map(section => <li key={section.sectionId} className="py-4 first:pt-0">
-          <h3 className="font-semibold"><Link to="/class" search={{ section: section.sectionId }} className="underline underline-offset-4">{section.title}</Link></h3>
+          <h3 className="font-semibold"><Link to="/class"  className="underline underline-offset-4">{section.title}</Link></h3>
           <p className="mt-1 text-sm text-muted-foreground">{section.letterGrade !== null || section.percentage !== null ?
             `Finalized grade: ${section.letterGrade ?? ""}${section.letterGrade && section.percentage !== null ? " · " : ""}${section.percentage !== null ? `${section.percentage}%` : ""}` :
             "No finalized grade yet"}</p>
@@ -142,7 +142,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
     rail={<>
       <WorkspacePanel title="Teaching team">
         <ul className="divide-y">{profile.sections.slice(0, 3).map(section => <li key={section.sectionId} className="py-3 first:pt-0">
-          <p className="text-sm font-semibold"><Link to="/class" search={{ section: section.sectionId }} className="underline underline-offset-2">{section.title}</Link></p>
+          <p className="text-sm font-semibold"><Link to="/class"  className="underline underline-offset-2">{section.title}</Link></p>
           <p className="mt-1 text-sm text-muted-foreground"><TeacherNameLinks teachers={section.teachers}/></p>
         </li>)}</ul>
         {!profile.sections.length && <p className="text-sm text-muted-foreground">No active teaching assignments.</p>}
