@@ -185,6 +185,14 @@ function isChoiceCardLabel(opening) {
       for (const child of node.children) inspect(child);
     } else if (node.type === "JSXFragment") {
       for (const child of node.children) inspect(child);
+    } else if (node.type === "JSXExpressionContainer") {
+      inspect(node.expression);
+    } else if (node.type === "LogicalExpression") {
+      inspect(node.left);
+      inspect(node.right);
+    } else if (node.type === "ConditionalExpression") {
+      inspect(node.consequent);
+      inspect(node.alternate);
     }
   }
   for (const child of element.children) inspect(child);
