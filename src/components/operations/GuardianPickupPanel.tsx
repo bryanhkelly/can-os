@@ -18,12 +18,17 @@ type Student = Workspace["students"][number];
 const keyFor = (student: Student) => student.programId + ":" + student.studentProfileId + ":" + student.householdId;
 /** Family release-authority management and authorized handoff history. */
 export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: string }) {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspaceSnapshot, setWorkspace] = useState<{
+    studentPersonId: string | undefined; value: Workspace;
+  } | null>(null);
+  // Filter during render, before effects run, so another child's authority
+  // never flashes on screen after selecting a different child.
+  const workspace = workspaceSnapshot?.studentPersonId === studentPersonId
+    ? workspaceSnapshot.value : null;
   const pendingMutationIds = useRef(new Map<string, string>());
   const requestSequence = useRef(0);
   // A child selection can change before an earlier response settles.
   const activeStudentPersonId = useRef(studentPersonId);
-  activeStudentPersonId.current = studentPersonId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -37,6 +42,10 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   const [holdReasons, setHoldReasons] = useState<Record<string, string>>({});
 
   const load = useCallback(async (propagateFailure = false) => {
+    if (studentPersonId !== activeStudentPersonId.current) {
+      if (propagateFailure) throw new Error("Pickup authority context changed; retry refresh.");
+      return;
+    }
     const request = ++requestSequence.current;
     setLoading(true);
     setError("");
@@ -48,7 +57,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
         if (propagateFailure) throw new Error("Pickup authority context changed; retry refresh.");
         return;
       }
-      setWorkspace(next);
+      setWorkspace({ studentPersonId, value: next });
     } catch (cause) {
       if (request === requestSequence.current &&
           studentPersonId === activeStudentPersonId.current) {
@@ -67,6 +76,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
+    activeStudentPersonId.current = studentPersonId;
     setNotice("");
     // Different guardian / child selection must not inherit a pending request.
     pendingMutationIds.current.clear();
