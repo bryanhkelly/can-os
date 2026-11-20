@@ -1,3 +1,15 @@
+import { isStudentAssessmentVisible } from "./assessment-availability";
+
+/** Reuse the student assignment release policy in the class workspace.
+ * Teachers may prepare unreleased work, but students and guardians must not
+ * see its title, metadata, status or evidence before the scheduled release.
+ */
+export function visibleClassAssessments<T extends {status: string; availableAt: Date | null}>(
+ rows: readonly T[], role: "student" | "guardian" | "teacher", now = new Date(),
+): T[] {
+ return role === "teacher" ? [...rows] : rows.filter(row => isStudentAssessmentVisible(row, now));
+}
+
 /**
  * Class assessment evidence intentionally stays distinct from student-reported
  * lesson completion. Neither is, by itself, a mastery or transcript-credit award.
@@ -61,4 +73,21 @@ export function summarizeClassAssessmentEvidence(items:ClassAssessmentEvidence[]
   awaitingFeedback:items.filter(item=>item.status==="submitted").length,
   notSubmitted:items.filter(item=>item.status==="not_submitted"||item.status==="draft").length,
  };
+}
+
+/** Place existing class assessments alongside the correct published lesson.
+ * Lesson-specific references take precedence over unit scope. Legacy
+ * course-prefixed unit identifiers (e.g. algebra1-u01) are allowed only
+ * within the already-authorized Section's curriculum module.
+ * General class assignments remain in the class assignment workspace.
+ */
+export function assessmentsForPublishedLesson(
+ items: readonly ClassAssessmentEvidence[], lessonId: string, moduleId?: string,
+): ClassAssessmentEvidence[] {
+ return items.filter(item => {
+  if (item.curriculumVersionMismatch) return false;
+  if (item.curriculumLessonId) return item.curriculumLessonId === lessonId;
+  if (!moduleId || !item.unitId) return false;
+  return item.unitId === moduleId || item.unitId.endsWith("-" + moduleId);
+ });
 }
