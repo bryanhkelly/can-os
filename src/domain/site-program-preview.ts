@@ -10,7 +10,7 @@ import type { SiteLaunchPreferences } from "./site-launch-preferences";
  *
  * This is NOT an Offering, adopted Solution, or enrollment authority. Every
  * card derives from the canonical, finite planning-interest vocabulary and
- * is deliberately labeled "Proposed · not enrolling".
+ * has no registration action while its content is still a draft.
  *
  * Reuse any independently authored website-section heading/layout while
  * retaining the source-controlled card titles, labels and safe descriptions.
@@ -38,7 +38,7 @@ export function projectPlannedSiteProgramsForPreview(
   const description = "We are exploring " + delivery +
     (audiences.length ? " for " + audiences.join(", ") : "") +
     (timing.length ? " with possible " + timing.join(", ") : "") +
-    ". These are proposed learning options, not approved or open for enrollment.";
+    ".";
   const homepage = authoredBlocks.find(block => block.channel === "learning.interests" &&
     (block.page === "/" || block.page === undefined));
   const programsPage = authoredBlocks.find(block => block.channel === "learning.interests" &&
@@ -52,7 +52,7 @@ export function projectPlannedSiteProgramsForPreview(
     // Source-controlled card content; never copy a draft link or claim.
     items: source.items.map(item => ({
       id: item.id, title: item.title, description: item.description,
-      label: "Proposed · not enrolling",
+      label: "Learning interest",
     })),
   });
   return [
