@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons,
+  canonicalClasses,canonicalClassEnrollments,
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
@@ -447,6 +448,8 @@ async function readMyNoncreditHistoryPage(
       releaseId:noncreditSelfEnrollmentClaims.releaseId,
       registrationId:noncreditRegistrations.id,
       courseAttemptId:learnerCourseAttempts.id,
+      classId:canonicalClassEnrollments.classId,
+      classTitle:canonicalClasses.title,
       trainingTitle:noncreditTrainingVersions.title,
       deliveryMode:noncreditSelfEnrollmentReleases.deliveryMode,
       siteId:noncreditSelfEnrollmentReleases.siteId,
@@ -466,17 +469,19 @@ async function readMyNoncreditHistoryPage(
       .innerJoin(learnerCourseAttempts,and(
         eq(learnerCourseAttempts.noncreditRegistrationId,noncreditRegistrations.id),
         isNull(learnerCourseAttempts.enrollmentId),
-        isNull(learnerCourseAttempts.classEnrollmentId),
         // Registration is one participation identity even with multiple
         // historical attempts. Select its latest original Course Attempt.
         sql`${learnerCourseAttempts.id} = (
           SELECT attempt.id FROM ${learnerCourseAttempts} attempt
           WHERE attempt.noncredit_registration_id=${noncreditRegistrations.id}
-            AND attempt.enrollment_id IS NULL AND attempt.class_enrollment_id IS NULL
+            AND attempt.enrollment_id IS NULL
           ORDER BY attempt.attempt_no DESC,attempt.started_at DESC,attempt.id DESC
           LIMIT 1
         )`,
       ))
+      .leftJoin(canonicalClassEnrollments,
+        eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId))
+      .leftJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
       .innerJoin(noncreditTrainingVersions,
         eq(noncreditTrainingVersions.id,noncreditRegistrations.trainingVersionId))
       .where(and(
