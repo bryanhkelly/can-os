@@ -79,7 +79,7 @@ function ClassNavigation({workspace}:{workspace:Workspace}){
         {viewLabels[view]}
       </SectionTab>)}
     </DetailNavigation>
-    <DetailNavigation label="Class sections" variant="record">
+    <DetailNavigation label="Class details" variant="record">
       {workspace.availableTabs.map(tab=><SectionTab key={tab}
         current={workspace.tab===tab}
         link={{to:"/class/$classId",params:{classId:workspace.classId},
