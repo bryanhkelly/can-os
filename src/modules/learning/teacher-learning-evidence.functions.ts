@@ -57,7 +57,7 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
   const ids = [...new Set(selected.map(r => r.studentProfileId))];
   const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const evidence = ids.length ? await db.select({
-    id: s.learningActivityEvents.id,
+    id: s.learningActivityEvents.id, kind: s.learningActivityEvents.kind,
     sectionId: s.learningActivityEvents.sectionId,
     studentProfileId: s.learningActivityEvents.studentProfileId,
     receivedAt: s.learningActivityEvents.receivedAt,
@@ -67,15 +67,20 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
       inArray(s.learningActivityEvents.studentProfileId, ids),
       gte(s.learningActivityEvents.receivedAt, from)))
     .orderBy(desc(s.learningActivityEvents.receivedAt)).limit(3001) : [];
-  const latest = new Map<string, { count: number; lastAt: Date; latestEventId: string; estimatedMs: number }>();
+  const latest = new Map<string, { count: number; lastAt: Date; latestEventId: string; estimatedMs: number; videoStarts: number; videoObservations: number }>();
   for (const row of evidence.slice(0, 3000)) {
     const key = row.sectionId + ":" + row.studentProfileId;
     const current = latest.get(key);
     if (current) {
       current.count++;
       current.estimatedMs += row.estimatedActiveMs;
+      if (row.kind === "video_played") current.videoStarts++;
+      if (row.kind.startsWith("video_")) current.videoObservations++;
     } else {
-      latest.set(key, { count: 1, lastAt: row.receivedAt, latestEventId: row.id, estimatedMs: row.estimatedActiveMs });
+      latest.set(key, { count: 1, lastAt: row.receivedAt, latestEventId: row.id,
+        estimatedMs: row.estimatedActiveMs,
+        videoStarts: row.kind === "video_played" ? 1 : 0,
+        videoObservations: row.kind.startsWith("video_") ? 1 : 0 });
     }
   }
   const titles = new Map(assigned.map(row => [row.sectionId, row.sectionTitle]));
@@ -89,6 +94,8 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
       latestObservedAt: activity?.lastAt.toISOString() ?? null,
       latestEventId: activity?.latestEventId ?? null,
       estimatedActiveMs7d: activity?.estimatedMs ?? 0,
+      nativeVideoStarts7d: activity?.videoStarts ?? 0,
+      nativeVideoObservations7d: activity?.videoObservations ?? 0,
     };
   });
   return {
