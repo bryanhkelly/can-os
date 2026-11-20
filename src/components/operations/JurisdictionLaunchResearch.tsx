@@ -9,7 +9,7 @@ export function JurisdictionLaunchResearch({
   research,
 }: {research:LaunchJurisdictionResearch | undefined}) {
   if(!research) return (
-    <div className="mt-3 rounded-lg border border-border/70 p-3 text-sm">
+    <div className="mt-3  border border-border/70 p-3 text-sm">
       <p className="font-medium">No source-backed research preview is available yet.</p>
       <p className="mt-1 text-muted-foreground">You can prepare the school, but CAN must review this jurisdiction and the proposed school model before any opening decision.</p>
     </div>
@@ -22,7 +22,7 @@ export function JurisdictionLaunchResearch({
     <div>
       <h4 className="font-semibold">Potential education funding</h4>
       {research.fundingPrograms.length===0?<p className="mt-1 text-muted-foreground">No researched funding pathway has been recorded yet.</p>:
-        <ul className="mt-2 space-y-3">{research.fundingPrograms.map(program=><li key={program.id} className="rounded-lg border border-border/70 p-3">
+        <ul className="mt-2 space-y-3">{research.fundingPrograms.map(program=><li key={program.id} className=" border border-border/70 p-3">
           <p className="font-medium">{program.name}</p>
           <p className="mt-1">{program.summary}</p>
           <p className="mt-1 text-xs text-muted-foreground">Research status: {program.eligibilityStatus.replaceAll("_"," ")}. Funding does not imply approval for CAN or this location.</p>
@@ -33,7 +33,7 @@ export function JurisdictionLaunchResearch({
       <h4 className="font-semibold">{verified?"Source-backed requirements to review":"Preliminary legal and launch questions"}</h4>
       <p className="mt-1 text-xs text-muted-foreground">These are informational candidates, not an automatically approved or complete checklist. CAN's separate jurisdiction review determines applicability for the actual site and operating model.</p>
       {research.investigationItems.length===0?<p className="mt-1 text-muted-foreground">No audience-approved research items have been recorded.</p>:
-        <ul className="mt-2 space-y-3">{research.investigationItems.map(item=><li key={item.id} className="rounded-lg border border-border/70 p-3">
+        <ul className="mt-2 space-y-3">{research.investigationItems.map(item=><li key={item.id} className=" border border-border/70 p-3">
           <p className="font-medium">{item.title}</p>
           <p className="mt-1">{item.description}</p>
           <p className="mt-1 text-xs text-muted-foreground">Potential owner: {partyLabels[item.responsibleParty]} · Phase: {phaseLabels[item.phase]}</p>

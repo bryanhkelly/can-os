@@ -11,7 +11,7 @@ export function GuidedSchoolJourney({program,journey}:{
   const steps=guidedSchoolJourney(program,journey);
   const recorded=steps.filter(s=>s.state==="recorded").length;
   const nextStep=steps.find(step=>step.state==="needs_attention")??steps.find(step=>step.state==="review");
-  return <section className="rounded-xl border bg-card p-5" aria-label={program.name+" guided launch"}>
+  return <section className=" border bg-card p-5" aria-label={program.name+" guided launch"}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h3 className="font-serif text-xl">{program.name} · guided operating journey</h3>
@@ -23,13 +23,13 @@ export function GuidedSchoolJourney({program,journey}:{
       {nextStep&&<a href={nextStep.href} className="text-sm underline">{nextStep.nextAction} →</a>}
     </div>
     <ol className="mt-4 grid gap-3 md:grid-cols-2">
-      {steps.map((step,index)=><li key={step.key} className="rounded-lg border p-4">
+      {steps.map((step,index)=><li key={step.key} className=" border p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <span className="text-xs text-muted-foreground">Step {index+1} · Suggested: {step.suggestedRole}</span>
             <h4 className="mt-1 font-semibold">{step.title}</h4>
           </div>
-          <span className="rounded-full border px-2 py-1 text-2xs whitespace-nowrap">
+          <span className=" border px-2 py-1 text-2xs whitespace-nowrap">
             {step.state==="recorded"?"Recorded":step.state==="review"?"Review":"Needs setup"}
           </span>
         </div>

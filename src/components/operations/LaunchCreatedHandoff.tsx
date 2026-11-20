@@ -19,7 +19,7 @@ export function LaunchCreatedHandoff({created}:{created:LaunchCreatedResult|null
  const navigation=useSchoolConfigurationNavigation();
  const settings=navigation.context==="settings";
  return <>
-            {created && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
+            {created && <div role="status" className="mt-4  border p-3 text-sm">
               <p className="font-semibold">Your school has been saved.</p>
               <p className="mt-1">Continue with your academic year, first classroom, school website and family invitations. Your progress is saved as you go.</p>
               <nav aria-label="Next steps for your new program" className="mt-4 flex flex-wrap gap-3">
@@ -34,7 +34,7 @@ export function LaunchCreatedHandoff({created}:{created:LaunchCreatedResult|null
                 </>}
               </nav>
               <p className="mt-3 text-xs text-muted-foreground">These are planning actions, not authorization to open. Institutional agreements, academic readiness and child safety must still be independently approved before active enrollment or onsite attendance.</p>
-              {created.publicSiteDraft && <details className="mt-3 rounded-lg border p-3">
+              {created.publicSiteDraft && <details className="mt-3  border p-3">
                 <summary className="cursor-pointer text-sm font-semibold">Optional: website and marketing setup</summary>
                 <p className="font-semibold">
                   {created.publicSiteDraft.created
