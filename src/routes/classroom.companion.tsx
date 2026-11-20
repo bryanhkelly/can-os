@@ -4,6 +4,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { ClassroomCompanionRoom } from "@/components/learning/ClassroomCompanionRoom";
 import { ClassroomFeedbackPanel } from "@/components/learning/ClassroomFeedbackPanel";
+import { ClassroomConnectionStatus } from "@/components/learning/ClassroomConnectionStatus";
 import { useLearnerClassroomRooms } from "@/components/learning/useLearnerClassroomRooms";
 import { leaveFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 
@@ -38,7 +39,7 @@ function ClassroomCompanionPage() {
   return <WorkspaceShell width="reading" eyebrow="Classroom Connect"
     title="Learner companion" subtitle="Your device remains linked to your verified Course registration.">
     {!courseAttemptId && <p role="alert">Join with a current facilitator code first.</p>}
-    {rooms.isPending && courseAttemptId && <p role="status">Checking your room connection…</p>}
+    {courseAttemptId && <ClassroomConnectionStatus rooms={rooms}/>}
     {rooms.isError && <p role="alert" className="mt-4 text-sm text-destructive">
       Classroom access could not be verified. Room controls are unavailable.
       <Button variant="outline" size="sm" className="ml-2"
