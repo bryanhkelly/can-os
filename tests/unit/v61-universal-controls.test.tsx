@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { Modal } from "@/components/ui/modal";
+import { FormActions } from "@/components/workspace/form-page";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { EmptyState, WorkspaceNotice, PageNavigation } from "@/components/workspace";
 
@@ -57,6 +58,31 @@ describe("V6.1 universal action and surface contracts", () => {
     expect(html).toMatch(/^<a\b/);
     expect(html).toContain('href="/programs"');
     expect(html).not.toContain("<button");
+  });
+
+  it("disables slotted link actions with ARIA rather than an invalid HTML disabled attribute", () => {
+    const disabled = renderToStaticMarkup(<Button asChild disabled variant="ghost">
+      <a href="/cancel">Cancel</a>
+    </Button>);
+    expect(disabled).toContain('href="/cancel"');
+    expect(disabled).toContain('aria-disabled="true"');
+    expect(disabled).toContain('tabindex="-1"');
+    expect(disabled).toContain("pointer-events-none");
+    expect(disabled).not.toMatch(/\\sdisabled(?:=|\\s|>)/);
+  });
+
+  it("uses the canonical Button component for both form actions", () => {
+    const html = renderToStaticMarkup(
+      <FormActions submitLabel="Save" pendingLabel="Saving…" pending
+        cancel={<a href="/back">Cancel</a>}/>,
+    );
+    expect(html).toContain('data-form-actions=""');
+    expect(html).toContain('type="submit"');
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('href="/back"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('tabindex="-1"');
+    expect(html).not.toMatch(/<a[^>]*\\sdisabled(?:=|\\s|>)/);
   });
 
   it("renders the public sign-in links without an invalid Radix Slot child array", () => {
