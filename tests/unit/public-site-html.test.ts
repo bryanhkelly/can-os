@@ -37,7 +37,7 @@ describe("standalone public site HTML", () => {
       };
       const privateHtml=renderPublicSiteHtml(page,{localPreview:true});
       expect(privateHtml).toContain("/template-photo/");
-      expect(privateHtml).toContain("Template photography");
+      expect(privateHtml).not.toContain('class="template-photo-disclosure"');
       const publicHtml=renderPublicSiteHtml(page);
       expect(publicHtml).not.toContain("/template-photo/");
       expect(publicHtml).not.toContain("Template photography");
