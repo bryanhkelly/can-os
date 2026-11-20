@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import { auditEvents as sharedAuditEvents } from "@/db/schema";
 import {
   blueprintComponents,
@@ -26,7 +27,7 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
   if (!organizationIds.length) throw new AuthorizationError("Blueprint reviewer Organization scope");
 
   const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const versions = await tx.select({
       configurationId: blueprintConfigurations.id,
@@ -163,5 +164,5 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
           .filter(component => component.versionId === version.versionId)
           .map(({ componentId, key, kind }) => ({ componentId, key, kind })),
       }));
-  });
+  }));
 }
