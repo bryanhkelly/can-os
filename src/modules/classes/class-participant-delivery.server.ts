@@ -42,9 +42,10 @@ async function meeting(sessionId: string): Promise<Meeting | null> {
     .where(eq(canonicalClassSessions.id, sessionId)).limit(1);
   return record ?? null;
 }
-function calendarEvent(row: Meeting, title: string): CalendarInvitationEvent {
+function calendarEvent(row: Meeting, title: string, attendeeEmail: string, organizerEmail?: string): CalendarInvitationEvent {
   return {
     uid: classSessionCalendarUid(row.id), summary: title,
+    attendeeEmail, organizerEmail,
     startsAt: row.startsAt, endsAt: row.endsAt,
     description: "Open CAN OS My Classes for the verified meeting location and learning materials.",
   };
@@ -195,6 +196,10 @@ const adapter = {
       return { kind: "suppress", reason: "Class_or_Site_no_longer_open" };
     const email = await verifiedRecipient(record.recipientPersonId, enrollment ?? null, now);
     if (!email) return { kind: "suppress", reason: "verified_recipient_contact_unavailable" };
+    const sender = process.env.CAN_NOTIFICATIONS_FROM_EMAIL ?? process.env.CAN_ACCESS_FROM_EMAIL;
+    const organizerEmail = sender?.includes("<")
+      ? sender.split("<").at(-1)?.replace(">", "").trim()
+      : sender?.trim();
     const label = cls.title;
     const greeting = "Hello,\n\n";
     const view = "Sign in to CAN OS and open My Classes for the authoritative schedule, lessons and meeting access.";
@@ -222,7 +227,7 @@ const adapter = {
       if (scheduled.length > 100)
         return { kind: "fail", reason: "Class_schedule_exceeds_email_series_limit" };
       if (scheduled.length) assets.push(attachment("class-schedule.ics",
-        scheduled.map(row => calendarEvent(row, label)), "REQUEST"));
+        scheduled.map(row => calendarEvent(row, label, email, organizerEmail)), "REQUEST"));
       subject = "You're enrolled: " + label;
       text = greeting + "Your enrollment in " + label + " at " + site.name +
         " is confirmed. " + (scheduled.length
@@ -239,7 +244,7 @@ const adapter = {
       if (record.kind === "session_scheduled") {
         if (original.state !== "scheduled" || original.startsAt <= now)
           return { kind: "suppress", reason: "Class_Session_no_longer_upcoming" };
-        assets.push(attachment("new-class-session.ics", [calendarEvent(original, label)], "REQUEST"));
+        assets.push(attachment("new-class-session.ics", [calendarEvent(original, label, email, organizerEmail)], "REQUEST"));
         subject = "New Class Session: " + label;
         text = greeting + "A Class Session has been scheduled for " + label +
           " on " + localTime(original.startsAt, site.timezone) + ".\n\n" + view;
@@ -253,7 +258,7 @@ const adapter = {
         if (replacement && replacement.classId === cls.id &&
             replacement.state === "scheduled" && replacement.startsAt > now) {
           assets.push(attachment("replacement-class-session.ics",
-            [calendarEvent(replacement, label)], "REQUEST"));
+            [calendarEvent(replacement, label, email, organizerEmail)], "REQUEST"));
           text = greeting + "The Session previously scheduled for " +
             localTime(original.startsAt, site.timezone) + " was cancelled. A replacement is scheduled for " +
             localTime(replacement.startsAt, site.timezone) + ".\n\n" + view;

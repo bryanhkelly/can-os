@@ -32,7 +32,7 @@ export function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledCl
         summary:snapshot.classTitle,
         description:"Sign in to CAN OS My Classes for meeting access and learning materials.",
         startsAt:new Date(session.startsAt),endsAt:new Date(session.endsAt),
-      })),"REQUEST");
+      })),"PUBLISH");
       downloadBlob(new Blob([body],{type:"text/calendar;charset=utf-8"}),
         "can-os-class-schedule.ics");
     }catch{

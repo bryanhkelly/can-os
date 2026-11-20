@@ -4,12 +4,14 @@ export type CalendarInvitationEvent = {
   uid: string;
   summary: string;
   startsAt: Date;
-  endsAt: Date;
+  endsAt?: Date;
+  attendeeEmail?: string;
+  organizerEmail?: string;
   description?: string;
   location?: string;
   sequence?: number;
 };
-export type CalendarInvitationMethod = "REQUEST" | "CANCEL";
+export type CalendarInvitationMethod = "REQUEST" | "CANCEL" | "PUBLISH";
 
 export function escapeCalendarText(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/\r\n|\r|\n/g, "\\n")
@@ -33,6 +35,11 @@ export function foldCalendarLine(line: string): string {
   }
   parts.push(segment);
   return parts.join("\r\n");
+}
+
+function validMailto(value: string): string {
+  if (!/^[^@\s;:\r\n]+@[^@\s;:\r\n]+$/.test(value)) throw new Error("Invalid calendar recipient");
+  return value;
 }
 
 function stamp(date: Date): string {
@@ -64,7 +71,7 @@ export function renderCalendarInvitation(
       throw new Error("Calendar UID must be unique and single-line");
     }
     if (!Number.isFinite(item.startsAt.getTime()) ||
-        !Number.isFinite(item.endsAt.getTime()) || item.endsAt <= item.startsAt) {
+        (item.endsAt !== undefined && (!Number.isFinite(item.endsAt.getTime()) || item.endsAt <= item.startsAt))) {
       throw new Error("Calendar event needs a valid positive interval");
     }
     const sequence = item.sequence ?? 0;
@@ -75,9 +82,13 @@ export function renderCalendarInvitation(
       "UID:" + escapeCalendarText(item.uid),
       "DTSTAMP:" + dtstamp,
       "DTSTART:" + stamp(item.startsAt),
-      "DTEND:" + stamp(item.endsAt),
+      ...(item.endsAt ? ["DTEND:" + stamp(item.endsAt)] : []),
       "SEQUENCE:" + sequence,
       "SUMMARY:" + escapeCalendarText(item.summary),
+      ...(item.organizerEmail ? ["ORGANIZER:mailto:" + validMailto(item.organizerEmail)] : []),
+      ...(item.attendeeEmail ? [
+        "ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:" + validMailto(item.attendeeEmail),
+      ] : []),
       ...(item.description ? ["DESCRIPTION:" + escapeCalendarText(item.description)] : []),
       ...(item.location ? ["LOCATION:" + escapeCalendarText(item.location)] : []),
       ...(method === "CANCEL" ? ["STATUS:CANCELLED"] : ["STATUS:CONFIRMED"]),

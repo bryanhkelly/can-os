@@ -35,11 +35,9 @@ export function renderInterestEventCalendar(input: {
   endsAt: Date | null;
   now?: Date;
 }): string {
-  // Missing event end time is not a made-up duration: use a one-minute
-  // calendar placeholder only for email clients that require DTEND.
-  const endsAt = input.endsAt ?? new Date(input.startsAt.getTime() + 60_000);
   return renderCalendarInvitation([{
     uid: input.uid, summary: input.title, description: input.description,
-    location: input.location, startsAt: input.startsAt, endsAt,
+    location: input.location, startsAt: input.startsAt,
+    ...(input.endsAt ? { endsAt: input.endsAt } : {}),
   }], "REQUEST", input.now);
 }
