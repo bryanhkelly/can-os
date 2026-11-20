@@ -1,6 +1,6 @@
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
-import { createSiteMarketingRelease, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
+import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Archive, ArrowLeft, ArrowRight, Check, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2, Download } from "lucide-react";
@@ -22,7 +22,8 @@ import {
   saveSiteMarketingPackageV61, selectSiteMarketingPackageBrandV61,
 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
-import { downloadOriginalMarketingOutput, downloadMarketingPng } from "./marketing-output-download";
+import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketingPackageZip } from "./marketing-output-download";
+import { packageReleaseChangesV61, packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
@@ -59,6 +60,12 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
+  const [packageReleases,setPackageReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingPackageReleases>>>([]);
+  const [releasesLoading,setReleasesLoading]=useState(false);
+  const [releasesUnavailable,setReleasesUnavailable]=useState(false);
+  const [releaseRefreshKey,setReleaseRefreshKey]=useState(0);
+  const [releaseRequestId,setReleaseRequestId]=useState(()=>crypto.randomUUID());
+  const [compare,setCompare]=useState<{id:string;format:MarketingFormat;mimeType:string;body:string;releaseNumber:number}|null>(null);
   const [currentBrand,setCurrentBrand]=useState<{id:string;revision:number}|null>(null);
   const [brandReadiness,setBrandReadiness]=useState<"loading"|"available"|"missing"|"unavailable">("loading");
   const [brandRefreshKey,setBrandRefreshKey]=useState(0);
@@ -81,20 +88,25 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   useEffect(()=>{
     if(view!=="detail"||!record)return;
     let live=true;
+    setReleasesLoading(true);setReleasesUnavailable(false);
+    setReleases([]);setPackageReleases([]);setCompare(null);
     void Promise.all([
       listSiteMarketingReleases({data:{siteId,packageId:record.id}}),
+      listSiteMarketingPackageReleases({data:{siteId,packageId:record.id}}),
       readSiteBrandVersionView({data:{siteId}}),
       record.brandVersionId
         ? readSiteBrandVersionView({data:{siteId,versionId:record.brandVersionId}})
         : Promise.resolve(null),
-    ]).then(([records,brand,selected])=>{
-      if(live){setReleases(records);
+    ]).then(([records,packageVersions,brand,selected])=>{
+      if(live){setReleases(records);setPackageReleases(packageVersions);setReleasesLoading(false);
+        setReleasesUnavailable(false);
         setCurrentBrand(brand.current?.version
           ? {id:brand.current.version.id,revision:brand.current.version.revision}:null);
         setSelectedBrandRevision(selected?.current?.version.revision??null);}
-    }).catch(error=>{if(live)setError(message(error));});
+    }).catch(error=>{if(live){setError(message(error));setReleasesLoading(false);
+      setReleasesUnavailable(true);}});
     return ()=>{live=false;};
-  },[view,record?.id,record?.brandVersionId,siteId]);
+  },[view,record?.id,record?.brandVersionId,siteId,releaseRefreshKey]);
   const dirty=view==="wizard" && (!record || title!==record.title ||
     JSON.stringify(content)!==JSON.stringify(record.content));
   const releaseNavigation=useLaunchUnsavedChanges(()=>dirty||busy,
@@ -103,6 +115,9 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   function open(recordToOpen:PackageRecord,editing=false) {
     setRecord(recordToOpen);setTitle(recordToOpen.title);setContent(recordToOpen.content);
     setStep(0);setView(editing?"wizard":"detail");setError("");setNotice("");
+    setReleases([]);setPackageReleases([]);setReleasesLoading(!editing);
+    setReleasesUnavailable(false);
+    setReleaseRequestId(crypto.randomUUID());setCompare(null);
   }
   function start() {
     setRecord(null);setTitle("");setContent(starter(context.defaultPurpose));
@@ -122,6 +137,9 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   function updateList(saved:PackageRecord) {
     setPackages(previous=>[saved,...previous.filter(item=>item.id!==saved.id)]);
     setRecord(saved);
+    // A newly saved draft is a different release intent. Uncertain retries
+    // retain their requestId only while the same revision is being released.
+    setReleaseRequestId(crypto.randomUUID());
   }
   async function saveCurrent() {
     if(!record)throw new Error("Create the package before saving its details.");
@@ -205,14 +223,51 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
       setNotice("Package updated to Brand v"+currentBrand.revision+". Existing releases remain unchanged.");
     });
   }
-  async function generate(format:MarketingPackageContent["formats"][number]){
-    if(!record)return;
+  async function releasePackage(){
+    if(!record||releasesLoading||releasesUnavailable)return;
     await run(async()=>{
-      await createSiteMarketingRelease({data:{
-        siteId,packageId:record.id,expectedPackageRevision:record.revision,format,
+      const result=await createSiteMarketingPackageRelease({data:{
+        siteId,packageId:record.id,expectedPackageRevision:record.revision,
+        requestId:releaseRequestId,
       }});
+      const versions=await listSiteMarketingPackageReleases({data:{siteId,packageId:record.id}});
+      setPackageReleases(versions);
       setReleases(await listSiteMarketingReleases({data:{siteId,packageId:record.id}}));
-      setNotice("A new immutable "+format+" was generated. Earlier releases are unchanged.");
+      setReleaseRequestId(crypto.randomUUID());
+      setNotice(result.created
+        ? "Package Release v"+result.releaseNumber+" created with all "+result.formats.length+
+          " selected materials. Earlier releases are unchanged."
+        : "Package Release v"+result.releaseNumber+" was already created. No duplicate was generated.");
+    });
+  }
+  async function downloadPackage(release:(typeof packageReleases)[number]){
+    if(!packageReleaseIsDownloadableV61(release))return;
+    await run(async()=>{
+      const outputs=await Promise.all(release.outputs.map(item=>
+        getSiteMarketingReleaseOutput({data:{siteId,releaseId:item.id}})));
+      const files=outputs.map((output,index)=>({
+        name:release.outputs[index]!.format+"."+output.fileName.split(".").at(-1),
+        body:output.content,
+      }));
+      for(let index=0;index<outputs.length;index++){
+        const output=outputs[index]!;
+        if(release.outputs[index]?.format==="social"&&output.plainText)
+          files.push({name:"social-caption.txt",body:output.plainText});
+      }
+      files.push({name:"package-manifest.json",body:JSON.stringify({
+        packageReleaseId:release.id,releaseNumber:release.releaseNumber,
+        brandVersionId:release.brandVersionId,sourcePackageRevision:release.packageRevision,
+        createdAt:release.createdAt,formats:release.formats,
+        outputs:release.outputs.map(x=>({id:x.id,format:x.format,templateVersion:x.templateVersion,sha256:x.checksum})),
+      },null,2)});
+      downloadMarketingPackageZip(release.title,release.releaseNumber,files);
+      setNotice("Downloaded the complete, original Package Release v"+release.releaseNumber+".");
+    });
+  }
+  async function compareRelease(id:string,format:MarketingFormat,releaseNumber:number){
+    await run(async()=>{
+      const output=await getSiteMarketingReleaseOutput({data:{siteId,releaseId:id}});
+      setCompare({id,format,mimeType:output.mimeType,body:output.content,releaseNumber});
     });
   }
   async function downloadRelease(id:string){
@@ -246,6 +301,10 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   const visible=packages.filter(item=>context.purposes.includes(item.content.purpose) &&
     (showArchived?item.status==="archived":item.status!=="archived"));
   const currentSuggestion=suggestions?.[content.purpose]??null;
+  const latestPackageRelease=packageReleases[0]??null;
+  const packageChanges=record?packageReleaseChangesV61(record,latestPackageRelease):[];
+  const packageUpToDate=Boolean(latestPackageRelease?.complete && packageChanges.length===0);
+  const legacyReleases=releases.filter(item=>!item.packageReleaseId);
   const packageHandoff=record && context.packageHandoff?.purpose===record.content.purpose
     ?context.packageHandoff:null;
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
@@ -525,49 +584,144 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
               }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
           </WorkspacePanel>}
         <WorkspaceNotice tone="info">The package's content is saved. New branded releases are available to download. Sending marketing email requires separate authorization.</WorkspaceNotice>
-        <WorkspacePanel title="Brand version and generated materials"
-          description="Generated files retain their original Brand and message.">
-          <div className="space-y-3">
+        <WorkspacePanel title="Package release"
+          description="Release every selected format together. A Package Release is a frozen set; edits never change an earlier download or email.">
+          <div className="space-y-4">
             <p className="text-sm">Selected identity:
               <strong>{record.brandVersionId
                 ? selectedBrandRevision!==null
                   ? " Brand v"+selectedBrandRevision
-                  : " Selected saved Brand"
+                  : " Saved Site Brand"
                 : " No saved Brand selected"}</strong>
             </p>
             {currentBrand&&currentBrand.id!==record.brandVersionId&&
               <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
-                <p className="text-sm">A newer saved Brand (v{currentBrand.revision}) is available.
-                  Existing releases remain unchanged.</p>
+                <p className="text-sm">Brand v{currentBrand.revision} is available in Establish.
+                  Updating your working Package will not change older releases.</p>
                 <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
-                  onClick={()=>void selectCurrentBrand()}>Update package Brand</Button>
+                  onClick={()=>void selectCurrentBrand()}>Use newer Brand</Button>
               </div>}
+            {releasesLoading&&<p role="status" className="text-sm text-muted-foreground">Loading Package Release history…</p>}
+            {releasesUnavailable&&<WorkspaceNotice tone="attention">Package history is unavailable. To avoid duplicate releases, reload the history before generating new material.
+              <Button type="button" variant="outline" size="sm"
+                onClick={()=>setReleaseRefreshKey(value=>value+1)}>Retry history</Button>
+            </WorkspaceNotice>}
+            {!releasesLoading&&latestPackageRelease&&<div className="space-y-2 border bg-muted/25 p-4">
+              <p className="text-sm font-semibold">Latest generated: Package Release v{latestPackageRelease.releaseNumber}</p>
+              {packageChanges.length
+                ? <p className="text-sm">Updates available: {packageChanges.join(", ")}. Preview and release an updated Package when ready.</p>
+                : <p className="text-sm text-muted-foreground">The working Package matches the latest generated release. Reuse that release instead of creating a duplicate.</p>}
+            </div>}
+            {!releasesLoading&&!latestPackageRelease&&
+              <p className="text-sm text-muted-foreground">This Package has no grouped release yet. Your first release will contain every selected format.</p>}
             <div className="flex flex-wrap gap-2">
-              {record.content.formats.map(format=><Button key={format} type="button" variant="outline"
-                disabled={busy||record.status==="archived"||!record.brandVersionId}
-                onClick={()=>void generate(format)}>Generate {format}</Button>)}
+              <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
+                onClick={()=>{setTitle(record.title);setContent(record.content);setStep(3);setView("wizard");}}>
+                Preview Package
+              </Button>
+              <Button type="button" disabled={busy||releasesLoading||releasesUnavailable||record.status==="archived"||!record.brandVersionId||packageUpToDate}
+                onClick={()=>void releasePackage()}>
+                {latestPackageRelease?"Release Updated Package":"Release Package"}
+              </Button>
             </div>
-            {releases.length>0&&<ul className="space-y-2 border-t pt-3">
-              {releases.map(item=><li key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 border p-3">
-                <span className="text-xs">{item.format} · Package revision {item.packageRevision}
-                  {" · "}{new Date(item.createdAt).toLocaleDateString()}
-                  {item.withdrawnAt?" · Withdrawn":""}</span>
-                <div className="flex flex-wrap items-center gap-2">
+            <WorkspaceNotice tone="info">Release creates all selected formats atomically. It does not publish the website,
+              send email, update scheduled communications, or change earlier Package Releases.</WorkspaceNotice>
+          </div>
+        </WorkspacePanel>
+        <WorkspacePanel title="Package release history"
+          description="Downloads are grouped by Package Release. Every version preserves its original Brand, message and outputs.">
+          <div className="space-y-3">
+            {releasesLoading&&<p role="status" className="text-sm text-muted-foreground">Loading releases…</p>}
+            {!releasesLoading&&packageReleases.length===0&&
+              <p className="text-sm text-muted-foreground">No Package Releases yet.</p>}
+            {!releasesLoading&&packageReleases.map((version,index)=>
+              <details key={version.id} className="border bg-background" open={index===0}>
+                <summary className="cursor-pointer p-4 text-sm font-semibold">
+                  Package Release v{version.releaseNumber} {index===0?"· Latest generated":"· Previous version"}
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {new Date(version.createdAt).toLocaleDateString()} · {version.formats.length} materials
+                  </span>
+                </summary>
+                <div className="space-y-3 border-t p-4">
+                  <p className="text-xs text-muted-foreground">
+                    Saved content revision {version.packageRevision} · Brand preserved with this release
+                  </p>
+                  {!version.complete&&<WorkspaceNotice tone="attention">This historical release is incomplete.
+                    Download the available original files individually; do not treat it as a full Package.</WorkspaceNotice>}
+                  {version.outputs.some(item=>item.withdrawnAt)&&<WorkspaceNotice tone="attention">
+                    At least one material was withdrawn. The full Package is unavailable, but unaffected
+                    original files may still be downloaded individually.</WorkspaceNotice>}
+                  <Button type="button" variant="outline" size="sm" disabled={busy||!packageReleaseIsDownloadableV61(version)}
+                    onClick={()=>void downloadPackage(version)}>
+                    <Download className="size-4" aria-hidden="true"/> Download Package ZIP
+                  </Button>
+                  <ul className="space-y-2">
+                    {version.outputs.map(item=><li key={item.id}
+                      className="flex flex-wrap items-center justify-between gap-3 border p-3">
+                      <span className="text-sm">{marketingFormatOptions.find(x=>x.id===item.format)?.label??item.format}
+                        {item.withdrawnAt?" · Withdrawn":""}
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm"
+                          disabled={busy||Boolean(item.withdrawnAt)}
+                          onClick={()=>void compareRelease(item.id,item.format,version.releaseNumber)}>
+                          Compare
+                        </Button>
+                        <Button type="button" variant="outline" size="sm"
+                          disabled={busy||Boolean(item.withdrawnAt)}
+                          onClick={()=>void downloadRelease(item.id)}>Original</Button>
+                        {item.format!=="email"&&<Button type="button" variant="outline" size="sm"
+                          disabled={busy||Boolean(item.withdrawnAt)}
+                          onClick={()=>void downloadPng(item.id)}>PNG</Button>}
+                        {item.format==="social"&&<Button type="button" variant="outline" size="sm"
+                          disabled={busy||Boolean(item.withdrawnAt)}
+                          onClick={()=>void copyCaption(item.id)}>Copy caption</Button>}
+                      </div>
+                    </li>)}
+                  </ul>
+                </div>
+              </details>)}
+            {!releasesLoading&&legacyReleases.length>0&&<details className="border bg-background">
+              <summary className="cursor-pointer p-4 text-sm font-semibold">
+                Previous individually generated materials ({legacyReleases.length})
+              </summary>
+              <ul className="space-y-2 border-t p-4">
+                {legacyReleases.map(item=><li key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border p-3">
+                  <span className="text-xs">{item.format} · {new Date(item.createdAt).toLocaleDateString()}
+                    {item.withdrawnAt?" · Withdrawn":""}</span>
                   <Button type="button" variant="outline" size="sm"
                     disabled={busy||Boolean(item.withdrawnAt)}
-                    onClick={()=>void downloadRelease(item.id)}>
-                    <Download className="size-4" aria-hidden="true"/> Download original
-                  </Button>
-                  {item.format!=="email"&&<Button type="button" variant="outline" size="sm"
-                    disabled={busy||Boolean(item.withdrawnAt)}
-                    onClick={()=>void downloadPng(item.id)}>PNG</Button>}
-                  {item.format==="social"&&<Button type="button" variant="outline" size="sm"
-                    disabled={busy||Boolean(item.withdrawnAt)}
-                    onClick={()=>void copyCaption(item.id)}>Copy caption</Button>}
+                    onClick={()=>void downloadRelease(item.id)}>Download original</Button>
+                </li>)}
+              </ul>
+            </details>}
+            {compare&&<section aria-label="Compare Package material" className="space-y-3 border p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold text-sm">Compare {compare.format} · Release v{compare.releaseNumber}</h3>
+                <Button type="button" variant="ghost" size="sm" onClick={()=>setCompare(null)}>Close</Button>
+              </div>
+              <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+                <div className="min-w-0 space-y-2">
+                  <p className="text-sm font-semibold">Original released material</p>
+                  {compare.mimeType==="image/svg+xml"
+                    ? <img src={"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(compare.body)}
+                        alt={"Original "+compare.format+" from Package Release v"+compare.releaseNumber}
+                        className="max-h-[36rem] max-w-full border bg-white object-contain"/>
+                    : <iframe title="Original released email" sandbox="" srcDoc={compare.body}
+                        className="h-[34rem] w-full border bg-white"/>}
                 </div>
-              </li>)}
-            </ul>}
+                <div className="min-w-0 space-y-2">
+                  <p className="text-sm font-semibold">Current saved Package preview</p>
+                  {record.content.formats.includes(compare.format)
+                    ? <MarketingMaterialPreviewV61 siteId={siteId}
+                        brandVersionId={record.brandVersionId}
+                        format={compare.format} content={record.content}/>
+                    : <p className="border p-4 text-sm">This format was removed from the working Package.
+                        It remains available in the original release.</p>}
+                </div>
+              </div>
+            </section>}
           </div>
         </WorkspacePanel>
         <ActionFooter>

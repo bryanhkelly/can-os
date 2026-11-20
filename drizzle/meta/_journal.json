@@ -645,6 +645,13 @@
       "when": 1795120800000,
       "tag": "0091_site_website_draft_write_capability",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1795130000000,
+      "tag": "0092_marketing_package_atomic_releases",
+      "breakpoints": true
     }
   ]
 }

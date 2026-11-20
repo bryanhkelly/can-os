@@ -41,11 +41,43 @@ export const siteBrandVersions=pgTable("site_brand_versions",{
   check("site_brand_versions_fingerprint_ck",sql`${t.fingerprint} ~ '^[a-f0-9]{64}$'`),
 ]);
 
+/**
+ * The immutable, atomic unit of marketing distribution. Every selected
+ * output is created in the same transaction and references this snapshot.
+ * Older standalone outputs retain packageReleaseId=null.
+ */
+export const siteMarketingPackageReleases=pgTable("site_marketing_package_releases",{
+  id:id(),
+  siteId:uuid("site_id").notNull().references(()=>sites.id,{onDelete:"restrict"}),
+  packageId:uuid("package_id").notNull(),
+  releaseNumber:integer("release_number").notNull(),
+  requestId:uuid("request_id").notNull(),
+  brandVersionId:uuid("brand_version_id").notNull().references(()=>siteBrandVersions.id,{onDelete:"restrict"}),
+  sourcePackageRevision:integer("source_package_revision").notNull(),
+  contentSnapshot:jsonb("content_snapshot").$type<Record<string,unknown>>().notNull(),
+  formats:jsonb("formats").$type<string[]>().notNull(),
+  createdByPersonId:uuid("created_by_person_id").notNull().references(()=>people.id,{onDelete:"restrict"}),
+  createdAt:createdAt(),
+},t=>[
+  index("site_marketing_package_releases_site_idx").on(t.siteId,t.createdAt),
+  uniqueIndex("site_marketing_package_releases_number_uq").on(t.packageId,t.releaseNumber),
+  uniqueIndex("site_marketing_package_releases_request_uq").on(t.packageId,t.requestId),
+  uniqueIndex("site_marketing_package_releases_site_id_uq").on(t.siteId,t.id),
+  uniqueIndex("site_marketing_package_releases_scope_uq").on(t.siteId,t.packageId,t.id),
+  foreignKey({name:"site_marketing_package_releases_package_scope_fk",
+    columns:[t.siteId,t.packageId],foreignColumns:[siteMarketingPackages.siteId,siteMarketingPackages.id]}),
+  foreignKey({name:"site_marketing_package_releases_brand_scope_fk",
+    columns:[t.siteId,t.brandVersionId],foreignColumns:[siteBrandVersions.siteId,siteBrandVersions.id]}),
+  check("site_marketing_package_releases_number_ck",sql`${t.releaseNumber} >= 1`),
+  check("site_marketing_package_releases_source_revision_ck",sql`${t.sourcePackageRevision} >= 1`),
+]);
+
 /** Artifact release snapshot is immutable; hosted access status is separate. */
 export const siteArtifactReleases=pgTable("site_artifact_releases",{
   id:id(),
   siteId:uuid("site_id").notNull().references(()=>sites.id,{onDelete:"restrict"}),
   packageId:uuid("package_id"),
+  packageReleaseId:uuid("package_release_id"),
   brandVersionId:uuid("brand_version_id").notNull().references(()=>siteBrandVersions.id,{onDelete:"restrict"}),
   sourcePackageRevision:integer("source_package_revision"),
   artifactKind:text("artifact_kind").notNull(),
@@ -60,10 +92,18 @@ export const siteArtifactReleases=pgTable("site_artifact_releases",{
 },t=>[
   index("site_artifact_releases_site_idx").on(t.siteId,t.createdAt),
   index("site_artifact_releases_package_idx").on(t.packageId),
+  index("site_artifact_releases_package_release_idx").on(t.packageReleaseId),
+  uniqueIndex("site_artifact_releases_one_format_per_package_release_uq")
+    .on(t.packageReleaseId,t.artifactKind)
+    .where(sql`${t.packageReleaseId} IS NOT NULL`),
   foreignKey({name:"site_artifact_releases_package_scope_fk",columns:[t.siteId,t.packageId],
     foreignColumns:[siteMarketingPackages.siteId,siteMarketingPackages.id]}),
+  foreignKey({name:"site_artifact_releases_package_release_scope_fk",
+    columns:[t.siteId,t.packageId,t.packageReleaseId],
+    foreignColumns:[siteMarketingPackageReleases.siteId,siteMarketingPackageReleases.packageId,siteMarketingPackageReleases.id]}),
   foreignKey({name:"site_artifact_releases_brand_scope_fk",columns:[t.siteId,t.brandVersionId],
     foreignColumns:[siteBrandVersions.siteId,siteBrandVersions.id]}),
+  check("site_artifact_releases_package_parent_ck",sql`${t.packageReleaseId} IS NULL OR ${t.packageId} IS NOT NULL`),
   check("site_artifact_releases_checksum_ck",sql`${t.outputChecksum} ~ '^[a-f0-9]{64}$'`),
 ]);
 

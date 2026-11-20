@@ -1,15 +1,15 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import QRCode from "qrcode";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { siteArtifactReleases, siteArtifactReleaseAccess, sites, siteMarketingPackages,
-  sitePublications, siteBrandAssets } from "@/db/schema";
+import { siteArtifactReleases, siteArtifactReleaseAccess, siteMarketingPackageReleases,
+  sites, siteMarketingPackages, sitePublications, siteBrandAssets } from "@/db/schema";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
-import { marketingPackageContentSchema, marketingFormatIds } from "@/domain/marketing-package-v61";
+import { marketingPackageContentSchema, marketingFormatIds, marketingStepIssue } from "@/domain/marketing-package-v61";
 import { containsProtectedInstitutionalClaim } from "@/domain/site-local-content";
 import { renderSiteMarketingArtifact } from "@/domain/site-artifact-renderer";
 import { assertSiteBrandMediaRights } from "@/domain/site-brand";
@@ -20,8 +20,6 @@ import { writeAudit } from "@/platform/mutation";
 
 const uuid=z.string().uuid();
 const scope=z.object({siteId:uuid,packageId:uuid}).strict();
-const createSchema=scope.extend({expectedPackageRevision:z.number().int().positive(),
-  format:z.enum(marketingFormatIds)}).strict();
 const releaseSchema=z.object({siteId:uuid,releaseId:uuid}).strict();
 
 async function checkSite(siteId:string,write:boolean,reader:Pick<typeof db,"select">=db){
@@ -76,73 +74,155 @@ export const previewSiteMarketingArtifact=createServerFn({method:"POST"})
       brandRevision:brand.version.revision,templateVersion:rendered.templateVersion};
   });
 
-/** Release format inputs are snapshotted with the exact frozen Brand and immutable media IDs. */
-export const createSiteMarketingRelease=createServerFn({method:"POST"})
-  .validator((value:unknown)=>createSchema.parse(value))
+
+/** One click releases all selected output formats in a single DB transaction.
+ * Retries with the same requestId return the exact same parent release.
+ */
+const packageReleaseInput=scope.extend({
+  expectedPackageRevision:z.number().int().positive(),
+  requestId:uuid,
+}).strict();
+
+export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
+  .validator((value:unknown)=>packageReleaseInput.parse(value))
   .handler(async ({data})=>db.transaction(async tx=>{
     setResponseHeader("Cache-Control","private, no-store");
     const {site,actor}=await checkSite(data.siteId,true,tx);
     const [pkg]=await tx.select().from(siteMarketingPackages).where(and(
       eq(siteMarketingPackages.siteId,site.id),eq(siteMarketingPackages.id,data.packageId)))
       .for("update").limit(1);
-    if(!pkg || pkg.status!=="draft")throw new DomainError("UNAVAILABLE","Active package required.");
+    if(!pkg)throw new DomainError("UNAVAILABLE","Marketing Package unavailable.");
+    // Check after locking the Package, before revision/status checks. A network
+    // retry must not create a second release or fail because edits happened later.
+    const [replayed]=await tx.select().from(siteMarketingPackageReleases).where(and(
+      eq(siteMarketingPackageReleases.packageId,pkg.id),
+      eq(siteMarketingPackageReleases.requestId,data.requestId))).limit(1);
+    if(replayed){
+      if(replayed.sourcePackageRevision!==data.expectedPackageRevision)
+        throw new DomainError("CONFLICT","A package release request ID was reused with different content.");
+      return {id:replayed.id,releaseNumber:replayed.releaseNumber,
+        formats:replayed.formats,created:false};
+    }
+    if(pkg.status!=="draft")throw new DomainError("CONFLICT","Restore this Package before releasing it.");
     if(pkg.revision!==data.expectedPackageRevision)
-      throw new DomainError("CONFLICT","Package changed since you opened it. Review and save first.");
-    if(!pkg.brandVersionId)throw new DomainError("UNAVAILABLE","Select a saved Site Brand before generating.");
+      throw new DomainError("CONFLICT","Package changed. Review the current saved version before releasing.");
+    if(!pkg.brandVersionId)throw new DomainError("UNAVAILABLE","Save a Site Brand in Establish first.");
+
+    const content=marketingPackageContentSchema.parse(pkg.content);
+    for(const step of ["menu","audience","messages","assets"] as const){
+      const issue=marketingStepIssue(step,pkg.title,content);
+      if(issue)throw new DomainError("VALIDATION_FAILED",issue);
+    }
+    if(new Set(content.formats).size!==content.formats.length)
+      throw new DomainError("VALIDATION_FAILED","Select each material format only once.");
+    const claimText=[pkg.title,content.headline,content.message,content.callToAction].join(" ");
+    if(containsProtectedInstitutionalClaim(claimText))
+      throw new DomainError("VALIDATION_FAILED",
+        "Remove unverified institutional, tuition or enrollment claims before releasing materials.");
     const brand=await readSavedBrandVersion(site.id,pkg.brandVersionId,tx);
-    if(!brand)throw new DomainError("UNAVAILABLE","Selected Site Brand could not be resolved.");
-    // Reuse the approved identity even if a draft logo is still awaiting
-    // rights/alt-text confirmation. Unapproved media is excluded, never copied.
+    if(!brand)throw new DomainError("UNAVAILABLE","The selected Site Brand is unavailable.");
     const resolvedBrand={...brand.resolved,
       logo:assertSiteBrandMediaRights(brand.resolved.logo)?brand.resolved.logo:null,
       hero:assertSiteBrandMediaRights(brand.resolved.hero)?brand.resolved.hero:null,
     };
-    const content=marketingPackageContentSchema.parse(pkg.content);
-    if(!content.formats.includes(data.format))throw new DomainError("VALIDATION_FAILED",
-      "Select this output format in the saved package first.");
-    if(!content.audiences.length || !content.headline.trim() || !content.message.trim())
-      throw new DomainError("VALIDATION_FAILED","Review the audience, headline and message before generating materials.");
-    const allText=[pkg.title,content.headline,content.message,content.callToAction].join(" ");
-    if(containsProtectedInstitutionalClaim(allText))
-      throw new DomainError("VALIDATION_FAILED",
-        "Remove unverified institutional, tuition or enrollment claims before creating materials.");
     const [publication]=await tx.select({status:sitePublications.status,slug:sitePublications.slug})
       .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
     const destination=publication?.status==="published"&&publication.slug
       ? "https://"+publicSiteHost(publication.slug):null;
-    if(data.format==="qr-card" && !destination)
+    if(content.formats.includes("qr-card")&&!destination)
       throw new DomainError("VALIDATION_FAILED",
-        "A printed QR card needs a durable approved public destination. A short-lived preview link is not suitable.");
-    const qrSvg=data.format==="qr-card" && destination
-      ? await QRCode.toString(destination,{type:"svg",margin:2,
-          color:{dark:brand.resolved.theme.ink,light:"#ffffff"}}):undefined;
-    const rendered=renderSiteMarketingArtifact({
-      format:data.format,brand:resolvedBrand,content,websiteUrl:destination,qrSvg,
-    });
-    const outputChecksum=createHash("sha256").update(rendered.body).digest("hex");
-    const assetManifest={
-      logo:resolvedBrand.logo?{id:resolvedBrand.logo.id,sha256:resolvedBrand.logo.checksum}:null,
-      hero:resolvedBrand.hero?{id:resolvedBrand.hero.id,sha256:resolvedBrand.hero.checksum}:null,
-    };
-    const outputManifest={mimeType:rendered.mimeType,extension:rendered.extension,
-      body:rendered.body,plainText:rendered.plainText??null,contentLength:Buffer.byteLength(rendered.body)};
-    const [release]=await tx.insert(siteArtifactReleases).values({
+        "QR cards require an authorized permanent public destination. Deselect QR card or publish the Site first.");
+
+    // Generate every output before any insert. Failure leaves no partial release.
+    const outputs=await Promise.all(content.formats.map(async format=>{
+      const qrSvg=format==="qr-card"&&destination
+        ? await QRCode.toString(destination,{type:"svg",margin:2,
+            color:{dark:resolvedBrand.theme.ink,light:"#ffffff"}}):undefined;
+      const rendered=renderSiteMarketingArtifact({
+        format,brand:resolvedBrand,content,websiteUrl:destination,qrSvg,
+      });
+      const logo=format!=="qr-card"&&resolvedBrand.logo
+        ? {id:resolvedBrand.logo.id,sha256:resolvedBrand.logo.checksum}:null;
+      return {
+        format,rendered,checksum:createHash("sha256").update(rendered.body).digest("hex"),
+        assetManifest:{logo,hero:null},
+        outputManifest:{mimeType:rendered.mimeType,extension:rendered.extension,
+          body:rendered.body,plainText:rendered.plainText??null,
+          contentLength:Buffer.byteLength(rendered.body)},
+      };
+    }));
+    const [previous]=await tx.select({number:siteMarketingPackageReleases.releaseNumber})
+      .from(siteMarketingPackageReleases)
+      .where(eq(siteMarketingPackageReleases.packageId,pkg.id))
+      .orderBy(desc(siteMarketingPackageReleases.releaseNumber)).limit(1);
+    const releaseNumber=(previous?.number??0)+1;
+    const [parent]=await tx.insert(siteMarketingPackageReleases).values({
       siteId:site.id,packageId:pkg.id,brandVersionId:brand.version.id,
-      sourcePackageRevision:pkg.revision,
-      artifactKind:data.format,templateId:rendered.templateId,
-      templateVersion:rendered.templateVersion,
-      contentSnapshot:{title:pkg.title,...content},assetManifest,outputManifest,
-      outputChecksum,createdByPersonId:actor.actorPersonId!,
-    }).returning({id:siteArtifactReleases.id});
-    if(!release)throw new DomainError("UNAVAILABLE","Unable to create immutable artifact.");
-    await writeAudit(tx,actor,{action:"site.marketing_artifact.generated",
+      sourcePackageRevision:pkg.revision,requestId:data.requestId,
+      releaseNumber,formats:[...content.formats],contentSnapshot:{title:pkg.title,...content},
+      createdByPersonId:actor.actorPersonId!,
+    }).returning({id:siteMarketingPackageReleases.id});
+    if(!parent)throw new DomainError("UNAVAILABLE","Could not create Package Release.");
+    await tx.insert(siteArtifactReleases).values(outputs.map(output=>({
+      siteId:site.id,packageId:pkg.id,packageReleaseId:parent.id,
+      brandVersionId:brand.version.id,sourcePackageRevision:pkg.revision,
+      artifactKind:output.format,templateId:output.rendered.templateId,
+      templateVersion:output.rendered.templateVersion,
+      contentSnapshot:{title:pkg.title,...content},
+      assetManifest:output.assetManifest,outputManifest:output.outputManifest,
+      outputChecksum:output.checksum,createdByPersonId:actor.actorPersonId!,
+    })));
+    await writeAudit(tx,actor,{action:"site.marketing_package.release",
       entityType:"site",entityId:site.id,
       scope:{siteId:site.id,organizationId:site.organizationId},
-      after:{releaseId:release.id,packageId:pkg.id,packageRevision:pkg.revision,
-        brandVersionId:brand.version.id,format:data.format,outputChecksum}});
-    return {id:release.id,format:rendered.format,
-      brandVersionId:brand.version.id,packageRevision:pkg.revision};
+      after:{packageId:pkg.id,releaseId:parent.id,releaseNumber,
+        packageRevision:pkg.revision,brandVersionId:brand.version.id,
+        formats:content.formats,outputChecksums:outputs.map(o=>o.checksum)}});
+    return {id:parent.id,releaseNumber,formats:[...content.formats],created:true};
   }));
+
+export const listSiteMarketingPackageReleases=createServerFn({method:"GET"})
+  .validator((value:unknown)=>scope.parse(value))
+  .handler(async ({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const {site}=await checkSite(data.siteId,false);
+    const parents=await db.select().from(siteMarketingPackageReleases)
+      .where(and(eq(siteMarketingPackageReleases.siteId,site.id),
+        eq(siteMarketingPackageReleases.packageId,data.packageId)))
+      .orderBy(desc(siteMarketingPackageReleases.releaseNumber)).limit(30);
+    if(!parents.length)return [];
+    const children=await db.select({
+      id:siteArtifactReleases.id,
+      packageReleaseId:siteArtifactReleases.packageReleaseId,
+      format:siteArtifactReleases.artifactKind,
+      templateVersion:siteArtifactReleases.templateVersion,
+      checksum:siteArtifactReleases.outputChecksum,
+      withdrawnAt:siteArtifactReleaseAccess.withdrawnAt,
+    }).from(siteArtifactReleases)
+      .leftJoin(siteArtifactReleaseAccess,eq(siteArtifactReleases.id,siteArtifactReleaseAccess.releaseId))
+      .where(and(eq(siteArtifactReleases.siteId,site.id),
+        inArray(siteArtifactReleases.packageReleaseId,parents.map(p=>p.id))));
+    return parents.map(parent=>{
+      const {title:releaseTitle,...snapshotContent}=parent.contentSnapshot;
+      const content=marketingPackageContentSchema.parse(snapshotContent);
+      const formats=z.array(z.enum(marketingFormatIds)).parse(parent.formats);
+      const outputs=formats.map(format=>children.find(child=>
+        child.packageReleaseId===parent.id&&child.format===format));
+      return {
+        id:parent.id,releaseNumber:parent.releaseNumber,
+        packageRevision:parent.sourcePackageRevision,
+        brandVersionId:parent.brandVersionId,
+        title:typeof releaseTitle==="string"?releaseTitle:"",
+        content,formats,
+        createdAt:parent.createdAt.toISOString(),
+        outputs:outputs.filter((o):o is NonNullable<typeof o>=>Boolean(o))
+          .map(o=>({id:o.id,format:z.enum(marketingFormatIds).parse(o.format),templateVersion:o.templateVersion,
+            checksum:o.checksum,
+            withdrawnAt:o.withdrawnAt?.toISOString()??null})),
+        complete:outputs.every(Boolean),
+      };
+    });
+  });
 
 export const listSiteMarketingReleases=createServerFn({method:"GET"})
   .validator((value:unknown)=>scope.parse(value))
@@ -151,6 +231,7 @@ export const listSiteMarketingReleases=createServerFn({method:"GET"})
     const {site}=await checkSite(data.siteId,false);
     const releases=await db.select({
       id:siteArtifactReleases.id,format:siteArtifactReleases.artifactKind,
+      packageReleaseId:siteArtifactReleases.packageReleaseId,
       brandVersionId:siteArtifactReleases.brandVersionId,
       packageRevision:siteArtifactReleases.sourcePackageRevision,
       createdAt:siteArtifactReleases.createdAt,
@@ -159,7 +240,8 @@ export const listSiteMarketingReleases=createServerFn({method:"GET"})
     }).from(siteArtifactReleases)
       .leftJoin(siteArtifactReleaseAccess,
         eq(siteArtifactReleases.id,siteArtifactReleaseAccess.releaseId))
-      .where(and(eq(siteArtifactReleases.siteId,site.id),eq(siteArtifactReleases.packageId,data.packageId)))
+      .where(and(eq(siteArtifactReleases.siteId,site.id),eq(siteArtifactReleases.packageId,data.packageId),
+        isNull(siteArtifactReleases.packageReleaseId)))
       .orderBy(desc(siteArtifactReleases.createdAt)).limit(40);
     return releases.map(item=>({...item,createdAt:item.createdAt.toISOString(),
       withdrawnAt:item.withdrawnAt?.toISOString()??null}));
