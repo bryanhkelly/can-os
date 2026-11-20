@@ -260,7 +260,7 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
       {excusesError && <QueryState error={excusesError.message}
         onRetry={excusesError.retryable ? () => void rosterQuery.refetch() : undefined}
         retrying={rosterQuery.isFetching} />}
-      {conflicts.length>0&&<div className="mt-4  border border-amber-500 p-3 text-sm">
+      {conflicts.length>0&&<div className="mt-4  border border-warning/40 p-3 text-sm">
         <strong>Attendance conflicts require review</strong>
         <p className="mt-1">A newer school record exists for {conflicts.length} offline
           {conflicts.length===1?" entry":" entries"}. Refresh attendance before deciding
@@ -344,7 +344,7 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
             <p className="mt-3  bg-muted p-3 text-sm">{excuse.reason}</p>
             <ExcuseAttachments attendanceEventId={excuse.attendanceEventId}
               attachments={excuse.attachments} disabled={busy !== ""} />
-            {!excuse.canReview && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-400">Attendance was subsequently corrected. This earlier excuse cannot change the current mark. A registrar can close it with a reason.</p>}
+            {!excuse.canReview && <p role="alert" className="mt-2 text-xs text-warning dark:text-warning">Attendance was subsequently corrected. This earlier excuse cannot change the current mark. A registrar can close it with a reason.</p>}
             {excuse.canClose && excuse.currentAttendanceEventId &&
               <ObsoleteExcuseClosure excuse={excuse} onSaved={() => load()} />}
             <Label className="mt-3 block text-sm font-semibold">

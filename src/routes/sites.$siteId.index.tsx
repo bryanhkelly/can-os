@@ -82,13 +82,13 @@ function SiteTodayPage() {
         ["Readiness", "/readiness"], ["Admissions", "/admissions"],
         ["People", "/profiles"], ["Ask CAN", "/ask"],
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/home","/launch/site","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
-        className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
+        className=" border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
         {data.canOpenOnsiteDay && <Link to="/home" search={{ siteId: data.site.id, date: data.localDate, view: "onsite" }}
         className="border px-3 py-1.5 hover:bg-muted">Onsite day</Link>}
     </nav>
     <section id="school-day-operating-decision" aria-label="School-day operating decision"
       role={decision.status==="opening_blocked"?"alert":"status"}
-      className="mt-6 rounded-xl border p-5">
+      className="mt-6  border p-5">
       <h2 className="font-semibold">Can this site receive students today?</h2>
       <p className="mt-2 font-semibold">{decision.title}</p>
       <p className="mt-2 text-sm">{decision.detail}</p>
@@ -131,13 +131,13 @@ function SiteTodayPage() {
       <StatCard label="Present records" value={data.attendance.count ? data.attendance.present : "—"} hint="Today’s recorded attendance observations"/>
       <StatCard label="Open actions" value={data.actions.length} hint="Scoped outstanding site actions"/>
     </div>
-    <section aria-label="Supervised school day" className="mt-8 rounded-2xl border bg-card p-5">
+    <section aria-label="Supervised school day" className="mt-8  border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-serif text-2xl">Supervised school day</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">One source-derived view of staff coverage, onsite attendance, family explanations, health and incident activity, and dismissal evidence. Learning activity is not physical attendance.</p>
         </div>
-        {data.canOpenOnsiteDay&&<Link to="/home" search={{ siteId: data.site.id, date: data.localDate, view: "onsite" }} className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted">Operate onsite day →</Link>}
+        {data.canOpenOnsiteDay&&<Link to="/home" search={{ siteId: data.site.id, date: data.localDate, view: "onsite" }} className=" border px-3 py-2 text-sm font-semibold hover:bg-muted">Operate onsite day →</Link>}
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -145,19 +145,19 @@ function SiteTodayPage() {
           ["Substitutions",data.schoolDay.staffing.substitutions,"Current adult differs from earlier duty evidence"],
           ["Emergency exceptions",data.schoolDay.exceptions.emergencyHolds+data.schoolDay.exceptions.openIncidents,"Active emergency holds and open incidents"],
           ["Dismissal follow-up",data.schoolDay.exceptions.uncollectedFollowUps,"Open uncollected-child actions"],
-        ].map(([label,value,note])=><div key={label} className="rounded-xl border p-4">
+        ].map(([label,value,note])=><div key={label} className=" border p-4">
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="mt-1 font-serif text-2xl">{value}</p>
           <p className="mt-1 text-xs text-muted-foreground">{note}</p>
         </div>)}
       </div>
-      {data.schoolDay.projectionTruncated&&<p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">Some source listings were capped. This is not a complete school-day review; resolve the source-data volume before attestation.</p>}
+      {data.schoolDay.projectionTruncated&&<p role="alert" className="mt-4  border border-destructive p-3 text-sm">Some source listings were capped. This is not a complete school-day review; resolve the source-data volume before attestation.</p>}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div id="staffing-exceptions" tabIndex={-1}>
           <h3 className="font-semibold">Staff coverage and check-in</h3>
           <p className="mt-1 text-xs text-muted-foreground">{data.schoolDay.staffing.unacknowledged} blocks awaiting duty response · {data.schoolDay.staffing.coverageExceptions} coverage exceptions · {data.schoolDay.staffing.witnessedBlocks} independently witnessed blocks</p>
           <div className="mt-3 space-y-2">
-            {staffingExceptions.slice(0,20).map(block=><article key={block.sectionId+":"+(block.periodId??"missing")} className="rounded-lg border p-3 text-sm">
+            {staffingExceptions.slice(0,20).map(block=><article key={block.sectionId+":"+(block.periodId??"missing")} className=" border p-3 text-sm">
               <p className="font-medium">{block.sectionTitle} · {block.periodLabel??"Schedule missing"}</p>
               <p className="mt-1 text-xs text-muted-foreground">{block.facilitatorName??"No verified facilitator"} · {block.dutyStatus.replaceAll("_"," ")}</p>
               <ul className="mt-2 list-inside list-disc text-xs">
@@ -167,14 +167,14 @@ function SiteTodayPage() {
                 {block.requiredAdultReports>0&&<li>{block.reportedAdultCount} of {block.requiredAdultReports} arrival reports; independent witness {block.witnessedBothAdults?"recorded":"not recorded"}.</li>}
               </ul>
             </article>)}
-            {!staffingExceptions.length&&<p className="rounded-lg border p-3 text-sm text-muted-foreground">No current staffing or check-in exceptions in the authorized plan.</p>}
+            {!staffingExceptions.length&&<p className=" border p-3 text-sm text-muted-foreground">No current staffing or check-in exceptions in the authorized plan.</p>}
           </div>
         </div>
         <div id="student-exceptions" tabIndex={-1}>
           <h3 className="font-semibold">Student attendance, exceptions and dismissal</h3>
           <p className="mt-1 text-xs text-muted-foreground">{data.schoolDay.exceptions.pendingGuardianExplanations} pending family explanations · {data.schoolDay.exceptions.healthVisits} health visits · {data.schoolDay.exceptions.sentHome} sent home · {data.schoolDay.exceptions.incidents} incidents</p>
           <div className="mt-3 space-y-2">
-            {studentExceptions.slice(0,30).map(student=><article key={student.programId+":"+student.studentProfileId} className="rounded-lg border p-3 text-sm">
+            {studentExceptions.slice(0,30).map(student=><article key={student.programId+":"+student.studentProfileId} className=" border p-3 text-sm">
               <div className="flex flex-wrap justify-between gap-2">
                 <p className="font-medium"><Link to="/staff/attendance" search={{programId:student.programId,date:data.localDate,student:student.studentProfileId}} className="underline">{student.studentName}</Link></p>
                 <span className="text-xs capitalize text-muted-foreground">{student.status.replaceAll("_"," ")}</span>
@@ -191,7 +191,7 @@ function SiteTodayPage() {
                 {student.uncollectedActionId&&<li><Link to="/home" search={{siteId:data.site.id,programId:undefined,action:student.uncollectedActionId}} className="underline">Review supervised uncollected-child follow-up →</Link></li>}
               </ul>
             </article>)}
-            {!studentExceptions.length&&<p className="rounded-lg border p-3 text-sm text-muted-foreground">No student attendance, explanation, health, incident or dismissal exceptions are currently linked.</p>}
+            {!studentExceptions.length&&<p className=" border p-3 text-sm text-muted-foreground">No student attendance, explanation, health, incident or dismissal exceptions are currently linked.</p>}
           </div>
         </div>
       </div>
@@ -202,25 +202,25 @@ function SiteTodayPage() {
         {ownedFollowUps.length>0&&        <SiteOwnedActionResolution actions={ownedFollowUps} timezone={data.site.timezone}/>}
         <h2 className="mt-8 font-serif text-2xl">Today's schedule</h2>
         <div className="mt-4 space-y-3">
-          {data.events.map(event => <article key={event.id} className="flex items-start gap-4 rounded-xl border bg-card p-4">
+          {data.events.map(event => <article key={event.id} className="flex items-start gap-4  border bg-card p-4">
             <p className="w-20 shrink-0 text-sm font-semibold">{localTime(event.startsAt)}</p>
             <div><h3 className="font-medium"><Link to="/calendar" search={{date:dateKeyInTimezone(event.startsAt,data.site.timezone),event:event.id}} className="hover:underline">{event.title}</Link></h3>
               <p className="text-xs capitalize text-muted-foreground">{event.type.replaceAll("_", " ")}</p></div>
           </article>)}
-          {!data.events.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">No scheduled site events recorded for today.</p>}
+          {!data.events.length && <p className=" border p-5 text-sm text-muted-foreground">No scheduled site events recorded for today.</p>}
         </div>
       </section>
       <aside>
         <h2 className="font-serif text-2xl">Programs</h2>
         <div className="mt-4 space-y-3">
-          {data.programs.map(program => <article key={program.id} className="rounded-xl border bg-card p-4">
+          {data.programs.map(program => <article key={program.id} className=" border bg-card p-4">
             <h3 className="font-semibold"><Link to="/launch/school/$programId" params={{programId:program.id}} search={{siteId:data.site.id,programId:undefined}} className="hover:underline">{program.name}</Link></h3>
             <p className="mt-2 text-xs text-muted-foreground">Grades {program.gradeRange.min}–{program.gradeRange.max} · {program.status.replaceAll("_", " ")}</p>
             <p className="mt-1 text-xs text-muted-foreground">{program.type.replaceAll("_", " ")}</p>
           </article>)}
-          {!data.programs.length && <p className="rounded-xl border p-4 text-sm text-muted-foreground">No programs visible in your scope.</p>}
+          {!data.programs.length && <p className=" border p-4 text-sm text-muted-foreground">No programs visible in your scope.</p>}
         </div>
-        <div className="mt-6 rounded-xl border bg-card p-4">
+        <div className="mt-6  border bg-card p-4">
           <h3 className="font-medium">Attendance overview</h3>
           <p className="mt-2 text-sm">Present: {data.attendance.present} · Absent: {data.attendance.absent} · Tardy: {data.attendance.tardy}</p>
           <p className="mt-2 text-xs text-muted-foreground">{data.attendance.note}. This is not a verified school-wide attendance rate.</p>

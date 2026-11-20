@@ -176,7 +176,7 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
       </div>
       <StatusBadge tone={trip.status === "approved" ? "info" : "neutral"}>Trip: {trip.status}</StatusBadge>
     </div>
-    {!trip.hasPublishedPermission && <p className="mt-3 text-sm text-amber-700">
+    {!trip.hasPublishedPermission && <p className="mt-3 text-sm text-warning">
       This older trip has no valid versioned permission statement. Invitations are unavailable.
     </p>}
     {trip.status === "proposed" &&
