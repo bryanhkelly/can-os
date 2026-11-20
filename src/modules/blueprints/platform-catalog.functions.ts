@@ -28,7 +28,7 @@ const auditResource = {
 /**
  * One account-wide CAN App Admin is the human authorization. No Site grant,
  * canonical reviewer persona or per-Organization PostgreSQL role is minted.
- * Publication still requires a different verified App Admin's review.
+ * Publication does not require a second human role or account.
  */
 async function currentPlatformActor(capability: "catalog.platform.manage" | "blueprint.template.manage"): Promise<PlatformContext> {
   const actor = await getIdentityContext(getRequest());
@@ -430,11 +430,12 @@ export const publishPlatformCatalogVersion = createServerFn({ method: "POST" })
       if (!draft || draft.lifecycle !== "draft") throw new Error("Draft is unavailable for publication.");
       const authorId = await versionAudit(tx, data.kind, data.versionId,
         "platform.catalog.version.created");
+      if (!authorId) throw new AuthorizationError("audited CAN planning draft author");
+      // Peer review is optional for planning-only definitions. App Admin alone
+      // may publish a Program reference or Solution recipe. This NEVER bypasses
+      // the distinct Course, institutional, safety or enrollment approvals.
       const reviewerId = await versionAudit(tx, data.kind, data.versionId,
         "platform.catalog.plan.approved");
-      if (!mayApprovePlatformVersion(authorId, reviewerId)) {
-        throw new AuthorizationError("independent documented planning review");
-      }
       const updated = data.kind === "program"
         ? await tx.update(blueprintReferenceItemVersions)
             .set({ lifecycle: "published", publishedAt: new Date() })
