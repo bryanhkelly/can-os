@@ -8,6 +8,14 @@ import {
 const source = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
 describe("Classroom Connect Phase 2 join and privacy", () => {
+  it("includes classroom browser acceptance in the guarded Playwright runner", () => {
+    const config = source("playwright.authenticated-routes.config.ts");
+    const pkg = JSON.parse(source("package.json")) as { scripts: Record<string, string> };
+    expect(pkg.scripts["test:classroom:browser"]).toContain("tests/e2e/classroom-connect.spec.ts");
+    expect(config).toContain('"classroom-connect.spec.ts"');
+    expect(config).toContain('CAN_TEST_DB_WRITES_ENABLED');
+    expect(config).toContain("requireLocalHttpUrl");
+  });
   it("encodes QR pairing codes only as disposable fragments", () => {
     const qr = classroomQrJoinUrl("https://can.example.org", "ABCDE-FGHJK");
     const uri = new URL(qr);
