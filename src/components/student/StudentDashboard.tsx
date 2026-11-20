@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, CalendarDays, Clock3, FileText, MessageCircle, Users } from "lucide-react";
 import { personShortName } from "@/domain/person-name";
@@ -8,22 +7,16 @@ import type { getMyStudentToday } from "@/modules/student-experience/student-tod
 import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { DashboardProgress, DashboardMediaTile } from "@/components/workspace/dashboard-widgets";
 import { StudentDashboardRail } from "./StudentDashboardRail";
+import { StudentUpcomingAssignments } from "./StudentUpcomingAssignments";
 import { formatCalendarDateTime } from "@/components/calendar/calendar-presentation";
-import { StatusBadge } from "@/components/workspace";
 import type { DashboardAssignment, StudentDashboardData } from "./student-dashboard-data";
 import { StudentAssignmentLink } from "./StudentAssignmentLink";
-import { Button } from "@/components/ui/button";
 import { DashboardHero, homeGreeting } from "@/components/workspace/dashboard-home";
 
 type Today = Awaited<ReturnType<typeof getMyStudentToday>>;
-const assignmentState = (item: DashboardAssignment) => item.status === "returned" ? "Revision requested"
-  : item.status === "submitted" ? "Submitted" : item.status === "graded" ? "Feedback available"
-  : item.timeliness === "missing" ? "Missing" : item.timeliness === "late" ? "Late"
-  : item.hasDraft ? "Draft" : "Not started";
 const textLink = "student-dashboard-link";
 
 export function StudentDashboard({ liveData, data }: { liveData: Today; data?: StudentDashboardData }) {
-  const [filter, setFilter] = useState<"all" | "due" | "progress">("all");
   const timezone = liveData.sections[0]?.timezone ?? liveData.events[0]?.timezone ?? "UTC";
   const at = new Date(liveData.generatedAt);
   const localDate = dateKeyInTimezone(at, timezone);
@@ -38,10 +31,6 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
     }));
   const assignmentsError = data && !data.assignments.ok ? data.assignments.message : null;
   const plan = deriveStudentSuccessPriorities(assignments, at, 25);
-  const dueIds = new Set(assignments.filter(item => {
-    const priority = deriveStudentSuccessPriorities([item], at);
-    return priority.dueSoon > 0 || priority.overdue > 0;
-  }).map(item => item.assessmentId));
   const nextWork = plan.steps.find(item => item.canEdit && ["revision","overdue","due_soon","to_do"].includes(item.kind));
   const learning = data?.learning.ok ? data.learning.data : null;
   const grades = data?.grades.ok ? data.grades.data : [];
@@ -50,8 +39,6 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   const scheduled = events.filter(event => !event.cancelled);
   const todayEvents = events.filter(event => dateKeyInTimezone(event.startsAt, timezone) === localDate);
   const classesToday = scheduled.filter(event => Boolean(event.sectionId) && dateKeyInTimezone(event.startsAt, timezone) === localDate);
-  const visible = assignments.filter(item => filter === "all" ||
-    (filter === "due" ? dueIds.has(item.assessmentId) : item.hasDraft && (item.status === "assigned" || item.status === null)));
   const format = (stamp: Date | string, zone = timezone) => formatCalendarDateTime(stamp,zone);
   const upcomingEvents = community?.events.filter(event => event.status !== "cancelled" && new Date(event.startsAt) >= at)
     .sort((a,b) => Date.parse(a.startsAt) - Date.parse(b.startsAt)) ?? [];
@@ -123,26 +110,9 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
         </DashboardPanel>
       </div>
       <div className="student-feature-grid student-feature-lower">
-        <DashboardPanel id="student-assignments" title="Upcoming Assignments"
-          action={<Link to="/student/assignments" className={textLink}>View all →</Link>}>
-          <div className="student-assignment-filters" role="group" aria-label="Filter dashboard assignments">
-            {(["all","due","progress"] as const).map(value => <Button key={value} type="button" size="sm" variant={filter === value ? "secondary" : "outline"} aria-pressed={filter === value}
-              onClick={() => setFilter(value)}>{value === "all" ? "All" : value === "due" ? "Due soon" : "In progress"}</Button>)}
-          </div>
-          {assignmentsError ? <p role="alert" className="p-3 text-xs">{assignmentsError} <Link to="/student/assignments" className="underline">Open assignments to retry.</Link></p>
-            : <div>{visible.slice(0,5).map(item => <StudentAssignmentLink key={item.assessmentId} assessmentId={item.assessmentId}
-              sectionId={item.sectionId} className="student-assignment-row">
-              <FileText aria-hidden="true" className="size-4 text-muted-foreground" />
-              <span className="min-w-0"><b className="block text-xs font-semibold">{item.title}</b><small className="text-muted-foreground">{item.course}</small></span>
-              <span className="text-3xs text-muted-foreground">{item.dueAt ? `Due ${format(item.dueAt,liveData.sections.find(section => section.sectionId === item.sectionId)?.timezone ?? timezone)}` : "No due date"}</span>
-              <StatusBadge tone={item.timeliness === "missing" || item.status === "returned" || item.timeliness === "late" ? "attention" : "neutral"}>{assignmentState(item)}</StatusBadge>
-              <strong className="text-xs text-primary">{item.canEdit ? "Continue →" : "View →"}</strong>
-            </StudentAssignmentLink>)}
-            {!visible.length && <p role="status" className="p-3 text-xs text-muted-foreground">{assignments.length
-              ? "No assignments match this filter." : "No published coursework in your current classes."}</p>}
-            {visible.length > 5 && <p className="p-3 text-xs text-muted-foreground">Showing 5 of {visible.length}. Open all assignments for the complete list.</p>}
-          </div>}
-        </DashboardPanel>
+        <StudentUpcomingAssignments assignments={assignments}
+          error={assignmentsError} at={at} timezone={timezone}
+          sections={liveData.sections} />rdPanel>
         <DashboardPanel id="student-grades" title="My Grades"
           action={<Link to="/student/report-card" className={textLink}>View all →</Link>}>
           {data && !data.grades.ok ? <p role="alert" className="text-xs">Released grades could not be loaded. <Link to="/student/report-card" className="underline">Open report card to retry.</Link></p>
