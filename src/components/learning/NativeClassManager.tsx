@@ -4,6 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
 import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
+import { NativeApprovedOfferingsPanel } from "@/components/learning/NativeApprovedOfferingsPanel";
 import { ClassOfferingTermsFields, initialClassOfferingTermsForm, type ClassOfferingTermsForm } from "@/components/learning/ClassOfferingTermsFields";
 import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
 import { nativeClassOperatorQueryKeys } from "@/domain/native-class-operator-query-keys";
@@ -329,70 +330,15 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         filtered:Boolean(search),
       }}/>
     </div>
-    <section className="mt-5 border border-border bg-card p-5" aria-label="Approved Offering hierarchy">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="font-serif text-2xl">Programs, Courses and local Classes</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Published publisher products are adopted once per authorized Deployment.
-            Each Course retains its published version; local Classes configure delivery without rewriting content.
-            Standalone Courses do not require a Program or network membership.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-4 text-sm font-semibold">
-          <Link to="/canonical/blueprints" className="underline">Approved Blueprints</Link>
-          <Link to="/canonical/lab/deployments" className="underline">Deployments and adoptions</Link>
-          <Link to="/class" search={{view:"activities"}} className="underline">Learning activities</Link>
-        </div>
-      </div>
-      {options.isSuccess&&offeringGroups.length===0&&<p className="mt-4 text-sm text-muted-foreground">
-        {search
-          ?"No matching approved Courses are visible for this search. Clear the search to inspect the current operator catalog."
-          :"No approved published Course adoption is visible for the current operator scope. Publisher approval and local adoption are separate."}
-      </p>}
-      <form className="mt-4 flex flex-wrap items-end gap-2" onSubmit={event=>{
-        event.preventDefault();setSearch(searchDraft.trim());setChoice("");
-      }}>
-        <Label className="min-w-[15rem] flex-1 text-sm font-semibold" htmlFor="authorized-course-search">
-          Find approved Programs or Courses
-          <Input id="authorized-course-search" value={searchDraft}
-            onChange={event=>setSearchDraft(event.target.value)} maxLength={100}
-            placeholder="Course name, code, Program or Deployment"
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-        </Label>
-        <Button type="submit" variant="outline">Search</Button>
-        {search&&<Button type="button" variant="outline"
-          onClick={()=>{setSearch("");setSearchDraft("");setChoice("");}}>Clear</Button>}
-      </form>
-      <p className="mt-2 text-xs text-muted-foreground">Authorized Course results are paginated. Program component counts reflect the loaded page, not the full Offering.</p>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {offeringGroups.map(group=><article key={group.id} className="border border-border p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {group.first.offeringKind==="program"?"Program Offering":group.first.offeringKind==="course"?"Course Offering":"Published Offering"} · v{group.first.offeringVersionNo}
-          </p>
-          <h3 className="mt-1 text-base font-semibold">{group.first.offeringTitle}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {group.components.length} loaded Course component(s) · {group.first.deploymentName} · Publisher content is read-only
-          </p>
-          <ul className="mt-3 space-y-2">
-            {group.components.map(row=><li key={row.courseVersionId} className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-2 text-sm">
-              <div>
-                <p className="font-semibold">{row.courseTitle} · v{row.courseVersionNo}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {row.isRequired?"Required":"Optional"} · {row.siteOptions.length} authorized delivery Site(s)
-                </p>
-                {(classes.data??[]).filter(item=>item.deploymentId===row.deploymentId&&
-                  item.courseVersionId===row.courseVersionId&&
-                  item.offeringVersionId===row.offeringVersionId).map(cls=>
-                    <Link key={cls.classId} to="/class/$classId"
-                      params={{classId:cls.classId}} search={{view:"manage",tab:"sessions"}}
-                      className="mt-2 block text-xs font-semibold underline">
-                      {cls.title} · {cls.state} · Sessions
-                    </Link>)}
-              </div>
-              <Button type="button" size="sm" variant="outline"
-                onClick={()=>{
-                  setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
+    <NativeApprovedOfferingsPanel
+      groups={offeringGroups} classes={classes.data??[]}
+      search={search} searchDraft={searchDraft}
+      loaded={options.isSuccess} hasNextPage={options.hasNextPage}
+      loadingMore={options.isFetchingNextPage}
+      onSearchDraftChange={setSearchDraft}
+      onSearch={value=>{setSearch(value);setChoice("");}}
+      onClear={()=>{setSearch("");setSearchDraft("");setChoice("");}}
+      onConfigureCourse={row=>{                  setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
                   setChoice(optionKey(row));setTitle(row.courseTitle);
                   setClassCapacity(row.localClassPolicy.maxClassCapacity===null
                     ?"":String(row.localClassPolicy.maxClassCapacity));
@@ -401,17 +347,9 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                   setDeliveryMode(mode);
                   setSiteId(selectAuthorizedClassSite(row.siteOptions,preferredSiteId,mode));
                   setNotice("Approved Course selected. Review local delivery configuration before creating a Class.");
-                }}>Configure Class</Button>
-            </li>)}
-          </ul>
-        </article>)}
-      </div>
-      {options.hasNextPage&&<Button type="button" variant="outline"
-        disabled={options.isFetchingNextPage} className="mt-4"
-        onClick={()=>void options.fetchNextPage()}>
-        {options.isFetchingNextPage?"Loading…":"Load more authorized Courses"}
-      </Button>}
-    </section>
+                
+      }}
+      onLoadMore={()=>options.fetchNextPage()} />
     <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,.8fr)]">
       <section className="border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">Create Class</h2>
