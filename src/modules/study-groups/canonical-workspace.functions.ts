@@ -7,6 +7,8 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { accessibleClasses } from "@/modules/learning/class-access.server";
+import { canonicalClasses, canonicalClassEnrollments, canonicalClassStaffAssignments } from "@/db/canonical-v301";
+import { canonicalGroupClassId } from "./canonical-membership.server";
 
 /** Deployment feature flags for the study-group pages. */
 export const getStudyGroupAvailability = createServerFn({ method: "GET" }).handler(async () => ({
@@ -39,7 +41,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
   };
   const groups = await db.select({
     id: s.studyGroups.id, siteId: s.studyGroups.siteId, programId: s.studyGroups.programId,
-    sectionId: s.studyGroups.sectionId, facilitatorPersonId: s.studyGroups.facilitatorPersonId,
+    sectionId: s.studyGroups.sectionId, metadata:s.studyGroups.metadata, facilitatorPersonId: s.studyGroups.facilitatorPersonId,
     title: s.studyGroups.title, description: s.studyGroups.description,
     kind: s.studyGroups.kind,
     maxMembers: s.studyGroups.maxMembers,
@@ -85,15 +87,47 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
       eq(s.enrollments.status, "active"), eq(s.enrollments.kind, "program"),
       inArray(s.programs.siteId, sites), inArray(s.programs.id, programs))) : [];
   const studentSectionIds = new Set(sectionIds);
-  const allowed = groups.filter(g => actor.role === "teacher"
-    ? g.facilitatorPersonId === actor.actorPersonId &&
-      (g.sectionId
-        ? teaching.some(section => section.id === g.sectionId &&
-          section.siteId === g.siteId && section.programId === g.programId)
-        : sites.includes(g.siteId!) && (!g.programId || programs.includes(g.programId)))
-    : studentPrograms.some(p => p.siteId === g.siteId &&
-      (!g.programId || p.programId === g.programId)) &&
-      (!g.sectionId || studentSectionIds.has(g.sectionId)));
+  const linkedClassIds=[...new Set(groups.flatMap(g=>{
+    const id=canonicalGroupClassId(g);
+    return id?[id]:[];
+  }))];
+  const nativeEligible=linkedClassIds.length
+    ? actor.role==="student"
+      ? await db.select({classId:canonicalClasses.id})
+          .from(canonicalClassEnrollments)
+          .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
+          .innerJoin(s.sites,eq(s.sites.id,canonicalClasses.siteId))
+          .where(and(inArray(canonicalClasses.id,linkedClassIds),
+            eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
+            eq(canonicalClassEnrollments.status,"active"),
+            eq(canonicalClasses.state,"active"),
+            eq(canonicalClasses.operatingOrganizationId,s.sites.organizationId)))
+      : await db.select({classId:canonicalClasses.id})
+          .from(canonicalClassStaffAssignments)
+          .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassStaffAssignments.classId))
+          .innerJoin(s.sites,eq(s.sites.id,canonicalClasses.siteId))
+          .where(and(inArray(canonicalClasses.id,linkedClassIds),
+            eq(canonicalClassStaffAssignments.personId,actor.actorPersonId),
+            eq(canonicalClassStaffAssignments.roleCode,"teacher"),
+            eq(canonicalClassStaffAssignments.state,"approved"),
+            eq(canonicalClasses.state,"active"),
+            eq(canonicalClasses.operatingOrganizationId,s.sites.organizationId)))
+    :[];
+  const permittedNativeClasses=new Set(nativeEligible.map(row=>row.classId));
+  const allowed = groups.filter(g=>{
+    const nativeClassId=canonicalGroupClassId(g);
+    if(nativeClassId)return permittedNativeClasses.has(nativeClassId) &&
+      (actor.role==="student"||g.facilitatorPersonId===actor.actorPersonId);
+    return actor.role==="teacher"
+      ? g.facilitatorPersonId===actor.actorPersonId &&
+        (g.sectionId
+          ? teaching.some(section=>section.id===g.sectionId &&
+              section.siteId===g.siteId&&section.programId===g.programId)
+          : sites.includes(g.siteId!)&&(!g.programId||programs.includes(g.programId)))
+      : studentPrograms.some(p=>p.siteId===g.siteId&&
+          (!g.programId||p.programId===g.programId)) &&
+          (!g.sectionId||studentSectionIds.has(g.sectionId));
+  });
   if (!allowed.length) return {
     role: actor.role, groups: [], sections: teaching, hasEnrollmentGuardian,
   };
