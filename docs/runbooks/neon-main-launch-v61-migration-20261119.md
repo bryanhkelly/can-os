@@ -36,3 +36,19 @@ A read-only run of `database/canonical/v3.0.1/check-launch-prepare-readiness.sql
 5. Run authenticated end-to-end Phase 1 and Phase 2 acceptance, including failed authorization attempts and build/test verification.
 
 No full migration, deployment, content publication, enrollment activation, partner approval, or successful CI run is claimed.
+
+
+## Follow-up: independently verified and applied fixes
+
+The following was subsequently applied to Neon `main`:
+
+1. Added `sites_canonical_catalog_operator_read` on `public.sites`. The transaction verified forced Site RLS, the existing restrictive `sites_no_direct_client_access` policy, the current exact-Site operator relation and the privileged-purpose binding function. Existing direct anonymous/authenticated denial was preserved; with no active catalog or Blueprint purpose bindings, the policy grants no presently usable new operator path. A future security test must prove both allowed and denied operator cases after scoped roles are installed.
+2. Populated `public.geographic_areas` with a parent `US` country record and 56 canonical first-level areas (50 states, District of Columbia, five territories). The seed derives only exact `US-XX` rows from `public.jurisdictions`, requiring their `region_code` to match, and intentionally excludes seven synthetic/test jurisdictions. The seed is additive and idempotent: `database/seeds/2026-11-canonical-us-geography.sql`. **No Site was classified and no jurisdictional or educational authorization was inferred.**
+
+**Read-only status after these commits:** 6 of 9 `check-launch-prepare-readiness.sql` checks are now ready. Remaining three blockers are restricted `program_catalog` PostgreSQL role provisioning, restricted `blueprint_author` PostgreSQL role provisioning, and an independently classified, active/planning Site with verified geography. Neither purpose-specific role nor its Organization binding was created.
+
+**Full transaction rehearsal only:** Using the pinned feature-branch SHA `3fb0a27346ebe8df77b73ad7089d1d6f74bff8cd`, all actual SQL statements from Drizzle 0089, 0090, 0091 and 0092 were run in a single Neon `main` transaction under a savepoint, then rolled back to that savepoint. The transaction returned `rollback_verified=true` and left `public.site_brand_versions` absent. This proves SQL execution against the then-current schema, **not** committed migration, app build, runtime acceptance, snapshot readiness or safe future rollback after commit. The Drizzle migration journal was not changed.
+
+**Capacity remains constrained:** The free Neon project has 10 of 10 branches and one existing old snapshot. Requests for a new validation branch and a fresh snapshot returned limits exceeded. Do not delete or overwrite recovery branches or snapshots without a deliberate retention approval.
+
+**Caution:** The manual scoped Site policy is now present; the operator-run `provision-public-site-catalog-rls.sql` intentionally fails if re-executed against an existing policy. Review the installed policy rather than attempting to apply the creation script a second time.
