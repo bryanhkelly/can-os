@@ -32,6 +32,13 @@ BEGIN
     v_alex,'2026-11-09T10:00:00Z')
   ON CONFLICT (id) DO NOTHING;
 
+  INSERT INTO public.scheduled_occurrences
+    (id,starts_at,ends_at,timezone,organization_id,site_id,program_id,created_by_person_id)
+  VALUES(md5('valor-v61:calendar:occurrence:family')::uuid,
+    '2026-11-10T18:00:00Z','2026-11-10T19:00:00Z',
+    'America/Los_Angeles',v_org,v_site,v_program,v_alex)
+  ON CONFLICT(id) DO NOTHING;
+
   INSERT INTO public.calendar_events
     (id,type,title,description,starts_at,ends_at,timezone,
      organization_id,site_id,program_id,source_type,source_id,
