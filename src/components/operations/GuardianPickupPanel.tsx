@@ -78,7 +78,16 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   useEffect(() => {
     activeStudentPersonId.current = studentPersonId;
     setNotice("");
-    // Different guardian / child selection must not inherit a pending request.
+    // Child-specific identity and custody drafts must never follow a guardian
+    // into another child's release-authority workspace.
+    setFirstNames({});
+    setLastNames({});
+    setRelationships({});
+    setMethods({});
+    setStartDates({});
+    setExpiryDates({});
+    setRevocationReasons({});
+    setHoldReasons({});
     pendingMutationIds.current.clear();
     void load();
     return () => { requestSequence.current++; };
