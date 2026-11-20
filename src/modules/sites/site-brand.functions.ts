@@ -1,3 +1,4 @@
+import type { PartnerLocalContentTx } from "./site-local-content.server";
 import { readSitePreviewShares } from "@/domain/site-preview-sharing";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { createHash } from "node:crypto";
@@ -104,12 +105,16 @@ const mutationSchema=z.object({
   heroImage:assetInputSchema.nullable().optional(),
 }).strict();
 
-export const saveSiteBrandVersion=createServerFn({method:"POST"})
-  .validator((value:unknown)=>mutationSchema.parse(value))
-  .handler(async ({data})=>{
-    setResponseHeader("Cache-Control","private, no-store");
-    const actor=await getCommandContext(getRequest());
-    return db.transaction(async tx=>{
+export type SiteBrandSaveInput=z.infer<typeof mutationSchema>;
+
+/** Transactional Brand save. Copy/editor workflows acquire the Site publication
+ * row first, then call this shared function in the same database transaction.
+ */
+export async function saveSiteBrandVersionWithinTransaction(
+  actor:Awaited<ReturnType<typeof getCommandContext>>,
+  data:SiteBrandSaveInput,
+  tx:PartnerLocalContentTx,
+){
       const authorized=await authorizeReader(actor,data.siteId,true,tx);
       const [site]=await tx.select({id:sites.id,currentBrandVersionId:sites.currentBrandVersionId})
         .from(sites).where(eq(sites.id,data.siteId)).for("update").limit(1);
@@ -182,7 +187,15 @@ export const saveSiteBrandVersion=createServerFn({method:"POST"})
         after:{brandVersionId:saved.id,revision:nextRevision,fingerprint},
       });
       return {changed:true,brandVersionId:saved.id,revision:nextRevision,configuration:config};
-    });
+
+}
+
+export const saveSiteBrandVersion=createServerFn({method:"POST"})
+  .validator((value:unknown)=>mutationSchema.parse(value))
+  .handler(async ({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(tx=>saveSiteBrandVersionWithinTransaction(actor,data,tx));
   });
 
 /** Revocation does not rewrite historical Brand versions, but blocks future
