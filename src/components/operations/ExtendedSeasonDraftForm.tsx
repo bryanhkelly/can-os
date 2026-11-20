@@ -76,7 +76,7 @@ export function ExtendedSeasonDraftForm({
           <Input type="date" min={startsOn||undefined} value={endsOn} onChange={e => onChange({endsOn:e.target.value})} />
         </Field>
         <div className="sm:col-span-2">
-          <Button variant="outline" type="submit" disabled={busy} className=" border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          <Button variant="outline" type="submit" disabled={busy} >
             {busy ? "Saving…" : "Save draft season"}
           </Button>
           {!selectable.length && <p className="mt-2 text-xs text-muted-foreground">Create a hosted noncredit summer or after-school Program above first.</p>}
