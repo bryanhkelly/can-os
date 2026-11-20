@@ -148,6 +148,10 @@ it("never presents an out-of-order pickup roster from a previous school date", a
   const current = renderDate("2030-01-02").elements;
   expect(current.some(element => element.props["aria-label"] === "Pickup for Next Date Student")).toBe(true);
   expect(current.some(element => element.props["aria-label"] === "Pickup for Previous Date Student")).toBe(false);
+  // A prop change must hide the previously verified roster immediately,
+  // without waiting for the date-change effect or another network round-trip.
+  expect(renderDate("2030-01-03").elements.some(element =>
+    element.props["aria-label"] === "Pickup for Next Date Student")).toBe(false);
 });
 
 it("never presents an out-of-order guardian workspace after switching children", async () => {
@@ -188,4 +192,8 @@ it("never presents an out-of-order guardian workspace after switching children",
     element.props["aria-label"] === "Pickup authority for Current Child")).toBe(true);
   expect(elements.some(element =>
     element.props["aria-label"] === "Pickup authority for Previous Child")).toBe(false);
+  // Child-selection changes must not display another child's family authority
+  // for even a single render before React's effects run.
+  expect(renderChild("child-third").elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Current Child")).toBe(false);
 });
