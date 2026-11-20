@@ -42,7 +42,7 @@ export function WebsiteTemplateSourceGuide({
 }: {template:SiteTemplateId;page:PublicSitePath}) {
   const notes=websiteTemplatePresentationNotes[template];
   const sections=websiteTemplatePageSources(template,page);
-  return <section aria-label="Website section and data source guide"
+  return <section id="website-template-section-sources" aria-label="Website section and data source guide"
     className="mt-5 min-w-0 space-y-4 border border-border bg-card p-4">
     <div>
       <h4 className="text-sm font-semibold">Section guide: content and sources</h4>
