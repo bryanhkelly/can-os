@@ -8,6 +8,7 @@ import { LaunchModuleDestinationV61, launchModuleDestinationsV61 } from "@/compo
 import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, replaceVisibleOfferingIntents, resolveSavedSolutionPlan, resolveVisibleSolutionRecipe, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
+  useBlocker: () => ({ status: "idle", proceed: () => undefined, reset: () => undefined }),
   Link: ({ children, to, search, ...props }: {
     children: ReactNode; to: string; search?: Record<string, string | undefined>;
     "aria-current"?: "page" | "step";
