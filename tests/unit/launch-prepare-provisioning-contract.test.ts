@@ -40,6 +40,23 @@ describe("Prepare catalog and Blueprint role provisioning", () => {
     expect(sql).not.toContain("FROM education_v30.organizations");
   });
 
+  it("keeps CAN-published Blueprint definitions separate from Site-owned plans", () => {
+    const sql = read("provision-blueprint-roles.sql");
+    const authorInsert = sql.slice(
+      sql.indexOf("-- Site authoring requires current, verified operator authority."),
+      sql.indexOf("-- Reviewer can see verification"),
+    );
+    expect(authorInsert).toContain("'blueprint_configurations','blueprint_configuration_versions'");
+    expect(authorInsert).not.toContain("'blueprints','blueprint_versions'");
+    expect(authorInsert).not.toContain("GRANT INSERT ON public.blueprints");
+    expect(authorInsert).not.toContain("GRANT UPDATE ON public.blueprint_versions");
+    // CAN app administration is separately provisioned. Operator planning
+    // cannot be used as a proxy for the global app-admin role.
+    const platform = readFileSync(new URL("../../src/modules/identity/platform-admin.functions.ts", import.meta.url), "utf8");
+    expect(platform).toContain('assertCapability(actor, "platform.admin")');
+    expect(platform).toContain('actor.role !== "app_admin"');
+  });
+
   it("requires a Site-specific, currently effective operator and purpose binding", () => {
     const sql = read("provision-public-site-catalog-rls.sql");
     expect(sql).toContain("CREATE POLICY sites_canonical_catalog_operator_read");
