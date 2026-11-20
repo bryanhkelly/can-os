@@ -125,6 +125,20 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
         actor.role === "room_facilitator") {
       return resolveCanonicalSiteStaffFromCan(actor, request);
     }
+    // CAN school students already have one directly authenticated Person and
+    // exact Site grant. Native Class participation uses that same identity,
+    // never a second adult-only credential or the demo-admin persona switch.
+    // Course Attempt and Class Enrollment authorizers still verify the exact
+    // Person, Site, Course and active participation on each request.
+    if (actor.role === "student") {
+      if (!actor.actorPersonId || actor.sessionAccountId ||
+          !actor.grantSiteId || actor.scope.siteIds?.length !== 1 ||
+          actor.scope.organizationIds?.length !== 1 ||
+          !actor.capabilities.has("student:read")) {
+        throw new AuthorizationError("current direct CAN student Site membership");
+      }
+      return actor;
+    }
     if (!actor.actorPersonId || actor.sessionAccountId) {
       throw new AuthorizationError("authorized canonical identity for active CAN account");
     }
