@@ -152,7 +152,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
         </Button>
       </div>
       <CanonicalBlueprintWorkspace key={siteId + ":" + configuringVersionId}
-        siteId={siteId} initialBlueprintVersionId={configuringVersionId} embedded />
+        siteId={siteId} initialBlueprintVersionId={configuringVersionId} embedded enableReferences />
     </>}
     <details className="mt-6 border-t pt-5">
       <summary className="cursor-pointer text-sm font-semibold">
