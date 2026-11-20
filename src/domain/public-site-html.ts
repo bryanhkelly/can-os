@@ -1103,7 +1103,7 @@ ${composePublicSiteChrome(templateId, {
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="${experienceCopy.navLabel}">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
   main: `<main id="main-content">\n  ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
-  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
+  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy${options?.localPreview ? "" : " · "+host}</span></footer>`,
 })}
 </body>
 </html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {
