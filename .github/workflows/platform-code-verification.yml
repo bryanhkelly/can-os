@@ -3,6 +3,8 @@ name: CAN OS V6.1 Source and Build Verification
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,12 +25,16 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Parse all runtime and build source before bundling
+        run: npm run check:build-source-syntax
       - name: Generate TanStack route types and build application
         run: npm run build
+      - name: Verify the production Cloudflare build target
+        run: npm run build:cloudflare
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests
@@ -63,7 +69,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Install locked dependencies
         run: npm ci

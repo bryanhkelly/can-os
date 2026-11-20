@@ -73,7 +73,7 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
           Create follow-up Action
         </Button>
         <Button type="button" variant="ghost" onClick={() => setExpanded(false)} disabled={busy}>Cancel</Button>
-      </ActionFooter>
+      </ActionFooter>}
       {notice && <WorkspaceNotice tone={created ? "success" : "danger"}>{notice}</WorkspaceNotice>}
       {actionId && <Link to="/actions/$actionId" params={{ actionId }} className="font-semibold underline">Open follow-up Action</Link>}
     </form>}

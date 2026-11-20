@@ -226,7 +226,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
               })}
             </div>
             {intent.startingFocus && <p className="mt-3 text-sm">Starting focus: <strong>{intentTitles[intent.startingFocus]}</strong></p>}
-          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You have not saved any learning interests. You can explore the catalog now and add your vision later.</p>
+          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You have not saved any learning interests. You can explore the catalog now and add your vision later.</p>}
           <Link to="/launch/site" search={{siteId, module:"programs-audiences"}}
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary underline">
             Review Programs &amp; Audiences <ArrowRight aria-hidden="true" className="size-4" />
