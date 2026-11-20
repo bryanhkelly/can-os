@@ -114,7 +114,7 @@ export function LegacySectionClassPage({outcome, search}:{
       </Link>
       {roster && <WorkspacePanel title={roster.section.title}
         description={`${roster.section.code} · ${roster.students.length} actively enrolled students`}>
-        <Link to="/classes" search={{}} className="text-sm underline">Back to all classes</Link>
+        <Link to="/class" search={{}} className="text-sm underline">Back to all classes</Link>
         <RosterList rows={roster.students} rowKey={student => student.personId}
           primary={student => <Link to="/staff/students/$personId" params={{personId:student.personId}}
             className="font-semibold underline">{student.name}</Link>}
@@ -123,7 +123,7 @@ export function LegacySectionClassPage({outcome, search}:{
       {!roster && <div className="mt-7 grid gap-4 md:grid-cols-2">
         {directory.classes.map(section => <WorkspacePanel key={section.id} title={section.title}
           description={section.code}>
-          <Link to="/classes" search={{section:section.id}} className="text-sm font-semibold underline">
+          <Link to="/class" search={{section:section.id}} className="text-sm font-semibold underline">
             View class roster
           </Link>
         </WorkspacePanel>)}
@@ -321,7 +321,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       className="inline-flex justify-center border bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
       {nextWork.status === "returned" ? "Review revision request" : "Open assignment"} →
     </Link> : nextSteps.nextLessonId && data.role !== "teacher" ?
-    <Link to="/classes" search={{...search,tab:"lessons",lesson:nextSteps.nextLessonId}}
+    <Link to="/class" search={{...search,tab:"lessons",lesson:nextSteps.nextLessonId}}
       className="inline-flex justify-center border bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Continue lesson →</Link> : classwork;
   const stepTitle = data.role === "student" && nextWork ? nextWork.title : "Review your classwork";
   const stepDetail = data.role === "student" && nextWork ?
@@ -335,7 +335,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     lessonPosition={tab === "lessons" && lesson ? {current:lessonIndex+1,total:lessons.length} : undefined}
     subtitle={tab === "lessons" && lesson ? `Lesson ${lessonIndex+1} of ${lessons.length} · ${data.section.code} · ${data.section.subject}` :
       `${data.section.code} · ${data.section.subject}`}
-    actions={<Link to="/classes" search={{...search,tab:"lessons"}} hash="published-lesson-outline"
+    actions={<Link to="/class" search={{...search,tab:"lessons"}} hash="published-lesson-outline"
       className="inline-flex items-center border bg-card px-3 py-2 text-xs font-semibold">All lessons</Link>}
     metadata={<>
       <span><strong>Teacher</strong> · {data.teachers.length ? data.teachers.map((teacher, index) => <span key={teacher.personId}>
@@ -372,14 +372,14 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       </WorkspacePanel>
     </>}>
     <DetailNavigation label="Class sections">{tabs.filter(value => !["people","teacher-guide","planning"].includes(value) || data.role === "teacher").map(value =>
-      <SectionTab key={value} current={tab === value} className="capitalize" link={{ to: "/classes", search: { ...search, tab: value } }}>{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</SectionTab>)}</DetailNavigation>
+      <SectionTab key={value} current={tab === value} className="capitalize" link={{ to: "/class", search: { ...search, tab: value } }}>{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</SectionTab>)}</DetailNavigation>
     <MutationFeedback state={mutation} className="mb-5" pendingMessage="Saving class change..."/>
     {downloadError && <p role="alert" className="mb-5 text-sm text-destructive">{downloadError}</p>}
     {tab === "overview" && <div className="grid grid-cols-1 gap-5">
       <ClassroomMediaStage sectionId={data.section.id} timezone={data.section.timezone} role={data.role} meetings={meetings} studentPersonId={search.student} commands={meetingCommands}
         recorded={<section><h2 className="font-serif text-2xl font-semibold">About this class</h2>
           <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p>
-          {lessons.length > 0 && <p className="mt-4"><Link to="/classes" search={{ ...search, tab: "lessons", lesson: nextSteps.nextLessonId ?? lessons[0]!.id }}
+          {lessons.length > 0 && <p className="mt-4"><Link to="/class" search={{ ...search, tab: "lessons", lesson: nextSteps.nextLessonId ?? lessons[0]!.id }}
             className="text-sm font-semibold underline">Open published lesson</Link></p>}
         </section>}/>
       <ClassLearningProgress search={search} isTeacher={data.role==="teacher"}
@@ -449,7 +449,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
         <div className="mt-5"><PublishedLessonNavigation search={search} lessonIndex={lessonIndex} lessonCount={lessons.length} completedCount={completed.size} isStudent={data.role==="student"} previousLesson={previousLesson} nextLesson={nextLesson}/></div>
       </div> : data.content?.modules.filter(module=>module.lessons.some(isLearnerFacingInstruction)).map(module => <WorkspacePanel key={module.id} title={module.title}>
         <ul className="divide-y">{module.lessons.filter(isLearnerFacingInstruction).map(item => <li key={item.id} className="flex items-center justify-between gap-3 py-3">
-          <Link to="/classes" search={{ ...search, tab: "lessons", lesson: item.id }} className="text-sm underline">{item.title}</Link>
+          <Link to="/class" search={{ ...search, tab: "lessons", lesson: item.id }} className="text-sm underline">{item.title}</Link>
           {data.role !== "teacher" && <StatusBadge tone={completed.has(item.id) ? "success" : "neutral"}>{completed.has(item.id) ? "Complete" : "Not completed"}</StatusBadge>}
         </li>)}</ul>
       </WorkspacePanel>)}
