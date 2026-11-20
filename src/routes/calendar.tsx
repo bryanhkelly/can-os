@@ -26,6 +26,7 @@ import { Modal } from "@/components/ui/modal";
 import { countCalendarInvitees } from "@/domain/calendar-invitees";
 import { CalendarInviteesPicker } from "@/components/calendar/CalendarInviteesPicker";
 import { CalendarAgendaList } from "@/components/calendar/CalendarAgendaList";
+import { WEEKDAY_ABBREVIATIONS } from "@/domain/weekdays";
 import { formatTime, formatEventDate, typeLabel, chipClass } from "@/components/calendar/calendar-presentation";
 
 export const Route = createFileRoute("/calendar")({
@@ -45,7 +46,6 @@ type InviteOptions = Awaited<ReturnType<typeof listCalendarInviteOptions>>;
 type InviteGroup = InviteOptions["groups"][number];
 type InviteContact = InviteOptions["contacts"][number];
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type RevisionInput =
   | { action: "edit"; eventId: string; title: string; description?: string | null }
@@ -628,7 +628,7 @@ function CalendarPage() {
           <div className="hidden min-w-0 overflow-x-auto border border-border bg-card p-5 md:block">
             <div className="min-w-[28rem]">
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {WEEKDAYS.map((day) => <div key={day} className="py-1">{day}</div>)}
+              {WEEKDAY_ABBREVIATIONS.map((day) => <div key={day} className="py-1">{day}</div>)}
             </div>
             <div className="mt-1 grid grid-cols-7 gap-1">
               {cells.map((cell, index) =>
