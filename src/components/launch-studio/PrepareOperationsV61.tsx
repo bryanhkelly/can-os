@@ -313,13 +313,26 @@ export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
   // Do not request older Program coverage until the operator explicitly
   // chooses it. Canonical Classes are the default Prepare experience.
   const [showExistingProgramCoverage, setShowExistingProgramCoverage] = useState(false);
+  const [showAcademicYears, setShowAcademicYears] = useState(false);
   return <div className="space-y-5">
-    <PrepareSchoolYearsV61 key={siteId} siteId={siteId} />
     <Suspense fallback={<p role="status" className="border p-4 text-sm">
       Loading approved Class and capacity planning…
     </p>}>
       <NativeClassManager key={siteId} preferredSiteId={siteId} embedded prepareOnly />
     </Suspense>
+    <details className="border bg-card p-4" onToggle={event => {
+      if (event.currentTarget.open) setShowAcademicYears(true);
+    }}>
+      <summary className="min-h-11 cursor-pointer text-sm font-semibold text-primary">
+        Academic years & calendars for school programs
+      </summary>
+      <p className="my-3 text-sm text-muted-foreground">
+        For school-year-based delivery, define academic years, terms and
+        instructional days. This is not a prerequisite for a short noncredit
+        training or a four-session workshop.
+      </p>
+      {showAcademicYears && <PrepareSchoolYearsV61 key={siteId} siteId={siteId} />}
+    </details>
     <WorkspacePanel title="Existing school Program room coverage"
       description="Optional for Sites already using the older school Program room-coverage service. This is not the canonical Class Session scheduler.">
       <details className="mt-3" onToggle={event => {
