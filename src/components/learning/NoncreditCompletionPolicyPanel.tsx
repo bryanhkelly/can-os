@@ -82,7 +82,7 @@ export function NoncreditCompletionPolicyPanel(){
     </p>:<>
       <Label className="block space-y-1 text-sm">
         <span className="font-medium">Training</span>
-        <Select className="w-full max-w-lg border border-border bg-background p-2"
+        <Select className="max-w-lg"
           value={chosen} onChange={event=>{
             const row=catalog.find(item=>item.trainingVersionId===event.target.value);
             if(row)selectTraining(row);
@@ -99,12 +99,12 @@ export function NoncreditCompletionPolicyPanel(){
         <Label className="block space-y-1 text-sm">
           <span className="font-medium">Verified participation minutes required</span>
           <Input type="number" min={0} max={100000} step={1}
-            className="w-full border border-border bg-background p-2" value={minutes}
+             value={minutes}
             onChange={event=>setMinutes(event.target.value)}/>
         </Label>
         <Label className="block space-y-1 text-sm">
           <span className="font-medium">Completion decision mode</span>
-          <Select className="w-full border border-border bg-background p-2"
+          <Select 
             value={mode} onChange={event=>{
               setMode(event.target.value as "automatic"|"provider_review");
               setConfirmed(false);
@@ -128,7 +128,7 @@ export function NoncreditCompletionPolicyPanel(){
       {checkRequired&&<Label className="block space-y-1 text-sm">
         <span className="font-medium">Minimum final knowledge-check fraction (0–1)</span>
         <Input type="number" min={0} max={1} step={0.05} value={fraction}
-          className="w-full max-w-xs border border-border bg-background p-2"
+          className="max-w-xs"
           onChange={e=>setFraction(e.target.value)}/>
       </Label>}
       {mode==="automatic"&&<Label className="flex gap-2 border border-border p-3 text-sm">
