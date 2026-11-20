@@ -18,11 +18,13 @@ describe("platform App Admin role isolation", () => {
     expect(context.scope.organizationIds).toEqual([]);
     expect(context.scope.siteIds).toEqual([]);
     expect(() => assertCapability(context, "platform.admin")).not.toThrow();
+    expect(() => assertCapability(context, "catalog.platform.manage")).not.toThrow();
+    expect(() => assertCapability(context, "blueprint.template.manage")).not.toThrow();
   });
 
   it("does not convert platform membership into Site or canonical authority", () => {
     const context = resolveAccessContext(principal, [grant]);
-    expect(roleCapabilities.app_admin).toEqual(["platform.admin"]);
+    expect(roleCapabilities.app_admin).toEqual(["platform.admin", "catalog.platform.manage", "blueprint.template.manage"]);
     for (const denied of ["admin.manage", "blueprint.read", "blueprint.configure",
       "blueprint.review", "credential.issue", "site.identity.review",
       "enrollment:manage", "student:read"]) {
