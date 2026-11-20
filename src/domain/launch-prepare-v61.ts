@@ -23,6 +23,33 @@ export function filterPublishedSolutionRecipes<T extends {
       .some(value => value.toLowerCase().includes(term)));
 }
 
+/** Informational title/component alignment, not a Site qualification or approval.
+ * CAN-owned metadata can eventually replace this conservative lexical signal. */
+const normalizeDiscoveryTerm = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+export function matchingSolutionInterests<T extends {
+  title: string; components: readonly { key: string }[];
+}>(recipe: T, interestIds: readonly string[]): string[] {
+  const labels = [recipe.title, ...recipe.components.map(component => component.key)]
+    .map(normalizeDiscoveryTerm);
+  return interestIds.filter(id => {
+    const normalized = normalizeDiscoveryTerm(id);
+    return normalized.length > 0 && labels.some(label => label.includes(normalized));
+  });
+}
+
+/** Prefer matches to saved Site vision without suppressing other published options. */
+export function orderSolutionsByVision<T extends {
+  title: string; components: readonly { key: string }[];
+}>(recipes: readonly T[], interestIds: readonly string[], startingFocus?: string | null): T[] {
+  const score = (recipe: T) => {
+    const matches = matchingSolutionInterests(recipe, interestIds);
+    return matches.length + (startingFocus && matches.includes(startingFocus) ? 2 : 0);
+  };
+  return [...recipes].sort((left, right) => score(right) - score(left));
+}
+
 /** A hidden/out-of-filter recipe must never remain in the visible detail pane. */
 export function resolveVisibleSolutionRecipe<T extends { blueprintVersionId: string }>(
   visible: readonly T[], selectedId: string | null,
