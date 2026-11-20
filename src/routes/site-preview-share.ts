@@ -40,7 +40,7 @@ export const Route = createFileRoute("/site-preview-share")({
         const html = share?.pages[page];
         if (!share || !html) return unavailable();
         return new Response(
-          renderSharedSitePreview(html, siteIds[0]!, tokens[0]!, Object.keys(share.pages)),
+          renderSharedSitePreview(html, siteIds[0]!, tokens[0]!, Object.keys(share.pages), share.synthetic===true),
           { status: 200, headers: sitePreviewShareHeaders },
         );
       } catch (error) {
