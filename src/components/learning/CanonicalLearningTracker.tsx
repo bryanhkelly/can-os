@@ -53,6 +53,7 @@ export function CanonicalLearningActivityProvider({
   const instance = useRef<string | null>(null);
   const pending = useRef<LearningOutboxItem[]>([]);
   const [syncPending, setSyncPending] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<"connecting" | "recording" | "unavailable">("connecting");
   const outboxKey = "can-learning-outbox:" + courseAttemptId;
   const persist = useCallback(() => {
     try {
@@ -143,6 +144,7 @@ export function CanonicalLearningActivityProvider({
 
   useEffect(() => {
     alive.current = true;
+    setSessionStatus("connecting");
     session.current = null;
     pending.current=[];
     try {
@@ -169,6 +171,7 @@ export function CanonicalLearningActivityProvider({
         });
         if (disposed) return;
         session.current = result.learningSessionId;
+        setSessionStatus("recording");
         pending.current=pruneLearningOutbox(pending.current,result.learningSessionId,new Date());
         persist();
         void flush();
@@ -176,6 +179,7 @@ export function CanonicalLearningActivityProvider({
         const id = lesson.current;
         if (id) void postEvent("lesson_opened",id).catch(() => {});
       } catch {
+        if (!disposed) setSessionStatus("unavailable");
         // Content remains accessible; a future online/focus retry may succeed.
       } finally { starting = false; }
     };
@@ -263,6 +267,9 @@ export function CanonicalLearningActivityProvider({
 
   return <Context.Provider value={{ selectLesson, observe, observeNativeVideo }}>
     {children}
+    {sessionStatus === "unavailable" && <p role="status" className="border-t border-border px-3 py-1 text-xs text-muted-foreground">
+      Learning activity could not connect. The lesson remains available and recording will retry when this tab is active.
+    </p>}
     {syncPending && <p role="status" className="border-t border-border px-3 py-1 text-xs text-muted-foreground">
       Recent learning observations will retry while this tab remains open.
     </p>}
