@@ -27,6 +27,7 @@ describe("enrollment-to-Class communication integration",()=>{
     expect(delivery).toContain('eq(accountPersonGrants.role, "guardian")');
     expect(delivery).toContain('terms.state!=="published"');
     expect(delivery).toContain("sendNotificationEmailWithReceipt");
+    expect(delivery).toContain("calendarEvent(original, label, email, organizerEmail), sequence: 1");
     expect(delivery).toContain('"class-participant:" + key');
     expect(delivery).toContain('original.state!=="scheduled"');
     expect(delivery).toContain('original.state !== "cancelled"');

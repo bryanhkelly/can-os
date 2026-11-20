@@ -100,6 +100,8 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     handoffs: [
       { title: "Review admissions", detail: "View authorized applications and the Program-specific admissions pipeline.", href: id => "/admissions?siteId=" + scoped(id) },
       { title: "Prepare admissions capacity", detail: "Configure and verify seat pools without activating registration.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
+      { title: "Manage Class Offerings and enrollment", detail: "Publish authorized Class registration terms and inspect enrollment communication status in the Class workspace.", href: id => "/class?view=manage&siteId=" + scoped(id) },
+      { title: "Publish approved noncredit Course registration", detail: "Use the existing noncredit release publisher. Course registration does not automatically create a Class enrollment.", href: () => "/programs/noncredit/enrollment" },
     ],
   },
   "opening-compliance": {

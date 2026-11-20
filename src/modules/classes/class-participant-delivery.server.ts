@@ -270,7 +270,7 @@ const adapter = {
         if (original.state !== "cancelled")
           return { kind: "suppress", reason: "Class_Session_change_not_current" };
         assets.push(attachment("cancelled-class-session.ics",
-          [{...calendarEvent(original, label), sequence: 1}], "CANCEL"));
+          [{...calendarEvent(original, label, email, organizerEmail), sequence: 1}], "CANCEL"));
         const replacementId = source.payload?.replacementSessionId;
         const replacement = typeof replacementId === "string" ? await meeting(replacementId) : null;
         if (replacement && replacement.classId === cls.id &&
