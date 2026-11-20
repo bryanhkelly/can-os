@@ -483,3 +483,51 @@ A full native-Class-to-room/session assignment model, richer Site evidence
 and capability inspection, and authorized calendar detail editing inside
 Prepare require dedicated integration. Do not claim a saved room, Class,
 school year, or staff invitation is legally verified or enrollment-ready.
+
+
+## 2026-11-19 · Follow-up Prepare integration audit and fixes
+
+- **Embedded form runtime:** `FormActions` can omit Cancel when used in
+  Launch Studio while retaining the standalone page's safe pending-link
+  behavior. Focused render tests added.
+- **Exact Site:** The embedded native Class editor hides unauthorized sibling
+  Site choices and refuses a draft create when its selected Site differs from
+  the current Launch Studio Site. Independent backend permissions are unchanged.
+- **Unsaved changes:** The embedded academic-year form relies on the shared
+  V6.1 navigation blocker, avoiding competing confirm dialogs. Editing the
+  grading-scale name now marks the form dirty, and in-form reload/dismissal
+  confirms before discarding unsaved work.
+- **Actual capabilities vs. labels:** Facilities room creation is separated
+  from old school Program facilitator coverage. The legacy coverage scheduler
+  remains accessible but explicitly optional, lazily mounted, and **not**
+  described as canonical Class Session scheduling.
+- **Pilot-friendly scheduling:** Class preparation is primary; academic-year
+  management is optional for school-year models and is not incorrectly required
+  for one-hour training or flexible four-session noncredit classes.
+- **Less duplicate UI:** Existing external handoffs for already-embedded
+  Facilities, Team and Schedules controls are collapsed into advanced actions.
+  This does not change the owning write/read services.
+- **Verification:** Focused static source contracts inspected: 16/16.
+  New or expanded tests are committed but the current repository has not
+  completed successful executable build, TypeScript, Vitest, browser and RLS
+  acceptance for this branch. A failing hosted preview is not evidence of a
+  particular code error absent build logs.
+
+### Remaining P0/P1 work, outside this quick fix pass
+
+1. **Native Class Session preparation** inside Prepare, with flexible dated
+   sessions rather than a mandatory school-year schedule. Keep independent
+   Course adoption, Site operation and enrollment decisions.
+2. **Canonical room assignment migration:** the existing room-coverage service
+   still links older school Program class/Section records. Native Class
+   identities must be mapped through one governed model, not a second editable
+   attendance/scheduling store.
+3. **Solution-linked coverage:** make CAN-published component requirements
+   drive the required staff appointments, physical resources, equipment,
+   connectivity, evidence and capacity at the selected Site.
+4. **End-to-end acceptance:** test new CAN Site/admin signup through Establish,
+   Solution selection and draft, Site-bound staff invite, room creation, class
+   options and scheduling, submitted approvals and enrollment gating. A newly
+   created Site may lack the canonical operation relationships required to
+   create operational Classes; that must display as a real authorization
+   dependency, not be bypassed by a private planning action.
