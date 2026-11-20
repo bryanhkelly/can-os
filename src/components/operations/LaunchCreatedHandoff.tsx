@@ -1,3 +1,4 @@
+import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { useSchoolConfigurationNavigation } from "@/components/launch-studio/SchoolConfigurationContext";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ export function LaunchCreatedHandoff({created}:{created:LaunchCreatedResult|null
             {created && <div role="status" className="mt-4  border p-3 text-sm">
               <p className="font-semibold">Your school has been saved.</p>
               <p className="mt-1">Continue with your academic year, first classroom, school website and family invitations. Your progress is saved as you go.</p>
-              <nav aria-label="Next steps for your new program" className="mt-4 flex flex-wrap gap-3">
+              <WorkspaceLinkNavigation label="Next steps for your new program" surface="plain" className="mt-4 gap-3">
                 {settings ? <>
                   <Button asChild><Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}>Continue academic configuration →</Link></Button>
                   <Button asChild variant="outline"><Link to="/settings/school/$module" params={{module:"compliance"}} search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}>Review compliance →</Link></Button>
@@ -32,7 +33,7 @@ export function LaunchCreatedHandoff({created}:{created:LaunchCreatedResult|null
                 <Button asChild variant="outline"><Link to="/launch/site" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
                   hash="invite-families">Invite families →</Link></Button>
                 </>}
-              </nav>
+              </WorkspaceLinkNavigation>
               <p className="mt-3 text-xs text-muted-foreground">These are planning actions, not authorization to open. Institutional agreements, academic readiness and child safety must still be independently approved before active enrollment or onsite attendance.</p>
               {created.publicSiteDraft && <details className="mt-3  border p-3">
                 <summary className="cursor-pointer text-sm font-semibold">Optional: website and marketing setup</summary>
