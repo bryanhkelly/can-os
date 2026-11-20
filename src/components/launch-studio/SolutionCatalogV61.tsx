@@ -131,7 +131,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
         size="sm" className="mt-2" onClick={() => setReload(value => value + 1)}>
         Reload catalog
       </Button>}
-    </div>
+    </div>}
     {loading && <p role="status" className="text-sm">Loading published Solutions…</p>}
     {error && <div role="alert" className="border border-destructive/30 bg-card p-4 text-sm">
       <p className="font-semibold">Unable to load Solutions</p>
@@ -143,7 +143,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
       </p>
       <Button type="button" variant="outline" size="sm" className="mt-3"
         onClick={() => setReload(value => value + 1)}>Retry Program Catalog</Button>
-    </div>
+    </div>}
     {workspace && <>
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>{templates.length} published {templates.length === 1 ? "Solution" : "Solutions"}</span>
