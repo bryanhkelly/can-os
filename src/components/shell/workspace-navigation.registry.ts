@@ -128,7 +128,7 @@ const schoolAdministrationLinks = [
 ] satisfies readonly WorkspaceNavigationItem[];
 
 const siteAdminProfileLink = {
-  title: "School profile", path: "/sites", icon: "building",
+  title: "Site profile", path: "/sites", icon: "building",
 } satisfies WorkspaceNavigationItem;
 
 /**
@@ -177,7 +177,7 @@ const roleLinks = {
     { title: "My Activity", path: "/learn/my-activity", icon: "book" },
     { title: "Classes", path: "/class", icon: "book" },
     { title: "Learn", path: "/student/courses", icon: "book" },
-    { title: "School profile", path: "/student/my-school", icon: "users" },
+    { title: "Site profile", path: "/student/my-school", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
     { title: "Support", path: "/student/support", icon: "support" },
   ],
@@ -185,7 +185,7 @@ const roleLinks = {
     { title: "My Activity", path: "/learn/my-activity", icon: "book" },
     { title: "Classes", path: "/class", icon: "book" },
     { title: "Students", path: "/guardian/students", icon: "book" },
-    { title: "School profile", path: "/guardian/experiences", icon: "users" },
+    { title: "Site profile", path: "/guardian/experiences", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
   ],
   teacher: [
