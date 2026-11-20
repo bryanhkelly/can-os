@@ -37,11 +37,24 @@ export interface ButtonProps extends React.ComponentProps<"button">, VariantProp
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, type, loading = false, loadingLabel, disabled, children, ...props }, ref) => {
     const classes = cn(buttonVariants({ variant, size }), className);
-    // Radix Slot requires exactly one React element, not an array containing
-    // a false conditional spinner and the intended child link.
+    // Radix Slot requires one element and doesn't confer native button
+    // disabled semantics on an <a>. Give slotted actions the same pending
+    // guard as native buttons, without emitting an invalid disabled attribute.
     if (asChild) {
-      return <Slot ref={ref} aria-busy={loading || undefined}
-        className={classes} {...props}>{children}</Slot>;
+      const inactive = disabled || loading;
+      return <Slot ref={ref} {...props}
+        className={cn(classes, inactive && "pointer-events-none opacity-50")}
+        aria-busy={loading || props["aria-busy"] || undefined}
+        aria-disabled={inactive || props["aria-disabled"] || undefined}
+        tabIndex={inactive ? -1 : props.tabIndex}
+        onClickCapture={event => {
+          if (inactive) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          props.onClickCapture?.(event as React.MouseEvent<HTMLButtonElement>);
+        }}>{children}</Slot>;
     }
     return <button ref={ref} type={type ?? "button"} disabled={disabled || loading}
       aria-busy={loading || undefined} className={classes} {...props}>
