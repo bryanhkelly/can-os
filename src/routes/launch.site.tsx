@@ -100,7 +100,11 @@ export const Route = createFileRoute("/launch/site")({
       // unavailable or its data needs repair. Never pretend it loaded empty.
       prepareIntent: site && deps.module === "program-catalog"
         ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } })
-            .then(result => ({ kind: "ready" as const, intent: result.intent, delivery: result.delivery }))
+            .then(result => ({
+              kind: "ready" as const, intent: result.intent, delivery: result.delivery,
+              schoolYearAvailability: result.schoolYearAvailability,
+              schoolYearAcademyPrograms: result.schoolYearAcademyPrograms,
+            }))
             .catch(() => ({ kind: "unavailable" as const }))
         : null,
       error: deps.siteId && !site ? "You do not have access to the selected Site." : null,
@@ -173,6 +177,10 @@ function SiteLaunchPage() {
       solutionPlanId={selected.id === "program-catalog" ? search.solutionPlanId : undefined}
       intent={prepareIntent?.kind === "ready" ? prepareIntent.intent : null}
       delivery={prepareIntent?.kind === "ready" ? prepareIntent.delivery : null}
+      schoolYearAvailability={prepareIntent?.kind === "ready"
+        ? prepareIntent.schoolYearAvailability : undefined}
+      schoolYearAcademyPrograms={prepareIntent?.kind === "ready"
+        ? prepareIntent.schoolYearAcademyPrograms : undefined}
       intentUnavailable={prepareIntent?.kind === "unavailable"} />
     : selected && isDestinationModuleV61(selected.id) ? <LaunchModuleDestinationV61
       module={selected.id} title={selected.title} stage={selected.stage} siteId={site.id} />
