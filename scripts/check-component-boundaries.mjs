@@ -51,7 +51,7 @@ for (const file of files) {
     const dependencyProblem = sharedUiImportViolation(file, importPath);
     if (dependencyProblem) failures.push(file + ": " + dependencyProblem);
     const target = resolveSourceDependency(file, importPath);
-    if (target && /^src\\/(?:routes|db|workers|server)(?:\\/|$)/.test(target)) {
+    if (target && /^src\/(?:routes|db|workers|server)(?:\/|$)/.test(target)) {
       failures.push(file + ": feature presentation must not import route, database, server or worker code: " + importPath);
     }
     if (importPath.includes("/components/operations/OperationsWorkspace") ||
