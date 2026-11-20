@@ -18,7 +18,7 @@ import {
   type SiteBrandAsset, type SiteBrandConfiguration, type SavedSiteBrandVersion,
 } from "@/domain/site-brand";
 
-import type { SiteBrandSaveInput } from "./site-brand.functions";
+import type { SiteBrandSaveInput } from "./site-brand.schemas";
 
 type Reader=Pick<typeof db,"select">;
 
