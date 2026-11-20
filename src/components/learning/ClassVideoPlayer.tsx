@@ -62,6 +62,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
   const player = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState<NativeVideoProgress | null>(null);
   const progressRef = useRef<NativeVideoProgress | null>(null);
+  const persistenceBlocked = useRef(false);
   const lastPosition = useRef<{position:number;at:number} | null>(null);
   const persistedAt = useRef(0);
   const progressStorageKey = resumeKey && resourceId
@@ -70,7 +71,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
   // Shared devices never retain video bookmarks in durable browser storage.
   // Existing CAN account-handoff/sign-out cleanup clears both storage areas.
   const flushProgress = useCallback(() => {
-    if (!progressStorageKey) return;
+    if (!progressStorageKey || persistenceBlocked.current) return;
     let next = progressRef.current;
     const element = player.current;
     if (next && element && Number.isFinite(element.currentTime) &&
@@ -88,6 +89,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
   }, [progressStorageKey]);
 
   useEffect(() => {
+    persistenceBlocked.current = false;
     progressRef.current = null;
     lastPosition.current = null;
     persistedAt.current = 0;
@@ -104,12 +106,19 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       if (document.visibilityState === "hidden") flushProgress();
     };
     const onPageHide = () => flushProgress();
+    const onAccountHandoff = () => {
+      persistenceBlocked.current = true;
+      progressRef.current = null;
+      lastPosition.current = null;
+    };
+    window.addEventListener("can:clear-learning-video", onAccountHandoff);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
     return () => {
       flushProgress();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("can:clear-learning-video", onAccountHandoff);
     };
   }, [progressStorageKey, flushProgress]);
 
