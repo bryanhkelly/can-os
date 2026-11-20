@@ -213,7 +213,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       </div>}
       <p className="mt-3 text-xs text-muted-foreground">
         Scheduling does not enroll learners or verify attendance. Attach meetings to
-        the appropriate enrollment release in Cohort & participant management.
+        the appropriate authorized Class Enrollment before recording participation.
       </p>
     </div>
     <div className="mt-6 border-t border-border pt-4">
