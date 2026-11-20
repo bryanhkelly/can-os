@@ -15,7 +15,8 @@ export const familyInvitationSendInput = z.object({
   requestId: z.string().uuid(),
   programId: z.string().uuid(),
   rawContacts: z.string().trim().min(1).max(20_000),
-  subject: z.string().trim().min(3).max(120),
+  subject: z.string().trim().min(3).max(120)
+    .refine(value=>!/[\r\n]/.test(value),"Use a single-line email subject."),
   introduction: z.string().trim().min(1).max(2_000),
   confirmed: z.literal(true),
   /** Interest outreach does not grant application access before school approval. */
