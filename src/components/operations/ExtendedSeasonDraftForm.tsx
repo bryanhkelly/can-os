@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -76,9 +77,9 @@ export function ExtendedSeasonDraftForm({
           <Input type="date" min={startsOn||undefined} value={endsOn} onChange={e => onChange({endsOn:e.target.value})} />
         </Field>
         <div className="sm:col-span-2">
-          <Button variant="outline" type="submit" disabled={busy} >
-            {busy ? "Saving…" : "Save draft season"}
-          </Button>
+          <ActionFooter layout="inline" className="mt-0">
+            <Button variant="outline" type="submit" disabled={busy} loading={busy} loadingLabel="Saving draft season...">Save draft season</Button>
+          </ActionFooter>
           {!selectable.length && <p className="mt-2 text-xs text-muted-foreground">Create a hosted noncredit summer or after-school Program above first.</p>}
         </div>
       </form>;
