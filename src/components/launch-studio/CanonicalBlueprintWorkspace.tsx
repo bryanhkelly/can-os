@@ -74,6 +74,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [reconciliationRequired, setReconciliationRequired] = useState(false);
 
   async function reload() {
     const next = await readCanonicalBlueprintWorkspace({ data: { siteId } });
@@ -91,6 +92,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     setExecutedDeployments(null);
     setLoading(true);
     setError(null);
+    setReconciliationRequired(false);
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
       .then(result => {
         if (cancelled) return;
@@ -246,14 +248,18 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   }
 
   async function save() {
-    if (!workspace || !selectedTemplate || (detail?.lifecycle === "frozen" && !revisingFrozen)) return;
+    if (!workspace || !selectedTemplate || reconciliationRequired ||
+        (detail?.lifecycle === "frozen" && !revisingFrozen)) return;
+    let attemptedWrite = false;
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
       const version = versionInput(selectedTemplate, detail ?? undefined);
       if (detail) {
-        const saved = await saveCanonicalBlueprintConfiguration({ data: {
+        attemptedWrite = true;
+        attemptedWrite = true;
+      const saved = await saveCanonicalBlueprintConfiguration({ data: {
           configurationId: detail.configurationId,
           versionId: crypto.randomUUID(),
           expectedRevision: detail.revision,
@@ -262,6 +268,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         const current = await reload();
         onWorkspaceChanged?.(current);
         const opened = await openConfiguration(detail.configurationId, current);
+        if (!opened) setReconciliationRequired(true);
         setMessage(!opened
           ? "Changes were saved, but the latest plan could not be reopened. Reload before editing."
           : saved.revision > detail.revision
@@ -269,6 +276,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
             : "The Solution plan is already up to date.");
       } else {
         const configurationId = crypto.randomUUID();
+        attemptedWrite = true;
         await createCanonicalBlueprintConfiguration({ data: {
           configurationId,
           initialVersionId: crypto.randomUUID(),
@@ -281,18 +289,26 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         const current = await reload();
         onWorkspaceChanged?.(current);
         const opened = await openConfiguration(configurationId, current);
+        if (!opened) setReconciliationRequired(true);
         setMessage(opened ? "Solution plan created." :
           "Solution plan created, but reopening failed. Reload to review the saved plan.");
       }
     } catch (caught) {
-      setError(normalizeClientError(caught, "The Blueprint configuration could not be saved.").message);
+      if (attemptedWrite) {
+        setReconciliationRequired(true);
+        setError("The save outcome could not be fully verified. Reload the Site to reconcile the latest Solution plan before retrying.");
+      } else {
+        setError(normalizeClientError(caught, "The Solution plan could not be saved.").message);
+      }
     } finally {
       setBusy(false);
     }
   }
 
   async function submit() {
-    if (!detail || !selectedTemplate || !workspace?.canConfigure || detail.lifecycle !== "draft") return;
+    if (!detail || !selectedTemplate || !workspace?.canConfigure ||
+        reconciliationRequired || detail.lifecycle !== "draft") return;
+    let attemptedWrite = false;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -312,11 +328,17 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       const current = await reload();
       onWorkspaceChanged?.(current);
       const opened = await openConfiguration(detail.configurationId, current);
+      if (!opened) setReconciliationRequired(true);
       setMessage(opened
         ? "Current Solution plan submitted for independent review. No Program or enrollment is authorized."
         : "Solution plan submitted, but review status could not be refreshed. Reload before taking another action.");
     } catch (caught) {
-      setError(normalizeClientError(caught, "Blueprint submission failed.").message);
+      if (attemptedWrite) {
+        setReconciliationRequired(true);
+        setError("The review submission outcome could not be fully verified. Reload before retrying.");
+      } else {
+        setError(normalizeClientError(caught, "Solution review submission failed.").message);
+      }
     } finally {
       setBusy(false);
     }
@@ -348,7 +370,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   }
 
   const readOnlyFrozen = detail?.lifecycle === "frozen" && !revisingFrozen;
-  const editingDisabled = busy || readOnlyFrozen;
+  const editingDisabled = busy || readOnlyFrozen || reconciliationRequired;
   // A selected Solution in Prepare must not display another Solution's saved drafts.
   const visibleConfigurations = embedded && initialBlueprintVersionId
     ? selectSavedSolutionPlans(workspace?.configurations ?? [], initialBlueprintVersionId)
@@ -364,6 +386,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     </p>
     {loading && <p className="mt-4" role="status">Loading Blueprint workspace…</p>}
     {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
+    {reconciliationRequired && <p className="mt-3 border border-border bg-muted p-3 text-sm" role="status">
+      The server may have recorded your last action. Reload before creating or updating another Solution plan.
+    </p>}
     {message && <p className="mt-4 text-sm" role="status">{message}</p>}
     {!loading && !workspace && <Button type="button" variant="outline"
       onClick={() => void reload().catch(caught =>
@@ -559,11 +584,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
             </ul>}
           </fieldset>}
           <div className="flex flex-wrap gap-3">
-            {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || (!detail && name.trim().length < 2)}
+            {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || reconciliationRequired || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
               {busy ? "Saving…" : detail ? "Save new revision" : "Save Solution plan"}
             </Button>}
-            {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy}
+            {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
               onClick={() => { setRevisingFrozen(true); setOperationId(""); setExecutedDeployments(null); }}>
               Revise submitted Blueprint
             </Button>}
@@ -572,9 +597,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
               Discard revision edits
             </Button>}
             {detail && detail.lifecycle === "draft" && workspace.canConfigure &&
-              <Button type="button" variant="outline" disabled={busy}
+              <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
                 onClick={() => void submit()}>Submit for review</Button>}
-            {detail && <Button type="button" variant="outline" disabled={busy}
+            {detail && <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
               onClick={() => {
                 setDetail(null);
                 setRevisingFrozen(false);
