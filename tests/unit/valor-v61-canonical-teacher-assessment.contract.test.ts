@@ -32,6 +32,10 @@ describe("Valor native teacher and student knowledge checks",()=>{
     expect(workspace).toContain('eq(canonicalClassStaffAssignments.state,"approved")');
     expect(workspace).toContain('await currentClassAuthority(tx,instance.id,now)');
     expect(workspace).toContain("assertCurrentNativeTeachingGrant(");
+    expect(workspace).toContain("canControlRoom=true");
+    expect(workspace).toContain("learner,staffRole,canVerifyAttendance,canControlRoom");
+    expect(route).toContain("canSchedule={workspace.canControlRoom}");
+    expect(route).toContain("workspace.canControlRoom");
   });
 
   it("shows bounded homework only for exact verified Class and Course Attempt",()=>{
