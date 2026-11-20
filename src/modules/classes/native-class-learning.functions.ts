@@ -12,6 +12,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
+import { canonicalLessonVideoResources } from "@/domain/canonical-lesson-video-resources";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
@@ -89,15 +90,7 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         const content=lesson.content&&typeof lesson.content==="object" &&
           !Array.isArray(lesson.content)
           ?lesson.content as Record<string,unknown>:{};
-        const videoResources=Array.isArray(content.videoResources)
-          ?content.videoResources.flatMap(item=>{
-            if(!item||typeof item!=="object"||Array.isArray(item))return [];
-            const video=item as Record<string,unknown>;
-            if(typeof video.url!=="string" || !/^https:\/\/(?:www\.)?(?:youtube\.com\/watch|youtu\.be\/|vimeo\.com\/)/.test(video.url))
-              return [];
-            return [{url:video.url,title:typeof video.title==="string"?video.title:"Supplemental video",
-              reviewStatus:typeof video.reviewStatus==="string"?video.reviewStatus:"unreviewed"}];
-          }).slice(0,5):[];
+        const videoResources=canonicalLessonVideoResources(content);
         return {
           unitId:lesson.unitId,unitTitle:lesson.unitTitle,unitOrder:lesson.unitOrder,
           lessonId:lesson.lessonId,lessonTitle:lesson.lessonTitle,lessonOrder:lesson.lessonOrder,
