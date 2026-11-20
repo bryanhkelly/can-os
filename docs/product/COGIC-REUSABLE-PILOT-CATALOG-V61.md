@@ -74,3 +74,36 @@ The additive, re-runnable source is `database/seeds/2026-11-cogic-reusable-pilot
 Do **not** bypass Site RLS, grant access to anonymous clients, log in as database owner, or grant an unscoped application role. Follow reviewed `database/canonical/v3.0.1/provision-program-catalog-role.sql` and `provision-blueprint-roles.sql` only **after** their RLS policy preconditions, restricted principals, and privilege reviews pass on a disposable test branch. Do not treat role provisioning or migration as part of the reusable content seed.
 
 **No build, UI session, or real partner-delivery acceptance is claimed by this record.**
+
+
+## 2026-11-20 delivery preparation update
+
+Implementation now uses **one canonical Program → Solution → Offering → Course delivery chain**, not a parallel pilot-specific enrollment system.
+
+- The published Site Blueprint recipe continues to link the exact reusable Program and Offering codes. The established Program codes live in Site metadata only. Selecting a Program, opening a Solution, or even saving a Blueprint plan does **not** publish or register any learner.
+- `src/domain/program-offering-journey-v61.ts` projects authorized results into existing Prepare/Open readiness panels without writing another record. The provider publisher now includes the actual Offering code, so the launch handoff filters to the exact authorized product and Site instead of title matching. A scoped URL is a hint, never approval.
+- The facilitator workspace accepts a Site-scoped URL and filters Course choices, rehearsal previews, meeting scheduler and visible rooms to that Site. Server-side facilitator and enrollment authorization still owns all commands.
+- Existing four-Class scheduling, learner-facing dated Class linking, facilitator attendance, provider reports, lesson completion and Class delivery mechanisms are reused. UI copy now uses **Course registration** and **Classes** rather than introducing new cohort/section workflows.
+
+The additive guarded seed `database/seeds/2026-11-cogic-pilot-draft-delivery.sql` was run against the disposable Neon validation branch and then Neon `main`. The same script was re-run on validation and produced no duplicates. Its canonical records:
+
+| Record | Custom Training | AI & Digital Skills |
+| --- | --- | --- |
+| Offering | Draft `CLC-CUSTOM-TRAINING-01` | Draft `CLC-DIGITAL-01` |
+| Course | Draft, 7 lesson segments | Draft, 4 lessons |
+| Noncredit training version | Draft, 60 planned minutes | Draft, 0 approved minutes pending real dates/content |
+| Knowledge-check form | Five draft, unreviewed short-answer questions | Five draft, unreviewed short-answer questions |
+| Feedback instrument | Five draft questions | Five draft questions |
+| Training assessment linkage | Draft assessment version | Draft assessment version |
+| Registered learners, attendance and completion | None created | None created |
+
+All check prompts and survey instruments are labeled draft and require actual instructor and privacy review. The seed author is the **existing synthetic CAN Demo Administrator** strictly for test provenance, not a COGIC content author or reviewer. No published survey campaigns, real COGIC participation, approved media, consent, signed provider decisions, Site grants, scheduled pilot meetings or enrollment releases have been fabricated.
+
+**Database acceptance:** `scripts/sql/canonical-v301/cogic-reusable-pilot-draft-acceptance.sql` passed against both Neon `main` and the disposable V6.1 validation branch. The checked outcome was two draft training versions, exactly five draft knowledge-check questions and five draft feedback questions for each, and the previously expected seven/four Course lesson counts. There are **zero** published enrollment releases. This does not constitute a browser/player/assessment/completion acceptance test. Unit coverage is added in `tests/unit/program-offering-journey-v61.test.ts`, but a successful TypeScript/build/CI run is **not** verified.
+
+### Remaining gates before the requested two end-to-end pilot acceptances
+
+1. **Phase 1:** Obtain approved leader intro/outro and training module media; independently review/publish the Course, Offering, knowledge-check form, consent, survey instrument/campaign, completion policy, and actual provider Site/Deployment authority. Then run one adult self-registration, lesson progress, five-question check, feedback invitation and independently governed completion/reporting journey.
+2. **Phase 2:** Obtain approved AI/Digital Skills teaching media and qualified facilitator(s), approved participant safeguards (particularly if minors), actual operator Site/Deployment rights and a published Course/Offering. Then schedule and attach four dated Classes at **each of two real authorized Sites**, and verify registered learner attendance, homework/activity records, assessments, feedback, corrections and Site/provider reporting. The four dates may be nonconsecutive; never infer presence from QR pairing.
+3. **Network:** Independently operated COGIC churches require explicit cross-Organization delegation and publication-safe disclosure decisions before national network rollup.
+4. **Release:** Finish production database migrations, scoped DB roles, exact-SHA build/TypeScript/role-denial tests and authenticated browser acceptance. Do not equate Neon draft setup with operational enrollment activation.
