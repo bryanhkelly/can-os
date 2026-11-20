@@ -20,9 +20,11 @@ export function launchModuleCompletionV61(site: {
   websiteDraft: { status: "draft" | "published" } | null;
 }, evidence: LaunchOverviewEvidence | null): LaunchModuleCompletion {
   const result: LaunchModuleCompletion = {};
-  // Signup or an authorized profile save establishes a Site identity.
+  // The persisted canonical Site record is the saved profile. Older Sites
+  // predate the optional siteIdentityRevision metadata and must not lose
+  // their completion check merely because they have not been edited again.
   result["site-profile"] = site.id && site.name.trim() && site.organizationId &&
-    site.slug && site.timezone && site.siteIdentityRevision ? "complete" : "incomplete";
+    site.slug && site.timezone ? "complete" : "incomplete";
   if (!evidence) return result;
   result["site-information"] = evidence.information.state === "unavailable"
     ? "unavailable" : evidence.information.value.hostingSaved &&
