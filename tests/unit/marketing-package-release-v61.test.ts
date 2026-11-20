@@ -3,7 +3,7 @@ import {
   packageReleaseChangesV61, packageReleaseIsDownloadableV61,
   type PackageReleaseReferenceV61, type PackageWorkingStateV61,
 } from "@/domain/marketing-package-release-v61";
-import { initialMarketingContent } from "@/domain/marketing-package-v61";
+import { initialMarketingContent, marketingPackageClaimsRequireReview } from "@/domain/marketing-package-v61";
 
 const brandA="11111111-1111-4111-8111-111111111111";
 const brandB="22222222-2222-4222-8222-222222222222";
@@ -24,6 +24,16 @@ function makeFixture(){
 }
 
 describe("Launch V6.1 immutable Marketing Package Release",()=>{
+  it("uses the same approved-claim boundary for preview and release metadata",()=>{
+    const {working}=makeFixture();
+    expect(marketingPackageClaimsRequireReview(working.title,working.content)).toBe(false);
+    expect(marketingPackageClaimsRequireReview("Accredited academy launch",working.content)).toBe(true);
+    expect(marketingPackageClaimsRequireReview(working.title,{...working.content,
+      message:"Our guaranteed enrollment starts today."})).toBe(true);
+    expect(marketingPackageClaimsRequireReview(working.title,{...working.content,
+      callToAction:"Apply for our scholarship guarantee"})).toBe(true);
+  });
+
   it("compares actual saved content, not an unrelated package revision",()=>{
     const {working,release}=makeFixture();
     expect(packageReleaseChangesV61(working,release)).toEqual([]);
