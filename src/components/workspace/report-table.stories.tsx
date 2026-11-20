@@ -63,19 +63,20 @@ const checkSemantics = async (canvasElement: HTMLElement) => {
   await expect(canvas.getByRole("button", { name: "Older" })).toBeDisabled();
 };
 
-export const Desktop: Story = { render: () => <ReportingExample />, play: async ({ canvasElement }) => checkSemantics(canvasElement) };
+export const Desktop: Story = { parameters: { chromatic: { viewports: [1440] } }, render: () => <ReportingExample />, play: async ({ canvasElement }) => checkSemantics(canvasElement) };
 export const Tablet: Story = {
-  parameters: { viewport: { defaultViewport: "ipad" } },
+  parameters: { chromatic: { viewports: [768] } },
   render: () => <ReportingExample />,
   play: async ({ canvasElement }) => checkSemantics(canvasElement),
 };
 export const Mobile: Story = {
-  parameters: { viewport: { defaultViewport: "iphone6" } },
+  parameters: { chromatic: { viewports: [390] } },
   render: () => <ReportingExample />,
   play: async ({ canvasElement }) => checkSemantics(canvasElement),
 };
 export const Dark: Story = {
   globals: { theme: "dark" },
+  parameters: { chromatic: { viewports: [390, 1440] } },
   render: () => <ReportingExample />,
   play: async ({ canvasElement }) => checkSemantics(canvasElement),
 };
