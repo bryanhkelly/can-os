@@ -126,7 +126,7 @@ export function NoncreditProviderEvidencePanel(){
         )}
       </div>
       <div className="border border-border bg-card">
-        <Table scrollLabel="Release-level evidence drill-down" aria-label="Release-level evidence drill-down" className="w-full min-w-[40rem] text-left text-sm"><TableCaption className="sr-only">Release-level evidence drill-down</TableCaption>
+        <Table scrollLabel="Release-level evidence drill-down" aria-label="Release-level evidence drill-down" className="w-full min-w-[40rem] text-left text-sm">
           <TableCaption className="p-4 text-left font-semibold">Release-level evidence drill-down</TableCaption>
           <TableHeader className="border-y border-border bg-muted/40">
             <TableRow>
