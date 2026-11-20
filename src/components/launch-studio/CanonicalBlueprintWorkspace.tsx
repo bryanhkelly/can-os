@@ -546,8 +546,18 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                         ? [...current, component.id]
                         : current.filter(id => id !== component.id)
                     )}/>
-                  <span>{readable(component.key)}
-                    {component.requirementMode === "required" ? " · required" : ""}</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">{readable(component.key)}
+                      {component.requirementMode === "required" ? " · required" :
+                        component.requirementMode === "conditional" ? " · conditional" : ""}
+                    </span>
+                    {component.description && <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {component.description}
+                    </span>}
+                    {component.requiresIndependentReview && <span className="mt-1 block text-xs text-muted-foreground">
+                      Independent verification remains separate from planning
+                    </span>}
+                  </span>
                 </Label>)}
             </div>
           </fieldset>
