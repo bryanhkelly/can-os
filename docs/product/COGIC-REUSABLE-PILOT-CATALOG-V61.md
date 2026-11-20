@@ -114,8 +114,9 @@ All check prompts and survey instruments are labeled draft and require actual in
 The central CAN-owned Program Catalog and reusable Blueprint definition authoring
 now belongs to independently verified CAN `app_admin` in `/platform`.
 This is **not** an institutional `blueprint_author` or `blueprint_reviewer`
-appointment. A distinct verified App Admin reviews each new immutable planning
-version before publication. The original per-Organization SQL purpose roles
+appointment. An App Admin may publish a new immutable planning version directly.
+Optional peer review by another App Admin is available, but is not a
+second role or a publication prerequisite. The original per-Organization SQL purpose roles
 remain for **native institutional** configuration/review paths only. A Site
 Admin continues to select a published Solution in Prepare, not author global
 recipes or automatically authorize enrollment.
