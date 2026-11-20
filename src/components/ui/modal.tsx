@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export function Modal({ open, onClose, label, children, className, initialFocus,
   dismissOnBackdrop = true, dismissible = true, keepMounted = false,
-  labelledBy, describedBy, busy }: {
+  labelledBy, describedBy, busy, id }: {
   open: boolean;
   onClose: () => void;
   label: string;
@@ -16,6 +16,7 @@ export function Modal({ open, onClose, label, children, className, initialFocus,
   labelledBy?: string;
   describedBy?: string;
   busy?: boolean;
+  id?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const startedOutside = useRef(false);
@@ -35,7 +36,7 @@ export function Modal({ open, onClose, label, children, className, initialFocus,
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
   }, [open, initialFocus]);
-  return <dialog ref={ref} aria-label={label} aria-labelledby={labelledBy}
+  return <dialog id={id} ref={ref} aria-label={label} aria-labelledby={labelledBy}
     aria-describedby={describedBy} aria-busy={busy}
     onCancel={event => { event.preventDefault(); if (dismissible) onClose(); }}
     onKeyDown={event => {
