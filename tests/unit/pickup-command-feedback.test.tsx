@@ -149,3 +149,43 @@ it("never presents an out-of-order pickup roster from a previous school date", a
   expect(current.some(element => element.props["aria-label"] === "Pickup for Next Date Student")).toBe(true);
   expect(current.some(element => element.props["aria-label"] === "Pickup for Previous Date Student")).toBe(false);
 });
+
+it("never presents an out-of-order guardian workspace after switching children", async () => {
+  let resolveOld!: (value: unknown) => void;
+  const previousChild = new Promise<unknown>(resolve => { resolveOld = resolve; });
+  state.read.mockImplementation(({ data }: { data: { studentPersonId?: string } }) =>
+    data.studentPersonId === "child-old"
+      ? previousChild
+      : Promise.resolve({
+          students: [{ ...student, studentName: "Current Child" }],
+          note: "Current child's verified authority",
+        }));
+
+  function renderChild(studentPersonId: string) {
+    state.cursor = 0;
+    state.effects = [];
+    const elements = nodes(GuardianPickupPanel({ studentPersonId }));
+    return { elements, effects: [...state.effects] };
+  }
+
+  const old = renderChild("child-old");
+  const cleanups = old.effects.map(effect => effect());
+  const current = renderChild("child-current");
+  cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); });
+  current.effects.forEach(effect => effect());
+
+  await vi.waitFor(() => expect(renderChild("child-current").elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Current Child")).toBe(true));
+
+  resolveOld({
+    students: [{ ...student, studentName: "Previous Child" }],
+    note: "Previous child's verified authority",
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  const elements = renderChild("child-current").elements;
+  expect(elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Current Child")).toBe(true);
+  expect(elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Previous Child")).toBe(false);
+});
