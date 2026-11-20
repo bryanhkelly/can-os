@@ -74,7 +74,7 @@ describe("V6.1 current Launch Studio presentation contract", () => {
   it("routes mobile navigation through shared modal and keeps a readable tablet canvas", () => {
     const frame = read("src/components/launch-studio/LaunchSiteFrameV61.tsx");
     expect(frame).toContain('import { Modal } from "@/components/ui/modal"');
-    expect(frame).toContain('xl:grid xl:grid-cols-[14rem_minmax(0,1fr)]');
+    expect(frame).toContain('var(--sidebar-width)');
     expect(frame).toContain('className="xl:hidden"');
     expect(frame).toContain('min-h-11 items-center border-l-2');
     expect(frame).not.toContain('href="#launch-help"');

@@ -1,6 +1,7 @@
 import { saveSiteBrandVersion } from "@/modules/sites/site-brand.functions";
 import { type SiteBrandConfiguration } from "@/domain/site-brand";
 import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
 import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { WebsiteCopyField } from "@/components/launch-studio/WebsiteCopyField";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
@@ -17,7 +18,7 @@ import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionDialog, ActionFooter, type StatusTone } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionDialog, ActionFooter, PageHeader, type StatusTone } from "@/components/workspace";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -112,14 +113,10 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     <div className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-7">
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
         <main className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Establish / Website &amp; Brand</p>
-          <h1 className="mt-2 font-serif text-3xl font-semibold">
-            {data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
+          <PageHeader eyebrow="Establish / Website & Brand"
+            title={data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
               "Tell Your Story","Review & Finish"][step]:"Prepare your private website address"}
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            One Site-owned, revisioned private website. Draft changes never open enrollment, approve a Site or publish content.
-          </p>
+            subtitle="One Site-owned, revisioned private website. Draft changes never open enrollment, approve a Site or publish content." />
           {data.host && <nav aria-label="Website & Brand steps" className="mt-5 flex min-w-0 gap-2 overflow-x-auto border-y py-3">
             {steps.map((item,index)=><Button key={item.id} type="button"
               variant={step===index?"default":"outline"}
@@ -740,17 +737,13 @@ function LocalWebsiteCopyEditor({
             ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Information: {new Date(data.siteStoryRevision).toLocaleDateString()}</p>
             : <p className="mt-2 text-xs text-muted-foreground">No optional purpose answers saved in Site Information. You can still choose a direction.</p>}
         </div>
-        <label className="block space-y-2 text-sm font-semibold">
-          <span>Public-facing Site name</span>
+        <Field label="Public-facing Site name"
+          description="This display name is saved with the Brand version. Changing your Site Profile name later will not alter older flyers or released website pages.">
           <Input type="text" maxLength={120} value={brandDisplayName}
             disabled={busy||!data.canEdit}
             onChange={event=>setBrandDisplayName(event.target.value)}
             placeholder="Your learning community name" className="min-h-11 w-full"/>
-          <span className="block text-xs font-normal text-muted-foreground">
-            This display name is saved with the Brand version. Changing your Site Profile name
-            later will not alter older flyers or released website pages.
-          </span>
-        </label>
+        </Field>
         <div className="border bg-muted/20 p-3 text-sm">
           <p className="font-semibold">
             {data.currentBrandRevision>0

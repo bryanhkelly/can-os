@@ -1,4 +1,5 @@
 import type { SiteLocalBranding } from "@/domain/site-local-content";
+import { Button } from "@/components/ui/button";
 import {
   resolveSchoolBrand, schoolBrandSvgDataUrl,
 } from "@/domain/school-brand-identity";
@@ -31,10 +32,9 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
           {brand.design.name} · Site identity from your current template, colors and typography.
         </p>
       </div>
-      <a href={wordmark} download={filename}
-        className="inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold text-primary">
-        Download SVG wordmark
-      </a>
+      <Button asChild variant="outline">
+        <a href={wordmark} download={filename}>Download SVG wordmark</a>
+      </Button>
     </div>
     <div className="mt-5 overflow-hidden  border" style={{background:brand.background}}>
       <img src={wordmark} alt={`${brand.schoolName} Site wordmark`}
@@ -47,7 +47,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
           {tokens.map(([name, color])=><div key={name} className="min-w-0">
             <span aria-hidden="true" className="block h-12  border" style={{background:color}}/>
             <span className="mt-1 block text-xs font-medium">{name}</span>
-            <code className="block text-[10px] text-muted-foreground">{color}</code>
+            <code className="block text-3xs text-muted-foreground">{color}</code>
           </div>)}
         </div>
       </div>
@@ -77,7 +77,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
                 <p className="break-words text-sm font-bold" style={{fontFamily:brand.theme.displayFont}}>
                   {brand.schoolName}
                 </p>
-                <p className="mt-1 text-[10px] font-medium tracking-wider" style={{color:brand.accent}}>
+                <p className="mt-1 text-3xs font-medium tracking-wider" style={{color:brand.accent}}>
                   {brand.design.caption}
                 </p>
               </div>
@@ -111,12 +111,13 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
           ["email-survey","Survey invitation email"],
           ["email-confirmation","Interest confirmation email"],
           ["email-update","Family update email"],
-        ] as const).map(([view,label])=><a key={view}
-          href={`/brand-preview?siteId=${encodeURIComponent(siteId)}&view=${view}`}
-          target="_blank" rel="noopener noreferrer"
-          className="inline-flex min-h-12 items-center  border bg-background px-4 py-3 text-sm font-semibold text-primary hover:bg-muted">
-            {label} <span aria-hidden="true" className="ml-auto">↗</span>
-          </a>)}
+        ] as const).map(([view,label])=><Button key={view} asChild variant="outline"
+          className="min-h-12 w-full justify-between whitespace-normal text-left">
+          <a href={`/brand-preview?siteId=${encodeURIComponent(siteId)}&view=${view}`}
+            target="_blank" rel="noopener noreferrer">
+            {label} <span aria-hidden="true">↗</span>
+          </a>
+        </Button>)}
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
         Previews are private and read-only, using the last saved Site design (or a starter if none is saved).

@@ -60,16 +60,18 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
         ))}
       </nav>
       <div className="m-3 border p-3">
-        <a href={"/sites/"+encodeURIComponent(site.id)} className="inline-flex min-h-9 items-center gap-2 text-sm font-semibold">
-          <Building2 className="size-4" /> Site Workspace
-        </a>
+        <Button asChild variant="ghost" className="w-full justify-start">
+          <Link to="/sites/$siteId" params={{ siteId: site.id }}>
+            <Building2 className="size-4" /> Site Workspace
+          </Link>
+        </Button>
       </div>
     </div>
   );
-  return <div className="min-h-screen bg-background text-foreground xl:grid xl:grid-cols-[14rem_minmax(0,1fr)]">
+  return <div className="min-h-screen bg-background text-foreground xl:grid xl:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]">
     <aside className="hidden min-h-0 border-r bg-card xl:sticky xl:top-0 xl:block xl:h-dvh">{renderSidebar("desktop")}</aside>
     <div className="min-w-0">
-      <header className="flex min-h-16 items-center justify-between gap-3 border-b bg-card px-4 sm:px-7">
+      <header className="flex min-h-[var(--topbar-height)] flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-2 sm:px-7">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" className="xl:hidden" onClick={()=>setDrawer(true)} aria-label="Open launch menu">
             <Menu className="size-4" />
@@ -79,10 +81,11 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           {active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
-          <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-primary">
-            <Globe2 className="size-4"/> Preview Website
-          </a>
+          <Button asChild variant="ghost" size="sm" className="min-h-11">
+            <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer">
+              <Globe2 className="size-4"/> Preview Website
+            </a>
+          </Button>
 
         </div>
       </header>
