@@ -118,3 +118,11 @@ Follow-on integration also enables the existing `purpose=interest` family invita
 - Added test fixtures: `launch-interest-event-handoff.test.ts`, `launch-recruit-package-handoff.test.ts`, plus updated page contracts. No tests or builds were executed, and Netlify deploy previews continue to be blocked by usage limits.
 
 **Acceptance still required:** TypeScript, unit/integration suite, V6.1 design-system lint, authenticated save/reload across Sites, controlled delivery tests and Playwright journey on an explicitly disposable migrated database. The user-directed order remains current-code integration, refinements, database, then main.
+
+## Launch stage ordering: remaining Program vs Solution boundary
+
+Establish / Programs & Audiences stores declared Site intent, **not** a concrete operating Program or approved Solution. Introduce can immediately author Site-level announcements and reusable family/event invitation Packages from that intent and the saved Brand. Actual family invitation sending and Interest Event creation currently use the canonical, independently authorized Program-linked services and require an eligible real Program row.
+
+This is intentional fail-closed behavior but it means a brand-new Site with only broad intent cannot yet send invitations or create Program-linked events. Do **not** fabricate a Program, select an unrelated Site's Program, insert mock contacts, or create a second Site-level CRM to paper over the gap. Any fully pre-Program Site inquiry/event capability must be designed against the canonical public Site/Person/Event model at the later database-design phase, without equating Program intent to a Solution or opening enrollment.
+
+The shared family invitation validator also rejects multi-line subjects, including CR/LF header injection, and package handoff checks original claims before limiting a subject to the provider's email bound. Event creation retains one idempotency key during uncertain retries; when an existing invitation-only event is recovered without its one-time RSVP token, the user is directed to the authorized explicit link rotation command instead of silently revoking shared links.
