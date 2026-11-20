@@ -60,7 +60,7 @@ export function ClassTeacherPlanningPanel({ data, lessons, search }: {
                 {ready
                   ? <div className="flex flex-wrap gap-2">
                       <Button asChild variant="outline" size="sm">
-                        <Link to="/classes" search={{ ...search, tab: "lessons", lesson: item.id }}>
+                        <Link to="/class" search={{ ...search, tab: "lessons", lesson: item.id }}>
                           View lesson
                         </Link>
                       </Button>
