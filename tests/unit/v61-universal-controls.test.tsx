@@ -66,9 +66,9 @@ describe("V6.1 universal action and surface contracts", () => {
     </Button>);
     expect(disabled).toContain('href="/cancel"');
     expect(disabled).toContain('aria-disabled="true"');
-    expect(disabled).toContain('tabindex="-1"');
+    expect(disabled).toMatch(/tabindex="-1"/i);
     expect(disabled).toContain("pointer-events-none");
-    expect(disabled).not.toMatch(/\\sdisabled(?:=|\\s|>)/);
+    expect(disabled).not.toMatch(/\sdisabled(?:=|\s|>)/);
   });
 
   it("uses the canonical Button component for both form actions", () => {
@@ -81,8 +81,8 @@ describe("V6.1 universal action and surface contracts", () => {
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('href="/back"');
     expect(html).toContain('aria-disabled="true"');
-    expect(html).toContain('tabindex="-1"');
-    expect(html).not.toMatch(/<a[^>]*\\sdisabled(?:=|\\s|>)/);
+    expect(html).toMatch(/tabindex="-1"/i);
+    expect(html).not.toMatch(/<a[^>]*\sdisabled(?:=|\s|>)/);
   });
 
   it("renders the public sign-in links without an invalid Radix Slot child array", () => {
