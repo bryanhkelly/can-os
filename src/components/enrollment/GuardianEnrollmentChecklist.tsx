@@ -124,7 +124,7 @@ export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAva
             type="file" accept="application/pdf,image/jpeg,image/png" className="mt-2 block w-full"
             onChange={event => onFile(requirement.id, event.target.files?.[0] ?? null)} />
         </Label>
-        <Button variant="outline" type="button" disabled={!files[requirement.id]} className="mt-2  border px-3 py-2 text-sm"
+        <Button variant="outline" type="button" disabled={!files[requirement.id]} className="mt-2"
           onClick={() => void onUpload(requirement.id)}>{requirement.documents.length ? "Submit replacement document" : "Submit document"}</Button>
       </fieldset>}
     </article>)}
