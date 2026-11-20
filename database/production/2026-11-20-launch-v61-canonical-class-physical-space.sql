@@ -36,7 +36,8 @@ ON CONFLICT DO NOTHING;
 -- by their existing independent records and must be revalidated at operation.
 ALTER TABLE public.classes
   ADD COLUMN IF NOT EXISTS physical_space_id uuid,
-  ADD COLUMN IF NOT EXISTS primary_facilitator_assignment_id uuid;
+  ADD COLUMN IF NOT EXISTS primary_facilitator_assignment_id uuid,
+  ADD COLUMN IF NOT EXISTS physical_planning_revision integer NOT NULL DEFAULT 1;
 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint
