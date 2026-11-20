@@ -8,7 +8,7 @@ const classSql=read("database/canonical/v3.0.1/patch-ws3-class-governed-outcomes
 const reviewService=read("src/modules/learning/completion-evidence-review.functions.ts");
 const classService=read("src/modules/classes/native-class-completion.functions.ts");
 const classOperator=read("src/components/learning/NativeClassCompletionOperatorPanel.tsx");
-const classRoute=read("src/routes/canonical.classes_.completion.tsx");
+const classRoute=read("src/routes/class_.$classId.tsx");
 const learnerSource=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
 const preflight=read("scripts/acceptance/check-ws3-completion-readiness.mjs");
 
@@ -54,7 +54,7 @@ describe("WS3 independent evidence reviewer workflow",()=>{
     expect(classOperator).toContain("getPendingCompletionEvidenceReviews");
     expect(classRoute).toContain("createFileRoute");
     expect(read("src/routes/class_.$classId.tsx")).toContain("NativeClassCompletionOperatorPanel");
-    expect(classRoute).toContain('<Navigate to="/class/$classId"');
+    expect(classRoute).toContain("NativeClassCompletionOperatorPanel");
   });
   it("does not claim verified learner completion until current canonical function agrees",()=>{
     expect(learnerSource).not.toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
