@@ -6,13 +6,17 @@ import {
 } from "@/modules/learning/learning-activity.functions";
 
 type ActivityItem = Awaited<ReturnType<typeof getLearningActivityHistory>>["evidence"][number];
+export type ClassLearningVideoController = {
+  observeVideo: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) => void;
+  observeNativeVideo: (durationMs: number) => void;
+};
 
 /**
  * A student-only lesson instrument. No passive timer or simulated engagement:
  * only trusted visible keyboard/pointer interactions can submit time estimates.
  * Tracking is nonblocking; failure never marks a lesson complete or changes attendance.
  */
-export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: string; lessonId: string }) {
+export function LearningActivityTracker({ sectionId, lessonId, controllerRef }: { sectionId: string; lessonId: string; controllerRef?: { current: ClassLearningVideoController | null } }) {
   const [status, setStatus] = useState<"connecting" | "recording" | "unavailable">("connecting");
   const [retry, setRetry] = useState(0);
   const [history, setHistory] = useState<ActivityItem[] | null>(null);
@@ -29,7 +33,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
 
     async function record(
       sessionId: string,
-      kind: "lesson_opened" | "lesson_resumed" | "engaged_interval" | "resource_opened",
+      kind: "lesson_opened" | "lesson_resumed" | "engaged_interval" | "resource_opened" | "video_opened" | "video_played" | "video_paused" | "video_ended",
       options?: { durationMs?: number; resourceId?: string },
     ) {
       const base = {
@@ -38,7 +42,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
       };
       const interaction = kind === "engaged_interval"
         ? { ...base, kind, durationMs: options?.durationMs ?? 1, pageVisible: true as const, windowFocused: true as const }
-        : kind === "resource_opened"
+        : kind === "resource_opened" || kind.startsWith("video_")
           ? { ...base, kind, resourceId: options?.resourceId ?? "" }
           : { ...base, kind };
       // Keep the same client event ID on retries: the server deduplicates
@@ -77,6 +81,21 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
       setStatus("unavailable");
       setMessage("Some learning activity could not be saved. Retry tracking to start a new session.");
     };
+    const controller: ClassLearningVideoController = {
+      observeVideo(kind, resourceId) {
+        const id = sessionRef.current;
+        if (!id || cancelled || document.visibilityState !== "visible" || !document.hasFocus()) return;
+        void record(id, kind, { resourceId }).catch(recordFailure);
+      },
+      observeNativeVideo(durationMs) {
+        const id = sessionRef.current;
+        if (!id || cancelled || !Number.isFinite(durationMs) || durationMs < 1000 ||
+            document.visibilityState !== "visible" || !document.hasFocus()) return;
+        void record(id, "engaged_interval", { durationMs: Math.min(60_000, Math.floor(durationMs)) })
+          .catch(recordFailure);
+      },
+    };
+    if (controllerRef) controllerRef.current = controller;
     const onInteraction = (event: Event) => {
       const sessionId = sessionRef.current;
       // Workspace navigation, menus and unrelated app controls never count as
@@ -126,6 +145,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
     document.addEventListener("keydown", onInteraction);
     return () => {
       cancelled = true;
+      if (controllerRef?.current === controller) controllerRef.current = null;
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("blur", onVisibilityChange);
       document.removeEventListener("click", onResourceClick);
@@ -138,7 +158,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
           .catch(() => { /* Server idle expiry remains authoritative. */ });
       }
     };
-  }, [sectionId, lessonId, retry]);
+  }, [sectionId, lessonId, retry, controllerRef]);
 
   async function loadHistory() {
     try {
