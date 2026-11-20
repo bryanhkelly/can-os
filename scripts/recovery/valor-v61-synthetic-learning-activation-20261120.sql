@@ -122,8 +122,9 @@ BEGIN
   UPDATE public.classes SET title=CASE
     WHEN course_version_id=md5('valor-v61:courseversion:CAN-BIO')::uuid THEN 'Biology · CAN Standard'
     WHEN course_version_id=md5('valor-v61:courseversion:BIO-S')::uuid THEN 'Biology · Foundations'
-    ELSE title END, state='active',updated_at=now()
-  WHERE site_id=sid AND deployment_id=dep AND state='draft';
+    ELSE title END, delivery_mode='self_paced',state='active',updated_at=now()
+  WHERE site_id=sid AND deployment_id=dep AND state='draft'
+    AND NOT EXISTS(SELECT 1 FROM public.class_sessions cs WHERE cs.class_id=public.classes.id);
   IF (SELECT count(*) FROM public.classes WHERE site_id=sid AND deployment_id=dep AND state='active')<>12
     OR (SELECT count(*) FROM public.class_offering_versions cov WHERE cov.class_id IN
       (SELECT cls.id FROM public.classes cls WHERE cls.site_id=sid AND cls.deployment_id=dep)
