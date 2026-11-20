@@ -33,7 +33,6 @@ export async function listEligibleCourseClasses(
     eq(canonicalClasses.adoptionId,release.adoptionId),
     eq(canonicalClasses.offeringVersionId,release.offeringVersionId),
     eq(canonicalClasses.courseVersionId,release.courseVersionId),
-    eq(canonicalClasses.operatingOrganizationId,release.registeringOrganizationId),
     eq(canonicalClasses.siteId,release.siteId),
     eq(canonicalClasses.state,"active"),
     release.deliveryMode==="independent"
@@ -91,8 +90,7 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
     cls.deploymentId!==args.release.deploymentId||
     cls.adoptionId!==args.release.adoptionId||
     cls.offeringVersionId!==args.release.offeringVersionId||
-    cls.courseVersionId!==args.release.courseVersionId||
-    cls.operatingOrganizationId!==args.release.registeringOrganizationId)
+    cls.courseVersionId!==args.release.courseVersionId)
     throw new AuthorizationError("Class does not belong to the registered Course and Site");
   // Native Class self-enrollment requires independently verified adulthood.
   // A Course sign-up attestation, email verification, or non-student role alone
@@ -186,7 +184,9 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
     .where(eq(canonicalClassEnrollments.id,placed.id));
   await writeCanonicalAudit(tx,{
     actorPersonId:args.personId,
-    owningOrganizationId:args.release.registeringOrganizationId,
+    // Class participation is owned by the authorized Class operator, which
+    // can differ from the Course registration Organization at a host Site.
+    owningOrganizationId:cls.operatingOrganizationId,
     eventCode:"course.registration.class_placed",
     entityKind:"class_enrollment",entityId:placed.id,
     payload:{registrationId:args.registrationId,courseAttemptId:args.attemptId,
