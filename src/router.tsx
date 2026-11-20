@@ -3,6 +3,7 @@ import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { assertRouterRefresh } from "./lib/router-refresh";
 import { AccessReturnError, AccessReturnNotFound } from "./lib/access-return-recovery";
+import { PageFrame } from "@/components/workspace";
 
 export const getRouter = () => {
   const queryClient = new QueryClient();
@@ -13,7 +14,7 @@ export const getRouter = () => {
     defaultErrorComponent: AccessReturnError,
     defaultNotFoundComponent: AccessReturnNotFound,
     scrollRestoration: true,
-    defaultPendingComponent: () => <main role="status" className="p-6" aria-label="Loading page">Loading page...</main>,
+    defaultPendingComponent: () => <PageFrame role="status" aria-label="Loading page">Loading page...</PageFrame>,
     defaultPendingMs: 150,
     defaultPendingMinMs: 0,
     defaultPreloadStaleTime: 0,
