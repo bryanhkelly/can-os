@@ -18,24 +18,19 @@ type HomeworkRow={
   first_name:string|null;last_name:string|null;preferred_name:string|null;
 };
 
-/** Independent academic teacher queue, using only the current native Class
- * and Course Attempt. This read does not turn a teacher appointment into an
- * independent grader authorization, and cannot alter grades or submissions.
- */
-export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
- .validator((value:unknown)=>input.parse(value))
- .handler(async({data})=>{
-   setResponseHeader("Cache-Control","private, no-store");
-   setResponseHeader("Referrer-Policy","no-referrer");
-   const actor=await getCanonicalCommandContext(getRequest());
-   if(actor.role!=="teacher"||!actor.actorPersonId||
+type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** One reader for both teacher queues: exact CAN teacher, current appointment,
+ * current Class publication and matched Site/Organization. */
+async function authorizedTeacher(tx:Tx,classId:string){
+  const actor=await getCanonicalCommandContext(getRequest());
+  if(actor.role!=="teacher"||!actor.actorPersonId||
       actor.scope.siteIds?.length!==1||
       actor.scope.organizationIds?.length!==1)
      throw new AuthorizationError("exact CAN academic teacher membership");
-   assertCapability(actor,"teacher:read");
-   return db.transaction(async tx=>{
-     const [cls]=await tx.select().from(canonicalClasses)
-       .where(eq(canonicalClasses.id,data.classId)).limit(1);
+  assertCapability(actor,"teacher:read");
+  const [cls]=await tx.select().from(canonicalClasses)
+       .where(eq(canonicalClasses.id,classId)).limit(1);
      const now=new Date();
      if(!cls||cls.state!=="active"||
         cls.siteId!==actor.scope.siteIds[0]||
@@ -52,7 +47,21 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
             gt(canonicalClassStaffAssignments.endsAt,now)),
        )).limit(1);
      if(!assignment)throw new AuthorizationError("current specific Class teacher appointment");
-     await currentClassAuthority(tx,cls.id,now);
+  await currentClassAuthority(tx,cls.id,now);
+  return cls;
+}
+
+/** Independent academic teacher queue, using only the current native Class
+ * and Course Attempt. This read does not turn a teacher appointment into an
+ * independent grader authorization, and cannot alter grades or submissions.
+ */
+export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
+ .validator((value:unknown)=>input.parse(value))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   setResponseHeader("Referrer-Policy","no-referrer");
+   return db.transaction(async tx=>{
+     const cls=await authorizedTeacher(tx,data.classId);
      const result=await tx.execute(sql`
        SELECT gs.id,gs.status,gs.submitted_at,gs.response,
          ga.assignment_key,ga.assignment_spec,
@@ -100,5 +109,42 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
        canRecordOfficialGrade:false,
        notice:"Viewing submitted work does not confer independent grading authority. Official grading requires a verified independent grader appointment and governed Course policy.",
      };
+   });
+ });
+
+/** Review readiness only. Draft questions, hidden keys, personal learner
+ * attempts and official grading appointments are not exposed here. */
+export const getNativeClassTeacherAssessments=createServerFn({method:"GET"})
+ .validator((value:unknown)=>input.parse(value))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   return db.transaction(async tx=>{
+     const cls=await authorizedTeacher(tx,data.classId);
+     const result=await tx.execute(sql`
+       SELECT av.assessment_key, av.lifecycle AS version_lifecycle,
+              fv.lifecycle AS form_lifecycle, aa.status AS administration_status
+       FROM public.assessment_administrations aa
+       JOIN public.assessment_versions av ON av.id=aa.assessment_version_id
+       JOIN public.assessment_form_versions fv
+         ON fv.id=aa.form_version_id AND fv.assessment_version_id=av.id
+       WHERE aa.course_version_id=${cls.courseVersionId}::uuid
+         AND aa.deployment_id=${cls.deploymentId}::uuid
+         AND aa.administering_organization_id=${cls.operatingOrganizationId}::uuid
+       ORDER BY av.assessment_key
+       LIMIT 51
+     `);
+     const rows=result.rows as Array<{
+       assessment_key:string;version_lifecycle:string;
+       form_lifecycle:string;administration_status:string;
+     }>;
+     return {items:rows.slice(0,50).map(item=>({
+       key:item.assessment_key,
+       assessmentStatus:item.version_lifecycle,
+       formStatus:item.form_lifecycle,
+       administrationStatus:item.administration_status,
+       ready:item.version_lifecycle==="published" &&
+         item.form_lifecycle==="published" &&
+         item.administration_status==="open",
+     })),partial:rows.length>50};
    });
  });
