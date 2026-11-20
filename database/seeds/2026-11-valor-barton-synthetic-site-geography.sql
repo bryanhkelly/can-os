@@ -27,11 +27,11 @@ BEGIN
     RAISE EXCEPTION 'Canonical California reference is missing';
   END IF;
   IF EXISTS (
-    SELECT 1 FROM public.program_site_authorizations authorization
-    WHERE authorization.site_id IN (
+    SELECT 1 FROM public.program_site_authorizations psa
+    WHERE psa.site_id IN (
       'f1000000-0000-4000-8000-000000000003'::uuid,
       'd8082b23-b28c-454d-a144-6860ef19d9ea'::uuid
-    ) AND authorization.status='approved'
+    ) AND psa.status='approved'
   ) THEN
     RAISE EXCEPTION 'Unexpected independently approved Site Program authority';
   END IF;
