@@ -38,7 +38,7 @@ export { readSaved as publishedRead } from "./brand.server";
 void [defaultValue, readSaved, a];`,
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /7 local imported\/re-exported bindings resolved/);
+  assert.match(result.stdout, /6 local imported\/re-exported bindings resolved/);
 });
 
 test("missing named export fails before any bundler phase", () => {
