@@ -1,7 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getOnsiteRoomPlanningFn, submitOnsiteRoomPlanFn, reviewOnsiteRoomPlanFn } from "@/modules/operations/onsite-room-plan.functions";
 import { Link } from "@tanstack/react-router";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
@@ -19,18 +19,34 @@ export function OnsiteRoomPlanningPanel({programId, initialDate, onChanged}:{
   const [model,setModel]=useState<Model|null>(null);
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(false);
+  // A date/program switch invalidates older requests, including a refresh
+  // started after a plan mutation. Never show another day's qualified adults.
+  const requestSequence=useRef(0);
   const load=useCallback(async()=>{
-    setLoading(true);setError("");
-    try{setModel(await getOnsiteRoomPlanningFn({data:{programId,date}}));}
-    catch(cause){setModel(null);setError(mutationErrorMessage(cause,"Room planning unavailable"));throw cause;}
-    finally{setLoading(false);}
+    const request=++requestSequence.current;
+    setLoading(true);setError("");setModel(null);
+    try {
+      const result=await getOnsiteRoomPlanningFn({data:{programId,date}});
+      if(request===requestSequence.current)setModel(result);
+    } catch(cause) {
+      if(request===requestSequence.current){
+        setModel(null);
+        setError(mutationErrorMessage(cause,"Room planning unavailable"));
+      }
+    } finally {
+      if(request===requestSequence.current)setLoading(false);
+    }
   },[programId,date]);
   const refreshAfterChange=useCallback(async()=>{
-    setModel(await getOnsiteRoomPlanningFn({data:{programId,date}}));
+    const request=++requestSequence.current;
+    const result=await getOnsiteRoomPlanningFn({data:{programId,date}});
+    if(request!==requestSequence.current)
+      throw new Error("Room planning context changed. Refresh the current date before continuing.");
+    setModel(result);
     await onChanged?.();
   },[programId,date,onChanged]);
   useEffect(()=>{if(initialDate)setDate(initialDate);},[initialDate]);
-  useEffect(()=>{void load().catch(()=>{});},[load]);
+  useEffect(()=>{void load();return ()=>{requestSequence.current++;};},[load]);
   return <section className="mt-6 border p-4" aria-label="Room and adult coverage planning">
     <h3 className="font-semibold">Room and adult coverage planning</h3>
     <p className="mt-2 text-sm text-muted-foreground">The church records the room, capacity and named adults for a real scheduled block. An independent CAN officer reviews the plan. This is a staff plan, not a legal inspection, permission to open or a record of physical arrival.</p>
@@ -38,7 +54,7 @@ export function OnsiteRoomPlanningPanel({programId, initialDate, onChanged}:{
       <Input type="date" value={date} onChange={event=>{setDate(event.target.value);setModel(null);}}
         className="mt-2"/>
     </Label>
-    <Button variant="ghost" type="button" onClick={()=>void load().catch(()=>{})} disabled={loading||!date} className="mt-2 text-sm underline">Refresh room plans</Button>
+    <Button variant="ghost" type="button" onClick={()=>void load()} disabled={loading||!date} className="mt-2 text-sm underline">Refresh room plans</Button>
     {loading&&<p role="status" className="mt-3 text-sm">Loading current schedule and eligible adults…</p>}
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
     {model&&!loading&&<>
