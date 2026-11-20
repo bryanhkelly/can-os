@@ -31,6 +31,10 @@ jobs:
         run: npm ci
       - name: Parse all runtime and build source before bundling
         run: npm run check:build-source-syntax
+      - name: Reject missing named exports from local project modules
+        run: npm run check:local-import-exports
+      - name: Test local import/export guard behavior
+        run: npm run test:local-import-exports
       - name: Generate TanStack route types and build application
         run: npm run build
       - name: Verify the production Cloudflare build target

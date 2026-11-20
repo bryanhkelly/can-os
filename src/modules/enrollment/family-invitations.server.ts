@@ -41,7 +41,7 @@ import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.s
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { renderFamilyBrandEmail } from "@/domain/school-brand-family";
 import { readSiteFamilyBrand } from "@/modules/sites/site-family-brand.server";
-import { requireSavedSiteBrand } from "@/modules/sites/site-brand.functions";
+import { requireSavedSiteBrand } from "@/modules/sites/site-brand.server";
 import {
   requestPublicFamilyStart,
 } from "./public-family-start.server";
