@@ -65,7 +65,7 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
    <SectionTab current={data.marketplaces.length>1} link={{to:"/operations/curriculum",search:{}}}>All programs</SectionTab>
    {data.programs.map(program=>
    <SectionTab key={program.id} current={data.marketplaces.length===1&&data.marketplaces[0]?.program.id===program.id}
-     link={{to:"/operations/curriculum",search:{programId:program.id}}}>{program.name}</SectionTab>)}</DetailNavigation>
+     link={{to:"/operations/curriculum",search:{programId:program.id}}}>{program.name}</SectionTab>)}</DetailNavigation>}
   {!data.programs.length&&<p role="status">No curriculum access grants are available in this membership. An administrator must assign institutional curriculum authority.</p>}
   {mode==="library"&&data.marketplaces.length>1&&data.marketplaces.some(market=>market.canPublish)&&
    <p className="text-sm text-muted-foreground">Select a program to create courses or manage publishing.</p>}
