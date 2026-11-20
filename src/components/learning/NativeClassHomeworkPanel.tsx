@@ -73,6 +73,13 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
             onChange={event=>setDrafts(previous=>({...previous,[item.id]:event.target.value}))}
             placeholder="Type your answer here…"/>
         </label>
+        {item.practiceFeedback&&<section className="space-y-1 border border-border bg-muted/30 p-3" aria-label="Practice feedback">
+          <h4 className="text-sm font-semibold">Teacher practice feedback</h4>
+          <p className="whitespace-pre-wrap text-sm">{item.practiceFeedback}</p>
+          {item.practiceScore!==null&&<p className="text-sm">
+            Practice score: {item.practiceScore} / {item.practiceScoreMax??10} (not an official grade)
+          </p>}
+        </section>}
         {!submitted?<Button type="button" disabled={!!submitting||current.trim().length<5}
           onClick={()=>void submit(item.id,current.trim())}>
           {submitting===item.id?"Submitting…":"Submit homework"}
