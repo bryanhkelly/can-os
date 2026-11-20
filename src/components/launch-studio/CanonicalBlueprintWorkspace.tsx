@@ -20,6 +20,7 @@ import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/bluepr
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
 import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.server";
 import { blueprintEditorialIdentityKeys, includedBlueprintComponentIds } from "@/domain/blueprint-configuration";
+import { selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
@@ -343,8 +344,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   const editingDisabled = busy || readOnlyFrozen;
   // A selected Solution in Prepare must not display another Solution's saved drafts.
   const visibleConfigurations = embedded && initialBlueprintVersionId
-    ? workspace?.configurations.filter(configuration =>
-        configuration.blueprintVersionId === initialBlueprintVersionId) ?? []
+    ? selectSavedSolutionPlans(workspace?.configurations ?? [], initialBlueprintVersionId)
     : workspace?.configurations ?? [];
 
   return <section className="mt-6 border bg-card p-6" aria-labelledby="canonical-blueprint-title">
