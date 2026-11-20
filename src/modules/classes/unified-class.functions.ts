@@ -262,7 +262,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
               ) AS "approvalReady",
             EXISTS(
               SELECT 1 FROM pg_constraint
-              WHERE conrelid=to_regclass('education_v30.class_enrollments')
+              WHERE conrelid=to_regclass('public.class_enrollments')
                 AND conname='canonical_class_enrollment_consent_ck'
                 AND pg_get_constraintdef(oid) LIKE '%invitation%'
                 AND pg_get_constraintdef(oid) LIKE '%approval%'

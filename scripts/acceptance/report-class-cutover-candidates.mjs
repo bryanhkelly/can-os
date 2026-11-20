@@ -55,7 +55,7 @@ try{
         WHERE lp.section_id=s.id) AS lesson_progress_count,
       (SELECT count(DISTINCT cv.id)::int
         FROM education_v30.courses nc
-        JOIN education_v30.course_versions cv ON cv.course_id=nc.id
+        JOIN public.course_versions cv ON cv.course_id=nc.id
         WHERE nc.course_code=ct.code
           AND nc.publisher_organization_id=ct.owning_organization_id
           AND cv.lifecycle='published'

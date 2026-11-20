@@ -15,14 +15,14 @@ export async function probeSiteNoncreditCatalogReader(
 ):Promise<SiteNoncreditPreflight>{
   const result=await executor.execute(sql`
     SELECT to_regclass('public.sites') IS NOT NULL AS "sitesReady",
-      to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS "releasesReady",
+      to_regclass('public.noncredit_self_enrollment_releases') IS NOT NULL AS "releasesReady",
       has_schema_privilege(current_user,'public','USAGE') AS "publicSchema",
       has_schema_privilege(current_user,'education_v30','USAGE') AS "nativeSchema",
       CASE WHEN to_regclass('public.sites') IS NOT NULL
         THEN has_table_privilege(current_user,'public.sites','SELECT')
         ELSE false END AS "siteRead",
-      CASE WHEN to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL
-        THEN has_table_privilege(current_user,'education_v30.noncredit_self_enrollment_releases','SELECT')
+      CASE WHEN to_regclass('public.noncredit_self_enrollment_releases') IS NOT NULL
+        THEN has_table_privilege(current_user,'public.noncredit_self_enrollment_releases','SELECT')
         ELSE false END AS "releaseRead"
   `);
   const row=result.rows[0] as SiteNoncreditPreflight|undefined;

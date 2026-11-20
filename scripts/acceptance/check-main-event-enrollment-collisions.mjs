@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Read-only, fail-closed reconciliation inventory for remaining duplicate
- * table names in production main. This creates no bridges, mutates no data,
- * and does NOT grant permission to drop any legacy relations.
+ * table names in production main, including those already retired.
+ * Never creates bridges, mutates records, or permits uncontrolled drops.
  *
  * CAN_MAIN_COLLISION_CHECK=1 DATABASE_URL=<Neon main> node \
  *   scripts/acceptance/check-main-event-enrollment-collisions.mjs
@@ -67,38 +67,32 @@ async function run(){
     ORDER BY names.name
   `;
 
-  // Direct counts are fixed to audited relation names. A name cannot be
-  // interpolated into an SQL identifier by an untrusted caller.
-  const [counts]=await sql`
-    SELECT
-      (SELECT count(*)::int FROM education_v30.audit_events) legacy_audit,
-      (SELECT count(*)::int FROM public.audit_events) public_audit,
-      (SELECT count(*)::int FROM education_v30.domain_events) legacy_domain,
-      (SELECT count(*)::int FROM public.domain_events) public_domain,
-      (SELECT count(*)::int FROM education_v30.enrollments) legacy_enrollments,
-      (SELECT count(*)::int FROM public.enrollments) public_enrollments,
-      (SELECT count(*)::int FROM education_v30.graduation_decisions) legacy_graduation,
-      (SELECT count(*)::int FROM public.graduation_decisions) public_graduation,
-      (SELECT count(*)::int FROM education_v30.qualification_definitions) legacy_qualification,
-      (SELECT count(*)::int FROM public.qualification_definitions) public_qualification,
-      (SELECT count(*)::int FROM education_v30.transcript_issuances) legacy_transcript,
-      (SELECT count(*)::int FROM public.transcript_issuances) public_transcript
-  `;
-  const rowNames=[
-    ["audit_events","legacy_audit","public_audit"],
-    ["domain_events","legacy_domain","public_domain"],
-    ["enrollments","legacy_enrollments","public_enrollments"],
-    ["graduation_decisions","legacy_graduation","public_graduation"],
-    ["qualification_definitions","legacy_qualification","public_qualification"],
-    ["transcript_issuances","legacy_transcript","public_transcript"],
-  ];
-  const result=inventory.map(row=>{
-    const [,legacyKey,publicKey]=rowNames.find(([name])=>name===row.name);
-    return {
+  // Only a fixed, audited list of relation names is permitted to become SQL
+  // identifiers. Retired tables are absent, not silently interpreted as empty
+  // when they still exist. This remains read-only on Neon main.
+  const expected=new Set(collisions);
+  if(inventory.length!==collisions.length||inventory.some(row=>!expected.has(row.name)))
+    throw new Error("Collision inventory changed");
+  const relationCount=async (schema,name)=>{
+    if(!["public","education_v30"].includes(schema)||!expected.has(name))
+      throw new Error("Unexpected relation requested for exact count");
+    const [row]=await sql.query(
+      'SELECT count(*)::int AS n FROM "'+schema+'"."'+name+'"'
+    );
+    return row.n;
+  };
+  const result=[];
+  for(const row of inventory){
+    if(!row.public_oid)throw new Error("Canonical public table missing: "+row.name);
+    const legacyExists=row.legacy_oid!==null;
+    const legacyRows=legacyExists?await relationCount("education_v30",row.name):0;
+    const publicRows=await relationCount("public",row.name);
+    result.push({
       table:row.name,legacy_oid:row.legacy_oid,public_oid:row.public_oid,
-      legacy_rows:counts[legacyKey],public_rows:counts[publicKey],
+      status:legacyExists?"collision_unresolved":"legacy_relation_retired",
+      legacy_rows:legacyRows,public_rows:publicRows,
       public_rows_at_prior_audit:expectedPublicAtAudit[row.name],
-      public_rows_have_not_disappeared:counts[publicKey]>=expectedPublicAtAudit[row.name],
+      public_rows_have_not_disappeared:publicRows>=expectedPublicAtAudit[row.name],
       legacy_inbound_fks:row.legacy_inbound_fks,
       public_inbound_fks:row.public_inbound_fks,
       legacy_rls:row.legacy_rls,public_rls:row.public_rls,
@@ -109,27 +103,32 @@ async function run(){
         delete:row.public_authenticated_delete,
       },
       routine_text_mentions:row.routine_text_mentions,
-      columns_equal:JSON.stringify(row.legacy_columns)===JSON.stringify(row.public_columns),
-    };
-  });
+      columns_equal:legacyExists
+        ?JSON.stringify(row.legacy_columns)===JSON.stringify(row.public_columns)
+        :null,
+    });
+  }
+
+  const blockers=[];
+  for(const row of result){
+    if(!row.public_rows_have_not_disappeared)
+      blockers.push("Public historical count regressed: "+row.table);
+    if(row.legacy_oid){
+      blockers.push("Legacy table still exists: "+row.table);
+      if(row.legacy_rows!==0)
+        blockers.push("Legacy table contains records: "+row.table);
+      if(row.legacy_inbound_fks>0)
+        blockers.push("Legacy table has inbound FKs: "+row.table);
+    }
+    if(!row.public_rls&&Object.values(row.public_authenticated_direct_access).some(Boolean))
+      blockers.push("Unrestricted authenticated public access: "+row.table);
+  }
   console.log(JSON.stringify({
     project:target.project,branch:target.branch,read_only:true,
-    conflicts:result,drop_allowed:false,
+    collisions:result,blockers,retirementReady:blockers.length===0,
+    drop_allowed:false,
   },null,2));
-  // The old authoritative event, enrollment and identity contracts must be
-  // retired by explicit, reviewed migrations. A zero-row table is not proof
-  // that its referenced identity or its permission model may be discarded.
-  if(result.some(row=>!row.legacy_oid||!row.public_oid||
-      !row.public_rows_have_not_disappeared||!row.legacy_rls&&row.legacy_rows>0))
-    throw new Error("Collision state changed; reconcile before proceeding");
-  const privileged=result.filter(row=>
-    !row.public_rls && Object.values(row.public_authenticated_direct_access).some(Boolean));
-  if(privileged.length)console.error(
-    "SECURITY REVIEW REQUIRED: public tables with authenticated direct grants and RLS disabled: "+
-      privileged.map(row=>row.table).join(", ")
-  );
-  process.exitCode=2;
-  console.error("BLOCKED: collisions and dependent FKs remain; no DROP is authorized");
+  if(blockers.length)process.exitCode=2;
 }
 run().catch(error=>{
  console.error(error instanceof Error?error.message:String(error));

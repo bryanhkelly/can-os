@@ -1,23 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import {
-  accessAccounts, accountPersonGrants, accessAccountCanonicalPrincipals,
-  organizations, sites,
-} from "@/db/schema";
-import {
-  canonicalAccountGrants, canonicalAccounts,
-  canonicalSensitiveCapabilityApprovals as approvals,
-} from "@/db/canonical-v301";
+import { accessAccounts, accountPersonGrants, organizations } from "@/db/schema";
+import { canonicalSensitiveCapabilityApprovals as approvals } from "@/db/canonical-v301";
 import { assertCANCredentialIssuerReviewer } from "@/domain/credential-issuer-review";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
 import { getIdentityContext } from "./command-context.server";
-import { getCanonicalCommandContext } from "./canonical-command-context.server";
-import { assertCurrentCanonicalStaffForMutation } from "./canonical-transaction-authorization.server";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCurrentCANGrantForMutation } from "./current-can-grant-transaction.server";
 
@@ -39,6 +31,36 @@ const revokeSchema=z.object({
 function protect() {
   setResponseHeader("Cache-Control","private, no-store");
   setResponseHeader("Referrer-Policy","no-referrer");
+}
+
+/** Resolve the exact current CAN grant, never a native v3 identity. */
+function issuerStaffScope(can:AccessContext) {
+  const org=can.scope.organizationIds?.length===1?can.scope.organizationIds[0]:null;
+  const site=can.scope.siteIds?.length===1?can.scope.siteIds[0]:null;
+  if(!org||!site||!can.grantId||!can.actorPersonId||can.sessionAccountId||
+     !["site_admin","registrar"].includes(can.role)||can.grantSiteId!==site)
+    throw new AuthorizationError("exact CAN issuer staff assignment");
+  return {org,site,grantId:can.grantId};
+}
+
+/** The active grant and operating Site relationship are separate checks. */
+async function assertIssuerOperatingSite(tx:Pick<typeof db,"execute">,org:string,site:string) {
+  const result=await tx.execute(sql`
+    SELECT 1 FROM public.organizations o JOIN public.sites s
+      ON s.organization_id=o.id
+    WHERE o.id=${org}::uuid AND s.id=${site}::uuid
+      AND o.lifecycle_status='active'
+      AND s.lifecycle_status IN ('planning','active')
+      AND EXISTS (
+        SELECT 1 FROM public.site_organization_roles sor
+        WHERE sor.organization_id=o.id AND sor.site_id=s.id
+          AND sor.role_code IN ('operator','host')
+          AND sor.valid_from<=clock_timestamp()
+          AND (sor.valid_through IS NULL OR sor.valid_through>clock_timestamp())
+      )
+    FOR SHARE OF o,s
+  `);
+  if(result.rows.length!==1)throw new AuthorizationError("current authorized issuer Site");
 }
 
 async function requireIndependentInstitutionalReviewer() {
@@ -114,40 +136,21 @@ export const requestCanonicalCredentialIssuerApproval=createServerFn({method:"PO
     if(!can.actorPersonId||can.sessionAccountId||
        !["site_admin","registrar"].includes(can.role))
       throw new AuthorizationError("verified non-demo Site administrator");
-    const canonical=await getCanonicalCommandContext(request);
-    if(!canonical.actorPersonId || canonical.role!==can.role ||
-       canonical.scope.siteIds?.length!==1 ||
-       canonical.scope.organizationIds?.length!==1)
-      throw new AuthorizationError("one verified canonical Site staff assignment");
-
+    const scope=issuerStaffScope(can);
     return db.transaction(async tx=>{
-      await assertCurrentCanonicalStaffForMutation(tx,request,canonical);
-      // The trusted canonical identity came from a restricted session reader.
-      // No browser-provided Person, Site, role or native grant is accepted.
-      const candidates=await tx.select({id:canonicalAccountGrants.id})
-        .from(canonicalAccountGrants)
-        .innerJoin(canonicalAccounts,
-          eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
-        .where(and(
-          eq(canonicalAccountGrants.personId,canonical.actorPersonId!),
-          eq(canonicalAccountGrants.organizationId,canonical.scope.organizationIds![0]!),
-          eq(canonicalAccountGrants.siteId,canonical.scope.siteIds![0]!),
-          eq(canonicalAccountGrants.roleCode,can.role as "site_admin"|"registrar"),
-          eq(canonicalAccountGrants.active,true),
-          isNull(canonicalAccountGrants.revokedAt),
-          isNull(canonicalAccounts.disabledAt),
-        )).limit(2);
-      if(candidates.length!==1)
-        throw new AuthorizationError("unique current canonical staff grant");
-      const grantId=candidates[0]!.id;
+      await assertCurrentCANGrantForMutation(tx,request,can,{
+        roles:["site_admin","registrar"],organizationId:scope.org,siteId:scope.site,
+      });
+      await assertIssuerOperatingSite(tx,scope.org,scope.site);
+      const grantId=scope.grantId;
       const existing=await tx.select({id:approvals.id}).from(approvals)
-        .where(and(eq(approvals.canonicalGrantId,grantId),
+        .where(and(eq(approvals.accountPersonGrantId,grantId),
           eq(approvals.capabilityCode,"credential.issue"),
           sql`${approvals.status} IN ('pending','approved')`)).limit(1);
       if(existing.length)throw new AuthorizationError("issuer approval already requested or approved");
       const [created]=await withSensitiveApprovalWriter(
         tx,"request",can.accountId,()=>tx.insert(approvals).values({
-          canonicalGrantId:grantId,capabilityCode:"credential.issue",
+          accountPersonGrantId:grantId,capabilityCode:"credential.issue",
           requestedByCanAccountId:can.accountId,
           requestEvidenceReference:data.evidenceReference,
         }).returning({id:approvals.id}),
@@ -156,8 +159,7 @@ export const requestCanonicalCredentialIssuerApproval=createServerFn({method:"PO
       await writeAudit(tx,can,{
         action:"canonical.credential_issuer.requested",
         entityType:"canonical_sensitive_capability_approval",entityId:created.id,
-        scope:{organizationId:canonical.scope.organizationIds![0]!,
-          siteId:canonical.scope.siteIds![0]!},
+        scope:{organizationId:scope.org,siteId:scope.site},
         after:{capabilityCode:"credential.issue",evidenceReference:data.evidenceReference},
       });
       return {requested:true as const,approvalId:created.id};
@@ -172,24 +174,14 @@ export const getMyCredentialIssuerApproval=createServerFn({method:"GET"})
     const can=await getIdentityContext(request);
     if(can.sessionAccountId||!["site_admin","registrar"].includes(can.role))
       throw new AuthorizationError("current CAN school staff");
-    const canonical=await getCanonicalCommandContext(request);
-    const grant=await db.select({id:canonicalAccountGrants.id})
-      .from(canonicalAccountGrants)
-      .where(and(
-        eq(canonicalAccountGrants.personId,canonical.actorPersonId!),
-        eq(canonicalAccountGrants.organizationId,canonical.scope.organizationIds![0]!),
-        eq(canonicalAccountGrants.siteId,canonical.scope.siteIds![0]!),
-        eq(canonicalAccountGrants.roleCode,can.role as "site_admin"|"registrar"),
-        eq(canonicalAccountGrants.active,true),
-        isNull(canonicalAccountGrants.revokedAt),
-      )).limit(2);
-    if(grant.length!==1)throw new AuthorizationError("current exact staff grant");
+    const {grantId}=issuerStaffScope(can);
     const [row]=await db.select({
       id:approvals.id,status:approvals.status,
       requestedAt:approvals.requestedAt,reviewedAt:approvals.reviewedAt,
       approvedUntil:approvals.approvedUntil,
     }).from(approvals)
-      .where(eq(approvals.canonicalGrantId,grant[0]!.id))
+      .where(and(eq(approvals.accountPersonGrantId,grantId),
+        eq(approvals.requestedByCanAccountId,can.accountId)))
       .orderBy(sql`${approvals.requestedAt} DESC`).limit(1);
     return row??null;
   });
@@ -205,10 +197,11 @@ export const listActiveCredentialIssuerApprovals=createServerFn({method:"GET"})
       requestedAt:approvals.requestedAt,
       reviewedAt:approvals.reviewedAt,
       approvedUntil:approvals.approvedUntil,
-      nativeOrganizationId:canonicalAccountGrants.organizationId,
-      nativeSiteId:canonicalAccountGrants.siteId,
-    }).from(approvals).innerJoin(canonicalAccountGrants,
-      eq(canonicalAccountGrants.id,approvals.canonicalGrantId))
+      organizationId:accountPersonGrants.organizationId,
+      siteId:accountPersonGrants.siteId,
+    }).from(approvals).innerJoin(accountPersonGrants,
+      and(eq(accountPersonGrants.id,approvals.accountPersonGrantId),
+        eq(accountPersonGrants.accountId,approvals.requestedByCanAccountId)))
       .where(eq(approvals.status,"approved")).limit(101);
   });
 
@@ -222,12 +215,13 @@ export const listPendingCredentialIssuerApprovals=createServerFn({method:"GET"})
       requestedByAccountId:approvals.requestedByCanAccountId,
       evidenceReference:approvals.requestEvidenceReference,
       requestedAt:approvals.requestedAt,
-      nativeGrantId:approvals.canonicalGrantId,
-      nativeOrganizationId:canonicalAccountGrants.organizationId,
-      nativeSiteId:canonicalAccountGrants.siteId,
-      nativeRole:canonicalAccountGrants.roleCode,
-    }).from(approvals).innerJoin(canonicalAccountGrants,
-      eq(canonicalAccountGrants.id,approvals.canonicalGrantId))
+      grantId:approvals.accountPersonGrantId,
+      organizationId:accountPersonGrants.organizationId,
+      siteId:accountPersonGrants.siteId,
+      role:accountPersonGrants.role,
+    }).from(approvals).innerJoin(accountPersonGrants,
+      and(eq(accountPersonGrants.id,approvals.accountPersonGrantId),
+        eq(accountPersonGrants.accountId,approvals.requestedByCanAccountId)))
       .where(eq(approvals.status,"pending")).limit(101);
   });
 
@@ -251,75 +245,23 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
          !reviewer.accountId||approval.requestedByCanAccountId===reviewer.accountId)
         throw new AuthorizationError("independent pending issuer request");
 
-      const [grant]=await tx.select().from(canonicalAccountGrants)
-        .where(eq(canonicalAccountGrants.id,approval.canonicalGrantId)).limit(1);
-      if(!grant||!grant.siteId||!grant.active||grant.revokedAt||
-         !["site_admin","registrar"].includes(grant.roleCode))
-        throw new AuthorizationError("current native Site staff grant");
-      // A pending request cannot be promoted after native staff/organization
-      // authority has been disabled or its hosting relationship has expired.
-      const nativeAuthority=await tx.execute(sql`
-        SELECT 1
-        FROM education_v30.canonical_accounts native_account
-        JOIN public.organizations native_org
-          ON native_org.id=${grant.organizationId}::uuid
-        JOIN public.sites native_site
-          ON native_site.id=${grant.siteId}::uuid
-        WHERE native_account.id=${grant.accountId}::uuid
-          AND native_account.disabled_at IS NULL
-          AND native_account.email_verified_at IS NOT NULL
-          AND native_org.lifecycle_status='active'
-          AND native_site.lifecycle_status IN ('planning','active')
-          AND EXISTS (
-            SELECT 1 FROM education_v30.site_organization_roles operator_role
-            WHERE operator_role.organization_id=${grant.organizationId}::uuid
-              AND operator_role.site_id=${grant.siteId}::uuid
-              AND operator_role.role_code IN ('operator','host')
-              AND operator_role.valid_from<=clock_timestamp()
-              AND (operator_role.valid_through IS NULL
-                OR operator_role.valid_through>clock_timestamp())
-          )
-        LIMIT 1
+      const [grant]=await tx.select().from(accountPersonGrants)
+        .where(eq(accountPersonGrants.id,approval.accountPersonGrantId)).for("share").limit(1);
+      if(!grant||!grant.organizationId||!grant.siteId||!grant.active||
+         !["site_admin","registrar"].includes(grant.role)||
+         grant.accountId!==approval.requestedByCanAccountId||
+         grant.personId===reviewer.actorPersonId)
+        throw new AuthorizationError("independent current CAN issuer grant");
+      const verified=await tx.execute(sql`
+        SELECT 1 FROM public.access_accounts a JOIN public.people p ON p.id=a.person_id
+        WHERE a.id=${approval.requestedByCanAccountId}::uuid
+          AND a.person_id=${grant.personId}::uuid
+          AND a.disabled=false AND a.email_verified_at IS NOT NULL AND p.active=true
+        FOR SHARE OF a,p
       `);
-      if(nativeAuthority.rows.length!==1)
-        throw new AuthorizationError("current authorized issuer Site organization");
-      const requesterMembership=await tx.select({
-        personId:accountPersonGrants.personId,
-      }).from(accountPersonGrants)
-        .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
-        .innerJoin(sites,and(eq(sites.id,accountPersonGrants.siteId),
-          eq(sites.organizationId,accountPersonGrants.organizationId)))
-        .innerJoin(accessAccountCanonicalPrincipals,and(
-          eq(accessAccountCanonicalPrincipals.accountId,accountPersonGrants.accountId),
-          eq(accessAccountCanonicalPrincipals.canonicalPrincipalId,grant.personId),
-          isNull(accessAccountCanonicalPrincipals.revokedAt),
-        ))
-        .where(and(
-          eq(accountPersonGrants.accountId,approval.requestedByCanAccountId),
-          eq(accountPersonGrants.role,grant.roleCode),
-          eq(accountPersonGrants.active,true),
-          eq(accessAccounts.disabled,false),
-          isNotNull(accessAccounts.emailVerifiedAt),
-          // One shared platform Site and Organization UUID; no crosswalk.
-          // Revalidate current CAN grant, verified Person, exact Site and
-          // hosting organization before an independent issuer approval.
-          eq(accountPersonGrants.siteId,grant.siteId),
-          eq(accountPersonGrants.organizationId,grant.organizationId),
-        )).limit(2);
-      if(requesterMembership.length!==1||
-         requesterMembership[0]?.personId===reviewer.actorPersonId)
-        throw new AuthorizationError("independent current requester staff identity");
-      if(data.decision==="approve"){
-        // Reviewer account must never be a second alias for the native issuer.
-        const selfNative=await tx.select({id:accessAccountCanonicalPrincipals.id})
-          .from(accessAccountCanonicalPrincipals)
-          .where(and(
-            eq(accessAccountCanonicalPrincipals.accountId,reviewer.accountId),
-            eq(accessAccountCanonicalPrincipals.canonicalPrincipalId,grant.personId),
-            isNull(accessAccountCanonicalPrincipals.revokedAt),
-          )).limit(1);
-        if(selfNative.length)throw new AuthorizationError("reviewer may not approve own native Person");
-      }
+      if(verified.rows.length!==1)
+        throw new AuthorizationError("verified current requester account and Person");
+      await assertIssuerOperatingSite(tx,grant.organizationId,grant.siteId);
       await assertCurrentReviewerInTransaction(tx,reviewer);
       await withSensitiveApprovalWriter(tx,"review",reviewer.accountId,
         ()=>tx.update(approvals).set({
@@ -356,10 +298,13 @@ export const revokeCanonicalCredentialIssuerApproval=createServerFn({method:"POS
          approval.requestedByCanAccountId===reviewer.accountId)
         throw new AuthorizationError("current independently approved issuer");
       const [grant]=await tx.select({
-        siteId:canonicalAccountGrants.siteId,
-        organizationId:canonicalAccountGrants.organizationId,
-      }).from(canonicalAccountGrants)
-        .where(eq(canonicalAccountGrants.id,approval.canonicalGrantId)).limit(1);
+        siteId:accountPersonGrants.siteId,
+        organizationId:accountPersonGrants.organizationId,
+        personId:accountPersonGrants.personId,
+      }).from(accountPersonGrants)
+        .where(eq(accountPersonGrants.id,approval.accountPersonGrantId)).limit(1);
+      if(!grant||grant.personId===reviewer.actorPersonId)
+        throw new AuthorizationError("independent existing CAN issuer");
       await assertCurrentReviewerInTransaction(tx,reviewer);
       await withSensitiveApprovalWriter(tx,"revoke",reviewer.accountId,
         ()=>tx.update(approvals).set({

@@ -105,40 +105,40 @@ async function run() {
       const client = clients[i];
       const { rows: visibleAttempts } = await client.query(`
         SELECT id,section_id,course_version_id
-        FROM education_v30.learner_course_attempts WHERE id=ANY($1::uuid[])
+        FROM public.learner_course_attempts WHERE id=ANY($1::uuid[])
       `, [[attempts[i], attempts[other]]]);
       assert(visibleAttempts.length === 1 && visibleAttempts[0].id === attempts[i],
         "Each restricted learner must see their own Course attempt, never the other learner.");
       own.push(visibleAttempts[0]);
 
       const { rows: ownSelections } = await client.query(`
-        SELECT track_version_id FROM education_v30.learner_track_selections
+        SELECT track_version_id FROM public.learner_track_selections
         WHERE course_attempt_id=$1 AND superseded_at IS NULL
       `, [attempts[i]]);
       const otherSelections = await readVisible(client,
-        "education_v30.learner_track_selections", "id",
+        "public.learner_track_selections", "id",
         attempts[other]);
       assert(ownSelections.length === 1 && otherSelections.length === 0,
         "Each learner must have exactly one private active recorded instructor.");
       selectedTracks.push(ownSelections[0].track_version_id);
 
       const ownProgress = await readVisible(client,
-        "education_v30.learner_lesson_progress", "lesson_id", attempts[i]);
+        "public.learner_lesson_progress", "lesson_id", attempts[i]);
       const otherProgress = await readVisible(client,
-        "education_v30.learner_lesson_progress", "lesson_id", attempts[other]);
+        "public.learner_lesson_progress", "lesson_id", attempts[other]);
       assert(ownProgress.length >= 1 && otherProgress.length === 0,
         "Canonical lesson progress must stay learner-private.");
 
       const ownPractice = await readVisible(client,
-        "education_v30.formative_practice_attempts", "id", attempts[i]);
+        "public.formative_practice_attempts", "id", attempts[i]);
       const otherPractice = await readVisible(client,
-        "education_v30.formative_practice_attempts", "id", attempts[other]);
+        "public.formative_practice_attempts", "id", attempts[other]);
       assert(ownPractice.length >= 1 && otherPractice.length === 0,
         "Practice history must stay learner-private.");
       const { rows: ownAnswers } = await client.query(`
         SELECT r.practice_attempt_id
         FROM education_v30_secure.formative_practice_responses r
-        JOIN education_v30.formative_practice_attempts p
+        JOIN public.formative_practice_attempts p
           ON p.id=r.practice_attempt_id
         WHERE p.course_attempt_id=$1
       `, [attempts[i]]);

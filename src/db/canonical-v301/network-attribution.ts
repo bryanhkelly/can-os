@@ -5,7 +5,7 @@ const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Network reporting units may be districts, jurisdictions, regions, chapters,
  * or any network-defined layer. Units never confer Site or learner authority. */
-export const networkUnits = educationV30.table("network_units",{
+export const networkUnits = pgTable("network_units",{
   id:id(),
   networkOrganizationId:uuid("network_organization_id").notNull(),
   parentUnitId:uuid("parent_unit_id"),
@@ -23,7 +23,7 @@ export const networkUnits = educationV30.table("network_units",{
 
 /** An Organization's reviewed, effective-dated membership in a network.
  * This does not verify the claimed affiliation of any individual learner. */
-export const networkMemberships = educationV30.table("network_reporting_memberships",{
+export const networkMemberships = pgTable("network_reporting_memberships",{
   id:id(),
   networkOrganizationId:uuid("network_organization_id").notNull(),
   memberOrganizationId:uuid("member_organization_id").notNull(),
@@ -79,7 +79,7 @@ export const networkReportingGrants = pgTable("network_reporting_grants",{
 
 /** Append-only attribution referencing one native Class enrollment OR one
  * existing noncredit registration, never creating another learning source. */
-export const participationAttributions = educationV30.table("participation_attributions",{
+export const participationAttributions = pgTable("participation_attributions",{
   id:id(),
   noncreditRegistrationId:uuid("noncredit_registration_id"),
   classEnrollmentId:uuid("class_enrollment_id"),

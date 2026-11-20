@@ -62,9 +62,9 @@ async function run() {
     const {rows:triggers}=await db.query(`
       SELECT tgname FROM pg_trigger
       WHERE tgrelid IN (
-        'education_v30.learner_course_attempts'::regclass,
-        'education_v30.assessment_administrations'::regclass,
-        'education_v30.noncredit_completion_decisions'::regclass
+        'public.learner_course_attempts'::regclass,
+        'public.assessment_administrations'::regclass,
+        'public.noncredit_completion_decisions'::regclass
       ) AND NOT tgisinternal
     `);
     const installed=new Set(triggers.map(row=>row.tgname));
@@ -83,7 +83,7 @@ async function run() {
     const {rows:rls}=await db.query(`
       SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity
       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='education_v30'
+      WHERE n.nspname='public'
         AND c.relname=ANY($1::text[])
     `,[["noncredit_registrations","learner_course_attempts",
        "assessment_access_grants","assessment_attempts","survey_responses"]]);
@@ -93,7 +93,7 @@ async function run() {
       secure.has("assessment_access_grants")&&secure.has("assessment_attempts")]);
     const {rows:columns}=await db.query(`
       SELECT table_name,column_name FROM information_schema.columns
-      WHERE table_schema='education_v30'
+      WHERE table_schema='public'
         AND (
           (table_name='noncredit_registrations' AND column_name='completion_policy_id')
           OR (table_name='noncredit_completion_policies' AND column_name='completion_mode')

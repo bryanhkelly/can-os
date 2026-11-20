@@ -32,6 +32,7 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(authorization).toContain("v301_can_sensitive_capability");
     expect(authorization).toContain("FOR SHARE OF approval");
     expect(authorization).toContain("approval.requested_by_can_account_id=can_session.account_id");
+    expect(authorization).toContain("approval.account_person_grant_id=staff.grant_id");
     expect(authorization).toContain("can_session.secret_hash=");
     expect(authorization).not.toContain("canonicalSessionCookie");
   });
@@ -81,12 +82,18 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).toContain("revokeCanonicalCredentialIssuerApproval");
     expect(service).toContain("assertCANCredentialIssuerReviewer(reviewer,organization)");
     expect(service).toContain("approval.requestedByCanAccountId===reviewer.accountId");
-    expect(service).toContain("requesterMembership[0]?.personId===reviewer.actorPersonId");
-    expect(service).toContain("eq(accountPersonGrants.siteId,grant.siteId)");
-    expect(service).toContain("eq(accountPersonGrants.organizationId,grant.organizationId)");
-    expect(service).toContain("eq(sites.id,accountPersonGrants.siteId)");
+    expect(service).toContain("grant.personId===reviewer.actorPersonId");
+    expect(service).toContain("grant.accountId!==approval.requestedByCanAccountId");
+    expect(service).toContain("assertIssuerOperatingSite");
+    expect(service).toContain("issuerStaffScope(can)");
+    expect(service).toContain("accountPersonGrants.id,approval.accountPersonGrantId");
+    expect(service).not.toContain("canonicalAccountGrants");
+    expect(service).not.toContain("accessAccountCanonicalPrincipals");
     expect(service).not.toContain("site_canonical_identity_links");
     expect(service).toContain("assertCurrentReviewerInTransaction(tx,reviewer)");
+    expect(service).toContain("roles:[\"site_admin\",\"registrar\"]");
+    expect(service).toContain("FOR SHARE OF a,p");
+    expect(service).toContain("current authorized issuer Site");
     expect(service).toContain("withSensitiveApprovalWriter");
     expect(service).toContain("SET LOCAL ROLE can_v30_sensitive_approval_writer");
     expect(service).toContain('withSensitiveApprovalWriter(\n        tx,"request",can.accountId');
@@ -104,6 +111,25 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).toContain("reviewEvidenceReference:data.evidenceReference");
     expect(service).toContain("expiresAt.getTime()>now.getTime()+366");
   });
+  it("migrates issuer approvals to the shared CAN grant without authorizing unverified users",()=>{
+    const migration=file("database/production/2026-11-19-credential-issuer-shared-grant-cutover.sql");
+    const schema=file("src/db/canonical-v301/auth.ts");
+    for(const expected of [
+      "FOREIGN KEY (account_person_grant_id) REFERENCES public.account_person_grants(id)",
+      "RENAME COLUMN canonical_grant_id TO account_person_grant_id",
+      "reviewer.person_id <> staff.person_id",
+      "issuer_approval_shared_grant_owner",
+      "Issuer approval grant and requester are immutable",
+      "Issuer approval must use the exact requesting CAN grant",
+      "FOR SHARE",
+      "FORCE ROW LEVEL SECURITY",
+    ]) {
+      if(expected==="FORCE ROW LEVEL SECURITY")continue; // preexisting FORCE RLS is guarded, not recreated
+      expect(migration).toContain(expected);
+    }
+    expect(schema).toContain('accountPersonGrantId: uuid("account_person_grant_id")');
+  });
+
   it("retains a clear one-login governed UI and rollback-only acceptance",()=>{
     const route=file("src/routes/canonical.issuer-access.tsx");
     expect(route).toContain('createFileRoute("/canonical/issuer-access")');

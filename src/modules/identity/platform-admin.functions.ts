@@ -60,10 +60,10 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     const publisherReleaseRows=await db.execute(sql`
       SELECT ov.id AS "offeringVersionId",o.title AS "offeringTitle",
         ov.version_no AS "versionNo",ov.lifecycle,
-        (SELECT count(*)::int FROM education_v30.offering_courses oc
+        (SELECT count(*)::int FROM public.offering_courses oc
           WHERE oc.offering_version_id=ov.id) AS "courseCount",
-        (SELECT count(*)::int FROM education_v30.offering_courses oc
-          JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_versions cv ON cv.id=oc.course_version_id
           WHERE oc.offering_version_id=ov.id
             AND cv.lifecycle='published' AND cv.published_at IS NOT NULL)
           AS "publishedCourses",
@@ -84,9 +84,9 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             AND a.email_verified_at IS NOT NULL
             AND g.role='academic_content_reviewer') AS "reviewerMemberships",
         (SELECT count(DISTINCT a.course_id)::int
-          FROM education_v30.offering_courses oc
-          JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
-          JOIN education_v30.professional_role_assignments a ON a.course_id=cv.course_id
+          FROM public.offering_courses oc
+          JOIN public.course_versions cv ON cv.id=oc.course_version_id
+          JOIN public.professional_role_assignments a ON a.course_id=cv.course_id
           WHERE oc.offering_version_id=ov.id
             AND a.organization_id=o.publisher_organization_id
             AND a.appointing_organization_id=o.publisher_organization_id
@@ -95,9 +95,9 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             AND (a.ends_at IS NULL OR a.ends_at>clock_timestamp()))
           AS "creatorAppointedCourses",
         (SELECT count(DISTINCT a.course_id)::int
-          FROM education_v30.offering_courses oc
-          JOIN education_v30.course_versions cv ON cv.id=oc.course_version_id
-          JOIN education_v30.professional_role_assignments a ON a.course_id=cv.course_id
+          FROM public.offering_courses oc
+          JOIN public.course_versions cv ON cv.id=oc.course_version_id
+          JOIN public.professional_role_assignments a ON a.course_id=cv.course_id
           WHERE oc.offering_version_id=ov.id
             AND a.organization_id=o.publisher_organization_id
             AND a.appointing_organization_id=o.publisher_organization_id
@@ -106,29 +106,29 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             AND (a.ends_at IS NULL OR a.ends_at>clock_timestamp()))
           AS "reviewerAppointedCourses",
         (SELECT count(*)::int
-          FROM education_v30.evidence_document_versions v
-          JOIN education_v30.evidence_documents d ON d.id=v.document_id
+          FROM public.evidence_document_versions v
+          JOIN public.evidence_documents d ON d.id=v.document_id
           WHERE d.owning_organization_id=o.publisher_organization_id
             AND v.verified_by_person_id IS NOT NULL AND v.verified_at IS NOT NULL
             AND v.verified_at<=clock_timestamp()
             AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE)
             AND (v.valid_through IS NULL OR v.valid_through>=CURRENT_DATE))
           AS "currentEvidenceRecords",
-        (SELECT count(*)::int FROM education_v30.offering_release_requirements r
+        (SELECT count(*)::int FROM public.offering_release_requirements r
           WHERE r.offering_version_id=ov.id) AS "releasePolicies",
-        (SELECT m.manifest_status FROM education_v30.content_publication_manifests m
+        (SELECT m.manifest_status FROM public.content_publication_manifests m
           WHERE m.offering_version_id=ov.id
           ORDER BY m.created_at DESC,m.id DESC LIMIT 1) AS "manifestStatus",
-        (SELECT count(*)::int FROM education_v30.content_publication_manifest_items i
+        (SELECT count(*)::int FROM public.content_publication_manifest_items i
           WHERE i.manifest_id=(
-            SELECT m.id FROM education_v30.content_publication_manifests m
+            SELECT m.id FROM public.content_publication_manifests m
             WHERE m.offering_version_id=ov.id
             ORDER BY m.created_at DESC,m.id DESC LIMIT 1)) AS "releaseAssets",
         (SELECT count(*)::int FROM public.deployment_offering_adoptions a
           WHERE a.offering_version_id=ov.id AND a.approval_status='approved')
           AS "approvedAdoptions"
-      FROM education_v30.offering_versions ov
-      JOIN education_v30.offerings o ON o.id=ov.offering_id
+      FROM public.offering_versions ov
+      JOIN public.offerings o ON o.id=ov.offering_id
       ORDER BY o.title,ov.version_no DESC,ov.id
       LIMIT 26
     `);

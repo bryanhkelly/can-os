@@ -38,6 +38,59 @@ const repoFiles=[
   "database/production/2026-11-18-consolidate-approved-deployment-adoptions.sql",
   "database/production/2026-11-18-consolidate-deployment-sites.sql",
 ];
+// These later migrations use guarded PL/pgSQL ALTER TABLE statements rather
+// than literal ALTER TABLE lines. Read their pinned relation snapshots and
+// reject name/row-contract drift, rather than silently omitting guarded moves.
+const guardedBatchFiles=[
+  ["database/production/2026-11-18-consolidate-eight-unmapped-tables.sql",8,7],
+  ["database/production/2026-11-18-consolidate-46-function-backed-empty-tables.sql",46,9],
+  ["database/production/2026-11-18-consolidate-51-remaining-unmapped-empty-tables.sql",51,9],
+  ["database/production/2026-11-19-consolidate-22-empty-foundation-funding-qualification-tables.sql",22,"json"],
+  ["database/production/2026-11-19-consolidate-eight-assessment-grading-tables.sql",8,"json"],
+  ["database/production/2026-11-19-consolidate-12-blueprint-tables.sql",12,"json"],
+  ["database/production/2026-11-19-consolidate-38-assessment-survey-qualification-completion-tables.sql",38,"json"],
+  ["database/production/2026-11-19-consolidate-nine-instructional-track-tables.sql",9,"json"],
+  ["database/production/2026-11-19-consolidate-10-content-professional-tables.sql",10,"json"],
+  ["database/production/2026-11-19-consolidate-10-course-offering-active-tables.sql",10,"json"],
+  ["database/production/2026-11-19-consolidate-three-populated-course-child-tables.sql",3,"json"],
+  ["database/production/2026-11-19-consolidate-six-assessment-parent-tables.sql",6,"json"],
+  ["database/production/2026-11-19-consolidate-12-native-class-lifecycle-tables.sql",12,"json"],
+  ["database/production/2026-11-19-consolidate-10-learner-award-rollout-tables.sql",10,"json"],
+  ["database/production/2026-11-19-consolidate-evidence-document-roots.sql",2,"json"],
+  ["database/production/2026-11-19-consolidate-five-assurance-noncredit-survey-tables.sql",5,"json"],
+  ["database/production/2026-11-19-consolidate-four-view-backed-publisher-and-resource-tables.sql",4,"json"],
+  ["database/production/2026-11-19-consolidate-eight-learner-noncredit-view-backed-tables.sql",8,"json"],
+];
+
+function guardedTableNames(file,expected,arity){
+  const source=readFileSync(file,"utf8");
+  if(arity==="json"){
+    const match=source.match(/(?:snapshot|tables)\s+jsonb\s*:=\s*'([^']+)'::jsonb/);
+    if(!match)throw new Error("Missing pinned snapshot: "+file);
+    const rows=JSON.parse(match[1]);
+    if(rows.length!==expected||new Set(rows.map(x=>x.name)).size!==expected)
+      throw new Error("Invalid table snapshot in "+file);
+    return rows.map(x=>x.name);
+  }
+  const tuple=new RegExp(
+    "\\('([a-z_]+)'\\s*,\\s*(\\d+)\\s*,\\s*(true|false)\\s*,"+
+    (arity===9?"\\s*(true|false)\\s*,":"")+
+    "\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)"+
+    (arity===9?",\\s*(\\d+)":"")+"\\s*\\)","g");
+  const names=new Map();
+  for(const record of source.matchAll(tuple)){
+    const name=record[1];
+    const identity=record.slice(2).join(",");
+    if(names.has(name) && names.get(name)!==identity)
+      throw new Error("Contradictory guarded migration snapshot: "+file+" "+name);
+    names.set(name,identity);
+  }
+  if(names.size!==expected)
+    throw new Error("Expected "+expected+" guarded relation identities in "+file+
+      ", got "+names.size);
+  return [...names.keys()];
+}
+
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
   vocabularies:12,vocabulary_terms:80,facility_capability_types:6,
@@ -67,6 +120,12 @@ function migratedTableNames(){
     const matches=[...text.matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm)];
     if(!matches.length)throw new Error("No reviewed table moves in "+file);
     for(const [,name] of matches){
+      if(tables.includes(name))throw new Error("Duplicate migration of "+name);
+      tables.push(name);
+    }
+  }
+  for(const [file,count,arity] of guardedBatchFiles){
+    for(const name of guardedTableNames(file,count,arity)){
       if(tables.includes(name))throw new Error("Duplicate migration of "+name);
       tables.push(name);
     }

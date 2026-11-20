@@ -16,18 +16,18 @@ const url=process.env.DATABASE_URL;
 if(!url)throw new Error("Explicit QA DATABASE_URL is required");
 const pool=new Pool({connectionString:url,max:2});
 const requirements={
-  "education_v30.deployment_offering_adoptions":[
+  "public.deployment_offering_adoptions":[
     "id","deployment_id","offering_version_id"
   ],
-  "education_v30.offering_courses":["offering_version_id","course_version_id"],
-  "education_v30.program_deployments":["id","operation_id","offering_id","status"],
-  "education_v30.delivery_sessions":["id","deployment_id","site_id","starts_at","ends_at"],
-  "education_v30.facilitated_classroom_plans":[
+  "public.offering_courses":["offering_version_id","course_version_id"],
+  "public.program_deployments":["id","operation_id","offering_id","status"],
+  "public.delivery_sessions":["id","deployment_id","site_id","starts_at","ends_at"],
+  "public.facilitated_classroom_plans":[
     "id","delivery_session_id","deployment_id","course_version_id","site_id",
     "host_organization_id","facilitator_person_id","request_id","state",
     "facilitated_session_id","enrollment_release_id"
   ],
-  "education_v30.learner_course_attempts":[
+  "public.learner_course_attempts":[
     "id","enrollment_id","noncredit_registration_id","course_version_id",
     "adoption_id","offering_version_id","deployment_id","status"
   ],
@@ -42,7 +42,7 @@ let exitCode=0;
 try{
   const sqlColumns=await pool.query(
     "SELECT table_schema,table_name,column_name FROM information_schema.columns "
-    +"WHERE table_schema='education_v30' "
+    +"WHERE table_schema='public' "
     +"AND table_name=ANY($1::text[])",
     [Object.keys(requirements).map(x=>x.split(".")[1])]
   );
@@ -54,17 +54,17 @@ try{
   const [native,integrity,sourceChecks,policies,roleData]=await Promise.all([
     pool.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity "
       +"FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
-      +"WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])",
+      +"WHERE n.nspname='public' AND c.relname=ANY($1::text[])",
       [nativeTables]),
     pool.query("SELECT conrelid::regclass::text AS relation,conname,contype,"
       +"pg_get_constraintdef(oid) AS definition FROM pg_constraint "
-      +"WHERE conrelid IN ('education_v30.deployment_offering_adoptions'::regclass,"
-      +"'education_v30.offering_courses'::regclass) AND contype IN ('u','p')"),
+      +"WHERE conrelid IN ('public.deployment_offering_adoptions'::regclass,"
+      +"'public.offering_courses'::regclass) AND contype IN ('u','p')"),
     pool.query("SELECT conname,pg_get_constraintdef(oid) AS definition "
       +"FROM pg_constraint WHERE conrelid="
-      +"'education_v30.learner_course_attempts'::regclass AND contype='c'"),
+      +"'public.learner_course_attempts'::regclass AND contype='c'"),
     pool.query("SELECT tablename,policyname,roles,cmd "
-      +"FROM pg_policies WHERE schemaname='education_v30' "
+      +"FROM pg_policies WHERE schemaname='public' "
       +"AND tablename=ANY($1::text[])",[nativeTables]),
     pool.query("SELECT rolname,rolcanlogin,rolbypassrls FROM pg_roles "
       +"WHERE rolname IN ('neondb_owner','can_os_canonical_auth_app')")

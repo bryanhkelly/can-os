@@ -43,10 +43,10 @@ async function run(){
   const sql=neon(url);
   const [schema]=await sql`
     SELECT
-      to_regclass('education_v30.class_completion_policy_versions') IS NOT NULL AS ws3_policy,
-      to_regclass('education_v30.class_enrollment_completion_pins') IS NOT NULL AS ws3_pins,
+      to_regclass('public.class_completion_policy_versions') IS NOT NULL AS ws3_policy,
+      to_regclass('public.class_enrollment_completion_pins') IS NOT NULL AS ws3_pins,
       to_regclass('public.learning_completion_evidence_review_requests') IS NOT NULL AS ws3_review,
-      to_regclass('education_v30.class_session_agenda_revisions') IS NOT NULL AS ws4_agendas
+      to_regclass('public.class_session_agenda_revisions') IS NOT NULL AS ws4_agendas
   `;
   if(!schema || Object.values(schema).some(value=>value!==true))
     throw new Error("WS00 QA missing migrated WS3/WS4 governance schema; no E2E acceptance");
@@ -104,7 +104,7 @@ async function run(){
       AND evidence.metadata->>'revokedAt' IS NULL
       AND evidence.metadata->>'verifiedBirthDate'=review.verified_birth_date::text
       AND evidence.verified_by_person_id<>review.access_person_id
-    JOIN education_v30.organizations o ON o.id=review.organization_id
+    JOIN public.organizations o ON o.id=review.organization_id
     WHERE a.id=${freshAccountId}::uuid
       AND a.email_verified_at IS NOT NULL AND a.disabled=false
       AND reviewer.id<>a.id
@@ -139,10 +139,10 @@ async function run(){
   const rows=singleLoginOnly
     ?await sql`SELECT id::text AS id,site_id::text AS site_id,
       course_version_id::text AS course_version_id,state
-      FROM education_v30.classes WHERE id=${ids[0]}::uuid`
+      FROM public.classes WHERE id=${ids[0]}::uuid`
     :await sql`SELECT id::text AS id,site_id::text AS site_id,
       course_version_id::text AS course_version_id,state
-      FROM education_v30.classes
+      FROM public.classes
       WHERE id IN (${ids[0]}::uuid,${ids[1]}::uuid,${ids[2]}::uuid)`;
   if(rows.length!==ids.length||rows.some(row=>
        !row.site_id||!row.course_version_id||row.state!=="active"))
@@ -153,10 +153,10 @@ async function run(){
   const [oneHourOffering]=await sql`
     SELECT v.id::text AS offering_version_id,
       v.class_id::text AS class_id
-    FROM education_v30.class_offering_versions v
+    FROM public.class_offering_versions v
     JOIN public.class_offerings o
       ON o.id=v.class_offering_id AND o.class_id=v.class_id
-    JOIN education_v30.classes c ON c.id=v.class_id
+    JOIN public.classes c ON c.id=v.class_id
     WHERE c.id=${ids[0]}::uuid AND c.state='active'
       AND v.state='published' AND v.visibility='public'
       AND 'self'=ANY(v.enrollment_methods)
@@ -175,7 +175,7 @@ async function run(){
       throw new Error("WS00 four-Session pilot must use two distinct approved delivery Sites");
     const counts=await sql`
       SELECT class_id::text AS class_id,count(*)::integer AS sessions
-      FROM education_v30.class_sessions
+      FROM public.class_sessions
       WHERE class_id IN (${ids[1]}::uuid,${ids[2]}::uuid)
       GROUP BY class_id
     `;
@@ -187,7 +187,7 @@ async function run(){
   const [security]=await sql`
     SELECT count(*)::integer AS forced_rls
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname='education_v30'
+    WHERE n.nspname='public'
       AND c.relname IN ('classes','class_sessions','class_enrollments',
         'class_completion_policy_versions','class_session_agenda_revisions')
       AND c.relrowsecurity AND c.relforcerowsecurity

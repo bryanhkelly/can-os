@@ -528,7 +528,7 @@ async function readNativeClassHistoryPage(
       isNotNull(canonicalClassOutcomes.completionEvidenceVersionId),
       isNotNull(canonicalClassOutcomes.completionDecidedByPersonId),
       sql`NOT EXISTS(
-        SELECT 1 FROM education_v30.class_outcomes superseding
+        SELECT 1 FROM public.class_outcomes superseding
         WHERE superseding.supersedes_outcome_id=${canonicalClassOutcomes.id}
       )`,
     )).orderBy(desc(canonicalClassOutcomes.recordedAt),

@@ -3,13 +3,13 @@ import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Mirrors the opt-in v3.0.1 credential patch; SQL owns triggers/RLS. */
-export const learningAwardDefinitions = educationV30.table("learning_award_definitions", {
+export const learningAwardDefinitions = pgTable("learning_award_definitions", {
   id: id(), issuerOrganizationId: uuid("issuer_organization_id").notNull(),
   code: text("code").notNull(),
   kind: text("kind").$type<"completion_certificate" | "digital_badge">().notNull(),
   sourceKind: text("source_kind").$type<"noncredit_completion" | "verified_activity">().notNull(),
 });
-export const learningAwardDefinitionVersions = educationV30.table("learning_award_definition_versions", {
+export const learningAwardDefinitionVersions = pgTable("learning_award_definition_versions", {
   id: id(), definitionId: uuid("definition_id").notNull(), versionNo: integer("version_no").notNull(),
   title: text("title").notNull(), description: text("description").notNull().default(""),
   minimumVerifiedMinutes: integer("minimum_verified_minutes").notNull().default(0),
@@ -18,7 +18,7 @@ export const learningAwardDefinitionVersions = educationV30.table("learning_awar
   approvedByPersonId: uuid("approved_by_person_id"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
 });
-export const learnerAchievementDecisions = educationV30.table("learner_achievement_decisions", {
+export const learnerAchievementDecisions = pgTable("learner_achievement_decisions", {
   id: id(), credentialDefinitionVersionId: uuid("credential_definition_version_id").notNull(),
   recipientPersonId: uuid("recipient_person_id").notNull(),
   noncreditCompletionDecisionId: uuid("noncredit_completion_decision_id"),
@@ -26,7 +26,7 @@ export const learnerAchievementDecisions = educationV30.table("learner_achieveme
   decidedByPersonId: uuid("decided_by_person_id").notNull(),
   decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
 });
-export const learningAwardIssuances = educationV30.table("learning_award_issuances", {
+export const learningAwardIssuances = pgTable("learning_award_issuances", {
   id: id(), achievementDecisionId: uuid("achievement_decision_id").notNull(),
   issuerOrganizationId: uuid("issuer_organization_id").notNull(),
   legacyNoncreditCertificateId: uuid("legacy_noncredit_certificate_id"),
@@ -35,7 +35,7 @@ export const learningAwardIssuances = educationV30.table("learning_award_issuanc
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
 });
-export const learningAwardIssuanceEvents = educationV30.table("learning_award_issuance_events", {
+export const learningAwardIssuanceEvents = pgTable("learning_award_issuance_events", {
   id: id(), issuanceId: uuid("issuance_id").notNull(),
   eventKind: text("event_kind").$type<"revoked">().notNull(),
   reason: text("reason").notNull(), evidenceVersionId: uuid("evidence_version_id").notNull(),

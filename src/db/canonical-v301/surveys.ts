@@ -10,14 +10,14 @@ export const surveyDefinitions = pgTable("survey_definitions", {
   intendedAudience:text("intended_audience").notNull(),
   status:text("status").$type<"active"|"retired">().notNull(),
 });
-export const surveyVersions = educationV30.table("survey_versions", {
+export const surveyVersions = pgTable("survey_versions", {
   id:id(), surveyId:uuid("survey_id").notNull(),
   versionNo:integer("version_no").notNull(),locale:text("locale").notNull(),
   authorPersonId:uuid("author_person_id").notNull(),
   lifecycle:text("lifecycle").$type<"draft"|"published">().notNull(),
   publishedAt:timestamp("published_at",{withTimezone:true}),
 });
-export const surveyQuestions = educationV30.table("survey_questions", {
+export const surveyQuestions = pgTable("survey_questions", {
   id:id(),surveyVersionId:uuid("survey_version_id").notNull(),
   questionKey:text("question_key").notNull(),promptText:text("prompt_text").notNull(),
   ordinal:integer("ordinal").notNull(),
@@ -25,18 +25,18 @@ export const surveyQuestions = educationV30.table("survey_questions", {
   required:boolean("required").notNull(),safetyTriage:boolean("safety_triage").notNull(),
   ratingMin:integer("rating_min"),ratingMax:integer("rating_max"),
 });
-export const surveyQuestionOptions = educationV30.table("survey_question_options", {
+export const surveyQuestionOptions = pgTable("survey_question_options", {
   id:id(),questionId:uuid("question_id").notNull(),
   optionKey:text("option_key").notNull(),label:text("label").notNull(),
   ordinal:integer("ordinal").notNull(),numericValue:numeric("numeric_value",{precision:12,scale:5}),
 });
-export const surveyQuestionBranchRules = educationV30.table("survey_question_branch_rules", {
+export const surveyQuestionBranchRules = pgTable("survey_question_branch_rules", {
   id:id(),surveyVersionId:uuid("survey_version_id").notNull(),
   sourceQuestionId:uuid("source_question_id").notNull(),
   targetQuestionId:uuid("target_question_id").notNull(),
   sourceOptionId:uuid("source_option_id").notNull(), action:text("action").notNull(),
 });
-export const surveyVersionReviews = educationV30.table("survey_version_reviews", {
+export const surveyVersionReviews = pgTable("survey_version_reviews", {
   id: id(),
   surveyVersionId: uuid("survey_version_id").notNull(),
   reviewKind: text("review_kind").$type<"academic" | "privacy" | "accessibility" | "safeguarding">().notNull(),
@@ -45,7 +45,7 @@ export const surveyVersionReviews = educationV30.table("survey_version_reviews",
   decisionOrder: bigint("decision_order", { mode: "bigint" }).generatedAlwaysAsIdentity().notNull(),
   evidenceVersionId: uuid("evidence_version_id"),
 });
-export const surveyCampaigns = educationV30.table("survey_campaigns", {
+export const surveyCampaigns = pgTable("survey_campaigns", {
   id:id(),surveyVersionId:uuid("survey_version_id").notNull(),
   operatingOrganizationId:uuid("operating_organization_id").notNull(),
   deploymentId:uuid("deployment_id"),offeringId:uuid("offering_id"),
@@ -55,27 +55,27 @@ export const surveyCampaigns = educationV30.table("survey_campaigns", {
   endsAt:timestamp("ends_at",{withTimezone:true}),
   surveyPermissionEvidenceId:uuid("survey_permission_evidence_id"),
 });
-export const surveyInvitations = educationV30.table("survey_invitations", {
+export const surveyInvitations = pgTable("survey_invitations", {
   id:id(),campaignId:uuid("campaign_id").notNull(),
   invitedPersonId:uuid("invited_person_id").notNull(),
   sentAt:timestamp("sent_at",{withTimezone:true}),
   dueAt:timestamp("due_at",{withTimezone:true}),
 });
-export const surveyResponses = educationV30.table("survey_responses", {
+export const surveyResponses = pgTable("survey_responses", {
   id:id(),campaignId:uuid("campaign_id").notNull(),
   surveyVersionId:uuid("survey_version_id").notNull(),
   respondentMode:text("respondent_mode").$type<"identified"|"confidential"|"anonymous">().notNull(),
   invitationId:uuid("invitation_id"),submittedAt:timestamp("submitted_at",{withTimezone:true}).notNull().defaultNow(),
   languageCode:text("language_code").notNull().default("en-US"),
 });
-export const surveyAnswers = educationV30.table("survey_answers", {
+export const surveyAnswers = pgTable("survey_answers", {
   id:id(),responseId:uuid("response_id").notNull(),
   surveyVersionId:uuid("survey_version_id").notNull(),
   questionId:uuid("question_id").notNull(),
   answerText:text("answer_text"),answerNumeric:numeric("answer_numeric",{precision:15,scale:5}),
   answerBoolean:boolean("answer_boolean"),sensitiveRedacted:boolean("sensitive_redacted").notNull(),
 });
-export const surveyAnswerChoices = educationV30.table("survey_answer_choices", {
+export const surveyAnswerChoices = pgTable("survey_answer_choices", {
   answerId:uuid("answer_id").notNull(),
   questionId:uuid("question_id").notNull(),
   optionId:uuid("option_id").notNull(),

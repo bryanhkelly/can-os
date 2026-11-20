@@ -4,7 +4,7 @@ const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Public-previewable only after an explicit provider publish command and
  * its runtime verification. An Offering alone never invites enrollment. */
-export const noncreditSelfEnrollmentReleases = educationV30.table("noncredit_self_enrollment_releases", {
+export const noncreditSelfEnrollmentReleases = pgTable("noncredit_self_enrollment_releases", {
   id: id(),
   deploymentId: uuid("deployment_id").notNull(),
   adoptionId: uuid("adoption_id").notNull(),
@@ -29,7 +29,7 @@ export const noncreditSelfEnrollmentReleases = educationV30.table("noncredit_sel
   index("noncredit_self_enroll_registering_idx").on(t.registeringOrganizationId,t.status,t.createdAt),
 ]);
 
-export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_enrollment_claims", {
+export const noncreditSelfEnrollmentClaims = pgTable("noncredit_self_enrollment_claims", {
   id: id(),
   releaseId: uuid("release_id").notNull(),
   registrationId: uuid("registration_id").notNull(),
@@ -92,7 +92,7 @@ export const canonicalPersons = educationV30.table("persons",{
 });
 
 /** Canonical Offering membership is source-of-truth for the chosen Course. */
-export const canonicalOfferingCourses = educationV30.table("offering_courses", {
+export const canonicalOfferingCourses = pgTable("offering_courses", {
   offeringVersionId: uuid("offering_version_id").notNull(),
   courseVersionId: uuid("course_version_id").notNull(),
   isRequired: boolean("is_required").notNull(),

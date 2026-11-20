@@ -17,7 +17,7 @@ export async function getPublicOperationProjection(rawInput: unknown) {
       program_claim_kind AS "programClaimKind",
       display_text AS "displayText",
       published_at AS "publishedAt"
-    FROM education_v30.v301_current_public_program_claims
+    FROM public.v301_current_public_program_claims
     WHERE operation_id = ${operationId}::uuid
   `);
   const claims = currentPublicProgramClaimsSchema.parse(result.rows);

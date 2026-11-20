@@ -1,6 +1,7 @@
-import { boolean, index, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { and, isNull, sql } from "drizzle-orm";
 import { educationV30 } from "./core";
+import { accountPersonGrants } from "@/db/schema/access";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 
@@ -30,10 +31,11 @@ export const canonicalAccountGrants = educationV30.table("canonical_account_gran
 ]);
 
 /** Independently approved time-bounded staff capability, not a role grant. */
-export const canonicalSensitiveCapabilityApprovals = educationV30.table(
-  "canonical_sensitive_capability_approvals", {
+export const canonicalSensitiveCapabilityApprovals = pgTable("canonical_sensitive_capability_approvals", {
     id: id(),
-    canonicalGrantId: uuid("canonical_grant_id").notNull(),
+    /** Current authoritative CAN grant. Not a native v3 account grant. */
+    accountPersonGrantId: uuid("account_person_grant_id").notNull()
+      .references(() => accountPersonGrants.id, { onDelete: "restrict" }),
     capabilityCode: text("capability_code").$type<"credential.issue">().notNull(),
     requestedByCanAccountId: uuid("requested_by_can_account_id").notNull(),
     requestEvidenceReference: text("request_evidence_reference").notNull(),
@@ -48,7 +50,7 @@ export const canonicalSensitiveCapabilityApprovals = educationV30.table(
     revokedReason: text("revoked_reason"),
   }, t => [
     uniqueIndex("sensitive_approvals_open_grant_uq")
-      .on(t.canonicalGrantId,t.capabilityCode)
+      .on(t.accountPersonGrantId,t.capabilityCode)
       .where(sql`${t.status} IN ('pending','approved')`),
     index("sensitive_approvals_status_idx").on(t.status,t.requestedAt),
   ],
