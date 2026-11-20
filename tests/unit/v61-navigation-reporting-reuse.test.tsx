@@ -33,6 +33,9 @@ describe("V6.1 reporting-table and navigation reuse", () => {
     ["src/components/reports/NativeClassReportPanel.tsx", 1],
     ["src/components/learning/NoncreditPilotOutcomesPanel.tsx", 1],
     ["src/components/reports/NoncreditProviderEvidencePanel.tsx", 2],
+    ["src/components/workflow/user-flow-map.tsx", 1],
+    ["src/routes/canonical.lab.impact.tsx", 1],
+    ["src/routes/student.assignments_.$assessmentId.tsx", 1],
   ] as const)("requires canonical table composition in %s", (path, expected) => {
     const content = source(path);
     expect((content.match(/<Table scrollLabel=/g) ?? []).length).toBe(expected);
