@@ -63,12 +63,14 @@ describe("V6.1 universal action and surface contracts", () => {
 
   it("disables slotted link actions with ARIA rather than an invalid HTML disabled attribute", () => {
     const disabled = renderToStaticMarkup(<Button asChild disabled variant="ghost">
-      <a href="/cancel">Cancel</a>
+      <a href="/cancel" aria-disabled={false} tabIndex={0}>Cancel</a>
     </Button>);
     expect(disabled).toContain('href="/cancel"');
     expect(disabled).toContain('aria-disabled="true"');
     expect(disabled).toMatch(/tabindex="-1"/i);
     expect(disabled).toContain("pointer-events-none");
+    expect(disabled).not.toContain('aria-disabled="false"');
+    expect(disabled).not.toMatch(/tabindex="0"/i);
     expect(disabled).not.toMatch(/\sdisabled(?:=|\s|>)/);
   });
 
