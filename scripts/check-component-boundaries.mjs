@@ -53,6 +53,7 @@ const guardedFiles = [
   "src/components/calendar/CalendarEventFactsPanels.tsx",
   "src/components/calendar/CalendarRecordContextPanel.tsx",
   "src/components/learning/ClassPublishedResourcesList.tsx",
+  "src/components/learning/ClassSupplementContent.tsx",
   "src/components/operations/ExtendedSeasonReadinessRequests.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
@@ -92,7 +93,7 @@ for (const file of files) {
 }
 
 const owners = [
-  ["src/routes/classes.tsx", ['<h3 className="font-semibold">Worked solutions</h3>', "Teacher guide not published", 'aria-label="Lesson discussions"', 'aria-label="Assignments for this lesson"', 'items.map(item => <li key={item.id} className=" border p-3 text-sm"> ']],
+  ["src/routes/classes.tsx", ['<h3 className="font-semibold">Worked solutions</h3>', "Teacher guide not published", 'aria-label="Lesson discussions"', 'aria-label="Assignments for this lesson"', '<ul className="space-y-3">{items.map(item => <li key={item.id}']],
   ["src/routes/class.tsx", ["function OfferingCard(", "function ApprovedClassCard(",
     "function InvitationCard(", "function EnrolledClassCard("]],
   ["src/routes/calendar.tsx", ['<WorkspacePanel title="Event details" description="Schedule and description for this calendar event."', 'rail={<WorkspacePanel title="Record context"', "const groupPeople = new Map", "visibleInvitePeople.map(",
