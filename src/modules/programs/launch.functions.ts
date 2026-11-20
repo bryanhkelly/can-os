@@ -202,7 +202,10 @@ export const startLaunch = createServerFn({ method: "POST" })
 
 /** Programs in pre-active states with their Launch Journey and requirement checklist. */
 export const listLaunches = createServerFn({ method: "GET" })
- .validator((value:unknown)=>z.object({includeActive:z.boolean().optional()}).strict().optional().parse(value))
+ .validator((value:unknown)=>z.object({
+   includeActive:z.boolean().optional(),
+   siteId:z.string().uuid().optional(),
+ }).strict().optional().parse(value))
  .handler(
   async ({data}) => {
     const context = await registrarContext("program.read");
@@ -243,6 +246,7 @@ export const listLaunches = createServerFn({ method: "GET" })
             ...(canReviewerOrganizations.length ? [inArray(s.programs.academicProviderOrganizationId, canReviewerOrganizations.map(org => org.id))] : [])),
           inArray(s.programs.status, data?.includeActive ? ["draft", "launching", "ready", "active"] : ["draft", "launching", "ready"]),
           ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
+          ...(data?.siteId ? [eq(s.programs.siteId, data.siteId)] : []),
           ...(context.scope.programIds?.length
             ? [inArray(s.programs.id, context.scope.programIds)] : []),
           ...(context.scope.siteIds?.length
