@@ -5,9 +5,9 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
+import { ActionFooter } from "@/components/workspace/action-footer";
 
 export function SchoolRoomsSetup({ programId }: { programId: string }) {
   const rooms = useQuery({ queryKey: ["school-rooms", programId],
@@ -71,9 +71,11 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
           <Input type="number" min={1} max={1000} step={1} value={capacity}
             onChange={event => setCapacity(event.target.value)} disabled={busy}/>
         </Field>
-        <Button type="submit" className="self-end" disabled={busy}>
-          {feedback.pending ? "Saving room…" : "Create physical classroom"}
-        </Button>
+        <ActionFooter layout="inline" className="mt-0 self-end">
+          <Button type="submit" disabled={busy} loading={feedback.pending} loadingLabel="Saving classroom...">
+            Create physical classroom
+          </Button>
+        </ActionFooter>
       </form>}
       {rooms.data.canManage && !!rooms.data.rooms.length && <div className="mt-5 space-y-3">
         <h3 className="font-semibold">Classroom locations</h3>
@@ -106,15 +108,16 @@ function SectionRoomLocation({ section, rooms, busy, save }: {
   return <form className="flex flex-wrap items-end gap-3" onSubmit={event => {
     event.preventDefault(); void save(roomId||null);
   }}>
-    <Label>{section.title} ({section.code}) physical room
-      <Select value={roomId} disabled={busy} onChange={event => setRoomId(event.target.value)}
-        className="mt-1 block w-full  border bg-background p-2">
+    <Field className="min-w-48 flex-1" label={`${section.title} (${section.code}) physical room`}>
+      <Select value={roomId} disabled={busy} onChange={event => setRoomId(event.target.value)}>
         <option value="">Not assigned</option>
         {retiredDefault && <option value={retiredDefault.id} disabled>{retiredDefault.name} (retired - replace or clear)</option>}
         {activeRooms.map(room => <option key={room.id} value={room.id}>{room.name} · capacity {room.capacity}</option>)}
       </Select>
-    </Label>
-    <Button type="submit" variant="outline" disabled={busy || roomId===(section.roomId??"")}>Save classroom location</Button>
+    </Field>
+    <ActionFooter layout="inline" className="mt-0">
+      <Button type="submit" variant="outline" disabled={busy || roomId===(section.roomId??"")}>Save classroom location</Button>
+    </ActionFooter>
     {retiredDefault && <p className="w-full text-sm" role="status">This class's default room is retired.
       Select an active room or clear the default. Historical assignments and approved plans remain unchanged.</p>}
   </form>;
@@ -161,8 +164,10 @@ function RoomEditor({ room, busy, update, retire }: {
         <Input minLength={5} maxLength={1000} value={reason} disabled={busy}
           onChange={event => setReason(event.target.value)}/>
       </Field>
-      <Button type="submit" variant="outline" disabled={busy ||
-        (name.trim() === room.name && Number(capacity) === room.capacity)}>Save room changes</Button>
+      <ActionFooter layout="inline" className="mt-0">
+        <Button type="submit" variant="outline" disabled={busy ||
+          (name.trim() === room.name && Number(capacity) === room.capacity)}>Save room changes</Button>
+      </ActionFooter>
     </form>
     <Field label="I understand retirement cannot be undone here, stops new assignments and approvals, and preserves existing defaults and reviewed plans for explicit follow-up"
       required error={retireAttempted&&!confirmed?"Confirm the retirement consequences before continuing.":undefined}>
