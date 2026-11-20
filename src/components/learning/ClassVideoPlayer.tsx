@@ -4,6 +4,7 @@ import { ClassroomMediaSurface, type ApprovedClassCaptionTrack } from "@/compone
 import { normalizeClientError } from "@/lib/client-error";
 import { Play, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isSharedDeviceMode } from "@/domain/session-client";
 import { advanceNativeVideoProgress, nativeVideoCoverage, normalizeNativeVideoProgress, type NativeVideoProgress } from "@/domain/native-video-progress";
 
 export function ClassVideoPlaceholder({ title, message, headingLevel = 2 }: {
@@ -60,19 +61,58 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
   const [playbackRevision, setPlaybackRevision] = useState(0);
   const player = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState<NativeVideoProgress | null>(null);
+  const progressRef = useRef<NativeVideoProgress | null>(null);
   const lastPosition = useRef<{position:number;at:number} | null>(null);
   const persistedAt = useRef(0);
   const progressStorageKey = resumeKey && resourceId
     ? "can-native-video-progress:" + resumeKey + ":" + resourceId : null;
+
+  // Shared devices never retain video bookmarks in durable browser storage.
+  // Existing CAN account-handoff/sign-out cleanup clears both storage areas.
+  const flushProgress = useCallback(() => {
+    if (!progressStorageKey) return;
+    let next = progressRef.current;
+    const element = player.current;
+    if (next && element && Number.isFinite(element.currentTime) &&
+        Number.isFinite(element.duration) && Math.abs(next.duration-element.duration) <= 1) {
+      next = advanceNativeVideoProgress(next, element.currentTime, element.currentTime,
+        element.duration, 0, false);
+      if (next) progressRef.current = next;
+    }
+    if (!next) return;
+    try {
+      const storage = isSharedDeviceMode() ? window.sessionStorage : window.localStorage;
+      storage.setItem(progressStorageKey, JSON.stringify(next));
+      persistedAt.current = Date.now();
+    } catch { /* Browser storage is optional. Never block lesson playback. */ }
+  }, [progressStorageKey]);
+
   useEffect(() => {
+    progressRef.current = null;
     lastPosition.current = null;
     persistedAt.current = 0;
     if (!progressStorageKey) { setProgress(null); return; }
     try {
-      const raw = window.localStorage.getItem(progressStorageKey);
-      setProgress(raw ? normalizeNativeVideoProgress(JSON.parse(raw)) : null);
+      const storage = isSharedDeviceMode() ? window.sessionStorage : window.localStorage;
+      const raw = storage.getItem(progressStorageKey);
+      const restored = raw ? normalizeNativeVideoProgress(JSON.parse(raw)) : null;
+      if (raw && !restored) storage.removeItem(progressStorageKey);
+      progressRef.current = restored;
+      setProgress(restored);
     } catch { setProgress(null); }
-  }, [progressStorageKey]);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushProgress();
+    };
+    const onPageHide = () => flushProgress();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      flushProgress();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [progressStorageKey, flushProgress]);
+
   function observePosition(element: HTMLVideoElement) {
     if (!progressStorageKey || !Number.isFinite(element.duration) || element.duration <= 0) return;
     const now = Date.now(), previous = lastPosition.current;
@@ -80,25 +120,24 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
     lastPosition.current = {position,at:now};
     if (!previous) return;
     const next = advanceNativeVideoProgress(
-      progress, previous.position, position, element.duration,
+      progressRef.current, previous.position, position, element.duration,
       (now-previous.at)/1000,
-      !element.paused && !element.seeking && document.visibilityState === "visible" && document.hasFocus(), now,
+      !element.paused && !element.seeking && element.readyState >= 3 &&
+        document.visibilityState === "visible" && document.hasFocus(), now,
     );
     if (!next) return;
+    progressRef.current = next;
     setProgress(next);
-    if (now - persistedAt.current >= 4000 || element.ended) {
-      persistedAt.current = now;
-      try { window.localStorage.setItem(progressStorageKey, JSON.stringify(next)); }
-      catch { /* Disabled browser storage must never block playback. */ }
-    }
+    if (now - persistedAt.current >= 4_000 || element.ended) flushProgress();
   }
   function resumeSavedPosition() {
     const element = player.current;
-    if (!element || !progress || !Number.isFinite(element.duration) ||
-        Math.abs(progress.duration - element.duration) > 1 ||
-        progress.position < 10 || progress.position >= element.duration - 5) return;
-    element.currentTime = progress.position;
-    lastPosition.current = {position:progress.position,at:Date.now()};
+    const saved = progressRef.current;
+    if (!element || !saved || !Number.isFinite(element.duration) ||
+        Math.abs(saved.duration - element.duration) > 1 ||
+        saved.position < 10 || saved.position >= element.duration - 5) return;
+    element.currentTime = saved.position;
+    lastPosition.current = {position:saved.position,at:Date.now()};
   }
   const attachPlayer = useCallback((element: HTMLVideoElement | null) => {
     player.current = element;
@@ -175,7 +214,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
     element.playbackRate = next;
     setSpeed(next);
   }
-  return <section aria-label={`Video: ${title}`} className={presentation === "classroom" ? "classroom-player" : "space-y-3"} data-learning-content>
+  return <section aria-label={`Video: ${title}`} className={presentation === "classroom" ? "classroom-player" : "space-y-3"} data-learning-content data-learning-video-player>
     {presentation === "standard" && <h3 className="font-semibold">{title}</h3>}
     <div className={presentation === "classroom" ? "classroom-player-screen" : undefined}>
     {!source && (loadUrl || video) && <Button variant="outline" type="button" disabled={pending}
@@ -196,11 +235,11 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       videoClassName="aspect-video w-full  bg-black"
       onLoadedMetadata={event => setReady(Number.isFinite(event.currentTarget.duration))}
       onTimeUpdate={event => observePosition(event.currentTarget)}
-      onSeeked={event => { lastPosition.current = {position:event.currentTarget.currentTime,at:Date.now()}; }}
+      onSeeked={event => { observePosition(event.currentTarget); flushProgress(); lastPosition.current = {position:event.currentTarget.currentTime,at:Date.now()}; }}
       onRateChange={event => setSpeed(event.currentTarget.playbackRate)}
       onPlay={() => { if (resourceId) onPlaybackEvent?.("video_played", resourceId); }}
-      onEnded={() => { if (resourceId) onPlaybackEvent?.("video_ended", resourceId); }}
-      onPause={event => { if (resourceId && !event.currentTarget.ended) onPlaybackEvent?.("video_paused", resourceId); }}
+      onEnded={() => { flushProgress(); if (resourceId) onPlaybackEvent?.("video_ended", resourceId); }}
+      onPause={event => { observePosition(event.currentTarget); flushProgress(); if (resourceId && !event.currentTarget.ended) onPlaybackEvent?.("video_paused", resourceId); }}
       onError={() => { onPlaybackError?.("media"); setReady(false); setError("This video could not be played. Retry playback or check the source format and permissions."); }}
     />}
     </div>
