@@ -151,7 +151,10 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
         return;
       }
       setSource(next);
-      if (resourceId) onPlaybackEvent?.("video_opened", resourceId);
+      // Only native media offers locally observable playback. An embedded
+      // provider launch is not evidence of viewing.
+      if (resourceId && resolveClassVideo(next, declaredVideo)?.kind === "file")
+        onPlaybackEvent?.("video_opened", resourceId);
       setReady(false);
       setSpeed(1);
     } catch (failure) {
