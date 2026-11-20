@@ -63,7 +63,16 @@ for (const file of program.getSourceFiles()) {
     }
     for (const { name, at } of bindings) {
       checked++;
-      if (!exportNames.has(name)) {
+      // JSON modules may have no advertised ES "default" symbol even when
+      // TypeScript permits their default import. Exempt only actual, resolved
+      // JSON files under the project's JSON-module interoperability settings.
+      // Never exempt a missing default from TypeScript sources or .d.ts shims.
+      const resolved = name === "default" && parsed.options.resolveJsonModule
+        ? ts.resolveModuleName(specifier.text, file.fileName, parsed.options, ts.sys).resolvedModule
+        : undefined;
+      const validJsonDefault = resolved?.extension === ts.Extension.Json &&
+        (parsed.options.esModuleInterop || parsed.options.allowSyntheticDefaultImports);
+      if (!exportNames.has(name) && !validJsonDefault) {
         const location = file.getLineAndCharacterOfPosition(at.getStart(file));
         failures.push(`${file.fileName.slice(root.length + 1)}:${location.line + 1}:${location.character + 1}: Local module ${JSON.stringify(specifier.text)} does not export ${JSON.stringify(name)}`);
       }
