@@ -56,10 +56,7 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         .where(eq(programs.siteId,site.id));
       const attachedIds=attached.map(item=>item.id);
       assertSiteLocationProgramScope(actor,attachedIds);
-      const [publication,approvedConfigurations,publishedPrograms,approvedServices]=await Promise.all([
-        tx.select({status:sitePublications.status})
-          .from(sitePublications).where(eq(sitePublications.siteId,site.id))
-          .for("update").limit(1),
+      const [approvedConfigurations,publishedPrograms,approvedServices]=await Promise.all([
         attachedIds.length?tx.select({id:schoolConfigurationVersions.id})
           .from(schoolConfigurationVersions)
           .where(and(inArray(schoolConfigurationVersions.programId,attachedIds),
@@ -73,10 +70,9 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
           .where(and(inArray(programSiteAuthorizations.programId,attachedIds),
             inArray(programSiteAuthorizations.status,["approved","suspended"]))).limit(1):Promise.resolve([]),
       ]);
-      // Fail closed even if a Program still says "launching". Independent
-      // authorization and marketing can already have been approved.
-      if(publication[0]?.status==="published" ||
-        attached.some(p=>p.status==="active" || p.status==="ready") ||
+      // Website hostname publication alone does not approve Site operations.
+      // Program readiness and independent operational authorization do.
+      if(attached.some(p=>p.status==="active" || p.status==="ready") ||
         approvedConfigurations.length>0 || publishedPrograms.length>0 ||
         approvedServices.length>0)
         throw new DomainError("SITE_LOCATION_AMENDMENT_REQUIRED");
@@ -209,10 +205,10 @@ export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
         .from(programs).where(eq(programs.siteId,site.id));
       const programIds=attached.map(program=>program.id);
       assertSiteLocationProgramScope(actor,programIds);
-      const [sitePublication]=await tx.select({status:sitePublications.status})
-        .from(sitePublications).where(eq(sitePublications.siteId,site.id))
-        .for("update").limit(1);
-      if(sitePublication?.status==="published" || attached.some(program=>
+      // A published Site address is not itself approval to operate.
+      // Unapproved draft Site identity remains editable; operationally
+      // ready/active Programs and independent authorization still lock it.
+      if(attached.some(program=>
           program.status==="active" || program.status==="ready"))
         throw new Error("An active, ready or publicly published Site requires CAN-coordinated identity amendment.");
       if(programIds.length) {
