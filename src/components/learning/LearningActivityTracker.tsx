@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { learnerInteractionInputSchema } from "@/domain/learning-activity-policy";
 import { useEffect, useRef, useState } from "react";
 import {
   endLearningActivitySession, getLearningActivityHistory,
@@ -40,11 +41,11 @@ export function LearningActivityTracker({ sectionId, lessonId, controllerRef }: 
         clientEventId: crypto.randomUUID(), sectionId, lessonId,
         occurredAt: new Date().toISOString(),
       };
-      const interaction = kind === "engaged_interval"
-        ? { ...base, kind, durationMs: options?.durationMs ?? 1, pageVisible: true as const, windowFocused: true as const }
+      const interaction = learnerInteractionInputSchema.parse(kind === "engaged_interval"
+        ? { ...base, kind, durationMs: options?.durationMs ?? 1, pageVisible: true, windowFocused: true }
         : kind === "resource_opened" || kind.startsWith("video_")
           ? { ...base, kind, resourceId: options?.resourceId ?? "" }
-          : { ...base, kind };
+          : { ...base, kind });
       // Keep the same client event ID on retries: the server deduplicates
       // successful writes when an acknowledgment is lost.
       for (let attempt = 0; attempt < 3; attempt++) {
