@@ -10,7 +10,7 @@ export function CommonCartridgeStaticLesson({programId,sectionId,resourceId}:{
  const [error,setError]=useState("");
  const [loading,setLoading]=useState(false);
  return <section aria-label="Common Cartridge static lesson" className="space-y-2">
-  <Button variant="outline" type="button" disabled={loading} className=" border px-3 py-2"
+  <Button variant="outline" type="button" disabled={loading} 
    onClick={async()=>{
     setLoading(true);setError("");
     try{
