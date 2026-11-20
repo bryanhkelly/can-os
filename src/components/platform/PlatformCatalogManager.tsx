@@ -111,6 +111,7 @@ export function PlatformCatalogManager() {
       } else {
         await publishPlatformCatalogVersion({ data: selected });
         setMessage("The reviewed planning definition is published. No Site, Course, Offering, or enrollment was approved.");
+        setSelected(null);
       }
       await refresh();
     } catch (reason) {
