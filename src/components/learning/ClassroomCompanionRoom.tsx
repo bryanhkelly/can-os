@@ -22,6 +22,9 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
   const [online,setOnline]=useState(true);
   const instance=useRef<string>("");
   const retryIds=useRef<Record<string,string>>({});
+  // Freeze the original payload whenever the server outcome is unknown.
+  // A replay must be byte-for-byte identical, even if the prompt closes.
+  const pendingAnswers=useRef<Record<string,string>>({});
   const state=useQuery({
     queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId],
     queryFn:()=>getClassroomLearnerActivities({data:{courseAttemptId,facilitatedSessionId}}),
@@ -69,11 +72,12 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
       setError("You're offline. Your answer is still in this form. Reconnect before submitting.");
       return;
     }
-    const answer=answers[activity.id]??"";
+    const answer=pendingAnswers.current[activity.id]??answers[activity.id]??"";
     if(!answer.trim())return;
     const key=activity.id;
     const clientSubmissionId=retryIds.current[key]??crypto.randomUUID();
     retryIds.current[key]=clientSubmissionId;
+    pendingAnswers.current[key]=answer;
     setBusy(key);setError("");setNotice("");
     try{
       await submitClassroomResponse({data:{
@@ -84,10 +88,14 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
         answerText:activity.answerType==="text"?answer.trim():null,
       }});
       delete retryIds.current[key];
+      delete pendingAnswers.current[key];
       setNotice("Response saved. This is formative work, not a graded submission.");
-      await queryClient.invalidateQueries({queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId]});
+      // Refresh is best-effort: a refresh outage must not turn a confirmed
+      // server write into a misleading failed-submission message.
+      void queryClient.invalidateQueries({queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId]})
+        .catch(()=>{});
     }catch{
-      setError("Response was not confirmed. Keep this page open and retry after reconnecting. Your retry ID is preserved to prevent duplicates.");
+      setError("Response was not confirmed. Retry with the unchanged answer. If the question has closed, only a previously saved response can be confirmed.");
     }
     finally{setBusy("");}
   }
@@ -111,9 +119,10 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
       <p className="mt-1 text-xs text-muted-foreground">
         {activity.closed?"Closed":"Open for responses"} · {activity.responded?"Response saved":"Not yet answered"}
       </p>
-      {!activity.closed&&!activity.responded&&<form className="mt-3 space-y-2"
+      {!activity.responded&&(!activity.closed||!!retryIds.current[activity.id])&&<form className="mt-3 space-y-2"
         aria-busy={busy===activity.id}
         onSubmit={e=>{e.preventDefault();void submit(activity);}}>
+        {activity.closed&&<p role="status" className="text-sm">This question is closed. Retry will only confirm an identical response previously received by the server; it cannot submit a new answer.</p>}
         {activity.answerType==="single_choice"?
           <fieldset className="space-y-2">
             <legend className="sr-only">{activity.prompt}</legend>
@@ -121,17 +130,19 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
               className="flex items-center gap-2 border border-border p-3 text-sm">
               <Radio name={"answer-"+activity.id} value={String(i)}
                 checked={answers[activity.id]===String(i)}
+                disabled={activity.closed||!!retryIds.current[activity.id]}
                 onChange={()=>setAnswers(prev=>({...prev,[activity.id]:String(i)}))}/>
               {choice}
             </Label>)}
           </fieldset>
           :<Field label="Your response">
             <Textarea maxLength={1000} value={answers[activity.id]??""}
+              disabled={activity.closed||!!retryIds.current[activity.id]}
               onChange={e=>setAnswers(prev=>({...prev,[activity.id]:e.target.value}))}
               className="mt-1" rows={3}/>
           </Field>}
         <Button disabled={!online||!!busy||!(answers[activity.id]??"").trim()}>
-          {busy===activity.id?"Saving…":"Submit response"}
+          {busy===activity.id?"Saving…":activity.closed?"Confirm previous submission":"Submit response"}
         </Button>
       </form>}
     </article>)}
