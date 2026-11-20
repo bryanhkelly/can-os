@@ -1,9 +1,9 @@
 import { useEffect, type ReactNode } from "react";
 import { ErrorComponent, Link, Navigate, useLocation, useMatches, type ErrorComponentProps } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { useActiveWorkspaceMember } from "@/components/shell/workspace-session-context";
 import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
-import { SITE_NAME } from "./site-config";
 import { accessReturnCookie } from "@/domain/access-navigation";
 import { hasFailedRead } from "./router-refresh";
 import { normalizeClientError } from "./client-error";
@@ -52,12 +52,12 @@ export function AccessReturnError(props: ErrorComponentProps) {
   useEffect(() => { if (pending) clearReturn(); }, [pending]);
   if (!pending) return <ErrorComponent {...props} />;
   if (denied) return <Navigate to="/" state={{ accessReturnFailed: true }} replace />;
-  return <WorkspaceShell eyebrow={SITE_NAME} title="This page couldn't load"
+  return <WorkspaceShell eyebrow="Workspace recovery" title="This page couldn't load"
     subtitle="CAN OS could not complete the request. Your account may still be signed in.">
     <nav aria-label="Retry page" className="mt-6 flex flex-wrap gap-4 text-sm font-semibold">
-      <button type="button" className="underline" onClick={() => window.location.reload()}>
+      <Button type="button" variant="ghost" className="underline" onClick={() => window.location.reload()}>
         Retry this page
-      </button>
+      </Button>
       <Link to="/home" className="underline">Go to my workspace</Link>
     </nav>
   </WorkspaceShell>;
@@ -73,12 +73,12 @@ export function AccessReturnNotFound() {
 export function NotFoundPage() {
   const member = useActiveWorkspaceMember();
   const home = member ? getWorkspaceHome(member.role) ?? "/home" : "/";
-  return <WorkspaceShell eyebrow={SITE_NAME + " · 404"} title="Page not found"
+  return <WorkspaceShell eyebrow="Navigation" title="Page not found"
     subtitle="This address does not match a page. The link may be outdated or the address may be incomplete.">
     <nav aria-label="Page recovery" className="mt-6 flex flex-wrap gap-4 text-sm font-semibold">
       <Link to={home} className="underline">{member ? "Return Home" : "Go to CAN OS"}</Link>
       {!member && <Link to="/access" className="underline">Sign in</Link>}
-      <button type="button" className="underline" onClick={() => window.history.back()}>Go back</button>
+      <Button type="button" variant="ghost" className="underline" onClick={() => window.history.back()}>Go back</Button>
     </nav>
   </WorkspaceShell>;
 }
