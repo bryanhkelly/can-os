@@ -537,6 +537,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
               {activePreviewFormat
                 ? <MarketingMaterialPreviewV61
                     siteId={siteId}
+                    title={title}
                     brandVersionId={record?.brandVersionId??null}
                     format={activePreviewFormat}
                     content={content}/>
