@@ -129,13 +129,13 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
       <div className="flex gap-2" role="group" aria-label="Template preview viewport">
         {(["desktop", "mobile"] as const).map(size => <Button type="button"
           variant="outline" key={size} aria-pressed={viewport === size}
-          onClick={() => setViewport(size)} className="min-h-11 border px-3 text-sm">
+          onClick={() => setViewport(size)} className="min-h-11 aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:text-primary">
           {size === "desktop" ? "Desktop" : "Mobile"}
         </Button>)}
       </div>
     </div>
     <Button type="button" variant="outline" aria-pressed={styledPreview}
-      onClick={()=>setStyledPreview(value=>!value)} className="mt-3 min-h-11 border px-3 text-sm">
+      onClick={()=>setStyledPreview(value=>!value)} className="mt-3 min-h-11 aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:text-primary">
       {styledPreview?"Return to grayscale wireframe":"Show styled example"}
     </Button>
     <p className="mt-2 text-xs text-muted-foreground">
