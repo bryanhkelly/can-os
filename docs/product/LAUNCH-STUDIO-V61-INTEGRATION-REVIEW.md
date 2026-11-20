@@ -226,3 +226,68 @@ of this design pass.
 4. Keep Site qualification, specific Offering adoption, Class registration,
    website publication, and opening/enrollment authorization independently
    governed. Do not equate a saved plan with permission to operate.
+
+
+## 2026-11-19 · Detailed Prepare implementation follow-up
+
+**Reviewed actual code paths:** `/site/new` verified signup, `/launch/site`
+routing, Establish Programs & Audiences, `SolutionCatalogV61`,
+`CanonicalBlueprintWorkspace`, published-Offering adoption picker,
+canonical Blueprint readers/mutations, scoped PostgreSQL roles, and
+operator navigation. Code inspection only; not a successful build.
+
+### Corrected in branch
+
+- One operator navigation entry: Launch Studio → Prepare → Program Catalog.
+  The older `/canonical/blueprints` authorized route remains for backwards
+  compatibility, but its separate Site operator sidebar link is removed.
+- Protected unsaved Solution edits with the shared navigation blocker and
+  ActionDialog confirmation for within-catalog selection changes. A pending
+  write or unreconciled save now blocks switching plans.
+- Fixed starting a new plan to retain mandatory components, and cleared
+  transient local-experience inputs between plans.
+- Saved Offering intents for hidden/proposed Program components are preserved
+  when the visible picker is edited, using one shared immutable merge helper.
+- The picker now defaults to the Site's saved delivery preference, discards
+  stale in-flight catalog responses after delivery/Site changes and unmount,
+  and never infers operating or enrollment approval from search results.
+- Saved Site Program references do not require redundant catalog revalidation
+  when the operator edits other Site vision fields. **New** references still
+  require live, Site-scoped published-reference checks.
+- Added or updated regression tests for the above contracts. The tests have
+  **not** been executed in an authenticated test environment.
+
+### Important P0 integration blockers still open
+
+1. **Fresh-Site provisioning.** `provisionVerifiedSchoolSignup` creates
+   public Site/Organization/person/grant records but does not create an active
+   canonical `site_organization_roles` operator relationship or the
+   purpose-scoped PostgreSQL roles used by Blueprint and catalog readers.
+   Those readers require both. The current SQL scripts deliberately require
+   DBA review and manual provisioning. Do not grant broad SQL privileges
+   automatically or bypass forced RLS merely to make a newly created Site
+   appear ready. An independently approved, idempotent provisioning process
+   and real test-Site acceptance are needed.
+2. **CAN app-admin Blueprint authoring.** Current UI supports Site-owned
+   configuration against published recipes; it does not implement an
+   independently authorized CAN-admin create/review/version/publish workflow
+   for the published Blueprint definitions. The starter seed alone is not
+   an administrator Studio or the full COGIC pilot solution catalog.
+3. **Operational requirements/readiness.** The catalog currently projects
+   recipe component keys and requirement modes. It does not yet integrate
+   complete, jurisdiction-scoped staffing/facility/equipment/evidence
+   requirements or independently verified readiness into one Prepare
+   operator experience.
+4. **Offering activation.** A saved and reviewed Solution remains a planning
+   configuration. Operation selection, Deployment, approved published Offering
+   adoption, Class scheduling, and learner registration still have separate
+   owners and gates. No end-to-end newly created Site → enrollable COGIC
+   Class acceptance is established.
+5. **Executable verification.** Run focused Vitest, TypeScript, design-system
+   checks, full build, and authenticated Playwright/role/RLS fixtures when
+   a capable environment is available. GitHub PR #348 remains draft and
+   nonmergeable; Netlify deploy-preview status is not proof of compilation.
+
+**Release decision:** Implementation improved, but not accepted as a fully
+provisioned, enrollable launch. Do not merge to `main` or alter production
+schema on the strength of source-only checks.
