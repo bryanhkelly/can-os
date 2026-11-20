@@ -3,6 +3,7 @@ import { AssessmentScheduleEditor } from "@/components/learning/AssessmentSchedu
 import { Link } from "@tanstack/react-router";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { TableHead } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ActionDialog } from "@/components/workspace/action-dialog";
@@ -35,7 +36,7 @@ export function GradebookAssessmentHeader({
 }) {
   const [pendingAction, setPendingAction] = useState<"publish" | "close" | null>(null);
   return (
-    <th className="min-w-32 p-3 font-semibold">
+    <TableHead scope="col" className="min-w-32 h-auto p-3 align-top font-semibold text-foreground">
       <Link to="/teacher/gradebook" search={{section:sectionId,assessment:assessment.id}} className="block underline">{assessment.title}</Link>
       <span className="block text-xs font-normal text-muted-foreground">
         {assessment.dueAt ? `Due ${formatDateOnly(dateKeyInTimezone(assessment.dueAt,timezone))}` : "No due date"}
@@ -85,6 +86,6 @@ export function GradebookAssessmentHeader({
           setPendingAction(null);
           if (action) onAction(action);
         }}/>
-    </th>
+    </TableHead>
   );
 }
