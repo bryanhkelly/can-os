@@ -595,6 +595,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
               siteId={siteId}
               initialDelivery={initialDelivery}
               components={editableProgramComponents}
+              linkedOffering={selectedTemplate.linkedPublishedOffering}
               selected={offeringAdoptions.filter(intent =>
                 editableProgramComponentIds.includes(intent.componentId))}
               onChange={next => setOfferingAdoptions(previous =>
