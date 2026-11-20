@@ -19,6 +19,7 @@ import {
   WorkspaceShell,
 } from "@/components/workspace";
 import { groupSessionSelectionSchema } from "@/lib/route-search";
+import { groupKindLabel, nextGroupSession } from "@/domain/study-group-display";
 import { Button } from "@/components/ui/button";
 import {
   getCanonicalGroupWorkspace,
@@ -55,21 +56,7 @@ type Data = Awaited<ReturnType<typeof loadGroups>>;
 type Workspace = NonNullable<Data["workspace"]>;
 type Group = Workspace["groups"][number];
 
-export function groupKindLabel(kind: Group["kind"]): string {
-  return kind === "course" ? "Course group" : "Interest group";
-}
-
-export function nextGroupSession(
-  group: Group,
-): Group["sessions"][number] | null {
-  const now = Date.now();
-  return (
-    group.sessions.find(
-      (session) =>
-        !session.cancelled && new Date(session.startsAt).getTime() > now,
-    ) ?? null
-  );
-}
+export { groupKindLabel, nextGroupSession } from "@/domain/study-group-display";
 
 function GroupsPage() {
   const outcome = Route.useLoaderData();
