@@ -230,6 +230,20 @@ export type SiteContentItem = {
 };
 export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentItem[]};
 
+/** The website preview is a presentation, not a mirror of Launch Studio.
+ * Private setup/affiliation evidence stays in the Site administrator screens;
+ * saved planning interests get independent editorial projection below.
+ */
+export function websitePreviewEditorialBlocks(
+  blocks: readonly SiteContentBlockProjection[],
+): SiteContentBlockProjection[] {
+  return blocks.filter(block =>
+    block.channel !== "site.setup" &&
+    block.channel !== "site.network" &&
+    block.channel !== "learning.interests");
+}
+
+
 export type SitePublishedClassListing = {
   classId:string;title:string;
   deliveryMode:"self_paced"|"scheduled"|"facilitated"|"hybrid";
