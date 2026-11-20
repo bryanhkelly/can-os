@@ -11,6 +11,8 @@ import {
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { assertCurrentCanonicalClassThread } from "@/modules/communication/current-canonical-class-thread.server";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 
 const site="f1000000-0000-4000-8000-000000000003";
@@ -110,4 +112,78 @@ export const submitNativeClassDiscussionMessage=createServerFn({method:"POST"})
       if(!row)throw new Error("Discussion message not saved");
       return {messageId:row.id};
     });
+  });
+
+const teacherClassScope=z.object({classId:z.string().uuid()}).strict();
+const teacherReply=teacherClassScope.extend({
+  threadId:z.string().uuid(),body:z.string().trim().min(5).max(1500),
+}).strict();
+
+/** Verified direct instructor identity and a current exact-Class staff
+ * appointment, never a publisher role or a stale discussion participant. */
+async function currentTeacherThreads(classId:string){
+  const actor=await getCommandContext(getRequest());
+  if(!actor.actorPersonId||actor.sessionAccountId||actor.role!=="teacher"||
+      !actor.scope.siteIds?.includes(site)||
+      !actor.scope.organizationIds?.includes(org))
+    throw new AuthorizationError("current direct Valor teacher");
+  const [cls]=await db.select().from(canonicalClasses)
+    .where(eq(canonicalClasses.id,classId)).limit(1);
+  if(!cls||cls.siteId!==site||cls.operatingOrganizationId!==org||cls.state!=="active")
+    throw new AuthorizationError("active Valor teaching Class");
+  const rows=await db.select({
+    id:communicationThreads.id,subject:communicationThreads.subject,
+    contextType:communicationThreads.contextType,
+    contextId:communicationThreads.contextId,
+    metadata:communicationThreads.metadata,
+  }).from(communicationThreads)
+    .innerJoin(communicationParticipants,and(
+      eq(communicationParticipants.threadId,communicationThreads.id),
+      eq(communicationParticipants.participantType,"person"),
+      eq(communicationParticipants.participantId,actor.actorPersonId)))
+    .where(and(eq(communicationThreads.contextType,"class"),
+      eq(communicationThreads.contextId,classId),
+      sql`${communicationThreads.metadata} @> '{"fixture":"valor-v61-class-discussions","synthetic":true,"demoOnly":true,"notPublic":true}'::jsonb`))
+    .limit(20);
+  for(const thread of rows)
+    await assertCurrentCanonicalClassThread(actor,thread);
+  return {actor,cls,threads:rows};
+}
+
+export const getNativeClassTeachingDiscussions=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>teacherClassScope.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const {actor,cls,threads}=await currentTeacherThreads(data.classId);
+    if(!threads.length)return {classId:cls.id,threads:[]};
+    const messages=await db.select({
+      id:communicationMessages.id,threadId:communicationMessages.threadId,
+      senderPersonId:communicationMessages.senderPersonId,
+      body:communicationMessages.body,sentAt:communicationMessages.sentAt,
+    }).from(communicationMessages)
+      .where(inArray(communicationMessages.threadId,threads.map(t=>t.id)))
+      .orderBy(asc(communicationMessages.sentAt)).limit(150);
+    return {classId:cls.id,threads:threads.map(t=>({
+      id:t.id,subject:t.subject,
+      messages:messages.filter(row=>row.threadId===t.id).map(row=>({
+        id:row.id,body:row.body,sentAt:row.sentAt.toISOString(),
+        senderLabel:row.senderPersonId===actor.actorPersonId?"You":"Student",
+      })),
+    }))};
+  });
+
+export const submitNativeClassTeachingDiscussionMessage=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>teacherReply.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const {actor,threads}=await currentTeacherThreads(data.classId);
+    if(!threads.some(t=>t.id===data.threadId))
+      throw new AuthorizationError("current assigned teacher Class conversation");
+    const [row]=await db.insert(communicationMessages).values({
+      threadId:data.threadId,senderPersonId:actor.actorPersonId!,body:data.body,
+      metadata:{synthetic:true,noExternalDelivery:true,demoOnly:true,
+        origin:"native-valor-private-class-teacher-reply"},
+    }).returning({id:communicationMessages.id});
+    if(!row)throw new Error("Teacher response not saved");
+    return {messageId:row.id};
   });
