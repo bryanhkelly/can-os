@@ -8,6 +8,7 @@ describe("native Class route ownership", () => {
     expect(read("src/routes/class_.$classId.tsx")).toContain('createFileRoute("/class_/$classId")');
     expect(existsSync("src/routes/learn.classes.tsx")).toBe(false);
     expect(existsSync("src/routes/classes_.$classId.tsx")).toBe(false);
+    expect(existsSync("src/routes/classes.tsx")).toBe(false);
     expect(read("src/components/shell/route-navigation.ts")).toContain('"/class": page("/class", all)');
     expect(read("src/components/shell/workspace-navigation.registry.ts")).toContain('{ title: "Classes", path: "/class", icon: "book" }');
     expect(read("src/routes/class.tsx")).toContain("NativeClassManager");
