@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import * as schema from "@/db/schema";
+import { canonicalOperationsUrlValid } from "@/domain/canonical-operations-connection";
 
 /**
  * Cloudflare Workers cannot share live WebSocket Pool clients across fetch
@@ -19,12 +20,16 @@ function makePoolDatabase(connectionString: string) {
 type PoolDatabase = ReturnType<typeof makePoolDatabase>;
 type DatabaseClient = PoolDatabase["database"];
 type RequestResource = { close: () => Promise<void> };
-type RequestDatabase = PoolDatabase & { closed: boolean; resources: Map<string, RequestResource> };
+type RequestDatabase = PoolDatabase & { closed: boolean; resources: Map<string, RequestResource>; connectionString: string };
 
 const requestDatabase = new AsyncLocalStorage<RequestDatabase>();
+const restrictedOperationsDatabase = new AsyncLocalStorage<DatabaseClient>();
+let nodeRestrictedOperations: { url: string; client: PoolDatabase } | undefined;
 let nodeDatabase: PoolDatabase | undefined;
 
 function activeDatabase(): DatabaseClient {
+  const restricted = restrictedOperationsDatabase.getStore();
+  if (restricted) return restricted;
   const scoped = requestDatabase.getStore();
   if (scoped) {
     if (scoped.closed) throw new Error("Database request scope has finished");
@@ -52,6 +57,7 @@ export async function withRequestDatabase<T>(
   if (requestDatabase.getStore()) return operation();
   const scoped: RequestDatabase = {
     ...makePoolDatabase(connectionString ?? ""),
+    connectionString: connectionString ?? "",
     closed: false,
     resources: new Map(),
   };
@@ -83,6 +89,39 @@ export function getRequestScopedResource<T extends RequestResource>(
   const resource = create();
   scoped.resources.set(key, resource);
   return resource;
+}
+
+/**
+ * Delegate canonical Program Catalog and Blueprint operations through a
+ * dedicated non-owner, non-auth PostgreSQL LOGIN. The existing db proxy keeps
+ * one schema and one transaction API; only the selected connection changes.
+ * Worker pools are disposed with the current request; Node pools are reusable.
+ * Never fall back to the owner connection when this credential is missing.
+ */
+export async function withCanonicalOperationsDatabase<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const url = process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL;
+  const primaryUrl = requestDatabase.getStore()?.connectionString ?? process.env.DATABASE_URL;
+  if (!canonicalOperationsUrlValid(
+    url, primaryUrl, process.env.CAN_CANONICAL_AUTH_DATABASE_URL,
+  )) {
+    throw new Error("Restricted canonical operations database is not configured");
+  }
+  if (restrictedOperationsDatabase.getStore()) return operation();
+
+  const scoped = getRequestScopedResource("canonical-operations-database", () => {
+    const client = makePoolDatabase(url!);
+    return { ...client, close: () => client.pool.end() };
+  });
+  if (scoped) return restrictedOperationsDatabase.run(scoped.database, operation);
+
+  if (!nodeRestrictedOperations || nodeRestrictedOperations.url !== url) {
+    const previous = nodeRestrictedOperations;
+    nodeRestrictedOperations = { url: url!, client: makePoolDatabase(url!) };
+    if (previous) void previous.client.pool.end().catch(() => {});
+  }
+  return restrictedOperationsDatabase.run(nodeRestrictedOperations.client.database, operation);
 }
 
 /**
