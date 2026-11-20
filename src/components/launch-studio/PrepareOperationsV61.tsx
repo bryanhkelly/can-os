@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/select";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { SchoolYearCreateForm } from "@/components/operations/SchoolYearCreateForm";
 import { getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
-import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   cleanSiteEnvironmentV61, siteEnvironmentV61Schema,
   type SiteEnvironmentV61,
@@ -48,6 +48,7 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [reload, setReload] = useState(0);
+  const [confirmReload, setConfirmReload] = useState(false);
   const saveLock = useRef(false);
   const dirty = snapshot(environment) !== savedSnapshot;
   useLaunchUnsavedChanges(dirty || saving || reconciliationRequired,
@@ -165,13 +166,25 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
       </>}
       <div className="mt-4">
         <Button type="button" variant="outline" size="sm" disabled={loading || saving}
-          onClick={() => setReload(value => value + 1)}>
+          onClick={() => {
+            if (dirty) setConfirmReload(true);
+            else setReload(value => value + 1);
+          }}>
           Reload saved environment
         </Button>
         <p className="mt-2 text-xs text-muted-foreground">
           Reloading discards local edits and reads the current saved Site revision.
         </p>
       </div>
+      <ActionDialog open={confirmReload}
+        title="Discard unsaved environment changes?"
+        description="Reloading will replace the local form with the current saved Site Information. It does not alter the saved record."
+        confirmLabel="Discard and reload" destructive
+        onClose={() => setConfirmReload(false)}
+        onConfirm={() => {
+          setConfirmReload(false);
+          setReload(value => value + 1);
+        }} />
     </WorkspacePanel>
     <RoomCoverageWorkspace key={siteId} siteId={siteId} view="rooms" />
     <WorkspaceNotice tone="info">
@@ -218,6 +231,8 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
     retry: false,
   });
   const [creating, setCreating] = useState(false);
+  const [yearFormDirty, setYearFormDirty] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
   const siteYears = years.data?.years.filter(year => year.siteId === siteId) ?? [];
   const authorizedSite = years.data?.sites.some(site => site.id === siteId) ?? false;
   return <WorkspacePanel title="School years & academic calendars"
@@ -252,18 +267,34 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
       </ul> : <p className="mt-3 text-sm text-muted-foreground">
         No academic year has been created for this Site.
       </p>}
-      <Button type="button" variant="outline" className="mt-4" onClick={() => setCreating(value => !value)}>
+      <Button type="button" variant="outline" className="mt-4" onClick={() => {
+        if (!creating) setCreating(true);
+        else if (yearFormDirty) setConfirmClose(true);
+        else setCreating(false);
+      }}>
         {creating ? "Close school-year form" : "Add school year"}
       </Button>
       {creating && <div className="mt-5 border-t pt-5">
         <SchoolYearCreateForm data={years.data}
           selection={{siteId}} lockedSiteId={siteId} embedded
+          onDirtyChange={setYearFormDirty}
           onDataChanged={() => years.refetch({throwOnError:true})}
           onCreated={async () => {
             await years.refetch({throwOnError:true});
             setCreating(false);
+            setYearFormDirty(false);
           }} />
       </div>}
+      <ActionDialog open={confirmClose}
+        title="Discard unfinished school-year setup?"
+        description="Unsaved dates or grading selections will be lost. Existing saved school years and calendars are unchanged."
+        confirmLabel="Discard draft" destructive
+        onClose={() => setConfirmClose(false)}
+        onConfirm={() => {
+          setConfirmClose(false);
+          setCreating(false);
+          setYearFormDirty(false);
+        }} />
     </>}
     <p className="mt-3 text-xs text-muted-foreground">
       Creating a school year is not academic approval, a Class schedule,
@@ -278,6 +309,11 @@ export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
   return <div className="space-y-5">
     <PrepareSchoolYearsV61 key={siteId} siteId={siteId} />
     <RoomCoverageWorkspace key={siteId} siteId={siteId} view="schedules"/>
+    <WorkspaceNotice tone="info">
+      Room coverage currently links the Site's existing Section records.
+      Native Class drafts below have separate canonical identities and are not
+      automatically attached to a room schedule.
+    </WorkspaceNotice>
     <Suspense fallback={<p role="status" className="border p-4 text-sm">
       Loading approved Class and capacity planning…
     </p>}>
