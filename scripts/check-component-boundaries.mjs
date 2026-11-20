@@ -12,7 +12,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { sharedUiImportViolation, sourceDependencySpecifiers } from "./lib/v61-component-dependencies.mjs";
+import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency } from "./lib/v61-component-dependencies.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const failures = [];
@@ -50,9 +50,9 @@ for (const file of files) {
   for (const importPath of sourceDependencySpecifiers(program, ts)) {
     const dependencyProblem = sharedUiImportViolation(file, importPath);
     if (dependencyProblem) failures.push(file + ": " + dependencyProblem);
-    if (importPath.startsWith("@/routes/") || importPath.startsWith("@/db/") ||
-        importPath.startsWith("@/workers/")) {
-      failures.push(file + ": shared UI must not import route, database, or worker code: " + importPath);
+    const target = resolveSourceDependency(file, importPath);
+    if (target && /^src\\/(?:routes|db|workers|server)(?:\\/|$)/.test(target)) {
+      failures.push(file + ": feature presentation must not import route, database, server or worker code: " + importPath);
     }
     if (importPath.includes("/components/operations/OperationsWorkspace") ||
         importPath.includes("/components/learning/NativeClassManager")) {
