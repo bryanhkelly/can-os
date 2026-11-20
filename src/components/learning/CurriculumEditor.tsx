@@ -100,7 +100,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
       <p className="text-xs text-muted-foreground">{content.modules.length} units · {lessonTotal} lessons · {lessonsWithContent} lessons with authored content. These counts do not certify academic credit.</p></div>
      <Label className="text-sm">Unit to edit
       <Select aria-label="Unit to edit" value={activeModule?.id??""} onChange={e=>setSelectedModuleId(e.target.value)}
-       className="mt-1 block min-w-48  border bg-background p-2">
+       className="mt-1 min-w-48">
        {!activeModule&&<option value="">Add a unit to start</option>}
        {content.modules.map((module,index)=><option value={module.id} key={module.id}>
          Unit {index+1}: {module.title} ({module.lessons.length} lessons)</option>)}
