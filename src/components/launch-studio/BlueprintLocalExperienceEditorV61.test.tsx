@@ -26,7 +26,7 @@ describe("controlled V6.1 local experience proposal editor", () => {
 
   it("renders the selected published category without approving the proposed activity", () => {
     const html = renderToStaticMarkup(<BlueprintLocalExperienceEditorV61 {...base}/>);
-    expect(html).toContain("Community arts");
+    expect(html).toContain("community arts");
     expect(html).toContain("A proposal is not an approved activity.");
     expect(html).toContain("canonical-local-component");
     expect(html).toContain("Drawing together");
