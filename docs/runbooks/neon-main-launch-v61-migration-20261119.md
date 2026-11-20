@@ -250,3 +250,49 @@ retirement. The old schema's seven tables and 13 dependent public FKs,
 244 legacy functions and 371 function-backed public triggers remain.
 The unrelated `education_v30.enrollments` and `public.enrollments`
 represent different models and must not be aliased or dropped.
+
+## 2026-11-20 · V6.1 QA-only purpose roles and bindings
+
+Three formerly missing delegated-purpose roles and their explicit
+Organization-purpose bindings have now been provisioned **only** on Neon
+branch `br-bitter-pine-ar7mjn70` for the existing synthetic
+`Valor School` test Organization (`f1000000-0000-4000-8000-000000000002`):
+
+- `can_v30_program_catalog_f1000000000040008000000000000002`
+- `can_v30_blueprint_author_f1000000000040008000000000000002`
+- `can_v30_blueprint_reviewer_f1000000000040008000000000000002`
+
+All three purpose roles are `NOLOGIN NOINHERIT NOBYPASSRLS`. Their
+`approved` **test fixtures** expire on **2026-11-27 11:07:31 UTC**.
+They are granted to the isolated `can_os_canonical_ops_app` LOGIN only
+with `SET TRUE, INHERIT FALSE, ADMIN FALSE`. That login has **NULL
+password**, no direct table authority, and no direct audit gateway
+execution; it cannot yet be used by a preview application.
+
+A single public audit event records the setup. No synthetic staff
+appointment or `site_organization_roles` rows were created.
+No deployment secrets or auth clients were configured. These temporary
+bindings are not real institutional approval and must never be promoted
+to production as such.
+
+Restricted-transaction checks with real PostgreSQL role switching
+verified own-Organization purpose = true and foreign Organization
+purpose = false for all applicable roles; author/reviewer journal-purpose
+checks also deny foreign Organizations. Author INSERT, reviewer INSERT,
+private evidence-label reading, and sensitive document storage rights
+remain distinct. The operations LOGIN inherits no direct permissions
+and cannot sign in without a separately configured password.
+
+Strengthened source readiness query
+`scripts/sql/report-v61-blueprint-public-journal-readiness.sql`
+now checks exact three-purpose scope, enabled bindings, membership
+semantics, and privilege separation: **12 of 12 ready**. Launch Prepare
+readiness: **8 of 9 ready**, with Site geography classification
+independently blocked. Neon main remains 87 journal rows, with zero
+QA purpose roles and zero purpose bindings.
+
+**Still needed for actual feature deployment:** provision a secure
+operations password and preview-only secret; verify actual canonical
+staff authority, independent reviewer and exact Site permissions; run
+authenticated application acceptance. QA bindings expire after seven
+days and must be revoked or independently renewed as appropriate.
