@@ -93,10 +93,10 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "funding-enrollment": {
-    question: "How will your Site fund its learning experiences and prepare admissions?"
-    decision: "Document funding sources, tuition and pricing, admissions policies and seat capacity. Prepare the receiving Program and application process here. Actual registration is enabled independently in Open, only for authorized Offerings."
-    canSupplies: "Authorized admissions setup, application invitations, eligibility records and capacity management where supported."
-    siteProvides: "An approved budget, documented funding, pricing and admissions decisions, and responsible staff."
+    question: "How will your Site fund its learning experiences and prepare admissions?",
+    decision: "Document funding sources, tuition and pricing, admissions policies and seat capacity. Prepare the receiving Program and application process here. Actual registration is enabled independently in Open, only for authorized Offerings.",
+    canSupplies: "Authorized admissions setup, application invitations, eligibility records and capacity management where supported.",
+    siteProvides: "An approved budget, documented funding, pricing and admissions decisions, and responsible staff.",
     status: "governed",
     handoffs: [
       { title: "Review admissions", detail: "View authorized applications and the Program-specific admissions pipeline.", href: id => "/admissions?siteId=" + scoped(id) },
