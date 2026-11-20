@@ -98,6 +98,8 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
           status:item.status??"not_started",
           submittedAt:item.submitted_at?.toISOString()??null,
           responseText:typeof response.text==="string"?response.text:"",
+          feedbackText:(item.status==="returned"||item.status==="graded") &&
+            typeof response.teacherFeedback==="string" ? response.teacherFeedback : null,
           submitted:!!item.submission_id,
         };
       })};
