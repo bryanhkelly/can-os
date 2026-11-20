@@ -21,6 +21,7 @@ import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 import { selectBlueprintWorkspaceRecipes } from "@/domain/blueprint-configuration";
 import { publicSolutionComponentDescription } from "@/domain/public-solution-component";
+import { getPublishedSolutionWorkspaceReadOnly } from "./blueprint-published-readonly.server";
 import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "./verified-site-planning.server";
 import { z } from "zod";
 
@@ -43,8 +44,12 @@ export async function getCanonicalBlueprintWorkspace(
   // SQL role may write Site configuration versions, never Blueprint definitions.
   // Read-only publisher discovery must use its separately scoped catalog service.
   assertCapability(context, "blueprint.read");
-  assertCapability(context, "blueprint.configure");
   const { siteId } = blueprintWorkspaceInputSchema.parse(rawInput);
+  // Read-only discovery must never require the ability to write Site plans.
+  // The separate published-only path returns no private configurations.
+  if(!context.capabilities.has("blueprint.configure"))
+    return getPublishedSolutionWorkspaceReadOnly(context,siteId);
+  assertCapability(context, "blueprint.configure");
   if (!context.scope.siteIds?.includes(siteId)) {
     throw new AuthorizationError("Blueprint workspace Site scope");
   }
