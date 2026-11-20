@@ -23,6 +23,7 @@ import {
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketingPackageZip } from "./marketing-output-download";
 import { packageReleaseChangesV61, packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
+import { siteMarketingTemplateVersions } from "@/domain/site-marketing-template-versions";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
@@ -304,7 +305,10 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
     (showArchived?item.status==="archived":item.status!=="archived"));
   const currentSuggestion=suggestions?.[content.purpose]??null;
   const latestPackageRelease=packageReleases[0]??null;
-  const packageChanges=record?packageReleaseChangesV61(record,latestPackageRelease):[];
+  const packageChanges=record?packageReleaseChangesV61(record,latestPackageRelease,{
+    templateVersions:siteMarketingTemplateVersions,
+    publicDestinationUrl:latestPackageRelease?.currentPublicDestinationUrl,
+  }):[];
   const packageUpToDate=Boolean(latestPackageRelease?.complete && packageChanges.length===0);
   const legacyReleases=releases.filter(item=>!item.packageReleaseId);
   const packageHandoff=record && context.packageHandoff?.purpose===record.content.purpose
@@ -446,7 +450,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
             {!releasesLoading&&latestPackageRelease&&<div className="space-y-2 border bg-muted/25 p-4">
               <p className="text-sm font-semibold">Latest generated: Package Release v{latestPackageRelease.releaseNumber}</p>
               {packageChanges.length
-                ? <p className="text-sm">Updates available: {packageChanges.join(", ")}. Preview and release an updated Package when ready.</p>
+                ? <p className="text-sm">Updates available: {packageChanges.map(change=>({templates:"creative templates",destination:"public link",withdrawn:"withdrawn materials",incomplete:"incomplete release"} as Record<string,string>)[change]??change).join(", ")}. Preview and release an updated Package when ready.</p>
                 : <p className="text-sm text-muted-foreground">The working Package matches the latest generated release. Reuse that release instead of creating a duplicate.</p>}
             </div>}
             {!releasesLoading&&!latestPackageRelease&&

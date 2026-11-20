@@ -1,5 +1,6 @@
 import type { ResolvedSiteBrand } from "./site-brand";
 import type { MarketingFormat, MarketingPackageContent } from "./marketing-package-v61";
+import { siteMarketingTemplateVersions } from "./site-marketing-template-versions";
 
 export type RenderedMarketingAsset={
   format:MarketingFormat;templateId:string;templateVersion:number;
@@ -64,7 +65,7 @@ const printable=(format:"flyer"|"handout"|"social",brand:ResolvedSiteBrand,conte
     <text x="${padding}" y="${captionY}" font-size="21" fill="${foreground}">${escape(proposed)}</text>
     ${url?`<text x="${padding}" y="${captionY+38}" font-size="18" fill="${foreground}">${escape(url)}</text>`:""}
   </g></svg>`;
-  return {format,templateId:"can-site-"+format,templateVersion:2,
+  return {format,templateId:"can-site-"+format,templateVersion:siteMarketingTemplateVersions[format],
     mimeType:"image/svg+xml",extension:"svg",body:svg,
     ...(social?{plainText:[content.headline,content.message,websiteUrl??""].filter(Boolean).join("\n\n")}:{}),};
 };
@@ -77,7 +78,7 @@ export function renderSiteMarketingArtifact(input:{
     return printable(format,brand,content,websiteUrl);
   if(format==="qr-card"){
     if(!input.qrSvg||!websiteUrl)throw new Error("QR cards require a reviewed, durable public Site destination.");
-    return {format,templateId:"can-site-qr",templateVersion:1,mimeType:"image/svg+xml",
+    return {format,templateId:"can-site-qr",templateVersion:siteMarketingTemplateVersions["qr-card"],mimeType:"image/svg+xml",
       extension:"svg",body:input.qrSvg};
   }
   const ink=brand.theme.ink,canvas=brand.theme.canvas;
@@ -103,7 +104,7 @@ export function renderSiteMarketingArtifact(input:{
       ${action}
       <p style="font-size:13px;color:#334155">${escape(proposed)}</p>
     </td></tr></table></td></tr></table></body></html>`;
-  return {format:"email",templateId:"can-site-email",templateVersion:1,
+  return {format:"email",templateId:"can-site-email",templateVersion:siteMarketingTemplateVersions.email,
     mimeType:"text/html",extension:"html",body:html,
     plainText:`${brand.displayName}\n\n${content.headline}\n\n${content.message}\n\n${proposed}\n${websiteUrl??""}`};
 }

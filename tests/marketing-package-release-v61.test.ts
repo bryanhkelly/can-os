@@ -23,6 +23,27 @@ describe("atomic Marketing Package release contracts",()=>{
     },released)).toEqual(["brand","message","formats"]);
     expect(packageReleaseChangesV61(working,null)).toEqual([]);
   });
+  it("recognizes template, published destination, and withdrawn material changes at package level",()=>{
+    const oldOutputs=[
+      {format:"email",templateVersion:1,publicDestinationUrl:"https://old.example",withdrawnAt:null},
+      {format:"flyer",templateVersion:1,publicDestinationUrl:"https://old.example",withdrawnAt:"2026-11-19"},
+    ];
+    const updated=packageReleaseChangesV61(working,{
+      ...released,outputs:oldOutputs,
+    },{
+      templateVersions:{email:1,flyer:2,social:2,handout:2,"qr-card":1},
+      publicDestinationUrl:"https://new.example",
+    });
+    expect(updated).toEqual(["templates","destination","withdrawn"]);
+  });
+  it("does not invent destination freshness for historical outputs without saved provenance",()=>{
+    const changes=packageReleaseChangesV61(working,released,{
+      templateVersions:{email:1,flyer:2,social:2,handout:2,"qr-card":1},
+      publicDestinationUrl:"https://new.example",
+    });
+    expect(changes).not.toContain("destination");
+    expect(changes).not.toContain("templates");
+  });
   it("treats withdrawn or incomplete outputs as unavailable for a full-package ZIP",()=>{
     expect(packageReleaseIsDownloadableV61(released)).toBe(true);
     expect(packageReleaseIsDownloadableV61({...released,complete:false})).toBe(false);

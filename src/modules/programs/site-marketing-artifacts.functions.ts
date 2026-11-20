@@ -147,6 +147,7 @@ export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
         assetManifest:{logo,hero:null},
         outputManifest:{mimeType:rendered.mimeType,extension:rendered.extension,
           body:rendered.body,plainText:rendered.plainText??null,
+          publicDestinationUrl:destination,
           contentLength:Buffer.byteLength(rendered.body)},
       };
     }));
@@ -190,6 +191,11 @@ export const listSiteMarketingPackageReleases=createServerFn({method:"GET"})
         eq(siteMarketingPackageReleases.packageId,data.packageId)))
       .orderBy(desc(siteMarketingPackageReleases.releaseNumber)).limit(30);
     if(!parents.length)return [];
+    const [publication]=await db.select({
+      status:sitePublications.status,slug:sitePublications.slug,
+    }).from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
+    const currentPublicDestinationUrl=publication?.status==="published"&&publication.slug
+      ? "https://"+publicSiteHost(publication.slug):null;
     const children=await db.select({
       id:siteArtifactReleases.id,
       packageReleaseId:siteArtifactReleases.packageReleaseId,
@@ -198,6 +204,7 @@ export const listSiteMarketingPackageReleases=createServerFn({method:"GET"})
       format:siteArtifactReleases.artifactKind,
       templateVersion:siteArtifactReleases.templateVersion,
       checksum:siteArtifactReleases.outputChecksum,
+      outputManifest:siteArtifactReleases.outputManifest,
       withdrawnAt:siteArtifactReleaseAccess.withdrawnAt,
     }).from(siteArtifactReleases)
       .leftJoin(siteArtifactReleaseAccess,eq(siteArtifactReleases.id,siteArtifactReleaseAccess.releaseId))
@@ -217,11 +224,15 @@ export const listSiteMarketingPackageReleases=createServerFn({method:"GET"})
         packageRevision:parent.sourcePackageRevision,
         brandVersionId:parent.brandVersionId,
         title:typeof releaseTitle==="string"?releaseTitle:"",
-        content,formats,
+        content,formats,currentPublicDestinationUrl,
         createdAt:parent.createdAt.toISOString(),
         outputs:outputs.filter((o):o is NonNullable<typeof o>=>Boolean(o))
           .map(o=>({id:o.id,format:z.enum(marketingFormatIds).parse(o.format),templateVersion:o.templateVersion,
             checksum:o.checksum,
+            publicDestinationUrl:typeof (o.outputManifest as {publicDestinationUrl?:unknown}).publicDestinationUrl==="string"
+              ? (o.outputManifest as {publicDestinationUrl:string}).publicDestinationUrl
+              : (o.outputManifest as {publicDestinationUrl?:unknown}).publicDestinationUrl===null
+                ? null : undefined,
             withdrawnAt:o.withdrawnAt?.toISOString()??null})),
         // Refuse a malformed historical release whose repeated format
         // resolves the same child twice. A complete Package always contains
