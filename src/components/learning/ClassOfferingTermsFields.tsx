@@ -62,7 +62,7 @@ export function ClassOfferingTermsFields({
               <Label htmlFor="native-class-visibility" className="block text-sm font-semibold">Visibility</Label>
               <Select id="native-class-visibility" value={value.visibility}
                 onChange={e=>patch({visibility:e.target.value as ClassOfferingTerms["visibility"]})}
-                className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+                className="mt-2 min-h-11">
                 <option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option>
               </Select>
             </div>
@@ -84,15 +84,15 @@ export function ClassOfferingTermsFields({
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               <div><Label htmlFor="native-class-open" className="block text-sm font-semibold">Opens</Label>
                 <Input id="native-class-open" type="datetime-local" value={value.opensAt}
-                  onChange={e=>patch({opensAt:e.target.value})} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
+                  onChange={e=>patch({opensAt:e.target.value})} className="mt-2 min-h-11"/>
               </div>
               <div><Label htmlFor="native-class-close" className="block text-sm font-semibold">Closes</Label>
                 <Input id="native-class-close" type="datetime-local" value={value.closesAt}
-                  onChange={e=>patch({closesAt:e.target.value})} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
+                  onChange={e=>patch({closesAt:e.target.value})} className="mt-2 min-h-11"/>
               </div>
               <div><Label htmlFor="native-class-capacity" className="block text-sm font-semibold">Capacity</Label>
                 <Input id="native-class-capacity" type="number" min={1} value={value.capacity} placeholder="Unlimited"
-                  onChange={e=>patch({capacity:e.target.value})} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
+                  onChange={e=>patch({capacity:e.target.value})} className="mt-2 min-h-11"/>
               </div>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
@@ -105,11 +105,11 @@ export function ClassOfferingTermsFields({
               <div><Label htmlFor="native-class-consent-version" className="block text-xs font-semibold">Version</Label>
                 <Input id="native-class-consent-version" value={value.consentVersion} required minLength={3}
                   onChange={e=>patch({consentVersion:e.target.value})} placeholder="participation-v1"
-                  className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/></div>
+                  className="mt-1 min-h-11"/></div>
               <div><Label htmlFor="native-class-consent-text" className="block text-xs font-semibold">Participation and data-use terms</Label>
                 <Textarea id="native-class-consent-text" value={value.consentText} required minLength={25} maxLength={10000} rows={4}
                   onChange={e=>patch({consentText:e.target.value})}
-                  className="mt-1 w-full border border-border bg-background p-3 text-sm"/></div>
+                  className="mt-1"/></div>
             </div>}
             </div>;
 }
