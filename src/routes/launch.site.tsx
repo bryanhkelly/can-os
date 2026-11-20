@@ -4,6 +4,7 @@ import { z } from "zod";
 import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { launchSiteLifecycleLabel, nextLaunchAction } from "@/domain/launch-overview-v61";
+import { launchModuleCompletionV61 } from "@/domain/launch-module-completion-v61";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
@@ -41,7 +42,7 @@ export const Route = createFileRoute("/launch/site")({
       : options.sites.length === 1 ? options.sites[0] : null;
     // Project next steps from real Site-scoped reads. A failed read must never
     // be confused with an empty saved answer or falsely reported as complete.
-    const overview = site && !deps.module ? await (async () => {
+    const overview = site ? await (async () => {
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
         readSiteInformationV61({ data: { siteId: site.id } }),
         readSiteProgramsAudiencesV61({ data: { siteId: site.id } }),
@@ -132,6 +133,7 @@ function SiteLaunchPage() {
   const selected = siteLaunchModules.find(item=>item.id===search.module);
   const statusLabel = launchSiteLifecycleLabel(site.lifecycleStatus);
   return <LaunchSiteFrame site={site} active={search.module} statusLabel={statusLabel}
+    completion={launchModuleCompletionV61(site, overview)}
     previewAvailable={Boolean(site.websiteDraft)}>
     {selected?.id === "site-profile" ? <WorkspaceShell title="Site Profile"
       eyebrow="Establish / Site Profile"
