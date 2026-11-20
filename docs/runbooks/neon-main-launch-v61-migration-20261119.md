@@ -132,3 +132,74 @@ restricted-role cross-Site denials, and actual application build/tests
 against the exact source SHA. Do not reapply journaled 0095/0096, create
 a second Class/Attempt, or promote these migrations to main without
 separate production authorization and a current rollback plan.
+
+## 2026-11-20 · Complete feature-branch database inventory audit
+
+Target: `v61-launch-brand-migration-validation-20261119`
+(`br-bitter-pine-ar7mjn70`), **not** Neon main.
+Compared the 730 changed paths in PR #348; 34 were Drizzle, SQL,
+seed, database-schema or database-check files. The feature-branch
+`drizzle/meta/_journal.json` contains entries through 0096.
+
+### Numbered migrations: complete on validation branch
+
+All **eleven** feature migration files 0086–0096 exist on validation
+with the original journal timestamp and **SHA-256 of the complete exact
+current GitHub source bytes**. All eleven checks passed. Journal holds
+98 rows (latest ID 98, timestamp 1795134000000). No migration was
+replayed or added; no schema changes were made by this audit.
+
+Schema probes confirmed new Brand/release/delivery objects, installed
+Course→Class provenance trigger and check constraint, cancellation
+delivery kind, and denied direct authenticated/anonymous access to
+Class participant receipts.
+
+### Reference/demo data: present on validation
+
+- Canonical geographic reference: one `US` parent and 56 subdivisions.
+- COGIC pilot Program references: both intended codes with published v1
+  and v2. COGIC published planning-only Solution blueprints: 2,
+  containing respectively 5 and 7 components.
+- Draft pilot knowledge checks: one version for each of two pilots.
+  Both pilot feedback surveys have 5 questions.
+- Existing Jordan demo YouTube resource library: 32 resource records,
+  **743 section-local lesson/class overlay placements**; four AI/Digital
+  Skills canonical pilot lessons have video candidate references.
+- Canonical immutable Site Brand versions: 3, marketing package
+  releases: 0 (new table structurally present and empty as expected);
+  Class participant delivery receipts: 0.
+
+This verifies expected records and schema state, **not the original
+execution history of each non-Drizzle seed** or any educational
+publication, partner approval, or real email delivery.
+
+### Remaining configuration and legacy cutover: NOT complete
+
+The checked-in `check-launch-prepare-readiness.sql` on validation
+returned **6 ready and 3 blocked**: the restricted Program Catalog SQL
+role, restricted Blueprint Author SQL role, and an independently verified
+Site geographic-area classification. No purpose-bound restricted roles,
+Organization bindings, or classified Sites are present. The applicable
+DBA scripts require approved role identities, current Site-operator
+permissions and non-owner application credentials; they are **not**
+ordinary automated Drizzle migrations, and were not executed.
+
+The legacy `education_v30` schema retains **7 base tables, 6 views**.
+The public schema has **13 foreign keys targeting legacy tables**,
+and **371 application-table triggers whose function is defined in
+education_v30**. Do not drop the schema or its functions based solely
+on empty row estimates: they actively enforce data and access rules.
+The canonical Person/Account and legacy Enrollment source cutover must
+be separately designed and tested. The existing Course Attempt source
+trigger remains dependent on `education_v30.validate_course_attempt_source`.
+
+Direct Neon branch schema diff was unavailable because Neon returned
+HTTP 413 (schema too large). Therefore the assessment used individual
+migration source hashes, catalog metadata, dependent objects, targeted
+data counts and the repository's read-only readiness query. **It is
+not a byte-for-byte entire schema diff.**
+
+Neon main was not changed. All current numbered feature migrations are
+present and matching on the validation branch. The broader restricted-role
+and legacy-schema retirement projects still require approved independent
+work and real application acceptance.
