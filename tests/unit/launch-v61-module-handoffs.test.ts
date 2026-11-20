@@ -30,7 +30,8 @@ describe("V6.1 Launch Studio module integration", () => {
 
   it("never duplicates the global Launch shell or invents statuses", () => {
     expect(route.match(/<LaunchSiteFrame /g)).toHaveLength(1);
-    expect(route).toContain("Site established");
+    expect(route).toContain("launchSiteLifecycleLabel(site.lifecycleStatus)");
+    expect(route).not.toContain('statusLabel: "Site established"');
     expect(frame).not.toContain("WorkspaceNavigation");
     expect(route).not.toContain("<LaunchStudioChrome");
     expect(destinations).not.toContain("Enrollment open");
