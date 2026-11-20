@@ -5,10 +5,21 @@ import { describe, expect, it } from "vitest";
 function source(path: string) { return readFileSync(resolve(path), "utf8"); }
 
 describe("canonical v3.0.1 stays net-new", () => {
-  it("uses canonical session context for every Blueprint handler", () => {
+  it("reuses the verified CAN Site grant for planning and retains canonical review authority", () => {
     const handler = source("src/modules/blueprints/blueprint-studio.functions.ts");
+    const verified = source("src/modules/blueprints/verified-site-planning.server.ts");
+    expect(handler).toContain("getBlueprintPlanningContext(getRequest())");
     expect(handler).toContain("getCanonicalCommandContext(getRequest())");
     expect(handler).not.toContain("getCommandContext(getRequest())");
+    expect(verified).toContain("getIdentityContext(request)");
+    expect(verified).toContain("verifiedCanPlanningContexts.add(context)");
+    expect(verified).toContain("assertVerifiedCanPlanningSite");
+    expect(verified).not.toContain("siteOrganizationRoles");
+    // Neither review decisions nor Deployment execution inherit plan-edit rights.
+    expect(handler.slice(handler.indexOf("export const decideCanonicalBlueprintReview")))
+      .toContain("getCanonicalCommandContext(getRequest())");
+    expect(handler.slice(handler.indexOf("export const executeCanonicalBlueprintConfiguration")))
+      .toContain("getCanonicalCommandContext(getRequest())");
   });
 
   it("uses native authorization without a global Blueprint write feature toggle", () => {
@@ -22,12 +33,36 @@ describe("canonical v3.0.1 stays net-new", () => {
       expect(module).not.toContain("requireCanonicalBlueprintWriteEnabled");
     }
     const handlers = source("src/modules/blueprints/blueprint-studio.functions.ts");
+    expect(handlers).toContain("getBlueprintPlanningContext(getRequest())");
     expect(handlers).toContain("getCanonicalCommandContext(getRequest())");
     expect(handlers).toContain("requireBlueprintSiteScope");
     expect(source("src/modules/blueprints/blueprint-workspace.server.ts"))
       .toContain('blueprintDatabaseRole(context, "blueprint_author")');
     expect(source("src/modules/blueprints/blueprint-review-queue.server.ts"))
       .toContain('blueprintDatabaseRole(context, "blueprint_reviewer")');
+  });
+
+  it("allows first-party CAN Site planning without a second operator or SQL-role binding", () => {
+    const workspace = source("src/modules/blueprints/blueprint-workspace.server.ts");
+    const configuration = source("src/modules/blueprints/blueprint-configuration.server.ts");
+    const catalog = source("src/modules/blueprints/blueprint-reference-catalog.server.ts");
+    const offerings = source("src/modules/programs/program-discovery.server.ts");
+    const reviews = source("src/modules/blueprints/blueprint-review.server.ts");
+    const signup = source("src/modules/identity/school-setup-signup.server.ts");
+    expect(workspace).toContain("isVerifiedCanSitePlanning(context)");
+    expect(workspace).toContain("await assertVerifiedCanPlanningSite(tx, context, siteId)");
+    expect(workspace).toContain("if (databaseRole) await tx.execute");
+    expect(workspace).toContain("siteOrganizationRoles");
+    for (const service of [configuration, catalog, offerings, reviews]) {
+      expect(service).toContain("isVerifiedCanSitePlanning(context)");
+      expect(service).toContain("assertVerifiedCanPlanningSite(");
+      expect(service).toContain("if (databaseRole) await tx.execute");
+    }
+    expect(configuration).toContain("Blueprint configuration Site cannot be reassigned");
+    expect(signup).toContain('lifecycleStatus: "planning"');
+    expect(signup).toContain('lifecycleStatus: "active"');
+    expect(signup).toContain("personId, updatedAt: now");
+    expect(signup).not.toContain("siteOrganizationRoles");
   });
 
   it("keeps the author and reviewer pages outside old School Hub and sign-in", () => {
