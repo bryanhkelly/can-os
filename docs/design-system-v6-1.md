@@ -261,6 +261,16 @@ and `Select` association rather than a custom-styled select inside a label.
 The cross-feature source tests lock these reuse contracts, and the scoped
 duplicate-form-action lint error covers the newly migrated modules.
 
+**Named form-component coverage:** The production `*Form.tsx` component
+family now uses the shared action patterns, including guardian applications,
+Class scheduling, provider recording uploads, teacher follow-ups, student goal
+reviews, and evidence decisions. The guardian application no longer maintains
+its own pending spinner beside `Button.loading`. The source-level test
+discovers all current and future named forms and checks every submitting form
+for `ActionFooter` or `FormActions`. ESLint treats duplicated native submit
+rows as errors for `src/components/**/*Form.tsx`, while other legacy
+surfaces remain visible as warnings pending migration.
+
 `can-os-design/no-duplicate-form-actions` reports a local `div` or
 `footer` directly wrapping a submit `Button` inside a form. It runs
 as an adoption warning across production JSX, and is an **error** for the
