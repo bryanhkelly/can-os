@@ -58,6 +58,7 @@ tester.run("no-native-feature-controls", plugin.rules["no-native-feature-control
     { code: 'const page = <input type={kind} />;', errors: [{ messageId: "primitive" }] },
     { code: 'const page = <select><option>Yes</option></select>;', errors: [{ messageId: "primitive" }] },
     { code: 'const page = <textarea />;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <dialog open>Details</dialog>;', errors: [{ messageId: "primitive" }] },
     { code: 'const page = <label>Feedback</label>;', errors: [{ messageId: "primitive" }] },
     { code: 'const page = <label><Input /> Feedback</label>;', errors: [{ messageId: "primitive" }] },
     { code: 'const page = <label><Checkbox/><Input/>Choose</label>;', errors: [{ messageId: "primitive" }] },
