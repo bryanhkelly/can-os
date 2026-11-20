@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/choice";
+import { Checkbox, Radio } from "@/components/ui/choice";
 import { Link } from "@tanstack/react-router";
 import { normalizeClientError } from "@/lib/client-error";
 import { buildSiteClassMeetings, displaySiteClassTime, siteWallWeek, type LocalMeeting } from "@/domain/class-session-local-time";

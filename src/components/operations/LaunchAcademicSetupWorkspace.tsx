@@ -13,6 +13,7 @@ import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,setLau
 import {WorkspaceNotice} from "@/components/workspace";
 import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
 import { schoolLaunchSteps } from "@/domain/launch-studio";
+import { legacySchoolStepModuleV61 } from "@/domain/launch-legacy-navigation-v61";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
 import { SchoolJurisdictionReviewPanel } from "@/components/operations/SchoolJurisdictionReviewPanel";
@@ -75,7 +76,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
   steps={schoolLaunchSteps.map(id=>({id,title:{welcome:"Welcome",school:"School details",academics:"Academics",website:"School website",families:"Families & staff",readiness:"Readiness review",next:"What's next"}[id]}))}
   currentId="academics" onStepChange={id=>{
     const step=schoolLaunchSteps.find(item=>item===id);
-    if(step)void router.navigate({to:"/launch/site",search:{siteId:data.program.siteId??undefined,programId:data.program.id,step}});
+    if(step)void router.navigate({to:"/launch/site",search:{siteId:data.program.siteId??undefined,programId:data.program.id,module:legacySchoolStepModuleV61(step)}});
   }}
   exit={hubMode ? <Link to={navigation.homePath} search={{siteId:data.program.siteId??undefined}} className="text-primary">Back to {navigation.homeLabel}</Link> : <Link to="/home" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Skip to dashboard</Link>}
   actions={!hubMode && <Button asChild variant="outline" size="sm">

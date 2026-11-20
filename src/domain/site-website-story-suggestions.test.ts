@@ -54,10 +54,13 @@ describe("Purpose & Story as reviewable website draft source", () => {
     };
     const options=suggestWebsiteCopyFromStory(input,"Example Site");
     const mapped=Object.fromEntries(options.map(item=>[item.field,item]));
-    expect(mapped.localDescription.text).not.toContain("<script>");
-    expect(mapped.schoolVision.text.length).toBeLessThanOrEqual(siteLocalContentLimits.schoolVision);
+    expect(mapped.localDescription).toBeDefined();
+    expect(mapped.localDescription?.text).not.toContain("<script>");
+    expect(mapped.schoolVision).toBeDefined();
+    expect(mapped.schoolVision?.text.length).toBeLessThanOrEqual(siteLocalContentLimits.schoolVision);
     const draft=prepareWebsiteCopyFromSiteInformation(createSchoolWebsiteStarterContent("Example Site"),options);
     expect(draft.localDescription).not.toContain("accredited");
-    expect(draft.schoolVision.length).toBeLessThanOrEqual(siteLocalContentLimits.schoolVision);
+    expect(draft.schoolVision).toBeDefined();
+    expect(draft.schoolVision?.length).toBeLessThanOrEqual(siteLocalContentLimits.schoolVision);
   });
 });

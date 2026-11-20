@@ -144,6 +144,7 @@ export function LaunchClassFacilitiesWorkspaceV61({siteId}:{siteId:string}){
     retry:false,
   });
   const refresh=async()=>{await query.refetch({throwOnError:true})};
+  const snapshot = query.data?.siteId === siteId ? query.data : null;
   return <WorkspacePanel title="Class rooms & facilitator assignments"
     description="Choose the actual Site room and a verified Class facilitator for each canonical Class. All changes use the original Class and staff records.">
     {query.isPending&&<p role="status" className="mt-3">Loading Class room assignments…</p>}
@@ -154,26 +155,26 @@ export function LaunchClassFacilitiesWorkspaceV61({siteId}:{siteId:string}){
         Retry authorized Class read
       </Button>
     </div>}
-    {query.data?.siteId===siteId && <>
-      {!query.data.classes.length&&<p className="mt-3 text-sm text-muted-foreground">
+    {snapshot && <>
+      {!snapshot.classes.length&&<p className="mt-3 text-sm text-muted-foreground">
         No canonical Classes are available for this Site under its current
         approved Course adoption. Your private Solution plan remains saved.
       </p>}
       <div className="mt-4 space-y-3">
-        {query.data.classes.map(cls=><details key={cls.classId+":"+cls.revision}
+        {snapshot.classes.map(cls=><details key={cls.classId+":"+cls.revision}
           className="border bg-background p-4">
           <summary className="cursor-pointer text-sm font-semibold">
             {cls.title} · {cls.state} · Room:{" "}
-            {query.data.spaces.find(space=>space.id===cls.physicalSpaceId)?.name??"not assigned"}
+            {snapshot.spaces.find(space=>space.id===cls.physicalSpaceId)?.name??"not assigned"}
           </summary>
           <div className="mt-4 border-t pt-4">
-            <ClassPhysicalForm plan={cls} workspace={query.data} onChanged={refresh}/>
+            <ClassPhysicalForm plan={cls} workspace={snapshot} onChanged={refresh}/>
           </div>
         </details>)}
       </div>
       <Button type="button" variant="outline" size="sm" className="mt-4"
         onClick={()=>void query.refetch()}>Refresh Class assignments</Button>
-      {!query.data.spaces.length && <p className="mt-3 text-sm text-muted-foreground">
+      {!snapshot.spaces.length && <p className="mt-3 text-sm text-muted-foreground">
         Register a room and its capacity in Facilities & Resources before assigning it here.
       </p>}
     </>}

@@ -7,7 +7,7 @@ const meta = { title:"V6.1 foundations/Disclosure section",
   component:DisclosureSection, parameters:{layout:"padded"} } satisfies Meta<typeof DisclosureSection>;
 export default meta;
 type Story=StoryObj<typeof meta>;
-export const IndependentPanels:Story={render:()=>{
+export const IndependentPanels:Story={args:{title:"Colors",children:null},render:()=>{
   const Example=()=>{const [value,setValue]=useState("Your School");
     return <div className="max-w-2xl space-y-3 bg-background p-5">
       <DisclosureSection title="Colors" description="Change a maintained palette" defaultOpen>

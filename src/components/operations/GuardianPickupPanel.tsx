@@ -23,7 +23,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   } | null>(null);
   // Filter during render, before effects run, so another child's authority
   // never flashes on screen after selecting a different child.
-  const workspace = workspaceSnapshot?.studentPersonId === studentPersonId
+  const workspace = workspaceSnapshot && workspaceSnapshot.studentPersonId === studentPersonId
     ? workspaceSnapshot.value : null;
   const pendingMutationIds = useRef(new Map<string, string>());
   const requestSequence = useRef(0);

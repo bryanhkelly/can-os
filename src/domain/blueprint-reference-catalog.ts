@@ -64,8 +64,8 @@ export function projectBlueprintReferenceCatalog(
       !Array.isArray(rawRange) &&
       typeof (rawRange as Record<string, unknown>).min === "string" &&
       typeof (rawRange as Record<string, unknown>).max === "string"
-        ? { min: (rawRange as Record<string, string>).min,
-            max: (rawRange as Record<string, string>).max } : null;
+        ? { min: String((rawRange as Record<string, unknown>).min),
+            max: String((rawRange as Record<string, unknown>).max) } : null;
     catalog.push({
       itemId: row.itemId,
       versionId: row.versionId,

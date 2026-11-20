@@ -69,7 +69,7 @@ export function GroupResourcesPanel({group, approvedMember, role}: {
   return <WorkspacePanel className="shadow-none" title="Shared learning resources"
     description="Open existing class materials instead of keeping a separate copy in study groups.">
     {approvedMember && group.sectionId ? <nav aria-label="Class learning resources" className="flex flex-wrap gap-3">
-      <Button asChild variant="outline"><Link to="/classes" search={{section: group.sectionId, tab: "lessons"}}>
+      <Button asChild variant="outline"><Link to="/class">
         Open class lessons
       </Link></Button>
       {role === "student" && <Button asChild variant="outline"><Link to="/student/assignments" search={{section: group.sectionId}}>

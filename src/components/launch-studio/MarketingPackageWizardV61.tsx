@@ -36,7 +36,7 @@ export function MarketingPackageWizardV61({
   return <>
 
         <GuidedSetupProgress label="Package progress" steps={marketingPackageSteps.map((id, index) => ({
-          id, title: stepLabels[index], status: index === step ? "current" as const : "upcoming" as const,
+          id, title: stepLabels[index] ?? id, status: index === step ? "current" as const : "upcoming" as const,
         }))} />
 
         {step===0&&<WorkspacePanel title="What would you like to share?" description="Choose a starting point. Your Site brand will be reused automatically later.">

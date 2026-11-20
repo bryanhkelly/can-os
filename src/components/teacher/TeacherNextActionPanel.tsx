@@ -43,7 +43,7 @@ export function TeacherNextActionPanel({
       <p className="text-sm text-muted-foreground">
         No grading or missing-work items in the current snapshot. Review your schedule and prepare your next class.
       </p>
-      <Link to="/classes" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">
+      <Link to="/class" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">
         Open my classes →
       </Link>
     </div>}

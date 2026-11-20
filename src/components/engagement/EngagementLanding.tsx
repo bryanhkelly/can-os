@@ -132,7 +132,7 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
         <h2 className="mt-3 font-serif text-3xl">Would a sample experience help?</h2>
         {mayTryIsolatedSchoolDemo(journey.id) ? <>
           <p className="mt-3 text-sm leading-7 text-muted-foreground">CAN OS offers an isolated, synthetic .demo school setup. It does not create an authorized partner school, enroll students, or grant a real operating approval.</p>
-          <Link to="/schools/new" className="mt-5 inline-flex min-h-11 items-center gap-2 border border-primary px-5 py-3 text-sm font-semibold text-primary">
+          <Link to="/site/new" className="mt-5 inline-flex min-h-11 items-center gap-2 border border-primary px-5 py-3 text-sm font-semibold text-primary">
             Try an isolated demo school <ArrowRight className="size-4"/>
           </Link>
         </> : <>

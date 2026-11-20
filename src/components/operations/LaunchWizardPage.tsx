@@ -23,6 +23,7 @@ import { LaunchStudioShell, JourneyWelcome } from "@/components/launch-studio/La
 import { LaunchDraftButton } from "@/components/launch-studio/LaunchDraftButton";
 import { useLaunchDraftChanges, useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import { schoolLaunchSteps, launchRequirementProgress } from "@/domain/launch-studio";
+import { legacySchoolStepModuleV61 } from "@/domain/launch-legacy-navigation-v61";
 import type { LaunchDraftRecord } from "@/domain/launch-draft";
 import { useState } from "react";
 import { hasEnteredSiteAddress, physicalSiteAddressSchema } from "@/domain/site-setup-configuration";
@@ -267,7 +268,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
       if (submission.refreshError) setError("Launch started, but the page could not refresh. Reopen its checklist; do not start a duplicate launch.");
       try {
         await router.navigate({
-          ...(hubMode ? {to:navigation.modulePath,params:{module:"academics"},search:{programId:result.programId,siteId}} : {to:"/launch/school" as const,search:{programId:result.programId,siteId:result.publicSiteDraft?.siteId,step:"academics" as const}}),
+          to:"/launch/site",search:{programId:result.programId,siteId:result.publicSiteDraft?.siteId ?? (siteId || undefined),module:"program-catalog"},
         });
       } catch {
         // startLaunch already committed. Keep the handoff with canonical IDs.
@@ -305,7 +306,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
     </WorkspaceNotice>
     <div className="mt-4 flex flex-wrap gap-4 text-sm">
       <Link to="/home" className="underline">Return to Operations</Link>
-      <Link to="/launch/school" search={{}} className="underline">Start a new school setup</Link>
+      <Link to="/site/new" className="underline">Start a new Site setup</Link>
     </div>
   </WorkspaceShell>;
   const currentLaunch=resolveLaunchResume(launches.launches,selection).launch;
@@ -366,7 +367,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
     const next = schoolLaunchSteps.find(item => item === id);
     const targetIndex = next ? schoolLaunchSteps.indexOf(next) : -1;
     if (next && (currentProgram || targetIndex <= schoolLaunchSteps.indexOf("school"))) {
-      void router.navigate({ to: "/launch/school", search: { ...selection, step: next } });
+      void router.navigate({ to: "/launch/site", search: { siteId:selection.siteId, programId:selection.programId, module:legacySchoolStepModuleV61(next) } });
     }
   }
   const titles = { welcome: "Let's build your school.", school: "Your school, your foundation.",
@@ -424,7 +425,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
         </Button>}
-        {!hubMode && <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/launch/school",search:{siteId:school.siteId??undefined,programId:school.id,step}})}/> }
+        {!hubMode && <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/launch/site",search:{siteId:school.siteId??undefined,programId:school.id,module:legacySchoolStepModuleV61(step)}})}/> }
         {(step === "welcome" || step === "readiness" || step === "next") && <section aria-label="Your next school launch action" className="mt-5  border border-primary/20 bg-card p-5">
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Your school · Next action</p>
           <h2 className="mt-2 font-serif text-2xl font-semibold">{nextTitle}</h2>
