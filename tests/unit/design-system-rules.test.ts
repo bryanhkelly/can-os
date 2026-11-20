@@ -80,3 +80,13 @@ tester.run("no-duplicate-form-actions", plugin.rules["no-duplicate-form-actions"
     { code: 'const page = <form><div><Field label="Name"><Input/></Field><Button type="submit">Save</Button></div></form>;', errors: [{ messageId: "reuse" }] },
   ],
 });
+
+tester.run("no-native-feature-tables", plugin.rules["no-native-feature-tables"], {
+  valid: [
+    'const view = <Table scrollLabel="Sites"><TableHeader><TableRow><TableHead scope="col">Site</TableHead></TableRow></TableHeader></Table>;',
+    'const view = <div><TableRowHead>Site</TableRowHead><TableCell>3</TableCell></div>;',
+  ],
+  invalid: [
+    { code: 'const view = <table><thead><tr><th>Site</th></tr></thead></table>;', errors: [{ messageId: "table" }] },
+  ],
+});
