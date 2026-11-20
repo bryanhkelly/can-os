@@ -23,6 +23,30 @@ function isNativeHiddenInput(node) {
   const type = attribute(node, "type")?.initializer;
   return !!type && ts.isStringLiteral(type) && type.text === "hidden";
 }
+/**
+ * A wrapping native label is the accessible click target for a whole-card
+ * checkbox/radio choice. Do not force it into a separate Label/htmlFor control.
+ * A text-input label without a choice remains migration debt.
+ */
+function isChoiceCardLabel(node, source) {
+  if (!ts.isJsxOpeningElement(node) || !ts.isJsxElement(node.parent)) return false;
+  const controls = [];
+  function visit(child) {
+    if (ts.isJsxOpeningElement(child) || ts.isJsxSelfClosingElement(child)) {
+      const tag = child.tagName.getText(source);
+      if (["Checkbox", "Radio", "Input", "Select", "Textarea", "input", "select", "textarea", "button"].includes(tag))
+        controls.push({ tag, type: attribute(child, "type")?.initializer });
+    }
+    ts.forEachChild(child, visit);
+  }
+  for (const child of node.parent.children) visit(child);
+  if (controls.length !== 1) return false;
+  const choice = controls[0];
+  return choice.tag === "Checkbox" || choice.tag === "Radio" ||
+    (choice.tag === "input" && !!choice.type &&
+      ts.isStringLiteral(choice.type) && ["checkbox", "radio"].includes(choice.type.text));
+}
+
 function importNames(clause) {
   if (!clause) return []; // Side-effect-only imports do not compose UI.
   if (clause.isTypeOnly) return [];
@@ -46,7 +70,8 @@ export function analyzeSource(source, path, options = {}) {
   function walk(node) {
     if (isTsx && (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))) {
       const tag = node.tagName.getText(syntax);
-      if (!primitive && nativeTags.has(tag) && !(tag === "input" && isNativeHiddenInput(node))) {
+      if (!primitive && nativeTags.has(tag) && !(tag === "input" && isNativeHiddenInput(node)) &&
+          !(tag === "label" && isChoiceCardLabel(node, syntax))) {
         native.push({ tag, ...location(syntax, node) });
       }
     }
