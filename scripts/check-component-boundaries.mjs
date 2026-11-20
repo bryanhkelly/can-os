@@ -69,6 +69,7 @@ const owners = [
   ]],
   ["src/components/launch-studio/CanonicalBlueprintWorkspace.tsx", [
     '<legend className="px-2 font-semibold">Blueprint components</legend>',
+    '<legend className="px-2 font-semibold">Propose a local experience</legend>',
     "referenceCatalog.filter(reference =>",
   ]],
   ["src/routes/groups.tsx", [
@@ -96,7 +97,23 @@ const owners = [
   ["src/routes/site-website.tsx", ["function WebsiteInformationChecklist(",
     "function WebsiteSourceMappingPanel(", "function WebsiteDesignChecklist(",
     "function WebsitePreviewPanel("]],
-  ["src/components/launch-studio/MarketingPackagesV61.tsx", ["visible.map(item=><article"]],
+  ["src/components/launch-studio/MarketingPackagesV61.tsx", [
+    "visible.map(item=><article",
+    '<WorkspacePanel title="Package release"',
+  ]],
+  ["src/components/launch-studio/LaunchReadinessPanelV61.tsx", [
+    'aria-label="Program to Offering delivery journey"',
+    'aria-label="Solution planning state"',
+    'aria-label="Program readiness state"',
+    'aria-label="Website publication state"',
+  ]],
+  ["src/components/launch-studio/EstablishSiteInformationV61.tsx", [
+    '<nav aria-label="Site Information sections"',
+    "function SingleChoice(",
+  ]],
+  ["src/components/launch-studio/EstablishProgramsAudiencesV61.tsx", [
+    "function ChoiceCard(",
+  ]],
   ["src/components/admissions/PublicInterestInbox.tsx", ['aria-label="Family relationship history"', 'items.map(row => <article']],
   ["src/components/enrollment/NoncreditReleaseOperations.tsx", ['rows={query.data.roster}', '<h3 className="mt-7 text-base font-semibold">Participant roster</h3>']],
   ["src/components/enrollment/GuardianApplicationForm.tsx", ['<Label htmlFor={`${id}-transfer`}', '<Label htmlFor={`${id}-household`}']],
@@ -129,5 +146,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("Component architecture: " + files.size +
-    " shared presentation sources and " + owners.length + " feature owners verified.");
+    " production component sources and " + owners.length + " feature owners verified.");
 }
