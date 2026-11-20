@@ -81,6 +81,11 @@ SELECT (
 \quit 3
 \endif
 
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtextextended(
+  :'program_catalog_role' || ':' || :'application_role' || ':' || :'organization_id' || ':program_catalog', 0
+));
+
 SELECT format(
   'CREATE ROLE %I NOLOGIN NOINHERIT NOBYPASSRLS NOCREATEDB NOCREATEROLE',
   :'program_catalog_role'
@@ -88,11 +93,6 @@ SELECT format(
   SELECT 1 FROM pg_roles WHERE rolname=:'program_catalog_role'
 )
 \gexec
-
-BEGIN;
-SELECT pg_advisory_xact_lock(hashtextextended(
-  :'program_catalog_role' || ':' || :'application_role' || ':' || :'organization_id' || ':program_catalog', 0
-));
 
 SELECT format('GRANT USAGE ON SCHEMA public, education_v30 TO %I', :'program_catalog_role')
 \gexec
