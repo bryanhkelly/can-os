@@ -44,6 +44,10 @@ export async function getBlueprintPlanningContext(request: Request): Promise<Com
       !actor.capabilities.has("program.launch.start")) {
     throw new AuthorizationError("current verified CAN Site planning grant");
   }
+  const organizationId = actor.scope.organizationIds[0];
+  if (!organizationId) {
+    throw new AuthorizationError("current verified CAN Organization grant");
+  }
   const [account] = await db.select({
     email: accessAccounts.emailNormalized,
     verifiedAt: accessAccounts.emailVerifiedAt,
@@ -61,7 +65,7 @@ export async function getBlueprintPlanningContext(request: Request): Promise<Com
     role: actor.role,
     capabilities: new Set(["blueprint.read", "blueprint.configure", "program.launch.start"]),
     scope: {
-      organizationIds: [actor.scope.organizationIds[0]],
+      organizationIds: [organizationId],
       siteIds: [...actor.scope.siteIds],
     },
   };
