@@ -17,6 +17,7 @@ import { NativeClassActivationStatus } from "@/components/learning/NativeClassAc
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassHomeworkPanel } from "@/components/learning/NativeClassHomeworkPanel";
+import { NativeClassDiscussionPanel } from "@/components/learning/NativeClassDiscussionPanel";
 import { NativeValorLessonPanel } from "@/components/learning/NativeValorLessonPanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
 import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
@@ -63,7 +64,7 @@ export const Route=createFileRoute("/class_/$classId")({
 type Workspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
 
 const tabLabels:Record<string,string>={
-  overview:"Overview",lessons:"Lessons",assignments:"Assignments",
+  overview:"Overview",lessons:"Lessons",assignments:"Assignments",discussions:"Discussions",
   progress:"My progress",sessions:"Sessions",roster:"Roster",
   classroom:"Classroom",offering:"Class Offering",reports:"Reports",completion:"Completion",
 };
@@ -188,6 +189,8 @@ function LearnerClass({workspace}:{workspace:Workspace}){
         <p className="mt-2 text-sm">{data.awards.filter(a=>!a.revokedAt).length} active awards recorded.</p>
       </>}
     </section>}
+    {workspace.tab==="discussions"&&
+      <NativeClassDiscussionPanel classEnrollmentId={learner.classEnrollmentId}/>}
     {workspace.tab==="assignments"&&<div className="space-y-5">
       <NativeClassHomeworkPanel classEnrollmentId={learner.classEnrollmentId}/>
       <NativeClassCanonicalEvidencePanel classEnrollmentId={learner.classEnrollmentId}/>
