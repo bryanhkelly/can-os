@@ -16,7 +16,7 @@ const props={
   loadPrivateUrl:async(_id:string)=>"https://example.org/private",
   onDownload:()=>{},
 };
-const item=(value:Record<string,unknown>)=>value as ClassSupplement;
+const item=(value:Record<string,unknown>)=>value as unknown as ClassSupplement;
 
 describe("Class supplements", () => {
   it("renders video using shared recorded-media UI", () => {
