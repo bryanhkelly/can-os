@@ -65,3 +65,18 @@ tester.run("no-native-feature-controls", plugin.rules["no-native-feature-control
     { code: 'const page = <label><input type="checkbox"/>Choose</label>;', errors: [{ messageId: "primitive" }, { messageId: "primitive" }] },
   ],
 });
+
+tester.run("no-duplicate-form-actions", plugin.rules["no-duplicate-form-actions"], {
+  valid: [
+    'const page = <form><ActionFooter><Button type="submit">Save</Button></ActionFooter></form>;',
+    'const page = <form><FormActions submitLabel="Save" pending={false}/></form>;',
+    'const page = <form><div className="flex gap-2"><Button type="button">Cancel</Button></div></form>;',
+    'const page = <div><Button type="submit">Standalone action</Button></div>;',
+    'const page = <form><div><ActionFooter><Button type="submit">Save</Button></ActionFooter></div></form>;',
+  ],
+  invalid: [
+    { code: 'const page = <form><div className="flex gap-2"><Button type="submit">Save</Button></div></form>;', errors: [{ messageId: "reuse" }] },
+    { code: 'const page = <form><footer><Button type="submit">Continue</Button></footer></form>;', errors: [{ messageId: "reuse" }] },
+    { code: 'const page = <form><div><Field label="Name"><Input/></Field><Button type="submit">Save</Button></div></form>;', errors: [{ messageId: "reuse" }] },
+  ],
+});
