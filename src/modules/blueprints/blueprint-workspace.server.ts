@@ -18,6 +18,7 @@ import { assertCapability, AuthorizationError, type CommandContext } from "@/dom
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 import { selectBlueprintWorkspaceRecipes } from "@/domain/blueprint-configuration";
+import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "./verified-site-planning.server";
 import { z } from "zod";
 
 export const blueprintWorkspaceInputSchema = z.object({
@@ -45,9 +46,10 @@ export async function getCanonicalBlueprintWorkspace(
     throw new AuthorizationError("Blueprint workspace Site scope");
   }
 
-  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
   return db.transaction(async tx => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [site] = await tx.select({ id: catalogSites.id, status: catalogSites.status })
       .from(catalogSites).where(eq(catalogSites.id, siteId)).limit(1);
     if (!isCanonicalSiteDiscoverable(site?.status)) {
@@ -55,17 +57,22 @@ export async function getCanonicalBlueprintWorkspace(
     }
     const now = new Date();
     const organizationIds = context.scope.organizationIds ?? [];
-    if (!organizationIds.length) throw new AuthorizationError("Blueprint Organization scope");
-    const [operator] = await tx.select({
-      organizationId: siteOrganizationRoles.organizationId,
-    }).from(siteOrganizationRoles).where(and(
-      eq(siteOrganizationRoles.siteId, siteId),
-      eq(siteOrganizationRoles.roleCode, "operator"),
-      inArray(siteOrganizationRoles.organizationId, organizationIds),
-      lte(siteOrganizationRoles.validFrom, now),
-      or(isNull(siteOrganizationRoles.validThrough), gt(siteOrganizationRoles.validThrough, now)),
-    )).limit(1);
-    if (!operator) throw new AuthorizationError("current Blueprint Site operator relationship");
+    if (organizationIds.length !== 1) throw new AuthorizationError("one Blueprint Organization scope");
+    // The verified CAN Site owner needs no second canonical operator grant.
+    // An independently delegated canonical operator still uses the existing
+    // purpose-scoped role and current operator relationship below.
+    const organizationId = isCanPlanning
+      ? await assertVerifiedCanPlanningSite(tx, context, siteId)
+      : (await tx.select({
+          organizationId: siteOrganizationRoles.organizationId,
+        }).from(siteOrganizationRoles).where(and(
+          eq(siteOrganizationRoles.siteId, siteId),
+          eq(siteOrganizationRoles.roleCode, "operator"),
+          inArray(siteOrganizationRoles.organizationId, organizationIds),
+          lte(siteOrganizationRoles.validFrom, now),
+          or(isNull(siteOrganizationRoles.validThrough), gt(siteOrganizationRoles.validThrough, now)),
+        )).limit(1))[0]?.organizationId;
+    if (!organizationId) throw new AuthorizationError("current Blueprint Site authority");
 
     const [recipes, configurations, affiliations, operations] = await Promise.all([
       tx.select({
@@ -84,7 +91,7 @@ export async function getCanonicalBlueprintWorkspace(
         id: blueprintConfigurations.id,
         name: blueprintConfigurations.name,
       }).from(blueprintConfigurations)
-        .where(eq(blueprintConfigurations.owningOrganizationId, operator.organizationId))
+        .where(eq(blueprintConfigurations.owningOrganizationId, organizationId))
         .orderBy(asc(blueprintConfigurations.name)),
       tx.select({
         code: religiousAffiliationOptions.code,
@@ -105,7 +112,7 @@ export async function getCanonicalBlueprintWorkspace(
           lte(educationOperationSites.validFrom, now),
           or(isNull(educationOperationSites.validThrough),
             gt(educationOperationSites.validThrough, now)),
-          eq(educationOperationOrganizationRoles.organizationId, operator.organizationId),
+          eq(educationOperationOrganizationRoles.organizationId, organizationId),
           eq(educationOperationOrganizationRoles.roleCode, "operator"),
           eq(educationOperationOrganizationRoles.status, "approved"),
           lte(educationOperationOrganizationRoles.validFrom, now),
@@ -158,7 +165,7 @@ export async function getCanonicalBlueprintWorkspace(
       : [];
     return {
       siteId,
-      organizationId: operator.organizationId,
+      organizationId,
       canConfigure: context.capabilities.has("blueprint.configure"),
       canReview: context.capabilities.has("blueprint.review"),
       canExecute: context.capabilities.has("blueprint.execute"),
