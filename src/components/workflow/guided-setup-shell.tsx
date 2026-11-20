@@ -51,7 +51,7 @@ export function GuidedSetupProgress({ steps, onStepChange, navigationDisabled = 
     </ol>;
 }
 
-export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange, navigationDisabled = false }: {
+export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange, navigationDisabled = false, progressLabel }: {
   title: string;
   description?: string;
   steps: readonly GuidedSetupStep[];
@@ -60,6 +60,7 @@ export function GuidedSetupShell({ title, description, steps, aside, children, o
   onStepChange?: (id: string) => void;
   /** Lock internal navigation while an owning workflow commits or reconciles a save. */
   navigationDisabled?: boolean;
+  progressLabel?: string;
   children: ReactNode;
 }) {
   const titleId = useId();
@@ -68,7 +69,7 @@ export function GuidedSetupShell({ title, description, steps, aside, children, o
       <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
       {description && <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
     </header>
-    <GuidedSetupProgress steps={steps} onStepChange={onStepChange} navigationDisabled={navigationDisabled} />
+    <GuidedSetupProgress steps={steps} onStepChange={onStepChange} navigationDisabled={navigationDisabled} label={progressLabel} />
     <div className={cn("grid gap-6 p-5 sm:p-6", aside && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0">{children}</div>
       {aside && <aside aria-label="Setup guidance" className="min-w-0 lg:border-l lg:pl-6">{aside}</aside>}
