@@ -14,7 +14,7 @@ export type ClassSupplement = NonNullable<Workspace["supplements"]>[number];
  */
 export function ClassSupplementContent({
   item, presentation = "standard", programId, sectionId, disabled,
-  loadPrivateUrl, onDownload,
+  loadPrivateUrl, onDownload, resumeKey, onPlaybackEvent, onVideoEngagement,
 }: {
   item: ClassSupplement;
   presentation?: "standard" | "classroom";
@@ -23,10 +23,15 @@ export function ClassSupplementContent({
   disabled: boolean;
   loadPrivateUrl: (supplementId: string) => Promise<string>;
   onDownload: (supplementId: string) => void | Promise<void>;
+  resumeKey?: string;
+  onPlaybackEvent?: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) => void;
+  onVideoEngagement?: (durationMs: number) => void;
 }) {
   if (item.kind === "video" || (item.url && resolveClassVideo(item.url))) {
     return <ClassVideoPlayer key={`${item.id}:${item.url ?? item.resourceId}`}
       title={item.title} presentation={presentation}
+      resourceId={item.resourceId ?? item.id}
+      resumeKey={resumeKey} onPlaybackEvent={onPlaybackEvent} onVideoEngagement={onVideoEngagement}
       url={item.url} loadUrl={!item.url ? () => loadPrivateUrl(item.id) : undefined}/>;
   }
   if (item.url) return <SafeClassExternalLink url={item.url} title={item.title} kind={item.kind}/>;
