@@ -78,8 +78,7 @@ describe("Launch readiness read-only presentation components", () => {
       publisherCandidateCount: null, releasedCount: null, openRegistrationCount: null,
       facilitatedFourSessions: false,
     }];
-    const intent = {siteId, intent: {programCodes:[journeys[0]!.programCode]}}
-      as unknown as LaunchReadinessIntent;
+    const intent = {siteId, intent: {programCodes:[journeys[0]!.programCode]}} as unknown as LaunchReadinessIntent;
     const html = renderToStaticMarkup(<ProgramOfferingJourneyReadinessV61
       siteId={siteId} context="prepare" savedIntent={{state:"ready",value:intent}}
       solutions={loading} noncredit={loading} pilotJourneys={journeys}/>);
@@ -94,8 +93,7 @@ describe("Launch readiness read-only presentation components", () => {
     const programs = [{id:"program-1", name:"Program A",status:"planning",
       requirements:[{id:"safe-1",title:"Safeguarding",blocking:true,status:"incomplete"}],
     }] as unknown as LaunchReadinessPrograms;
-    const publication = {address:{host:"academy.example",status:"published"}}
-      as unknown as LaunchReadinessPublication;
+    const publication = {address:{host:"academy.example",status:"published"}} as unknown as LaunchReadinessPublication;
     const noncredit = {
       candidates:[{deploymentId:"d",adoptionId:"a",trainingVersionId:"t",
         courseVersionId:"c",trainingTitle:"Training",siteOptions:[{id:siteId}],digitalSiteOptions:[]}],
