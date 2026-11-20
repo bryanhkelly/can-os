@@ -94,7 +94,7 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
           id:String(item.id),
           title:String(spec.title??official.title??item.assignment_key),
           instructions:String(spec.instructions??official.instructions??"Submit your written response."),
-          dueAt:item.due_at?.toISOString()??null,
+          dueAt:item.due_at ? new Date(item.due_at).toISOString() : null,
           status:item.status??"not_started",
           submittedAt:item.submitted_at?.toISOString()??null,
           responseText:typeof response.text==="string"?response.text:"",
