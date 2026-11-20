@@ -130,7 +130,7 @@ function SiteNewPage() {
   const eyebrow = "text-2xs font-bold uppercase tracking-eyebrow text-primary";
   return <div className="min-h-screen bg-background text-foreground">
     <header className="border-b bg-card">
-      <div className="mx-auto flex min-h-18 max-w-screen-2xl flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
+      <div className="can-shell-bar mx-auto flex min-h-[var(--topbar-height)] max-w-screen-2xl flex-wrap items-center justify-between gap-4 px-[var(--page-gutter)] py-3">
         <Link to="/" className="flex items-center gap-4 text-foreground no-underline" aria-label="CAN OS home">
           <span className="text-xl font-bold tracking-tight">CAN OS</span>
           <span className="h-7 border-l border-border" aria-hidden="true" />
@@ -143,7 +143,7 @@ function SiteNewPage() {
         </nav>
       </div>
     </header>
-    <main className="mx-auto max-w-screen-2xl px-5 pb-12 pt-8 sm:px-8 lg:pt-11">
+    <main className="mx-auto max-w-screen-2xl px-[var(--page-gutter)] pb-12 pt-[var(--page-pad-top)]">
       <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)]">
         <div className="min-w-0 space-y-6">
           <section aria-labelledby="site-new-heading">
