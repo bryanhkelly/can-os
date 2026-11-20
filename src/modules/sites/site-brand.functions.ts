@@ -1,3 +1,4 @@
+import { canonicalJson } from "@/lib/canonical-json";
 import type { PartnerLocalContentTx } from "./site-local-content.server";
 import { readSitePreviewShares } from "@/domain/site-preview-sharing";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
@@ -20,10 +21,7 @@ import {
 } from "@/domain/site-brand";
 
 type Reader=Pick<typeof db,"select">;
-function canonicalJson(value:unknown):string{
-  return JSON.stringify(value,(_key,entry:unknown)=>entry&&typeof entry==="object"&&!Array.isArray(entry)
-    ? Object.fromEntries(Object.entries(entry).sort(([a],[b])=>a.localeCompare(b))):entry);
-}
+
 export const brandFingerprint=(value:SiteBrandConfiguration)=>
   createHash("sha256").update(canonicalJson(value)).digest("hex");
 
