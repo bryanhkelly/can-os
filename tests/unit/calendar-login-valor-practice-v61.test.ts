@@ -12,14 +12,16 @@ describe("V6.1 calendar login and build footer",()=>{
    expect(safeAccessReturnTo("//example.com/calendar")).toBeUndefined();
    expect(safeAccessReturnTo("/access/verify?token=private")).toBeUndefined();
  });
- it("guards calendar before rendering the Event unavailable state",()=>{
+ it("uses the global server and client authentication gates before the calendar",()=>{
    const calendar=read("src/routes/calendar.tsx");
-   expect(calendar).toContain("loader: async ({ location })");
-   expect(calendar).toContain("const session = await getWorkspaceSession()");
-   expect(calendar).toContain("if (session.error) throw new Error");
-   expect(calendar).toContain('throw redirect({ to: "/access"');
-   expect(calendar).toContain("accessReturnToFromLocation(location)");
-   expect(calendar).toContain("replace: true");
+   const root=read("src/routes/__root.tsx");
+   const gate=read("src/components/shell/ProtectedRouteAuthGate.tsx");
+   expect(root).toContain("if (!isPublicCanPath(location.pathname)");
+   expect(root).toContain('throw redirect({ to: "/access"');
+   expect(root).toContain("accessReturnToFromLocation(location)");
+   expect(root).toContain("<ProtectedRouteAuthGate>");
+   expect(gate).toContain("!session?.authenticated");
+   expect(calendar).not.toContain("const session = await getWorkspaceSession()");
    expect(calendar).toContain('normalizeClientError(error).kind === "authentication"');
    expect(calendar).toContain('title="Event unavailable"');
  });
