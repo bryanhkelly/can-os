@@ -3,6 +3,7 @@ import { searchAdmissionsHouseholds } from "@/modules/enrollment/admissions-inta
 import { AdmissionsPageNavigation } from "./AdmissionsPageNavigation";
 import { Button } from "@/components/ui/button";
 import { ActionFooter } from "@/components/workspace/action-footer";
+import { WorkspaceNotice } from "@/components/workspace/notice";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -66,7 +67,7 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
      </Select>
     </Field>
     {attempted&&convertibleInterest&&!contactReviewed&&
-     <p role="alert" className="text-sm text-destructive sm:col-span-2">Review the family's contact information in the confirmation above before creating this inquiry.</p>}
+     <WorkspaceNotice tone="danger" className="sm:col-span-2">Review the family's contact information in the confirmation above before creating this inquiry.</WorkspaceNotice>}
     <Field className="sm:col-span-2" label="Student identity"
      description="Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.">
      <Select disabled={convertibleInterest} value={existingStudentKey}
