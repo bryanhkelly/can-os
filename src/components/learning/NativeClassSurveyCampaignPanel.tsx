@@ -73,7 +73,7 @@ export function NativeClassSurveyCampaignPanel({classId}:{classId:string}){
       <Select id="native-class-survey-campaign" value={selection}
         onChange={event=>setSelection(event.target.value)}
         disabled={busy||available.length===0}
-        className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+        className="mt-2 min-h-11">
         <option value="">Choose an unassigned approved campaign</option>
         {available.map(row=><option key={row.campaignId} value={row.campaignId}>
           {row.title} · {row.status}
