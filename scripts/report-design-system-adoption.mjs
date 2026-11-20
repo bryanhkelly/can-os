@@ -15,6 +15,11 @@ const canonicalTags = new Set([
   "FieldTripFacts", "RecordedTime", "DeliveryReceiptFacts", "ActionFooter", "StatCard", "WorkspacePanel",
   "StatusTimeline", "EvidencePicker", "WorkspaceActionLink",
   "ClassParticipationAcknowledgments", "LaunchGuidancePanels",
+  "CalendarInviteesPicker", "CalendarAgendaList", "NativeApprovedOfferingsPanel",
+  "ClassOfferingTermsFields", "GuardianStudentIdentityFields", "GuardianTransferAuthorizationFields",
+  "GuardianEnrollmentNextSteps", "GuardianGradeQuestions", "PublicInterestRecordCard",
+  "PublicInterestTimeline", "MarketingPackageLibraryList", "NoncreditParticipantRoster",
+  "SchoolImprovementPanel", "OperationsHealthSummary", "OperationsIssueList",
 ]);
 const files = [];
 function walk(directory) {
