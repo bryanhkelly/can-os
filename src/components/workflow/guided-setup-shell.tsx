@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from "react";
 import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface GuidedSetupStep {
@@ -43,9 +44,10 @@ export function GuidedSetupShell({ title, description, steps, aside, children, o
         const itemClass = cn("flex h-full min-w-0 items-start gap-2 border p-3 text-left",
           step.status === "current" ? "border-primary/40 bg-accent" : "border-transparent");
         return <li key={step.id} className="min-w-0">
-          {onStepChange ? <button type="button" className={cn(itemClass, "w-full hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring")}
+          {onStepChange ? <Button type="button" variant="ghost"
+            className={cn(itemClass, "h-full w-full shrink justify-start whitespace-normal hover:border-primary/40")}
             aria-current={step.status === "current" ? "step" : undefined}
-            onClick={() => onStepChange(step.id)}>{item}</button> :
+            onClick={() => onStepChange(step.id)}>{item}</Button> :
             <div className={itemClass} aria-current={step.status === "current" ? "step" : undefined}>{item}</div>}
         </li>;
       })}
