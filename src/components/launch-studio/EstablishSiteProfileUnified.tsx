@@ -253,7 +253,7 @@ export function EstablishSiteProfileUnified({
       {reloadRequired && <Button type="button" variant="outline" onClick={() => window.location.reload()}>
         Reload Site to reconcile changes
       </Button>}
-      <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
+      <ActionFooter layout="step">
         <Button type="button" variant="outline" disabled={saving || reloadRequired} onClick={onBackToOverview}>
           <ArrowLeft aria-hidden="true" /> Back to Overview
         </Button>
