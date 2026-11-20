@@ -302,6 +302,7 @@ registerDomainEventHandler(EventTypes.NoncreditTrainingCompleted, handleNotifica
 for (const type of [
   "ClassEnrollmentCreated", "ClassEnrollmentAssigned", "ClassGuardianEnrollmentCreated",
   "ClassInvitationIssued", "ClassSessionScheduled", "ClassSessionScheduleChanged",
+  "ClassEnrollmentWithdrawn", "ClassEnrollmentCancelled",
 ]) registerDomainEventHandler(type, handleClassParticipantEvent);
 
 
