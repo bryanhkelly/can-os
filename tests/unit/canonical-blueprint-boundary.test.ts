@@ -94,6 +94,24 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(editor).toContain("Reload before creating or updating another Solution plan");
   });
 
+  it("guards unsaved changes and ignores stale published-product discovery", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const catalog = source("src/components/launch-studio/SolutionCatalogV61.tsx");
+    const picker = source("src/components/launch-studio/BlueprintOfferingAdoptionPicker.tsx");
+    expect(editor).toContain("useLaunchUnsavedChanges(");
+    expect(editor).toContain("solutionDraftSnapshot");
+    expect(editor).toContain("replaceVisibleOfferingIntents(previous, next, editableProgramComponentIds)");
+    expect(editor).toContain('initialDelivery = "onsite"');
+    expect(catalog).toContain('ActionDialog open={Boolean(pendingSwitch)}');
+    expect(catalog).toContain("editorState.reconciliationRequired");
+    expect(catalog).toContain("editorState.busy");
+    expect(catalog).toContain("onUnsavedChange={setEditorState}");
+    expect(catalog).toContain("initialDelivery={preferredCatalogDelivery(delivery)}");
+    expect(picker).toContain("const version = ++requestVersion.current");
+    expect(picker).toContain("requestVersion.current === version");
+    expect(picker).toContain("return () => { requestVersion.current += 1; }");
+  });
+
   it("keeps approved plans read-only until the author explicitly starts a revision", () => {
     const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
     expect(editor).toContain('detail?.lifecycle === "frozen" && !revisingFrozen');
