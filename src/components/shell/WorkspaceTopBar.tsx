@@ -85,7 +85,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
           title={member ? `${member.firstName} ${member.lastName}` : undefined}
           aria-description={member ? `Signed in as ${member.firstName} ${member.lastName}` : undefined}
           onClick={onOpenAccount} className=" border bg-muted"><UserRound aria-hidden="true" /></Button>
-        : sessionAvailable && <Link to="/access" search={{returnTo}} className="inline-flex min-h-11 items-center border border-border px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Sign in</Link>}
+        : sessionAvailable && <Button asChild variant="outline" size="lg"><Link to="/access" search={{returnTo}}>Sign in</Link></Button>}
     </div>
   </header>
   <div className="space-y-2 px-[var(--page-gutter)] empty:hidden [&:not(:empty)]:pt-3">
