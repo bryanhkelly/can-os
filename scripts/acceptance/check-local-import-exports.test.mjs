@@ -74,7 +74,7 @@ test("JSON defaults from relative and aliased paths are valid", () => {
       'import same from "@/legacy.json";\nvoid [legacy,staged,same];',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /3 local imported\\/re-exported bindings resolved/);
+  assert.match(result.stdout, /3 local imported\/re-exported bindings resolved/);
 });
 
 test("missing TypeScript default exports remain errors", () => {
