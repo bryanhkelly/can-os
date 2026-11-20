@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { WebsiteTemplateSourceGuide } from "./WebsiteTemplateSourceGuide";
 
 const previewLabels: Record<PublicSitePath, string> = {
   "/": "Home", "/about": "About us", "/academics": "Academics",
@@ -175,6 +176,7 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
         <p className="mt-3 text-xs text-muted-foreground">
           Changing a layout does not change your website copy, colors, fonts or photos.
         </p>
+        <WebsiteTemplateSourceGuide template={value} page={previewPage}/>
       </section>
     </div>
   </fieldset>;
