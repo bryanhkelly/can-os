@@ -47,8 +47,7 @@ BEGIN
      'scenario','proposed-awaiting-guardian-and-operator-readiness',
      'description',rec.description,'origin','valor-v61-phase9',
      'noActualTravel',true,'notApproved',true,
-     'permissionVersion','VALOR-SYNTHETIC-PROPOSAL-v1',
-     'permissionText','This is a fictional field-trip proposal for CAN OS interface testing. It does not grant actual travel consent, medical care, supervision, pickup permission, transport approval, photography consent, payment authorization or access to real participants. Independent review is required before any real off-campus activity.'))
+     'permissionNotPublished',true,'tripReadiness','blocked_no_consent_or_chaperone'))
    ON CONFLICT(id) DO NOTHING;
 
    FOR student IN
