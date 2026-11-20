@@ -1,13 +1,13 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { auditEvents as sharedAuditEvents } from "@/db/schema";
+import { writeBlueprintTransition } from "./blueprint-journal.server";
 import {
-  auditEvents,
   blueprintComponentApprovalDecisions,
   blueprintConfigurationComponents,
   blueprintConfigurations,
   blueprintConfigurationVersions,
   configurationReviews,
-  domainEvents,
   evidenceDocuments,
   evidenceDocumentVersions,
   type JsonObject,
@@ -236,12 +236,12 @@ export async function decideBlueprintReview(
       };
     }
 
-    const authors = await tx.select({ actorPersonId: auditEvents.actorPersonId })
-      .from(auditEvents)
+    const authors = await tx.select({ actorPersonId: sharedAuditEvents.actorPersonId })
+      .from(sharedAuditEvents)
       .where(and(
-        eq(auditEvents.entityKind, "blueprint_configuration"),
-        eq(auditEvents.entityId, version.configurationId),
-        inArray(auditEvents.eventCode, [
+        eq(sharedAuditEvents.resourceType, "blueprint_configuration"),
+        eq(sharedAuditEvents.resourceId, version.configurationId),
+        inArray(sharedAuditEvents.action, [
           "blueprint.configuration.created",
           "blueprint.configuration.saved",
           "blueprint.configuration.submitted",
@@ -311,6 +311,7 @@ export async function decideBlueprintReview(
       conditions: { rationale: input.rationale } satisfies JsonObject,
     });
     const payload: JsonObject = {
+      owningOrganizationId: version.owningOrganizationId,
       configurationVersionId: version.id,
       reviewId: input.reviewId,
       decision: input.decision,
@@ -320,15 +321,14 @@ export async function decideBlueprintReview(
       })),
       requestId: context.requestId ?? null,
     };
-    await tx.insert(auditEvents).values({
+    await writeBlueprintTransition(tx, context, {
       actorPersonId,
       owningOrganizationId: version.owningOrganizationId,
       eventCode: "blueprint.configuration.reviewed",
       entityKind: "blueprint_configuration",
       entityId: version.configurationId,
       payload,
-    });
-    await tx.insert(domainEvents).values({
+    }, {
       eventType: "BlueprintConfigurationReviewed",
       aggregateType: "blueprint_configuration",
       aggregateId: version.configurationId,
