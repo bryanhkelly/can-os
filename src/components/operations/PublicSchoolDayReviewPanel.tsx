@@ -57,7 +57,7 @@ export function PublicSchoolDayReviewPanel({siteId,programId}:{
           </div>
           <Button variant="outline" type="button" disabled={Boolean(pending)||!schedule.active||!schedule.periods.length}
             onClick={()=>void approve(schedule)}
-            className="mt-3  border px-3 py-2 text-xs font-semibold">
+            className="mt-3">
             {pending===schedule.id?"Saving…":"Review and approve this timetable"}
           </Button>
         </div>)}
