@@ -117,6 +117,11 @@ describe("verified CAN Site planning authorization", () => {
     await expect(assertVerifiedCanPlanningSite(siteTx(), context, siteId, orgId)).rejects.toThrow();
     state.siteRows = [{ id: siteId, organizationId: orgId, lifecycleStatus: "closed" }];
     await expect(assertVerifiedCanPlanningSite(siteTx(), context, siteId, orgId)).rejects.toThrow();
+    // Legacy unclassified Site lifecycle permits private planning only.
+    state.siteRows = [{ id: siteId, organizationId: orgId, lifecycleStatus: null }];
+    expect(await assertVerifiedCanPlanningSite(siteTx(), context, siteId, orgId)).toBe(orgId);
+    state.siteRows = [];
+    await expect(assertVerifiedCanPlanningSite(siteTx(), context, siteId, orgId)).rejects.toThrow();
     state.siteRows = [{ id: siteId, organizationId: orgId, lifecycleStatus: "planning" }];
     await expect(assertVerifiedCanPlanningSite(siteTx(), context, siteId, otherOrg)).rejects.toThrow();
   });
