@@ -7,13 +7,14 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const script = fileURLToPath(new URL("./check-local-import-exports.mjs", import.meta.url));
-function runFixture(files) {
+function runFixture(files, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), "can-local-exports-"));
   try {
     mkdirSync(join(directory, "src"));
     writeFileSync(join(directory, "tsconfig.json"), JSON.stringify({
       compilerOptions: {module: "ESNext", moduleResolution: "Bundler", baseUrl: ".",
-        paths: {"@/*": ["src/*"]}},
+        resolveJsonModule: true, esModuleInterop: true,
+        paths: {"@/*": ["src/*"]}, ...options},
       include: ["src/**/*.ts"],
     }));
     for (const [name, content] of Object.entries(files))
@@ -62,4 +63,43 @@ export { alsoAbsent } from "./source";`,
   assert.match(result.stderr, /does not export "absent"/);
   assert.match(result.stderr, /does not export "alsoAbsent"/);
   assert.match(result.stderr, /2 missing named exports/);
+});
+
+test("JSON defaults from relative and aliased paths are valid", () => {
+  const result = runFixture({
+    "legacy.json": '{"files":[{"key":"hero.jpg"}]}',
+    "staged.json": '{"version":2,"files":[]}',
+    "consumer.ts": 'import legacy from "./legacy.json";\n' +
+      'import staged from "@/staged.json";\n' +
+      'import same from "@/legacy.json";\nvoid [legacy,staged,same];',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /3 local imported\\/re-exported bindings resolved/);
+});
+
+test("missing TypeScript default exports remain errors", () => {
+  const result = runFixture({
+    "source.ts": "export const named = 1;",
+    "consumer.ts": 'import missing from "./source"; void missing;',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /does not export "default"/);
+});
+
+test("JSON named imports do not receive a default-export exemption", () => {
+  const result = runFixture({
+    "legacy.json": '{"files":[]}',
+    "consumer.ts": 'import { missing } from "./legacy.json"; void missing;',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /does not export "missing"/);
+});
+
+test("JSON default exemption requires compatible compiler options", () => {
+  const result = runFixture({
+    "legacy.json": '{"files":[]}',
+    "consumer.ts": 'import legacy from "./legacy.json"; void legacy;',
+  }, { esModuleInterop: false, allowSyntheticDefaultImports: false });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /does not export "default"/);
 });
