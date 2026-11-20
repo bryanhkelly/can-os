@@ -23,7 +23,7 @@ SPA navigation retains exact Site scope; the active stage re-expands on module c
 | Introduce / Recruit Families / Learners | Reuses the same Marketing Packages and source projection, focused on interest invitations and program ideas; exact-Site handoff to existing consent-aware preopening family outreach with canonical Brand and editable Story suggestions | Site-level CRM is not implemented; interest invitation sending is separately registrar-authorized, not an automatic Marketing Package action |
 | Introduce / Interest Events | Uses the same Brand-pinned Marketing Packages; an active invitation package or the canonical Site editorial suggestion can seed the editable title of an authorized Program-linked event | Generic pre-Program Site events and automatic marketing distribution are not implemented; the operator must create the event independently |
 | Prepare / Invite Your Team | Existing exact-Site verified staff invitation/access workspace | Test verified role acceptance; no implicit appointment |
-| Prepare / Program Catalog | Source-backed canonical published-Offering discovery panel plus Blueprint/Class handoffs | Requires independently verified canonical grant and enabled catalog; Solution adoption, requirements and readiness are independent |
+| Prepare / Program Catalog | Unified CAN-published Solution browser, exact-version saved-plan resume, and inline canonical Site configuration editor; learning-product selection remains part of governed Solution configuration | CAN app-admin Blueprint authoring/publishing UI remains separate and incomplete; run authenticated save/reentry, qualification, and enrollment acceptance |
 | Prepare / Opening & Compliance | Existing authenticated compliance and canonical qualification review destinations | Site-specific evidence and jurisdiction review acceptance |
 | Open | Governed institutional readiness and Site operations handoffs | No automatic activation, publishing, opening or enrollment |
 
@@ -176,3 +176,53 @@ Resolve PR #348's merge conflicts only after current-code integration and
 database review. Preserve pending migrations and independent publication,
 opening, safeguarding and enrollment gates. No change to `main` is part
 of this design pass.
+
+
+## 2026-11-19 · Prepare Solution select, save and resume integration
+
+- **Ownership:** CAN app administrators own the published Blueprint/Solution
+  definitions. Site administrators and registrars only create and revise
+  Site-scoped *configurations*, never immutable Blueprint recipes. The existing
+  restricted SQL `blueprint_author` role is a local configuration role, not
+  permission to insert or publish `blueprints` or `blueprint_versions`.
+  CAN-admin graphical Blueprint authoring/publishing is **not implemented** by
+  this cutover and must not be represented as operational.
+- **One operator catalog:** Prepare renders `SolutionCatalogV61` once. Published
+  learning-product selection remains within the existing canonical configuration
+  picker, rather than a second independent discovery panel. Saved Establish
+  Program codes/vision can order suggestions but never establish qualification.
+- **Version-pinned resume:** Operators can start a plan or reopen a saved draft
+  for the selected published Blueprint version. Inline editor and catalog share
+  `selectSavedSolutionPlans`; Site authorization and ownership remain enforced
+  by server commands. Reopened records must match the exact Site and selected
+  Blueprint version, and the editor does not overwrite CAN's published recipe.
+- **Readback after writes:** Configuration create/save/submit uses existing
+  revision-checked canonical mutations and reloads the authorized workspace
+  before opening the saved revision. A successful write with failed readback
+  is reported separately. Uncertain writes fail closed and ask for reload
+  before another write, rather than creating duplicate configurations.
+- **No new source of truth:** No new DB tables, provisioning changes, schema
+  migration, enabling of enrollment, or changes to `main`.
+- **Source checks:** Verified 12 of 12 scoped source invariants manually,
+  including one catalog, exact-version resume, Site/version guards,
+  configuration authorization, and fail-closed uncertain-write behavior.
+  Updated source-contract and Vitest regression tests were committed but
+  **not executed**. There is no evidence of passing TypeScript, build,
+  Playwright, or authenticated database acceptance.
+
+### Unclosed acceptance requirements
+
+1. Run `npm run typecheck`, `npm run build`, `npm run lint`, and focused
+   `tests/unit/canonical-blueprint-boundary.test.ts`,
+   `tests/unit/launch-prepare-v61.test.tsx`,
+   `tests/unit/launch-prepare-provisioning-contract.test.ts` and
+   `tests/unit/canonical-blueprint-workspace.test.tsx`.
+2. Exercise create → save → reopen → revise → submit → review under a
+   disposable test Site, verifying saved revision identity, Site isolation,
+   published-version pinning, and rejected stale/unauthorized requests.
+3. Implement and separately secure the CAN app-admin Blueprint definition
+   authoring, approval, and publishing experience before calling that capability
+   complete. Do not grant Site configuration roles publishing privileges.
+4. Keep Site qualification, specific Offering adoption, Class registration,
+   website publication, and opening/enrollment authorization independently
+   governed. Do not equate a saved plan with permission to operate.
