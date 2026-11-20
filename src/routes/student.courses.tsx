@@ -168,7 +168,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
    </div>:<>
     <DetailNavigation label="Class detail">
      <SectionTab current={tab==="overview"} link={{to:"/student/courses",search:{section:course.id,tab:"overview"}}}>Overview</SectionTab>
-     <SectionTab current={false} link={{to:"/class",search:{section:course.id,tab:"lessons"}}}>Classroom</SectionTab>
+     <SectionTab current={false} link={{to:"/class"}}>Classroom</SectionTab>
      {(["classwork","grades"] as const).map(value=><SectionTab key={value} current={tab===value} link={{to:"/student/courses",search:{section:course.id,tab:value}}}>{value==="classwork"?"Classwork":"Grades & feedback"}</SectionTab>)}
     </DetailNavigation>
     {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>
