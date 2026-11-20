@@ -10,7 +10,6 @@ DECLARE
  cat constant uuid:=md5('valor-v61:catalog:fake-chromebook')::uuid;
  a1 constant uuid:=md5('valor-v61:asset:chromebook-a')::uuid;
  a2 constant uuid:=md5('valor-v61:asset:loaner-b')::uuid;
- seq bigint;
 BEGIN
  IF NOT EXISTS(SELECT 1 FROM public.sites WHERE id=vsite AND organization_id=vorg
    AND metadata @> '{"synthetic":true}'::jsonb)
@@ -42,24 +41,21 @@ BEGIN
  -- Append-only provenance: fictional check-out and return, NOT a real
  -- custody transaction. Stable events and monotonic order ensure replay.
  PERFORM pg_advisory_xact_lock(hashtext('valor-v61-demo-equipment-events'));
- SELECT COALESCE(max(event_order),0) INTO seq FROM public.equipment_custody_events;
  IF NOT EXISTS(SELECT 1 FROM public.equipment_custody_events
     WHERE id=md5('valor-v61:equipment:checkout-demo')::uuid)
  THEN
-   seq:=seq+1;
    INSERT INTO public.equipment_custody_events
-     (id,asset_id,from_site_id,to_organization_id,occurred_at,actor_person_id,event_kind,event_order)
+     (id,asset_id,from_site_id,to_organization_id,occurred_at,actor_person_id,event_kind)
    VALUES(md5('valor-v61:equipment:checkout-demo')::uuid,a2,vsite,vorg,
-     '2026-11-05T16:00:00Z',alex,'checked_out',seq);
+     '2026-11-05T16:00:00Z',alex,'checked_out');
  END IF;
  IF NOT EXISTS(SELECT 1 FROM public.equipment_custody_events
     WHERE id=md5('valor-v61:equipment:return-demo')::uuid)
  THEN
-   seq:=(SELECT COALESCE(max(event_order),0)+1 FROM public.equipment_custody_events);
    INSERT INTO public.equipment_custody_events
      (id,asset_id,from_organization_id,to_site_id,occurred_at,actor_person_id,event_kind,event_order)
    VALUES(md5('valor-v61:equipment:return-demo')::uuid,a2,vorg,vsite,
-     '2026-11-06T20:00:00Z',alex,'returned',seq);
+     '2026-11-06T20:00:00Z',alex,'returned');
  END IF;
  IF (SELECT count(*) FROM public.equipment_assignments WHERE id IN (
      md5('valor-v61:equipment:jordan-reservation')::uuid,
