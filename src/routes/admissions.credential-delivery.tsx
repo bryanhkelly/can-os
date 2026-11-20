@@ -45,7 +45,7 @@ function CredentialDeliveryPage(){
    {message&&<p role="status" className=" border p-3">{message}</p>}
    <MutationFeedback state={mutation} pendingMessage="Recording credential authorization..."/>
    <section className="space-y-3  border p-4">
-    <Label className="block text-sm font-medium">Credential type<Select className="mt-1 block w-full  border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as "transcript"|"diploma");setCredentialId("");setHistory([]);setReleases([]);setRecipients([])}}><option value="transcript">Official transcript</option><option value="diploma">Diploma</option></Select></Label>
+    <Label className="block text-sm font-medium">Credential type<Select className="mt-1" value={kind} onChange={e=>{setKind(e.target.value as "transcript"|"diploma");setCredentialId("");setHistory([]);setReleases([]);setRecipients([])}}><option value="transcript">Official transcript</option><option value="diploma">Diploma</option></Select></Label>
     <Field label="Issued credential ID"><Input value={credentialId} onChange={event=>{setCredentialId(event.target.value);setHistory([]);setReleases([])}}/></Field>
     <div className="flex flex-wrap gap-2">
      <Button type="submit" variant="outline" disabled={busy}  onClick={()=>void run(async()=>{const result=await renderAcademicCredential({data:{kind,credentialId}});downloadBase64(result.base64,result.filename,"application/pdf");setMessage("Document generated for download.")})}>Download official PDF</Button>
@@ -55,7 +55,7 @@ function CredentialDeliveryPage(){
    <section className="space-y-3  border p-4">
     <h2 className="font-semibold">Verified transfer release</h2>
     <p className="text-sm">A registrar may grant the verified guardian secure access to an issued transcript only when a completed school transfer and that guardian's signed, unrevoked records-release consent match the student. No PDF is emailed. This is a verified guardian handoff only; direct external school-to-school delivery is not supported.</p>
-    <Label className="block text-sm">Verified guardian<Select className="mt-1 block w-full  border bg-background p-2" value={selectedRecipient} onChange={e=>setSelectedRecipient(e.target.value)}><option value="">Select verified identity</option>{recipients.map(row=><option key={row.personId+row.email} value={row.personId+"|"+row.email}>{row.firstName} {row.lastName} ({row.email})</option>)}</Select></Label>
+    <Label className="block text-sm">Verified guardian<Select className="mt-1" value={selectedRecipient} onChange={e=>setSelectedRecipient(e.target.value)}><option value="">Select verified identity</option>{recipients.map(row=><option key={row.personId+row.email} value={row.personId+"|"+row.email}>{row.firstName} {row.lastName} ({row.email})</option>)}</Select></Label>
     <Field label="Completed transfer action ID"><Input value={transferActionId} onChange={event=>setTransferActionId(event.target.value)}/></Field>
     <Field label="Signed transfer consent ID"><Input value={consentId} onChange={event=>setConsentId(event.target.value)}/></Field>
     <Label className="flex gap-2 text-sm"><Checkbox checked={releaseAcknowledged} onChange={e=>setReleaseAcknowledged(e.target.checked)}/>I reviewed the completed transfer, signed consent, guardian authority and verified recipient. This grants guardian access, not delivery to an outside institution.</Label>
