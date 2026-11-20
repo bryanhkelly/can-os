@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import ts from "typescript";
-import { sharedUiImportViolation, sourceDependencySpecifiers } from "./v61-component-dependencies.mjs";
+import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency } from "./v61-component-dependencies.mjs";
 
 test("V6.1 primitives can only depend on other primitives and utilities", () => {
   const file = "src/components/ui/field.tsx";
@@ -53,4 +53,13 @@ test("architecture inventory catches static, exported, type-only, and lazy depen
     "@/components/ui/button", "@/routes/bad", "@/modules/learning/read.server",
     "../learning/Feature", "@/db/client",
   ]));
+});
+
+test("source resolver treats relative paths and aliases as the same dependency", () => {
+  const file = "src/components/launch-studio/SchoolHubWorkflow.tsx";
+  assert.equal(resolveSourceDependency(file, "@/routes/admin"), "src/routes/admin");
+  assert.equal(resolveSourceDependency(file, "../../routes/admin"), "src/routes/admin");
+  assert.equal(resolveSourceDependency(file, "@/db/canonical-v301"), "src/db/canonical-v301");
+  assert.equal(resolveSourceDependency(file, "../../db/canonical-v301"), "src/db/canonical-v301");
+  assert.equal(resolveSourceDependency(file, "react"), null);
 });
