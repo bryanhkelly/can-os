@@ -116,8 +116,8 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
       description="The same authoritative answers saved in Establish → Site Information. Changing these values here updates that Site record, not a second facilities checklist.">
       {loading ? <p role="status" className="mt-3 text-sm">Reading saved learning environment…</p>
       : <>
-        {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-        {notice && <p role="status" className="mt-3 text-sm text-muted-foreground">{notice}</p>}
+        {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+        {notice && <WorkspaceNotice tone="info" className="mt-3">{notice}</WorkspaceNotice>}
         {reconciliationRequired && <WorkspaceNotice tone="attention">
           A previous save may have succeeded. Reload the saved record before retrying.
         </WorkspaceNotice>}
