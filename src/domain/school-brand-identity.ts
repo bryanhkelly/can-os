@@ -1,3 +1,4 @@
+import type { SiteBrandDirectionId } from "./site-brand-direction";
 import {
   contrastRatio, resolveSiteTemplateId, resolveSiteTheme,
   type SitePaletteId, type SiteTemplateId, type SiteTypographyId,
@@ -35,18 +36,20 @@ export function schoolBrandMonogram(schoolName: string): string {
 }
 
 export function resolveSchoolBrand(schoolName: string, branding: Pick<
-  SiteLocalBranding, "templateId" | "paletteId" | "typographyId" | "headingFontId" | "bodyFontId"
+  SiteLocalBranding, "templateId" | "paletteId" | "typographyId" | "headingFontId" | "bodyFontId" | "brandDirectionId"
 >) {
   const templateId = resolveSiteTemplateId(branding.templateId);
-  const design = schoolBrandDesigns[templateId];
-  const selectedTheme = resolveSiteTheme(branding.paletteId, branding.typographyId,
-    branding.headingFontId, branding.bodyFontId);
-  // Match the hosted Modern template's original sans-serif heading unless
-  // the editor explicitly selected another heading font.
-  const theme = templateId === "modern" && !branding.headingFontId
-    ? { ...selectedTheme, displayFont: selectedTheme.bodyFont }
-    : selectedTheme;
-  const normalizedName = schoolName.trim().slice(0, 120) || "Your School";
+  // Identity follows the Brand direction, never the website wireframe.
+  // A wireframe change cannot silently rewrite an established Site wordmark.
+  const direction:Record<SiteBrandDirectionId,SiteTemplateId>={
+    belonging:"community",excellence:"heritage",innovation:"modern",
+    classical:"classic",creative:"bright-futures",leadership:"summit",
+  };
+  const design=schoolBrandDesigns[branding.brandDirectionId
+    ? direction[branding.brandDirectionId] : "heritage"];
+  const theme=resolveSiteTheme(branding.paletteId,branding.typographyId,
+    branding.headingFontId,branding.bodyFontId);
+  const normalizedName = schoolName.trim().slice(0, 120) || "Your Site";
   const readableAccent = contrastRatio(theme.accent, theme.ink) >= 3
     ? theme.accent : theme.canvas;
   return {

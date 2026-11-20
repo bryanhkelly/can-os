@@ -13,7 +13,7 @@ export function CourseLessonNavigation({
   renderPrevious: (lesson: CourseLessonNeighbor) => ReactNode;
   renderNext: (lesson: CourseLessonNeighbor) => ReactNode;
 }) {
-  return <nav aria-label="Course lesson navigation" className="mb-5 space-y-3 rounded-lg border p-3">
+  return <nav aria-label="Course lesson navigation" className="mb-5 space-y-3  border p-3">
     <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
       <span>Lesson {lessonIndex+1} of {lessonCount}</span>
       {completedCount !== undefined && <span>{completedCount} of {lessonCount} {progressLabel ?? "lessons complete"}</span>}

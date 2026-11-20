@@ -61,8 +61,8 @@ describe("CAN Landing, Launch, Next Steps framework", () => {
     const family=engagementJourneys["family-admissions"];
     expect(engagementVerifiedRoute(school,undefined)).toBeNull();
     expect(engagementVerifiedRoute(school,"guardian")).toBeNull();
-    expect(engagementVerifiedRoute(school,"registrar")).toBe("/launch/school");
-    expect(engagementVerifiedRoute(school,"site_admin")).toBe("/launch/school");
+    expect(engagementVerifiedRoute(school,"registrar")).toBe("/launch/site");
+    expect(engagementVerifiedRoute(school,"site_admin")).toBe("/launch/site");
     expect(engagementVerifiedRoute(teacher,"registrar")).toBeNull();
     expect(engagementVerifiedRoute(teacher,"teacher")).toBe("/launch/staff");
     expect(engagementVerifiedRoute(family,"guardian")).toBe("/launch/family");

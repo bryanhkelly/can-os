@@ -1,3 +1,4 @@
+import { isCanonicalSiteDiscoverable } from "@/domain/canonical-site-availability";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sites } from "@/db/schema";
@@ -27,7 +28,7 @@ export async function resolveLaunchSiteCatalogContext(
 
   // A legacy unclassified or closed Site cannot claim native readiness.
   // Do not read or provision a second Site. Operating grants are below.
-  if(!site.lifecycleStatus||site.lifecycleStatus==="closed")
+  if(!isCanonicalSiteDiscoverable(site?.lifecycleStatus))
     return {kind:"not_provisioned"};
 
   let actor:CommandContext;

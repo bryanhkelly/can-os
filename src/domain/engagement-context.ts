@@ -63,10 +63,10 @@ export function engagementInformationHref(journey: EngagementJourney, choice: Jo
 export function engagementVerifiedRoute(
   journey: EngagementJourney,
   role: string | undefined,
-): "/launch/school" | "/launch/family" | "/launch/staff" | null {
+): "/launch/site" | "/launch/family" | "/launch/staff" | null {
   if (!journey.launch) return null;
   const roles = {
-    "/launch/school": ["registrar", "site_admin"],
+    "/launch/site": ["registrar", "site_admin"],
     "/launch/family": ["guardian"],
     "/launch/staff": ["teacher", "site_staff", "site_leader", "room_facilitator", "specialist", "counselor", "paraeducator"],
   } as const;

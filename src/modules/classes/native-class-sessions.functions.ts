@@ -357,7 +357,6 @@ export const openNativeClassSession=createServerFn({method:"POST"})
           eq(learnerCourseAttempts.offeringVersionId,instance.offeringVersionId),
           eq(learnerCourseAttempts.status,"active"),
           isNull(learnerCourseAttempts.enrollmentId),
-          isNull(learnerCourseAttempts.noncreditRegistrationId),
         )).where(and(
           eq(canonicalClassEnrollments.classId,instance.id),
           eq(canonicalClassEnrollments.status,"active"),

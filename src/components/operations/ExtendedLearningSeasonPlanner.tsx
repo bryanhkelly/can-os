@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState } from "react";
@@ -14,10 +16,10 @@ import {
   publishExtendedSeasonFn,
   type listExtendedSeasonPlanning,
 } from "@/modules/activities/extended-learning.functions";
-import { programTypeLabels } from "@/domain/program-offerings";
+import { ExtendedSeasonDraftForm, type ExtendedSeasonDraftValues } from "./ExtendedSeasonDraftForm";
 import type { EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listEnrichmentSessionRoster } from "@/modules/activities/enrichment-roster.functions";
-import { extendedLearningReadinessTasks } from "@/domain/extended-learning-readiness-tasks";
+import { ExtendedSeasonReadinessRequests } from "./ExtendedSeasonReadinessRequests";
 import { ExtendedSeasonEvidencePanel } from "./ExtendedSeasonEvidencePanel";
 
 type Planning = Awaited<ReturnType<typeof listExtendedSeasonPlanning>>;
@@ -28,13 +30,11 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   siteId?: string;
 }) {
   const router = useRouter();
-  const [programId, setProgramId] = useState("");
-  const [offeringName, setOfferingName] = useState("");
-  const [seasonName, setSeasonName] = useState("");
-  const [activityType, setActivityType] = useState<"club"|"athletics"|"arts"|"service"|"stem"|"faith"|"leadership"|"outings"|"other">("other");
-  const [startsOn, setStartsOn] = useState("");
-  const [endsOn, setEndsOn] = useState("");
-  const [capacity, setCapacity] = useState(24);
+  const [draft,setDraft]=useState<ExtendedSeasonDraftValues>({
+    programId:"", offeringName:"", seasonName:"", activityType:"other",
+    startsOn:"", endsOn:"", capacity:24,
+  });
+  const {programId,offeringName,seasonName,activityType,startsOn,endsOn,capacity}=draft;
   const mutation = useMutationFeedback(() => router.invalidate({ sync: true }));
   const busy = mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
@@ -67,7 +67,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const programs = planning.programs.filter(p => !siteId || p.siteId === siteId);
   const selectable = programs.filter(p => p.status !== "paused" && p.status !== "closed");
   const selected = selectable.find(p => p.id === programId);
-  const inputClass = "mt-1 w-full rounded-lg border bg-background p-2 text-sm";
+  const inputClass = "mt-1 w-full  border bg-background p-2 text-sm";
 
   async function createDraft(event: React.FormEvent) {
     event.preventDefault();
@@ -87,7 +87,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       refreshErrorMessage: "The draft season was saved, but current planning records could not be loaded. Retry the refresh before creating another season.",
     });
     if (outcome.status === "saved" || outcome.status === "refresh-failed") {
-      setOfferingName(""); setSeasonName(""); setDraftAttempted(false);
+      setDraft(current=>({...current,offeringName:"",seasonName:""})); setDraftAttempted(false);
     }
   }
 
@@ -207,7 +207,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   }
 
   return (
-    <section className="rounded-xl border bg-card p-5" aria-label="Summer and after-school season planning">
+    <section className=" border bg-card p-5" aria-label="Summer and after-school season planning">
       <h2 className="font-serif text-2xl">Summer and after-school planning</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Set up a program-linked offering and a draft season. Drafts do not accept family registrations.
@@ -215,66 +215,22 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       </p>
       {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving season changes…"/>
-      <form noValidate onSubmit={createDraft} className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label="Extended-learning program" className="text-xs sm:col-span-2" required
-          error={draftAttempted&&!selected?"Choose an eligible noncredit program.":undefined}>
-          <Select value={programId} onChange={e => setProgramId(e.target.value)}>
-            <option value="">Select a noncredit summer or after-school program</option>
-            {selectable.map(p => <option key={p.id} value={p.id}>{p.name} · {programTypeLabels[p.type]}</option>)}
-          </Select>
-        </Field>
-        <Field label="Offering name" className="text-xs" required
-          error={draftAttempted&&offeringName.trim().length<2?"Enter an offering name with at least 2 characters.":undefined}>
-          <Input value={offeringName} onChange={e => setOfferingName(e.target.value)} placeholder="Robotics lab" minLength={2} maxLength={160} />
-        </Field>
-        <Field label="Season name" className="text-xs" required
-          error={draftAttempted&&seasonName.trim().length<2?"Enter a season name with at least 2 characters.":undefined}>
-          <Input value={seasonName} onChange={e => setSeasonName(e.target.value)} placeholder="Summer 2027 / June" minLength={2} maxLength={120} />
-        </Field>
-        <Field label="Category" className="text-xs">
-          <Select value={activityType} onChange={e => setActivityType(e.target.value as typeof activityType)}>
-            <option value="other">Other enrichment</option>
-            <option value="stem">STEM / robotics</option>
-            <option value="faith">Faith / discipleship</option>
-            <option value="leadership">Leadership</option>
-            <option value="outings">Outings / field trips</option>
-            <option value="club">Club</option>
-            <option value="arts">Arts</option>
-            <option value="athletics">Athletics</option>
-            <option value="service">Service</option>
-          </Select>
-        </Field>
-        <Field label="Seat capacity" className="text-xs" required
-          error={draftAttempted&&(!Number.isInteger(capacity)||capacity<1||capacity>10000)?"Enter a whole number from 1 to 10,000.":undefined}>
-          <Input type="number" min={1} max={10000} value={capacity} onChange={e => setCapacity(Number(e.target.value))} />
-        </Field>
-        <Field label="Start date" className="text-xs" required
-          error={draftAttempted&&!startsOn?"Choose a start date.":undefined}>
-          <Input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} />
-        </Field>
-        <Field label="End date" className="text-xs" required
-          error={draftAttempted&&(!endsOn||endsOn<startsOn)?"Choose an end date on or after the start date.":undefined}>
-          <Input type="date" min={startsOn||undefined} value={endsOn} onChange={e => setEndsOn(e.target.value)} />
-        </Field>
-        <div className="sm:col-span-2">
-          <button type="submit" disabled={busy} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
-            {busy ? "Saving…" : "Save draft season"}
-          </button>
-          {!selectable.length && <p className="mt-2 text-xs text-muted-foreground">Create a hosted noncredit summer or after-school Program above first.</p>}
-        </div>
-      </form>
+      <ExtendedSeasonDraftForm value={draft} selectable={selectable}
+        busy={busy} attempted={draftAttempted}
+        onChange={patch=>setDraft(current=>({...current,...patch}))}
+        onSubmit={createDraft} />
       <div className="mt-6">
         <h3 className="text-sm font-semibold">Recorded seasons</h3>
         <ul className="mt-2 space-y-2">
           {planning.seasons.filter(season => programs.some(p => p.id === season.programId)).map(season =>
-            <li key={season.id} className="rounded-lg border p-3 text-sm">
+            <li key={season.id} className=" border p-3 text-sm">
               <strong>{season.offeringName}</strong> · {season.name} · {season.startsOn} to {season.endsOn}
               <span className="ml-2 text-xs text-muted-foreground">{season.status} · {season.capacity ?? "Uncapped"} seats</span>
               {(season.status === "draft" || season.status === "registration") && <div className="mt-2">
-                <button type="button" className="text-xs font-semibold underline"
+                <Button variant="ghost" type="button" className="text-xs font-semibold underline"
                   onClick={() => setEvidenceSeasonId(old => old === season.id ? "" : season.id)}>
                   {evidenceSeasonId === season.id ? "Close operating evidence" : "Submit and review operating evidence"}
-                </button>
+                </Button>
                 {evidenceSeasonId === season.id && <ExtendedSeasonEvidencePanel seasonId={season.id}
                   onChange={() => router.invalidate()}/>}
               </div>}
@@ -286,20 +242,20 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                 const openingReadiness = planning.readiness.find(item => item.seasonId === season.id);
                 const canPublish = openingReadiness?.ready === true;
                 const scheduled = planning.sessions.filter(item => item.seasonId === season.id);
-                return <div className="mt-3 rounded-lg border p-3">
+                return <div className="mt-3  border p-3">
                   <p className="text-sm font-semibold">Family registration</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Publishing requires independently approved safeguarding, screened staff, emergency response,
                      authorized child release and session coverage. An attestation cannot replace approvals.
                   </p>
-                  <button type="button" className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  <Button variant="outline" type="button" className="mt-2"
                     disabled={!canPublish || !isProgramActive || !scheduled.length || busy}
                     onClick={() => {
                       setPublishSeasonId(active ? "" : season.id);
                       setOperatorConfirmed(false);
                       setPackages([]); setPackageTitle("");
                       setPackageFrom(season.startsOn); setPackageThrough(season.endsOn);
-                    }}>{active ? "Close publication" : canPublish ? "Publish family registration" : "Registration opening blocked"}</button>
+                    }}>{active ? "Close publication" : canPublish ? "Publish family registration" : "Registration opening blocked"}</Button>
                    {!canPublish && <p role="status" className="mt-2 text-xs">
                      Registration remains blocked pending independently verified operational approvals.
                      {openingReadiness?.blockers?.length ? " Missing: " + openingReadiness.blockers.join("; ") : ""}
@@ -315,7 +271,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                       error={publicationAttempted&&!permissionVersion.trim()?"Enter the approved consent version.":undefined}>
                       <Input maxLength={80} value={permissionVersion} placeholder="summer-2027-v1" onChange={e => setPermissionVersion(e.target.value)}/>
                     </Field>
-                    <div className="sm:col-span-2 rounded-lg border p-3">
+                    <div className="sm:col-span-2  border p-3">
                       <p className="text-sm font-semibold">Optional week / weekday / day packages</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Leave empty for one full-season price. Otherwise add saleable
@@ -327,48 +283,48 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                           className="flex items-center justify-between gap-2 text-xs">
                           <span>{item.title} · {item.sessionIds.length} sessions ·
                             {" "}${(item.priceCents/100).toFixed(2)}</span>
-                          <button type="button" className="underline"
+                          <Button variant="ghost" type="button" className="underline"
                             onClick={() => setPackages(all=>all.filter(p=>p.id!==item.id))}>
                             Remove
-                          </button>
+                          </Button>
                         </li>)}
                       </ul>
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                        <label className="text-xs">Package name
-                          <input className={inputClass} value={packageTitle}
+                        <Label className="text-xs">Package name
+                          <Input className={inputClass} value={packageTitle}
                             maxLength={100} placeholder="Week 1 / M-W-F / Full camp"
                             onChange={e=>setPackageTitle(e.target.value)}/>
-                        </label>
-                        <label className="text-xs">Package fee (USD)
-                          <input className={inputClass} type="number" min={0} max={100000} step="0.01"
+                        </Label>
+                        <Label className="text-xs">Package fee (USD)
+                          <Input className={inputClass} type="number" min={0} max={100000} step="0.01"
                             value={packagePrice} onChange={e=>setPackagePrice(e.target.value)}/>
-                        </label>
-                        <label className="text-xs">From
-                          <input className={inputClass} type="date" min={season.startsOn}
+                        </Label>
+                        <Label className="text-xs">From
+                          <Input className={inputClass} type="date" min={season.startsOn}
                             max={season.endsOn} value={packageFrom}
                             onChange={e=>setPackageFrom(e.target.value)}/>
-                        </label>
-                        <label className="text-xs">Through
-                          <input className={inputClass} type="date" min={packageFrom||season.startsOn}
+                        </Label>
+                        <Label className="text-xs">Through
+                          <Input className={inputClass} type="date" min={packageFrom||season.startsOn}
                             max={season.endsOn} value={packageThrough}
                             onChange={e=>setPackageThrough(e.target.value)}/>
-                        </label>
+                        </Label>
                         <fieldset className="col-span-2">
                           <legend className="text-xs">Include weekdays</legend>
                           <div className="mt-1 flex flex-wrap gap-3">
                             {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day,i)=>
-                              <label key={day} className="text-xs">
-                                <input type="checkbox" checked={packageWeekdays.includes(i)}
+                              <Label key={day} className="text-xs">
+                                <Checkbox checked={packageWeekdays.includes(i)}
                                   onChange={e=>setPackageWeekdays(days=>e.target.checked
                                     ? [...days,i] : days.filter(value=>value!==i))}/>
                                 {" "}{day}
-                              </label>)}
+                              </Label>)}
                           </div>
                         </fieldset>
-                        <button type="button" onClick={()=>addPackage(season.id)}
-                          className="col-span-2 rounded-lg border p-2 text-xs font-semibold">
+                        <Button variant="outline" type="button" onClick={()=>addPackage(season.id)}
+                          className="col-span-2  border p-2 text-xs font-semibold">
                           Add package option
-                        </button>
+                        </Button>
                       </div>
                     </div>
                     <Field label="Published guardian participation permission" className="text-xs sm:col-span-2" required
@@ -383,10 +339,10 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                       <Checkbox checked={operatorConfirmed} onChange={e => setOperatorConfirmed(e.target.checked)}/>
                     </Field>
                     <div className="sm:col-span-2">
-                      <button type="submit" disabled={busy || !canPublish}
-                        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                      <Button variant="outline" type="submit" disabled={busy || !canPublish}
+                        >
                         {busy ? "Publishing…" : "Publish enrollment to families"}
-                      </button>
+                      </Button>
                     </div>
                   </form>}
                 </div>;
@@ -396,7 +352,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                 const staff = planning.staff.filter(person => person.programId === season.programId);
                 const active = scheduleSeasonId === season.id;
                 return (
-                  <div className="mt-3 rounded-lg border p-3">
+                  <div className="mt-3  border p-3">
                     <p className="text-sm font-semibold">Sessions · {meetings.length} scheduled</p>
                     {!!meetings.length && <div className="mt-1 text-xs text-muted-foreground">
                       First: {new Intl.DateTimeFormat("en-US", {dateStyle:"medium",timeStyle:"short",
@@ -406,20 +362,20 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                       {" · "}{meetings[0]!.location}
                     </div>}
                     {season.status === "registration" && !!meetings.length &&
-                      <details className="mt-2 rounded-lg border p-2">
+                      <details className="mt-2  border p-2">
                         <summary className="cursor-pointer text-xs font-semibold">Daily registered rosters</summary>
                         <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
-                          {meetings.map(session => <button key={session.id} type="button"
-                            className="block w-full rounded border px-2 py-1 text-left text-xs"
+                          {meetings.map(session => <Button variant="outline" key={session.id} type="button"
+                            className="block w-full  border px-2 py-1 text-left text-xs"
                             onClick={()=>showRoster(season.id,session.id)}>
                             {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",
                               timeZone:session.timezone}).format(new Date(session.startsAt))}
                             {" · "}{session.location}
-                          </button>)}
+                          </Button>)}
                         </div>
                         {rosterLoading && <p className="mt-2 text-xs">Loading roster…</p>}
                         {roster && meetings.some(item=>item.id===roster.session.id) &&
-                          <div className="mt-2 rounded-lg border p-3">
+                          <div className="mt-2  border p-3">
                             <p className="text-xs font-semibold">
                               {roster.count} registered for {new Intl.DateTimeFormat("en-US",{
                                 dateStyle:"medium",timeZone:roster.session.timezone,
@@ -437,65 +393,65 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                             </p>
                           </div>}
                       </details>}
-                    {season.status === "draft" && <button type="button"
-                      className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold"
+                    {season.status === "draft" && <Button variant="outline" type="button"
+                      className="mt-2"
                       onClick={() => {
                         setScheduleSeasonId(active ? "" : season.id);
                         setScheduleFrom(season.startsOn);
                         setScheduleThrough(season.endsOn);
                         setScheduleStaffId("");
                         setScheduleLocation("");
-                      }}>{active ? "Close session editor" : "Plan recurring sessions"}</button>}
+                      }}>{active ? "Close session editor" : "Plan recurring sessions"}</Button>}
                     {active && <form onSubmit={saveSessions} className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <label className="text-xs">From
-                        <input type="date" required className={inputClass} min={season.startsOn} max={season.endsOn}
+                      <Label className="text-xs">From
+                        <Input type="date" required className={inputClass} min={season.startsOn} max={season.endsOn}
                           value={scheduleFrom} onChange={e => setScheduleFrom(e.target.value)} />
-                      </label>
-                      <label className="text-xs">Through
-                        <input type="date" required className={inputClass} min={scheduleFrom||season.startsOn}
+                      </Label>
+                      <Label className="text-xs">Through
+                        <Input type="date" required className={inputClass} min={scheduleFrom||season.startsOn}
                           max={season.endsOn} value={scheduleThrough}
                           onChange={e => setScheduleThrough(e.target.value)} />
-                      </label>
+                      </Label>
                       <fieldset className="sm:col-span-2">
                         <legend className="text-xs">Days of week (site local time)</legend>
                         <div className="mt-1 flex flex-wrap gap-3 text-xs">
                           {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((label, day) =>
-                            <label key={label} className="flex items-center gap-1">
-                              <input type="checkbox" checked={scheduleDays.includes(day)} onChange={e =>
+                            <Label key={label} className="flex items-center gap-1">
+                              <Checkbox checked={scheduleDays.includes(day)} onChange={e =>
                                 setScheduleDays(days => e.target.checked
                                   ? [...days, day].sort((a,b) => a-b) : days.filter(d => d!==day))} />
                               {label}
-                            </label>)}
+                            </Label>)}
                         </div>
                         {scheduleAttempted&&!scheduleDays.length&&<FieldError>Select at least one day of the week.</FieldError>}
                       </fieldset>
-                      <label className="text-xs">Start time
-                        <input type="time" required className={inputClass} value={scheduleStart}
+                      <Label className="text-xs">Start time
+                        <Input type="time" required className={inputClass} value={scheduleStart}
                           onChange={e => setScheduleStart(e.target.value)} />
-                      </label>
-                      <label className="text-xs">End time
-                        <input type="time" required className={inputClass} value={scheduleEnd}
+                      </Label>
+                      <Label className="text-xs">End time
+                        <Input type="time" required className={inputClass} value={scheduleEnd}
                           min={scheduleStart} onChange={e => setScheduleEnd(e.target.value)} />
-                      </label>
-                      <label className="text-xs">Room or location
-                        <input required className={inputClass} value={scheduleLocation}
+                      </Label>
+                      <Label className="text-xs">Room or location
+                        <Input required className={inputClass} value={scheduleLocation}
                           minLength={2} maxLength={120} placeholder="Classroom 2 / Fellowship Hall"
                           onChange={e => setScheduleLocation(e.target.value)} />
-                      </label>
-                      <label className="text-xs">Instructor / facilitator (optional)
-                        <select className={inputClass} value={scheduleStaffId}
+                      </Label>
+                      <Label className="text-xs">Instructor / facilitator (optional)
+                        <Select className={inputClass} value={scheduleStaffId}
                           onChange={e => setScheduleStaffId(e.target.value)}>
                           <option value="">Assign later</option>
                           {staff.map(person => <option key={person.personId} value={person.personId}>
                             {person.firstName} {person.lastName}
                           </option>)}
-                        </select>
-                      </label>
+                        </Select>
+                      </Label>
                       <div className="sm:col-span-2">
-                        <button type="submit" disabled={busy}
-                          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                        <Button variant="outline" type="submit" disabled={busy}
+                          >
                           {busy ? "Scheduling…" : "Save draft sessions"}
-                        </button>
+                        </Button>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Up to 180 sessions per request; dates must be within this season.
                           Assigning an instructor does not certify qualifications or open registration.
@@ -505,53 +461,11 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                   </div>
                 );
               })()}
-              {season.status === "draft" && (() => {
-                const tasks = planning.assignments.filter(a => a.seasonId === season.id);
-                const available = planning.operators.filter(p => p.programId === season.programId);
-                const existingOwner = tasks[0]?.ownerPersonId ?? "";
-                const operatorId = readinessOwners[season.id] ?? existingOwner;
-                return (
-                  <details className="mt-3 rounded-lg border p-3">
-                    <summary className="cursor-pointer text-xs font-semibold">Optional evidence requests</summary>
-                    <p className="text-xs font-semibold">
-                      Evidence requests: {tasks.length}/{extendedLearningReadinessTasks.length} recorded
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      These are evidence-gathering assignments only. A completed task does not
-                      demonstrate approval or allow children to register.
-                    </p>
-                    {!!tasks.length && <ul className="mt-2 list-disc pl-5 text-xs">
-                      {tasks.map(task => <li key={task.id}>
-                        {extendedLearningReadinessTasks.find(t => t.key === task.requirementKey)?.title ??
-                          "Unrecognized requirement"} — {task.status === "resolved"
-                            ? "task closed, verification pending" : "evidence requested"}
-                      </li>)}
-                    </ul>}
-                    {season.status === "draft" && <div className="mt-2 flex flex-wrap items-end gap-2">
-                      <label className="min-w-44 flex-1 text-xs">Receiving site operator
-                        <select className={inputClass} value={operatorId}
-                          disabled={busy || tasks.length > 0}
-                          onChange={e => setReadinessOwners(current => ({
-                            ...current, [season.id]: e.target.value,
-                          }))}>
-                          <option value="">Choose active site registrar</option>
-                          {available.map(person => <option key={person.personId} value={person.personId}>
-                            {person.firstName} {person.lastName}
-                          </option>)}
-                        </select>
-                      </label>
-                      <button type="button" className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                        disabled={busy || !operatorId || tasks.length === extendedLearningReadinessTasks.length}
-                        onClick={() => assignReadiness(season.id, season.programId ?? "")}>
-                        {tasks.length ? "Complete missing requests" : "Assign readiness requests"}
-                      </button>
-                    </div>}
-                    {!available.length && <p className="mt-2 text-xs text-muted-foreground">
-                      No active site registrar/operator is currently eligible for these tasks.
-                    </p>}
-                  </details>
-                );
-              })()}
+              <ExtendedSeasonReadinessRequests season={season}
+                assignments={planning.assignments} operators={planning.operators}
+                owner={readinessOwners[season.id]} busy={busy}
+                onOwnerChange={personId=>setReadinessOwners(current=>({...current,[season.id]:personId}))}
+                onAssign={()=>assignReadiness(season.id,season.programId??"")} />
             </li>
           )}
           {!planning.seasons.some(season => programs.some(p => p.id === season.programId)) &&

@@ -1,8 +1,8 @@
 import { and, desc, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
+import { writeBlueprintTransition } from "./blueprint-journal.server";
 import {
-  domainEvents,
-  auditEvents,
   blueprintComponentApprovalDecisions,
   blueprintConfigurationComponents,
   blueprintConfigurationOfferingIntents,
@@ -72,7 +72,7 @@ export async function executeBlueprintConfiguration(
   const input = executeBlueprintConfigurationInputSchema.parse(rawInput);
   const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
 
-  return db.transaction(async (tx) => {
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configurationVersion] = await tx.select({
       id: blueprintConfigurationVersions.id,
@@ -369,7 +369,7 @@ export async function executeBlueprintConfiguration(
       });
     }
 
-    await tx.insert(auditEvents).values({
+    await writeBlueprintTransition(tx, context, {
       actorPersonId,
       owningOrganizationId: configurationVersion.owningOrganizationId,
       eventCode: "blueprint.configuration.executed",
@@ -381,8 +381,7 @@ export async function executeBlueprintConfiguration(
         deploymentIds,
         requestId: context.requestId ?? null,
       },
-    });
-    await tx.insert(domainEvents).values({
+    }, {
       eventType: "BlueprintConfigurationExecuted",
       aggregateType: "BlueprintExecutionBatch",
       aggregateId: batch.id,
@@ -396,5 +395,5 @@ export async function executeBlueprintConfiguration(
     });
 
     return { executionBatchId: batch.id, deploymentIds, created: true };
-  });
+  }));
 }

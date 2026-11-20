@@ -27,9 +27,9 @@ export function useSchoolYearCommands() {
     if (outcome.status === "refreshed") { setError(""); setNotice("Saved school-year records have been refreshed."); }
   }
   const feedback = <>
-    {error && <p role="alert" className="mt-5 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    {error && <p role="alert" className="mt-5  border border-destructive p-3 text-sm">{error}</p>}
     {mutation.refreshError && <Button type="button" variant="outline" disabled={mutation.isSubmitting} onClick={() => void retryRefresh()} className="mt-3">Retry saved school-year refresh</Button>}
-    {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+    {notice && <p role="status" className="mt-5  border p-3 text-sm">{notice}</p>}
   </>;
   return { busy, run, feedback };
 }

@@ -11,7 +11,7 @@ export const programTypeLabels: Record<ProgramType, string> = {
   full_school: "Full school",
   microschool: "Microschool",
   hybrid_program: "Hybrid program",
-  homeschool_cohort: "Homeschool cohort",
+  homeschool_cohort: "Homeschool community",
   summer_enrichment: "Summer camp / enrichment",
   summer_program: "Summer academic program",
   after_school_enrichment: "After-school enrichment",

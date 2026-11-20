@@ -50,7 +50,7 @@ function withRouter(content: ReactNode) {
   const root = createRootRoute({ component: () => <div className="bg-background p-4 sm:p-8">{content}</div> });
   const index = createRoute({
     getParentRoute: () => root,
-    path: "/launch/school",
+    path: "/launch/site",
     component: () => null,
   });
   const academicSetup = createRoute({

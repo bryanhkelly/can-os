@@ -65,7 +65,7 @@ export function PersonProfile({profile, tab: requestedTab = "overview"}:{profile
     {(tab === "overview" || tab === "connections") && <WorkspacePanel title={connectionTitle}
       actions={tab === "overview" && profile.sections.length > 0 && <Link to="/profiles" search={{person:profile.personId,tab:"connections"}} className="text-sm text-primary underline underline-offset-4">View all {plural(profile.sections.length, "connection")}</Link>}>
       <ul className="divide-y">{(tab === "overview" ? profile.sections.slice(0,3) : profile.sections).map(section=><li key={section.id} className="py-4 text-sm first:pt-0 last:pb-0">
-        {["teacher","student"].includes(profile.viewerRole)?<Link to="/classes" search={{section:section.id}} className="underline">{section.title}</Link>:<span>{section.title}</span>}
+        <Link to="/class"  className="underline">{section.title}</Link>
       </li>)}</ul>
       {!profile.sections.length&&<p className="text-sm text-muted-foreground">No active class relationships are recorded in this membership.</p>}
     </WorkspacePanel>}

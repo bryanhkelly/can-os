@@ -84,7 +84,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
       </p>}
       <p className="mt-1 text-xs text-muted-foreground">Add/drop deadline: {s.policy.addDropEndsOn} · Withdrawal deadline: {s.policy.withdrawalEndsOn}</p>
       {s.policy.prerequisites.length>0&&<p className="mt-1 text-xs text-muted-foreground">Prerequisites: {s.policy.prerequisites.join(", ")}</p>}
-      {s.policy.guardianApprovalRequired&&<p className="mt-1 text-xs text-amber-700">This class requires guardian permission. Your guardian can review your pending request under Family → Course approvals.</p>}
+      {s.policy.guardianApprovalRequired&&<p className="mt-1 text-xs text-warning">This class requires guardian permission. Your guardian can review your pending request under Family → Course approvals.</p>}
       {s.withdrawalNotation&&<p className="mt-1 text-xs font-semibold">Transcript notation: {String(s.withdrawalNotation)}</p>}
      </div>
      {hasRegistrarAuthority(role)?<span className=" border border-border px-3 py-2 text-xs font-semibold">Decision mode below</span>:
@@ -117,7 +117,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
 /** Same V6.1 class actions in every student context; no parallel navigation path. */
 function StudentClassActions({sectionId}:{sectionId:string}) {
  return <nav aria-label="Class learning actions" className="mt-5 flex flex-wrap gap-3">
-  <Button asChild><Link to="/classes" search={{section:sectionId,tab:"lessons"}}>Open classroom</Link></Button>
+  <Button asChild><Link to="/class" >Open classroom</Link></Button>
   <Button asChild variant="outline"><Link to="/student/assignments" search={{section:sectionId}}>Classwork</Link></Button>
  </nav>;
 }
@@ -131,7 +131,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
  
  const connections=course?<WorkspacePanel title="Class connections">
    <nav aria-label="Class connections" className="grid gap-4 text-sm">
-    <Link to="/classes" search={{section:course.id}} className="underline">Class lessons, files and announcements</Link>
+    <Link to="/class"  className="underline">Class lessons, files and announcements</Link>
     <Link to="/student/assignments" search={{section:course.id}} className="underline">View class assignments</Link>
     <Link to="/student/discussions" search={{section:course.id}} className="underline">Class discussion</Link>
     <Link to="/calendar" search={{section:course.id}} className="underline">Class schedule</Link>
@@ -168,11 +168,11 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
    </div>:<>
     <DetailNavigation label="Class detail">
      <SectionTab current={tab==="overview"} link={{to:"/student/courses",search:{section:course.id,tab:"overview"}}}>Overview</SectionTab>
-     <SectionTab current={false} link={{to:"/classes",search:{section:course.id,tab:"lessons"}}}>Classroom</SectionTab>
+     <SectionTab current={false} link={{to:"/class"}}>Classroom</SectionTab>
      {(["classwork","grades"] as const).map(value=><SectionTab key={value} current={tab===value} link={{to:"/student/courses",search:{section:course.id,tab:value}}}>{value==="classwork"?"Classwork":"Grades & feedback"}</SectionTab>)}
     </DetailNavigation>
     {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>
-      <p className="text-sm text-muted-foreground">Teaching team: {course.teachers?.length ? course.teachers.map(teacher=>teacher.name).join(", ") : "Not assigned"}</p>
+      <p className="text-sm text-muted-foreground">Teaching team: {course.teachers?.length ? course.teachers.map((teacher,index)=><span key={teacher.personId}>{index>0?", ":""}<Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></span>) : "Not assigned"}</p>
       <StudentClassActions sectionId={course.id}/>
     </WorkspacePanel> : <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>

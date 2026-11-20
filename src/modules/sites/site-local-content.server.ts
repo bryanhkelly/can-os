@@ -1,14 +1,13 @@
-import { changeSitePublicationWithinTransaction } from "./site-publication.server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, siteLocalContentVersions, sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import {
-  classifySiteLocalContent, normalizeSiteLocalContent, type SiteLocalContent,
+  classifySiteLocalContent, normalizeSiteLocalContent, websiteCopyOnlyForStorage, type SiteLocalContent,
 } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
-import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
+import { siteWebsiteDraftWriteCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { DomainError } from "@/domain/errors";
 
 import { EventTypes } from "@/domain/event-types";
@@ -46,7 +45,8 @@ export async function readLocalContentHistory(siteId: string, executor: Reader =
  * the last locally published revision untouched. Unsafe markup is rejected.
  *
  * Rollback appends another revision, preserving authorship and evidence.
- * Neither action changes official Site/Program publication or admission.
+ * Saving a website revision never changes the Site publication status,
+ * independently governed Program publication, or admission.
  */
 export type PartnerLocalContentTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type PartnerLocalContentCommand = {
@@ -66,9 +66,10 @@ export async function publishPartnerLocalContentWithinTransaction(
   actor: AccessContext, input: PartnerLocalContentCommand, tx: PartnerLocalContentTx,
 ) {
     // Relationship authorization runs inside the write transaction.
-    const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
+    const site = await requirePartnerWebsiteEditor(actor, tx, input.operation === "draft"
+      ? siteWebsiteDraftWriteCapability : siteWebsiteLocalPublishCapability);
     const [sitePublication] = await tx.select({
-      siteId: sitePublications.siteId, updatedAt: sitePublications.updatedAt,
+      siteId: sitePublications.siteId,
     }).from(sitePublications)
       .where(eq(sitePublications.siteId, site.id)).for("update").limit(1);
     if (!sitePublication) {
@@ -123,18 +124,18 @@ export async function publishPartnerLocalContentWithinTransaction(
     // Return the exact normalized restored snapshot to this already-authorized
     // editor. A router refresh alone cannot safely replace dirty local form
     // state, and a restore may need independent claim review before publication.
-    const restored = input.operation === "restore" ? { restoredContent: content } : {};
-    if (latest && canonicalJson(latest.content) === canonicalJson(content) &&
+    const stored=websiteCopyOnlyForStorage(content);
+    const restored = input.operation === "restore" ? { restoredContent: stored } : {};
+    if (latest && canonicalJson(websiteCopyOnlyForStorage(
+      normalizeSiteLocalContent(latest.content,{allowIncompleteImage:true}))) === canonicalJson(stored) &&
       latest.status === decision.status) {
-      if(actor.role === "site_admin" && decision.status === "published")
-        await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
       return { changed: false, revision: currentRevision, status: latest.status,
         flaggedFields: latest.flaggedFields, ...restored };
     }
 
     const revision = currentRevision + 1;
     const [created] = await tx.insert(siteLocalContentVersions).values({
-      siteId: site.id, revision, content, status: decision.status,
+      siteId: site.id, revision, content:stored, status: decision.status,
       flaggedFields: decision.flaggedFields,
       createdByPersonId: actor.actorPersonId!,
       restoredFromRevision,
@@ -180,8 +181,6 @@ export async function publishPartnerLocalContentWithinTransaction(
       organizationId: site.organizationId, siteId: site.id,
       payload: { revision, status: decision.status },
     });
-    if(actor.role === "site_admin" && decision.status === "published")
-      await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
     return { changed: true, revision, status: decision.status,
       flaggedFields: decision.flaggedFields, ...restored };
 }

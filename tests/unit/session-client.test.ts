@@ -46,7 +46,9 @@ describe("browser account handoff clears only CAN-owned data",()=>{
     const sessionStorage=memoryStorage();
     const localStorage=memoryStorage();
     vi.stubGlobal("window",{sessionStorage,localStorage});
+    localStorage.setItem("can-native-video-progress:old-student:lesson", "private-bookmark");
     setSharedDeviceMode(true);
+    expect(localStorage.getItem("can-native-video-progress:old-student:lesson")).toBeNull();
     const before=accessClientInstance();
     clearLearnerBrowserState();
     const after=accessClientInstance();
@@ -55,5 +57,18 @@ describe("browser account handoff clears only CAN-owned data",()=>{
     expect(localStorage.getItem("can-session-revocation")).toMatch(/^\d+:[0-9a-f-]{36}$/i);
     setSharedDeviceMode(false);
     expect(isSharedDeviceMode()).toBe(false);
+  });
+
+  it("notifies mounted players before clearing storage to prevent pagehide re-persistence",()=>{
+    const sessionStorage=memoryStorage();
+    const localStorage=memoryStorage();
+    const dispatchEvent=vi.fn();
+    const key="can-native-video-progress:student:lesson";
+    localStorage.setItem(key,"private-bookmark");
+    vi.stubGlobal("window",{sessionStorage,localStorage,dispatchEvent});
+    clearLearnerBrowserState(false);
+    expect(dispatchEvent).toHaveBeenCalledOnce();
+    expect(dispatchEvent.mock.calls[0]![0]).toMatchObject({type:"can:clear-learning-video"});
+    expect(localStorage.getItem(key)).toBeNull();
   });
 });

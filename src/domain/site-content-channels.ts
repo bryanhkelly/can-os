@@ -313,7 +313,7 @@ export function resolveSiteContentBlocks(
         }
         break;
       case "learning.interests":
-        items = (feeds.preferences?.interestIds ?? []).map(id => ({
+        items = (feeds.preferences?.interestIds ?? []).filter(id => id !== "weekend" && id !== "evening").map(id => ({
           id, title: interestCopy[id].title, description: interestCopy[id].description,
           label: "Proposed · not enrolling",
         }));

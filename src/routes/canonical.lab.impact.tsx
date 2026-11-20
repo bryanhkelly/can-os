@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { createFileRoute } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
@@ -46,32 +47,32 @@ function ImpactLabPage() {
           </p>
         </div>)}
       </div>
-      <div className="mt-5 overflow-x-auto border border-border bg-card">
-        <table className="w-full min-w-160 text-left text-sm">
-          <thead className="border-b border-border bg-muted/40">
-            <tr>
-              <th scope="col" className="p-3">Deployment</th>
-              <th scope="col" className="p-3">Site</th>
-              <th scope="col" className="p-3">Rooms</th>
-              <th scope="col" className="p-3">Device pairings across rooms</th>
-              <th scope="col" className="p-3">Playback starts</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.siteDelivery.byDeployment.map(row=><tr
+      <div className="mt-5 border border-border bg-card">
+        <Table scrollLabel="Facilitated delivery by deployment" aria-label="Facilitated delivery by deployment" className="w-full min-w-160 text-left text-sm"><TableCaption className="sr-only">Facilitated delivery by deployment</TableCaption>
+          <TableHeader className="border-b border-border bg-muted/40">
+            <TableRow>
+              <TableHead scope="col" className="p-3">Deployment</TableHead>
+              <TableHead scope="col" className="p-3">Site</TableHead>
+              <TableHead scope="col" className="p-3">Rooms</TableHead>
+              <TableHead scope="col" className="p-3">Device pairings across rooms</TableHead>
+              <TableHead scope="col" className="p-3">Playback starts</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.siteDelivery.byDeployment.map(row=><TableRow
               key={row.deploymentId+":"+row.siteId} className="border-b border-border last:border-b-0">
-              <td className="p-3 font-mono text-xs">{row.deploymentId.slice(0,8)}</td>
-              <td className="p-3 font-mono text-xs">{row.siteId.slice(0,8)}</td>
-              <td className="p-3 tabular-nums">{row.rooms}</td>
-              <td className="p-3 tabular-nums">{row.pairedDeviceSessions}</td>
-              <td className="p-3 tabular-nums">{row.playbackStarts}</td>
-            </tr>)}
+              <TableRowHead className="p-3 font-mono text-xs">{row.deploymentId.slice(0,8)}</TableRowHead>
+              <TableCell className="p-3 font-mono text-xs">{row.siteId.slice(0,8)}</TableCell>
+              <TableCell className="p-3 tabular-nums">{row.rooms}</TableCell>
+              <TableCell className="p-3 tabular-nums">{row.pairedDeviceSessions}</TableCell>
+              <TableCell className="p-3 tabular-nums">{row.playbackStarts}</TableCell>
+            </TableRow>)}
             {!data.siteDelivery.byDeployment.length&&
-              <tr><td colSpan={5} className="p-4 text-muted-foreground">
+              <TableRow><TableCell colSpan={5} className="p-4 text-muted-foreground">
                 No facilitated delivery records in the current reporting window.
-              </td></tr>}
-          </tbody>
-        </table>
+              </TableCell></TableRow>}
+          </TableBody>
+        </Table>
       </div>
     </section>
     <section className="mt-8" aria-label="Optional classroom feedback">

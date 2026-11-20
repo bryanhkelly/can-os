@@ -3,10 +3,40 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox, Radio } from "@/components/ui/choice";
+import { Modal } from "@/components/ui/modal";
+import { FormActions } from "@/components/workspace/form-page";
+import { CreateAction } from "@/components/workspace/create-action";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { EmptyState, WorkspaceNotice, PageNavigation } from "@/components/workspace";
 
 describe("V6.1 universal action and surface contracts", () => {
+
+  it("shares the V6.1 focus and disabled-state contract across native primitives", () => {
+    const controls = [
+      renderToStaticMarkup(<Button type="button">Continue</Button>),
+      renderToStaticMarkup(<Input aria-label="Name"/>),
+      renderToStaticMarkup(<Select aria-label="Program"><option>High school</option></Select>),
+      renderToStaticMarkup(<Textarea aria-label="Notes"/>),
+      renderToStaticMarkup(<Checkbox aria-label="Acknowledged"/>),
+      renderToStaticMarkup(<Radio aria-label="Choice" name="choice"/>),
+    ];
+    for (const markup of controls) {
+      expect(markup).toContain("focus-visible:ring-2");
+      expect(markup).toContain("focus-visible:ring-ring");
+      expect(markup).toContain("focus-visible:ring-offset-background");
+      expect(markup).toContain("disabled:opacity-50");
+      expect(markup).not.toMatch(/rounded-(?:full|lg|xl|2xl|3xl)/);
+    }
+    for (const markup of controls.slice(1, 4)) {
+      expect(markup).toContain("border-input");
+      expect(markup).toContain("aria-invalid:border-destructive");
+      expect(markup).toContain("disabled:cursor-not-allowed");
+    }
+  });
+
   it("prevents repeat submits and announces pending native actions", () => {
     const html = renderToStaticMarkup(<Button loading loadingLabel="Saving…" type="submit">Save</Button>);
     expect(html).toContain('type="submit"');
@@ -31,13 +61,53 @@ describe("V6.1 universal action and surface contracts", () => {
     expect(html).not.toContain("<button");
   });
 
+  it("disables slotted link actions with ARIA rather than an invalid HTML disabled attribute", () => {
+    const disabled = renderToStaticMarkup(<Button asChild disabled variant="ghost">
+      <a href="/cancel" aria-disabled={false} tabIndex={0}>Cancel</a>
+    </Button>);
+    expect(disabled).toContain('href="/cancel"');
+    expect(disabled).toContain('aria-disabled="true"');
+    expect(disabled).toMatch(/tabindex="-1"/i);
+    expect(disabled).toContain("pointer-events-none");
+    expect(disabled).not.toContain('aria-disabled="false"');
+    expect(disabled).not.toMatch(/tabindex="0"/i);
+    expect(disabled).not.toMatch(/\sdisabled(?:=|\s|>)/);
+  });
+
+  it("uses the canonical Button component for both form actions", () => {
+    const html = renderToStaticMarkup(
+      <FormActions submitLabel="Save" pendingLabel="Saving…" pending
+        cancel={<a href="/back">Cancel</a>}/>,
+    );
+    expect(html).toContain('data-form-actions=""');
+    expect(html).toContain('type="submit"');
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('href="/back"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toMatch(/tabindex="-1"/i);
+    expect(html).not.toMatch(/<a[^>]*\sdisabled(?:=|\s|>)/);
+  });
+
+  it("renders one canonical primary CreateAction without nested buttons", () => {
+    const html = renderToStaticMarkup(<CreateAction>
+      <a href="/sites/new">Create site</a>
+    </CreateAction>);
+    expect(html).toMatch(/^<a\b/);
+    expect(html).toContain('data-create-action=""');
+    expect(html).toContain('href="/sites/new"');
+    expect(html).toContain("bg-primary");
+    expect(html).toContain("Create site");
+    expect(html).toContain("<svg");
+    expect(html).not.toContain("<button");
+  });
+
   it("renders the public sign-in links without an invalid Radix Slot child array", () => {
     const html = renderToStaticMarkup(<div>
       <Button asChild variant="outline"><a href="/access/register">Create a personal CAN account</a></Button>
-      <Button asChild variant="outline"><a href="/schools/new">Create a school</a></Button>
+      <Button asChild variant="outline"><a href="/site/new">Create a Site</a></Button>
     </div>);
     expect(html).toContain('href="/access/register"');
-    expect(html).toContain('href="/schools/new"');
+    expect(html).toContain('href="/site/new"');
     expect(html.match(/<a\b/g)).toHaveLength(2);
     expect(html).not.toContain("<button");
   });
@@ -76,6 +146,14 @@ describe("V6.1 universal action and surface contracts", () => {
     expect(html).toContain('aria-invalid="true"');
     expect(html).toContain(`aria-describedby="existing-help ${id}-description ${id}-error"`);
     expect(html).toContain('role="alert"');
+  });
+
+  it("exposes a stable dialog id for an accessible mobile navigation control", () => {
+    const html = renderToStaticMarkup(<Modal id="launch-navigation-drawer" open={false}
+      label="Launch Studio navigation" onClose={() => undefined}>Menu</Modal>);
+    expect(html).toContain('id="launch-navigation-drawer"');
+    expect(html).toContain('aria-label="Launch Studio navigation"');
+    expect(html).not.toMatch(/\brounded(?:-[\w-]+)?\b/);
   });
 
   it("keeps empty, error and pagination surfaces rectangular", () => {

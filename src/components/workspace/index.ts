@@ -1,4 +1,5 @@
 export { WorkspaceShell, type WorkspaceShellProps } from "./workspace-shell";
+export { WorkspaceActionLink } from "./workspace-action-link";
 export { PageFrame, PageHeader, PageEyebrow, PageTitle, type PageWidth } from "./page-frame";
 export { CreateAction, secondaryActionClassName } from "./create-action";
 export { FormSection, FormActions, useUnsavedChangesGuard } from "./form-page";
@@ -13,7 +14,9 @@ export { MutationFeedback } from "./mutation-feedback";
 export { LocalDateTimeField } from "./local-datetime-field";
 export { ActionDialog } from "./action-dialog";
 export { ActionFooter } from "./action-footer";
+export { DisclosureSection } from "./disclosure-section";
 export { PageNavigation } from "./page-navigation";
+export { WorkspaceLinkNavigation } from "./workspace-link-navigation";
 export { DirectoryPagination } from "./directory-pagination";
 export { DirectoryWindowPagination } from "./directory-window-pagination";
 export { DirectoryBulkActions, type DirectoryBulkAction } from "./directory-bulk-actions";
@@ -28,3 +31,4 @@ export { RecordHeader, RecordLayout, RecordFacts, EntityCard, type RecordFact } 
 export { MasterDetailWorkspace, MasterDetailListItem } from "./master-detail-workspace";
 export { DashboardProgress, DashboardTimeline, DashboardPreviewList, DashboardMediaTile } from "./dashboard-widgets";
 export type { TimelineEntry, DashboardPreviewItem } from "./dashboard-widgets";
+export { SelectionCard, type SelectionCardProps } from "./selection-card";

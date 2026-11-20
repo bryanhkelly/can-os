@@ -3,8 +3,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { auditEvents as sharedAuditEvents } from "@/db/schema";
 import {
-  auditEvents, blueprintConfigurationOfferingIntents, blueprintConfigurationVersions, blueprintExecutionBatches,
+  blueprintConfigurationOfferingIntents, blueprintConfigurationVersions, blueprintExecutionBatches,
   blueprintOutputs, canonicalOfferingCourses, catalogSites, configurationReviews,
   courseVersions, deploymentOfferingAdoptions, deploymentReadinessReviews,
   educationOperationOrganizationRoles, educationOperationSites, educationOperations,
@@ -301,11 +302,11 @@ export const approveNativeOfferingAdoption=createServerFn({method:"POST"})
         .from(blueprintConfigurationVersions)
         .where(eq(blueprintConfigurationVersions.id,provenance.configurationVersionId)).limit(1);
       if(!configuration)invalid("Blueprint configuration provenance is incomplete.");
-      const authorEvents=await tx.select({personId:auditEvents.actorPersonId})
-        .from(auditEvents).where(and(
-          eq(auditEvents.entityKind,"blueprint_configuration"),
-          eq(auditEvents.entityId,configuration.id),
-          inArray(auditEvents.eventCode,[
+      const authorEvents=await tx.select({personId:sharedAuditEvents.actorPersonId})
+        .from(sharedAuditEvents).where(and(
+          eq(sharedAuditEvents.resourceType,"blueprint_configuration"),
+          eq(sharedAuditEvents.resourceId,configuration.id),
+          inArray(sharedAuditEvents.action,[
             "blueprint.configuration.created","blueprint.configuration.saved",
             "blueprint.configuration.submitted",
           ]),

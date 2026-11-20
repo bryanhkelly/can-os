@@ -73,7 +73,7 @@ export function FamilyServicesSetupPanel({siteId}:{siteId:string}) {
     }finally{setBusy(false)}
   }
   if(loading)return <p role="status" className="text-sm">Loading family services…</p>;
-  return <section aria-label="Family services configuration" className="space-y-4 rounded-xl border bg-card p-5">
+  return <section aria-label="Family services configuration" className="space-y-4  border bg-card p-5">
     <h2 className="font-serif text-xl">Family services and school-life support</h2>
     <p className="text-sm text-muted-foreground">
       These statements come from Site configuration. Only the institutional Site publisher
@@ -82,7 +82,7 @@ export function FamilyServicesSetupPanel({siteId}:{siteId:string}) {
     <form noValidate onSubmit={save} className="space-y-4">
       {categories.map(({key,label})=>{
         const item=entries.find(value=>value.category===key)??blank(key);
-        return <fieldset key={key} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+        return <fieldset key={key} className="grid gap-2  border p-3 sm:grid-cols-2">
           <legend className="px-1 text-sm font-semibold">{label}</legend>
           <Field label="Current status" className="text-xs">
             <Select

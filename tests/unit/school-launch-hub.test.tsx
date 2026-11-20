@@ -1,90 +1,37 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { SchoolLaunchHub, type SchoolHubOptions } from "@/components/launch-studio/SchoolLaunchHub";
-import { schoolHubSearch } from "@/domain/school-launch-hub";
-import { SchoolSettingsDestinations } from "@/components/launch-studio/SchoolSettingsDestinations";
-vi.mock("@tanstack/react-router", () => ({
-  Link: ({children,to,search,params}:{children:ReactNode;to:string;search?:{siteId?:string;returnToHub?:boolean;returnToSettings?:boolean};params?:{module?:string}}) => {
-    const query = new URLSearchParams();
-    if(search?.siteId)query.set("siteId",search.siteId);
-    if(search?.returnToHub)query.set("returnToHub","true");
-    if(search?.returnToSettings)query.set("returnToSettings","true");
-    return <a href={`${to.replace("$module",params?.module ?? "")}?${query}`}>{children}</a>;
-  },
-}));
-const siteId="00000000-0000-4000-8000-000000000001";
-const options={sites:[{id:siteId,name:"Test School",websiteDraft:null}],schoolSetupAdministrator:true} as unknown as SchoolHubOptions;
-describe("school Launch Hub",()=>{
-  it("orders School details, Site Information and Website before community and opening setup",()=>{
-    const planned={state:"Planned",detail:"Module is on the roadmap",nextAction:"Explore module"} as const;
-    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
-      statuses={{promote:planned,recruitment:planned,events:planned}}/>);
-    expect((html.match(/Open module/g) ?? []).length).toBe(3);
-    expect(html).toContain("School details");
-    expect(html).toContain("Site Information");
-    expect(html).toContain("Build Website");
-    expect(html).toContain(`/launch/hub/school/profile?siteId=${siteId}`);
-    expect(html).toContain(`/launch/hub/school/information?siteId=${siteId}`);
-    expect(html.indexOf("School Profile")).toBeLessThan(html.indexOf("Site Information"));
-    expect(html.indexOf("Site Information")).toBeLessThan(html.indexOf("Build Website"));
-    expect(html).toContain(`/launch/website?siteId=${siteId}&amp;returnToHub=true`);
-    expect(html).not.toContain(`/launch/hub/school/website?siteId=${siteId}`);
-    expect(html).toContain("Build Your School Community");
-    expect(html).toContain(`/launch/hub/school/promote?siteId=${siteId}`);
-    expect(html).toContain(`/launch/hub/school/recruitment?siteId=${siteId}`);
-    expect(html).toContain(`/launch/hub/school/events?siteId=${siteId}`);
-    expect(html).toContain("Promote Your School");
-    expect(html).not.toContain("100%");
-    expect(html).not.toContain("Not Started");
+import { describe, expect, it } from "vitest";
+import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
+import { siteLaunchModules } from "@/components/launch-studio/LaunchStudioOverviewV61";
+
+const site = { id: "9bdc982d-73b3-48bf-b0e3-66c2870b08f5", name: "Valor Learning Center" };
+
+describe("single V6.1 Site Launch Studio", () => {
+  it("renders one Site-scoped frame, four milestones and an authorized private preview link", () => {
+    const html = renderToStaticMarkup(<LaunchSiteFrame site={site}><p>Overview content</p></LaunchSiteFrame>);
+    expect(html).toContain("Valor Learning Center");
+    expect(html).toContain("Launch Studio");
+    expect(html).toContain("Establish");
+    expect(html).toContain("Introduce");
+    expect(html).toContain("Prepare");
+    expect(html).toContain("Open");
+    expect(html).toContain("/launch/site-preview?siteId="+site.id);
+    expect(html).toContain("Overview content");
+    expect(html).not.toContain("Launch Hub");
   });
-  it("does not send blocked website editors into a permission error",()=>{
-    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
-      statuses={{website:{state:"Blocked",detail:"Network authorization required",nextAction:"Request access"}}}/>);
-    expect(html).toContain("Network authorization required");
-    expect(html).not.toContain("/launch/website?");
-    expect(html).toContain(`/launch/hub/school/website?siteId=${siteId}`);
+
+  it("keeps website setup in Establish and Solution selection in Prepare", () => {
+    expect(siteLaunchModules.find(item => item.id === "website-brand")?.stage).toBe("Establish");
+    expect(siteLaunchModules.find(item => item.id === "program-catalog")?.stage).toBe("Prepare");
+    expect(siteLaunchModules.find(item => item.id === "programs-audiences")?.stage).toBe("Establish");
   });
-  it("routes Settings Website through scoped authorization without an interstitial",()=>{
-    const html=renderToStaticMarkup(<SchoolSettingsDestinations siteId={siteId}/>);
-    expect(html).toContain(`/settings/school/website?siteId=${siteId}`);
-    expect(html).toContain(`/settings/school/information?siteId=${siteId}`);
-    expect(html).not.toContain("returnToSettings=true");
-    expect(html).toContain(`/settings/school/promote?siteId=${siteId}`);
-    expect(html).toContain(`/settings/school/recruitment?siteId=${siteId}`);
-    expect(html).toContain(`/settings/school/events?siteId=${siteId}`);
-  });
-  it("preserves malformed selections for explicit authorization feedback, without silently dropping them",()=>{
-    const selection=schoolHubSearch.parse({siteId:"00000000-0000-4000-8000-00000000000",programId:"invalid"});
-    expect(selection.siteId).toBe("00000000-0000-4000-8000-00000000000");
-    expect(selection.programId).toBe("invalid");
-    expect(renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={selection.siteId}/>)).toContain("Choose your school");
-  });
-  it("shows invalid Program selections as actionable Hub errors rather than silently ignoring them",()=>{
-    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
-      selectionError="Requested Program is not available in this school."/>);
-    expect(html).toContain("Requested Program is not available in this school.");
-    expect(html).toContain(`/launch/hub/school/team?siteId=${siteId}`);
-  });
-  it("never silently substitutes the only authorized school for a missing or invalid selection",()=>{
-    for(const selection of [undefined,"another-school"]){
-      const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={selection}/>);
-      expect(html).toContain("Choose your school");
-      expect(html).not.toContain("Open module");
-    }
-  });
-  it("keeps all planned modules clickable while reporting their status",()=>{
-    const planned={state:"Planned",detail:"Module is on the roadmap",nextAction:"Explore module"} as const;
-    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
-      statuses={{promote:planned,recruitment:planned,events:planned}}/>);
-    expect((html.match(/Explore module/g)??[])).toHaveLength(3);
-    for(const module of ["promote","recruitment","events"])expect(html).toContain(`/launch/hub/school/${module}?siteId=${siteId}`);
-  });
-  it.each(["promote","recruitment","events"] as const)("makes the %s placeholder honest and retains its return scope",module=>{
-    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId} module={module}/>);
-    expect(html).toContain(`/launch/hub/school?siteId=${siteId}`);
-    expect(html).toContain(module === "promote" ? "not implemented" : "not enabled");
-    expect(html).toContain("What this module will make possible");
-    expect(html).not.toContain("<button");
+
+  it("uses canonical Site context, never a second new Site or tenant during module navigation", () => {
+    const html = renderToStaticMarkup(<LaunchSiteFrame site={site} active="site-profile">
+      <p>Authorized Site Profile</p>
+    </LaunchSiteFrame>);
+    expect(html).toContain("siteId="+site.id);
+    expect(html).toContain("module=site-profile");
+    expect(html).not.toContain("/schools/new");
+    expect(html).not.toContain("/launch/hub/school");
   });
 });

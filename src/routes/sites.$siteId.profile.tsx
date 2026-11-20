@@ -28,7 +28,7 @@ function SchoolProfilePage() {
   const outcome = Route.useLoaderData();
   const { siteId } = Route.useParams();
   const { tab = "overview" } = Route.useSearch();
-  if (!outcome.ok) return <LoaderFailure eyebrow="School profile" title="School profile" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Site Profile" title="Site Profile" outcome={outcome} />;
   return <SchoolProfile data={outcome.data} tab={tab}
     tabLink={value => ({ to: "/sites/$siteId/profile", params: { siteId }, search: { tab: value === "overview" ? undefined : value } })} />;
 }

@@ -2,6 +2,8 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { Link } from "@tanstack/react-router";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { CoachCaseloadList } from "@/components/support/CoachCaseloadList";
+import { CoachOutreachPanel, type CoachOutreachOutcome } from "@/components/support/CoachOutreachPanel";
 import { Users, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -13,13 +15,6 @@ import {
 type CaseloadStudent = Awaited<ReturnType<typeof getCoachCaseload>>["students"][number];
 type TimelineEntry = Awaited<ReturnType<typeof getCoachStudentHistory>>["timeline"][number];
 
-const outcomes = [
-  { value: "contacted", label: "Contacted" },
-  { value: "meeting_scheduled", label: "Meeting scheduled" },
-  { value: "escalated", label: "Escalated" },
-  { value: "no_response", label: "No response" },
-] as const;
-
 export function CoachPage({studentProfileId,selectStudent,title="Specialist caseload"}:{
   studentProfileId?:string;selectStudent:(id:string)=>void;title?:string;
 }) {
@@ -30,7 +25,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [note, setNote] = useState("");
-  const [outcome, setOutcome] = useState<(typeof outcomes)[number]["value"]>("contacted");
+  const [outcome, setOutcome] = useState<CoachOutreachOutcome>("contacted");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [message, setMessage] = useState("");
@@ -111,138 +106,20 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
       actions={<><Link to="/support">Referrals, plans & services →</Link><Link to="/profiles">My profile →</Link></>}>
         <div id="support-caseload">
         {loading && <p className="mt-8 text-sm" role="status">Loading caseload…</p>}
-        {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-        {!loading&&!error&&selected&&!chosen&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This student is unavailable in your current caseload.</p>}
+        {error && <p className="mt-8  border p-4 text-sm" role="alert">{error}</p>}
+        {!loading&&!error&&selected&&!chosen&&<p role="alert" className="mt-5  border p-4 text-sm">This student is unavailable in your current caseload.</p>}
         {!loading && !error && students.length === 0 && (
           <p className="mt-8 text-sm">No students currently need coach attention at your sites.</p>
         )}
         {!loading && !error && students.length > 0 && (
           <div className="mt-8 grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-            <section>
-              <div className="space-y-3">
-                {students.map((student) => (
-                  <button
-                    key={student.studentProfileId}
-                    onClick={() => {
-                      selectStudent(student.studentProfileId);
-                      setMessage("");
-                      setFormError("");
-                    }}
-                    className={`w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${
-                      selected === student.studentProfileId ? "border-foreground" : "border-border"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h2 className="text-base font-semibold">{student.name}</h2>
-                      <span className="text-xs text-muted-foreground">
-                        {student.gradeLevel ? `Grade ${student.gradeLevel}` : "Grade —"}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      {student.openReferrals > 0 && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">
-                          {student.openReferrals} open referral{student.openReferrals === 1 ? "" : "s"}
-                          {student.latestReferralStage ? ` · ${student.latestReferralStage.replaceAll("_", " ")}` : ""}
-                        </span>
-                      )}
-                      {student.hasOpenPlan && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">Support plan</span>
-                      )}
-                      {student.openInsights > 0 && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">
-                          {student.openInsights} insight{student.openInsights === 1 ? "" : "s"}
-                        </span>
-                      )}
-                      {student.openActions > 0 && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">
-                          {student.openActions} open action{student.openActions === 1 ? "" : "s"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Last activity {new Date(student.lastActivityAt).toLocaleString()}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </section>
-            <section className="h-fit rounded-xl border bg-card p-5">
-              {!chosen && <p className="text-sm text-muted-foreground">Select a student to see their timeline and log outreach.</p>}
-              {chosen && (
-                <>
-                  <h2 className="font-serif text-2xl">{chosen.name}</h2>
-                  <Link to="/staff/students/$personId" params={{personId:chosen.personId}} className="mt-3 inline-block text-sm underline">Open student profile</Link>
-                  <p className="mt-3 text-xs text-muted-foreground">School-support records only. Do not enter clinical or private counseling notes.</p>
-                  <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Timeline</h3>
-                  {historyError&&<p role="alert" className="mt-3 text-sm">{historyError}</p>}
-                  {timelineLoading && <p className="mt-3 text-sm" role="status">Loading history…</p>}
-                  {!timelineLoading && !historyError && timeline.length === 0 && (
-                    <p className="mt-3 text-sm text-muted-foreground">No recorded history yet.</p>
-                  )}
-                  <ol className="mt-3 space-y-3">
-                    {timeline.map((entry) => (
-                      <li key={`${entry.kind}-${entry.id}`} className="rounded-lg border border-border p-3 text-sm">
-                        <div className="flex flex-wrap justify-between gap-2">
-                          <p className="font-semibold">{entry.title}</p>
-                          {entry.kind==="referral"&&<Link to="/support" search={{referral:entry.id}} className="text-xs underline">Open referral</Link>}
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(entry.occurredAt).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
-                          {entry.kind.replaceAll("_", " ")}
-                          {entry.outcome ? ` · ${entry.outcome.replaceAll("_", " ")}` : ""}
-                          {` · ${entry.status.replaceAll("_", " ")}`}
-                        </p>
-                        {entry.detail && <p className="mt-2 text-sm text-muted-foreground">{entry.detail}</p>}
-                        {entry.stageHistory && entry.stageHistory.length > 0 && (
-                          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                            {entry.stageHistory.map((stage, index) => (
-                              <li key={index}>
-                                {stage.stage.replaceAll("_", " ")} · {new Date(stage.occurredAt).toLocaleDateString()}
-                                {stage.note ? ` — ${stage.note}` : ""}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                  <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Log outreach</h3>
-                  <label className="mt-3 block text-sm font-semibold">
-                    Note
-                    <textarea
-                      value={note}
-                      onChange={(event) => setNote(event.target.value)}
-                      rows={4}
-                      placeholder="Who did you contact, what was discussed, and what happens next?"
-                      className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
-                    />
-                  </label>
-                  <label className="mt-3 block text-sm font-semibold">
-                    Outcome
-                    <select
-                      value={outcome}
-                      onChange={(event) => setOutcome(event.target.value as typeof outcome)}
-                      className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
-                    >
-                      {outcomes.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                  {formError && <p className="mt-3 rounded-lg border border-red-300 p-3 text-sm" role="alert">{formError}</p>}
-                  {message && <p className="mt-3 rounded-lg border border-emerald-300 p-3 text-sm" role="status">{message}</p>}
-                  <button
-                    disabled={busy || note.trim().length < 3}
-                    onClick={submitOutreach}
-                    className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40"
-                  >
-                    Log outreach
-                  </button>
-                </>
-              )}
-            </section>
+            <CoachCaseloadList students={students} selected={selected}
+              onSelect={id=>{selectStudent(id);setMessage("");setFormError("");}} />
+            <CoachOutreachPanel
+              chosen={chosen} timeline={timeline} timelineLoading={timelineLoading}
+              historyError={historyError} note={note} outcome={outcome} busy={busy}
+              formError={formError} message={message} onNoteChange={setNote}
+              onOutcomeChange={setOutcome} onSubmit={submitOutreach} />
           </div>
         )}
         </div>

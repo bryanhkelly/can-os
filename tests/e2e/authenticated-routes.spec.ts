@@ -126,7 +126,7 @@ for (const persona of ["student", "guardian", "teacher"] as const) {
  */
 const guardianP0Destinations = [
   { route: "/guardian/students", heading: "Academic progress" },
-  { route: "/classes", heading: "Your family's classes" },
+  { route: "/class", heading: "My Classes" },
   { route: "/guardian/report-cards", heading: "Report card" },
   { route: "/messages", heading: "Messages" },
   { route: "/notifications", heading: "Notifications" },
@@ -236,7 +236,7 @@ test("student opens enrolled classroom and assessment detail", async ({ browser 
   await withAuthenticatedPage(browser, secret, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
-    const classroom = await page.goto(`/classes?section=${fixture!.sectionId}&tab=lessons`);
+    const classroom = await page.goto("/class");
     expect(classroom?.status()).toBe(200);
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
     await expectWorkspaceShell(page);
@@ -302,9 +302,9 @@ test("student assignment list links back to enrolled classes", async ({ browser 
   await withAuthenticatedPage(browser, secret, async ({ page }) => {
     await page.goto("/student/assignments");
     const classesLink = page.getByRole("link", { name: "My classes", exact: true });
-    await expect(classesLink).toHaveAttribute("href", "/classes");
+    await expect(classesLink).toHaveAttribute("href", "/class");
     await classesLink.click();
-    await expect(page).toHaveURL(/\\/classes(?:\\?|$)/);
+    await expect(page).toHaveURL(/\/class(?:\?|$)/);
   });
 });
 
@@ -342,7 +342,7 @@ test("teacher reaches classes, discussions, missing work and their support works
     const errors:string[]=[];
     page.on("pageerror",error=>errors.push(error.message));
 
-    await expectWorkspaceRoute(page,"/classes","My classes");
+    await expectWorkspaceRoute(page,"/class","My Classes");
     await expect(page.getByRole("main")).not.toContainText(/Sign in with an authorized|Unable to open/i);
 
     await page.goto("/teacher/gradebook?section="+fixture!.sectionId);
@@ -411,10 +411,10 @@ test("student dashboard class links open the enrolled classroom directory", asyn
   await withAuthenticatedPage(browser, secret, async ({ page }) => {
     await page.goto("/home");
     const classLink = page.getByRole("link", { name: /View my classes/ }).first();
-    await expect(classLink).toHaveAttribute("href", "/classes");
+    await expect(classLink).toHaveAttribute("href", "/class");
     await classLink.click();
-    await expect(page).toHaveURL(/\/classes(?:\?|$)/);
-    await expect(page.getByRole("main").getByRole("heading", { name: "My classes" })).toBeVisible();
+    await expect(page).toHaveURL(/\/class(?:\?|$)/);
+    await expect(page.getByRole("main").getByRole("heading", { name: "My Classes" })).toBeVisible();
   });
 });
 

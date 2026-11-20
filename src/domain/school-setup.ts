@@ -20,6 +20,7 @@ export const schoolSetupSchema = z.object({
 
 export const realSchoolSetupSignupSchema = z.object({
   name: z.string().trim().min(2).max(160),
+  organizationName: z.string().trim().min(2).max(160).optional(),
   email: z.string().trim().toLowerCase().email().max(254)
     .refine(email => !email.endsWith(".demo") && !email.endsWith(".invalid"),
       "Use a real email address; demo schools use the shared-code setup."),

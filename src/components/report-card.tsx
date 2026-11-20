@@ -61,7 +61,7 @@ export function ReportCardView({ grades }: { grades: ReportCardGrade[] }) {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{period}</h2>
           <div className="mt-3 grid gap-4">
             {periodGrades.map(grade => (
-              <div key={grade.sectionGradeId} className="rounded-xl border bg-card p-5">
+              <div key={grade.sectionGradeId} className=" border bg-card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-semibold">{grade.sectionTitle}</h3>
@@ -103,7 +103,7 @@ export function TranscriptView({
         <section key={year} className="mt-6">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{year}</h3>
           {groupBy(yearRows, row => row.termName).map(([term, termRows]) => (
-            <div key={term} className="mt-3 rounded-xl border bg-card p-5">
+            <div key={term} className="mt-3  border bg-card p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{term}</p>
               <ul className="mt-3 divide-y">
                 {termRows.map(row => (
@@ -146,7 +146,7 @@ export function TranscriptView({
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Official issuances</h3>
           <div className="mt-3 grid gap-3">
             {issuances.map(issuance => (
-              <div key={issuance.id} className="rounded-xl border bg-card p-4 text-sm">
+              <div key={issuance.id} className=" border bg-card p-4 text-sm">
                 <p className="font-semibold">Issued by {issuance.issuingOrganization}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {new Date(issuance.issuedAt).toLocaleString()}
@@ -169,7 +169,7 @@ export function TranscriptView({
 export function RecordedCreditInventory({ rows }: { rows: ReportCardGrade[] }) {
   if (!rows.length) return null;
   if (rows.some(row => !row.sectionId || !row.termId || !row.creditIssuingOrganizationId)) {
-    return <section className="mt-5 rounded-lg border p-4" aria-label="Recorded credit inventory">
+    return <section className="mt-5  border p-4" aria-label="Recorded credit inventory">
       <h3 className="font-semibold">Recorded credits by subject</h3>
       <p className="mt-2 text-sm text-muted-foreground">
         This transcript record lacks the provenance needed to calculate a reliable credit summary.
@@ -190,7 +190,7 @@ export function RecordedCreditInventory({ rows }: { rows: ReportCardGrade[] }) {
     creditsAttempted: row.creditsAttempted,
     creditsEarned: row.creditsEarned,
   })));
-  return <section className="mt-5 rounded-lg border p-4" aria-label="Recorded credit inventory">
+  return <section className="mt-5  border p-4" aria-label="Recorded credit inventory">
     <h3 className="font-semibold">Recorded credits by subject</h3>
     <p className="mt-1 text-xs text-muted-foreground">
       Informational summary of finalized academic records, kept separate by issuing institution.

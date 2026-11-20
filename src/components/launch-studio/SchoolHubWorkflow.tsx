@@ -2,7 +2,7 @@ import { SchoolConfigurationContextProvider, useSchoolConfigurationNavigation } 
 import type { SchoolConfigurationContext } from "@/domain/school-configuration";
 import { Link, useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { ScopedAdminConsole } from "@/routes/admin";
+import { ScopedAdminConsole } from "@/components/operations/ScopedAdminConsole";
 import { LaunchWizardPage, type LaunchWizardData } from "@/components/operations/LaunchWizardPage";
 import { LaunchAcademicSetupWorkspace } from "@/components/operations/LaunchAcademicSetupWorkspace";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";

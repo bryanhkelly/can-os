@@ -32,7 +32,7 @@ type CompletionTarget = {
 };
 
 const pad = (value: number) => String(value).padStart(2, "0");
-/** Local wall-time value for <input type="datetime-local">. */
+/** Local wall-time value for <Input type="datetime-local">. */
 function localInputValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { DirectoryTable } from "@/components/workspace";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import {useState, type FormEvent} from "react";
@@ -99,31 +101,31 @@ function SiteResourceNeedForm({assessmentId}:{assessmentId:string}){
     finally{setBusy(false);}
   }
   return <div className="mt-3">
-    <button type="button" className="text-xs font-semibold text-primary underline"
-      onClick={()=>setOpen(!open)}>{open?"Cancel entry":"Record equipment or connectivity need"}</button>
+    <Button variant="ghost" type="button" className="text-xs font-semibold text-primary underline"
+      onClick={()=>setOpen(!open)}>{open?"Cancel entry":"Record equipment or connectivity need"}</Button>
     {notice&&<p role="status" className="mt-2 text-xs">{notice}</p>}
     {open&&<form className="mt-3 space-y-3 border border-border p-3 text-xs" onSubmit={e=>void submit(e)}>
       <p>Record a need for this Site assessment. Questionnaires, qualification approval and evidence review remain separate governed processes.</p>
-      <label className="block">Resource code
-        <input required minLength={2} maxLength={64} pattern="[a-z][a-z0-9_]*" value={code}
+      <Label className="block">Resource code
+        <Input required minLength={2} maxLength={64} pattern="[a-z][a-z0-9_]*" value={code}
           onChange={e=>setCode(e.target.value)} placeholder="e.g. learner_laptops"
-          className="mt-1 w-full border border-border bg-background p-2"/></label>
-      <label className="block">Resource description
-        <input required minLength={5} maxLength={500} value={description}
+          className="mt-1"/></Label>
+      <Label className="block">Resource description
+        <Input required minLength={5} maxLength={500} value={description}
           onChange={e=>setDescription(e.target.value)} placeholder="Laptops for participating learners"
-          className="mt-1 w-full border border-border bg-background p-2"/></label>
-      <label className="block">Measurement unit
-        <input required value={unit} maxLength={40} onChange={e=>setUnit(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></label>
+          className="mt-1"/></Label>
+      <Label className="block">Measurement unit
+        <Input required value={unit} maxLength={40} onChange={e=>setUnit(e.target.value)}
+          className="mt-1"/></Label>
       <div className="grid grid-cols-2 gap-2">
-        <label>Required<input type="number" min="0" max="1000000" step="any" required value={required} onChange={e=>setRequired(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></label>
-        <label>Available<input type="number" min="0" max="1000000" step="any" required value={available} onChange={e=>setAvailable(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></label>
+        <Label>Required<Input type="number" min="0" max="1000000" step="any" required value={required} onChange={e=>setRequired(e.target.value)}
+          className="mt-1"/></Label>
+        <Label>Available<Input type="number" min="0" max="1000000" step="any" required value={available} onChange={e=>setAvailable(e.target.value)}
+          className="mt-1"/></Label>
       </div>
-      <label className="block">Estimated cost per additional unit (USD, optional)
-        <input type="number" min="0" max="10000000" step=".01" value={cost} onChange={e=>setCost(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></label>
+      <Label className="block">Estimated cost per additional unit (USD, optional)
+        <Input type="number" min="0" max="10000000" step=".01" value={cost} onChange={e=>setCost(e.target.value)}
+          className="mt-1"/></Label>
       <Button size="sm" type="submit" disabled={busy}>{busy?"Recording…":"Record self-reported need"}</Button>
     </form>}
   </div>;

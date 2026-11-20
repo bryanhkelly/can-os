@@ -1,3 +1,7 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { OnsiteRoomPlanningPanel } from "@/components/operations/OnsiteRoomPlanningPanel";
 import { OperatingAgreementEvidencePicker } from "./OperatingAgreementEvidencePicker";
@@ -51,7 +55,7 @@ export function CANOperatingAuthorizationDesk() {
     }catch(e){setError(mutationErrorMessage(e, "Unable to record decision"));}
     finally{setBusy(false);}
   }
-  return <section className="mt-6 rounded-xl border bg-card p-5">
+  return <section className="mt-6  border bg-card p-5">
     <h2 className="font-serif text-2xl">CAN–church institutional service agreements</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Only separately verified contracts may authorize CAN services at independently owned churches.
@@ -63,7 +67,7 @@ export function CANOperatingAuthorizationDesk() {
       desk.authorizations.length===0?<p className="mt-3 text-sm">No church-site requests for this CAN institution.</p>:
       <div className="mt-3 space-y-3">{desk.authorizations.map(item=>{
         const value=inputs[item.id]??{evidence:"",from:"",through:"",reason:""};
-        return <article key={item.id} className="rounded-lg border p-3 text-sm">
+        return <article key={item.id} className=" border p-3 text-sm">
           <p className="font-semibold">{item.programName} · {item.hostName}</p>
           <p className="mt-1 text-xs">{item.status} · Version {item.version} · {item.services.join(", ")}</p>
           {item.status==="suspended"&&<p className="mt-1 text-xs" role="status">
@@ -90,39 +94,39 @@ export function CANOperatingAuthorizationDesk() {
                   through={value.through} value={value.evidence} disabled={busy}
                   onChange={id=>update(item.id,"evidence",id)}/>
               </div>
-              {item.status==="requested"&&<label className="text-xs">Effective from
-                <input type="date" className="mt-1 w-full rounded border bg-background p-2" value={value.from}
+              {item.status==="requested"&&<Label className="text-xs">Effective from
+                <Input type="date" className="mt-1 w-full  border bg-background p-2" value={value.from}
                   onChange={e=>update(item.id,"from",e.target.value)}/>
-              </label>}
+              </Label>}
               {item.status==="approved"&&<p className="text-xs sm:col-span-2">
                 Renewal requires independently verified evidence covering the extended period.
                 It does not renew school-opening authorization or change staff grants.
               </p>}
-              <label className="text-xs">Effective through (exclusive)
-                <input type="date" className="mt-1 w-full rounded border bg-background p-2" value={value.through}
+              <Label className="text-xs">Effective through (exclusive)
+                <Input type="date" className="mt-1 w-full  border bg-background p-2" value={value.through}
                   onChange={e=>update(item.id,"through",e.target.value)}/>
-              </label>
+              </Label>
             </>}
-            <label className="text-xs sm:col-span-2">Decision reason
-              <input className="mt-1 w-full rounded border bg-background p-2" minLength={10} maxLength={500}
+            <Label className="text-xs sm:col-span-2">Decision reason
+              <Input className="mt-1 w-full  border bg-background p-2" minLength={10} maxLength={500}
                 value={value.reason} onChange={e=>update(item.id,"reason",e.target.value)}/>
-            </label>
+            </Label>
             <div className="sm:col-span-2 flex flex-wrap gap-2">
               {item.status==="requested"&&<>
-                <button type="button" disabled={busy||value.reason.trim().length<10||!value.evidence||!value.from||!value.through}
-                  onClick={()=>void decide(item.id,"approved")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Approve verified agreement</button>
-                <button type="button" disabled={busy||value.reason.trim().length<10}
-                  onClick={()=>void decide(item.id,"denied")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Deny request</button>
+                <Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10||!value.evidence||!value.from||!value.through}
+                  onClick={()=>void decide(item.id,"approved")} className=" border px-3 py-2 text-xs disabled:opacity-50">Approve verified agreement</Button>
+                <Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
+                  onClick={()=>void decide(item.id,"denied")} className=" border px-3 py-2 text-xs disabled:opacity-50">Deny request</Button>
               </>}
-              {item.status==="approved"&&<button type="button"
+              {item.status==="approved"&&<Button variant="outline" type="button"
                 disabled={busy||value.reason.trim().length<10||!value.evidence||!value.through}
-                onClick={()=>void decide(item.id,"renewed")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Renew verified agreement</button>}
-              {item.status==="approved"&&<button type="button" disabled={busy||value.reason.trim().length<10}
-                onClick={()=>void decide(item.id,"suspended")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Suspend agreement</button>}
-              {item.status==="suspended"&&<button type="button" disabled={busy||value.reason.trim().length<10}
-                onClick={()=>void decide(item.id,"resumed")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Resume agreement</button>}
-              {(item.status==="approved"||item.status==="suspended")&&<button type="button" disabled={busy||value.reason.trim().length<10}
-                onClick={()=>void decide(item.id,"revoked")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Revoke agreement</button>}
+                onClick={()=>void decide(item.id,"renewed")} className=" border px-3 py-2 text-xs disabled:opacity-50">Renew verified agreement</Button>}
+              {item.status==="approved"&&<Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"suspended")} className=" border px-3 py-2 text-xs disabled:opacity-50">Suspend agreement</Button>}
+              {item.status==="suspended"&&<Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"resumed")} className=" border px-3 py-2 text-xs disabled:opacity-50">Resume agreement</Button>}
+              {(item.status==="approved"||item.status==="suspended")&&<Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"revoked")} className=" border px-3 py-2 text-xs disabled:opacity-50">Revoke agreement</Button>}
             </div>
           </div>}
         </article>;
@@ -135,16 +139,16 @@ export function CANOperatingAuthorizationDesk() {
         academic registrar. Staff remain CAN employees and gain only the named
         Program and their specifically assigned classes.
       </p>
-      <label className="mt-3 block text-sm">Church school
-        <select className="mt-1 w-full rounded border bg-background p-2"
+      <Label className="mt-3 block text-sm">Church school
+        <Select className="mt-1 w-full  border bg-background p-2"
           value={staffProgramId} onChange={e=>setStaffProgramId(e.target.value)}>
           <option value="">Choose approved CAN–church Program…</option>
           {desk.authorizations.filter(item=>item.status==="approved")
             .map(item=><option key={item.id} value={item.programId}>
               {item.programName} · {item.hostName}
             </option>)}
-        </select>
-      </label>
+        </Select>
+      </Label>
       {staffProgramId&&<>
         <SchoolOpeningEvidencePanel key={"evidence:"+staffProgramId} programId={staffProgramId}/>
         <SchoolOpeningReviewPanel key={"opening:"+staffProgramId} programId={staffProgramId}/>

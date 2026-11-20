@@ -1,9 +1,9 @@
 import { isDeepStrictEqual } from "node:util";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
+import { writeBlueprintTransition } from "./blueprint-journal.server";
 import {
-  domainEvents,
-  auditEvents,
   blueprintComponents,
   blueprintConfigurationComponents,
   blueprintConfigurationComponentReferences,
@@ -29,6 +29,8 @@ import {
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole, blueprintReadDatabaseRole } from "@/domain/blueprint-database-role";
+import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
+import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "./verified-site-planning.server";
 
 const BLUEPRINT_CONFIGURE = "blueprint.configure";
 const BLUEPRINT_READ = "blueprint.read";
@@ -362,15 +364,14 @@ async function recordMutation(
     lifecycle: input.lifecycle,
     requestId: context.requestId ?? null,
   };
-  await tx.insert(auditEvents).values({
+  await writeBlueprintTransition(tx, context, {
     actorPersonId: context.actorPersonId,
     owningOrganizationId: input.owningOrganizationId,
     eventCode: input.action,
     entityKind: "blueprint_configuration",
     entityId: input.configurationId,
     payload,
-  });
-  await tx.insert(domainEvents).values({
+  }, {
     eventType: input.eventType,
     aggregateType: "blueprint_configuration",
     aggregateId: input.configurationId,
@@ -417,9 +418,10 @@ export async function getBlueprintConfiguration(
   configurationId: string,
 ): Promise<BlueprintConfigurationDetail> {
   assertCanRead(context);
-  const databaseRole = blueprintReadDatabaseRole(context);
-  return db.transaction(async tx => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
     .where(eq(blueprintConfigurations.id, configurationId))
     .limit(1);
@@ -433,6 +435,10 @@ export async function getBlueprintConfiguration(
     .orderBy(desc(blueprintConfigurationVersions.revision))
     .limit(1);
   if (!version) throw new DomainError("UNAVAILABLE", "Blueprint configuration has no version.");
+  if (isCanPlanning) {
+    const siteId = requireBlueprintSiteScope(context, version.config);
+    await assertVerifiedCanPlanningSite(tx, context, siteId, configuration.owningOrganizationId);
+  }
 
   const [components, references, offeringAdoptions, localExperiences] = await Promise.all([
     tx.select().from(blueprintConfigurationComponents)
@@ -476,7 +482,7 @@ export async function getBlueprintConfiguration(
       configuration: experience.configuration,
     })),
   };
-  });
+  }));
 }
 
 export async function createBlueprintConfiguration(
@@ -487,9 +493,14 @@ export async function createBlueprintConfiguration(
   const input = createBlueprintConfigurationInputSchema.parse(rawInput);
   assertOrganization(context, input.owningOrganizationId);
 
-  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
-  return db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    if (isCanPlanning) {
+      const siteId = requireBlueprintSiteScope(context, input.version.config);
+      await assertVerifiedCanPlanningSite(tx, context, siteId, input.owningOrganizationId);
+    }
     const [existing] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
       .limit(1)
@@ -566,7 +577,7 @@ export async function createBlueprintConfiguration(
       lifecycle: version.lifecycle,
     });
     return asResult(configuration.id, version);
-  });
+  }));
 }
 
 export async function saveBlueprintConfiguration(
@@ -576,9 +587,10 @@ export async function saveBlueprintConfiguration(
   assertAuthenticated(context);
   const input = saveBlueprintConfigurationInputSchema.parse(rawInput);
 
-  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
-  return db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
       .limit(1)
@@ -587,6 +599,21 @@ export async function saveBlueprintConfiguration(
       throw new DomainError("UNAVAILABLE", "Blueprint configuration is unavailable.");
     }
     assertOrganization(context, configuration.owningOrganizationId);
+    if (isCanPlanning) {
+      const [currentSiteVersion] = await tx.select({
+        config: blueprintConfigurationVersions.config,
+      }).from(blueprintConfigurationVersions)
+        .where(eq(blueprintConfigurationVersions.configurationId, configuration.id))
+        .orderBy(desc(blueprintConfigurationVersions.revision)).limit(1);
+      if (!currentSiteVersion) {
+        throw new DomainError("UNAVAILABLE", "Blueprint configuration has no version.");
+      }
+      const siteId = requireBlueprintSiteScope(context, currentSiteVersion.config);
+      if (requireBlueprintSiteScope(context, input.version.config) !== siteId) {
+        throw new AuthorizationError("Blueprint configuration Site cannot be reassigned");
+      }
+      await assertVerifiedCanPlanningSite(tx, context, siteId, configuration.owningOrganizationId);
+    }
 
     const [replayedVersion] = await tx.select().from(blueprintConfigurationVersions)
       .where(and(
@@ -631,7 +658,7 @@ export async function saveBlueprintConfiguration(
       lifecycle: version.lifecycle,
     });
     return asResult(configuration.id, version);
-  });
+  }));
 }
 
 export async function submitBlueprintConfiguration(
@@ -641,9 +668,10 @@ export async function submitBlueprintConfiguration(
   assertAuthenticated(context);
   const input = submitBlueprintConfigurationInputSchema.parse(rawInput);
 
-  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
-  return db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
       .limit(1)
@@ -659,6 +687,10 @@ export async function submitBlueprintConfiguration(
       ))
       .limit(1);
     if (!version) return conflict("Blueprint configuration changed. Reload it before submitting.");
+    if (isCanPlanning) {
+      const siteId = requireBlueprintSiteScope(context, version.config);
+      await assertVerifiedCanPlanningSite(tx, context, siteId, configuration.owningOrganizationId);
+    }
 
     const [latest] = await tx.select().from(blueprintConfigurationVersions)
       .where(eq(blueprintConfigurationVersions.configurationId, configuration.id))
@@ -687,5 +719,5 @@ export async function submitBlueprintConfiguration(
       lifecycle: frozen.lifecycle,
     });
     return asResult(configuration.id, frozen);
-  });
+  }));
 }

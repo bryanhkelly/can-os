@@ -74,7 +74,7 @@ export function WorkspaceSearchDialog({ open, onClose, query, onQueryChange, gro
             return <div key={entry.id} id={`${id}-option-${index}`} role="option"
               aria-selected={selected?.item === entry}
               onMouseEnter={() => setActive(index)} onClick={() => onChoose(entry)}
-              className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm ${
+              className={`flex cursor-pointer items-center justify-between gap-3  px-3 py-3 text-sm ${
                 selected?.item === entry ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}>
               <span className="min-w-0 break-words font-medium">{entry.label}</span>
               <span className="shrink-0 text-xs text-muted-foreground">{entry.sub}</span>

@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
 import { QueryState, WorkspacePanel } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
@@ -95,38 +96,38 @@ export function TeacherProfessionalProfileEditor({ snapshot, changed }: {
     <fieldset disabled={mutation.pending || mutation.refreshFailed} className="grid gap-4">
       <legend className="sr-only">Professional background</legend>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-sm">Years of teaching experience
+        <Label className="text-sm">Years of teaching experience
           <Input type="number" min="0" max="60" step="1" value={years}
             onChange={event => setYears(event.target.value)} className="mt-2" />
-        </label>
-        <label className="text-sm">Subject or specialty areas (comma-separated)
+        </Label>
+        <Label className="text-sm">Subject or specialty areas (comma-separated)
           <Input value={specialties} maxLength={1200} placeholder="For example: mathematics, literacy, special education"
             onChange={event => setSpecialties(event.target.value)} className="mt-2" />
-        </label>
+        </Label>
       </div>
       <fieldset className="grid gap-3">
         <legend className="font-semibold">Education and degrees</legend>
         {education.map((item, index) => <div key={index} className="grid gap-3 border-b py-4 sm:grid-cols-2">
-          <label className="text-sm">University or institution
+          <Label className="text-sm">University or institution
             <Input required maxLength={160} value={item.institution}
               onChange={event => updateEducation(index, { institution: event.target.value })}
               className="mt-2" />
-          </label>
-          <label className="text-sm">Degree
+          </Label>
+          <Label className="text-sm">Degree
             <Input required maxLength={120} value={item.degree} placeholder="For example: B.A., M.Ed., Ph.D."
               onChange={event => updateEducation(index, { degree: event.target.value })}
               className="mt-2" />
-          </label>
-          <label className="text-sm">Field of study
+          </Label>
+          <Label className="text-sm">Field of study
             <Input maxLength={120} value={item.fieldOfStudy}
               onChange={event => updateEducation(index, { fieldOfStudy: event.target.value })}
               className="mt-2" />
-          </label>
-          <label className="text-sm">Graduation year (optional)
+          </Label>
+          <Label className="text-sm">Graduation year (optional)
             <Input type="number" min="1900" max="2100" step="1" value={item.graduationYear}
               onChange={event => updateEducation(index, { graduationYear: event.target.value })}
               className="mt-2" />
-          </label>
+          </Label>
           <Button type="button" variant="ghost"
             onClick={() => setEducation(current => current.filter((_, itemIndex) => itemIndex !== index))}
             className="justify-self-start sm:col-span-2"><Trash2 aria-hidden="true"/>Remove education item</Button>

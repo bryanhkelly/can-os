@@ -2,7 +2,7 @@
  * Site publication approves a public landing/catalog only. It does not open
  * admissions, publish individual Programs, or change activity registration.
  */
-export type SitePublicationAction = "publish" | "unpublish";
+export type SitePublicationAction = "publish" | "unpublish" | "republish";
 export type SitePublicationStatus = "draft" | "published";
 
 export type SitePublicationRecord = {
@@ -34,8 +34,10 @@ export function planSitePublicationTransition(input: {
       (current.status === "published" && !(current.publishedAt instanceof Date))) {
     throw new Error("Site publication state requires repair");
   }
-  const target: SitePublicationStatus = action === "publish" ? "published" : "draft";
-  if (current.status === target) {
+  const target: SitePublicationStatus = action === "unpublish" ? "draft" : "published";
+  if(action==="republish" && current.status!=="published")
+    throw new Error("Publish the Site before using Republish.");
+  if (current.status === target && action!=="republish") {
     // No new write, event, or audit for a repeated request. A later opposite
     // action cannot be overwritten by replaying a stale revision.
     return { changed: false, status: target,
@@ -47,7 +49,7 @@ export function planSitePublicationTransition(input: {
   if (input.reason.trim().length < 10 || input.reason.trim().length > 500) {
     throw new Error("Provide a 10–500 character publication decision reason");
   }
-  if (action === "publish" &&
+  if (action !== "unpublish" &&
       (!input.contentReviewed || (input.eligibleOfferingCount < 1 && !input.siteOwnedContentReady))) {
     throw new Error("Review the public content and include at least one eligible published academic or enrichment listing");
   }
@@ -57,7 +59,7 @@ export function planSitePublicationTransition(input: {
   return {
     changed: true,
     status: target,
-    publishedAt: action === "publish" ? now : null,
+    publishedAt: action === "unpublish" ? null : action === "republish" ? current.publishedAt : now,
     updatedAt,
   };
 }

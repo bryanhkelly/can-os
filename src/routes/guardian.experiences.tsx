@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getMySchoolProfile } from "@/modules/operations/school-profile.functions";
 import { SchoolProfile, schoolRecordTabs, type SchoolRecordTab } from "@/components/operations/SchoolProfile";
-import { EmptyState, WorkspaceShell } from "@/components/workspace";
+import { DetailNavigation, EmptyState, SectionTab, WorkspaceShell } from "@/components/workspace";
 import { LiveSchoolExperiences } from "@/components/student/LiveSchoolExperiences";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -33,14 +33,12 @@ function GuardianExperiencesPage() {
   if (!site) return <WorkspaceShell width="wide" eyebrow="Family" title="School & teacher conferences"
     subtitle="Your family's authorized school updates, calendar and appointments. A single school profile is not available for this membership.">
     {outcome.data.experiences.connected ? <>
-      <nav aria-label="Family school sections" className="mt-6 flex flex-wrap gap-2">
-        {schoolRecordTabs.map(item => <Link key={item.value} to="/guardian/experiences"
-          search={item.value === "overview" ? { student } : { student, tab: item.value }}
-          aria-current={tab === item.value ? "page" : undefined}
-          className="inline-flex min-h-11 items-center border px-4 py-2 text-sm font-semibold underline focus-visible:outline-2">
+      <DetailNavigation label="Family school sections" variant="record">
+        {schoolRecordTabs.map(item => <SectionTab key={item.value} current={tab === item.value}
+          link={{ to: "/guardian/experiences", search: item.value === "overview" ? { student } : { student, tab: item.value } }}>
           {item.label}
-        </Link>)}
-      </nav>
+        </SectionTab>)}
+      </DetailNavigation>
       <div className="mt-6"><LiveSchoolExperiences data={outcome.data.experiences}
         view={tab === "overview" ? "all" : tab} /></div>
     </> : <EmptyState title="No school connected" description="The school calendar and conference bookings will appear when your family account is linked to an active school." />}

@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
@@ -78,11 +80,11 @@ function PublishCard({version}:{version:Version}){
         </p>
       </div>)}
     </div>
-    <label className="mt-5 flex items-start gap-3 border-t border-border pt-4 text-sm">
-      <input type="checkbox" className="mt-1 size-4 accent-primary" checked={confirmed}
+    <Label className="mt-5 flex items-start gap-3 border-t border-border pt-4 text-sm">
+      <Checkbox className="mt-1 size-4 accent-primary" checked={confirmed}
         onChange={e=>setConfirmed(e.target.checked)} disabled={busy||!version.publicationReady}/>
       I understand publication makes this version immutable. I have confirmed the independent approvals.
-    </label>
+    </Label>
     {feedback&&<p role={feedback.error?"alert":"status"} className={
       "mt-3 border p-3 text-sm "+(feedback.error?"border-destructive text-destructive":"border-border")
     }>{feedback.text}</p>}

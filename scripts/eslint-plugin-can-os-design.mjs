@@ -153,8 +153,146 @@ const noRepeatedPrimary = {
   },
 };
 
+
+/**
+ * V6.1 owns the native HTML control once in src/components/ui. Feature JSX
+ * composes the canonical primitives instead of restyling native controls.
+ * Hidden form fields and accessible choice-card labels are deliberate HTML
+ * exceptions; the same exceptions are used by v61-source-audit.mjs.
+ */
+const nativeControlTags = new Set(["button", "input", "select", "textarea", "label", "dialog"]);
+const choiceControlTags = new Set(["Checkbox", "Radio"]);
+const nestedControlTags = new Set([
+  ...nativeControlTags, "Button", "Input", "Select", "Textarea", "Checkbox", "Radio",
+]);
+const jsxName = node => node?.type === "JSXIdentifier" ? node.name : null;
+
+function isHiddenFormInput(opening) {
+  return opening.attributes?.some(attr =>
+    attr.type === "JSXAttribute" && attr.name?.name === "type" &&
+    attr.value?.type === "Literal" && attr.value.value === "hidden"
+  );
+}
+
+function isChoiceCardLabel(opening) {
+  const element = opening.parent;
+  if (element?.type !== "JSXElement") return false;
+  const controls = [];
+  function inspect(node) {
+    if (node.type === "JSXElement") {
+      const tag = jsxName(node.openingElement.name);
+      if (nestedControlTags.has(tag)) controls.push(tag);
+      for (const child of node.children) inspect(child);
+    } else if (node.type === "JSXFragment") {
+      for (const child of node.children) inspect(child);
+    } else if (node.type === "JSXExpressionContainer") {
+      inspect(node.expression);
+    } else if (node.type === "LogicalExpression") {
+      inspect(node.left);
+      inspect(node.right);
+    } else if (node.type === "ConditionalExpression") {
+      inspect(node.consequent);
+      inspect(node.alternate);
+    }
+  }
+  for (const child of element.children) inspect(child);
+  return controls.length === 1 && choiceControlTags.has(controls[0]);
+}
+
+const noNativeFeatureControls = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Implement native interactive controls in src/components/ui; reuse V6.1 primitives in every application feature",
+    },
+    schema: [],
+    messages: {
+      primitive: "Use the canonical V6.1 primitive instead of native <{{name}}> in feature JSX. Native HTML belongs in src/components/ui.",
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        const tag = jsxName(node.name);
+        if (!nativeControlTags.has(tag)) return;
+        if (tag === "input" && isHiddenFormInput(node)) return;
+        if (tag === "label" && isChoiceCardLabel(node)) return;
+        context.report({ node, messageId: "primitive", data: { name: tag } });
+      },
+    };
+  },
+};
+
+/**
+ * Pages should compose the V6.1 ActionFooter/FormActions instead of
+ * reproducing submit-button rows. This is intentionally narrow: only a
+ * direct submit Button inside a div/footer that is itself inside a form.
+ * Unrelated filter bars, navigation, and non-submit actions remain valid.
+ */
+const noDuplicateFormActions = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "Compose form submit rows with ActionFooter or FormActions" },
+    schema: [],
+    messages: {
+      reuse: "Use V6.1 <ActionFooter> or <FormActions> instead of a custom <{{name}}> around a submit Button.",
+    },
+  },
+  create(context) {
+    function containsDirectSubmitButton(element) {
+      return element.children.some(child => {
+        if (child.type !== "JSXElement" || jsxName(child.openingElement.name) !== "Button") return false;
+        return child.openingElement.attributes.some(attr =>
+          attr.type === "JSXAttribute" && attr.name.name === "type" &&
+          attr.value?.type === "Literal" && attr.value.value === "submit"
+        );
+      });
+    }
+    return {
+      JSXOpeningElement(node) {
+        const tag = jsxName(node.name);
+        if (tag !== "div" && tag !== "footer") return;
+        const element = node.parent;
+        if (element?.type !== "JSXElement" || !containsDirectSubmitButton(element)) return;
+        for (let ancestor = element.parent; ancestor; ancestor = ancestor.parent) {
+          if (ancestor.type === "JSXElement" && jsxName(ancestor.openingElement.name) === "form") {
+            context.report({ node, messageId: "reuse", data: { name: tag } });
+            return;
+          }
+        }
+      },
+    };
+  },
+};
+
+/**
+ * Real tables should use the canonical Table family for consistent
+ * keyboard-accessible horizontal scrolling, headers and V6.1 geometry.
+ * Complex legacy grids migrate separately after interaction QA.
+ */
+const noNativeFeatureTables = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "Reuse the CAN OS V6.1 Table primitives instead of native feature tables" },
+    schema: [],
+    messages: {
+      table: "Use V6.1 <Table>, <TableHeader>, <TableRow>, <TableHead>, <TableRowHead> and <TableCell> rather than a native feature <table>.",
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        if (jsxName(node.name) === "table") context.report({ node, messageId: "table" });
+      },
+    };
+  },
+};
+
 export default {
   rules: {
+    "no-native-feature-controls": noNativeFeatureControls,
+    "no-native-feature-tables": noNativeFeatureTables,
+    "no-duplicate-form-actions": noDuplicateFormActions,
     "no-hardcoded-colors": noHardcodedColors,
     "no-arbitrary-type-values": noArbitraryTypeValues,
     "no-raw-page-structure": noRawPageStructure,

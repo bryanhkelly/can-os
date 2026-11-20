@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
@@ -55,12 +57,12 @@ export function SiteOwnedActionResolution({ actions, timezone }: { actions: Owne
   return <WorkspacePanel title="Your assigned onsite follow-ups"
     description="Coverage gaps and pickup exceptions assigned to you as the named local leader. Record what was actually done before resolving."
     className="mt-6" id="site-owned-follow-ups">
-    {error && <p role="alert" className="mb-3 rounded border p-3 text-sm">{error}</p>}
+    {error && <p role="alert" className="mb-3  border p-3 text-sm">{error}</p>}
     <MutationFeedback state={mutation} className="mb-3" pendingMessage="Resolving onsite follow-up…"/>
     {actions.length === 0 ? <EmptyState title="No assigned onsite follow-ups."
       description="New coverage and pickup exceptions assigned to you will appear here." /> :
     <ul className="space-y-3">
-      {actions.map(action => <li key={action.id} className="rounded-lg border p-4 text-sm">
+      {actions.map(action => <li key={action.id} className=" border p-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="font-medium">{action.title}</span>
           <span className="text-xs text-muted-foreground">
@@ -70,13 +72,13 @@ export function SiteOwnedActionResolution({ actions, timezone }: { actions: Owne
         </div>
         {action.description &&
           <p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{action.description}</p>}
-        <label className="mt-3 block text-xs font-semibold">
+        <Label className="mt-3 block text-xs font-semibold">
           What was done (required)
-          <textarea value={notes[action.id] ?? ""} maxLength={2000} rows={2}
+          <Textarea value={notes[action.id] ?? ""} maxLength={2000} rows={2}
             onChange={event => setNotes(current => ({ ...current, [action.id]: event.target.value }))}
             placeholder="Factual record of the steps taken and any remaining handoff"
-            className="mt-1 w-full rounded border bg-background p-2 text-sm font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
-        </label>
+            className="mt-1 w-full  border bg-background p-2 text-sm font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+        </Label>
         <Button className="mt-2" variant="outline"
           disabled={!!busy || (notes[action.id] ?? "").trim().length < 10}
           onClick={() => void resolve(action.id)}>

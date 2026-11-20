@@ -19,8 +19,8 @@ describe("Launch Studio input protection", () => {
   it("protects dashboard exits and changes of school or child", () => {
     expect(launchNavigationLosesInput(current, { pathname: "/home", search: {} })).toBe(true);
     expect(launchNavigationLosesInput(current, { ...current, search: { application: "different-child", step: "application" } })).toBe(true);
-    expect(launchNavigationLosesInput({ pathname: "/launch/school", search: { siteId: "one" } },
-      { pathname: "/launch/school", search: { siteId: "two" } })).toBe(true);
+    expect(launchNavigationLosesInput({ pathname: "/launch/site", search: { siteId: "one" } },
+      { pathname: "/launch/site", search: { siteId: "two" } })).toBe(true);
   });
   const fields = { preferredName: "Draft", pronouns: "", interests: "Art", courseIds: [],
     profileBaseline: { preferredName: "Saved", pronouns: "", interests: "" } };

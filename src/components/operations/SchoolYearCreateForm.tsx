@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { createStudioGradeScale, createStudioYear, type getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
@@ -12,10 +12,18 @@ import { FormActions, FormSection, MutationFeedback, WorkspaceNotice, WorkspaceS
 type Snapshot = Awaited<ReturnType<typeof getSchoolYearStudio>>;
 type Selection = { siteId?: string; programId?: string };
 
-export function SchoolYearCreateForm({ data, selection }: { data: Snapshot; selection: Selection }) {
+export function SchoolYearCreateForm({ data, selection, embedded = false,
+  lockedSiteId, onDataChanged, onCreated, onDirtyChange,
+}: {
+  data: Snapshot; selection: Selection; embedded?: boolean;
+  lockedSiteId?: string;
+  onDataChanged?: () => Promise<unknown>;
+  onCreated?: (schoolYearId: string) => Promise<unknown>;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const router = useRouter();
   const navigate = useNavigate();
-  const [siteId, setSiteId] = useState(selection.siteId ?? data.programs.find(p => p.id === selection.programId)?.siteId ?? data.sites[0]?.id ?? "");
+  const [siteId, setSiteId] = useState(lockedSiteId ?? selection.siteId ?? data.programs.find(p => p.id === selection.programId)?.siteId ?? data.sites[0]?.id ?? "");
   const [programId, setProgramId] = useState(() =>
     data.programs.some(program => program.id === selection.programId && program.siteId === siteId) ? selection.programId! : "");
   const [scaleId, setScaleId] = useState("");
@@ -27,9 +35,18 @@ export function SchoolYearCreateForm({ data, selection }: { data: Snapshot; sele
   const [key, setKey] = useState(suggestedYear.key);
   const [start, setStart] = useState(suggestedYear.startsOn), [end, setEnd] = useState(suggestedYear.endsOn);
   const [touched, setTouched] = useState(false);
-  const release = useUnsavedChangesGuard(touched);
-  const mutation = useMutationFeedback(() => router.invalidate());
+  // The embedded Launch flow uses its central V6.1 unsaved-changes dialog.
+  // Standalone academic-year pages retain the standard browser guard.
+  const release = useUnsavedChangesGuard(touched && !embedded);
+  const mutation = useMutationFeedback(async () => {
+    if (onDataChanged) await onDataChanged();
+    else await router.invalidate();
+  });
   const busy = mutation.pending || mutation.refreshFailed;
+  useEffect(() => {
+    onDirtyChange?.(touched || busy);
+    return () => onDirtyChange?.(false);
+  }, [touched, busy, onDirtyChange]);
 
   const scopedPrograms = data.programs.filter(p => p.siteId === siteId);
   const site = data.sites.find(s => s.id === siteId);
@@ -40,11 +57,13 @@ export function SchoolYearCreateForm({ data, selection }: { data: Snapshot; sele
   const listSearch = { siteId: siteId || undefined, programId: programId || undefined };
   const edit = <T,>(setter: (value: T) => void) => (value: T) => { setTouched(true); setter(value); };
 
-  return <WorkspaceShell width="reading" eyebrow="School years" title="Create school year"
+  return <WorkspaceShell embedded={embedded} width="reading"
+    eyebrow={embedded ? "Prepare / School years" : "School years"} title="Create school year"
     subtitle="Set the dates and grading scale for a site's school year. Terms, grading periods and calendars are added on the saved year; activation still requires readiness checks."
-    breadcrumbs={<Link to="/operations/school-years" search={listSearch} className="underline">School years</Link>}>
+    breadcrumbs={!embedded && <Link to="/operations/school-years" search={listSearch} className="underline">School years</Link>}>
     <form onSubmit={event => {
       event.preventDefault();
+      if (lockedSiteId && siteId !== lockedSiteId) return;
       let createdId = "";
       void mutation.run(async () => {
         const created = await createStudioYear({ data: { siteId, ...(programId ? { programId } : {}), gradeScaleId: selectedScaleId, key, name, startsOn: start, endsOn: end } });
@@ -56,15 +75,18 @@ export function SchoolYearCreateForm({ data, selection }: { data: Snapshot; sele
         refreshErrorMessage: "The school year was saved, but it could not be opened. Open School years instead of submitting again.",
         refresh: async () => {
           release();
-          await navigate({ to: "/operations/school-years/$yearId", params: { yearId: createdId }, search: listSearch });
+          if (onCreated) await onCreated(createdId);
+          else await navigate({ to: "/operations/school-years/$yearId", params: { yearId: createdId }, search: listSearch });
         },
       });
     }}>
       <fieldset disabled={busy} className="space-y-8">
         <FormSection title="Scope">
           <Field label="Site" required>
-            <Select value={siteId} onChange={e => { edit(setSiteId)(e.target.value); setProgramId(""); setScaleId(""); }}>
-              {data.sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <Select value={siteId} disabled={Boolean(lockedSiteId)}
+              onChange={e => { edit(setSiteId)(e.target.value); setProgramId(""); setScaleId(""); }}>
+              {data.sites.filter(site => !lockedSiteId || site.id === lockedSiteId)
+                .map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </Field>
           <Field label="Program (optional)">
@@ -96,7 +118,7 @@ export function SchoolYearCreateForm({ data, selection }: { data: Snapshot; sele
           </Field>
           {!siteScales.length && <WorkspaceNotice className="sm:col-span-2">This school needs a grading scale. Create the standard scale, then continue with its school year.</WorkspaceNotice>}
           <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
-            <Field label="New grading scale name"><Input value={newScaleName} onChange={e => setNewScaleName(e.target.value)} /></Field>
+            <Field label="New grading scale name"><Input value={newScaleName} onChange={e => edit(setNewScaleName)(e.target.value)} /></Field>
             <Button type="button" variant="outline" disabled={!site?.organizationId || !newScaleName.trim()}
               onClick={() => void mutation.run(() => createStudioGradeScale({ data: { organizationId: site!.organizationId, name: newScaleName } }), {
                 successMessage: "Grading scale created.",
@@ -109,7 +131,9 @@ export function SchoolYearCreateForm({ data, selection }: { data: Snapshot; sele
       </fieldset>
       <MutationFeedback state={mutation} pendingMessage="Saving..." className="mt-6" />
       <FormActions submitLabel="Create school year" pendingLabel="Creating school year..." pending={mutation.pending}
-        disabled={busy || !siteId || !selectedScaleId} cancel={<Link to="/operations/school-years" search={listSearch}>Cancel</Link>} />
+        disabled={busy || !siteId || !selectedScaleId ||
+          Boolean(lockedSiteId && siteId !== lockedSiteId)}
+        cancel={!embedded && <Link to="/operations/school-years" search={listSearch}>Cancel</Link>} />
     </form>
   </WorkspaceShell>;
 }

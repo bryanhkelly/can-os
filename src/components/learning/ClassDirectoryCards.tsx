@@ -27,13 +27,9 @@ export function ClassDirectoryCards({
             description={role === "guardian" ? section.studentName ?? section.code : section.code}
           >
             <Link
-                to="/classes"
-                search={{
-                  section: section.id,
-                  student: role === "guardian" ? section.studentPersonId ?? undefined : undefined,
-                  tab: role === "student" ? "lessons" : undefined,
-                }}
-                className="inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background"
+                to="/class"
+                
+                className="inline-block  bg-foreground px-4 py-2 text-sm font-semibold text-background"
               >
                 Open class
             </Link>
@@ -41,7 +37,7 @@ export function ClassDirectoryCards({
         ))}
       </div>
       {!classes.length && (
-        <p role="status" className="mt-7 rounded-xl border p-5 text-sm">
+        <p role="status" className="mt-7  border p-5 text-sm">
           {role === "teacher"
             ? "No active classes are currently assigned to you."
             : "No active classes are available in this membership."}

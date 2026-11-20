@@ -36,6 +36,14 @@ export default tseslint.config(
     files: ["src/components/{ui,workspace,workflow}/**/*.tsx", "src/routes/guardian.apply.tsx"],
     rules: { "can-os-design/no-hardcoded-colors": "error" },
   },
+  // All production pages and feature components must use semantic V6.1
+  // colors, not arbitrary Tailwind palette shades. Stories and tests remain
+  // diagnostic rather than production UI.
+  {
+    files: ["src/**/*.tsx"],
+    ignores: ["src/**/*.stories.tsx", "src/**/*.test.tsx", "src/**/*.spec.tsx"],
+    rules: { "can-os-design/no-hardcoded-colors": "error" },
+  },
   // Layout and type contract (docs/design-system-v6-1.md): pages align to the shell grid
   // through the shared primitives, and type sizes/letter-spacing come from tokens.
   {
@@ -60,76 +68,59 @@ export default tseslint.config(
       "src/components/student/StudentExperience.tsx",
       "src/components/learning/ClassroomWorkspace.tsx",
       "src/router.tsx",
-      "src/routes/{index,access.verify,church.apply,family.join,schools.new}.tsx",
+      "src/routes/site.new.tsx",
       "src/**/*.stories.tsx",
     ],
     rules: { "can-os-design/no-raw-page-structure": "off" },
   },
+  // One rule across every production UI surface. Native controls are owned
+  // by the canonical primitives; hidden inputs and whole-card choice labels
+  // receive explicitly tested semantic exceptions.
   {
-    files: [
-      "src/components/learning/ClassCreationRequestForm.tsx",
-      "src/components/workspace/{site-program-fields,local-datetime-field}.tsx",
-      "src/components/evidence/FileSelectionField.tsx",
-      "src/components/evidence/EvidencePicker.tsx",
-      "src/components/learning/GradebookSectionSelector.tsx",
-      "src/components/operations/{SectionFacilitatorPanel,LocalSiteDelegationPanel,SiteStaffingFeedback}.tsx",
-      "src/components/operations/OutboxHealthPanel.tsx",
-      "src/components/operations/SchoolOpeningReviewPanel.tsx",
-      "src/components/learning/SectionGradeFinalization.tsx",
-      "src/components/communication/{NotificationFeed,DeliveryHistory,DeliveryReceiptFacts}.tsx",
-      "src/components/enrollment/NoncreditDeliveryRecoveryPanel.tsx",
-      "src/components/operations/SchoolFamilyDeliveryRecoveryPanel.tsx",
-      "src/components/workflow/recorded-time.tsx",
-      "src/components/field-trips/FieldTripFacts.tsx",
-      "src/components/church/ChurchApplicationConfirmation.tsx",
-      "src/components/enrollment/FirstSchoolDayHandoff.tsx",
-      "src/routes/enrichment.tsx",
-      "src/components/shell/WorkspaceContextSwitcher.tsx",
-      "src/components/shell/{CommandPalette,WorkspaceSearchDialog}.tsx",
-      "src/components/operations/{OpeningHandoffs,ObsoleteExcuseClosure,SectionLifecycleManager}.tsx",
-      "src/components/admissions/AdmissionsInquiryForm.tsx",
-      "src/components/teacher/TeacherConferencePanel.tsx",
-      "src/components/student/LiveSchoolExperiences.tsx",
-      "src/components/learning/GradebookAssessmentComposer.tsx",
-      "src/components/operations/SchoolYearCard.tsx",
-      "src/components/operations/SchoolYearScheduleSetup.tsx",
-      "src/components/operations/SchoolYearScheduleEditor.tsx",
-      "src/components/operations/LaunchRequirementActions.tsx",
-      "src/components/operations/LaunchHostAndProviderFields.tsx",
-      "src/components/operations/LaunchConfigurationForm.tsx",
-      "src/components/operations/LaunchWizardPage.tsx",
-      "src/components/operations/LaunchAcademicSetupWorkspace.tsx",
-      "src/components/operations/{SchoolPreparationNavigation,LaunchCreatedHandoff,LaunchPortfolio}.tsx",
-      "src/components/operations/{LaunchAcademicYearStep,LaunchOpeningTask,LaunchOrientationTask,LaunchTeacherQualificationPolicy,LaunchTaskDestination,OneHourSchoolLaunch,SchoolRoomsSetup}.tsx",
-      // Launch Studio is migrated to canonical UI controls, not route-local native widgets.
-      "src/components/launch-studio/{LaunchStudioShell,LaunchStudioEntry,LaunchFieldHelp,LaunchDraftButton,WebsiteTemplateGallery}.tsx",
-      "src/components/operations/{LaunchWebsiteStep,LaunchWebsiteEditorHandoff,LaunchSchoolModelPicker,LaunchDeliveryModelFields,LaunchProgramIdentityFields}.tsx",
-      "src/routes/launch.{family,staff,student}.tsx",
-      "src/routes/site-website.tsx",
-      "src/components/profiles/{TeacherPolicyRevisions,QualificationCatalog}.tsx",
-      "src/components/workspace/{query-state,directory-table}.tsx",
-      "src/routes/staff.teachers.tsx",
-      "src/routes/operations.teacher-marketplace.tsx",
-      "src/routes/operations.jurisdiction-profiles.tsx",
-      "src/routes/guardian.admission-offers.tsx",
+    files: ["src/**/*.{tsx,jsx}"],
+    ignores: [
+      "src/components/ui/**/*.{tsx,jsx}",
+      "src/**/*.stories.{tsx,jsx}",
+      "src/**/*.test.{tsx,jsx}",
+      "src/**/*.spec.{tsx,jsx}",
     ],
     rules: {
-      "no-restricted-syntax": ["error", {
-        selector: "JSXOpeningElement[name.name=/^(button|input|select|textarea|label)$/]",
-        message: "Use the canonical Button, Input, Select, Textarea, or Label primitive.",
-      }],
+      "can-os-design/no-native-feature-controls": "error",
+      "can-os-design/no-native-feature-tables": "warn",
+      // Existing unmatched form layouts remain visible as warnings while
+      // consolidated flows are protected with a stricter scoped rule below.
+      "can-os-design/no-duplicate-form-actions": "warn",
     },
   },
-  // Shared workspace, workflow and evidence families must use canonical controls.
   {
-    files: ["src/components/{workspace,workflow,evidence}/**/*.tsx"],
-    ignores: ["src/components/{workspace,workflow,evidence}/**/*.stories.tsx", "src/components/{workspace,workflow,evidence}/**/*.test.tsx"],
-    rules: {
-      "no-restricted-syntax": ["error", {
-        selector: "JSXOpeningElement[name.name=/^(button|input|select|textarea|label)$/]",
-        message: "Shared components must use V6.1 Button, Field, Input, Select or Textarea.",
-      }],
-    },
+    files: [
+      "src/components/**/*Form.tsx",
+      "src/components/learning/{ClassVideoUploadForm,ClassSupplementForm}.tsx",
+      "src/components/operations/{ExtendedSeasonDraftForm,LaunchConfigurationForm}.tsx",
+      "src/components/admissions/{FamilyInvitationForm,AdmissionsInquiryForm}.tsx",
+      "src/components/enrollment/EnrollmentForm.tsx",
+      "src/components/learning/{ClassCreationRequestForm,TeacherStudentGoalForm}.tsx",
+      "src/components/admissions/AdmissionsGuardianActions.tsx",
+      "src/components/operations/SchoolRoomsSetup.tsx",
+      "src/routes/{messages,guardian.enrichment,guardian.health,platform}.tsx",
+      "src/routes/operations.{family-alerts,curriculum,field-trips}.tsx",
+      "src/routes/operations.interest-events.tsx",
+      "src/components/launch-studio/{EstablishSiteProfileUnified,PrepareOperationsV61,NativeOfferingAdoptionReviewPanel,ProgramDiscoveryPanel}.tsx",
+    ],
+    rules: { "can-os-design/no-duplicate-form-actions": "error" },
+  },
+  {
+    // Report tables already consolidated under the V6.1 primitives.
+    files: [
+      "src/components/enrollment/NoncreditNetworkReportPanel.tsx",
+      "src/components/reports/{NativeClassReportPanel,NoncreditProviderEvidencePanel}.tsx",
+      "src/components/learning/NoncreditPilotOutcomesPanel.tsx",
+      "src/components/workflow/user-flow-map.tsx",
+      "src/routes/canonical.lab.impact.tsx",
+      "src/routes/student.assignments_.$assessmentId.tsx",
+      "src/routes/teacher.gradebook.tsx",
+    ],
+    rules: { "can-os-design/no-native-feature-tables": "error" },
   },
   ...storybook.configs["flat/recommended"],
 );

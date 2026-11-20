@@ -1,70 +1,82 @@
 import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 
-const files = [
+/**
+ * Enforcement is directory-wide rather than an ever-growing manifest of
+ * feature filenames. Every current and future feature gets the same contract.
+ */
+const featureSurfaces = [
+  "src/routes/launch.site.tsx",
+  "src/routes/class.tsx",
   "src/components/learning/ClassCreationRequestForm.tsx",
-  "src/components/workspace/site-program-fields.tsx",
-  "src/components/workspace/local-datetime-field.tsx",
-  "src/components/evidence/FileSelectionField.tsx",
+  "src/components/operations/LaunchWizardPage.tsx",
+  "src/components/launch-studio/EstablishSiteProfileUnified.tsx",
+  "src/components/admissions/AdmissionsInquiryForm.tsx",
+  "src/components/shell/WorkspaceSidebar.tsx",
+  "src/components/workspace/form-page.tsx",
+  "src/components/workflow/guided-setup-shell.tsx",
   "src/components/evidence/EvidencePicker.tsx",
-  "src/components/workspace/empty-state.tsx",
-  "src/components/workflow/WorkflowPrerequisites.tsx",
-  "src/components/learning/GradebookSectionSelector.tsx",
-  "src/components/shell/WorkspaceContextSwitcher.tsx",
-  "src/components/launch-studio/LaunchStudioShell.tsx",
-  "src/components/launch-studio/LaunchStudioEntry.tsx",
-  "src/components/launch-studio/LaunchFieldHelp.tsx",
-  "src/components/launch-studio/LaunchDraftButton.tsx",
-  "src/components/launch-studio/WebsiteTemplateGallery.tsx",
-  "src/components/operations/LaunchWebsiteStep.tsx",
-  "src/components/operations/LaunchWebsiteEditorHandoff.tsx",
-  "src/components/operations/LaunchSchoolModelPicker.tsx",
-  "src/components/operations/LaunchDeliveryModelFields.tsx",
-  "src/components/operations/LaunchProgramIdentityFields.tsx",
-  "src/components/operations/SchoolPreparationNavigation.tsx",
-  "src/components/operations/LaunchCreatedHandoff.tsx",
-  "src/components/operations/LaunchPortfolio.tsx",
-  "src/components/operations/LaunchAcademicYearStep.tsx",
-  "src/components/operations/LaunchOpeningTask.tsx",
-  "src/components/operations/SectionFacilitatorPanel.tsx",
-  "src/components/operations/LocalSiteDelegationPanel.tsx",
-  "src/components/operations/SiteStaffingFeedback.tsx",
-  "src/components/operations/OutboxHealthPanel.tsx",
-  "src/components/operations/SchoolOpeningReviewPanel.tsx",
-  "src/components/learning/SectionGradeFinalization.tsx",
-  "src/components/communication/NotificationFeed.tsx",
-  "src/components/communication/DeliveryHistory.tsx",
-  "src/components/communication/DeliveryReceiptFacts.tsx",
-  "src/components/enrollment/NoncreditDeliveryRecoveryPanel.tsx",
-  "src/components/operations/SchoolFamilyDeliveryRecoveryPanel.tsx",
-  "src/components/field-trips/FieldTripFacts.tsx",
-  "src/components/church/ChurchApplicationConfirmation.tsx",
-  "src/components/enrollment/FirstSchoolDayHandoff.tsx",
-  "src/routes/enrichment.tsx",
-  "src/components/operations/LaunchOrientationTask.tsx",
-  "src/components/operations/LaunchTeacherQualificationPolicy.tsx",
-  "src/components/operations/LaunchTaskDestination.tsx",
-  "src/components/operations/OneHourSchoolLaunch.tsx",
-  "src/components/operations/SchoolRoomsSetup.tsx",
-  "src/routes/launch.family.tsx",
-  "src/routes/launch.staff.tsx",
-  "src/routes/launch.student.tsx",
-  "src/routes/site-website.tsx",
-];
-describe("migrated workflow control reuse", () => {
-  const eslint = new ESLint();
-  it.each(files)("rejects route-local native controls in %s", async filePath => {
+] as const;
+
+const eslint = new ESLint();
+const ownershipErrors = (messages: readonly { ruleId: string | null }[]) =>
+  messages.filter(message => message.ruleId === "can-os-design/no-native-feature-controls");
+
+describe("V6.1 global native-control ownership", () => {
+  it.each(featureSurfaces)("rejects custom native controls in %s", async filePath => {
     const [result] = await eslint.lintText(
-      "export function Example(){return <label>Reason<input/><select/><textarea/><button>Save</button></label>}",
+      "export function Example(){return <><button>Save</button><input/><select/><textarea/><label>Reason</label></>}",
       { filePath },
     );
-    expect(result.messages.filter(message => message.ruleId === "no-restricted-syntax")).toHaveLength(5);
+    expect(ownershipErrors(result.messages)).toHaveLength(5);
   });
-  it("accepts canonical controls", async () => {
+
+  it("permits canonical component composition in every feature", async () => {
     const [result] = await eslint.lintText(
       'import { Button } from "@/components/ui/button"; export function Example(){return <Button>Save</Button>}',
-      { filePath: files[0] },
+      { filePath: featureSurfaces[0] },
     );
-    expect(result.errorCount).toBe(0);
+    expect(ownershipErrors(result.messages)).toHaveLength(0);
+  });
+
+  it("keeps intentional hidden form fields and choice-card labels", async () => {
+    const [result] = await eslint.lintText(
+      'export function Example(){return <><input type="hidden" name="token"/><label><Checkbox name="consent"/>Agree</label><label><Radio name="answer"/>Yes</label></>}',
+      { filePath: featureSurfaces[0] },
+    );
+    expect(ownershipErrors(result.messages)).toHaveLength(0);
+  });
+
+  it("enforces canonical submit rows in migrated modules", async () => {
+    const [result] = await eslint.lintText(
+      'export function Example(){return <form><div className="flex gap-2"><Button type="submit">Save</Button></div></form>}',
+      { filePath: "src/components/admissions/FamilyInvitationForm.tsx" },
+    );
+    const matched = result.messages.filter(message => message.ruleId === "can-os-design/no-duplicate-form-actions");
+    expect(matched).toHaveLength(1);
+    expect(matched[0]?.severity).toBe(2);
+  });
+
+  it("reports unmigrated submit rows as actionable warnings", async () => {
+    const [result] = await eslint.lintText(
+      'export function Example(){return <form><footer><Button type="submit">Save</Button></footer></form>}',
+      { filePath: "src/components/learning/LearningQuestionnaire.tsx" },
+    );
+    const matched = result.messages.filter(message => message.ruleId === "can-os-design/no-duplicate-form-actions");
+    expect(matched).toHaveLength(1);
+    expect(matched[0]?.severity).toBe(1);
+  });
+
+  it("allows native HTML only inside canonical UI primitive implementations", async () => {
+    const [primitive] = await eslint.lintText(
+      'export function Example(){return <button type="button">Save</button>}',
+      { filePath: "src/components/ui/button.tsx" },
+    );
+    const [feature] = await eslint.lintText(
+      'export function Example(){return <button type="button">Save</button>}',
+      { filePath: "src/components/learning/ClassCreationRequestForm.tsx" },
+    );
+    expect(ownershipErrors(primitive.messages)).toHaveLength(0);
+    expect(ownershipErrors(feature.messages)).toHaveLength(1);
   });
 });

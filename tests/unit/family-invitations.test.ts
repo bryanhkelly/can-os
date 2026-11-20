@@ -85,6 +85,17 @@ describe("family invitation recipient review", () => {
       confirmed: false,
     }).success).toBe(false);
   });
+
+  it("rejects CRLF header injection in the shared email subject",()=>{
+    const valid={
+      requestId:requestOne,programId:keyTwo,rawContacts:"first@example.test",
+      subject:"Welcome families",introduction:"We are exploring learning opportunities.",
+      confirmed:true as const,purpose:"interest" as const,
+    };
+    expect(familyInvitationSendInput.safeParse(valid).success).toBe(true);
+    expect(familyInvitationSendInput.safeParse({...valid,subject:"Welcome\nBcc: outside@example.test"}).success).toBe(false);
+    expect(familyInvitationSendInput.safeParse({...valid,subject:"Welcome\rBcc: outside@example.test"}).success).toBe(false);
+  });
 });
 
 describe("family invitation outbox retry and status behavior", () => {

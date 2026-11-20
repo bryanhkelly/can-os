@@ -66,7 +66,6 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
           eq(learnerCourseAttempts.deploymentId,cls.deploymentId),
           eq(learnerCourseAttempts.courseVersionId,cls.courseVersionId),
           isNull(learnerCourseAttempts.sectionId),
-          isNull(learnerCourseAttempts.noncreditRegistrationId),
           isNull(learnerCourseAttempts.enrollmentId),
           eq(learnerCourseAttempts.status,"active"))).limit(1);
       if(!attempt)throw new AuthorizationError("exact native Course Attempt provenance");

@@ -8,6 +8,7 @@ import { sites, sitePublications } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { writeAudit } from "@/platform/mutation";
 import { ensureExistingSitePublicationDraftForLaunch } from "@/modules/sites/site-public-provisioning.server";
@@ -37,19 +38,38 @@ export const saveSiteLaunchPreferences = createServerFn({method:"POST"})
       if(!address)await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:site.id,organizationId:site.organizationId,slug:site.slug,
       });
+      if(data.preferences.planningVersion === 2)
+        throw new Error("V6.1 Site planning requires the revision-aware Programs & Audiences command.");
       const previous=site.metadata.launchPreferences;
-      if(JSON.stringify(previous)===JSON.stringify(data.preferences))
+      const current=previous == null ? null : siteLaunchPreferencesSchema.parse(previous);
+      // The older command has no expected revision; never let it mutate a V2
+      // record that is now governed by the revision-aware Site planning writer.
+      if(current?.planningVersion === 2)
+        throw new Error("Use the current Programs & Audiences editor to update Site planning.");
+      // Keep the V6.1 planning dimensions even if an older consumer submits
+      // only delivery + interests. Focus cannot reference a removed interest.
+      const interestIds=data.preferences.interestIds;
+      const focus=data.preferences.startingFocus ?? current?.startingFocus ?? null;
+      const next=siteLaunchPreferencesSchema.parse({
+        ...current,...data.preferences,
+        interestIds,
+        planningVersion:data.preferences.planningVersion ?? current?.planningVersion,
+        timingIds:data.preferences.timingIds ?? current?.timingIds,
+        audienceIds:data.preferences.audienceIds ?? current?.audienceIds,
+        startingFocus:focus && interestIds.includes(focus) ? focus : null,
+      });
+      if(JSON.stringify(previous)===JSON.stringify(next))
         return {siteId:site.id,updated:false};
       const [updated]=await tx.update(sites).set({
-        metadata:{...site.metadata,launchPreferences:data.preferences},
-        updatedAt:new Date(),
+        metadata:{...site.metadata,launchPreferences:next},
+        updatedAt:nextSiteConfigurationRevision(site.updatedAt),
       }).where(eq(sites.id,site.id)).returning({id:sites.id});
       if(!updated)throw new Error("Unable to save Site launch preferences");
       await writeAudit(tx,actor,{
         action:"site.launch_preferences.update",entityType:"site",entityId:site.id,
         scope:{siteId:site.id,organizationId:site.organizationId},
         before:{preferences:previous??null},
-        after:{preferences:data.preferences},
+        after:{preferences:next},
       });
       return {siteId:site.id,updated:true};
     });

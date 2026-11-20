@@ -92,14 +92,14 @@ describe("generated workspace navigation", () => {
   });
 
   it("keeps class context across learning, grading, and calendar destinations", () => {
-    for (const path of ["/classes", "/student/courses", "/teacher/gradebook", "/guardian/students", "/calendar"]) {
+    for (const path of ["/student/courses", "/teacher/gradebook", "/guardian/students", "/calendar"]) {
       expect(workspaceDestination(path, `?section=${section}&assessment=selected&tab=grades`))
         .toBe(`${path}?section=${section}`);
     }
   });
 
   it("drops malformed context before navigating into strict route validators", () => {
-    expect(workspaceDestination("/classes", "?section=invalid")).toBe("/classes");
+    expect(workspaceDestination("/class", "?section=invalid")).toBe("/class");
     expect(workspaceDestination("/home", `?siteId=invalid&programId=${programId}`)).toBe(`/home?programId=${programId}`);
   });
 

@@ -10,6 +10,7 @@ import {
   domainEvents,
   programs,
   sites,
+  siteMarketingPackages,
   publicAdmissionsInterests,
   publicFamilyStartRequests,
 } from "@/db/schema";
@@ -40,6 +41,7 @@ import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.s
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { renderFamilyBrandEmail } from "@/domain/school-brand-family";
 import { readSiteFamilyBrand } from "@/modules/sites/site-family-brand.server";
+import { requireSavedSiteBrand } from "@/modules/sites/site-brand.functions";
 import {
   requestPublicFamilyStart,
 } from "./public-family-start.server";
@@ -158,6 +160,11 @@ export async function sendFamilyInvitationBatch(
     assertProgramScope(context, destination.programId);
     if (await isDemoTenantOrganization(destination.organizationId, tx))
       throw new DomainError("FORBIDDEN", "External family outreach is suppressed for demo schools");
+    // Preopening interest is a Launch Studio marketing action. The Site must
+    // have established its real, immutable Brand before any batch is queued.
+    // Application invitations retain their independent institutional gate.
+    if(data.purpose==="interest")
+      await requireSavedSiteBrand(destination.siteId,tx);
 
     const [existing] = await tx.select({
       id: communicationThreads.id,
@@ -173,7 +180,9 @@ export async function sendFamilyInvitationBatch(
 
     if (existing) {
       const metadata = familyInvitationBatchMetadataSchema.parse(existing.metadata);
-      if (existing.subject !== data.subject || !familyInvitationRetryMatches(
+      const sameSource=JSON.stringify(metadata.marketingSource??null)===
+        JSON.stringify(data.marketingSource??null);
+      if (!sameSource || existing.subject !== data.subject || !familyInvitationRetryMatches(
         metadata, data.subject, data.introduction, parsed.contacts.map(contactProjection), data.purpose,
       )) {
         throw new Error("This invitation request was already used with different content");
@@ -184,6 +193,25 @@ export async function sendFamilyInvitationBatch(
         recipientCount: metadata.recipients.length,
         skippedExisting: 0,
       };
+    }
+
+    if(data.marketingSource){
+      if(data.purpose!=="interest")throw new DomainError("FORBIDDEN",
+        "Marketing Package attribution is only valid for preopening interest outreach.");
+      const [packageRecord]=await tx.select({
+        id:siteMarketingPackages.id,
+        revision:siteMarketingPackages.revision,
+        status:siteMarketingPackages.status,
+      }).from(siteMarketingPackages).where(and(
+        eq(siteMarketingPackages.id,data.marketingSource.packageId),
+        eq(siteMarketingPackages.siteId,destination.siteId),
+      )).limit(1);
+      if(!packageRecord || packageRecord.status!=="draft")
+        throw new DomainError("UNAVAILABLE",
+          "The source Marketing Package is unavailable for this Site.");
+      if(packageRecord.revision!==data.marketingSource.packageRevision)
+        throw new DomainError("CONFLICT",
+          "The source Marketing Package changed. Reload the invitation before sending.");
     }
 
     const previousBatches = await tx.select({ metadata: communicationThreads.metadata })
@@ -223,6 +251,7 @@ export async function sendFamilyInvitationBatch(
       destination: data.purpose === "interest" ? "preopening_interest" : "private_platform",
       siteId: destination.siteId,
       introduction: data.introduction,
+      ...(data.marketingSource?{marketingSource:data.marketingSource}:{}),
       status: "queued",
       recipients: contacts.map(contact => ({
         ...contactProjection(contact),
@@ -490,6 +519,7 @@ export async function listFamilyInvitationWorkspace(
         programName,
         subject: batch.subject,
         introduction: batch.metadata.introduction,
+        marketingSource:batch.metadata.marketingSource??null,
         createdAt: batch.createdAt.toISOString(),
         status: batch.metadata.status,
         purpose: batch.metadata.destination === "preopening_interest" ? "interest" as const : "application" as const,
@@ -603,7 +633,7 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   const responseUrl = new URL("/family/interest", origin);
   responseUrl.searchParams.set("invitationBatchId", batchId);
   responseUrl.searchParams.set("invitationRecipientKey", recipient.key);
-  const brand = await readSiteFamilyBrand(school.siteId);
+  const brand = await readSiteFamilyBrand(school.siteId,{requireSavedBrand:true});
   const message = renderFamilyBrandEmail({
     ...brand, introduction: metadata.introduction,
   }, "survey", {

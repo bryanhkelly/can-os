@@ -32,7 +32,7 @@ export function LaunchOrientationTask({ launch, busy, save }: {
       setTimeError(mutationErrorMessage(error, "Unable to suggest an orientation time"));
     }
   }
-  return <form noValidate className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+  return <form noValidate className="mt-4  border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     setAttempted(true);
     if (!title.trim() || !startsAt || !endsAt) return;

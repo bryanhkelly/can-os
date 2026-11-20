@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
+import { auditEvents as sharedAuditEvents } from "@/db/schema";
 import {
-  auditEvents,
   blueprintComponents,
   blueprintConfigurationComponents,
   blueprintConfigurationComponentReferences,
@@ -26,7 +27,7 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
   if (!organizationIds.length) throw new AuthorizationError("Blueprint reviewer Organization scope");
 
   const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const versions = await tx.select({
       configurationId: blueprintConfigurations.id,
@@ -77,11 +78,11 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
           eq(blueprintConfigurationComponents.selectionStatus, "selected"),
         )).orderBy(asc(blueprintComponents.componentKey)),
       tx.select({
-        configurationId: auditEvents.entityId,
-        authorPersonId: auditEvents.actorPersonId,
-      }).from(auditEvents).where(and(
-        inArray(auditEvents.entityId, configurationIds),
-        inArray(auditEvents.eventCode, [
+        configurationId: sharedAuditEvents.resourceId,
+        authorPersonId: sharedAuditEvents.actorPersonId,
+      }).from(sharedAuditEvents).where(and(
+        inArray(sharedAuditEvents.resourceId, configurationIds),
+        inArray(sharedAuditEvents.action, [
           "blueprint.configuration.created",
           "blueprint.configuration.saved",
           "blueprint.configuration.submitted",
@@ -163,5 +164,5 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
           .filter(component => component.versionId === version.versionId)
           .map(({ componentId, key, kind }) => ({ componentId, key, kind })),
       }));
-  });
+  }));
 }

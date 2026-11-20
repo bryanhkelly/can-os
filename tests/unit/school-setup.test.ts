@@ -21,7 +21,12 @@ vi.mock("@/db/client", () => ({
       const tx = {
         execute: vi.fn(),
         select: () => {
-          const query = { from: () => query, where: () => query, limit: async () => state.reads.shift() ?? [] };
+          const query = {
+            from: () => query, where: () => query, for: () => query,
+            limit: async () => state.reads.shift() ?? [],
+            then: (resolve: (value: unknown[]) => unknown, reject?: (error: unknown) => unknown) =>
+              Promise.resolve(state.reads.shift() ?? []).then(resolve, reject),
+          };
           return query;
         },
         insert: (table: Parameters<typeof getTableName>[0]) => ({
@@ -33,7 +38,7 @@ vi.mock("@/db/client", () => ({
         update: (table: Parameters<typeof getTableName>[0]) => ({
           set: (value: Record<string, unknown>) => {
             state.updates.push({ table: getTableName(table), value });
-            return { where: () => ({ returning: async () => [{ id: `${getTableName(table)}-id` }] }) };
+            return { where: () => ({ returning: async () => [{ id: `${getTableName(table)}-id`, ...value }] }) };
           },
         }),
       };
@@ -89,6 +94,13 @@ describe("real school signup validation", () => {
       firstName:"Alex",lastName:"Admin"}).email).toBe("admin@example.org");
     expect(realSchoolSetupSignupSchema.safeParse({name:"Example School",email:"admin@example.demo",
       firstName:"Alex",lastName:"Admin"}).success).toBe(false);
+  });
+  it("accepts an optional responsible Organization name without granting affiliation", () => {
+    expect(realSchoolSetupSignupSchema.parse({name:"Example School", organizationName:"  Grace Community Church  ",
+      email:"admin@example.org",firstName:"Alex",lastName:"Admin"}).organizationName)
+      .toBe("Grace Community Church");
+    expect(realSchoolSetupSignupSchema.safeParse({name:"Example School", organizationName:"A",
+      email:"admin@example.org",firstName:"Alex",lastName:"Admin"}).success).toBe(false);
   });
   it("rejects caller-supplied identity and malformed signup fields", () => {
     expect(realSchoolSetupSignupSchema.safeParse({name:"Example School",email:"admin@example.org",
@@ -163,6 +175,7 @@ describe("verified real-school signup provisioning", () => {
       expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
       organizationId: null, siteId: null, createdAt: now, updatedAt: now,
     } as never;
+    state.reads = [[], [{ personId: null }]];
     await expect(testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now)))
       .resolves.toEqual({ organizationId: "organizations-id", siteId: "sites-id",
         grantId: "account_person_grants-id" });
@@ -170,7 +183,13 @@ describe("verified real-school signup provisioning", () => {
       "organizations", "sites", "people", "account_person_grants", "memberships", "role_assignments",
     ]);
     expect(state.writes.find(row => row.table === "organizations")?.value)
-      .toMatchObject({ type: "christian_school", name: "Example Microschool" });
+      .toMatchObject({ type: "christian_school", name: "Example Microschool",
+        lifecycleStatus: "active" });
+    expect(state.writes.find(row => row.table === "sites")?.value)
+      .toMatchObject({ lifecycleStatus: "planning" });
+    expect(state.updates).toContainEqual(expect.objectContaining({
+      table: "access_accounts", value: expect.objectContaining({ personId: "people-id" }),
+    }));
     expect(state.writes.find(row => row.table === "account_person_grants")?.value)
       .toMatchObject({ accountId: "account-real", role: "site_admin", active: true });
     expect(state.updates).toContainEqual(expect.objectContaining({ table: "school_setup_signups",
@@ -178,6 +197,22 @@ describe("verified real-school signup provisioning", () => {
     expect(state.writes.some(row => ["demo_school_tenants", "programs", "site_publications"].includes(row.table))).toBe(false);
     expect(state.audit).toHaveBeenCalledOnce();
     expect(state.event).toHaveBeenCalledTimes(2);
+  });
+  it("uses the optional Organization name without changing the Site identity", async () => {
+    const now = new Date("2026-11-07T12:00:00Z");
+    const signup = {
+      id: "00000000-0000-4000-8000-000000000001", accountId: "account-real",
+      schoolName: "Valor Learning Center", organizationName: "Grace Community Church",
+      firstName: "Alex", lastName: "Admin",
+      expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
+      organizationId: null, siteId: null, createdAt: now, updatedAt: now,
+    } as never;
+    state.reads = [[], [{ personId: null }]];
+    await testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now));
+    expect(state.writes.find(row => row.table === "organizations")?.value)
+      .toMatchObject({name: "Grace Community Church"});
+    expect(state.writes.find(row => row.table === "sites")?.value)
+      .toMatchObject({name: "Valor Learning Center"});
   });
   it.each(["expired", "consumed"]) ("refuses an %s signup without provisioning records", async condition => {
     const now = new Date("2026-11-07T12:00:00Z");

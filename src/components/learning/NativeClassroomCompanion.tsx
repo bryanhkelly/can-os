@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useLearnerClassroomRooms } from "@/components/learning/useLearnerClassroomRooms";
 import { Link } from "@tanstack/react-router";
 import { FacilitatedLearnerPairing } from "@/components/learning/FacilitatedLearnerPairing";
 import { ClassroomCompanionRoom } from "@/components/learning/ClassroomCompanionRoom";
-import { getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
+import { ClassroomFeedbackPanel } from "@/components/learning/ClassroomFeedbackPanel";
+import { ClassroomConnectionStatus } from "@/components/learning/ClassroomConnectionStatus";
 
 /** The room is only an adjunct to this learner's native Course Attempt.
  * QR possession and client connection confer no attendance, progress, grade
@@ -10,11 +11,7 @@ import { getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learni
 export function NativeClassroomCompanion({courseAttemptId}:{
   courseAttemptId:string;
 }){
-  const rooms=useQuery({
-    queryKey:["native-class-companion",courseAttemptId],
-    queryFn:()=>getLearnerFacilitatedRoom({data:{courseAttemptId}}),
-    staleTime:0,refetchInterval:8000,retry:false,
-  });
+  const rooms=useLearnerClassroomRooms(courseAttemptId);
   return <section className="mt-5 space-y-4" aria-label="My facilitated classroom">
     <header className="border border-border bg-card p-4">
       <h2 className="font-serif text-xl font-semibold">Join your classroom</h2>
@@ -27,11 +24,15 @@ export function NativeClassroomCompanion({courseAttemptId}:{
         Join with classroom QR or code
       </Link>
     </header>
+    <ClassroomConnectionStatus rooms={rooms}/>
     <FacilitatedLearnerPairing courseAttemptId={courseAttemptId}/>
+    <ClassroomFeedbackPanel courseAttemptId={courseAttemptId}/>
+    {rooms.isPending&&<p role="status" className="text-sm">Connecting to your current classroom…</p>}
+    {rooms.isFetching&&!rooms.isPending&&<p role="status" className="text-xs text-muted-foreground">Rechecking current classroom access…</p>}
     {rooms.isError&&<p role="alert" className="text-sm">
       Room activities are unavailable. Confirm your current Class Enrollment.
     </p>}
-    {rooms.data?.rooms.map(room=>
+    {rooms.isSuccess&&rooms.data.rooms.map(room=>
       <ClassroomCompanionRoom key={room.facilitatedSessionId}
         courseAttemptId={courseAttemptId}
         facilitatedSessionId={room.facilitatedSessionId}/>

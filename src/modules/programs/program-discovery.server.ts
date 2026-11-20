@@ -1,6 +1,8 @@
+import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import {
   catalogSites,
   geographicAreas,
@@ -22,6 +24,7 @@ import {
 } from "@/domain/command-context";
 import { programCatalogDatabaseRole } from "@/domain/program-catalog-database-role";
 import { DomainError } from "@/domain/errors";
+import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "@/modules/blueprints/verified-site-planning.server";
 
 const catalogAvailabilityRowSchema = z.object({
   policyVersionId: z.string().uuid(),
@@ -41,10 +44,14 @@ export async function getAvailableOfferings(
   // Fail closed before attempting purpose-specific PostgreSQL roles. The
   // canonical catalog must be explicitly provisioned before it can be exposed
   // through either native Blueprint planning or the legacy School Hub.
-  const databaseRole = programCatalogDatabaseRole(context);
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  if (isCanPlanning && input.subject.kind !== "site") {
+    throw new AuthorizationError("verified CAN planning requires an exact Site");
+  }
+  const databaseRole = isCanPlanning ? null : programCatalogDatabaseRole(context);
 
-  return db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     let geographicAreaId: string | null;
     if (input.subject.kind === "site") {
       if (!context.scope.siteIds?.includes(input.subject.siteId)) {
@@ -56,8 +63,20 @@ export async function getAvailableOfferings(
       }).from(catalogSites)
         .where(eq(catalogSites.id, input.subject.siteId))
         .limit(1);
-      if (!site || site.status === "closed") {
+      if (!site || (isCanPlanning
+        ? !isPrivateCanSitePlanningAllowed(site.status)
+        : !isCanonicalSiteDiscoverable(site.status))) {
         throw new DomainError("UNAVAILABLE", "The selected Site is unavailable for program discovery.");
+      }
+      if (isCanPlanning) {
+        await assertVerifiedCanPlanningSite(tx, context, input.subject.siteId);
+      }
+      // A missing classification is unknown, not a location where an
+      // Offering is supported. Never evaluate jurisdiction-dependent policy
+      // against NULL and inadvertently suggest availability.
+      if (!site.geographicAreaId) {
+        throw new DomainError("UNAVAILABLE",
+          "This Site needs a geographic area classification before Offering availability can be checked.");
       }
       geographicAreaId = site.geographicAreaId;
     } else {
@@ -129,5 +148,5 @@ export async function getAvailableOfferings(
     }));
 
     return projectAvailableOfferings(productRows, availablePolicies);
-  });
+  }));
 }

@@ -16,6 +16,7 @@ import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
+import { resolveSiteGeographicAreaId } from "./site-geographic-area.server";
 import { listOpeningOperators } from "./opening-handoff.server";
 
 import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
@@ -107,6 +108,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
         .select({
           id: s.sites.id,
           organizationId: s.sites.organizationId,
+          lifecycleStatus: s.sites.lifecycleStatus,
           name: s.sites.name,
           slug: s.sites.slug,
           timezone: s.sites.timezone,
@@ -201,7 +203,10 @@ export const startLaunch = createServerFn({ method: "POST" })
 
 /** Programs in pre-active states with their Launch Journey and requirement checklist. */
 export const listLaunches = createServerFn({ method: "GET" })
- .validator((value:unknown)=>z.object({includeActive:z.boolean().optional()}).strict().optional().parse(value))
+ .validator((value:unknown)=>z.object({
+   includeActive:z.boolean().optional(),
+   siteId:z.string().uuid().optional(),
+ }).strict().optional().parse(value))
  .handler(
   async ({data}) => {
     const context = await registrarContext("program.read");
@@ -242,6 +247,7 @@ export const listLaunches = createServerFn({ method: "GET" })
             ...(canReviewerOrganizations.length ? [inArray(s.programs.academicProviderOrganizationId, canReviewerOrganizations.map(org => org.id))] : [])),
           inArray(s.programs.status, data?.includeActive ? ["draft", "launching", "ready", "active"] : ["draft", "launching", "ready"]),
           ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
+          ...(data?.siteId ? [eq(s.programs.siteId, data.siteId)] : []),
           ...(context.scope.programIds?.length
             ? [inArray(s.programs.id, context.scope.programIds)] : []),
           ...(context.scope.siteIds?.length
@@ -582,7 +588,12 @@ export const createLaunchSite = createServerFn({method:"POST"})
       const publicSiteDraft=data.stubOnly ? null : await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:existing.id,organizationId:data.organizationId,slug:existing.slug,
       });
+      const existingPlanning=siteLaunchPreferencesSchema.safeParse(existing.metadata.launchPreferences);
+      // A retried Site-creation command must never overwrite a configured V6.1
+      // Programs & Audiences draft. Editing belongs to the canonical Site command.
       if(data.launchPreferences &&
+         (existing.metadata.launchPreferences == null ||
+           (existingPlanning.success && existingPlanning.data.planningVersion !== 2)) &&
          JSON.stringify(existing.metadata.launchPreferences)!==JSON.stringify(data.launchPreferences)){
         await tx.update(s.sites).set({
           metadata:{...existing.metadata,launchPreferences:data.launchPreferences},
@@ -600,8 +611,9 @@ export const createLaunchSite = createServerFn({method:"POST"})
     throw new Error(`This church already has the site "${existing.name}" (${existing.slug}). Select its saved record and edit it instead of creating another Site.`);
    }
    const createdAt=new Date();
+   const geographicAreaId=await resolveSiteGeographicAreaId(tx,data.address);
    const [site]=await tx.insert(s.sites).values({organizationId:data.organizationId,name:data.name,
-     slug:data.slug,timezone:data.timezone,address:data.address,
+     slug:data.slug,timezone:data.timezone,address:data.address,geographicAreaId,
      siteKind:data.siteKind,lifecycleStatus:"planning",updatedAt:createdAt,
      metadata:{siteIdentityRevision:createdAt.toISOString(),
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),
@@ -619,7 +631,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
     after:{name:data.name,timezone:data.timezone,siteKind:data.siteKind??null,
-      lifecycleStatus:"planning",address:data.address??null,
+      lifecycleStatus:"planning",address:data.address??null,geographicAreaId,
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),stubOnly:Boolean(data.stubOnly)}});
    // Stub creation has no website reservation dependency. The legacy location
    // flow still reserves a private draft, without publishing or issuing grants.

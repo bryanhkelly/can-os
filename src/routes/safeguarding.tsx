@@ -38,7 +38,7 @@ export function SafeguardingHome({ outcome, search }: {
 
   return <WorkspaceShell width="wide" eyebrow="Restricted child safety" title="Safeguarding"
     subtitle={workspace?.mode === "reporter" ? `Report a safety concern at ${workspace.site.name}. This is separate from ordinary student support.` : "Respond only to safeguarding cases explicitly assigned to your verified membership."}>
-    {reloadError && <p role="alert" className="mb-4 rounded-xl border border-danger/50 bg-danger/10 p-3 text-sm">{reloadError}</p>}
+    {reloadError && <p role="alert" className="mb-4  border border-danger/50 bg-danger/10 p-3 text-sm">{reloadError}</p>}
     {workspace?.mode === "reporter" && <SafeguardingReporter workspace={workspace} reload={reload} />}
     {workspace?.mode === "responder" && <SafeguardingResponder workspace={workspace} initialCaseId={search.case} reload={reload} />}
   </WorkspaceShell>;

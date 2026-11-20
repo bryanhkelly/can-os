@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
+import { requireCurriculumDeliveryAccess } from "./curriculum-delivery-access.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { sessionIdleCutoff } from "@/domain/access-tokens";
 import {
@@ -57,6 +58,7 @@ export const startLearningActivitySession = createServerFn({ method: "POST" })
           !readClassContent(section.curriculum)) {
         throw new AuthorizationError("published enrolled class");
       }
+      await requireCurriculumDeliveryAccess(tx, section);
       const [created] = await tx.insert(s.learningActivitySessions).values({
         accessSessionId: actor.sessionId,
         studentProfileId,
@@ -109,18 +111,81 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
       if (!studentProfileId || !section.siteId || section.contentStatus !== "published") {
         throw new AuthorizationError("published enrolled class");
       }
+      await requireCurriculumDeliveryAccess(tx, section);
       const content = readClassContent(section.curriculum);
       if (!content) throw new AuthorizationError("published lesson content");
       const lesson = content.modules.flatMap(module => module.lessons)
         .find(candidate => candidate.id === data.interaction.lessonId);
       if (!lesson) throw new AuthorizationError("published lesson");
-      if (data.interaction.kind === "resource_opened") {
-        const resourceId = data.interaction.resourceId;
-        if (!classResources(content).some(resource =>
-            resource.id === resourceId &&
-            (lesson.resources.some(item => item.id === resource.id) ||
-             content.resources.some(item => item.id === resource.id)))) {
-          throw new AuthorizationError("published lesson resource");
+      if (data.interaction.kind === "resource_opened" ||
+          data.interaction.kind.startsWith("video_")) {
+        const resourceId = "resourceId" in data.interaction ? data.interaction.resourceId : undefined;
+        if (!resourceId) throw new AuthorizationError("published video reference");
+        const publisherResource = classResources(content).find(resource =>
+          resource.id === resourceId &&
+          (lesson.resources.some(item => item.id === resource.id) ||
+           content.resources.some(item => item.id === resource.id)));
+        // Native-video events must refer to a published video, not an
+        // arbitrary resource, and never accept client-supplied learner scope.
+        const publishedVideo = Boolean(publisherResource?.url &&
+          (await import("@/domain/class-video"))
+            .resolveClassVideo(publisherResource.url, false)?.kind === "file");
+        let authorizedSupplement = false;
+        if (!publisherResource || (data.interaction.kind.startsWith("video_") && !publishedVideo)) {
+          const [supplement] = await tx.select({
+            id: s.curriculumOverlays.id,
+            lessonId: s.curriculumOverlays.lessonId,
+            kind: s.curriculumOverlays.kind,
+            url: s.curriculumResources.url,
+          }).from(s.curriculumOverlays)
+            .innerJoin(s.curriculumResources,
+              eq(s.curriculumResources.id, s.curriculumOverlays.resourceId))
+            .where(and(
+              eq(s.curriculumOverlays.resourceId, resourceId),
+              eq(s.curriculumOverlays.sectionId, section.id),
+              eq(s.curriculumOverlays.courseTemplateVersionId, section.versionId),
+              eq(s.curriculumOverlays.status, "active"),
+            )).limit(1);
+          authorizedSupplement = Boolean(supplement &&
+            (!supplement.lessonId || supplement.lessonId === lesson.id) &&
+            supplement.kind === "video" &&
+            supplement.url &&
+            (await import("@/domain/class-video")).resolveClassVideo(supplement.url)?.kind === "file");
+        }
+        // Publisher-pack materials are bound through current adoption and
+        // entitlement, rather than the teacher-owned class overlay table.
+        let authorizedPublisherPack = false;
+        if (!publisherResource && !authorizedSupplement) {
+          const [packResource] = await tx.select({
+            url: s.curriculumResources.url,
+            kind: s.curriculumResources.kind,
+          }).from(s.curriculumAdoptions)
+            .innerJoin(s.curriculumEntitlements, and(
+              eq(s.curriculumEntitlements.packId, s.curriculumAdoptions.packId),
+              eq(s.curriculumEntitlements.organizationId, s.curriculumAdoptions.organizationId),
+              eq(s.curriculumEntitlements.status, "active"),
+            ))
+            .innerJoin(s.curriculumResourceBindings,
+              eq(s.curriculumResourceBindings.packVersionId, s.curriculumAdoptions.packVersionId))
+            .innerJoin(s.curriculumResources,
+              eq(s.curriculumResources.id, s.curriculumResourceBindings.resourceId))
+            .where(and(
+              eq(s.curriculumAdoptions.programId, section.programId),
+              eq(s.curriculumAdoptions.status, "active"),
+              eq(s.curriculumResourceBindings.resourceId, resourceId),
+              or(eq(s.curriculumResourceBindings.courseTemplateVersionId, section.versionId),
+                 isNull(s.curriculumResourceBindings.courseTemplateVersionId)),
+              or(eq(s.curriculumResourceBindings.lessonId, lesson.id),
+                 isNull(s.curriculumResourceBindings.lessonId)),
+            )).limit(1);
+          authorizedPublisherPack = Boolean(packResource?.url &&
+            (await import("@/domain/class-video")).resolveClassVideo(packResource.url)?.kind === "file");
+        }
+        if (data.interaction.kind.startsWith("video_")
+          ? !publishedVideo && !authorizedSupplement && !authorizedPublisherPack
+          : !publisherResource && !authorizedSupplement && !authorizedPublisherPack) {
+          throw new AuthorizationError(data.interaction.kind === "resource_opened"
+            ? "published lesson resource" : "published lesson video");
         }
       }
       const [learningSession] = await tx.select().from(s.learningActivitySessions)
@@ -163,7 +228,7 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
         learningSessionId: learningSession.id, studentProfileId,
         sectionId: section.id, courseTemplateVersionId: section.versionId,
         lessonId: interaction.lessonId,
-        resourceId: interaction.kind === "resource_opened" ? interaction.resourceId : null,
+        resourceId: "resourceId" in interaction ? interaction.resourceId : null,
         kind: interaction.kind, clientEventId: interaction.clientEventId, requestDigest: digest,
         reportedAt: new Date(interaction.occurredAt), receivedAt: now, estimatedActiveMs,
       }).returning({ id: s.learningActivityEvents.id });

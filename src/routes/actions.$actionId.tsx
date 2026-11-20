@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { resolveMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
@@ -37,7 +40,7 @@ function ActionDetailPage() {
       {action.resolutionNote && <div className="mt-5 border-t pt-5"><h3 className="font-semibold">Resolution</h3><p className="mt-2 whitespace-pre-wrap text-sm">{action.resolutionNote}</p></div>}
       {action.resolvedAt && <p className="mt-3 text-sm text-muted-foreground">Resolved {new Date(action.resolvedAt).toLocaleDateString()}</p>}
       {action.canReviewClass && action.sectionId && <nav aria-label="Related academic work" className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
-        <Link to="/classes" search={{ section: action.sectionId }} className="underline">Open class</Link>
+        <Link to="/class"  className="underline">Open class</Link>
         <Link to="/teacher/gradebook" search={{ section: action.sectionId }} className="underline">Review academic work</Link>
         <Link to="/calendar" search={{ section: action.sectionId }} className="underline">View class calendar</Link>
       </nav>}
@@ -70,18 +73,18 @@ function TeacherMissingWorkResolution({actionId}:{actionId:string}) {
       Record the outcome of your outreach or the student's response before resolving.
       This note stays with the canonical Action.
     </p>
-    <label className="mt-4 block text-sm font-semibold">
+    <Label className="mt-4 block text-sm font-semibold">
       Resolution note
-      <textarea value={note} maxLength={1000} rows={3} disabled={busy}
+      <Textarea value={note} maxLength={1000} rows={3} disabled={busy}
         onChange={event=>setNote(event.target.value)}
-        className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+        className="mt-2"
         placeholder="Document the follow-up outcome"/>
-    </label>
-    <button type="button" disabled={busy||note.trim().length<5}
+    </Label>
+    <Button variant="default" type="button" disabled={busy||note.trim().length<5}
       onClick={()=>void resolve()}
-      className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">
+      className="mt-3">
       Resolve follow-up
-    </button>
+    </Button>
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Resolving follow-up..."/>
   </section>;
 }

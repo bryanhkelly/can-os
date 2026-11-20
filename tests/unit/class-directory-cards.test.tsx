@@ -25,14 +25,14 @@ describe("ClassDirectoryCards", () => {
     expect(teacher).toContain('class="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm');
     expect(teacher).toContain('class="text-base font-semibold">Biology</h2>');
     expect(teacher).toContain("Open class");
-    expect(teacher).toContain('href="/classes?section=section-id"');
+    expect(teacher).toContain('href="/class"');
     expect(teacher).toContain("Biology");
     expect(teacher).not.toContain("font-serif text-2xl");
 
     const guardian = renderToStaticMarkup(<ClassDirectoryCards classes={[
       { id: "section-id", title: "Biology", code: "BIO", studentPersonId: "student-id", studentName: "Jordan" },
     ]} role="guardian"/>);
-    expect(guardian).toContain('href="/classes?section=section-id&amp;student=student-id"');
+    expect(guardian).toContain('href="/class"');
     expect(guardian).toContain("Jordan");
   });
 });

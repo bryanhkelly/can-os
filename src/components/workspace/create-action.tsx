@@ -1,7 +1,6 @@
-import { Slot, Slottable } from "@radix-ui/react-slot";
 import { Plus } from "lucide-react";
-import type { ReactElement } from "react";
-import { buttonVariants } from "@/components/ui/button";
+import { cloneElement, type ReactElement, type ReactNode } from "react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,10 +9,12 @@ import { cn } from "@/lib/utils";
  * dedicated create page) or `<button>`.
  */
 export function CreateAction({ children, className }: { children: ReactElement; className?: string }) {
-  return <Slot data-create-action="" className={cn(buttonVariants({ size: "lg" }), "can-create-action", className)}>
-    <Plus aria-hidden="true" />
-    <Slottable>{children}</Slottable>
-  </Slot>;
+  // The canonical Button owns visual treatments and link-style semantics.
+  // Preserve the Link/button's original navigation and event props.
+  const child = children as ReactElement<{ children?: ReactNode }>;
+  return <Button asChild size="lg" data-create-action="" className={cn("can-create-action", className)}>
+    {cloneElement(child, undefined, <><Plus aria-hidden="true" />{child.props.children}</>)}
+  </Button>;
 }
 
 /** Secondary header navigation next to a CreateAction; never styled as primary. */

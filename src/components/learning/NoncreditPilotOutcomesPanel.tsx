@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState } from "@/components/workspace";
@@ -26,7 +27,7 @@ export function NoncreditPilotOutcomesPanel(){
           registrations. Learning, feedback and completion are tracked per registration.
         </p>
         {report&&<p className="text-xs text-muted-foreground">
-          Registration cohort: {report.from.slice(0,10)} through {report.to.slice(0,10)} (UTC).
+          Reporting period: {report.from.slice(0,10)} through {report.to.slice(0,10)} (UTC).
         </p>}
       </div>
       <Button type="button" size="sm" variant="outline" disabled={query.isFetching}
@@ -70,24 +71,24 @@ export function NoncreditPilotOutcomesPanel(){
           proof of verified participation minutes.
         </p>
       </div>
-      {!!report?.byTraining.length&&<div className="overflow-x-auto border border-border bg-card">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
-            <tr><th className="p-3" scope="col">Training</th>
-              <th className="p-3" scope="col">Registered</th>
-              <th className="p-3" scope="col">Engaged</th>
-              <th className="p-3" scope="col">Passed</th>
-              <th className="p-3" scope="col">Completed</th></tr>
-          </thead>
-          <tbody>{report.byTraining.map(item=>
-            <tr key={item.trainingVersionId} className="border-b last:border-b-0">
-              <th scope="row" className="p-3 font-medium">{item.title}</th>
-              <td className="p-3 tabular-nums">{count(item.summary.registrations)}</td>
-              <td className="p-3 tabular-nums">{count(item.summary.engagedParticipants)}</td>
-              <td className="p-3 tabular-nums">{count(item.summary.knowledgeCheckPasses)}</td>
-              <td className="p-3 tabular-nums">{count(item.summary.confirmedNoncreditCompletions)}</td>
-            </tr>)}</tbody>
-        </table>
+      {!!report?.byTraining.length&&<div className="border border-border bg-card">
+        <Table scrollLabel="Training participation and outcome counts" aria-label="Training participation and outcome counts" className="w-full text-left text-sm"><TableCaption className="sr-only">Training participation and outcome counts</TableCaption>
+          <TableHeader className="border-b bg-muted/40 text-xs text-muted-foreground">
+            <TableRow><TableHead className="p-3" scope="col">Training</TableHead>
+              <TableHead className="p-3" scope="col">Registered</TableHead>
+              <TableHead className="p-3" scope="col">Engaged</TableHead>
+              <TableHead className="p-3" scope="col">Passed</TableHead>
+              <TableHead className="p-3" scope="col">Completed</TableHead></TableRow>
+          </TableHeader>
+          <TableBody>{report.byTraining.map(item=>
+            <TableRow key={item.trainingVersionId} className="border-b last:border-b-0">
+              <TableRowHead  className="p-3 font-medium">{item.title}</TableRowHead>
+              <TableCell className="p-3 tabular-nums">{count(item.summary.registrations)}</TableCell>
+              <TableCell className="p-3 tabular-nums">{count(item.summary.engagedParticipants)}</TableCell>
+              <TableCell className="p-3 tabular-nums">{count(item.summary.knowledgeCheckPasses)}</TableCell>
+              <TableCell className="p-3 tabular-nums">{count(item.summary.confirmedNoncreditCompletions)}</TableCell>
+            </TableRow>)}</TableBody>
+        </Table>
       </div>}
       <p className="text-xs text-muted-foreground">
         Internal access is provider-scoped. Separate publication-safe outputs

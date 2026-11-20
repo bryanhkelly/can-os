@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -85,16 +88,16 @@ function ObjectiveAssessmentPublications(){
         publisher permission.
       </p>}
       {queue.data&&<>
-        <label htmlFor="assessment-publication-version" className="mt-4 block text-sm font-semibold">
+        <Label htmlFor="assessment-publication-version" className="mt-4 block text-sm font-semibold">
           Approved candidate
-        </label>
-        <select id="assessment-publication-version" value={selected}
+        </Label>
+        <Select id="assessment-publication-version" value={selected}
           onChange={e=>{setSelected(e.target.value);setConfirmed(false);setError("");setNotice("");}}
-          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          className="mt-2 min-h-11">
           <option value="">Select an assessment draft</option>
           {queue.data.versions.map(x=><option key={x.assessmentVersionId}
             value={x.assessmentVersionId}>{x.title} · {x.questionCount} questions</option>)}
-        </select>
+        </Select>
         {queue.data.versions.length===0&&<p className="mt-3 text-sm text-muted-foreground">
           No draft assessments in the current publisher's organization.
         </p>}
@@ -141,12 +144,12 @@ function ObjectiveAssessmentPublications(){
         A rejection or newer incomplete decision blocks release. See the
         independent review workspace to complete the missing decisions.
       </p>}
-      <label className="mt-5 flex items-start gap-3 border-t border-border pt-4 text-sm">
-        <input type="checkbox" checked={confirmed} disabled={!ready||busy}
+      <Label className="mt-5 flex items-start gap-3 border-t border-border pt-4 text-sm">
+        <Checkbox checked={confirmed} disabled={!ready||busy}
           onChange={e=>setConfirmed(e.target.checked)} className="mt-1"/>
         I understand that publishing makes canonical content immutable.
         It does not activate a local Class or permit self-awarded completion.
-      </label>
+      </Label>
       <Button type="button" className="mt-4" disabled={!ready||!confirmed||busy}
         onClick={()=>void publish()}>
         {busy?"Publishing approved versions…":"Publish approved assessment"}

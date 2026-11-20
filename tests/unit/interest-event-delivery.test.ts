@@ -39,7 +39,7 @@ describe("interest event delivery schedule", () => {
       endsAt: new Date("2027-01-15T19:00:00.000Z"),
       now: new Date("2027-01-01T00:00:00.000Z"),
     });
-    expect(calendar).toContain("METHOD:PUBLISH\r\n");
+    expect(calendar).toContain("METHOD:REQUEST\r\n");
     expect(calendar).toContain("DTSTART:20270115T180000Z\r\n");
     expect(calendar).toContain("SUMMARY:Open house\\, families\\; all welcome\r\n");
     expect(calendar).toContain("DESCRIPTION:Meet the team\\nBring questions\r\n");

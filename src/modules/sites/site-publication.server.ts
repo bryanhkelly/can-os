@@ -1,3 +1,8 @@
+import { readSavedBrandVersion } from "./site-brand.functions";
+import { assertSiteBrandMediaRights } from "@/domain/site-brand";
+import { siteBrandPresentationIdentity } from "@/domain/site-brand";
+import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-local-content";
+import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { db } from "@/db/client";
 import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sites } from "@/db/schema";
@@ -99,6 +104,13 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     readAcademicProgramCatalog(site.id),
     readCurrentLocalContent(site.id),
   ]);
+  const brand=await readSavedBrandVersion(site.id);
+  const templateId=resolveSiteTemplateId(localCopy?.content.branding?.templateId);
+  const websiteCopy=brand
+    ? {...normalizeSiteLocalContent(localCopy?.content??emptySiteLocalContent),
+        branding:siteBrandPresentationIdentity(brand.resolved,templateId)}
+    : localCopy?.content??null;
+  const displayName=brand?.resolved.displayName??site.name;
   const publicOfferings = publishedOfferings.map(toPublicSiteEnrichment);
   const approvedPhotos=address[0] ? await readApprovedSchoolSitePhotos(site.id) : [];
   const media=address[0] ? projectApprovedSchoolSiteMedia(site.id,publicSiteHost(address[0].slug),approvedPhotos) : {};
@@ -110,9 +122,9 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   const authorizedPrograms=withVerifiedPublicApplications(approvedAcademicListings,
     parentExtras.admissions);
   const parentInformation = projectApprovedParentInformation({
-    site: {name: site.name, organizationName: site.organizationName},
+    site: {name: displayName, organizationName: site.organizationName},
     academicPrograms: authorizedPrograms, offerings: publicOfferings,
-    localContent: localCopy?.content ?? null, ...parentExtras,
+    localContent: websiteCopy, ...parentExtras,
   });
   // Institutional publishing preview must use the exact published-channel
   // configuration and approved Course/Class feeds as the anonymous Site.
@@ -136,9 +148,9 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   const publisherPreview = address[0] ? withIllustrativeLocalPreview({
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host: publicSiteHost(address[0].slug),
-    site: {name: site.name, organizationName: site.organizationName},
+    site: {name: displayName, organizationName: site.organizationName},
     academicPrograms: authorizedPrograms,
-    localContent: localCopy?.content ?? null,
+    localContent: websiteCopy,
     offerings: publicOfferings,
     parentInformation,
     media,noncreditReleases,enrollmentAppOrigin,
@@ -331,11 +343,27 @@ export async function changeSitePublicationWithinTransaction(
     // This queries the canonical published Seasons inside the same transaction.
     // Unpublishing is never prevented by empty or expired offerings.
     // Keep queries sequential on the same transactional connection.
-    const needsReadiness = input.action === "publish" && current.status === "draft";
+    const needsReadiness = (input.action === "publish" && current.status === "draft") ||
+      (input.action === "republish" && current.status === "published");
     const enrichmentListings = needsReadiness ? await readEnrichmentCatalog(site.id, tx) : [];
     const academicListings = needsReadiness ? await readAcademicProgramCatalog(site.id, tx) : [];
     const eligibleCount = enrichmentListings.length + academicListings.length;
-    const local = needsReadiness && actor.role === "site_admin" ? await readCurrentLocalContent(site.id, tx) : null;
+    // Site-level publication may rely on reviewed Site-owned website copy
+    // even before academic Offerings exist. The caller still needs its own
+    // explicit institutional publishing authority; local copy is never an
+    // enrollment or accreditation approval.
+    const local = needsReadiness ? await readCurrentLocalContent(site.id, tx) : null;
+    const [currentBrand]=needsReadiness ? await tx.select({
+      id:sites.currentBrandVersionId,
+    }).from(sites).where(eq(sites.id,site.id)).for("update").limit(1) : [];
+    if(needsReadiness&&!currentBrand?.id)
+      throw new DomainError("UNAVAILABLE","Save your Site Brand before publishing the website.");
+    if(needsReadiness && currentBrand?.id){
+      const brand=await readSavedBrandVersion(site.id,currentBrand.id,tx);
+      if(!brand || !assertSiteBrandMediaRights(brand.resolved.logo) ||
+          !assertSiteBrandMediaRights(brand.resolved.hero))
+        throw new DomainError("FORBIDDEN","Complete Brand media rights and consent before publication.");
+    }
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
       reason: input.reason, contentReviewed: input.contentReviewed,
@@ -347,23 +375,33 @@ export async function changeSitePublicationWithinTransaction(
         updatedAt: decision.updatedAt.toISOString(), changed: false };
     }
 
+    const layoutId=local?.content.branding?.templateId??"heritage";
     const [updated] = await tx.update(sitePublications).set({
       status: decision.status, publishedAt: decision.publishedAt,
       updatedAt: decision.updatedAt,
+      ...(needsReadiness&&currentBrand?.id?{
+        brandVersionId:currentBrand.id,
+        websiteContentRevision:local?.revision??null,
+        websiteTemplateId:layoutId,
+        websiteTemplateVersion:1,
+      }:{}),
     }).where(eq(sitePublications.siteId, site.id))
       .returning({ siteId: sitePublications.siteId });
     if (!updated) throw new Error("Site publication update failed");
 
     const scope = { organizationId: site.organizationId, siteId: site.id };
     await writeAudit(tx, actor, {
-      action: input.action === "publish" ? "site.publication.publish" : "site.publication.unpublish",
+      action: input.action === "republish" ? "site.publication.republish" :
+        input.action === "publish" ? "site.publication.publish" : "site.publication.unpublish",
       entityType: "site", entityId: site.id, scope,
       before: { status: current.status, publishedAt: current.publishedAt?.toISOString() ?? null,
         updatedAt: current.updatedAt.toISOString() },
       after: { status: decision.status, publishedAt: decision.publishedAt?.toISOString() ?? null,
         updatedAt: decision.updatedAt.toISOString(), reason: input.reason.trim(),
-        contentReviewed: input.action === "publish" && input.contentReviewed,
-        eligibleOfferingCount: input.action === "publish" ? eligibleCount : null },
+        contentReviewed: input.action !== "unpublish" && input.contentReviewed,
+        eligibleOfferingCount: input.action !== "unpublish" ? eligibleCount : null,
+        brandVersionId:needsReadiness?currentBrand?.id??null:null,
+        websiteContentRevision:needsReadiness?local?.revision??null:null },
     });
     await emitEvent(tx, {
       eventType: input.action === "publish" ? EventTypes.SitePublished : EventTypes.SiteUnpublished,

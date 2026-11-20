@@ -1,8 +1,7 @@
-import { Slot } from "@radix-ui/react-slot";
 import { ActionFooter } from "./action-footer";
 import { useBlocker } from "@tanstack/react-router";
 import { useCallback, useEffect, useId, useRef, type ReactElement, type ReactNode } from "react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** A titled group of related fields on a dedicated create/edit page. */
@@ -33,13 +32,11 @@ export function FormActions({ submitLabel, pendingLabel, pending, disabled, canc
   pendingLabel: string;
   pending: boolean;
   disabled?: boolean;
-  cancel: ReactElement;
+  cancel?: ReactElement | null | false;
 }) {
   return <ActionFooter layout="form">
     <Button type="submit" size="lg" loading={pending} loadingLabel={pendingLabel} disabled={pending || disabled}>{submitLabel}</Button>
-    <Slot className={cn(buttonVariants({ variant: "ghost", size: "lg" }), pending && "pointer-events-none opacity-50")}
-      aria-disabled={pending || undefined} tabIndex={pending ? -1 : undefined}
-      onClickCapture={event => { if (pending) { event.preventDefault(); event.stopPropagation(); } }}>{cancel}</Slot>
+    {cancel && <Button asChild variant="ghost" size="lg" disabled={pending}>{cancel}</Button>}
   </ActionFooter>;
 }
 

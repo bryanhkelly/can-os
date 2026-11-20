@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -97,11 +98,14 @@ export function TeacherStudentGoalReviewForm({
           error={attempted&&!confirmed?"Confirm the evidence and student-safety review.":undefined}>
           <Checkbox checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)} />
         </Field>
-        <Button type="submit" variant="outline" disabled={busy}>
-          {busy ? "Saving…" : "Save teacher-reviewed outcome"}
-        </Button>
       </>}
-      <Button type="button" variant="ghost" size="sm" className="underline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
+      <ActionFooter layout="inline" className="mt-0">
+        {evidence && !!evidence.availableEvidence.length &&
+          <Button type="submit" variant="outline" disabled={busy} loading={busy}
+            loadingLabel="Saving reviewed outcome...">Save teacher-reviewed outcome</Button>}
+        <Button type="button" variant="ghost" size="sm" className="underline"
+          disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
+      </ActionFooter>
       {message && <p role="status" className="text-sm">{message}</p>}
     </form>}
   </div>;

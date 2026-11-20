@@ -1,3 +1,9 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import type { RefreshOutcome } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
@@ -155,20 +161,20 @@ export function FamilyInviteImporter({
   }
 
   if (!workspace) {
-    return <section id="invite-families" className="mt-7 scroll-mt-6 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
+    return <section id="invite-families" className="mt-7 scroll-mt-6  border bg-card p-5 sm:p-7" aria-label="Invite families">
       <h2 className="font-serif text-2xl">Invite families</h2>
       <p role="status" className="mt-3 text-sm text-muted-foreground">Family outreach is unavailable. Launch management remains accessible.</p>
     </section>;
   }
 
-  return <section id="invite-families" className="mt-7 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
+  return <section id="invite-families" className="mt-7  border bg-card p-5 sm:p-7" aria-label="Invite families">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Family outreach · School launch</p>
     <h2 className="mt-2 font-serif text-2xl">Invite families</h2>
     <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} family contacts, preview your message, and queue school outreach. Before opening authorization, families receive an informational email with an optional interest-response link; no application or account is created. Only families who personally request updates are added to the inquiry inbox. Once the school is active and admissions are authorized, invitations use a verified one-time application link. A public website is not required.</p>
 
-    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No authorized school is available for outreach. A draft, launching or ready academic Program can send pre-opening information; application invitations require an active Program with current admissions and school-of-record authorization.</p> : <>
-      <label className="mt-5 block text-sm font-semibold">School outreach destination
-        <select disabled={awaitingVerification} value={selectedProgram?.id ?? ""} onChange={event => {
+    {!programs.length ? <p role="status" className="mt-5  border p-4 text-sm">No authorized school is available for outreach. A draft, launching or ready academic Program can send pre-opening information; application invitations require an active Program with current admissions and school-of-record authorization.</p> : <>
+      <Label className="mt-5 block text-sm font-semibold">School outreach destination
+        <Select disabled={awaitingVerification} value={selectedProgram?.id ?? ""} onChange={event => {
           const program = programs.find(item => item.id === event.target.value);
           setProgramId(event.target.value);
           // Never transfer a pasted family contact list or a confirmed preview
@@ -180,32 +186,32 @@ export function FamilyInviteImporter({
             ? `${program.name} · school launch information`
             : `${program.name} is welcoming families`);
           changed();
-        }} className="mt-2 block w-full rounded-lg border bg-background p-3 font-normal">
+        }} className="mt-2 block w-full  border bg-background p-3 font-normal">
           <option value="">Choose your school outreach destination</option>
           {programs.map(program => <option key={program.id} value={program.id}>{program.name} · {program.purpose === "interest" ? "Pre-opening information" : "Application"}</option>)}
-        </select>
-      </label>
+        </Select>
+      </Label>
       {programId && !selectedProgram && <p role="alert" className="mt-2 text-sm">The previously selected school is no longer eligible for this outreach. Choose another destination and review a new recipient list.</p>}
       {selectedProgram && (selectedProgram.purpose === "interest"
         ? <p className="mt-2 text-xs text-muted-foreground">The school is still preparing to open. The email states that opening has not been authorized and includes an optional request-updates link. Imported contacts are not considered opted in until they submit that form.</p>
         : <p className="mt-2 text-xs text-muted-foreground">After email verification: <a href={selectedProgram.privateApplicationUrl ?? selectedProgram.publishedSiteUrl} target="_blank" rel="noreferrer" className="underline">{selectedProgram.name} family application</a>. Each recipient receives a single-use verification link.</p>)}
 
-      <label className="mt-5 block text-sm font-semibold">Paste families
-        <textarea disabled={awaitingVerification} value={raw} onChange={event => { setRaw(event.target.value); changed(); }}
+      <Label className="mt-5 block text-sm font-semibold">Paste families
+        <Textarea disabled={awaitingVerification} value={raw} onChange={event => { setRaw(event.target.value); changed(); }}
           rows={7} placeholder={"john@example.com\nMary Jones <mary@example.com>\nJane Smith,jane@example.com"}
-          className="mt-2 w-full rounded-xl border bg-background p-3 font-normal" />
-      </label>
-      <label className="mt-4 block text-sm font-semibold">Or upload CSV / text (up to 1 MB)
-        <input type="file" disabled={awaitingVerification} accept=".csv,.txt,text/csv,text/plain" className="mt-2 block w-full text-sm font-normal"
+          className="mt-2 w-full  border bg-background p-3 font-normal" />
+      </Label>
+      <Label className="mt-4 block text-sm font-semibold">Or upload CSV / text (up to 1 MB)
+        <Input type="file" disabled={awaitingVerification} accept=".csv,.txt,text/csv,text/plain" className="mt-2 block w-full text-sm font-normal"
           onChange={event => void loadFile(event.target.files?.[0])} />
-      </label>
+      </Label>
       <div className="mt-5 grid gap-3 sm:grid-cols-3" aria-live="polite">
-        <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{parsed.contacts.length}</strong>Valid contacts</p>
-        <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{parsed.duplicates}</strong>Duplicates removed</p>
-        <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{parsed.issues.length - parsed.duplicates}</strong>Need attention</p>
+        <p className=" border p-3 text-sm"><strong className="block text-2xl">{parsed.contacts.length}</strong>Valid contacts</p>
+        <p className=" border p-3 text-sm"><strong className="block text-2xl">{parsed.duplicates}</strong>Duplicates removed</p>
+        <p className=" border p-3 text-sm"><strong className="block text-2xl">{parsed.issues.length - parsed.duplicates}</strong>Need attention</p>
       </div>
-      {tooMany && <p role="alert" className="mt-3 rounded-lg border border-destructive p-3 text-sm">Reduce this batch to {FAMILY_INVITATION_MAX_RECIPIENTS} valid recipients.</p>}
-      {parsed.contacts.length > 0 && <details className="mt-4 rounded-lg border p-3">
+      {tooMany && <p role="alert" className="mt-3  border border-destructive p-3 text-sm">Reduce this batch to {FAMILY_INVITATION_MAX_RECIPIENTS} valid recipients.</p>}
+      {parsed.contacts.length > 0 && <details className="mt-4  border p-3">
         <summary className="cursor-pointer text-sm font-semibold">Review {parsed.contacts.length} valid recipients</summary>
         <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto" aria-label="Validated family contacts">
           {parsed.contacts.map(contact => <li key={contact.email} className="break-words border-b pb-2 text-sm">
@@ -214,49 +220,49 @@ export function FamilyInviteImporter({
           </li>)}
         </ul>
       </details>}
-      {parsed.issues.length > 0 && <details className="mt-4 rounded-lg border p-3" open>
+      {parsed.issues.length > 0 && <details className="mt-4  border p-3" open>
         <summary className="cursor-pointer text-sm font-semibold">Review skipped rows</summary>
         <ul className="mt-3 space-y-2">{parsed.issues.map(issue => <li key={issue.line} className="break-words text-sm">Line {issue.line}: {issue.reason} — {issue.raw}</li>)}</ul>
       </details>}
       <div className="mt-6 grid gap-4">
-        <label className="text-sm font-semibold">Subject
-          <input disabled={awaitingVerification} value={subject} maxLength={120} onChange={event => { setSubject(event.target.value); changed(); }} className="mt-2 w-full rounded-lg border bg-background p-3 font-normal" />
-        </label>
-        <label className="text-sm font-semibold">Personal introduction
-          <textarea disabled={awaitingVerification} rows={3} value={introduction} maxLength={2000} onChange={event => { setIntroduction(event.target.value); changed(); }} className="mt-2 w-full rounded-lg border bg-background p-3 font-normal" />
-        </label>
+        <Label className="text-sm font-semibold">Subject
+          <Input disabled={awaitingVerification} value={subject} maxLength={120} onChange={event => { setSubject(event.target.value); changed(); }} className="mt-2 w-full  border bg-background p-3 font-normal" />
+        </Label>
+        <Label className="text-sm font-semibold">Personal introduction
+          <Textarea disabled={awaitingVerification} rows={3} value={introduction} maxLength={2000} onChange={event => { setIntroduction(event.target.value); changed(); }} className="mt-2 w-full  border bg-background p-3 font-normal" />
+        </Label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Email uses the approved CAN sender. Application links use the CAN access-mail service; pre-opening notices use the notification delivery service. A typed sender address cannot override either.</p>
-      <button type="button" disabled={awaitingVerification || !selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
+      <Button variant="default" type="button" disabled={awaitingVerification || !selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
         onClick={() => { setPreview(true); setConfirmed(false); }}
-        className="mt-5 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Preview invitation</button>
-      {preview && <div className="mt-6 rounded-xl border p-5" aria-label="Invitation preview">
+        className="mt-5 min-h-11  bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Preview invitation</Button>
+      {preview && <div className="mt-6  border p-5" aria-label="Invitation preview">
         <h3 className="font-semibold">Invitation preview · {parsed.contacts.length} families</h3>
         <p className="mt-2 font-semibold">{subject}</p>
         <p className="mt-4 whitespace-pre-wrap text-sm">{introduction}</p>
         <p className="mt-3 text-sm">{selectedProgram?.purpose === "interest"
           ? "Each message is a pre-opening notice, not an application. It includes an opening-authorization disclaimer and a link where the adult can explicitly request school updates."
           : `Each email includes a single-use, 10-minute link directly to ${selectedProgram?.name}\u0027s verified application.`}</p>
-        <label className="mt-5 flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I reviewed the recipients and message and have a school-approved basis to contact these families.</label>
-        <button type="button" disabled={awaitingVerification || !selectedProgram || !confirmed || busy} onClick={() => void send()}
-          className="mt-4 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving and queueing…" : "Save and queue invitations"}</button>
+        <Label className="mt-5 flex items-start gap-2 text-sm"><Checkbox checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I reviewed the recipients and message and have a school-approved basis to contact these families.</Label>
+        <Button variant="default" type="button" disabled={awaitingVerification || !selectedProgram || !confirmed || busy} onClick={() => void send()}
+          className="mt-4 min-h-11  bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving and queueing…" : "Save and queue invitations"}</Button>
       </div>}
     </>}
 
-    {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    {error && <p role="alert" className="mt-4  border border-destructive p-3 text-sm">{error}</p>}
     <MutationFeedback state={{...mutation,retryRefresh:verifySavedBatch}} className="mt-3"
       pendingMessage="Updating invitation records…"/>
-    {awaitingVerification && !mutation.refreshFailed && <button type="button" disabled={busy}
-      onClick={()=>void verifySavedBatch()} className="mt-3 rounded border px-3 py-2 text-sm font-semibold">
+    {awaitingVerification && !mutation.refreshFailed && <Button variant="outline" type="button" disabled={busy}
+      onClick={()=>void verifySavedBatch()} className="mt-3  border px-3 py-2 text-sm font-semibold">
       Verify saved invitation batch
-    </button>}
-    {result && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{result}</p>}
+    </Button>}
+    {result && <p role="status" className="mt-4  border p-3 text-sm">{result}</p>}
 
     {batches.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-4" aria-label="Family invitation progress">
-      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.length,0)}</strong>Invitation recipients</p>
-      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.interest?.consentedAt).length,0)}</strong>Family opt-ins</p>
-      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.interest?.applicationId || recipient.status==="responded").length,0)}</strong>Admissions responses</p>
-      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.status==="retrying").length,0)}</strong>Recipients needing retry</p>
+      <p className=" border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.length,0)}</strong>Invitation recipients</p>
+      <p className=" border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.interest?.consentedAt).length,0)}</strong>Family opt-ins</p>
+      <p className=" border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.interest?.applicationId || recipient.status==="responded").length,0)}</strong>Admissions responses</p>
+      <p className=" border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.status==="retrying").length,0)}</strong>Recipients needing retry</p>
     </div>}
 
     {batches.length > 0 && <div className="mt-8">
@@ -264,17 +270,17 @@ export function FamilyInviteImporter({
       <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. Pre-opening contacts only become interested leads after the adult submits an explicit request for updates. CAN authorization is still required before a verified application invitation, and a verified link does not establish guardianship.</p>
       <div className="mt-3 space-y-3">{batches.map(batch => {
         const progress = familyInvitationProgress(batch);
-        return <details key={batch.id} className="rounded-xl border p-4">
+        return <details key={batch.id} className=" border p-4">
         <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.purpose === "interest" ? "Pre-opening information" : "Applications"} · {batch.recipients.length} recipients</summary>
         <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {progress.label}</p>
-        {progress.canRetry && <button type="button" disabled={busy || awaitingVerification} onClick={() => void retryFailed(batch.id)}
-          className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+        {progress.canRetry && <Button variant="outline" type="button" disabled={busy || awaitingVerification} onClick={() => void retryFailed(batch.id)}
+          className="mt-3 min-h-11  border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           {busy ? "Queueing retry…" : `Retry ${progress.failedRecipients} failed recipient${progress.failedRecipients === 1 ? "" : "s"}`}
-        </button>}
+        </Button>}
         <ul className="mt-3 space-y-2">{batch.recipients.map(recipient => <li key={recipient.email} className="flex flex-col gap-1 border-b pb-2 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="break-words">{[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "Name not supplied"} · {recipient.email}</span>
           <span className="text-xs text-muted-foreground">{recipientStatus(recipient.status, batch.outboxStatus)}{recipient.respondedAt ? ` · ${new Date(recipient.respondedAt).toLocaleString()}` : ""}</span>
-          {recipient.interest && <div className="mt-2 w-full rounded-lg border bg-muted/30 p-3 text-xs" aria-label="Family relationship progress">
+          {recipient.interest && <div className="mt-2 w-full  border bg-muted/30 p-3 text-xs" aria-label="Family relationship progress">
             <p>Family requested updates · {new Date(recipient.interest.requestedAt).toLocaleString()} · {recipient.interest.status}</p>
             <p className="mt-1">{recipient.interest.contactedAt
               ? `Registrar contacted family · ${new Date(recipient.interest.contactedAt).toLocaleString()}`

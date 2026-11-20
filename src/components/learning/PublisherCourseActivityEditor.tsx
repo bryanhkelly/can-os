@@ -379,7 +379,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
             Response
             <Select value={question.kind} onChange={e=>editFeedback(question.key,{
               kind:e.target.value as "rating"|"text",
-            })} className="mt-1 min-h-11 w-full border border-border bg-background px-2 text-sm">
+            })} className="mt-1 min-h-11">
               <option value="rating">1–5 rating</option>
               <option value="text">Written</option>
             </Select>

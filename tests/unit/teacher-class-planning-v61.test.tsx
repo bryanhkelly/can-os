@@ -38,7 +38,7 @@ describe("V6.1 teacher class planning", () => {
     expect(html).toContain("Outline only");
     expect(html).toContain("1 linked released assignments");
     expect(html).toContain("1/1 learners self-reported complete");
-    expect(html).toContain('href="/classes?section=section-one&amp;tab=lessons&amp;lesson=published-lesson"');
+    expect(html).toContain('href="/class"');
     expect(html).toContain('href="/teacher/gradebook?section=section-one&amp;lesson=published-lesson&amp;kind=classwork"');
     expect(html).toContain('href="/teacher/gradebook?section=section-one&amp;assessment=assessment-one"');
     expect(html).not.toContain("lesson=outline-lesson&amp;kind=classwork");

@@ -24,10 +24,9 @@ const groups = [
     description: "Configure approved educational experiences and the content behind them.",
     icon: Layers3,
     links: [
-      { title: "Blueprint Studio", detail: "Site-based educational blueprints and planning", path: "/canonical/blueprints" },
+      { title: "Solution planning", detail: "Configure CAN-published packages for an authorized Site", path: "/canonical/blueprints" },
       { title: "Blueprint reviews", detail: "Independent approval and review", path: "/canonical/blueprint-reviews" },
-      { title: "Content studio", detail: "Academic content and instructional tracks", path: "/canonical/content" },
-      { title: "Content reviews", detail: "Independent instructional content review", path: "/canonical/content-reviews" },
+      { title: "Classes and content", detail: "Manage authorized Classes and their instructional content", path: "/class" },
     ],
   },
   {
@@ -80,7 +79,7 @@ function CanonicalIndex() {
         </Link>
         <Link to="/canonical/blueprints" className="flex min-h-24 items-center gap-4 border border-border bg-card px-5 py-4 hover:border-primary focus-visible:outline-2 focus-visible:outline-primary">
           <Layers3 aria-hidden="true" className="h-6 w-6 shrink-0 text-primary" />
-          <span className="flex-1"><strong className="block text-sm">Blueprint Studio</strong><span className="mt-1 block text-xs text-muted-foreground">Plan your educational operations</span></span>
+          <span className="flex-1"><strong className="block text-sm">Solution planning</strong><span className="mt-1 block text-xs text-muted-foreground">Configure CAN-published Solutions</span></span>
           <ArrowRight aria-hidden="true" className="h-4 w-4" />
         </Link>
         <Link to="/programs/noncredit/enrollment" className="flex min-h-24 items-center gap-4 border border-border bg-card px-5 py-4 hover:border-primary focus-visible:outline-2 focus-visible:outline-primary">

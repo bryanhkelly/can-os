@@ -6,7 +6,7 @@ import { z } from "zod";
 import { enrichmentConsentContext } from "@/domain/enrichment-consent";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { WorkspaceShell } from "@/components/workspace";
+import { ActionFooter, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -109,7 +109,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
     subtitle="Explore available programs and register your children, whether or not they attend CAN Academy."
     actions={<Link to="/home" >Family home</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family registration..."/>
-    {error && <p role="alert" className="mt-5  border border-red-500 p-3 text-sm">{error}</p>}
+    {error && <p role="alert" className="mt-5  border border-danger/40 p-3 text-sm">{error}</p>}
     <section className="mt-6  border bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold">Your family</h2>
@@ -141,11 +141,11 @@ function EnrichmentFamilyView({ data, seasonId }: {
           <Input value={lastName} maxLength={80} onChange={e => setLastName(e.target.value)}/>
         </Field>
         <Field label="Grade (optional)" className="text-sm"><Input value={gradeLevel} maxLength={20} onChange={e => setGradeLevel(e.target.value)}/></Field>
-        <div className="sm:col-span-3">
-          <Button type="submit" variant="outline" disabled={busy}>
+        <ActionFooter layout="inline" className="mt-0 sm:col-span-3">
+          <Button type="submit" variant="outline" disabled={busy} loading={busy} loadingLabel="Adding child...">
             Add child
           </Button>
-        </div>
+        </ActionFooter>
       </form>}
     </section>
     <section className="mt-8" aria-label="Your enrichment registrations">
@@ -244,7 +244,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
                 Selected total: {usd(quotedPrice)}
                 {requestedWaitlist && " · At least one selection is waitlisted"}
               </p>
-              {packageConflict && <p role="alert" className="mt-2 text-xs text-red-700">
+              {packageConflict && <p role="alert" className="mt-2 text-xs text-danger">
                 These packages have overlapping days. Choose non-overlapping options.
               </p>}
             </fieldset>}

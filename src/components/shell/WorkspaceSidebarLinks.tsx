@@ -37,7 +37,7 @@ export function SidebarLinks({ links, activePath, collapsed = false, onNavigate,
       return <Link key={item.path} to={destination} activeOptions={{ exact: true, includeSearch: false }}
         aria-current={active ? "page" : undefined}
         title={collapsed ? item.title : undefined} onClick={onNavigate}
-        className={`flex items-center gap-3 rounded-lg ${collapsed ? "justify-center px-1" : "px-3"} py-2.5 text-sm font-medium ${focusRingClass} ${
+        className={`flex items-center gap-3  ${collapsed ? "justify-center px-1" : "px-3"} py-2.5 text-sm font-medium ${focusRingClass} ${
           active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
         }`}>
         <Icon className="size-4 shrink-0" aria-hidden="true" /><span className={collapsed ? "sr-only" : undefined}>{item.title}</span>

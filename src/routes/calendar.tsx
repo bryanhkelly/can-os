@@ -1,7 +1,7 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { z } from "zod";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,13 +17,19 @@ import { addCalendarDays, calendarWeekday, dateKeyInTimezone, dateOnlyDayBoundsI
 import { calendarSources, calendarViews, calendarEventDetailsDestination, calendarItemDestination, calendarRecordDestination, filterCalendarItems, type CalendarSource, type CalendarView } from "@/domain/calendar-view";
 import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Modal } from "@/components/ui/modal";
+import { countCalendarInvitees } from "@/domain/calendar-invitees";
+import { CalendarEventComposer } from "@/components/calendar/CalendarEventComposer";
+import { CalendarAgendaList } from "@/components/calendar/CalendarAgendaList";
+import { CalendarWeekGrid } from "@/components/calendar/CalendarWeekGrid";
+import { CalendarMonthGrid } from "@/components/calendar/CalendarMonthGrid";
+import { CalendarEventFactsPanels } from "@/components/calendar/CalendarEventFactsPanels";
+import { CalendarRecordContextPanel } from "@/components/calendar/CalendarRecordContextPanel";
+import { formatTime, formatEventDate, typeLabel } from "@/components/calendar/calendar-presentation";
 
 export const Route = createFileRoute("/calendar")({
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:CalendarView;q?:string}=>({
@@ -42,54 +48,11 @@ type InviteOptions = Awaited<ReturnType<typeof listCalendarInviteOptions>>;
 type InviteGroup = InviteOptions["groups"][number];
 type InviteContact = InviteOptions["contacts"][number];
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function formatTime(iso: string, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(new Date(iso));
-  } catch {
-    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
-  }
-}
-
-function formatEventDate(iso: string, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      timeZone: timezone,
-    }).format(new Date(iso));
-  } catch {
-    return new Intl.DateTimeFormat("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(iso));
-  }
-}
 
 type RevisionInput =
   | { action: "edit"; eventId: string; title: string; description?: string | null }
   | { action: "reschedule"; eventId: string; startsAt: string; endsAt?: string | null }
   | { action: "cancel"; eventId: string };
-
-function typeLabel(item: CalendarFeedItem): string {
-  if (item.source === "assessment") return "Due";
-  if (item.source === "personal") return "Personal";
-  if (item.source === "study_group") return "Study group";
-  if (item.type === "class_time") return "Class time";
-  if (item.type === "chapel") return "Chapel";
-  if (item.type === "field_trip") return "Field trip";
-  if (item.source === "section") return "Section";
-  return "School";
-}
-
-function chipClass(): string {
-  return "border-border bg-muted text-primary";
-}
 
 const MAX_CALENDAR_RANGE_MS = 3 * 24 * 60 * 60 * 1000;
 const CALENDAR_TIMEZONE_PADDING_MS = 14 * 60 * 60 * 1000;
@@ -241,17 +204,6 @@ function CalendarPage() {
     return map;
   }, [periodItems]);
 
-  const cells = useMemo(() => {
-    const first = new Date(year, month - 1, 1);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const blanks = first.getDay();
-    const list: ({ key: string; day: number } | null)[] = [];
-    for (let i = 0; i < blanks; i += 1) list.push(null);
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      list.push({ key: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, day });
-    }
-    return list;
-  }, [year, month]);
 
   const isTeacher = data?.viewerRole === "teacher";
   const isRoomFacilitator = data?.viewerRole === "room_facilitator";
@@ -435,32 +387,7 @@ function CalendarPage() {
   };
 
   const selectedItems = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
-  const groupPeople = new Map<string, { personId: string; name: string; label: string }>();
-  for (const group of inviteGroups) {
-    for (const member of group.members) {
-      const current = groupPeople.get(member.personId);
-      groupPeople.set(member.personId, {
-        personId: member.personId,
-        name: member.name,
-        label: current ? `${current.label}; ${group.title}` : `${group.kind.replaceAll("_", " ")} member · ${group.title}`,
-      });
-    }
-  }
-  const inviteDirectory = new Map(inviteContacts.map(contact => [contact.personId, contact]));
-  for (const [personId, person] of groupPeople) {
-    if (!inviteDirectory.has(personId)) inviteDirectory.set(personId, person);
-  }
-  const normalizedInviteSearch = inviteSearch.trim().toLowerCase();
-  const visibleInvitePeople = [...inviteDirectory.values()].filter(contact =>
-    !normalizedInviteSearch || `${contact.name} ${contact.label}`.toLowerCase().includes(normalizedInviteSearch));
-  const visibleInviteGroups = inviteGroups.filter(group =>
-    !normalizedInviteSearch || group.title.toLowerCase().includes(normalizedInviteSearch) ||
-    group.members.some(member => member.name.toLowerCase().includes(normalizedInviteSearch)));
-  const groupInviteeIds = new Set(inviteGroups.filter(group => inviteGroupIds.includes(group.id))
-    .flatMap(group => group.members.map(member => member.personId)));
-  const selectedInviteeCount = new Set([...groupInviteeIds, ...inviteePersonIds]).size;
-  const selectedInviteeNames = [...inviteDirectory.values()].filter(contact =>
-    inviteePersonIds.includes(contact.personId) && !groupInviteeIds.has(contact.personId));
+  const selectedInviteeCount = countCalendarInvitees(inviteGroups, inviteGroupIds, inviteePersonIds);
   const selectedEvent = selectedItems.find(item => item.id === search.event);
   const assignmentDestination = selectedEvent && calendarItemDestination(selectedEvent, data?.viewerRole);
   const recordDestination = selectedEvent && calendarRecordDestination(selectedEvent, data?.viewerRole);
@@ -507,69 +434,11 @@ function CalendarPage() {
         ? <Link {...assignmentDestination} className="text-sm font-semibold text-primary underline">Open assignment</Link>
         : recordDestination &&
           <Link {...recordDestination} className="text-sm font-semibold text-primary underline">{recordLabel}</Link>}
-      rail={<WorkspacePanel title="Record context" className=" shadow-none">
-        <dl className="space-y-4 text-sm">
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calendar status</dt>
-            <dd className="mt-1">
-              <span className={`inline-flex items-center border px-2 py-1 text-xs font-medium ${selectedEvent.cancelled
-                ? "border-danger/50 bg-danger/10 text-danger"
-                : "border-border bg-muted text-muted-foreground"}`}>
-                {selectedEvent.cancelled ? "Cancelled" : "On calendar"}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event type</dt>
-            <dd className="mt-1">{typeLabel(selectedEvent)}</dd>
-          </div>
-          {selectedEvent.studyGroup && <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study group</dt>
-            <dd className="mt-1">{recordDestination
-              ? <Link {...recordDestination} className="text-primary underline">{selectedEvent.studyGroup.title}</Link>
-              : selectedEvent.studyGroup.title}</dd>
-          </div>}
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time zone</dt>
-            <dd className="mt-1">{selectedEvent.timezone}</dd>
-          </div>
-        </dl>
-      </WorkspacePanel>}
+      rail={<CalendarRecordContextPanel event={selectedEvent}
+        recordDestination={recordDestination} />}
     >
       <div className="mt-6 grid gap-5">
-        <WorkspacePanel title="Event details" description="Schedule and description for this calendar event." className=" shadow-none">
-          <dl className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</dt>
-              <dd className="mt-1 text-sm">{formatEventDate(selectedEvent.startsAt, selectedEvent.timezone)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</dt>
-              <dd className="mt-1 text-sm">{eventTime} <span className="text-muted-foreground">{selectedEvent.timezone}</span></dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</dt>
-              <dd className="mt-1 text-sm">{typeLabel(selectedEvent)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</dt>
-              <dd className="mt-1 text-sm">{selectedEvent.cancelled ? "Cancelled" : "On calendar"}</dd>
-            </div>
-            {!!selectedEvent.teachers?.length && <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {selectedEvent.teachers.length > 1 ? "Teachers" : "Teacher"}
-              </dt>
-              <dd className="mt-1 text-sm">{selectedEvent.teachers.map((teacher, index) => <span key={teacher.personId}>
-                {index > 0 && ", "}<Link to="/profiles" search={{ person: teacher.personId }} className="underline underline-offset-2">{teacher.name}</Link>
-              </span>)}</dd>
-            </div>}
-          </dl>
-        </WorkspacePanel>
-        <WorkspacePanel title="Description" className=" shadow-none">
-          <p className="whitespace-pre-wrap text-sm leading-6">
-            {selectedEvent.description || "No additional description has been provided."}
-          </p>
-        </WorkspacePanel>
+        <CalendarEventFactsPanels event={selectedEvent} eventTime={eventTime}/>
         {selectedEvent.manageable&&<WorkspacePanel title="Manage event" className=" shadow-none">
           {manageMode?.id!==selectedEvent.id&&confirmCancelId!==selectedEvent.id&&<div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"edit")} className="">Edit details</Button>
@@ -671,90 +540,19 @@ function CalendarPage() {
         </div>
 
         <div className={`mt-6 grid gap-6 ${view==="week"?"":"lg:grid-cols-[2fr_1fr]"}`}>
-          {view==="agenda"||view==="day"?<section aria-label={view==="day"?`Events on ${anchorDate}`:"Calendar agenda"} className="border border-border bg-card p-5">
-            <h2 className="font-semibold">{view==="day"?`Agenda · ${formatDateOnly(anchorDate)}`:`Agenda · ${monthLabel}`}</h2>
-            <ul className="mt-4 divide-y">{periodItems.map(item=><li key={item.id} className="py-4">
-              <Link {...itemDestination(item)} className="font-semibold text-primary underline">{item.title}</Link>
-              <p className="mt-1 text-sm text-muted-foreground">{dateKeyInTimezone(item.startsAt,item.timezone)} · {formatTime(item.startsAt,item.timezone)} · {item.timezone} · {typeLabel(item)}{item.cancelled?" · Cancelled":""}</p>
-            </li>)}</ul>
-            {!periodItems.length&&!loading&&<p className="mt-4 text-sm text-muted-foreground">No events match this calendar view.</p>}
-          </section>:view==="week"?<section aria-label="Calendar week" className="grid grid-cols-1 border border-border bg-card md:grid-cols-7">
-            {viewDates.map(day=><section key={day} aria-label={`Events on ${day}`} className="min-w-0 border-b border-border p-3 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-              <h3 className="border-b border-border pb-2 text-sm font-semibold">
-                <Link to="/calendar" search={{...search,view:"day",date:day,event:undefined}} className="text-primary underline">{new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric"}).format(new Date(`${day}T12:00:00Z`))}</Link>
-              </h3>
-              <ul className="divide-y divide-border">{(byDay.get(day)??[]).map(item=><li key={item.id} className="min-w-0 py-3 text-xs">
-                <Link {...itemDestination(item)} className="block break-words font-semibold text-primary underline">{item.title}</Link>
-                <p className="mt-1 break-words text-muted-foreground">{formatTime(item.startsAt,item.timezone)} · {typeLabel(item)}{item.cancelled?" · Cancelled":""}</p>
-              </li>)}</ul>
-              {!byDay.get(day)?.length&&!loading&&<p className="pt-3 text-xs text-muted-foreground">Nothing scheduled.</p>}
-            </section>)}
-          </section>:<>
-          <section aria-label="Calendar agenda" className="border border-border bg-card p-5 md:hidden">
-            <h2 className="font-semibold">Agenda · {monthLabel}</h2>
-            <ul className="mt-4 divide-y">{visibleItems.map(item=><li key={item.id} className="py-4">
-              <Link {...itemDestination(item)} className="font-semibold text-primary underline">{item.title}</Link>
-              <p className="mt-1 text-sm text-muted-foreground">{dateKeyInTimezone(item.startsAt,item.timezone)} · {formatTime(item.startsAt,item.timezone)} · {item.timezone} · {typeLabel(item)}{item.cancelled?" · Cancelled":""}</p>
-            </li>)}</ul>
-            {!visibleItems.length&&!loading&&<p className="mt-4 text-sm text-muted-foreground">No events match this calendar view.</p>}
-          </section>
-          <div className="hidden min-w-0 overflow-x-auto border border-border bg-card p-5 md:block">
-            <div className="min-w-[28rem]">
-            <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {WEEKDAYS.map((day) => <div key={day} className="py-1">{day}</div>)}
-            </div>
-            <div className="mt-1 grid grid-cols-7 gap-1">
-              {cells.map((cell, index) =>
-                cell ? (
-                  <div
-                    key={cell.key}
-                    onClick={(event) => {
-                      if (!(event.target instanceof Element) || !event.target.closest("a, button")) openDay(cell.key);
-                    }}
-                    onDragOver={(event) => {
-                      if (isTeacher) event.preventDefault();
-                    }}
-                    onDrop={(event) => onDrop(event, cell.key)}
-                    className={`min-h-24 cursor-pointer border p-1.5 text-xs ${
-                      selectedDay === cell.key ? "border-primary ring-1 ring-primary" : "border-border"
-                    }`}
-                  >
-                    <Button variant="ghost" size="sm"
-                      id={`calendar-day-${cell.key}`}
-                      type="button"
-                      onClick={() => openDay(cell.key)}
-                      onKeyDown={event=>onCalendarDayKeyDown(event,cell.key)}
-                      tabIndex={selectedDay===cell.key||(!selectedDay&&cell.day===1)?0:-1}
-                      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
-                      className="block h-auto min-h-10 w-full p-0 text-left font-normal"
-                      aria-label={`Select ${cell.key}`}
-                    >
-                      <span className="font-semibold">{cell.day}</span>
-                    </Button>
-                    <span className="mt-1 flex flex-col gap-1">
-                      {(byDay.get(cell.key) ?? []).map((item) => (
-                        <Link
-                          key={item.id}
-                          {...itemDestination(item)}
-                          draggable={isTeacher && item.source === "assessment"}
-                          onDragStart={(event) => onDragStart(event, item)}
-                          title={`${item.cancelled?"Cancelled · ":""}${typeLabel(item)} · ${item.title}`}
-                          className={`block truncate border px-1 py-0.5 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${item.cancelled?"border-danger/50 bg-danger/10 text-danger":chipClass()} ${
-                            isTeacher && item.source === "assessment" ? "cursor-grab" : ""
-                          }`}
-                        >
-                          {item.cancelled?"Cancelled · ":""}{typeLabel(item)} · {item.title}
-                        </Link>
-                      ))}
-                    </span>
-                  </div>
-                ) : (
-                  <div key={`blank-${index}`} className="min-h-24 border border-transparent" />
-                ),
-              )}
-            </div>
-            </div>
-          </div></>}
+          {view==="agenda"||view==="day"?<CalendarAgendaList
+            label={view==="day"?`Events on ${anchorDate}`:"Calendar agenda"}
+            heading={view==="day"?`Agenda · ${formatDateOnly(anchorDate)}`:`Agenda · ${monthLabel}`}
+            items={periodItems} loading={loading} selection={search} />:view==="week"?<CalendarWeekGrid
+             dates={viewDates} byDay={byDay} selection={search} loading={loading}/>:<>
+          <CalendarAgendaList className="md:hidden" label="Calendar agenda"
+            heading={`Agenda · ${monthLabel}`} items={visibleItems}
+            loading={loading} selection={search} />
+          <CalendarMonthGrid year={year} month={month}
+             byDay={byDay} selection={search} selectedDay={selectedDay}
+             canDragDeadlines={isTeacher} onSelectDay={openDay}
+             onDayKeyDown={onCalendarDayKeyDown}
+             onDragStart={onDragStart} onDrop={onDrop}/></>}
 
           <aside className="border border-border bg-card p-5">
             <h3 className="font-semibold">{selectedDay ? `Events on ${selectedDay}` : "Select a day"}</h3>
@@ -840,106 +638,29 @@ function CalendarPage() {
             )}
           </aside>
         </div>
-        <Modal open={composerOpen} onClose={() => { if (!saving) setComposerOpen(false); }}
-          label="Create calendar event" labelledBy="calendar-event-dialog-title" initialFocus={titleInput}
-          className="max-w-4xl" busy={saving} dismissible={!saving}>
-          <form noValidate onSubmit={event => { event.preventDefault(); submitEvent(); }}>
-            <header className="flex items-start justify-between gap-5 border-b border-border px-6 py-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calendar</p>
-                <h2 id="calendar-event-dialog-title" className="mt-1 font-serif text-2xl">Create event</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Add an event and invite people from your authorized address list.</p>
-              </div>
-              <Button type="button" variant="ghost" size="icon" aria-label="Close event composer"
-                disabled={saving} onClick={() => setComposerOpen(false)}><X aria-hidden="true" /></Button>
-            </header>
-            <div className="grid gap-6 p-6 md:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-              <div className="space-y-4">
-                <Field label="Title" required error={eventAttempted && formTitle.trim().length < 3 ? "Enter a title with at least 3 characters." : undefined}>
-                  <Input ref={titleInput} value={formTitle} onChange={event => setFormTitle(event.target.value)}
-                    minLength={3} maxLength={200} placeholder="Add a title" />
-                </Field>
-                <Field label="Description">
-                  <Textarea value={formDescription} onChange={event => setFormDescription(event.target.value)}
-                    maxLength={2000} rows={4} placeholder="Add details" />
-                </Field>
-                <Field label="Date" required error={eventAttempted && !formDate ? "Choose an event date." : undefined}>
-                  <Input type="date" value={formDate} onChange={event => setFormDate(event.target.value)} />
-                </Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Starts" required error={eventAttempted && !formStart ? "Choose a start time." : undefined}>
-                    <Input type="time" value={formStart} onChange={event => setFormStart(event.target.value)} />
-                  </Field>
-                  <Field label="Ends" error={eventAttempted && formEnd && formEnd <= formStart ? "Choose an end after the start." : undefined}>
-                    <Input type="time" value={formEnd} onChange={event => setFormEnd(event.target.value)} />
-                  </Field>
-                </div>
-                <p className="text-xs text-muted-foreground">Times use {viewerTimezone}.</p>
-              </div>
-              <section aria-label="Event invitees" className="min-w-0 border-t border-border pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="font-semibold">Invite people or groups</h3>
-                  <span className="text-sm text-muted-foreground">{selectedInviteeCount} selected</span>
-                </div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">Only people in your role-scoped Global Address List (GAL) and permitted groups appear here. The server verifies selections again when you create the event.</p>
-                <Field label="Search the Global Address List" className="mt-4">
-                  <Input type="search" value={inviteSearch} onChange={event => setInviteSearch(event.target.value)}
-                    placeholder="Search people or groups" />
-                </Field>
-                {(inviteContactsError || inviteGroupsError) && <div className="mt-3 space-y-1">
-                  {inviteContactsError && <p role="alert" className="text-xs text-danger">{inviteContactsError}</p>}
-                  {inviteGroupsError && <p role="alert" className="text-xs text-danger">{inviteGroupsError}</p>}
-                </div>}
-                {loading && <p role="status" className="mt-3 text-sm text-muted-foreground">Loading authorized contacts…</p>}
-                {!loading && <div className="mt-3 max-h-64 space-y-4 overflow-y-auto border-y border-border py-3">
-                  {visibleInviteGroups.length > 0 && <fieldset className="space-y-2">
-                    <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Groups</legend>
-                    {visibleInviteGroups.map(group => <Label key={group.id} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
-                      <Checkbox className="mt-0.5 size-4 accent-primary" checked={inviteGroupIds.includes(group.id)}
-                        onChange={event => setInviteGroupIds(ids => event.target.checked
-                          ? [...ids, group.id] : ids.filter(id => id !== group.id))} />
-                      <span className="min-w-0"><span className="block font-medium">{group.title}</span>
-                        <span className="block text-xs text-muted-foreground">{group.members.length} eligible {group.members.length === 1 ? "member" : "members"}</span></span>
-                    </Label>)}
-                  </fieldset>}
-                  <fieldset className="space-y-2">
-                    <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">People</legend>
-                    {visibleInvitePeople.map(contact => <Label key={contact.personId} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
-                      <Checkbox className="mt-0.5 size-4 accent-primary" checked={inviteePersonIds.includes(contact.personId)}
-                        onChange={event => setInviteePersonIds(ids => event.target.checked
-                          ? [...ids, contact.personId] : ids.filter(id => id !== contact.personId))} />
-                      <span className="min-w-0"><span className="block font-medium">{contact.name}</span>
-                        <span className="block text-xs text-muted-foreground">{contact.label}</span></span>
-                    </Label>)}
-                    {!visibleInvitePeople.length && <p className="text-sm text-muted-foreground">No matching people in your authorized address list.</p>}
-                  </fieldset>
-                  {!visibleInviteGroups.length && !visibleInvitePeople.length && inviteSearch &&
-                    <p className="text-sm text-muted-foreground">No matching people or groups.</p>}
-                </div>}
-                <div className="mt-4">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected guests</h4>
-                  {selectedInviteeCount > 100 && <p role="alert" className="mt-2 text-xs text-danger">Choose no more than 100 people.</p>}
-                  {inviteGroupIds.length > 50 && <p role="alert" className="mt-2 text-xs text-danger">Choose no more than 50 groups.</p>}
-                  {!selectedInviteeCount ? <p className="mt-2 text-sm text-muted-foreground">No invitees selected.</p> : <ul className="mt-2 space-y-1 text-sm">
-                    {inviteGroupIds.map(groupId => {
-                      const group = inviteGroups.find(item => item.id === groupId);
-                      return group ? <li key={group.id} className="flex justify-between gap-2"><span>{group.title}</span><span className="text-xs text-muted-foreground">Group</span></li> : null;
-                    })}
-                    {selectedInviteeNames.map(contact => <li key={contact.personId} className="flex justify-between gap-2"><span>{contact.name}</span><span className="text-xs text-muted-foreground">Person</span></li>)}
-                  </ul>}
-                </div>
-              </section>
-            </div>
-            {error && <p role="alert" className="mx-6 mb-4 border border-danger/50 bg-danger/10 p-3 text-sm">{error}</p>}
-            <MutationFeedback state={mutation} className="px-6 pb-4" pendingMessage="Creating event and sending invitations…" />
-            <footer className="flex flex-wrap justify-end gap-3 border-t border-border px-6 py-4">
-              <Button type="button" variant="outline" disabled={saving} onClick={() => setComposerOpen(false)}>Cancel</Button>
-              <Button type="submit" size="lg" disabled={saving || selectedInviteeCount > 100 || inviteGroupIds.length > 50} className="min-w-40">
-                {saving ? "Creating…" : "Create event"}
-              </Button>
-            </footer>
-          </form>
-        </Modal>
+        <CalendarEventComposer
+          open={composerOpen} busy={saving} attempted={eventAttempted}
+          error={error} mutation={mutation} initialFocus={titleInput}
+          form={{title:formTitle,description:formDescription,date:formDate,
+            start:formStart,end:formEnd,timezone:viewerTimezone}}
+          onFieldChange={(field,value)=>{
+            switch(field){
+              case "title": setFormTitle(value);break;
+              case "description": setFormDescription(value);break;
+              case "date": setFormDate(value);break;
+              case "start": setFormStart(value);break;
+              case "end": setFormEnd(value);break;
+            }
+          }}
+          invitees={{
+            inviteGroups,inviteContacts,inviteGroupsError,inviteContactsError,
+            loading,inviteSearch,setInviteSearch,
+            inviteGroupIds,setInviteGroupIds,inviteePersonIds,setInviteePersonIds,
+          }}
+          selectedInviteeCount={selectedInviteeCount}
+          inviteGroupCount={inviteGroupIds.length}
+          onClose={()=>setComposerOpen(false)}
+          onSubmit={submitEvent}/>
     </WorkspaceShell>
   );
 }

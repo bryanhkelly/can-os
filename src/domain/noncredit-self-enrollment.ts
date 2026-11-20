@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 export const noncreditEnrollCommand = z.object({
   releaseId:z.string().uuid(),
+  classId:z.string().uuid().optional(),
   consentVersion:z.string().min(3).max(80),
   consentSha256:z.string().regex(/^[a-f0-9]{64}$/),
   acceptedConsent:z.literal(true),

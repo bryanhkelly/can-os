@@ -2,6 +2,20 @@
 
 Status: **IN PROGRESS**. Native application routing cut over on November 17, 2026. Academic Section domain retirement is still outstanding.
 
+
+## November 20 feature-branch clean-cutover checkpoint
+
+**Scope:** `feature/launch-studio-v61-clean-cutover-20261118` and isolated Neon validation branch `br-bitter-pine-ar7mjn70` only. Production `main` was not changed by the data reset.
+
+- The user explicitly authorized deleting disposable test academic records. The isolated branch ran `TRUNCATE TABLE public.sections CASCADE`, clearing all dependent academic fixture tables. Post-reset counts: 0 old academic class records, 0 enrollments, 0 assessments, 0 submissions, 0 canonical Classes. The isolated branch retained 9 Sites, 17 organizations, and 142 People. CASCADE truncated entire dependent relations, not just rows filtered to the retired Classes.
+- Removed the duplicate `/classes` application route, the compatibility loader from `/class`, and seven former Class/content/reporting staging redirects. The live Class directory and exact-ID Class workspace remain `/class` and `/class/:classId`. Removed corresponding route contract entries, navigation entries, legacy tests, and source-check requirements.
+- Teacher marketplace UI/backend no longer distinguish sample records from other Site teacher records. Eligibility still requires current provider, staffing, schedule, and capacity authorization.
+- Read-only check of Neon `main` still found 19 old academic records, 178 enrollments, 0 canonical Classes and 0 canonical Class Enrollments. **Do not merge this code into main while those old records remain unaddressed.**
+- Removing route files does **not** mean that every old academic database schema, service, record projection, or seed fixture is fully retired. Complete native Class integration remains separately required.
+- The current Netlify preview is skipped because build usage was exceeded; inspected GitHub jobs reported failure without executable steps or obtainable logs. No successful TypeScript, unit, production build or browser verification is established.
+
+This checkpoint is a branch cleanup report, **not** release approval. If the validation branch must be reused, create new canonical Course, Class, Class Enrollment and Class Session fixtures through their authorized workflows. Do not repopulate the retired model.
+
 ## Non-negotiable target
 - One native Class directory `/class` and one Class workspace `/class/:classId`. No redirects, aliases, legacy dual-writes or continuing school Section records after verified migration.
 - Class references one published Course version, with optional published Class Offering and zero or more dated Sessions. Class Enrollment is the authoritative individual participation; Course Attempt preserves learner activity. Academic credit and official outcomes require independently authorized issuing policy.

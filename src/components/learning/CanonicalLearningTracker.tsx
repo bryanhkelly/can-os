@@ -48,11 +48,13 @@ export function CanonicalLearningActivityProvider({
   const lesson = useRef<string | null>(null);
   const lastInteraction = useRef(Date.now());
   const needsResume = useRef(false);
+  const videoPlaying = useRef(false);
   const operation = useRef<Promise<unknown>>(Promise.resolve());
   const alive = useRef(false);
   const instance = useRef<string | null>(null);
   const pending = useRef<LearningOutboxItem[]>([]);
   const [syncPending, setSyncPending] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<"connecting" | "recording" | "unavailable">("connecting");
   const outboxKey = "can-learning-outbox:" + courseAttemptId;
   const persist = useCallback(() => {
     try {
@@ -121,6 +123,9 @@ export function CanonicalLearningActivityProvider({
     if(!lessonId || !alive.current || needsResume.current ||
       document.visibilityState!=="visible" || !document.hasFocus() ||
       !Number.isFinite(durationMs) || durationMs<1000)return;
+    // Only advancing native playback invokes this callback. Prevent concurrent
+    // pointer-based estimates while the native player is consuming the lesson.
+    videoPlaying.current = true;
     lastInteraction.current=Date.now();
     void postEvent("engaged_interval",lessonId,null,
       Math.floor(Math.min(durationMs,60_000))).catch(()=>{});
@@ -128,6 +133,7 @@ export function CanonicalLearningActivityProvider({
 
   const selectLesson = useCallback((id: string | null) => {
     if (lesson.current === id) return;
+    videoPlaying.current = false;
     lesson.current = id;
     lastInteraction.current = Date.now();
     if (id && session.current && document.visibilityState === "visible")
@@ -138,11 +144,16 @@ export function CanonicalLearningActivityProvider({
     if (!lessonId || !alive.current ||
       document.visibilityState !== "visible" || !document.hasFocus()) return;
     if (kind === "engaged_interval" || kind === "lesson_opened" || kind === "lesson_resumed") return;
+    if (kind === "video_played") videoPlaying.current = true;
+    if (kind === "video_paused" || kind === "video_ended") videoPlaying.current = false;
+    if (kind.startsWith("video_")) lastInteraction.current = Date.now();
     void postEvent(kind, lessonId, resourceId ?? null).catch(() => {});
   }, [postEvent]);
 
   useEffect(() => {
     alive.current = true;
+    videoPlaying.current = false;
+    setSessionStatus("connecting");
     session.current = null;
     pending.current=[];
     try {
@@ -169,6 +180,7 @@ export function CanonicalLearningActivityProvider({
         });
         if (disposed) return;
         session.current = result.learningSessionId;
+        setSessionStatus("recording");
         pending.current=pruneLearningOutbox(pending.current,result.learningSessionId,new Date());
         persist();
         void flush();
@@ -176,6 +188,7 @@ export function CanonicalLearningActivityProvider({
         const id = lesson.current;
         if (id) void postEvent("lesson_opened",id).catch(() => {});
       } catch {
+        if (!disposed) setSessionStatus("unavailable");
         // Content remains accessible; a future online/focus retry may succeed.
       } finally { starting = false; }
     };
@@ -223,8 +236,9 @@ export function CanonicalLearningActivityProvider({
     const interact = (event: Event) => {
       const target = event.target;
       if (!alive.current || !session.current || !lesson.current || needsResume.current ||
-        !event.isTrusted || !(target instanceof Element) ||
+        videoPlaying.current || !event.isTrusted || !(target instanceof Element) ||
         !target.closest("[data-learning-content]") ||
+        target.closest("[data-learning-video-player]") ||
         document.visibilityState !== "visible" || !document.hasFocus()) return;
       const now = Date.now(), elapsed = now - lastInteraction.current;
       if (elapsed < 30_000) return;
@@ -263,6 +277,9 @@ export function CanonicalLearningActivityProvider({
 
   return <Context.Provider value={{ selectLesson, observe, observeNativeVideo }}>
     {children}
+    {sessionStatus === "unavailable" && <p role="status" className="border-t border-border px-3 py-1 text-xs text-muted-foreground">
+      Learning activity could not connect. The lesson remains available and recording will retry when this tab is active.
+    </p>}
     {syncPending && <p role="status" className="border-t border-border px-3 py-1 text-xs text-muted-foreground">
       Recent learning observations will retry while this tab remains open.
     </p>}

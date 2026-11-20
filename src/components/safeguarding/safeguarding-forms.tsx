@@ -46,7 +46,7 @@ export function SafeguardingEvidenceForm({ incidentId, onSaved }: {
     <Button variant="outline" size="sm" onClick={() => setOpen(value => !value)} aria-expanded={open}>
       {open ? "Close evidence form" : "Add evidence record"}
     </Button>
-    {open && <form noValidate onSubmit={event => void submit(event)} aria-busy={busy} className="mt-4 rounded-xl border p-4">
+    {open && <form noValidate onSubmit={event => void submit(event)} aria-busy={busy} className="mt-4  border p-4">
       <fieldset disabled={busy} className="grid gap-4">
         <Field label="Evidence source" className="text-sm">
           <Select value={type} onChange={event => setType(event.target.value as typeof type)}>

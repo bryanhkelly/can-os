@@ -610,6 +610,90 @@
       "when": 1794990002000,
       "tag": "0086_notification_provider_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1795070000000,
+      "tag": "0087_site_signup_organization_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1795100000000,
+      "tag": "0088_site_marketing_packages",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1795120500000,
+      "tag": "0089_canonical_site_brand_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1795120700000,
+      "tag": "0090_brand_current_and_published_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1795120800000,
+      "tag": "0091_site_website_draft_write_capability",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1795130000000,
+      "tag": "0092_marketing_package_atomic_releases",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1795131000000,
+      "tag": "0093_class_participant_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1795132000000,
+      "tag": "0094_class_participant_delivery_privacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1795133000000,
+      "tag": "0095_course_registration_class_placement",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1795134000000,
+      "tag": "0096_class_enrollment_calendar_cancellation",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1795135000000,
+      "tag": "0097_blueprint_public_journal_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795136000000,
+      "tag": "0098_blueprint_journal_client_privilege_hardening",
+      "breakpoints": true
     }
   ]
 }

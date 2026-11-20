@@ -1,4 +1,11 @@
+import { readSavedBrandVersion } from "./site-brand.functions";
+import { siteBrandPresentationIdentity } from "@/domain/site-brand";
+import { resolveSiteTemplateId } from "@/domain/site-theme";
+import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
+import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
+import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
+import { recommendBrandDirection } from "@/domain/site-brand-direction";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
@@ -55,34 +62,53 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   `);
   const draftStorageReady = draftConstraint.rows.some(row =>
     typeof row.definition === "string" && row.definition.includes("'draft'"));
+  const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
+    .from(sites).where(eq(sites.id, site.id)).limit(1);
+  const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
+  const siteStorySource=siteStorySourceV61Schema.safeParse(siteConfiguration?.metadata?.siteStoryV61);
+  const storyCandidates=siteStorySource.success
+    ? suggestWebsiteCopyFromStory(siteStorySource.data.answers,site.name) : [];
+  const savedBrand=await readSavedBrandVersion(site.id);
   const latestContent = history[0]?.content ?? local?.content;
-  const editingContent: SiteLocalContent | null = latestContent
+  const rawEditingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
+  // The saved identity comes ONLY from site_brand_versions. Website history
+  // stores the structural wireframe, not colors, logo, fonts or direction.
+  const editingContent:SiteLocalContent|null=rawEditingContent && savedBrand
+    ? {...rawEditingContent,branding:siteBrandPresentationIdentity(savedBrand.resolved,
+        resolveSiteTemplateId(rawEditingContent.branding.templateId),true)}
+    : rawEditingContent;
   // Editor and full-page private previews use the latest saved immutable draft,
   // never the last published revision by accident. Unapproved child artwork
   // remains editable but cannot escape into preview HTML.
   // A new Site can explore a complete read-only design even before its first
   // saved draft. The starter is never persisted or published by this GET.
   const candidate = proposedContent ?? editingContent ?? local?.content
-    ?? createSchoolWebsiteStarterContent(site.name);
+    ?? prepareWebsiteCopyFromSiteInformation(createSchoolWebsiteStarterContent(site.name),storyCandidates);
+  // A newly established Site can save its Brand before its first website
+  // revision. Apply that canonical Brand to the first-visit starter, not the
+  // legacy default palette. In-editor unsaved previews retain their proposed
+  // visual choices, without persisting a second Brand source.
+  const renderedCandidate = savedBrand && !proposedContent
+    ? {...candidate,branding:siteBrandPresentationIdentity(savedBrand.resolved,
+        resolveSiteTemplateId(candidate.branding.templateId),true)}
+    : candidate;
+  const displaySiteName = savedBrand?.resolved.displayName ?? site.name;
   // The same rights gate applies to both artwork slots, including saved private drafts.
   // Unsigned logos must never bypass the hero-image gate in a private HTML preview.
-  const previewContent = candidate ? { ...candidate, branding: {
-    ...candidate.branding,
-    heroImage: siteLocalImagePublicationGaps(candidate.branding.heroImage).length
-      ? null : candidate.branding.heroImage,
-    logoImage: siteLocalImagePublicationGaps(candidate.branding.logoImage ?? null).length
-      ? null : candidate.branding.logoImage ?? null,
-  } } : candidate;
-  const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
-    .from(sites).where(eq(sites.id, site.id)).limit(1);
-  const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
+  const previewContent = { ...renderedCandidate, branding: {
+    ...renderedCandidate.branding,
+    heroImage: siteLocalImagePublicationGaps(renderedCandidate.branding.heroImage).length
+      ? null : renderedCandidate.branding.heroImage,
+    logoImage: siteLocalImagePublicationGaps(renderedCandidate.branding.logoImage ?? null).length
+      ? null : renderedCandidate.branding.logoImage ?? null,
+  } };
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
     academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
   const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
     parentExtras?.admissions);
   const parentInformation = projectApprovedParentInformation({
-    site: { name: site.name, organizationName: site.organizationName },
+    site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     ...(parentExtras ?? {}),
   });
@@ -117,10 +143,10 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     (["pending","approved","rejected","revoked"] as const).includes(
       row.status as "pending"|"approved"|"rejected"|"revoked")
       ? [{name:row.name,status:row.status as "pending"|"approved"|"rejected"|"revoked"}] : []) ?? null;
-  const contentBlocks = resolveSiteContentBlocks(
+  const baseContentBlocks = resolveSiteContentBlocks(
     contentConfig, {
       mode: "private", preferences: preferences.success ? preferences.data : null,
-      siteSetup:{name:site.name,organizationName:site.organizationName,
+      siteSetup:{name:displaySiteName,organizationName:site.organizationName,
         city:planningLocation.success?planningLocation.data.city:null,
         state:planningLocation.success?planningLocation.data.state:null,
         timezone:siteConfiguration?.timezone??null},
@@ -129,9 +155,18 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
       noncredit: noncreditReleases, classes, classTimezone:siteConfiguration?.timezone??null,
       enrollmentOrigin: noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
     });
+
+  // Website previews show the full Site vision, including planned Program categories.
+  // They do not require an adopted Solution or grant registration authority.
+  const proposedPrograms = projectPlannedSiteProgramsForPreview(
+    preferences.success ? preferences.data : null, baseContentBlocks);
+  const contentBlocks = [
+    ...baseContentBlocks.filter(block => block.channel !== "learning.interests"),
+    ...proposedPrograms,
+  ];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
-    host, site: { name: site.name, organizationName: site.organizationName },
+    host, site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media, contentBlocks, enrollmentOpportunities,
     ...(noncreditReleases.length ? {
@@ -145,8 +180,21 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ])) : {};
   return {
     siteId:site.id,
+    currentBrandVersionId:savedBrand?.version.id??null,
+    currentBrandRevision:savedBrand?.version.revision??0,
+    currentBrandConfiguration:savedBrand?.version.configuration??null,
+    siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
+    siteStoryCopyCandidates:storyCandidates,
+    siteStorySourceChoices:siteStorySource.success ? {
+      motivations:siteStorySource.data.answers.motivations,
+      distinctives:siteStorySource.data.answers.distinctives,
+      values:siteStorySource.data.answers.values,
+      experiences:siteStorySource.data.answers.experiences,
+    } : null,
+    siteStoryRevision:siteStorySource.success ? siteStorySource.data.revision : null,
     siteName: site.name,
     organizationName: site.organizationName,
+    canEdit: site.canEdit,
     canPublish: site.canPublish,
     draftStorageReady,
     canPrepareWebsite: actor.role === "site_admin",

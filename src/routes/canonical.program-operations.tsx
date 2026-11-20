@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -88,13 +90,13 @@ function ProgramOperations(){
       </p>
       <form onSubmit={event=>{event.preventDefault();setSearch(searchInput.trim());setSelectedKey("");}}
         className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="min-w-[15rem] flex-1 text-sm font-semibold" htmlFor="program-search">
+        <Label className="min-w-[15rem] flex-1 text-sm font-semibold" htmlFor="program-search">
           Program, Course or Deployment
-          <input id="program-search" value={searchInput} maxLength={100}
+          <Input id="program-search" value={searchInput} maxLength={100}
             onChange={event=>setSearchInput(event.target.value)}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+            className="mt-1 min-h-11"
             placeholder="Search approved products"/>
-        </label>
+        </Label>
         <Button type="submit">Search</Button>
         {search&&<Button type="button" variant="outline" onClick={()=>{
           setSearch("");setSearchInput("");setSelectedKey("");

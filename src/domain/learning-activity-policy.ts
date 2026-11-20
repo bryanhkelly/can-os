@@ -18,6 +18,10 @@ const common = {
 export const learnerInteractionInputSchema = z.discriminatedUnion("kind", [
   z.object({ ...common, kind: z.literal("lesson_opened") }).strict(),
   z.object({ ...common, kind: z.literal("lesson_resumed") }).strict(),
+  z.object({ ...common, kind: z.literal("video_opened"), resourceId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/) }).strict(),
+  z.object({ ...common, kind: z.literal("video_played"), resourceId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/) }).strict(),
+  z.object({ ...common, kind: z.literal("video_paused"), resourceId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/) }).strict(),
+  z.object({ ...common, kind: z.literal("video_ended"), resourceId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/) }).strict(),
   z.object({
     ...common,
     kind: z.literal("resource_opened"),

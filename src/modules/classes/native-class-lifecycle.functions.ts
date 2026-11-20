@@ -136,6 +136,11 @@ async function exitNativeClass(command:ExitRequest){
       const attempts=await tx.select().from(learnerCourseAttempts)
         .where(eq(learnerCourseAttempts.classEnrollmentId,enrollment.id))
         .for("update");
+      // A Class placement linked to a Course Registration must be withdrawn
+      // through the owning Course command so both participation records and
+      // the single Course Attempt change together.
+      if(attempts.some(attempt=>attempt.noncreditRegistrationId!==null))
+        throw new AuthorizationError("Withdraw the Course registration to leave this Class");
       const selected=attempts.find(attempt=>attempt.id===enrollment.courseAttemptId);
       if(!selected)throw new AuthorizationError("selected Class Course Attempt");
       assertNativeClassAttemptForExit({

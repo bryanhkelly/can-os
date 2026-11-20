@@ -38,4 +38,4 @@ function GalleryFixture() {
     </p>
   </div>;
 }
-export const FiveTemplates: Story = { render: () => <GalleryFixture/> };
+export const SevenWireframes: Story = { render: () => <GalleryFixture/> };

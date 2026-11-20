@@ -6,6 +6,9 @@ import { Checkbox } from "@/components/ui/choice";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/workspace";
 import { BlueprintReviewHistoryPanel } from "./BlueprintReviewHistoryPanel";
+import { BlueprintComponentPicker } from "./BlueprintComponentPicker";
+import { BlueprintReferencesPicker } from "./BlueprintReferencesPicker";
+import { readableBlueprintKey as readable } from "@/domain/blueprint-display";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   createCanonicalBlueprintConfiguration,
@@ -19,27 +22,54 @@ import {
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
 import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.server";
-import { blueprintEditorialIdentityKeys, includedBlueprintComponentIds } from "@/domain/blueprint-configuration";
+import { blueprintEditorialIdentityKeys, includedBlueprintComponentIds, isBlueprintLocalExperienceKind } from "@/domain/blueprint-configuration";
+import { replaceVisibleOfferingIntents, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
+import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { BlueprintLocalExperienceEditorV61, type LocalExperienceDraft } from "./BlueprintLocalExperienceEditorV61";
 
 type Workspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 type Template = Workspace["templates"][number];
 type Review = Awaited<ReturnType<typeof getBlueprintReview>>;
-type LocalExperienceDraft = BlueprintConfigurationDetail["localExperiences"][number] & {
-  source: "proposed_local_experience";
+
+type SolutionDraftFields = {
+  name: string;
+  templateId: string;
+  editorialIdentity: string;
+  religiousAffiliationCode: string;
+  selectedComponents: readonly string[];
+  selectedReferences: Readonly<Record<string, string[]>>;
+  offeringAdoptions: readonly BlueprintOfferingIntent[];
+  localExperiences: readonly LocalExperienceDraft[];
 };
 
-function readable(value: string): string {
-  return value.replaceAll("_", " ");
+/** Only local editor inputs belong to the dirty snapshot. Published CAN-owned
+ * Blueprint fields and independently approved readiness are never writable here. */
+function solutionDraftSnapshot(fields: SolutionDraftFields): string {
+  return JSON.stringify(fields);
 }
 
 /**
  * Canonical Blueprint preparation. A draft is Organization-owned and anchored
  * to a Site; freezing it requests review, not permission to operate.
  */
-export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }: { siteId: string; enableReferences?: boolean }) {
+export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
+  initialBlueprintVersionId, initialConfigurationId, initialDelivery = "onsite",
+  embedded = false, onWorkspaceChanged, onUnsavedChange,
+}: {
+  siteId: string;
+  enableReferences?: boolean;
+  initialBlueprintVersionId?: string;
+  initialConfigurationId?: string;
+  initialDelivery?: "onsite" | "remote" | "hybrid";
+  embedded?: boolean;
+  onWorkspaceChanged?: (workspace: Workspace) => void;
+  onUnsavedChange?: (state: {
+    unsaved: boolean; busy: boolean; reconciliationRequired: boolean;
+  }) => void;
+}) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
   const [revisingFrozen, setRevisingFrozen] = useState(false);
@@ -64,6 +94,25 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [reconciliationRequired, setReconciliationRequired] = useState(false);
+  const [savedDraftSnapshot, setSavedDraftSnapshot] = useState(() =>
+    solutionDraftSnapshot({
+      name: "", templateId: "", editorialIdentity: "community_belonging",
+      religiousAffiliationCode: "", selectedComponents: [], selectedReferences: {},
+      offeringAdoptions: [], localExperiences: [],
+    }));
+  const currentDraftSnapshot = solutionDraftSnapshot({
+    name, templateId, editorialIdentity, religiousAffiliationCode,
+    selectedComponents, selectedReferences, offeringAdoptions, localExperiences,
+  });
+  const unsaved = currentDraftSnapshot !== savedDraftSnapshot;
+  useLaunchUnsavedChanges(
+    () => unsaved || busy || reconciliationRequired,
+    "Leave Solution planning? Unsaved changes will be lost.",
+  );
+  useEffect(() => {
+    onUnsavedChange?.({ unsaved, busy, reconciliationRequired });
+  }, [onUnsavedChange, unsaved, busy, reconciliationRequired]);
 
   async function reload() {
     const next = await readCanonicalBlueprintWorkspace({ data: { siteId } });
@@ -81,14 +130,33 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     setExecutedDeployments(null);
     setLoading(true);
     setError(null);
+    setReconciliationRequired(false);
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
-      .then(result => { if (!cancelled) setWorkspace(result); })
+      .then(result => {
+        if (cancelled) return;
+        setWorkspace(result);
+        if (initialBlueprintVersionId) {
+          const initial = result.templates.find(template =>
+            template.blueprintVersionId === initialBlueprintVersionId);
+          if (!initial) {
+            setError("The selected published Solution is no longer available for this Site.");
+          } else if (initialConfigurationId) {
+            const saved = result.configurations.some(configuration =>
+              configuration.configurationId === initialConfigurationId &&
+              configuration.blueprintVersionId === initialBlueprintVersionId);
+            if (saved) void openConfiguration(initialConfigurationId, result);
+            else setError("The requested Solution plan is not available for this Site and version.");
+          } else {
+            chooseTemplate(initial);
+          }
+        }
+      })
       .catch(caught => {
         if (!cancelled) setError(normalizeClientError(caught, "Blueprint planning could not load.").message);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, initialBlueprintVersionId, initialConfigurationId]);
 
   useEffect(() => {
     if (!enableReferences) {
@@ -111,6 +179,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     setSelectedReferences({});
     setOfferingAdoptions([]);
     setLocalExperiences([]);
+    setLocalComponentId("");
+    setLocalTitle("");
+    setLocalSummary("");
+    setRevisingFrozen(false);
     setSelectedComponents(template.components.filter(component =>
       component.requirementMode === "required"
     ).map(component => component.id));
@@ -118,16 +190,43 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     setReview(null);
     setOperationId("");
     setExecutedDeployments(null);
+    setName("");
+    setEditorialIdentity("community_belonging");
+    setReligiousAffiliationCode("");
+    setSavedDraftSnapshot(solutionDraftSnapshot({
+      name: "", templateId: template.blueprintVersionId,
+      editorialIdentity: "community_belonging", religiousAffiliationCode: "",
+      selectedComponents: template.components.filter(component =>
+        component.requirementMode === "required").map(component => component.id),
+      selectedReferences: {}, offeringAdoptions: [], localExperiences: [],
+    }));
     setMessage(null);
   }
 
-  async function openConfiguration(configurationId: string) {
+  async function openConfiguration(configurationId: string, available: Workspace | null = workspace): Promise<boolean> {
+    if (embedded && initialBlueprintVersionId &&
+        !available?.configurations.some(configuration =>
+          configuration.configurationId === configurationId &&
+          configuration.blueprintVersionId === initialBlueprintVersionId)) {
+      setError("This saved plan is unavailable for the selected Site and Solution version.");
+      return false;
+    }
     setBusy(true);
     setRevisingFrozen(false);
     setOperationId("");
     setError(null);
     try {
       const result = await readCanonicalBlueprintConfiguration({ data: { configurationId } });
+      // The server independently validates current Site scope. Refuse any stale
+      // cross-Solution result before populating the editor as an extra UI safeguard.
+      if (embedded && initialBlueprintVersionId &&
+          result.blueprintVersionId !== initialBlueprintVersionId) {
+        throw new Error("This saved plan belongs to another Solution version.");
+      }
+      if (!result.config || typeof result.config !== "object" ||
+          Array.isArray(result.config) || result.config.siteId !== siteId) {
+        throw new Error("The saved Solution plan no longer belongs to this Site.");
+      }
       setDetail(result);
       setReview(null);
       setExecutedDeployments(null);
@@ -149,6 +248,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
         .filter(component => component.selectionStatus === "selected")
         .map(component => component.componentId));
       setLocalExperiences(result.localExperiences.map(item => ({ ...item, source: "proposed_local_experience" as const })));
+      setLocalComponentId("");
+      setLocalTitle("");
+      setLocalSummary("");
       setSelectedReferences(Object.fromEntries(
         result.components.map(component => [
           component.componentId,
@@ -156,9 +258,24 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
         ])
       ));
       setTemplateId(result.blueprintVersionId);
+      setSavedDraftSnapshot(solutionDraftSnapshot({
+        name: result.name,
+        templateId: result.blueprintVersionId,
+        editorialIdentity: result.identity.editorialIdentity,
+        religiousAffiliationCode: result.identity.religiousAffiliationCode ?? "",
+        selectedComponents: result.components.filter(component =>
+          component.selectionStatus === "selected").map(component => component.componentId),
+        selectedReferences: Object.fromEntries(result.components.map(component =>
+          [component.componentId, component.referenceItemVersionIds])),
+        offeringAdoptions: result.offeringAdoptions,
+        localExperiences: result.localExperiences.map(item =>
+          ({ ...item, source: "proposed_local_experience" as const })),
+      }));
       setMessage(null);
+      return true;
     } catch (caught) {
-      setError(normalizeClientError(caught, "This Blueprint configuration is unavailable.").message);
+      setError(normalizeClientError(caught, "This Solution plan could not be reopened.").message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -199,25 +316,34 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   }
 
   async function save() {
-    if (!workspace || !selectedTemplate || (detail?.lifecycle === "frozen" && !revisingFrozen)) return;
+    if (!workspace || !selectedTemplate || reconciliationRequired ||
+        (detail?.lifecycle === "frozen" && !revisingFrozen)) return;
+    let attemptedWrite = false;
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
       const version = versionInput(selectedTemplate, detail ?? undefined);
       if (detail) {
+        attemptedWrite = true;
         const saved = await saveCanonicalBlueprintConfiguration({ data: {
           configurationId: detail.configurationId,
           versionId: crypto.randomUUID(),
           expectedRevision: detail.revision,
           version,
         } });
-        await openConfiguration(detail.configurationId);
-        setMessage(saved.revision > detail.revision
-          ? "A new Blueprint configuration revision was saved."
-          : "The Blueprint configuration is already up to date.");
+        const current = await reload();
+        onWorkspaceChanged?.(current);
+        const opened = await openConfiguration(detail.configurationId, current);
+        if (!opened) setReconciliationRequired(true);
+        setMessage(!opened
+          ? "Changes were saved, but the latest plan could not be reopened. Reload before editing."
+          : saved.revision > detail.revision
+            ? "A new Solution plan revision was saved."
+            : "The Solution plan is already up to date.");
       } else {
         const configurationId = crypto.randomUUID();
+        attemptedWrite = true;
         await createCanonicalBlueprintConfiguration({ data: {
           configurationId,
           initialVersionId: crypto.randomUUID(),
@@ -227,19 +353,29 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
           name: name.trim(),
           version,
         } });
-        await openConfiguration(configurationId);
-        setMessage("Blueprint configuration created.");
+        const current = await reload();
+        onWorkspaceChanged?.(current);
+        const opened = await openConfiguration(configurationId, current);
+        if (!opened) setReconciliationRequired(true);
+        setMessage(opened ? "Solution plan created." :
+          "Solution plan created, but reopening failed. Reload to review the saved plan.");
       }
-      await reload();
     } catch (caught) {
-      setError(normalizeClientError(caught, "The Blueprint configuration could not be saved.").message);
+      if (attemptedWrite) {
+        setReconciliationRequired(true);
+        setError("The save outcome could not be fully verified. Reload the Site to reconcile the latest Solution plan before retrying.");
+      } else {
+        setError(normalizeClientError(caught, "The Solution plan could not be saved.").message);
+      }
     } finally {
       setBusy(false);
     }
   }
 
   async function submit() {
-    if (!detail || !selectedTemplate || !workspace?.canConfigure || detail.lifecycle !== "draft") return;
+    if (!detail || !selectedTemplate || !workspace?.canConfigure ||
+        reconciliationRequired || detail.lifecycle !== "draft") return;
+    let attemptedWrite = false;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -247,6 +383,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       // Submit what the author actually sees. A previously saved draft may not
       // include edits made since it was opened. Save first using optimistic
       // revision control; the service reuses an identical draft revision.
+      attemptedWrite = true;
       const saved = await saveCanonicalBlueprintConfiguration({ data: {
         configurationId: detail.configurationId,
         versionId: crypto.randomUUID(),
@@ -256,11 +393,20 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       await submitCanonicalBlueprintConfiguration({
         data: { configurationId: detail.configurationId, expectedRevision: saved.revision },
       });
-      await openConfiguration(detail.configurationId);
-      await reload();
-      setMessage("Current Blueprint changes saved and submitted for independent review. No program has been authorized.");
+      const current = await reload();
+      onWorkspaceChanged?.(current);
+      const opened = await openConfiguration(detail.configurationId, current);
+      if (!opened) setReconciliationRequired(true);
+      setMessage(opened
+        ? "Current Solution plan submitted for independent review. No Program or enrollment is authorized."
+        : "Solution plan submitted, but review status could not be refreshed. Reload before taking another action.");
     } catch (caught) {
-      setError(normalizeClientError(caught, "Blueprint submission failed.").message);
+      if (attemptedWrite) {
+        setReconciliationRequired(true);
+        setError("The review submission outcome could not be fully verified. Reload before retrying.");
+      } else {
+        setError(normalizeClientError(caught, "Solution review submission failed.").message);
+      }
     } finally {
       setBusy(false);
     }
@@ -291,29 +437,56 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     }
   }
 
+  const eligibleLocalCategories = selectedTemplate?.components.filter(component =>
+    selectedComponents.includes(component.id) && isBlueprintLocalExperienceKind(component.kind)) ?? [];
+  function addLocalExperience() {
+    const component = eligibleLocalCategories.find(item => item.id === localComponentId);
+    if (!component || !isBlueprintLocalExperienceKind(component.kind) ||
+        localTitle.trim().length < 2) return;
+    setLocalExperiences(current => current.length >= 200 ? current : [...current, {
+      source: "proposed_local_experience",
+      componentId: component.id,
+      kind: component.kind,
+      title: localTitle.trim(),
+      summary: localSummary.trim(),
+      configuration: {},
+    }]);
+    setLocalTitle("");
+    setLocalSummary("");
+  }
+  const editableProgramComponents = selectedTemplate?.components.filter(component =>
+    component.kind === "program_model" && selectedComponents.includes(component.id)) ?? [];
+  const editableProgramComponentIds = editableProgramComponents.map(component => component.id);
   const readOnlyFrozen = detail?.lifecycle === "frozen" && !revisingFrozen;
-  const editingDisabled = busy || readOnlyFrozen;
+  const editingDisabled = busy || readOnlyFrozen || reconciliationRequired;
+  // A selected Solution in Prepare must not display another Solution's saved drafts.
+  const visibleConfigurations = embedded && initialBlueprintVersionId
+    ? selectSavedSolutionPlans(workspace?.configurations ?? [], initialBlueprintVersionId)
+    : workspace?.configurations ?? [];
 
   return <section className="mt-6 border bg-card p-6" aria-labelledby="canonical-blueprint-title">
     <h2 id="canonical-blueprint-title" className="font-serif text-2xl">
-      Configure your School Blueprint
+      {embedded ? "Configure selected Solution" : "Configure your Solution"}
     </h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Choose a published recipe, select its components, and save your plan.
-      Review and approval are separate from operating authorization.
+      CAN defines and publishes the Blueprint. Your Site selects its available components
+      and saves an implementation plan. Independent approval and enrollment authorization are separate.
     </p>
     {loading && <p className="mt-4" role="status">Loading Blueprint workspace…</p>}
     {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
+    {reconciliationRequired && <p className="mt-3 border border-border bg-muted p-3 text-sm" role="status">
+      The server may have recorded your last action. Reload before creating or updating another Solution plan.
+    </p>}
     {message && <p className="mt-4 text-sm" role="status">{message}</p>}
     {!loading && !workspace && <Button type="button" variant="outline"
       onClick={() => void reload().catch(caught =>
         setError(normalizeClientError(caught, "Blueprint planning could not load.").message)
       )}>Retry</Button>}
     {workspace && <>
-      {workspace.configurations.length > 0 && <div className="mt-5">
-        <h3 className="font-semibold">Saved Blueprint configurations</h3>
+      {visibleConfigurations.length > 0 && <div className="mt-5">
+        <h3 className="font-semibold">Saved Solution plans</h3>
         <div className="mt-3 flex flex-wrap gap-2">
-          {workspace.configurations.map(configuration =>
+          {visibleConfigurations.map(configuration =>
             <Button key={configuration.configurationId} type="button" variant="outline"
               disabled={busy}
               onClick={() => void openConfiguration(configuration.configurationId)}>
@@ -328,9 +501,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       {workspace.templates.length > 0 && <div className="mt-5 space-y-4">
         <div className="flex flex-wrap gap-3">
           <Label htmlFor="canonical-blueprint-template" className="min-w-52 flex-1 text-sm">
-            Published Blueprint recipe
+            CAN-published Solution
             <Select id="canonical-blueprint-template" className="mt-2"
-              value={templateId} disabled={busy || Boolean(detail)}
+              value={templateId} disabled={busy || Boolean(detail) || (embedded && Boolean(initialBlueprintVersionId))}
               onChange={event => {
                 const template = workspace.templates.find(item =>
                   item.blueprintVersionId === event.currentTarget.value);
@@ -375,135 +548,47 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
               </Select>
             </Label>
           </div>
-          <fieldset className="border p-4" disabled={editingDisabled}>
-            <legend className="px-2 font-semibold">Blueprint components</legend>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
-              {selectedTemplate.components.map(component =>
-                <Label key={component.id} className="flex items-center gap-3 text-sm">
-                  <Checkbox checked={selectedComponents.includes(component.id)}
-                    disabled={component.requirementMode === "required" || editingDisabled}
-                    onChange={event => setSelectedComponents(current =>
-                      event.target.checked
-                        ? [...current, component.id]
-                        : current.filter(id => id !== component.id)
-                    )}/>
-                  <span>{readable(component.key)}
-                    {component.requirementMode === "required" ? " · required" : ""}</span>
-                </Label>)}
-            </div>
-          </fieldset>
-          {enableReferences && referenceCatalog.length > 0 && selectedTemplate.components
-            .filter(component => selectedComponents.includes(component.id))
-            .map(component => {
-              const available = referenceCatalog.filter(reference =>
-                reference.kind === component.kind
-              );
-              if (!available.length) return null;
-              return <fieldset key={component.id} className="border p-4" disabled={editingDisabled}>
-                <legend className="px-2 font-semibold">
-                  {readable(component.key)} · curated references
-                </legend>
-                <div className="mt-2 grid max-h-52 gap-3 overflow-y-auto sm:grid-cols-2">
-                  {available.map(reference => <Label key={reference.versionId}
-                    className="flex items-start gap-3 text-sm">
-                    <Checkbox className="mt-1"
-                      checked={(selectedReferences[component.id] ?? []).includes(reference.versionId)}
-                      onChange={event => setSelectedReferences(current => {
-                        const before = current[component.id] ?? [];
-                        return { ...current, [component.id]: event.target.checked
-                          ? [...before, reference.versionId]
-                          : before.filter(id => id !== reference.versionId) };
-                      })}/>
-                    <span><strong className="block">{reference.title}</strong>
-                      <span className="text-muted-foreground">{reference.summary}</span>
-                    </span>
-                  </Label>)}
-                </div>
-              </fieldset>;
-            })}
-          {enableReferences && selectedTemplate.components.some(component =>
-            selectedComponents.includes(component.id) && component.kind === "program_model"
-          ) && <BlueprintOfferingAdoptionPicker
-            siteId={siteId}
-            components={selectedTemplate.components
-              .filter(component => component.kind === "program_model" &&
-                selectedComponents.includes(component.id))}
-            selected={offeringAdoptions.filter(intent =>
-              selectedComponents.includes(intent.componentId))}
-            onChange={setOfferingAdoptions}
+          <BlueprintComponentPicker
+            components={selectedTemplate.components}
+            selected={selectedComponents} disabled={editingDisabled}
+            onToggle={(componentId,checked)=>setSelectedComponents(current=>
+              checked?[...current,componentId]:current.filter(id=>id!==componentId))}/>
+          <BlueprintReferencesPicker enabled={enableReferences}
+            components={selectedTemplate.components} selected={selectedComponents}
+            catalog={referenceCatalog} selectedReferences={selectedReferences}
             disabled={editingDisabled}
-          />}
-          {selectedTemplate.components.some(component =>
-            selectedComponents.includes(component.id) &&
-            ["community", "experience", "club", "activity"].includes(component.kind)
-          ) && <fieldset className="border p-4" disabled={editingDisabled}>
-            <legend className="px-2 font-semibold">Propose a local experience</legend>
-            <p className="mb-3 text-sm text-muted-foreground">
-              Describe a club, activity, community project, or experience unique to your Site.
-              A proposal is not an approved activity.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Label className="text-sm" htmlFor="canonical-local-component">
-                Category
-                <Select id="canonical-local-component" className="mt-2"
-                  value={localComponentId}
-                  onChange={event => setLocalComponentId(event.currentTarget.value)}>
-                  <option value="">Choose category</option>
-                  {selectedTemplate.components
-                    .filter(component => selectedComponents.includes(component.id) &&
-                      ["community", "experience", "club", "activity"].includes(component.kind))
-                    .map(component => <option key={component.id} value={component.id}>
-                      {readable(component.key)}
-                    </option>)}
-                </Select>
-              </Label>
-              <Label className="text-sm" htmlFor="canonical-local-title">
-                Name
-                <Input id="canonical-local-title" className="mt-2" maxLength={160}
-                  value={localTitle} onChange={event => setLocalTitle(event.currentTarget.value)}/>
-              </Label>
-              <Label className="text-sm" htmlFor="canonical-local-summary">
-                Summary
-                <Input id="canonical-local-summary" className="mt-2" maxLength={4000}
-                  value={localSummary} onChange={event => setLocalSummary(event.currentTarget.value)}/>
-              </Label>
-            </div>
-            <Button type="button" variant="outline" className="mt-3"
-              disabled={!localComponentId || localTitle.trim().length < 2 || localExperiences.length >= 200}
-              onClick={() => {
-                const component = selectedTemplate.components.find(item => item.id === localComponentId);
-                if (!component || !["community", "experience", "club", "activity"].includes(component.kind)) return;
-                setLocalExperiences(current => [...current, {
-                  source: "proposed_local_experience",
-                  componentId: component.id,
-                  kind: component.kind as LocalExperienceDraft["kind"],
-                  title: localTitle.trim(),
-                  summary: localSummary.trim(),
-                  configuration: {},
-                }]);
-                setLocalTitle("");
-                setLocalSummary("");
-              }}>
-              Add to private Blueprint draft
-            </Button>
-            {localExperiences.length > 0 && <ul className="mt-4 space-y-2 text-sm">
-              {localExperiences.map((item, index) => <li key={index}
-                className="flex items-center justify-between gap-3 border p-3">
-                <span>{item.title} · {readable(item.kind)}</span>
-                <Button type="button" variant="outline"
-                  onClick={() => setLocalExperiences(current =>
-                    current.filter((_value, itemIndex) => itemIndex !== index))}>
-                  Remove
-                </Button>
-              </li>)}
-            </ul>}
-          </fieldset>}
+            onToggle={(componentId,versionId,checked)=>setSelectedReferences(current=>{
+              const existing=current[componentId]??[];
+              return {...current,[componentId]:checked
+                ? [...existing,versionId]:existing.filter(id=>id!==versionId)};
+            })}/>
+          {enableReferences && editableProgramComponents.length > 0 &&
+            <BlueprintOfferingAdoptionPicker
+              siteId={siteId}
+              initialDelivery={initialDelivery}
+              components={editableProgramComponents}
+              linkedOffering={selectedTemplate.linkedPublishedOffering}
+              selected={offeringAdoptions.filter(intent =>
+                editableProgramComponentIds.includes(intent.componentId))}
+              onChange={next => setOfferingAdoptions(previous =>
+                replaceVisibleOfferingIntents(previous, next, editableProgramComponentIds))}
+              disabled={editingDisabled}
+            />}
+          {eligibleLocalCategories.length > 0 && <BlueprintLocalExperienceEditorV61
+            categories={eligibleLocalCategories} categoryId={localComponentId}
+            title={localTitle} summary={localSummary} experiences={localExperiences}
+            disabled={editingDisabled}
+            onCategoryChange={setLocalComponentId}
+            onTitleChange={setLocalTitle} onSummaryChange={setLocalSummary}
+            onAdd={addLocalExperience}
+            onRemove={index => setLocalExperiences(current =>
+              current.filter((_value,itemIndex) => itemIndex !== index))} />}
           <div className="flex flex-wrap gap-3">
-            {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || (!detail && name.trim().length < 2)}
+            {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || reconciliationRequired || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
-              {busy ? "Saving…" : detail ? "Save new revision" : "Create Blueprint configuration"}
+              {busy ? "Saving…" : detail ? "Save new revision" : "Save Solution plan"}
             </Button>}
-            {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy}
+            {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
               onClick={() => { setRevisingFrozen(true); setOperationId(""); setExecutedDeployments(null); }}>
               Revise submitted Blueprint
             </Button>}
@@ -512,25 +597,42 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
               Discard revision edits
             </Button>}
             {detail && detail.lifecycle === "draft" && workspace.canConfigure &&
-              <Button type="button" variant="outline" disabled={busy}
+              <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
                 onClick={() => void submit()}>Submit for review</Button>}
-            {detail && <Button type="button" variant="outline" disabled={busy}
+            {detail && <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
               onClick={() => {
                 setDetail(null);
                 setRevisingFrozen(false);
                 setReview(null);
                 setOperationId("");
                 setExecutedDeployments(null);
-                setTemplateId("");
+                const original = embedded && initialBlueprintVersionId
+                  ? workspace.templates.find(template =>
+                      template.blueprintVersionId === initialBlueprintVersionId)
+                  : undefined;
+                if (original) chooseTemplate(original);
+                else {
+                  setTemplateId("");
+                  setSelectedComponents([]);
+                }
                 setEditorialIdentity("community_belonging");
                 setReligiousAffiliationCode("");
-                setSelectedComponents([]);
                 setSelectedReferences({});
                 setOfferingAdoptions([]);
                 setLocalExperiences([]);
+                setLocalComponentId("");
+                setLocalTitle("");
+                setLocalSummary("");
                 setName("");
+                setSavedDraftSnapshot(solutionDraftSnapshot({
+                  name: "", templateId: original?.blueprintVersionId ?? "",
+                  editorialIdentity: "community_belonging", religiousAffiliationCode: "",
+                  selectedComponents: original?.components.filter(component =>
+                    component.requirementMode === "required").map(component => component.id) ?? [],
+                  selectedReferences: {}, offeringAdoptions: [], localExperiences: [],
+                }));
                 setMessage(null);
-              }}>Start a new configuration</Button>}
+              }}>Start a new Solution plan</Button>}
           </div>
           {detail && <div className="text-sm text-muted-foreground">
             <p>Revision {detail.revision} · {detail.lifecycle === "frozen"

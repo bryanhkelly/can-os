@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { actions, siteLocalContentVersions } from "@/db/schema";
-import { emptySiteLocalContent, type SiteLocalContent } from "@/domain/site-local-content";
+import { emptySiteLocalContent, websiteCopyOnlyForStorage, type SiteLocalContent } from "@/domain/site-local-content";
 import type { AccessContext } from "@/domain/access-context";
 
 const state = vi.hoisted(() => ({
@@ -141,7 +141,7 @@ describe("transactional church-local publication", () => {
       operation: "draft", expectedRevision: 1, content: next,
     })).resolves.toMatchObject({ changed: true, revision: 2, status: "draft" });
     expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value)
-      .toMatchObject({ revision: 2, content: next, status: "draft" });
+      .toMatchObject({ revision: 2, content: websiteCopyOnlyForStorage(next), status: "draft" });
   });
 
   it("does not create a second revision when only JSON object order differs", async () => {
@@ -179,7 +179,7 @@ describe("transactional church-local publication", () => {
       operation: "draft", expectedRevision: 4, content: proposal,
     })).resolves.toMatchObject({ changed: true, revision: 5, status: "draft", flaggedFields: [] });
     expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value)
-      .toMatchObject({ status: "draft", revision: 5, content: proposal });
+      .toMatchObject({ status: "draft", revision: 5, content: websiteCopyOnlyForStorage(proposal) });
     expect(state.inserts.some(row => row.table === actions)).toBe(false);
     expect(state.audit).toHaveBeenCalledWith(expect.anything(), expect.anything(),
       expect.objectContaining({ action: "site.website.local_content.draft_saved" }));
@@ -196,7 +196,7 @@ describe("transactional church-local publication", () => {
       operation: "draft", expectedRevision: 0, content: unfinished,
     })).resolves.toMatchObject({ status: "draft", revision: 1 });
     expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value)
-      .toMatchObject({ status: "draft", content: unfinished });
+      .toMatchObject({ status: "draft", content: websiteCopyOnlyForStorage(unfinished) });
 
     state.inserts = [];
     state.rows.push([{ siteId: "site-a" }], [revision(1, unfinished, "draft")]);
@@ -246,10 +246,10 @@ describe("transactional church-local publication", () => {
     state.rows.push([{ siteId: "site-a" }], [revision(3)], [{ content: oldCopy }]);
     await expect(publishPartnerLocalContent(actor, { operation: "restore", expectedRevision: 3, restoreRevision: 1 }))
       .resolves.toMatchObject({
-        changed: true, revision: 4, status: "published", restoredContent: oldCopy,
+        changed: true, revision: 4, status: "published", restoredContent: websiteCopyOnlyForStorage(oldCopy),
       });
     expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value).toMatchObject({
-      revision: 4, restoredFromRevision: 1, content: oldCopy,
+      revision: 4, restoredFromRevision: 1, content: websiteCopyOnlyForStorage(oldCopy),
     });
   });
 
@@ -258,7 +258,7 @@ describe("transactional church-local publication", () => {
     await expect(publishPartnerLocalContent(actor, {
       operation: "restore", expectedRevision: 3, restoreRevision: 1,
     })).resolves.toMatchObject({
-      changed: false, revision: 3, status: "published", restoredContent: copy,
+      changed: false, revision: 3, status: "published", restoredContent: websiteCopyOnlyForStorage(copy),
     });
     expect(state.inserts).toHaveLength(0);
     expect(state.audit).not.toHaveBeenCalled();
@@ -275,17 +275,21 @@ describe("transactional church-local publication", () => {
 });
 
 
-describe("Site Administrator publication through the canonical Site publisher",()=>{
-  it("publishes the school shell in the same transaction as reviewed local content",async()=>{
-    const updatedAt=new Date("2026-11-06T00:00:00Z");
-    state.rows.push([{siteId:"site-a",updatedAt}],[]);
-    await publishPartnerLocalContent({...actor,role:"site_admin"},{operation:"save",expectedRevision:0,content:copy});
-    expect(state.publishSite).toHaveBeenCalledWith(expect.objectContaining({role:"site_admin"}),expect.objectContaining({siteId:"site-a",action:"publish",expectedRevision:updatedAt.toISOString(),contentReviewed:true}),tx);
+describe("Site publication is independent from Establish website saves", () => {
+  it("keeps Site publication unchanged when a Site Admin saves reviewed local copy", async () => {
+    state.rows.push([{siteId:"site-a",updatedAt:new Date("2026-11-06T00:00:00Z")}], []);
+    await expect(publishPartnerLocalContent({...actor, role:"site_admin"}, {
+      operation:"save", expectedRevision:0, content:copy,
+    })).resolves.toMatchObject({ status:"published", revision:1 });
+    expect(state.publishSite).not.toHaveBeenCalled();
   });
-  it("does not publish a private draft or a revision requiring institutional review",async()=>{
-    for(const operation of ["draft","save"] as const){
-      state.rows.push([{siteId:"site-a",updatedAt:new Date()}],[]);
-      await publishPartnerLocalContent({...actor,role:"site_admin"},{operation,expectedRevision:0,content:{...copy,welcomeMessage:"We are fully accredited."}});
+  it("does not publish a Site from a private draft or protected claim", async () => {
+    for (const operation of ["draft","save"] as const) {
+      state.rows.push([{siteId:"site-a",updatedAt:new Date()}], []);
+      await publishPartnerLocalContent({...actor, role:"site_admin"}, {
+        operation, expectedRevision:0,
+        content:{...copy,welcomeMessage:"We are fully accredited."},
+      });
     }
     expect(state.publishSite).not.toHaveBeenCalled();
   });

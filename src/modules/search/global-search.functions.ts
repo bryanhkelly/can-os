@@ -83,7 +83,7 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
       id: `course-${row.id}`,
       label: row.title,
       sub: row.code,
-      to: `/classes?section=${encodeURIComponent(row.id)}`,
+      to: "/class",
     }));
   }
 
@@ -110,7 +110,7 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
     id: `course-${row.id}`,
     label: row.title,
     sub: row.code,
-    to: `/classes?section=${encodeURIComponent(row.id)}`,
+    to: "/class",
   }));
 }
 

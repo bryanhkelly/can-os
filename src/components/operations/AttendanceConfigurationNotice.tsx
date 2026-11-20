@@ -21,7 +21,7 @@ export function AttendanceConfigurationNotice({ programs, canConfigure, date }: 
   const incomplete = programs.filter(program =>
     program.configuration !== "configured" && program.configuration !== "not_onsite");
   if (!incomplete.length) return null;
-  return <section role="status" aria-label="Attendance setup next steps" className="mt-4 rounded-xl border border-warning p-4 text-sm">
+  return <section role="status" aria-label="Attendance setup next steps" className="mt-4  border border-warning p-4 text-sm">
     <h2 className="font-semibold">Attendance setup needs attention for {date}</h2>
     <p className="mt-1">No presence or absence is inferred from incomplete setup. Record only observed attendance after the roster is configured.</p>
     {incomplete.map(program => {

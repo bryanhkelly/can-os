@@ -271,7 +271,6 @@ export async function currentRoomMediaAudience(
         eq(learnerCourseAttempts.offeringVersionId,nativeClass.offeringVersionId),
         eq(learnerCourseAttempts.status,"active"),
         isNull(learnerCourseAttempts.enrollmentId),
-        isNull(learnerCourseAttempts.noncreditRegistrationId),
       )).where(and(
         eq(canonicalClassEnrollments.classId,nativeClass.classId),
         eq(canonicalClassEnrollments.status,"active"),

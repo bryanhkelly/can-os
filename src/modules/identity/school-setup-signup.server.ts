@@ -21,12 +21,14 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
 
   const slug = uniqueSlug(signup.schoolName, signup.id);
   const [organization] = await tx.insert(organizations).values({
-    type: "christian_school", name: signup.schoolName, slug,
+    type: "christian_school", name: signup.organizationName?.trim() || signup.schoolName,
+    slug, lifecycleStatus: "active",
   }).returning({ id: organizations.id });
   if (!organization) throw new Error("School organization could not be created");
 
   const [site] = await tx.insert(sites).values({
     organizationId: organization.id, name: signup.schoolName, slug,
+    lifecycleStatus: "planning",
     timezone: DEFAULT_SITE_TIMEZONE,
     metadata: { siteIdentityRevision: now.toISOString() },
     updatedAt: now,
@@ -64,6 +66,17 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
     personId=createdPerson?.id??null;
   }
   if (!personId) throw new Error("School administrator identity could not be created");
+  // The CAN login's immutable Person anchor must be established in the same
+  // verified-email transaction as the first Site Admin grant. Without it,
+  // redeemOneTimeAccess rejects a newly registered founder at session issue.
+  if (!account.personId) {
+    const [bound] = await tx.update(accessAccounts).set({
+      personId, updatedAt: now,
+    }).where(and(eq(accessAccounts.id, accountId), isNull(accessAccounts.personId)))
+      .returning({ personId: accessAccounts.personId });
+    if (bound?.personId !== personId)
+      throw new Error("School administrator Person binding could not be established");
+  }
 
   const [grant] = await tx.insert(accountPersonGrants).values({
     accountId, personId, role: "site_admin",

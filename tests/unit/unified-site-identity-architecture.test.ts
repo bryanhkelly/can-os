@@ -21,12 +21,13 @@ describe("one public-schema Site and Organization model",()=>{
   it("keeps shared Site identity and lifecycle in the public Drizzle model",()=>{
     const schema=read("src/db/schema/organizations.ts");
     const launch=read("src/modules/programs/launch.functions.ts");
-    const siteWizard=read("src/components/launch-studio/SiteFirstLaunch.tsx");
+    const launchRoute=read("src/routes/launch.site.tsx");
     expect(schema).toContain('siteKind: text("site_kind")');
     expect(schema).toContain('referenceCode: text("reference_code")');
     expect(schema).toContain('lifecycleStatus: text("lifecycle_status")');
     expect(launch).toContain('siteKind:data.siteKind,lifecycleStatus:"planning"');
-    expect(siteWizard).toContain("siteKind,stubOnly:false");
+    expect(launchRoute).toContain("listLaunchOptions");
+    expect(launchRoute).not.toContain("createSite(");
   });
 
   it("only inventories the exact Neon main branch, and performs no writes",()=>{

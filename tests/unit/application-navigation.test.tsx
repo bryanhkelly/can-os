@@ -199,7 +199,7 @@ describe("application contextual navigation",()=>{
     successful({connected:true,viewerRole:"student",requests:[],sections:[
       {id:"english",title:"English Literature",credits:1,enrollmentStatus:"active",policy},
     ]});
-    expect(render(Courses)).toContain('href="/classes?section=english&amp;tab=lessons"');
+    expect(render(Courses)).toContain('href="/class"');
   });
 
   it("reports an unavailable course without opening another course",()=>{

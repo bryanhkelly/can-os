@@ -102,7 +102,7 @@ function CreatorDraftEditor({data,navigation}:{data:Draft;navigation?:ReactNode}
       <details className="mt-6 border-t border-border pt-4">
         <summary className="cursor-pointer font-semibold">Advanced supplemental materials</summary>
         <p className="mt-2 text-xs text-muted-foreground">Preserve or update the complete canonical materials array. Practice questions must meet the server's approved schema. No private answer keys may be stored here.</p>
-        <Textarea className="mt-3 min-h-40 w-full border border-border bg-background p-3 font-mono text-xs"
+        <Textarea className="mt-3 min-h-40 font-mono text-xs"
           value={advancedMaterials} onChange={event=>{setAdvancedMaterials(event.target.value);setDirty(true);setValidation("");}}
           aria-label="Supplemental materials JSON"/>
       </details>

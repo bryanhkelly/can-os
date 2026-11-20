@@ -1,0 +1,586 @@
+# Launch Studio V6.1 integration and acceptance inventory
+
+**Scope:** `feature/launch-studio-v61-clean-cutover-20261118` (PR #348).
+**Evidence level:** Source inspection and static contract checks. No live browser session, authenticated API/database test, or build has been claimed.
+
+## One Site, one Launch Studio navigation
+
+The `/launch/site` route uses one `LaunchSiteFrame`. The four stages are
+Establish, Introduce, Prepare, Open. The stage sidebar remains outside each
+module's center content and right guidance rail. The mobile menu uses the shared
+`Modal` with native focus trapping, Escape/backdrop behavior, and return focus.
+SPA navigation retains exact Site scope; the active stage re-expands on module change.
+
+## Module-by-module contract
+
+| Module | Implemented destination | Remaining boundary |
+| --- | --- | --- |
+| Establish / Site Profile | Site-scoped V6.1 editor and audited canonical Site commands | Authenticated Site/profile amendment acceptance |
+| Establish / Site Information | Four internal steps and scoped revised Site metadata, private Story, explicit affiliation request | Live 390 px/keyboard/screen-reader review; prove private Story is not exposed in public projections |
+| Establish / Programs & Audiences | Two-step V6.1 intent form, scoped revised canonical Site preferences and separate timing/audience controls | Live save/reload/legacy-upgrade and navigation acceptance |
+| Establish / Website & Brand | Direct entry to existing `/launch/website` studio; exact selected Site and return to Launch | Live editor/save/preview/return path and publishing-role checks |
+| Introduce / Promote | Site-scoped Marketing Package library, purpose-specific Story/intent suggestions, immutable Brand-pinned output and downloads | Sending/distribution and recipient management are not implemented |
+| Introduce / Recruit Families / Learners | Reuses the same Marketing Packages and source projection, focused on interest invitations and program ideas; exact-Site handoff to existing consent-aware preopening family outreach with canonical Brand and editable Story suggestions | Site-level CRM is not implemented; interest invitation sending is separately registrar-authorized, not an automatic Marketing Package action |
+| Introduce / Interest Events | Uses the same Brand-pinned Marketing Packages; an active invitation package or the canonical Site editorial suggestion can seed the editable title of an authorized Program-linked event | Generic pre-Program Site events and automatic marketing distribution are not implemented; the operator must create the event independently |
+| Prepare / Invite Your Team | Existing exact-Site verified staff invitation/access workspace | Test verified role acceptance; no implicit appointment |
+| Prepare / Program Catalog | Unified CAN-published Solution browser, exact-version saved-plan resume, and inline canonical Site configuration editor; learning-product selection remains part of governed Solution configuration | CAN app-admin Blueprint authoring/publishing UI remains separate and incomplete; run authenticated save/reentry, qualification, and enrollment acceptance |
+| Prepare / Opening & Compliance | Existing authenticated compliance and canonical qualification review destinations | Site-specific evidence and jurisdiction review acceptance |
+| Open | Governed institutional readiness and Site operations handoffs | No automatic activation, publishing, opening or enrollment |
+
+**Boundary:** A planned landing is not a completed operational feature. No migration
+or new parallel Blueprint/Program/Offering/Section source of truth was introduced.
+
+## Design-system findings
+
+- Reuses canonical `Button`, `Field`, `Select`, `Checkbox`,
+  `WorkspaceShell`, `WorkspacePanel`, `WorkspaceNotice`,
+  `ActionFooter`, `StatusBadge`, `GuidedSetupShell`, and `Modal`.
+- Uses semantic color tokens, rectangular cards/controls and the shared layout.
+- Maintains Site Information's four center-pane steps. The sidebar does not
+  replicate those internal steps.
+- Website editor and existing Program/service destinations retain their
+  independently authorized workflows. The Launch route does not duplicate them.
+- Normal module navigation is route-aware; the mobile drawer is an accessible
+  modal rather than an untrapped overlay.
+
+## Source-level check
+
+A 24-point source inspection checked module coverage, route ownership, exact
+Site readers, V6.1 components, modal navigation, private Story audit minimization,
+revision locks, guarded Program discovery and no auto-opening claims. All 24
+conditions evaluated true. These are **source predicates**, not tests of runtime
+behavior or accessibility.
+
+Added `tests/unit/launch-v61-module-handoffs.test.ts`, `tests/unit/launch-introduce-integration.test.ts` and
+`src/components/launch-studio/LaunchStudioDestinations.stories.tsx` as regression
+and visual-review surfaces. Their execution is not claimed.
+
+## Release gates: still open
+
+1. `npm run check:build-source-syntax`
+2. `npm run typecheck` and `npm run build`
+3. `npm run test -- tests/unit/launch-v61-module-handoffs.test.ts`
+   plus focused Site Information and Programs & Audiences unit tests
+4. `npm run lint` and `npm run test:design-audit`
+5. `npm run build-storybook` / `npm run test:storybook` / representative visual review
+6. Authenticated Site-admin and registrar journeys at 390, 768, 1024 and
+   1440 px, keyboard/Escape/focus, screen-reader naming and 200% zoom
+7. Real persisted create/reentry/save/unsaved-conflict/save-success-but-refresh-fails
+   checks; multi-Site and unauthorized Site scope rejection; no cross-Site leak
+8. Website draft/publication role separation; canonical Program adoption,
+   Site qualification, opening and enrollment authorization gates
+9. Deployed commit SHA confirmation and independent production acceptance
+
+The Netlify deploy-preview provider has skipped builds due to the account's
+build-usage limit, not due to a proven code-build failure. A CI status from
+that provider must not be reported as a TypeScript/build result.
+
+**Conclusion:** All eleven sidebar destinations now have intentional owned
+navigation or implementation, but Launch Studio V6.1 remains **unreleased/
+unaccepted** until executable gates pass. Planned modules remain explicitly
+planned, not silently reclassified as complete.
+
+## Follow-on source integration, 2026-11-19
+
+Introduced one presentation-only `launch-introduce-v61.ts` configuration, routed all three Introduce modules through the existing Marketing Packages and Site Story/Programs/Brand services, removed the obsolete Introduce placeholder destinations and Storybook fixtures, and preserved permission-checked operational handoffs. No database migrations were run, no changes were made to main, and no build, browser, or deployment verification is asserted by this follow-on work.
+
+Follow-on integration also enables the existing `purpose=interest` family invitation mode, with exact-Site Program filtering, editable saved Story/intent suggestions and the existing canonical family Brand resolver. The preexisting Program-linked Interest Events workspace now filters available Programs to its selected Site. This is application source work only; send/run and authorization tests remain pending.
+
+
+## 2026-11-19 · Continued Launch product integration (source)
+
+- Corrected Interest Events links to retain the actual Site ID and Program Catalog context. Verified that a selected Site filters the Event Program chooser; the selector now derives a valid timezone through the schema result.
+- Fixed shared family-invitation form validation so the first submit checks contacts, subject, introduction and that the Program is among the current authorized Site/purpose choices.
+- Prepare / Publish Site now allows authorized Site Admins to inspect status using draft-read authority, but independently evaluates the actual Site publisher assignment before exposing publication controls. Network-governed/local publisher approval remains separately checked.
+- The authenticated Launch topbar Site preview now uses `readSavedBrandVersion` and `siteBrandPresentationIdentity` for the saved immutable Brand instead of treating legacy embedded website fields as the authoritative palette, fonts or media. The structural template still comes from the saved website revision. Rights/consent filters apply to both media slots.
+- First-visit preview now uses the same saved Purpose & Story candidate/starter helpers as the Website editor, without persisting suggested copy or overwriting saved revisions. The read-only preview uses exact Site `program.read` authority; launch mutation capability is not necessary.
+- Added or updated focused regression tests for navigation, invitation validation, canonical preview behavior and publication permission projections.
+- No migrations, production commands or `main` changes have been made. Build, TypeScript checks, database acceptance, authenticated browser tests and actual network-delivery checks remain unexecuted.
+
+
+## 2026-11-19 · Unified preview and event creation follow-up
+
+- Corrected private website preview return links from invalid `step=preview` to the supported `step=review` and HTML-escaped query separators.
+- Both full-page preview entry points now resolve the current saved Site Brand and display name without introducing a second identity store. The first-visit Website editor preview also uses the saved Brand even with no Site website-copy revision. A new regression test verifies this behavior.
+- Both private preview entry points use the same `projectPlannedSiteProgramsForPreview` against saved Programs & Audiences; no new Offering is created.
+- After a new Interest Event is created, the detail link uses the created event's actual Program rather than an unrelated earlier URL filter. Event Program changes validate the timezone and send timezone corrections to Establish / Site Profile.
+- A saved event-invitation Marketing Package can now hand off its headline to the existing independently governed event creation screen, scoped by Site and package ID. With no usable package, the same Site editorial suggestion is available. No message distribution, event persistence or registration is triggered by the read-only prefill.
+- Added source contracts and server-rendered component tests, but none have been executed. Netlify PR deploys are currently skipped due to account build-usage limits, which do not establish a compile failure.
+
+## 2026-11-19 · Package-to-operation integration and failure recovery
+
+- Recruit and Interest Events now share a single presentation configuration for their specific active-package handoffs. This carries an exact Site/Package reference, not copied canonical state.
+- The existing family interest invitation form can start with a saved Package headline and message, with original text claim checks, email subject bounds, authorized Site/Program filtering, an explicit send confirmation and no imported contacts. New preopening interest batches and their delivery worker require a saved canonical Site Brand; this does not change legacy application sending.
+- The Interest Event create route now refuses stale/cross-Site Site, Program and Package hints rather than selecting a sibling Site. Valid saved event Packages supply editable title and description. The existing Story/Program editorial projection is used only when no Package was explicitly selected.
+- Event create retries preserve a stable request identifier across uncertain network outcomes and rotate it only after successful acknowledgment; the server continues to own idempotency and the independently governed calendar/event records.
+- The Introduce package library disables new work until a saved Site Brand has actually been verified and offers an explicit retry when the status query fails.
+- The Site-first private preview now links back to the authorized Launch overview, not a website editing role the viewer may not hold.
+- Added test fixtures: `launch-interest-event-handoff.test.ts`, `launch-recruit-package-handoff.test.ts`, plus updated page contracts. No tests or builds were executed, and Netlify deploy previews continue to be blocked by usage limits.
+
+**Acceptance still required:** TypeScript, unit/integration suite, V6.1 design-system lint, authenticated save/reload across Sites, controlled delivery tests and Playwright journey on an explicitly disposable migrated database. The user-directed order remains current-code integration, refinements, database, then main.
+
+## Launch stage ordering: remaining Program vs Solution boundary
+
+Establish / Programs & Audiences stores declared Site intent, **not** a concrete operating Program or approved Solution. Introduce can immediately author Site-level announcements and reusable family/event invitation Packages from that intent and the saved Brand. Actual family invitation sending and Interest Event creation currently use the canonical, independently authorized Program-linked services and require an eligible real Program row.
+
+This is intentional fail-closed behavior but it means a brand-new Site with only broad intent cannot yet send invitations or create Program-linked events. Do **not** fabricate a Program, select an unrelated Site's Program, insert mock contacts, or create a second Site-level CRM to paper over the gap. Any fully pre-Program Site inquiry/event capability must be designed against the canonical public Site/Person/Event model at the later database-design phase, without equating Program intent to a Solution or opening enrollment.
+
+The shared family invitation validator also rejects multi-line subjects, including CR/LF header injection, and package handoff checks original claims before limiting a subject to the provider's email bound. Event creation retains one idempotency key during uncertain retries; when an existing invitation-only event is recovered without its one-time RSVP token, the user is directed to the authorized explicit link rotation command instead of silently revoking shared links.
+
+
+## V6.1 Launch Studio design-system realignment (November 19, 2026)
+
+This pass repaired the missing object-property separators in the Prepare /
+Funding & Admissions module, then applied the repository-approved V6.1
+primitives and application patterns across the current Launch Studio route,
+Website & Brand, Introduce Marketing Packages, Prepare, and Open handoffs.
+
+- Shared `GuidedSetupShell` step navigation composes canonical `Button`
+  instead of standalone native controls. Browser-visible steps remain local to
+  their module, not duplicated in the Launch sidebar; visits do not imply saved
+  or completed requirements.
+- The global Launch sidebar activates at `xl` to preserve usable working
+  width beside the context rail, and nested navigation links have 44px touch
+  targets. The mobile menu retains the shared focus-managed `Modal`.
+- Marketing Packages uses the same `Button` geometry as other V6.1 choices
+  and an `ActionDialog` to confirm discarding unsaved changes.
+- Website & Brand uses `ActionDialog` for reloading conflicted work and
+  restoring historical revisions. Demo warnings, conflict recovery and
+  unavailable storage now use semantic `WorkspaceNotice`, not local amber
+  palettes.
+- Programs & Audiences reuses `ActionFooter` and exposes an explicit
+  reload-and-reconcile action after uncertain persistence.
+- Catalog's existing governed planning links now compose shared
+  `Button asChild` actions. Preview sharing uses semantic success colors.
+- Strict ESLint scoped to the V6.1 Launch screens and embedded canonical
+  planning components enforces shared form controls and semantic color
+  utilities. It intentionally permits wrapping `<label>` for accessible
+  full-card checkbox/radio selection, without permitting native form fields.
+- `tests/unit/launch-v61-design-system.test.ts` adds TSX syntax, raw-control,
+  geometry, semantic-color and key workflow checks across the Launch surfaces.
+  `LaunchV61StepNavigation.stories.tsx` adds two- and four-step interactive
+  examples. The Prepare story and shared Button route expectation were
+  corrected to their current source contracts.
+
+**Inspection only:** A source-level scan found no raw `button`, `input`,
+`select` or `textarea` elements, unsupported rounded card utilities,
+or hard-coded numeric Tailwind alert colors in the audited current Launch
+components and direct website editor. This is not evidence of a successful
+TypeScript compilation, running unit tests, rendered screenshots or accessibility
+acceptance.
+
+**Still required:** Execute `npm run typecheck`, `npm run build`, focused
+and full unit tests, `npm run lint`, design-system inventory checks, Storybook
+and authenticated Playwright journeys at 390/768/1024/1440px and 200% zoom.
+Resolve PR #348's merge conflicts only after current-code integration and
+database review. Preserve pending migrations and independent publication,
+opening, safeguarding and enrollment gates. No change to `main` is part
+of this design pass.
+
+
+## 2026-11-19 · Prepare Solution select, save and resume integration
+
+- **Ownership:** CAN app administrators own the published Blueprint/Solution
+  definitions. Site administrators and registrars only create and revise
+  Site-scoped *configurations*, never immutable Blueprint recipes. The existing
+  restricted SQL `blueprint_author` role is a local configuration role, not
+  permission to insert or publish `blueprints` or `blueprint_versions`.
+  CAN-admin graphical Blueprint authoring/publishing is **not implemented** by
+  this cutover and must not be represented as operational.
+- **One operator catalog:** Prepare renders `SolutionCatalogV61` once. Published
+  learning-product selection remains within the existing canonical configuration
+  picker, rather than a second independent discovery panel. Saved Establish
+  Program codes/vision can order suggestions but never establish qualification.
+- **Version-pinned resume:** Operators can start a plan or reopen a saved draft
+  for the selected published Blueprint version. Inline editor and catalog share
+  `selectSavedSolutionPlans`; Site authorization and ownership remain enforced
+  by server commands. Reopened records must match the exact Site and selected
+  Blueprint version, and the editor does not overwrite CAN's published recipe.
+- **Readback after writes:** Configuration create/save/submit uses existing
+  revision-checked canonical mutations and reloads the authorized workspace
+  before opening the saved revision. A successful write with failed readback
+  is reported separately. Uncertain writes fail closed and ask for reload
+  before another write, rather than creating duplicate configurations.
+- **No new source of truth:** No new DB tables, provisioning changes, schema
+  migration, enabling of enrollment, or changes to `main`.
+- **Source checks:** Verified 12 of 12 scoped source invariants manually,
+  including one catalog, exact-version resume, Site/version guards,
+  configuration authorization, and fail-closed uncertain-write behavior.
+  Updated source-contract and Vitest regression tests were committed but
+  **not executed**. There is no evidence of passing TypeScript, build,
+  Playwright, or authenticated database acceptance.
+
+### Unclosed acceptance requirements
+
+1. Run `npm run typecheck`, `npm run build`, `npm run lint`, and focused
+   `tests/unit/canonical-blueprint-boundary.test.ts`,
+   `tests/unit/launch-prepare-v61.test.tsx`,
+   `tests/unit/launch-prepare-provisioning-contract.test.ts` and
+   `tests/unit/canonical-blueprint-workspace.test.tsx`.
+2. Exercise create → save → reopen → revise → submit → review under a
+   disposable test Site, verifying saved revision identity, Site isolation,
+   published-version pinning, and rejected stale/unauthorized requests.
+3. Implement and separately secure the CAN app-admin Blueprint definition
+   authoring, approval, and publishing experience before calling that capability
+   complete. Do not grant Site configuration roles publishing privileges.
+4. Keep Site qualification, specific Offering adoption, Class registration,
+   website publication, and opening/enrollment authorization independently
+   governed. Do not equate a saved plan with permission to operate.
+
+
+## 2026-11-19 · Detailed Prepare implementation follow-up
+
+**Reviewed actual code paths:** `/site/new` verified signup, `/launch/site`
+routing, Establish Programs & Audiences, `SolutionCatalogV61`,
+`CanonicalBlueprintWorkspace`, published-Offering adoption picker,
+canonical Blueprint readers/mutations, scoped PostgreSQL roles, and
+operator navigation. Code inspection only; not a successful build.
+
+### Corrected in branch
+
+- One operator navigation entry: Launch Studio → Prepare → Program Catalog.
+  The older `/canonical/blueprints` authorized route remains for backwards
+  compatibility, but its separate Site operator sidebar link is removed.
+- Protected unsaved Solution edits with the shared navigation blocker and
+  ActionDialog confirmation for within-catalog selection changes. A pending
+  write or unreconciled save now blocks switching plans.
+- Fixed starting a new plan to retain mandatory components, and cleared
+  transient local-experience inputs between plans.
+- Saved Offering intents for hidden/proposed Program components are preserved
+  when the visible picker is edited, using one shared immutable merge helper.
+- The picker now defaults to the Site's saved delivery preference, discards
+  stale in-flight catalog responses after delivery/Site changes and unmount,
+  and never infers operating or enrollment approval from search results.
+- Saved Site Program references do not require redundant catalog revalidation
+  when the operator edits other Site vision fields. **New** references still
+  require live, Site-scoped published-reference checks.
+- Added or updated regression tests for the above contracts. The tests have
+  **not** been executed in an authenticated test environment.
+
+### Remaining integration and acceptance gates
+
+1. **First-party Site planning, corrected in source.** A verified CAN Site
+   administrator or registrar now enters the private Solution catalog and
+   configuration workflow using their existing CAN Site grant. The application
+   rechecks the canonical public Site's ownership and lifecycle inside each
+   planning transaction. No second operator relationship, native staff
+   correspondence, or per-Organization SQL role is needed for first-party
+   *planning*. The old scoped PostgreSQL role path remains for separately
+   provisioned native or delegated operators and independent review.
+   The actual `DATABASE_URL` role and its enforced RLS posture still require
+   deployment verification: the new CAN application path uses the same
+   server-side database connection and Site authorization pattern as Establish
+   rather than the native `SET LOCAL ROLE` planning transaction.
+2. **CAN app-admin Blueprint authoring.** Current UI supports Site-owned
+   configuration against published recipes; it does not implement an
+   independently authorized CAN-admin create/review/version/publish workflow
+   for the published Blueprint definitions. The starter seed alone is not
+   an administrator Studio or the full COGIC pilot solution catalog.
+3. **Operational requirements/readiness.** The catalog currently projects
+   recipe component keys and requirement modes. It does not yet integrate
+   complete, jurisdiction-scoped staffing/facility/equipment/evidence
+   requirements or independently verified readiness into one Prepare
+   operator experience.
+4. **Offering activation.** A saved and reviewed Solution remains a planning
+   configuration. Operation selection, Deployment, approved published Offering
+   adoption, Class scheduling, and learner registration still have separate
+   owners and gates. No end-to-end newly created Site → enrollable COGIC
+   Class acceptance is established.
+5. **Executable verification.** Run focused Vitest, TypeScript, design-system
+   checks, full build, and authenticated Playwright/role/RLS fixtures when
+   a capable environment is available. GitHub PR #348 remains draft and
+   nonmergeable; Netlify deploy-preview status is not proof of compilation.
+
+**Release decision:** Implementation improved, but not accepted as a fully
+provisioned, enrollable launch. Do not merge to `main` or alter production
+schema on the strength of source-only checks.
+
+
+## 2026-11-19 · Verified CAN Site grant is sufficient for private Solution planning
+
+The previous fresh-Site authorization requirement was incorrect. In the
+Launch Studio owner workflow, the authoritative verified CAN Site grant must
+be enough to start private Solution planning. This branch now implements it
+using the existing shared `public.sites` identity rather than manufacturing
+native operator links or issuing a second staff account.
+
+- `getBlueprintPlanningContext` authenticates the current verified CAN session,
+  Person, Site Admin/Registrar grant, owning Organization, and verified email.
+  It explicitly rejects demo delegation and grants only `blueprint.read`,
+  `blueprint.configure`, and `program.launch.start`. A private server-side
+  WeakSet marks this context; browser-supplied properties cannot opt in.
+- Workspace, published reference catalog, published-Offering lookup, and
+  configuration create/read/save/submit now verify the exact public Site
+  and owning Organization and use this first-party CAN planning context.
+  Saved versions cannot be transferred across Sites. Delegated native
+  operators retain the existing purpose-bound PostgreSQL role path.
+- Read-only review status/history for a Site's own plan uses the same verified
+  Site owner. Independent `blueprint.review` decisions, Blueprint execution,
+  actual Offering adoption, publishing, enrollment, and activation have *not*
+  been granted by this change.
+- Verified-email signup now binds an otherwise unbound CAN account to its one
+  Person in the same transaction and explicitly creates an active Organization
+  with a `planning` Site. This is not opening or accreditation authorization.
+- Catalog error messaging no longer tells verified new Site owners to request
+  manual operator provisioning.
+- Regression tests cover CAN login, demo/unverified denials, exact Site and
+  Organization scope, closed Site denials, immutable Person binding, and
+  approval separation. The tests have been committed but not executed.
+
+**Security/runtime acceptance:** Existing Neon main metadata reports
+`neondb_owner` as `rolbypassrls=true`. The actual application database
+credential was not inspected. Before merging, verify this first-party
+planning path against the configured application role, with cross-tenant
+negative tests, revocation, transactional ownership checks, and audit/event
+persistence. A first-party application service authorization is *not*
+evidence that restricted-role RLS was exercised. Do not conflate the
+normal Site planning path with approval/deployment role provisioning.
+
+
+## 2026-11-19 · Establish-to-Prepare Catalog and published COGIC package integration
+
+- **Single authorization:** `exploreBlueprintReferenceCatalog` now uses the
+  verified CAN Site planning context. A founder's existing authenticated Site
+  administrator grant can browse published Program references in Establish
+  and published Solutions in Prepare without a second canonical operator role.
+- **Save-time integrity:** Adding a new Program reference inside
+  `saveSiteProgramsAudiencesV61` now calls the same published-reference query
+  inside the already authorized, revision-locked Site transaction. It does not
+  open a nested catalog transaction or use an unrelated DB role. Previously
+  saved/retired reference codes remain removable without requiring catalog
+  availability.
+- **Published operating details:** Site-facing Solution cards and editors now
+  render whitelisted CAN-authored `componentSpec.description` text and explicit
+  independent-review requirements. Raw unpublished/internal component specs
+  are not exposed.
+- **Published Solution product:** The existing `Blueprint.spec.offeringCode`
+  is resolved to the latest active/published Offering version **owned by the
+  same publisher Organization**. The linked product can be added as a
+  version-pinned private proposal without requiring a current geographic
+  availability decision. The existing availability-policy picker and all
+  execution/review/enrollment gates remain independent.
+- **COGIC pilot data observed:** Two active published pilot Blueprint versions
+  and their twelve component definitions are present on Neon main. No
+  published qualification fit policies or associated policy requirements were
+  observed. Consequently the application must not infer Site readiness,
+  regulatory eligibility or enrollability from the published product link.
+- **Verification:** Source contracts (20/20 inspected assertions) and focused
+  regression tests were authored and committed, but the new tests have not
+  been executed in a functioning CI/build environment. GitHub Actions and
+  the Netlify preview currently report failures without a successful build
+  acceptance. Authenticated browser and RLS/role tests remain necessary.
+- **Scope:** Feature branch only. No production writes, new schema, approval
+  grants, website release or enrollment activation.
+
+
+## Functional and security follow-up (November 19, 2026)
+
+The source branch now includes the following integration changes, all written
+against existing Site, Blueprint and Program authorities:
+
+1. **Retired Program references:** Establish retains previously saved catalog
+   codes and displays an explicit Remove reference control for items missing
+   from the currently published catalog. The server allows removal but
+   validates newly added references against the published catalog inside the
+   locked Site update transaction.
+2. **Source-derived next action:** Launch Overview reads saved Site Information,
+   Programs & Audiences, current Brand, Marketing Packages and reserved website
+   draft. Missing and unavailable sources are distinct; no page visit is
+   treated as task completion. The navigation sidebar presents the canonical
+   Site lifecycle rather than a fixed Preparing label. Preview availability
+   requires an actual saved website address.
+3. **Operational readback:** Prepare and Open use a shared read-only component
+   showing existing Solution configuration drafts/submissions, current Program
+   launch requirements and their actual incomplete blockers, and Site
+   website publication. An unavailable read fails closed with a visible
+   unknown state. Neither Solution plan submission nor a Program requirement
+   count is an Offering enrollment authorization. The receiving Program/Class
+   services still own activation.
+4. **Unsaved navigation:** Launch Studio and Website & Brand mount the shared
+   focus-managed ActionDialog with TanStack's resolver flow. Active module
+   guards register their dirty state with the outer frame, with browser-native
+   beforeunload protection retained.
+5. **Visual acceptance:** Strict coverage now consults
+   `docs/verification/v61-visual-evidence.json` and requires source-hash
+   matching and independently reviewed mobile/tablet/desktop screenshots.
+   The ledger starts empty; visual certification is **not** claimed.
+6. **Planning authorization regression:** New tests target forged CAN context
+   objects, exact Site and Organization scope, disabled/unverified/demo
+   accounts, closed Sites, and permitted unclassified private planning.
+   These are test cases for the existing server authorization path, not a
+   substitute for real authenticated cross-tenant integration or database
+   RLS acceptance.
+
+### Read-only Neon policy inspection
+
+A read-only inspection of Neon project `can-os`, branch `main` on
+November 19, 2026 found RLS enabled and forced for
+`public.sites`, `public.blueprints`,
+`public.blueprint_versions`,
+`public.blueprint_configurations`, and
+`public.blueprint_configuration_versions`. The latter Blueprint tables
+include a trusted-owner policy and role-scoped canonical policies. The
+inspection does **not** establish effective app-login least privilege or prove
+that a verified CAN Site session cannot cross Site boundaries via HTTP.
+`public.site_publications` was reported without RLS, and
+`public.site_marketing_packages` had RLS enabled without standalone
+policies; their application-service authorization must be tested separately.
+Do not infer a vulnerability solely from a table's RLS flag.
+
+**Remaining acceptance:** Run the V6.1 build, TypeScript, unit tests,
+authenticated Site A / Site B / closed-Site planning journeys, fresh Site
+signup, retry/conflict tests, and mobile/keyboard/contrast visual review
+against a fixed SHA in an isolated environment. Existing hosted build/CI
+runs are not a proof of success. Production approval and data migrations
+remain separate.
+
+
+## 2026-11-19 · Live Facilities, Team, and Schedules in Prepare
+
+The three operational Prepare modules now reuse actual Site records and
+authorized write services **inside Launch Studio**, rather than rendering
+only links to separate administrative workspaces:
+
+- **Facilities & Resources:** Reads and revision-checks the existing Site
+  Information learning environment. Saves via `saveSiteInformationV61`,
+  retaining the audited canonical Site metadata and Establish delivery.
+  Physical room names and capacities reuse `RoomCoverageWorkspace` and
+  `createRoomAtSiteFn`. An uncertain save is reconciled before replay.
+- **Team & Responsibilities:** Reuses `ScopedAdminConsole` extracted
+  from `/admin`, with `lockedSiteId` enforced in the embedded form
+  and grants presentation. Invitations and onboarding readiness remain in
+  `inviteStaffMember` and `listAccessAccounts`. Staff invitation,
+  acceptance, qualifications, screening, and final assignments are separate.
+- **Schedules & Capacity:** Reuses the existing academic-year reader and
+  creator, room-coverage schedules, and native Class manager. Existing
+  school years can be reviewed and new years created with a fixed Site,
+  while the authoritative year detail retains term/calendar editing.
+  Embedded native Class management is **draft-only**. Activation,
+  Class Offering publication, and enrollment controls are excluded.
+  The original room coverage service currently links `public.sections`;
+  canonical Class drafts have a separate identity and are **not**
+  automatically connected to those room coverage assignments.
+- **Shared components:** The original admin route re-exports its extracted
+  staff component, avoiding a second implementation; room coverage
+  supports distinct rooms and schedules views, with defaults unchanged;
+  original Class and School Year routes retain their normal behavior.
+- **Unsaved work and permissions:** Facilities reload and school-year form
+  dismissal require confirmation when locally dirty. Every existing
+  backend mutation still enforces its own exact Site, role and business
+  readiness constraints; embedded UI does not broaden authority.
+- **Tests:** Updated Prepare SSR coverage and authored focused source
+  contract tests for persisted environment, exact-Site staff invitations,
+  room capacity/coverage, school-year records, and draft-only Class.
+  Read-only source checks completed (20/20). **Executable Vitest,
+  TypeScript, full build and authenticated end-to-end acceptance have
+  not been established.**
+- **Scope:** Feature branch only. No database migration, production write,
+  enrollment authorization, or `main` merge.
+
+### Remaining operator-flow work
+
+A full native-Class-to-room/session assignment model, richer Site evidence
+and capability inspection, and authorized calendar detail editing inside
+Prepare require dedicated integration. Do not claim a saved room, Class,
+school year, or staff invitation is legally verified or enrollment-ready.
+
+
+## 2026-11-19 · Follow-up Prepare integration audit and fixes
+
+- **Embedded form runtime:** `FormActions` can omit Cancel when used in
+  Launch Studio while retaining the standalone page's safe pending-link
+  behavior. Focused render tests added.
+- **Exact Site:** The embedded native Class editor hides unauthorized sibling
+  Site choices and refuses a draft create when its selected Site differs from
+  the current Launch Studio Site. Independent backend permissions are unchanged.
+- **Unsaved changes:** The embedded academic-year form relies on the shared
+  V6.1 navigation blocker, avoiding competing confirm dialogs. Editing the
+  grading-scale name now marks the form dirty, and in-form reload/dismissal
+  confirms before discarding unsaved work.
+- **Actual capabilities vs. labels:** Facilities room creation is separated
+  from old school Program facilitator coverage. The legacy coverage scheduler
+  remains accessible but explicitly optional, lazily mounted, and **not**
+  described as canonical Class Session scheduling.
+- **Pilot-friendly scheduling:** Class preparation is primary; academic-year
+  management is optional for school-year models and is not incorrectly required
+  for one-hour training or flexible four-session noncredit classes.
+- **Less duplicate UI:** Existing external handoffs for already-embedded
+  Facilities, Team and Schedules controls are collapsed into advanced actions.
+  This does not change the owning write/read services.
+- **Verification:** Focused static source contracts inspected: 16/16.
+  New or expanded tests are committed but the current repository has not
+  completed successful executable build, TypeScript, Vitest, browser and RLS
+  acceptance for this branch. A failing hosted preview is not evidence of a
+  particular code error absent build logs.
+
+### Remaining P0/P1 work, outside this quick fix pass
+
+1. **Native Class Session preparation** inside Prepare, with flexible dated
+   sessions rather than a mandatory school-year schedule. Keep independent
+   Course adoption, Site operation and enrollment decisions.
+2. **Canonical room assignment migration:** the existing room-coverage service
+   still links older school Program class/Section records. Native Class
+   identities must be mapped through one governed model, not a second editable
+   attendance/scheduling store.
+3. **Solution-linked coverage:** make CAN-published component requirements
+   drive the required staff appointments, physical resources, equipment,
+   connectivity, evidence and capacity at the selected Site.
+4. **End-to-end acceptance:** test new CAN Site/admin signup through Establish,
+   Solution selection and draft, Site-bound staff invite, room creation, class
+   options and scheduling, submitted approvals and enrollment gating. A newly
+   created Site may lack the canonical operation relationships required to
+   create operational Classes; that must display as a real authorization
+   dependency, not be bypassed by a private planning action.
+
+
+## 2026-11-20 · Canonical Class room assignments and complete Site facilities
+
+Both requested Launch Studio Prepare implementations are now in the branch:
+
+1. **Physical spaces and resources:** Facilities & Resources uses existing
+   `public.site_spaces`, not a second editable `site_rooms` directory.
+   Operators can create spaces and revise names, maximum occupancy, declared
+   connectivity and estimated download speed, available device counts,
+   accessibility features, specialized equipment, and notes. All are
+   **self-reported planning records**, not capability assertions or independent
+   facility verifications. The existing `resources` JSONB preserves unrelated
+   qualification metadata, namespaced under `launchPlanningV61`.
+   Writes check the exact Site and organization, use stable room IDs and
+   optimistic `revision`, preserve transactional audit/events, and prevent
+   lowering an occupied room below planned Class seating (or clearing its
+   occupancy limit while Classes reference it).
+2. **Canonical Class physical assignments:** Prepare → Schedules & Capacity
+   now displays a Site-specific physical-room and facilitator planner using
+   `public.classes`, `public.site_spaces`, and existing
+   `public.class_staff_assignments`. It does not use old
+   `public.sections` or `room_coverage_sections`. A Site operator may
+   select one default physical room and an **existing approved Class
+   facilitator assignment** for a draft/approved Class only, after current
+   Deployment, Course, Site, capacity and grant checks. The database enforces
+   composite Site/Space and Class/Staff foreign keys so cross-Site and
+   cross-Class references cannot silently be persisted.
+3. **Shared workflows:** Draft Class creation invalidates the canonical
+   room-planning read, so the newly created Class appears without a second
+   Class store. CAN staff assignment still flows through the existing
+   `assignNativeClassStaff` command; room planning does not issue a
+   facilitator grant. Operational Session scheduling remains canonical and
+   independent.
+4. **Migration isolation:** The additive migration is recorded in
+   `database/production/2026-11-20-launch-v61-canonical-class-physical-space.sql`.
+   It was executed on the **isolated Neon branch**
+   `v61-launch-brand-migration-validation-20261119`
+   (`br-bitter-pine-ar7mjn70`), not production `main`. Read-only checks
+   verified one previous room migrated as a Site Space, three new Class
+   columns, and the composite Class-specific facilitator foreign key.
+   No Class assignment/retirement operations were executed against live
+   records.
+5. **Verification remaining:** Added domain and source-contract regression
+   coverage, but no successful TypeScript/Vitest/production build, role/RLS
+   or authenticated browser tests have been observed for these commits.
+   No merge to `main` is justified yet.
+
+**Important boundary:** Physical-space and facilitator assignment here is a
+*Class-level planning default*, not a dated Session room booking, daily
+presence verification, fire/accessibility approval or enrollment release.
+Room-time collision detection and approval-specific evidence must remain
+independently verified before an operational Class Session opens.

@@ -52,13 +52,13 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
     <Label htmlFor="workspace-switcher-search" className="mb-2 block">Search workspaces</Label>
     <Input id="workspace-switcher-search" type="search" autoComplete="off" value={query}
       onChange={event => setQuery(event.target.value)} placeholder="Search people, roles, or schools…"
-      className="mb-5 min-h-11 rounded-none" />
+      className="mb-5 min-h-11 " />
     <div className="space-y-2" aria-busy={changing}>
       {grants.map(grant => {
         const active = grant.id === session.activeGrantId;
         return <Button key={grant.id} type="button" variant="outline" disabled={changing} aria-current={active ? "true" : undefined}
           onClick={() => { if (active) close(); else onSwitch(grant.id); }}
-          className="min-h-20 w-full flex-col items-start gap-0 rounded-xl px-4 py-3 text-left">
+          className="min-h-20 w-full flex-col items-start gap-0  px-4 py-3 text-left">
           <span className="flex flex-wrap items-center gap-2 text-sm font-semibold capitalize">
             {grant.role.replaceAll("_", " ")}{active && <StatusBadge tone="success">Active</StatusBadge>}
           </span>

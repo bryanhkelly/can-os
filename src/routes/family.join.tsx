@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { useEffect,useState } from "react";
@@ -63,16 +65,21 @@ function FamilyJoinPage(){
    }catch{setStatus("Unable to verify your email right now.");}
    finally{setBusy(false);}
  }
- return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
-   <h1 className="font-serif text-3xl">Confirm your school application email</h1>
-   <p role="status">{ready&&!token?
-     "Verification link missing. Open the email sent after choosing Apply on your school's website.":
-     status}</p>
-   <p className="text-sm text-muted-foreground">After verification, you can begin
-     your student's application. School staff independently verify legal guardian authority
-     before child records, consents or offers can be accessed.</p>
-   <button disabled={!ready||!token||busy} type="button" onClick={()=>void verify()}
-     className="rounded-lg bg-foreground px-5 py-3 font-semibold text-background disabled:opacity-50">
-     {busy?"Verifying…":"Verify email and continue"}</button>
- </main>;
+ return <WorkspaceShell width="reading" eyebrow="Family enrollment"
+   title="Confirm your school application email"
+   subtitle="Verify your email to continue with your school's application process.">
+   <WorkspacePanel title="Verify your email" className="mt-6">
+     <div className="space-y-5">
+       <p role="status">{ready&&!token?
+         "Verification link missing. Open the email sent after choosing Apply on your school's website.":
+         status}</p>
+       <p className="text-sm text-muted-foreground">After verification, you can begin
+         your student's application. School staff independently verify legal guardian authority
+         before child records, consents or offers can be accessed.</p>
+       <Button disabled={!ready||!token||busy} type="button" loading={busy}
+         loadingLabel="Verifying…" onClick={()=>void verify()}>
+         Verify email and continue</Button>
+     </div>
+   </WorkspacePanel>
+ </WorkspaceShell>;
 }

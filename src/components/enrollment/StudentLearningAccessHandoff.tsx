@@ -87,17 +87,17 @@ function ApplicationLearningAccessHandoff({
   }catch(e){setError(mutationErrorMessage(e, "Student access handoff could not be completed"));}
   finally{setBusy(false);}
  }
- if(status==="blocked"&&blocker)return <section aria-label="Student learning account" className="mt-4 rounded-lg border p-4 text-sm">
+ if(status==="blocked"&&blocker)return <section aria-label="Student learning account" className="mt-4  border p-4 text-sm">
   <h4 className="font-semibold">Student learning account · Next requirement</h4>
   <p role="status" className="mt-2">{blocker.message}</p>
   {hasRegistrarAuthority(role)?(blocker.target==="academic_setup"
    ?<Link to="/launch/school/$programId" params={{programId:blocker.programId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>
    :<Link to="/admissions" search={{siteId:blocker.siteId??undefined,programId:blocker.programId,application:blocker.applicationId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>)
    :<Link to="/messages" className="mt-3 inline-block underline">Ask admissions to complete this requirement</Link>}
-  <button type="button" onClick={()=>setRetry(value=>value+1)} className="ml-3 rounded border px-3 py-2">Check again</button>
+  <Button variant="outline" type="button" onClick={()=>setRetry(value=>value+1)} className="ml-3">Check again</Button>
  </section>;
  if(status==="access_unavailable")return <section aria-label="Student learning account"
-  className="mt-4 rounded-lg border p-4 text-sm">
+  className="mt-4  border p-4 text-sm">
   <h4 className="font-semibold">Student learning account · Access needs review</h4>
   <p role="status" className="mt-2">A prior guardian authorization was approved, but the
    student's current school login grant is no longer available. A sign-in link
@@ -105,20 +105,20 @@ function ApplicationLearningAccessHandoff({
   <p className="mt-2">{hasRegistrarAuthority(role)
     ? "Review the original student grant, account status and school authorization. Restore access only through the independently authorized student-access restoration workflow."
     : "Contact admissions to review the student's separate school account. Your guardian sign-in does not restore the student's access."}</p>
-  <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
-   onClick={()=>setRetry(value=>value+1)}>Recheck access</button>
+  <Button variant="outline" type="button" className="mt-3"
+   onClick={()=>setRetry(value=>value+1)}>Recheck access</Button>
   <Link to="/messages" className="ml-3 inline-block text-sm underline">Contact admissions</Link>
  </section>;
  if(status==="not_available")return <section aria-label="Student learning account"
-  className="mt-4 rounded-lg border p-4 text-sm">
+  className="mt-4  border p-4 text-sm">
   <h4 className="font-semibold">Student learning account</h4>
   <p className="mt-2" role="status">We could not verify this student's current school sign-in status.
    Admissions can confirm classroom placement and account eligibility. No invitation has been sent by this screen.</p>
-  <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
-   onClick={()=>setRetry(value=>value+1)}>Check again</button>
+  <Button variant="outline" type="button" className="mt-3"
+   onClick={()=>setRetry(value=>value+1)}>Check again</Button>
   <Link to="/messages" className="ml-3 inline-block text-sm underline">Ask admissions for help</Link>
  </section>;
- return <section className="mt-4 rounded-lg border p-4 text-sm">
+ return <section className="mt-4  border p-4 text-sm">
   <h4 className="font-semibold">Student learning account</h4>
   {status==="loading"?<p className="mt-2">Checking the active class and access status…</p>:
   <form noValidate onSubmit={event=>void submit(event)} className="mt-3 space-y-3">
@@ -160,11 +160,11 @@ function ApplicationLearningAccessHandoff({
      </>}
     </>:status==="approved"?<>
      <p>Student access is approved. The student uses their own verified email address—not the parent’s account—to request a short-lived sign-in link and open assigned classes.</p>
-     {role==="guardian"&&<Link to="/access" className="mt-3 inline-block rounded border px-3 py-2 font-semibold">Open student sign-in</Link>}
-     {hasRegistrarAuthority(role)&&<button disabled={busy}
-       className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
+     {role==="guardian"&&<Button asChild variant="outline" className="mt-3"><Link to="/access">Open student sign-in</Link></Button>}
+     {hasRegistrarAuthority(role)&&<Button type="submit" variant="outline" disabled={busy}
+       >
        {busy?"Requesting…":"Request student sign-in link again"}
-     </button>}
+     </Button>}
     </>:status==="not_requested"&&hasRegistrarAuthority(role)?
      <p>Enrollment and classroom placement are ready. A verified managing guardian
       must authorize the student's separate sign-in request in their enrollment

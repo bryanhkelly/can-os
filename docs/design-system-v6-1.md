@@ -178,6 +178,158 @@ Class enrollment service. The existing learner enrollment-history feed is a
 list of source participation records, not an audit trail of every transition;
 do not present it as event history without a distinct authorized source.
 
+### Canonical native controls and reuse contract (November 2026)
+
+**The design system already owns the native elements.** Do not introduce another
+Button/Input/Select/Label implementation in a feature. Native HTML is an
+implementation detail of `src/components/ui/`, not a competing option for
+feature pages. Every Site, Launch Studio, classroom, guardian, facilitator,
+admissions and operations surface follows the same ownership rules.
+
+| Native behavior | Canonical V6.1 owner | Feature use |
+| --- | --- | --- |
+| Action or link-styled action | `ui/button.tsx` (`Button`) | Use `Button` and `Button asChild` for a real link. Only one primary action per view. |
+| Text, email, number, date, file inputs | `ui/input.tsx` (`Input`) | Wrap in `Field` for labels, descriptions, required and error presentation. |
+| Select menu / multiline text | `ui/select.tsx`, `ui/textarea.tsx` | Compose with `Field` rather than per-feature styles. |
+| Checkbox or radio | `ui/choice.tsx` | Use `Checkbox` / `Radio`; preserve an accessible label and fieldset where appropriate. |
+| Label, validation, managed forms | `ui/label.tsx`, `ui/field.tsx`, `ui/form.tsx` | Reuse `Label`, `Field` and the existing React Hook Form adapter; do not clone markup per module. |
+| Dialog and tabular data | `ui/modal.tsx`, `ui/table.tsx` | Compose the shared primitives; use `WorkspacePanel`, `ActionDialog`, `DirectoryTable` as the higher-level patterns. |
+
+**Style ownership:** `src/components/ui/control-styles.ts` is the single
+source of shared focus-ring, disabled-control, validation and field-surface
+classes. The controls still own their meaningful differences, such as textarea
+resizing, check/radio appearance, button loading and select sizing.
+Changes to these shared behaviors propagate to all existing consumers.
+
+**Enforcement:** `can-os-design/no-native-feature-controls` applies to every
+production JSX route and feature, including newly added files. It permits only
+static hidden form inputs and a native wrapping `label` whose sole interactive
+descendant is a canonical `Checkbox` or `Radio`. The actual primitive
+implementation files are exempt. Native `dialog` is owned by the shared
+`Modal` primitive. The rule does not ban semantic native `form`, `fieldset`,
+`legend`, `video` or other elements that are not duplicate form controls. Its unit tests verify both exceptions and regressions.
+`npm run lint` and the source-level V6.1 audit are independent enforcement
+routes. Storybook is the interactive catalog; browser and visual QA remain
+separate release gates.
+
+**Shared action composition:** `FormActions` and `CreateAction` compose
+`Button` instead of duplicating Radix slots or hand-copying button classes.
+A slotted `Button asChild` preserves the child link and its navigation props.
+When disabled or pending, it announces `aria-disabled`, removes sequential
+keyboard focus, and prevents user navigation without emitting the invalid
+HTML `disabled` attribute on an anchor.
+
+**Managed form accessibility:** `FormField`, `FormItem`, `FormControl`
+and `FormLabel` enforce their required React Hook Form context, preserve
+control-specific and form-level descriptions in `aria-describedby`, and share
+one generated label/control ID. Incorrect composition throws an explicit
+developer error instead of rendering an inaccessible orphan label.
+Unit tests cover composed forms, missing context and descriptions.
+
+**Build-time dependency guard:** `scripts/check-component-boundaries.mjs`
+runs `sharedUiImportViolation` against aliased and relative imports in all
+V6.1 UI, workspace and workflow sources. Primitives may depend on peer
+primitives, never on features. Shared patterns may compose peer patterns and
+primitives, never feature components or server commands. A single existing
+thin shell session-context import in `DashboardHome` is explicitly
+documented as a narrow exception rather than allowing arbitrary shell
+dependencies. The pure dependency tests are included in `test:design-audit`.
+
+**Cross-feature form pattern adoption (November 2026):** Existing
+`WorkspacePanel`, `ActionFooter`, `Field`, `Button` and `EmptyState`
+components now compose the reviewed forms for Class video uploads and resource
+links, admissions inquiries and family invitations, guardian enrollment form
+signing and registrar decisions, interest-event creation, school setup and
+extended-season drafts. Launch Studio Site Profile, learning-environment
+preparation, Program Discovery and native Offering adoption review also use
+the same patterns. No new feature-specific Button, form footer or panel
+abstraction was introduced. Each workflow retains its original command,
+authorization boundaries, eligibility, validation and state ownership.
+
+**Step navigation adoption:** `ActionFooter layout="step"` owns the
+border, spacing, and back-versus-save alignment for Launch Studio's Site
+Profile, Site Information, Programs & Audiences, and Marketing Package wizard.
+The feature supplies actual Back, Save & Exit and Continue commands, preserving
+its own validation, approval and publication gates. `LaunchDraftButton` uses
+the native shared `Button.loading` treatment instead of maintaining a second
+pending label implementation.
+
+**Additional form migrations:** Teacher Class requests, learning-goal sharing,
+guardian relationship verification and the physical classroom directory all
+compose `ActionFooter`. Room-to-Class assignment uses the canonical `Field`
+and `Select` association rather than a custom-styled select inside a label.
+The cross-feature source tests lock these reuse contracts, and the scoped
+duplicate-form-action lint error covers the newly migrated modules.
+
+**Named form-component coverage:** The production `*Form.tsx` component
+family now uses the shared action patterns, including guardian applications,
+Class scheduling, provider recording uploads, teacher follow-ups, student goal
+reviews, and evidence decisions. The guardian application no longer maintains
+its own pending spinner beside `Button.loading`. The source-level test
+discovers all current and future named forms and checks every submitting form
+for `ActionFooter` or `FormActions`. ESLint treats duplicated native submit
+rows as errors for `src/components/**/*Form.tsx`, while other legacy
+surfaces remain visible as warnings pending migration.
+
+**Route-level adoption:** Messages, school-family alerts, curriculum creation,
+guardian enrichment and health updates, field trips, and platform adult-learner
+identity review now use the same `ActionFooter` patterns with the shared
+`Button.loading` behavior. Field-trip proposal and invitation forms now use
+`Field`-associated `Input`, `Textarea`, and `Select` primitives instead
+of locally styled label-wrapped controls. The scoped lint error and source
+contract tests protect these seven additional routes. Their data access,
+eligibility checks, confirmation steps, review authority, and writes remain
+feature/server owned.
+
+`can-os-design/no-duplicate-form-actions` reports a local `div` or
+`footer` directly wrapping a submit `Button` inside a form. It runs
+as an adoption warning across production JSX, and is an **error** for the
+migrated feature modules. A header toolbar, filter row, non-submit
+action or composition using `ActionFooter`/`FormActions` is not prohibited.
+The narrow detection intentionally does not claim to recognize every
+possible duplicated UI; cross-feature rendering tests and browser review
+remain complementary checks.
+
+**Shared navigation ownership (November 2026):** Use
+`DetailNavigation` with `SectionTab` for exclusive record views, `PageNavigation`
+for known forward/back links, `DirectoryPagination` for known totals,
+`DirectoryWindowPagination` for bounded server windows without a total, and
+`WorkspaceLinkNavigation` for a compact group of related destinations.
+`WorkspaceLinkNavigation` accepts `surface="panel" | "plain"` and owns the
+accessible navigation landmark, V6.1 spacing and panel tokens. Feature
+components still own their destination links, authorization and navigation
+eligibility. The reusable cursor pager accepts `previousLabel` and
+`nextLabel` for contextual wording without inventing an unavailable total.
+Do not use a record tab to present independent destinations or reuse a page
+navigator for active view selection.
+
+**Reporting table ownership (November 2026):** Use `Table`, `TableCaption`,
+`TableHeader`, `TableHead` (column header), `TableRowHead` (accessible
+`th scope="row"`), `TableBody`, `TableRow` and `TableCell` from
+`src/components/ui/table.tsx` for source-reconciled evidence tables.
+`Table` owns the focusable horizontal scroll region; feature panels own
+disclosure limits, server filtering, reporting scope and the data itself.
+Use `DirectoryTable` for record lists with sorting, permitted actions,
+selection or pagination. Reuse the low-level table family for fixed-column
+reporting and source metadata rather than adding directory affordances.
+The current migrated read-only screens have **ten tables** across
+Noncredit Network, Native Class, Noncredit Pilot, Noncredit Provider,
+facilitated-impact reporting, workflow transitions, and student rubric views.
+
+`can-os-design/no-native-feature-tables` warns across production TSX and
+is an error for the seven migrated reporting, workflow and rubric components. Complex legacy
+gradebook and assessment grids are not silently converted: retain their
+functional behavior until interaction, keyboard and source-of-truth
+acceptance is available. Storybook reports/table fixtures include mobile,
+tablet, desktop and dark-mode views, but they cannot count as reviewed
+screenshots until actually executed, inspected and recorded in
+`docs/verification/v61-visual-evidence.json`.
+
+**Dependency direction:** `ui` does not import features; shared
+`workspace` and `workflow` patterns compose `ui`; feature-specific
+components compose those layers. Server authorization, identity, evidence,
+approval decisions and mutations never belong in primitive controls.
+
 **Reuse before invention:** For any new feature surface, look for an existing pattern
 before creating a new table, filter row, status display, stepper, form layout or header.
 Extend a shared pattern only when the behavior is genuinely reusable across multiple
@@ -511,6 +663,30 @@ The local Storybook gate is now **green**. Authenticated per-role journeys,
 screen-reader review, 200% zoom, approved-reference visual comparison and
 Chromatic approval remain **unverified**. This evidence does not authorize a
 production release or certify product-wide route migration.
+
+### Navigation and data table reuse (November 20, 2026)
+
+**Related destinations** compose `WorkspaceLinkNavigation` with an explicit
+accessible label. **Selected route sections** compose `DetailNavigation`
+with `SectionTab` and one explicit `current` selection. A feature remains
+responsible for authorization, route parameters and search state. It should
+not duplicate the shared nav geometry or create a second selection model.
+A record's main views and its inner sections may be separate labeled
+navigation regions, as in the unified Class workspace.
+
+**Tabular data** use `ui/Table`, `TableCaption`, `TableHeader`,
+`TableBody`, `TableRow`, `TableHead`, `TableRowHead` and `TableCell`.
+`DirectoryTable` remains the higher-level pattern when sorting,
+selection, row actions and pagination apply. Complex keyboard-operated
+grids such as the teacher gradebook retain their domain interactions
+while reusing semantic table primitives and a labeled focusable scroll
+region. Do not replace evidence/report tables with `DirectoryTable`
+solely to achieve visual consistency.
+
+Verification source, Storybook interaction cases, viewport matrix,
+and outstanding authenticated visual approval are tracked in
+`docs/verification/v61-navigation-table-acceptance-20261120.md`.
+These are not a claim that fresh branch screenshot approval has passed.
 
 ## 9. Scope boundaries
 

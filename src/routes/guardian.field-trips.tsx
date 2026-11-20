@@ -103,7 +103,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
                     {item.permissionText}
                   </div>
                   {!item.canSign
-                    ? <p className="mt-3 text-sm text-amber-700">The permission window is closed. Contact your school.</p>
+                    ? <p className="mt-3 text-sm text-warning">The permission window is closed. Contact your school.</p>
                     : <>
                         <Label className="mt-4 flex items-start gap-3 text-sm">
                           <Checkbox className="mt-1"
@@ -125,7 +125,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
                           onClick={()=>void decline(item.participantId,item.studentName)}>Decline participation</Button>}
                       </>}
                 </div>
-              : <p className="mt-4 text-sm text-amber-700">
+              : <p className="mt-4 text-sm text-warning">
                   This school has not published a permission statement for this trip.
                 </p>}
           {(item.feeAmountCents ?? 0) > 0 && <p className="mt-3 text-xs text-muted-foreground">

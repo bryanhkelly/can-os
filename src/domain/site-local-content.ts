@@ -1,3 +1,4 @@
+import { siteBrandDirectionIds, type SiteBrandDirectionId } from "./site-brand-direction";
 import { isSiteFontId, type SiteFontId, sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
@@ -60,6 +61,8 @@ export function siteLocalImagePublicationGaps(image: SiteLocalImage | null): str
 }
 export type SiteLocalBranding = {
   theme: SiteLocalTheme;
+  /** Versioned with the existing Site website draft, never an unversioned sidecar. */
+  brandDirectionId?: SiteBrandDirectionId;
   /** Structural template is versioned with local branding, not Program facts. */
   templateId?: SiteTemplateId;
   heroImage: SiteLocalImage | null;
@@ -120,6 +123,19 @@ export function createSchoolWebsiteEditorialBaseline(schoolName: string): SiteEd
 
 /** Starts real school sites with useful editable copy, not blank fields.
  * No save, publication or approval occurs until the editor acts. */
+
+/** Canonical database shape for website copy and structural layout.
+ * Identity colors, typography, logo and hero imagery are NOT serialized
+ * into site_local_content_versions; only Site Brand versions own them.
+ * This projection is for storage, not public rendering.
+ */
+export function websiteCopyOnlyForStorage(content:SiteLocalContent):SiteLocalContent {
+  return {...content, branding:{
+    theme:"classic", templateId:content.branding.templateId??"heritage",
+    heroImage:null,
+  }};
+}
+
 export function createSchoolWebsiteStarterContent(schoolName: string): SiteLocalContent {
   const editorialBaseline = createSchoolWebsiteEditorialBaseline(schoolName);
   return {
@@ -219,7 +235,7 @@ function normalizeText(value: string | undefined, field: SiteLocalTextField): st
 }
 
 /** Accept only PNG critical chunks. This excludes EXIF/text/location metadata. */
-function validateInlinePng(dataUrl: string): void {
+export function validateInlinePng(dataUrl: string): void {
   const match = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
   if (!match || match[1]!.length > siteLocalImageMaxBase64Length || match[1]!.length % 4 !== 0) {
     throw new Error("Website artwork must be a bounded PNG image");
@@ -280,6 +296,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   }
   const branding = input.branding ?? emptySiteLocalBranding;
   if (!siteLocalThemes.includes(branding.theme)) throw new Error("Choose an approved website theme");
+  if (branding.brandDirectionId !== undefined && !siteBrandDirectionIds.includes(branding.brandDirectionId))
+    throw new Error("Choose an approved Site brand direction");
   const paletteId = branding.paletteId ?? "signature";
   const typographyId = branding.typographyId ?? "editorial";
   const templateId = branding.templateId ?? "heritage";
@@ -304,7 +322,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
     if (!options.allowIncompleteImage && gaps.length) throw new Error(gaps[0]);
     return validatedImage;
   };
-  result.branding = { theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides,
+  result.branding = { theme: branding.theme, paletteId, typographyId, templateId,
+    ...(branding.brandDirectionId ? {brandDirectionId:branding.brandDirectionId} : {}), ...fontOverrides,
     heroImage: normalizeArtwork(branding.heroImage),
     ...(branding.logoImage !== undefined ? { logoImage: normalizeArtwork(branding.logoImage) } : {}),
   };

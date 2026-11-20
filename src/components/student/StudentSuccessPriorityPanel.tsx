@@ -29,13 +29,13 @@ export function StudentSuccessPriorityPanel({ plan }: {
     description="Across your enrolled classes · based on published assignments and the latest saved submission status."
     className="mt-7">
     <div className="flex flex-wrap gap-2 text-xs" aria-label="Assignment status summary">
-      <span className="rounded-full border px-3 py-1">Revisions: {plan.revise}</span>
-      <span className="rounded-full border px-3 py-1">Overdue: {plan.overdue}</span>
-      <span className="rounded-full border px-3 py-1">Due soon: {plan.dueSoon}</span>
-      <span className="rounded-full border px-3 py-1">Awaiting feedback: {plan.awaitingFeedback}</span>
+      <span className=" border px-3 py-1">Revisions: {plan.revise}</span>
+      <span className=" border px-3 py-1">Overdue: {plan.overdue}</span>
+      <span className=" border px-3 py-1">Due soon: {plan.dueSoon}</span>
+      <span className=" border px-3 py-1">Awaiting feedback: {plan.awaitingFeedback}</span>
     </div>
     {plan.steps.length ? <ol className="mt-4 grid gap-3">
-      {plan.steps.map(step => <li key={step.assessmentId} className="rounded-lg border p-4">
+      {plan.steps.map(step => <li key={step.assessmentId} className=" border p-4">
         <p className="text-xs text-muted-foreground">{step.course} · {step.label}</p>
         <p className="mt-1 font-semibold">
           <StudentAssignmentLink assessmentId={step.assessmentId} sectionId={step.sectionId}

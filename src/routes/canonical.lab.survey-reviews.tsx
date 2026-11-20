@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
@@ -121,42 +123,42 @@ function ReviewCard({version,evidence,evidenceInventoryComplete}:{
       You authored this survey version. An independent reviewer must record its decisions.
     </p>:<section className="mt-5 border-t border-border pt-4" aria-label={"Record review for "+version.title}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="space-y-2 text-sm font-medium">Review domain
+        <Label className="space-y-2 text-sm font-medium">Review domain
           <Select value={kind} onChange={e=>setKind(e.target.value as ReviewKind)} disabled={busy}>
             <option value="privacy">Privacy</option>
             <option value="accessibility">Accessibility</option>
             <option value="safeguarding">Safeguarding</option>
           </Select>
-        </label>
-        <label className="space-y-2 text-sm font-medium">Decision
+        </Label>
+        <Label className="space-y-2 text-sm font-medium">Decision
           <Select value={decision} disabled={busy}
             onChange={e=>setDecision(e.target.value as ""|"approved"|"rejected")}>
             <option value="">Select decision</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </Select>
-        </label>
+        </Label>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <label className="space-y-2 text-sm font-medium">Verified evidence reference
+        <Label className="space-y-2 text-sm font-medium">Verified evidence reference
           <Select value={evidenceVersionId} disabled={busy||!evidenceInventoryComplete}
             onChange={e=>setEvidenceVersionId(e.target.value)}>
             <option value="">Select evidence for approval</option>
             {evidence.map(item=><option key={item.id} value={item.id}>{item.kind} · {item.id}</option>)}
           </Select>
-        </label>
-        <label className="space-y-2 text-sm font-medium">Review rationale
+        </Label>
+        <Label className="space-y-2 text-sm font-medium">Review rationale
           <Textarea value={rationale} minLength={20} maxLength={1500} rows={3}
             onChange={e=>setRationale(e.target.value)} disabled={busy}
             placeholder="Document the independent review decision without personal information."/>
-        </label>
+        </Label>
       </div>
       {!evidenceInventoryComplete&&<p className="mt-3 text-sm text-destructive">Evidence inventory exceeds the safe inspection limit. Review is disabled.</p>}
-      <label className="mt-4 flex items-start gap-3 text-sm">
-        <input type="checkbox" className="mt-1 size-4 accent-primary" checked={ack}
+      <Label className="mt-4 flex items-start gap-3 text-sm">
+        <Checkbox className="mt-1 size-4 accent-primary" checked={ack}
           onChange={e=>setAck(e.target.checked)} disabled={busy}/>
         I have independently reviewed the draft. My decision will be persisted and audited.
-      </label>
+      </Label>
       {error&&<p role="alert" className="mt-3 border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {success&&<p role="status" className="mt-3 border border-border p-3 text-sm">{success}</p>}
       <Button type="button" className="mt-4" variant="outline"

@@ -1,3 +1,9 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
+import { Radio } from "@/components/ui/choice";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {useCallback,useEffect,useRef,useState,type ChangeEvent} from "react";
 import {
   beginSchoolSiteMediaUpload,finishSchoolSiteMediaUpload,listSchoolSiteMedia,
@@ -131,7 +137,7 @@ export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
     finally{setWorking(false);}
   }
 
-  return <section className="mt-6 rounded-2xl border bg-card p-6" aria-labelledby="school-media-folder-title">
+  return <section className="mt-6  border bg-card p-6" aria-labelledby="school-media-folder-title">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Website imagery</p>
     <h2 id="school-media-folder-title" className="mt-2 font-serif text-2xl font-semibold">Point CAN to your school's photos</h2>
     <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -139,26 +145,26 @@ export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
       matches them to website pages, and fills gaps with its original artwork library.
       You do not need to select hero or page images individually. Nothing uploads publicly until rights review.
     </p>
-    <label className="mt-4 block text-sm font-semibold">
+    <Label className="mt-4 block text-sm font-semibold">
       Upload a school media folder (including subfolders)
-      <input ref={folderRef} type="file" multiple accept="image/jpeg,image/png"
+      <Input ref={folderRef} type="file" multiple accept="image/jpeg,image/png"
         disabled={!canPublish||!enabled||working} onChange={event=>void stageFolder(event)}
-        className="mt-2 block w-full rounded-lg border p-3 text-sm"/>
-    </label>
+        className="mt-2 block w-full  border p-3 text-sm"/>
+    </Label>
     {!canPublish&&<p className="mt-2 text-sm">Only a verified Site website editor with publishing authority can import or approve photos.</p>}
     {!enabled&&<p role="status" className="mt-2 text-sm">Photo folder uploads are not enabled for this deployment. CAN original artwork remains available automatically; ask your administrator to configure the private media service.</p>}
     <p className="mt-3 text-sm" role="status">{status||"No images required: built-in CAN artwork automatically fills empty placements."}</p>
     {error&&<p className="mt-2 text-sm text-destructive" role="alert">{error}</p>}
     <div className="mt-4 grid gap-3 sm:grid-cols-3" aria-label="School media import status">
-      <p className="rounded-lg border p-3 text-sm"><strong>{approved.length}</strong> approved</p>
-      <p className="rounded-lg border p-3 text-sm"><strong>{pending.length}</strong> awaiting rights review</p>
-      <p className="rounded-lg border p-3 text-sm"><strong>{revoked.length}</strong> revoked</p>
+      <p className=" border p-3 text-sm"><strong>{approved.length}</strong> approved</p>
+      <p className=" border p-3 text-sm"><strong>{pending.length}</strong> awaiting rights review</p>
+      <p className=" border p-3 text-sm"><strong>{revoked.length}</strong> revoked</p>
     </div>
-    {pending.length>0&&<fieldset disabled={working||!canPublish||!enabled} className="mt-5 space-y-3 rounded-xl border p-4">
+    {pending.length>0&&<fieldset disabled={working||!canPublish||!enabled} className="mt-5 space-y-3  border p-4">
       <legend className="px-2 font-semibold">One review for the imported folder</legend>
       <p className="text-sm">This approval covers {Math.min(pending.length,40)} private photos.
         Check that every included image has appropriate usage rights and subject permissions.</p>
-      <details className="rounded-lg border p-3">
+      <details className=" border p-3">
         <summary className="cursor-pointer text-sm font-semibold">Review imported file names ({Math.min(pending.length,40)})</summary>
         <ul className="mt-2 max-h-44 list-disc space-y-1 overflow-y-auto pl-5 text-sm">
           {pending.slice(0,40).map(item=><li key={item.documentId}>{item.fileName}
@@ -166,46 +172,46 @@ export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
           </li>)}
         </ul>
       </details>
-      <label className="flex gap-2 text-sm"><input type="checkbox" checked={rights}
+      <Label className="flex gap-2 text-sm"><Checkbox checked={rights}
         onChange={event=>setRights(event.target.checked)}/>
         I have the rights or permission to publish each included photograph on our school's public website.
-      </label>
+      </Label>
       <div className="grid gap-2 text-sm" role="group" aria-label="Person and child photo release status">
-        <label className="flex gap-2"><input type="radio" name="subject-release" checked={release==="no_identifiable_people"}
+        <Label className="flex gap-2"><Radio name="subject-release" checked={release==="no_identifiable_people"}
           onChange={()=>setRelease("no_identifiable_people")}/>
           None of these images contains identifiable people.
-        </label>
-        <label className="flex gap-2"><input type="radio" name="subject-release" checked={release==="all_identifiable_people_cleared"}
+        </Label>
+        <Label className="flex gap-2"><Radio name="subject-release" checked={release==="all_identifiable_people_cleared"}
           onChange={()=>setRelease("all_identifiable_people_cleared")}/>
           Every identifiable person, including any children, has the required permission or guardian release for this use.
-        </label>
+        </Label>
       </div>
-      <label className="flex gap-2 text-sm"><input type="checkbox" checked={consents}
+      <Label className="flex gap-2 text-sm"><Checkbox checked={consents}
         onChange={event=>setConsents(event.target.checked)}/>
         This confirmation covers every imported image, not just representative samples.
-      </label>
-      <label className="block text-sm font-medium">Rights review note
-        <textarea rows={2} value={reason} onChange={event=>setReason(event.target.value)}
-          placeholder="Document the source and image-use permissions" className="mt-1 w-full rounded-lg border bg-background p-2"/>
-      </label>
-      <button type="button" disabled={!rights||!release||!consents||reason.trim().length<10||working}
-        onClick={()=>void approve()} className="min-h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+      </Label>
+      <Label className="block text-sm font-medium">Rights review note
+        <Textarea rows={2} value={reason} onChange={event=>setReason(event.target.value)}
+          placeholder="Document the source and image-use permissions" className="mt-1 w-full  border bg-background p-2"/>
+      </Label>
+      <Button variant="default" type="button" disabled={!rights||!release||!consents||reason.trim().length<10||working}
+        onClick={()=>void approve()} className="min-h-11  bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">
         Approve entire folder for automatic placement
-      </button>
+      </Button>
     </fieldset>}
-    {approved.length>0&&<details className="mt-5 rounded-xl border p-4">
+    {approved.length>0&&<details className="mt-5  border p-4">
       <summary className="cursor-pointer text-sm font-semibold">Revoke previously approved school photos</summary>
       <p className="mt-2 text-sm text-muted-foreground">Revocation stops new public requests from serving these images. Original CAN artwork will be used where no other approved photo is available.</p>
-      <label className="mt-2 block text-sm">Reason for revocation
-        <textarea rows={2} value={revokeReason} onChange={event=>setRevokeReason(event.target.value)}
-          className="mt-1 w-full rounded-md border p-2"/>
-      </label>
-      <label className="mt-2 flex gap-2 text-sm"><input type="checkbox" checked={confirmRevoke}
-        onChange={event=>setConfirmRevoke(event.target.checked)}/>Revoke all currently approved photos displayed here</label>
-      <button type="button" disabled={!canPublish||working||!confirmRevoke||revokeReason.trim().length<10}
-        onClick={()=>void revokeAll()} className="mt-3 min-h-11 rounded-md border px-4 text-sm font-semibold disabled:opacity-50">
+      <Label className="mt-2 block text-sm">Reason for revocation
+        <Textarea rows={2} value={revokeReason} onChange={event=>setRevokeReason(event.target.value)}
+          className="mt-1 w-full  border p-2"/>
+      </Label>
+      <Label className="mt-2 flex gap-2 text-sm"><Checkbox checked={confirmRevoke}
+        onChange={event=>setConfirmRevoke(event.target.checked)}/>Revoke all currently approved photos displayed here</Label>
+      <Button variant="outline" type="button" disabled={!canPublish||working||!confirmRevoke||revokeReason.trim().length<10}
+        onClick={()=>void revokeAll()} className="mt-3 min-h-11  border px-4 text-sm font-semibold disabled:opacity-50">
         Revoke approved photos
-      </button>
+      </Button>
     </details>}
   </section>;
 }

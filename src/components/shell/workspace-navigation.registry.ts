@@ -5,7 +5,6 @@ import { optionalSearchUuid } from "@/lib/route-search";
 const destinationContextKeys: Record<string, readonly string[]> = {
   "/home": ["siteId", "programId"],
   "/launch/site": ["siteId"],
-  "/launch/hub/school": ["siteId", "programId"],
   "/admissions": ["siteId", "programId"],
   "/staff/students": ["siteId", "programId"],
   "/operations/school-years": ["siteId", "programId"],
@@ -18,7 +17,6 @@ const destinationContextKeys: Record<string, readonly string[]> = {
   "/staff/attendance": ["programId"],
   "/operations/curriculum": ["programId"],
   "/operations/teacher-marketplace": ["programId"],
-  "/classes": ["section"],
   "/student/courses": ["section"],
   "/teacher/gradebook": ["section"],
   "/guardian/students": ["section"],
@@ -122,7 +120,6 @@ const schoolAdministrationLinks = [
   { title: "Students", path: "/staff/students", icon: "users" },
   { title: "School years", path: "/operations/school-years", icon: "calendar" },
   { title: "Curriculum", path: "/operations/curriculum", icon: "book" },
-  { title: "Blueprint Studio", path: "/canonical/blueprints", icon: "book" },
   { title: "Program operations", path: "/canonical/program-operations", icon: "book" },
   { title: "Reports", path: "/reports/", icon: "clipboard" },
   { title: "Teachers", path: "/operations/teacher-marketplace", icon: "users" },
@@ -130,7 +127,7 @@ const schoolAdministrationLinks = [
 ] satisfies readonly WorkspaceNavigationItem[];
 
 const siteAdminProfileLink = {
-  title: "School profile", path: "/sites", icon: "building",
+  title: "Site Profile", path: "/sites", icon: "building",
 } satisfies WorkspaceNavigationItem;
 
 /**
@@ -179,7 +176,7 @@ const roleLinks = {
     { title: "My Activity", path: "/learn/my-activity", icon: "book" },
     { title: "Classes", path: "/class", icon: "book" },
     { title: "Learn", path: "/student/courses", icon: "book" },
-    { title: "School profile", path: "/student/my-school", icon: "users" },
+    { title: "Site Profile", path: "/student/my-school", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
     { title: "Support", path: "/student/support", icon: "support" },
   ],
@@ -187,7 +184,7 @@ const roleLinks = {
     { title: "My Activity", path: "/learn/my-activity", icon: "book" },
     { title: "Classes", path: "/class", icon: "book" },
     { title: "Students", path: "/guardian/students", icon: "book" },
-    { title: "School profile", path: "/guardian/experiences", icon: "users" },
+    { title: "Site Profile", path: "/guardian/experiences", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
   ],
   teacher: [
@@ -265,8 +262,7 @@ export function getActiveWorkspacePath(
 
 export function isFocusedClassroomRoute(pathname: string, searchStr: string, role: string | null): boolean {
   const search = new URLSearchParams(searchStr);
-  // The canonical native Class route uses an exact Class ID, not the retired
-  // Section query param. Focus only learning and teaching work, never roster
+  // Focus only learning and teaching work, never roster
   // or manager views. Server-side Class permissions remain authoritative.
   if (/^\/class\/[0-9a-f-]{36}\/?$/i.test(pathname)) {
     const view = search.get("view");
@@ -276,9 +272,5 @@ export function isFocusedClassroomRoute(pathname: string, searchStr: string, rol
     return (view === "learn" && learner && ["lessons", "sessions"].includes(tab ?? "")) ||
       (view === "teach" && teacher && ["lessons", "sessions", "classroom"].includes(tab ?? ""));
   }
-  // Existing Section readers cannot be removed until their academic records
-  // and dependent access have completed independent cutover acceptance.
-  if (!search.has("section")) return false;
-  if (pathname === "/classes") return role === "student" || role === "guardian" || role === "teacher";
-  return pathname === "/student/courses" && search.get("view") !== "catalog" && role === "student";
+  return false;
 }

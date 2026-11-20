@@ -364,13 +364,13 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
                 </p></div>
               <StatusBadge tone={student.status==="present"?"success":student.status==="absent"?"attention":"neutral"}>{student.status.replaceAll("_"," ")}</StatusBadge>
             </div>
-            {student.attendanceEventId && <label className="mt-3 block text-xs">
+            {student.attendanceEventId && <Label className="mt-3 block text-xs">
               Correction reason (required)
               <Input value={notes[key] ?? ""} maxLength={2000}
                 onChange={event => setNotes(current => ({ ...current, [key]: event.target.value }))}
                 placeholder="Why is this recorded attendance changing?"
                 className="mt-1"/>
-            </label>}
+            </Label>}
             <div className="mt-4 flex flex-wrap gap-2">
               {marks.map(status => <Button key={status} type="button" size="sm"
                 variant={student.status===status ? "secondary" : "outline"}

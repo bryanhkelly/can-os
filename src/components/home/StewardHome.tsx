@@ -1,3 +1,7 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -56,7 +60,7 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
         : "This officer already holds the authorized membership.",
       commandErrorMessage: "Unable to provision HQ officer." });
   };
-  const field = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
+  const field = "mt-1 block w-full  border bg-background p-2 text-sm";
   return <DashboardHome eyebrow="Church onboarding and partner contracts"
     subtitle="Review new church requests, verify church authority, invite leaders, and manage partner contracts. School opening remains separately authorized."
     shortcuts={<>
@@ -69,63 +73,63 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
     <div id="steward-applications"><ChurchApplicationsDesk/></div>
     <p className="mt-5 text-sm text-muted-foreground">Denomination agreements and HQ officer appointments below require an already verified Document with the appropriate subject and category. Church applications above do not require anyone to assemble a document UUID manually.</p>
     <MutationFeedback state={mutation} className="mt-4" pendingMessage="Recording partner authority..."/>
-    <section id="steward-agreement" className="mt-6 rounded-xl border bg-card p-5">
+    <section id="steward-agreement" className="mt-6  border bg-card p-5">
       <h2 className="font-serif text-2xl">Record independently verified agreement</h2>
       <form onSubmit={saveAgreement} className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-medium">Denomination
-          <select required className={field} value={denominationOrganizationId} onChange={e=>setOrganization(e.target.value)}>
+        <Label className="text-sm font-medium">Denomination
+          <Select required className={field} value={denominationOrganizationId} onChange={e=>setOrganization(e.target.value)}>
             <option value="">Choose denomination…</option>
             {data.networks.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium">Contract reference
-          <input required minLength={4} maxLength={100} className={field} value={agreementReference} onChange={e=>setReference(e.target.value)} placeholder="External agreement ID"/>
-        </label>
-        <label className="text-sm font-medium sm:col-span-2">Verified signed-agreement document ID
-          <input required className={field} value={evidenceDocumentId} onChange={e=>setEvidence(e.target.value)} placeholder="UUID"/>
-        </label>
-        <label className="text-sm font-medium">Effective date
-          <input required type="date" className={field} value={validFrom} onChange={e=>setFrom(e.target.value)}/>
-        </label>
-        <label className="text-sm font-medium">Valid through (exclusive)
-          <input required type="date" className={field} value={validThrough} onChange={e=>setThrough(e.target.value)}/>
-        </label>
-        <button type="submit" disabled={busy} className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50 sm:col-span-2">
+          </Select>
+        </Label>
+        <Label className="text-sm font-medium">Contract reference
+          <Input required minLength={4} maxLength={100} className={field} value={agreementReference} onChange={e=>setReference(e.target.value)} placeholder="External agreement ID"/>
+        </Label>
+        <Label className="text-sm font-medium sm:col-span-2">Verified signed-agreement document ID
+          <Input required className={field} value={evidenceDocumentId} onChange={e=>setEvidence(e.target.value)} placeholder="UUID"/>
+        </Label>
+        <Label className="text-sm font-medium">Effective date
+          <Input required type="date" className={field} value={validFrom} onChange={e=>setFrom(e.target.value)}/>
+        </Label>
+        <Label className="text-sm font-medium">Valid through (exclusive)
+          <Input required type="date" className={field} value={validThrough} onChange={e=>setThrough(e.target.value)}/>
+        </Label>
+        <Button variant="ghost" type="submit" disabled={busy} className=" bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50 sm:col-span-2">
           {busy ? "Recording…" : "Record agreement"}
-        </button>
+        </Button>
       </form>
     </section>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <h2 className="font-serif text-2xl">Authorize denomination HQ officer</h2>
       <p className="mt-2 text-sm text-muted-foreground">Requires a current verified contract and an independently reviewed officer authorization document whose authorized email matches this officer.</p>
       <form onSubmit={provision} className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-medium">Denomination
-          <select required className={field} value={officerOrganizationId} onChange={e=>setOfficerOrg(e.target.value)}>
+        <Label className="text-sm font-medium">Denomination
+          <Select required className={field} value={officerOrganizationId} onChange={e=>setOfficerOrg(e.target.value)}>
             <option value="">Choose denomination…</option>
             {data.networks.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium">Verified HQ authority document ID
-          <input required className={field} value={authorityDocumentId} onChange={e=>setAuthorityDocument(e.target.value)} placeholder="UUID"/>
-        </label>
-        <label className="text-sm font-medium">Officer email
-          <input required type="email" className={field} value={email} onChange={e=>setEmail(e.target.value)}/>
-        </label>
-        <label className="text-sm font-medium">First name
-          <input required className={field} value={firstName} onChange={e=>setFirst(e.target.value)}/>
-        </label>
-        <label className="text-sm font-medium">Last name
-          <input required className={field} value={lastName} onChange={e=>setLast(e.target.value)}/>
-        </label>
-        <button type="submit" disabled={busy} className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50 sm:col-span-2">
+          </Select>
+        </Label>
+        <Label className="text-sm font-medium">Verified HQ authority document ID
+          <Input required className={field} value={authorityDocumentId} onChange={e=>setAuthorityDocument(e.target.value)} placeholder="UUID"/>
+        </Label>
+        <Label className="text-sm font-medium">Officer email
+          <Input required type="email" className={field} value={email} onChange={e=>setEmail(e.target.value)}/>
+        </Label>
+        <Label className="text-sm font-medium">First name
+          <Input required className={field} value={firstName} onChange={e=>setFirst(e.target.value)}/>
+        </Label>
+        <Label className="text-sm font-medium">Last name
+          <Input required className={field} value={lastName} onChange={e=>setLast(e.target.value)}/>
+        </Label>
+        <Button variant="ghost" type="submit" disabled={busy} className=" bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50 sm:col-span-2">
           {busy ? "Recording…" : "Provision verified HQ officer"}
-        </button>
+        </Button>
       </form>
     </section>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <h2 id="steward-contracts" className="font-serif text-2xl">Recorded contracts</h2>
       <ul className="mt-3 space-y-2">
-        {data.agreements.map(a=><li key={a.id} className="rounded-lg border p-3 text-sm">
+        {data.agreements.map(a=><li key={a.id} className=" border p-3 text-sm">
           <strong>{data.networks.find(n=>n.id===a.denominationOrganizationId)?.name ?? "Denomination"}</strong>
           {" · "}{a.agreementReference}
           <p className="text-muted-foreground">{new Date(a.validFrom).toLocaleDateString()} – {new Date(a.validThrough).toLocaleDateString()}{" · "}{a.revokedAt ? "Revoked" : new Date(a.validThrough) <= new Date() ? "Expired" : new Date(a.validFrom) > new Date() ? "Not yet effective" : "Within term (subject to evidence validity)"}</p>

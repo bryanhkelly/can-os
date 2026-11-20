@@ -60,7 +60,7 @@ export function calendarRecordDestination(
   };
   if (item.source === "section" && item.sectionId) {
     if (viewerRole === "student" || viewerRole === "teacher") return {
-      to: "/classes" as const, search: { section: item.sectionId },
+      to: "/class" as const, search: {},
     };
     if (viewerRole === "guardian") {
       const students = item.guardianStudents ?? [];
@@ -68,7 +68,7 @@ export function calendarRecordDestination(
         ? students.find(child => child.studentPersonId === studentPersonId)
         : students.length === 1 ? students[0] : undefined;
       if (student) return {
-        to: "/classes" as const, search: { section: item.sectionId, student: student.studentPersonId },
+        to: "/class" as const, search: {},
       };
     }
     return null;

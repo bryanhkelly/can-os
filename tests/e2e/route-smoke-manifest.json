@@ -5,8 +5,8 @@
       "Access CAN OS"
     ],
     [
-      "/schools/new",
-      "Create a school"
+      "/site/new",
+      "Create your Site"
     ],
     [
       "/church/apply",
@@ -44,13 +44,13 @@
     "/guardian/students",
     "/guardian/attendance",
     "/guardian/admission-offers",
-    "/classes",
+    "/class",
     "/sites",
     "/calendar",
     "/messages",
     "/notifications",
     "/operations/curriculum",
-    "/launch/school",
+    "/launch/site",
     "/admissions",
     "/staff/students",
     "/profiles",
@@ -70,7 +70,7 @@
     },
     {
       "persona": "teacher",
-      "destination": "/classes"
+      "destination": "/class"
     },
     {
       "persona": "registrar",

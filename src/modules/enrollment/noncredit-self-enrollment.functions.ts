@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons,
+  canonicalClasses,canonicalClassEnrollments,canonicalClassSessions,
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
@@ -24,6 +25,7 @@ import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-ad
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
+import { placeCourseRegistrationInClass } from "./course-class-placement.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type VerifiedSelfEnrollmentActor = {
@@ -211,6 +213,8 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
       let registrationId:string;
       let attemptId:string;
       let alreadyEnrolled=false;
+      let previouslyAssignedClassId:string|null=null;
+      let previouslyAssignedEnrollmentId:string|null=null;
       if(prior){
         const [claim]=await tx.select({releaseId:noncreditSelfEnrollmentClaims.releaseId,
           canonicalAccountId:noncreditSelfEnrollmentClaims.canonicalAccountId})
@@ -220,16 +224,33 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         if(!claim||claim.releaseId!==release.id||claim.canonicalAccountId!==native.accountId ||
            !["active","registered","completed"].includes(prior.status))
           throw new AuthorizationError("Existing enrollment requires provider review");
-        const [attempt]=await tx.select({id:learnerCourseAttempts.id})
+        const [attempt]=await tx.select({id:learnerCourseAttempts.id,classEnrollmentId:learnerCourseAttempts.classEnrollmentId})
           .from(learnerCourseAttempts).where(and(
             eq(learnerCourseAttempts.noncreditRegistrationId,prior.id),
             eq(learnerCourseAttempts.courseVersionId,release.courseVersionId),
           )).limit(1);
         if(!attempt)throw new AuthorizationError("Existing course attempt requires review");
+        if(attempt.classEnrollmentId){
+          const [priorClass]=await tx.select({
+            classId:canonicalClassEnrollments.classId,
+            learnerPersonId:canonicalClassEnrollments.learnerPersonId,
+            courseAttemptId:canonicalClassEnrollments.courseAttemptId,
+            status:canonicalClassEnrollments.status,
+          }).from(canonicalClassEnrollments)
+            .where(eq(canonicalClassEnrollments.id,attempt.classEnrollmentId))
+            .limit(1);
+          if(!priorClass||priorClass.learnerPersonId!==native.personId||
+             priorClass.courseAttemptId!==attempt.id||priorClass.status!=="active")
+            throw new AuthorizationError("existing Class placement requires review");
+          if(data.classId&&data.classId!==priorClass.classId)
+            throw new AuthorizationError("changing your Class requires an approved transfer");
+          previouslyAssignedClassId=priorClass.classId;
+          previouslyAssignedEnrollmentId=attempt.classEnrollmentId;
+        }
         registrationId=prior.id;attemptId=attempt.id;alreadyEnrolled=true;
       }else{
         if(!invited&&(release.seatsRemaining<=0||release.hasWaitingQueue))
-          throw new AuthorizationError("This cohort is full or serving its waitlist; join the waiting queue");
+          throw new AuthorizationError("This Course is full or serving its waitlist; join the waiting queue");
         // New participant records cannot be invented when capacity is exhausted.
         await tx.insert(learnerProfiles).values({personId:native.personId})
           .onConflictDoNothing();
@@ -313,16 +334,23 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           },
         });
       }
+      // New Course registration is complete only with a real Class placement.
+      // Existing legacy registrations remain readable without inventing a
+      // second Course Attempt or silently assigning a different Class.
+      const placement=alreadyEnrolled?null:await placeCourseRegistrationInClass(tx,{
+        release,personId:native.personId,registrationId,attemptId,
+        selectedClassId:data.classId,now,
+      });
       const grantId=await requireLearnerGrant(
         tx,native.accountId,native.personId,release.registeringOrganizationId,
       );
       const cookie=await issueNativeLearnerSession(tx,native.accountId,grantId,now);
-      return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie};
+      return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie,classId:placement?.classId??previouslyAssignedClassId,classEnrollmentId:placement?.classEnrollmentId??previouslyAssignedEnrollmentId};
     });
     appendResponseHeader("Set-Cookie",outcome.cookie);
     return {registrationId:outcome.registrationId,
       courseAttemptId:outcome.courseAttemptId,
-      alreadyEnrolled:outcome.alreadyEnrolled};
+      alreadyEnrolled:outcome.alreadyEnrolled,classId:outcome.classId,classEnrollmentId:outcome.classEnrollmentId};
   });
 
 /** Public projections disclose only current approved releases and schedules,
@@ -439,6 +467,8 @@ async function readMyNoncreditHistoryPage(
       releaseId:noncreditSelfEnrollmentClaims.releaseId,
       registrationId:noncreditRegistrations.id,
       courseAttemptId:learnerCourseAttempts.id,
+      classId:canonicalClassEnrollments.classId,
+      classTitle:canonicalClasses.title,
       trainingTitle:noncreditTrainingVersions.title,
       deliveryMode:noncreditSelfEnrollmentReleases.deliveryMode,
       siteId:noncreditSelfEnrollmentReleases.siteId,
@@ -458,17 +488,19 @@ async function readMyNoncreditHistoryPage(
       .innerJoin(learnerCourseAttempts,and(
         eq(learnerCourseAttempts.noncreditRegistrationId,noncreditRegistrations.id),
         isNull(learnerCourseAttempts.enrollmentId),
-        isNull(learnerCourseAttempts.classEnrollmentId),
         // Registration is one participation identity even with multiple
         // historical attempts. Select its latest original Course Attempt.
         sql`${learnerCourseAttempts.id} = (
           SELECT attempt.id FROM ${learnerCourseAttempts} attempt
           WHERE attempt.noncredit_registration_id=${noncreditRegistrations.id}
-            AND attempt.enrollment_id IS NULL AND attempt.class_enrollment_id IS NULL
+            AND attempt.enrollment_id IS NULL
           ORDER BY attempt.attempt_no DESC,attempt.started_at DESC,attempt.id DESC
           LIMIT 1
         )`,
       ))
+      .leftJoin(canonicalClassEnrollments,
+        eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId))
+      .leftJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
       .innerJoin(noncreditTrainingVersions,
         eq(noncreditTrainingVersions.id,noncreditRegistrations.trainingVersionId))
       .where(and(
@@ -488,6 +520,20 @@ async function readMyNoncreditHistoryPage(
     const nextCursor=registrations.length>50&&last
       ?{registeredAt:last.registeredAtCursor,registrationId:last.registrationId}:null;
     const releaseIds=[...new Set(page.map(r=>r.releaseId))];
+    const classIds=[...new Set(page.flatMap(r=>r.classId?[r.classId]:[]))];
+    const classSessions=classIds.length?await db.select({
+      classId:canonicalClassSessions.classId,
+      startsAt:canonicalDeliverySessions.startsAt,
+      endsAt:canonicalDeliverySessions.endsAt,
+    }).from(canonicalClassSessions)
+      .innerJoin(facilitatedClassroomPlans,eq(
+        facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
+      .innerJoin(canonicalDeliverySessions,eq(
+        canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
+      .where(and(
+        inArray(canonicalClassSessions.classId,classIds),
+        inArray(facilitatedClassroomPlans.state,["scheduled","started"]),
+      )).orderBy(canonicalDeliverySessions.startsAt).limit(1001):[];
     const plans=releaseIds.length?await db.select({
       releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
       startsAt:canonicalDeliverySessions.startsAt,
@@ -527,11 +573,13 @@ async function readMyNoncreditHistoryPage(
         referenceId:current.get(r.registrationId)!.id,
         label:"Completion decision: "+current.get(r.registrationId)!.outcome.replaceAll("_"," "),
       }:null,
-      upcomingSessions:plans.filter(p=>p.releaseId===r.releaseId &&
-        p.endsAt.getTime()>Date.now()).slice(0,20).map(p=>({
+      upcomingSessions:(r.classId
+        ?classSessions.filter(p=>p.classId===r.classId)
+        :plans.filter(p=>p.releaseId===r.releaseId))
+        .filter(p=>p.endsAt.getTime()>Date.now()).slice(0,20).map(p=>({
           startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
         })),
-      schedulePartial:plans.length>1000,
+      schedulePartial:r.classId?classSessions.length>1000:plans.length>1000,
     })),nextCursor};
 
 }

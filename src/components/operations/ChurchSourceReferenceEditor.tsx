@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,7 @@ export function ChurchSourceReferenceEditor({suggestedSchoolWebsiteUrl}:{suggest
   }
 
   return <section aria-labelledby="church-references-title"
-    className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+    className="mt-6  border border-border/70 bg-card p-6 shadow-sm">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Optional · Church identity</p>
     <h2 id="church-references-title" className="mt-1 font-serif text-2xl font-semibold">
       Does your school or church have an existing website or social profiles?
@@ -119,8 +120,8 @@ export function ChurchSourceReferenceEditor({suggestedSchoolWebsiteUrl}:{suggest
         let validUrl=false;
         try { const parsed=new URL(urls[kind]);validUrl=parsed.protocol==="http:"||parsed.protocol==="https:"; } catch { /* invalid URL */ }
         return <form key={kind} noValidate onSubmit={event => void save(event, kind)}
-          className="rounded-xl border border-border/70 p-4">
-          <label htmlFor={`church-source-${kind}`} className="block font-semibold">{labels[kind]}</label>
+          className=" border border-border/70 p-4">
+          <Label htmlFor={`church-source-${kind}`} className="block font-semibold">{labels[kind]}</Label>
           <p className="mt-1 text-xs text-muted-foreground">{descriptions[kind]}</p>
           <Field label={labels[kind]} className="sr-only" required
             error={attempted[kind]&&!validUrl?"Enter a valid public web URL.":undefined}>

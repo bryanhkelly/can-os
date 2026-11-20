@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -82,21 +83,19 @@ export function UserFlowMap({ title, description, stages, transitions, legend, c
     </ol>
     {transitions && transitions.length > 0 && <section aria-label="Transitions, branches and exception paths" className="border border-border bg-card">
       <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Transitions and decision branches</h3>
-      <div className="overflow-x-auto" role="region" aria-label="Workflow transitions table" tabIndex={0}>
-        <table className="w-full min-w-[36rem] text-left text-xs">
-          <thead className="bg-muted/30 text-muted-foreground"><tr>
-            <th scope="col" className="p-3 font-semibold">From</th>
-            <th scope="col" className="p-3 font-semibold">Trigger / outcome</th>
-            <th scope="col" className="p-3 font-semibold">Next</th>
-            <th scope="col" className="p-3 font-semibold">Guard or exception</th>
-          </tr></thead>
-          <tbody className="divide-y divide-border">{transitions.map((edge, index) =>
-            <tr key={`${edge.from}-${edge.to}-${index}`}>
-              <td className="p-3">{edge.from}</td><td className="p-3">{edge.outcome ?? "Continue"}</td>
-              <td className="p-3">{edge.to}</td><td className="p-3 text-muted-foreground">{edge.condition ?? "—"}</td>
-            </tr>)}</tbody>
-        </table>
-      </div>
+      <Table scrollLabel="Workflow transitions" aria-label="Workflow transitions" className="w-full min-w-[36rem] text-left text-xs"><TableCaption className="sr-only">Workflow transitions</TableCaption>
+          <TableHeader className="bg-muted/30 text-muted-foreground"><TableRow>
+            <TableHead scope="col" className="p-3 font-semibold">From</TableHead>
+            <TableHead scope="col" className="p-3 font-semibold">Trigger / outcome</TableHead>
+            <TableHead scope="col" className="p-3 font-semibold">Next</TableHead>
+            <TableHead scope="col" className="p-3 font-semibold">Guard or exception</TableHead>
+          </TableRow></TableHeader>
+          <TableBody className="divide-y divide-border">{transitions.map((edge, index) =>
+            <TableRow key={`${edge.from}-${edge.to}-${index}`}>
+              <TableRowHead className="p-3">{edge.from}</TableRowHead><TableCell className="p-3">{edge.outcome ?? "Continue"}</TableCell>
+              <TableCell className="p-3">{edge.to}</TableCell><TableCell className="p-3 text-muted-foreground">{edge.condition ?? "—"}</TableCell>
+            </TableRow>)}</TableBody>
+        </Table>
     </section>}
     {legend && <div className="border border-border bg-card p-4">{legend}</div>}
   </section>;

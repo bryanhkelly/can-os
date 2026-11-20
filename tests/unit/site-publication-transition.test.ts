@@ -63,3 +63,16 @@ it("allows a reviewed Site-owned website without granting academic listing publi
   const current={status:"draft",publishedAt:null,updatedAt:new Date("2026-11-06T00:00:00Z")};
   expect(planSitePublicationTransition({current,action:"publish",expectedRevision:current.updatedAt.toISOString(),reason:"Reviewed school website content",contentReviewed:true,eligibleOfferingCount:0,siteOwnedContentReady:true,now:new Date("2026-11-07T00:00:00Z")})).toMatchObject({status:"published",changed:true});
 });
+
+it("republishes reviewed content and maintains original published-at timestamp",()=>{
+  const original=new Date("2026-11-01T00:00:00Z");
+  const current={status:"published",publishedAt:original,updatedAt:t0};
+  expect(planSitePublicationTransition({...base,current,action:"republish"})).toEqual({
+    changed:true,status:"published",publishedAt:original,updatedAt:t1,
+  });
+  expect(()=>planSitePublicationTransition({...base,current,action:"republish",contentReviewed:false}))
+    .toThrow(/Review/);
+  expect(()=>planSitePublicationTransition({...base,current,action:"republish",expectedRevision:"stale"}))
+    .toThrow(/Refresh/);
+  expect(()=>planSitePublicationTransition({...base,action:"republish"})).toThrow(/before using Republish/);
+});

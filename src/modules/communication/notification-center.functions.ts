@@ -705,7 +705,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    (()=>{const thread=threadById.get(n.resourceId!)!;
     if(thread.metadata?.kind==="class_announcement")
      return thread.contextId&&accessibleAnnouncementSections.has(thread.contextId)?
-      `/classes?section=${encodeURIComponent(thread.contextId)}&tab=announcements`:null;
+      "/class":null;
     return memberThreadIds.has(thread.id)?`/messages?thread=${encodeURIComponent(thread.id)}`:null;})():
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:

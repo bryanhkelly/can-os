@@ -64,7 +64,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
   }
   return <WorkspaceShell width="wide" eyebrow="Teacher" title="Class discussions"
     subtitle="Discuss classwork with enrolled students. The assigned teaching team can respond, lock discussions and moderate posts."
-    breadcrumbs={<Link to="/classes" search={{ section }} className="underline">Back to classes</Link>}>
+    breadcrumbs={<Link to="/class"  className="underline">Back to classes</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Updating class discussion..."/>
     {section && !sections.length && <WorkspaceNotice tone="danger" className="mt-5">This class is unavailable in your current teaching membership.</WorkspaceNotice>}
     {sections.length > 0 && <details className="mt-6 border border-border bg-card p-5" open={lesson?true:undefined}>

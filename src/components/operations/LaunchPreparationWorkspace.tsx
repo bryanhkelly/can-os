@@ -1,3 +1,4 @@
+import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { useSchoolConfigurationNavigation } from "@/components/launch-studio/SchoolConfigurationContext";
 import { Link } from "@tanstack/react-router";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
@@ -38,7 +39,7 @@ export function LaunchPreparationWorkspace({ hubMode=false, focus, currentLaunch
   const recordedOutreachMinutes=firstInvitationTime!==undefined&&Number.isFinite(launchStart)&&firstInvitationTime>=launchStart
     ? Math.floor((firstInvitationTime-launchStart)/60000):null;
   return <>
-        {focus === "readiness" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<details aria-label="Measured launch setup" className="mt-5 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Setup timing and saved milestones</summary>
+        {focus === "readiness" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<details aria-label="Measured launch setup" className="mt-5  border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Setup timing and saved milestones</summary>
           <h2 className="font-serif text-xl">Recorded launch start</h2>
           <p className="mt-2 text-sm">Program creation: <time dateTime={currentLaunch.createdAt}>{new Date(currentLaunch.createdAt).toLocaleString()}</time>.</p>
           {firstInvitationTime!==undefined&&<p className="mt-2 text-sm">First saved invitation batch: <time dateTime={new Date(firstInvitationTime).toISOString()}>{new Date(firstInvitationTime).toLocaleString()}</time>.</p>}
@@ -57,10 +58,10 @@ export function LaunchPreparationWorkspace({ hubMode=false, focus, currentLaunch
           <SchoolJurisdictionReviewPanel key={`jurisdiction-review-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <ProgramSiteAuthorizationPanel key={`site-authorization-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
-          <Link {...(hubMode?{to:navigation.modulePath,params:{module:"academics"},search:schoolSelection}:{to:"/launch/school" as const,search:{...schoolSelection,step:"academics" as const}})} className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</Link>
+          <Link {...(hubMode?{to:navigation.modulePath,params:{module:"academics"},search:schoolSelection}:{to:"/launch/site" as const,search:{...schoolSelection,step:"academics" as const}})} className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</Link>
         </div>}
         {focus === "academics" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
-        {focus === "academics" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section id="launch-first-class" className="mt-5 scroll-mt-6 rounded-xl border bg-card p-5" aria-label="Prepare your first classroom">
+        {focus === "academics" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section id="launch-first-class" className="mt-5 scroll-mt-6  border bg-card p-5" aria-label="Prepare your first classroom">
           <h2 className="font-serif text-2xl">Prepare your first classroom</h2>
           <p className="mt-2 text-sm text-muted-foreground">Use the real published curriculum, scheduled term and CAN-authorized instructor. The academic setup will suggest the first eligible course and a matching schedule, then independently verify credentials and service authorization before allowing assignment. Preparing a class never opens the school.</p>
           <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}} search={{siteId:currentLaunch.siteId??undefined,programId:undefined}} className="mt-3 inline-block text-sm font-semibold underline">Review guided academic setup →</Link>
@@ -68,13 +69,13 @@ export function LaunchPreparationWorkspace({ hubMode=false, focus, currentLaunch
         </section>}
         {focus === "website" && currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
 
-        {focus === "families" && currentProgram&&<details className="mt-4 rounded-xl border bg-card p-4" open>
+        {focus === "families" && currentProgram&&<details className="mt-4  border bg-card p-4" open>
           <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>
           <p className="mt-2 text-sm text-muted-foreground">An authorized administrator can invite a school registrar to complete setup, or a website editor to prepare church-owned content. Choose the exact Site in the invitation workspace. Access starts only after secure email acceptance; institutional approval remains separate.</p>
-          <nav aria-label="School launch staff invitations" className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
+          <WorkspaceLinkNavigation label="School launch staff invitations" surface="plain" className="mt-3 gap-4 font-semibold">
             <Link to="/admin" search={{siteId:schoolSelection.siteId,inviteRole:"registrar"}} className="underline">Invite a school setup lead</Link>
             <Link to="/admin" search={{siteId:schoolSelection.siteId,inviteRole:"site_website_editor"}} className="underline">Invite a church website editor</Link>
-          </nav>
+          </WorkspaceLinkNavigation>
         </details>}
 
         {focus === "families" && hasSchoolPreparation && currentProgram && <section id="invite-families" className="scroll-mt-6" aria-label="Invite families and review admissions progress"><LaunchFamilyProgress

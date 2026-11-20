@@ -8,16 +8,16 @@ describe("native Class route ownership", () => {
     expect(read("src/routes/class_.$classId.tsx")).toContain('createFileRoute("/class_/$classId")');
     expect(existsSync("src/routes/learn.classes.tsx")).toBe(false);
     expect(existsSync("src/routes/classes_.$classId.tsx")).toBe(false);
-    expect(read("src/components/shell/route-navigation.ts")).toContain('"/class": page("/class", all)');
+    expect(existsSync("src/routes/classes.tsx")).toBe(false);
+    expect(read("src/components/shell/route-navigation.ts")).toContain('"/class": page("/class", [...all, "academic_content_creator", "academic_content_reviewer"])');
     expect(read("src/components/shell/workspace-navigation.registry.ts")).toContain('{ title: "Classes", path: "/class", icon: "book" }');
     expect(read("src/routes/class.tsx")).toContain("NativeClassManager");
-    expect(read("src/routes/canonical.classes.tsx")).toContain('<Navigate to="/class"');
+    expect(existsSync("src/routes/canonical.classes.tsx")).toBe(false);
   });
   it("does not send native learners into the academic Section route", () => {
     for (const file of [
       "src/routes/class.tsx","src/routes/class_.$classId.tsx",
-      "src/routes/join.tsx","src/routes/canonical.classes.tsx",
-      "src/routes/reports.classes_.$classId.tsx",
+      "src/routes/join.tsx",
       "src/components/learning/NativeClassSessionsPanel.tsx",
       "src/components/learning/NativeClassSessionAgenda.tsx",
       "src/components/launch-studio/SiteNativeClassHandoff.tsx",

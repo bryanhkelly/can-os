@@ -1,4 +1,4 @@
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceLinkNavigation, WorkspaceShell } from "@/components/workspace";
 import { getDemoCurriculumPreview } from "@/modules/learning/demo-curriculum-preview.functions";
 import { OneRosterStudentReconciliation } from "@/components/learning/OneRosterStudentReconciliation";
 import { encodeCommonCartridge } from "@/components/learning/common-cartridge-encoding";
@@ -95,12 +95,12 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
  }):[];
  const destination=mode==="resources"?"/operations/curriculum-marketplace/resources":mode==="imports"?"/operations/curriculum-marketplace/imports":mode==="roster"?"/operations/curriculum-marketplace/roster":"/operations/curriculum-marketplace";
  return <WorkspaceShell width="wide" eyebrow="Academic operations" title={mode==="resources"?"Curriculum resources":mode==="imports"?"Curriculum imports":mode==="roster"?"Roster exchange":"Curriculum Marketplace"}
-  actions={<nav aria-label="Curriculum workflows" className="flex flex-wrap gap-3 text-sm">
+  actions={<WorkspaceLinkNavigation label="Curriculum workflows" surface="plain" className="gap-3">
    <Link to="/operations/curriculum-marketplace" search={{programId:market?.program.id}} className="underline">Browse</Link>
    <Link to="/operations/curriculum-marketplace/resources" search={{programId:market?.program.id}} className="underline">Resources</Link>
    <Link to="/operations/curriculum-marketplace/imports" search={{programId:market?.program.id}} className="underline">Imports</Link>
    <Link to="/operations/curriculum-marketplace/roster" search={{programId:market?.program.id}} className="underline">Roster exchange</Link>
-  </nav>}>
+  </WorkspaceLinkNavigation>}>
   <div className="space-y-6">
   {mode==="browse" && data.demoPreview && <section className="space-y-3  border p-5" aria-label="Sample curriculum catalog">
     <h2 className="font-serif text-2xl">Explore sample curriculum</h2>
@@ -172,7 +172,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
       </ul>}
       </div>}
      <p className="mt-1 text-xs text-muted-foreground">For classroom verification, switch to an assigned teacher or enrolled student account before opening the class.</p>
-     <Link to="/classes" search={{section:klass.id}} className="text-sm underline">Open class as an authorized member →</Link>
+     <Link to="/class"  className="text-sm underline">Open class as an authorized member →</Link>
     </div>)}
     {!data.journey.classes.length&&<p className="text-sm">No classes use currently adopted publisher course releases. Provision a class after adopting a pack.</p>}
     <p className="text-xs text-muted-foreground">To certify the workflow, run the isolated database acceptance suite and signed-in browser tests. Nonzero counts establish operational records only.</p>

@@ -106,7 +106,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
        {o.sectionCount>0&&<StudentLearningAccessHandoff
          applicationId={app.applicationId} role="guardian"/>}
        <div className="flex flex-wrap gap-3 text-sm">
-        {o.sectionCount>0&&<Link to="/classes" search={{student:app.studentPersonId}}
+        {o.sectionCount>0&&<Link to="/class" 
           className=" border px-3 py-2 font-semibold">Open your child's classes →</Link>}
         <Link to="/guardian/attendance" search={{student:app.studentPersonId}}
          className=" border px-3 py-2">Attendance and excuses →</Link>

@@ -1,3 +1,7 @@
+import { Field } from "@/components/ui/field";
+import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
@@ -41,7 +45,6 @@ export const Route = createFileRoute("/church/apply")({
   component: ChurchApplicationPage,
 });
 
-const field = "mt-1 block w-full rounded-lg border bg-background p-3 text-sm";
 function ChurchApplicationPage() {
   const [form, setForm] = useState({
     churchName: "", siteName: "", timezone: DEFAULT_SITE_TIMEZONE,
@@ -81,34 +84,37 @@ function ChurchApplicationPage() {
     } catch { setError("Unable to connect. Please try again."); }
     finally { setBusy(false); }
   }
-  return <main className="mx-auto max-w-2xl space-y-6 px-5 py-12">
-    <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Church partnership</p>
-      <h1 className="mt-2 font-serif text-4xl">Bring a school to your church</h1>
-      <p className="mt-3 text-muted-foreground">Tell us about your church and your proposed school location. CAN will independently verify that you are authorized to represent the church before issuing access.</p>
+  return <WorkspaceShell width="reading" eyebrow="Church partnership"
+    title="Bring a school to your church"
+    subtitle="Tell us about your church and proposed Site. CAN independently verifies your authority to represent the church before issuing access.">
+    <div className="mt-6">
+      {submitted ? <ChurchApplicationConfirmation {...submitted}/> :
+      <WorkspacePanel title="Partnership information"
+        description="Provide your church and contact details to request onboarding.">
+        <form noValidate onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+          {([
+            ["churchName","Church name"],["siteName","Proposed school site name"],
+            ["firstName","Your first name"],["lastName","Your last name"],
+            ["leaderTitle","Your role at the church"],["contactEmail","Your work email"],
+          ] as const).map(([key,label]) => <Field key={key} label={label} required
+              error={fieldErrors[key]?.[0]}>
+              <Input id={`church-${key}`} required
+                type={key==="contactEmail"?"email":"text"}
+                maxLength={churchApplicationLimits[key]}
+                value={form[key]} onChange={event=>change(key,event.target.value)} />
+            </Field>)}
+          <SiteTimezoneField value={form.timezone} onChange={value=>change("timezone",value)} />
+          <Field label="Church website (optional)" error={fieldErrors.churchWebsite?.[0]}>
+            <Input id="church-churchWebsite" type="url" placeholder="https://…"
+              maxLength={churchApplicationLimits.churchWebsite}
+              value={form.churchWebsite} onChange={event=>change("churchWebsite",event.target.value)}/>
+          </Field>
+          <p className="text-xs text-muted-foreground sm:col-span-2">CAN will verify church authorization outside this form. Email ownership is also checked by a one-time sign-in link after approval.</p>
+          {error&&<p role="alert" className="text-sm text-destructive sm:col-span-2">{error}</p>}
+          <Button type="submit" disabled={busy} loading={busy}
+            loadingLabel="Sending…" className="sm:col-span-2">Request church onboarding</Button>
+        </form>
+      </WorkspacePanel>}
     </div>
-    {submitted ? <ChurchApplicationConfirmation {...submitted}/> : <form noValidate onSubmit={submit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2">
-      {([
-        ["churchName","Church name"],["siteName","Proposed school site name"],
-        ["firstName","Your first name"],["lastName","Your last name"],
-        ["leaderTitle","Your role at the church"],["contactEmail","Your work email"],
-      ] as const).map(([key,label]) => <label key={key} className="text-sm font-semibold"><span id={`church-${key}-label`}>{label}</span>
-        <input id={`church-${key}`} required type={key==="contactEmail"?"email":"text"} maxLength={churchApplicationLimits[key]}
-          aria-invalid={Boolean(fieldErrors[key])} aria-describedby={fieldErrors[key]?`church-${key}-error`:undefined}
-          aria-labelledby={`church-${key}-label`}
-          className={field} value={form[key]} onChange={event=>change(key,event.target.value)} />
-        {fieldErrors[key]&&<span id={`church-${key}-error`} className="mt-1 block text-sm text-destructive">{fieldErrors[key]?.[0]}</span>}
-      </label>)}
-      <SiteTimezoneField value={form.timezone} onChange={value=>change("timezone",value)} />
-      <label className="text-sm font-semibold"><span id="church-website-label">Church website (optional)</span>
-        <input id="church-churchWebsite" type="url" placeholder="https://…" maxLength={churchApplicationLimits.churchWebsite} className={field}
-          aria-invalid={Boolean(fieldErrors.churchWebsite)} aria-describedby={fieldErrors.churchWebsite?"church-website-error":undefined}
-          aria-labelledby="church-website-label"
-          value={form.churchWebsite} onChange={event=>change("churchWebsite",event.target.value)}/>
-        {fieldErrors.churchWebsite&&<span id="church-website-error" className="mt-1 block text-sm text-destructive">{fieldErrors.churchWebsite[0]}</span>}
-      </label>
-      <p className="text-xs text-muted-foreground sm:col-span-2">CAN will verify church authorization outside this form. Email ownership is also checked by a one-time sign-in link after approval.</p>
-      {error&&<p role="alert" className="text-sm text-destructive sm:col-span-2">{error}</p>}
-      <button type="submit" disabled={busy} className="rounded-lg bg-foreground px-4 py-3 font-semibold text-background disabled:opacity-50 sm:col-span-2">{busy?"Sending…":"Request church onboarding"}</button>
-    </form>}
-  </main>;
+  </WorkspaceShell>;
 }

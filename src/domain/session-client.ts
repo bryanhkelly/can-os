@@ -12,7 +12,18 @@ export function isSharedDeviceMode():boolean {
  try{return window.localStorage.getItem(sharedKey)==="1";}catch{return false;}
 }
 export function setSharedDeviceMode(enabled:boolean):void {
- try{if(enabled)window.localStorage.setItem(sharedKey,"1");else window.localStorage.removeItem(sharedKey);}catch{}
+ try{
+  if(enabled){
+   // Remove previously durable video bookmarks when enabling kiosk mode;
+   // future progress remains in tab-scoped sessionStorage.
+   const storage=window.localStorage;
+   for(let index=storage.length-1;index>=0;index--){
+    const key=storage.key(index);
+    if(key?.startsWith("can-native-video-progress:"))storage.removeItem(key);
+   }
+   storage.setItem(sharedKey,"1");
+  }else window.localStorage.removeItem(sharedKey);
+ }catch{}
 }
 /** Clear only CAN-owned state. Other same-origin features may use this tab's
  * storage, and a sign-out must not erase their unrelated data. Iterate
@@ -25,6 +36,9 @@ function clearCanStorageKeys(storage:Storage,preserve:ReadonlySet<string>=new Se
 }
 /** Broadcast a local account handoff to every tab. Events carry no account ID or secret. */
 export function clearLearnerBrowserState(broadcast=true):void {
+ // Stop mounted players before clearing storage, or pagehide may recreate
+ // private bookmarks after sign-out cleanup.
+ try{window.dispatchEvent(new Event("can:clear-learning-video"));}catch{}
  try{clearCanStorageKeys(window.sessionStorage);}catch{}
  // Preserve kiosk preference and the latest cross-tab revocation marker only.
  try{

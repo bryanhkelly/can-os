@@ -10,7 +10,7 @@ import { issueClassroomProjectorCommand } from "@/modules/learning/classroom-pro
 
 type Catalog=Awaited<ReturnType<typeof getFacilitatedRoomMedia>>;
 /** Private command surface; no media playback or learner response data is projected. */
-export function ClassroomPlaybackControls({facilitatedSessionId,preferredLessonIds=[]}:{facilitatedSessionId:string;preferredLessonIds?:readonly string[]}){
+export function ClassroomPlaybackControls({facilitatedSessionId,preferredLessonIds=[],onCommandStatus}:{facilitatedSessionId:string;preferredLessonIds?:readonly string[];onCommandStatus?:(status:"accepted"|"failed",kind:"load"|"play"|"pause"|"seek"|"stop")=>void}){
   const [selected,setSelected]=useState("");
   const [position,setPosition]=useState(0);
   const [busy,setBusy]=useState(false);
@@ -39,8 +39,12 @@ export function ClassroomPlaybackControls({facilitatedSessionId,preferredLessonI
         lessonId:current.lessonId,assetVersionId:current.assetVersionId,
         commandKind:kind,positionSeconds:position,
       }});
-      setMessage("Projector "+kind+" request sent.");
-    }catch{setError("Projector control was refused. Check current lesson rights and active room.");}
+      onCommandStatus?.("accepted",kind);
+      setMessage("Projector "+kind+" request accepted; playback must be confirmed on the display.");
+    }catch{
+      onCommandStatus?.("failed",kind);
+      setError("Projector control was refused. Check current lesson rights and active room.");
+    }
     finally{setBusy(false);}
   }
   return <section className="mt-4 border border-border bg-card p-4" aria-label="Shared screen playback controls">

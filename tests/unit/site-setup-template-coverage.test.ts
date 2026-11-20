@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { siteTemplateIds } from "@/domain/site-theme";
-import { siteLaunchInterestIds } from "@/domain/site-launch-preferences";
+import { siteLaunchInterestIds, sitePlanningInterestIds } from "@/domain/site-launch-preferences";
 import { emptySiteLocalContent } from "@/domain/site-local-content";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { defaultSiteContentChannelConfig, resolveSiteContentBlocks,
@@ -33,7 +33,7 @@ const templateSite=(templateId:typeof siteTemplateIds[number])=>({
 });
 
 describe("Every Site-first setup choice has a native template home",()=>{
-  it("covers all eight registered program interests, Site identity and network status",()=>{
+  it("shows six learning interests but not legacy weekend/evening timing as Programs",()=>{
     const blocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,sourceFeeds("both"));
     const setup=blocks.find(x=>x.channel==="site.setup");
     const network=blocks.find(x=>x.channel==="site.network");
@@ -43,7 +43,7 @@ describe("Every Site-first setup choice has a native template home",()=>{
     ]);
     expect(network?.items[0]?.title).toBe("Community Learning Network");
     expect(network?.items[0]?.label).toBe("Affiliation: pending");
-    expect(interests?.items.map(x=>x.id)).toEqual([...siteLaunchInterestIds]);
+    expect(interests?.items.map(x=>x.id)).toEqual([...sitePlanningInterestIds]);
     expect(interests?.items.every(x=>x.link===undefined)).toBe(true);
   });
   it("renders all three delivery choices, all interests and all setup fields in all seven templates",()=>{
@@ -57,9 +57,10 @@ describe("Every Site-first setup choice has a native template home",()=>{
         for(const text of [siteSetup.name,siteSetup.organizationName,
           "Brentwood, CA",siteSetup.timezone,expectedDelivery[delivery],
           "Community Learning Network","Grades 6–8","Grades 9–12",
-          "Afterschool","Weekend Learning","Summer &amp; Breaks",
-          "Evening Learning","Adult Learning","Senior Programs"])
+          "Afterschool","Summer &amp; Breaks","Adult Learning","Senior Programs"])
           expect(html,templateId+"/"+delivery+" missing "+text).toContain(text);
+        expect(html).not.toContain("Weekend Learning");
+        expect(html).not.toContain("Evening Learning");
       }
     }
   });

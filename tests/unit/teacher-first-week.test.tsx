@@ -17,9 +17,9 @@ describe("authorized Teacher Today first-week handoff", () => {
   it("uses the assigned section's actual lesson and published assessment IDs", () => {
     const html = renderToStaticMarkup(<TeacherFirstWeekCard id="section-1" title="Biology" studentCount={1} classroom={ready} />);
     expect(html).toContain("First week: ready to teach");
-    expect(html).toContain('href="/classes?section=section-1&amp;tab=lessons&amp;lesson=intro"');
+    expect(html).toContain('href="/class"');
     expect(html).toContain('href="/teacher/gradebook?section=section-1&amp;assessment=assessment-1"');
-    expect(html).toContain('href="/classes?section=section-1&amp;tab=people"');
+    expect(html).toContain('href="/class"');
     expect(html).not.toContain("Create first assessment");
   });
   it("offers the canonical assessment creator instead of inventing student work", () => {

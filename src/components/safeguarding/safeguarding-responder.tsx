@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useState } from "react";
 import { personDisplayName as name } from "@/domain/person-name";
@@ -140,11 +143,11 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
     <section aria-label="Assigned safeguarding cases">
       <h2 className="font-serif text-2xl font-semibold">My assigned cases</h2>
       <p className="mt-2 text-sm text-muted-foreground">Site membership alone grants no access. Only active named assignments appear.</p>
-      {!workspace.cases.length ? <EmptyState title="No assigned safeguarding cases" description="Ordinary support referrals and unassigned incidents are not available in this workspace." /> : <div className="mt-4 space-y-3">{workspace.cases.map(item => <button key={item.incidentId} type="button" onClick={() => void openCase(item.incidentId)} aria-pressed={selectedId === item.incidentId} className={"w-full rounded-xl border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " + (selectedId === item.incidentId ? "bg-muted" : "bg-card")}>
+      {!workspace.cases.length ? <EmptyState title="No assigned safeguarding cases" description="Ordinary support referrals and unassigned incidents are not available in this workspace." /> : <div className="mt-4 space-y-3">{workspace.cases.map(item => <Button variant="ghost" key={item.incidentId} type="button" onClick={() => void openCase(item.incidentId)} aria-pressed={selectedId === item.incidentId} className={"w-full  border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " + (selectedId === item.incidentId ? "bg-muted" : "bg-card")}>
         <span className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold">{item.incidentNumber}</span><StatusBadge tone={item.status === "closed" ? "neutral" : item.urgent ? "danger" : item.acknowledgedAt ? "success" : "attention"}>{item.status === "closed" ? "Closed" : item.urgent ? "Urgent" : item.acknowledgedAt ? "Acknowledged" : "Needs response"}</StatusBadge></span>
         <span className="mt-2 block text-xs text-muted-foreground">{item.responsibility.replaceAll("_", " ")} · reported {date(item.reportedAt)}</span>
         <span className="mt-1 block text-xs">{item.concernKinds.map(kind => kind.replaceAll("_", " ")).join(", ")}</span>
-      </button>)}</div>}
+      </Button>)}</div>}
       {overdue.length > 0 && <div className="mt-6" aria-label="Unacknowledged cases past their response target">
         <h3 className="text-sm font-semibold">Unacknowledged past response target</h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -153,7 +156,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
           until it exists. This is never a substitute for the offline emergency procedure.
         </p>
         <div className="mt-3 space-y-3">{overdue.map(item =>
-          <div key={item.incidentId} className="rounded-xl border border-rose-300 p-4">
+          <div key={item.incidentId} className=" border border-danger/40 p-4">
             <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold">{item.incidentNumber}</span>
               <StatusBadge tone={item.urgent ? "danger" : "attention"}>{item.urgent ? "Urgent · overdue" : "Overdue"}</StatusBadge>
@@ -190,65 +193,65 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
               <div><dt className="font-semibold">Immediate danger response</dt><dd className="mt-1">{detail.concern.immediateDanger}</dd></div>
               <div><dt className="font-semibold">Acknowledgment target</dt><dd className="mt-1">{date(detail.concern.acknowledgmentDueAt)}</dd></div>
             </dl>
-            <section className="mt-6 rounded-xl border p-4"><h3 className="text-sm font-semibold">Factual observation as reported</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{detail.incident.summary}</p></section>
-            {detail.incident.immediateActions && <section className="mt-4 rounded-xl border p-4"><h3 className="text-sm font-semibold">Immediate steps recorded by reporter</h3><p className="mt-2 whitespace-pre-wrap text-sm">{detail.incident.immediateActions}</p></section>}
+            <section className="mt-6  border p-4"><h3 className="text-sm font-semibold">Factual observation as reported</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{detail.incident.summary}</p></section>
+            {detail.incident.immediateActions && <section className="mt-4  border p-4"><h3 className="text-sm font-semibold">Immediate steps recorded by reporter</h3><p className="mt-2 whitespace-pre-wrap text-sm">{detail.incident.immediateActions}</p></section>}
             <WorkspaceNotice className="mt-5">This is a concern report, not a finding. Do not automatically notify guardians. Internal receipt and external reporting remain separate, and any individual legal duty is not delayed by this workflow.</WorkspaceNotice>
           </WorkspacePanel>
 
           <WorkspacePanel title="Response and acknowledgment" description="Named case responsibility, not site-wide browsing." className="mt-5">
             <ul className="grid gap-3 text-sm">{detail.assignments.map(assignment => {
               const acknowledgment = detail.notifications.find(item => item.recipientPersonId === assignment.personId && item.acknowledgedAt);
-              return <li key={assignment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"><span>{name(assignment)} <span className="text-muted-foreground">· {assignment.responsibility.replaceAll("_", " ")}</span></span><StatusBadge tone={acknowledgment ? "success" : "attention"}>{acknowledgment ? `Acknowledged ${date(acknowledgment.acknowledgedAt!)}` : "Awaiting acknowledgment"}</StatusBadge></li>;
+              return <li key={assignment.id} className="flex flex-wrap items-center justify-between gap-2  border p-3"><span>{name(assignment)} <span className="text-muted-foreground">· {assignment.responsibility.replaceAll("_", " ")}</span></span><StatusBadge tone={acknowledgment ? "success" : "attention"}>{acknowledgment ? `Acknowledged ${date(acknowledgment.acknowledgedAt!)}` : "Awaiting acknowledgment"}</StatusBadge></li>;
             })}</ul>
           </WorkspacePanel>
 
           <WorkspacePanel title="Evidence" description="Append-only source records; no diagnosis or finding is inferred." className="mt-5">
-            {!detail.evidence.length ? <p className="text-sm text-muted-foreground">No evidence records yet.</p> : <ul className="space-y-3 text-sm">{detail.evidence.map(item => <li key={item.id} className="rounded-lg border p-3"><span className="font-medium">{item.type}</span> · {date(item.createdAt)}<p className="mt-1 whitespace-pre-wrap">{item.description}</p></li>)}</ul>}
+            {!detail.evidence.length ? <p className="text-sm text-muted-foreground">No evidence records yet.</p> : <ul className="space-y-3 text-sm">{detail.evidence.map(item => <li key={item.id} className=" border p-3"><span className="font-medium">{item.type}</span> · {date(item.createdAt)}<p className="mt-1 whitespace-pre-wrap">{item.description}</p></li>)}</ul>}
             <SafeguardingEvidenceForm incidentId={selectedId} onSaved={refresh} />
           </WorkspacePanel>
 
           <WorkspacePanel title="Independent external-report history" description="Attempts, submissions and agency acknowledgments are distinct person-attested records." className="mt-5">
-            {!detail.externalReports.length ? <p className="text-sm text-muted-foreground">No outside action has been recorded. This says nothing about whether a legal duty applies.</p> : <ul className="space-y-3 text-sm">{detail.externalReports.map(item => <li key={item.id} className="rounded-lg border p-3"><div className="flex flex-wrap justify-between gap-2"><span className="font-medium">{item.status.replaceAll("_", " ")} · {item.agencyLabel}</span><span>{date(item.occurredAt)}</span></div><p className="mt-1 text-muted-foreground">{item.channel}{item.reference ? ` · Reference ${item.reference}` : ""}</p>{item.details && <p className="mt-2 whitespace-pre-wrap">{item.details}</p>}</li>)}</ul>}
+            {!detail.externalReports.length ? <p className="text-sm text-muted-foreground">No outside action has been recorded. This says nothing about whether a legal duty applies.</p> : <ul className="space-y-3 text-sm">{detail.externalReports.map(item => <li key={item.id} className=" border p-3"><div className="flex flex-wrap justify-between gap-2"><span className="font-medium">{item.status.replaceAll("_", " ")} · {item.agencyLabel}</span><span>{date(item.occurredAt)}</span></div><p className="mt-1 text-muted-foreground">{item.channel}{item.reference ? ` · Reference ${item.reference}` : ""}</p>{item.details && <p className="mt-2 whitespace-pre-wrap">{item.details}</p>}</li>)}</ul>}
           </WorkspacePanel>
           <SafeguardingExternalReportForm incidentId={selectedId} onSaved={refresh} />
 
           {detail.incident.status==="filed"&&<WorkspacePanel title="Assign an internal case review"
             description="Record reviews identified by the authorized case response. A review assignment grants no new case access and does not determine legal reporting requirements." className="mt-5">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm">Review type
-                <select value={reviewKind} onChange={event=>setReviewKind(event.target.value as typeof reviewKind)} className="mt-1 w-full rounded border bg-background p-2">
+              <Label className="text-sm">Review type
+                <Select value={reviewKind} onChange={event=>setReviewKind(event.target.value as typeof reviewKind)} className="mt-1 w-full  border bg-background p-2">
                   <option value="follow_up_review">Follow-up review</option>
                   <option value="protective_measure_review">Protective-measure review</option>
                   <option value="external_reporting_review">External-reporting review</option>
-                </select>
-              </label>
-              <label className="text-sm">Assigned case responder
-                <select value={reviewerId} onChange={event=>setReviewerId(event.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+                </Select>
+              </Label>
+              <Label className="text-sm">Assigned case responder
+                <Select value={reviewerId} onChange={event=>setReviewerId(event.target.value)} className="mt-1 w-full  border bg-background p-2">
                   <option value="">Choose an assigned responder</option>
                   {[...new Map(detail.assignments.filter(row=>!row.revokedAt).map(row=>[row.personId,row])).values()]
                     .map(row=><option key={row.personId} value={row.personId}>{name(row)}</option>)}
-                </select>
-              </label>
+                </Select>
+              </Label>
             </div>
-            <label className="mt-3 block text-sm">What must be reviewed
-              <textarea rows={2} maxLength={2000} value={reviewNotes} onChange={event=>setReviewNotes(event.target.value)}
-                className="mt-1 w-full rounded border bg-background p-2"/>
-            </label>
+            <Label className="mt-3 block text-sm">What must be reviewed
+              <Textarea rows={2} maxLength={2000} value={reviewNotes} onChange={event=>setReviewNotes(event.target.value)}
+                className="mt-1 w-full  border bg-background p-2"/>
+            </Label>
             <Button className="mt-3" disabled={!!busy||!reviewerId||reviewNotes.trim().length<10} onClick={()=>void assignReview()}>Assign restricted review</Button>
           </WorkspacePanel>}
 
           {!!detail.reviews.length&&<WorkspacePanel title="Assigned restricted case reviews"
             description="Pending reviews block closure. Completing an internal review never records an external report or ends a legal duty." className="mt-5">
-            <ul className="space-y-3">{detail.reviews.map(review=><li key={review.id} className="rounded-lg border p-3 text-sm">
+            <ul className="space-y-3">{detail.reviews.map(review=><li key={review.id} className=" border p-3 text-sm">
               <p className="font-semibold">{review.level.replaceAll("_"," ")} · {review.status}</p>
               {review.notes&&<p className="mt-2 whitespace-pre-wrap">{review.notes}</p>}
               {review.decision&&<p className="mt-2 whitespace-pre-wrap">Outcome: {review.decision}</p>}
               {review.canComplete&&<>
-                <label className="mt-3 block text-sm">Your factual review outcome
-                  <textarea rows={2} maxLength={2000} value={reviewOutcomes[review.id]??""}
+                <Label className="mt-3 block text-sm">Your factual review outcome
+                  <Textarea rows={2} maxLength={2000} value={reviewOutcomes[review.id]??""}
                     onChange={event=>setReviewOutcomes(values=>({...values,[review.id]:event.target.value}))}
-                    className="mt-1 w-full rounded border bg-background p-2"/>
-                </label>
+                    className="mt-1 w-full  border bg-background p-2"/>
+                </Label>
                 <Button variant="outline" className="mt-2" disabled={!!busy||(reviewOutcomes[review.id]??"").trim().length<10}
                   onClick={()=>void completeReview(review.id)}>Complete assigned review</Button>
               </>}
@@ -256,13 +259,13 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
           </WorkspacePanel>}
 
           {detail.incident.status !== "closed" && <WorkspacePanel title="Accountable closure" description="Closing ends the active internal response. Every record stays intact, and closure never completes or replaces an external legal reporting duty." className="mt-5">
-            <label className="block text-sm font-semibold">
+            <Label className="block text-sm font-semibold">
               Factual resolution summary (required)
-              <textarea value={resolution} maxLength={2000} rows={4}
+              <Textarea value={resolution} maxLength={2000} rows={4}
                 onChange={event => setResolution(event.target.value)}
                 placeholder="What was actually done, by whom, and what — if anything — remains outstanding?"
-                className="mt-2 w-full rounded border bg-background p-3 text-sm font-normal" />
-            </label>
+                className="mt-2 w-full  border bg-background p-3 text-sm font-normal" />
+            </Label>
             <Button className="mt-3" disabled={!!busy || resolution.trim().length < 10 || detail.reviews.some(review=>review.status==="pending")} onClick={() => void closeCase()}>
               {busy === "close" ? "Closing…" : "Close restricted case"}
             </Button>

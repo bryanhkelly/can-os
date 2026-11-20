@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { normalizeClientError } from "@/lib/client-error";
 import { canPlanOffering, type AvailableOffering } from "@/domain/program-discovery";
-import type { JsonObject } from "@/db/canonical-v301";
+import type { JsonObject } from "@/domain/json-types";
 import { discoverCanonicalBlueprintOfferings } from "@/modules/blueprints/blueprint-studio.functions";
 
 export type BlueprintOfferingIntent = {
@@ -15,7 +15,14 @@ export type BlueprintOfferingIntent = {
 
 type Props = {
   siteId: string;
+  initialDelivery?: "onsite" | "remote" | "hybrid";
   components: readonly { id: string; key: string }[];
+  linkedOffering?: {
+    offeringVersionId: string;
+    code: string;
+    title: string;
+    versionNo: number;
+  } | null;
   selected: readonly BlueprintOfferingIntent[];
   onChange: (next: BlueprintOfferingIntent[]) => void;
   disabled?: boolean;
@@ -26,48 +33,93 @@ type Props = {
  * It never creates a Deployment, activates a program, or overrides program fit.
  */
 export function BlueprintOfferingAdoptionPicker({
-  siteId, components, selected, onChange, disabled = false,
+  siteId, initialDelivery = "onsite", components, linkedOffering,
+  selected, onChange, disabled = false,
 }: Props) {
-  const [deliveryContext, setDeliveryContext] = useState<"onsite" | "remote" | "hybrid">("onsite");
+  const [deliveryContext, setDeliveryContext] =
+    useState<"onsite" | "remote" | "hybrid">(initialDelivery);
+  const requestVersion = useRef(0);
   const [offerings, setOfferings] = useState<AvailableOffering[] | null>(null);
   const [targetComponentId, setTargetComponentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    requestVersion.current += 1;
+    setDeliveryContext(initialDelivery);
     setOfferings(null);
     setTargetComponentId("");
-  }, [siteId]);
+    setError(null);
+    setLoading(false);
+    return () => { requestVersion.current += 1; };
+  }, [siteId, initialDelivery]);
 
   async function discover() {
+    const version = ++requestVersion.current;
     setLoading(true);
     setError(null);
     try {
-      setOfferings(await discoverCanonicalBlueprintOfferings({
+      const result = await discoverCanonicalBlueprintOfferings({
         data: { subject: { kind: "site", siteId }, deliveryContext },
-      }));
+      });
+      if (requestVersion.current === version) setOfferings(result);
     } catch (caught) {
-      setError(normalizeClientError(caught, "Published Offerings could not be loaded.").message);
+      if (requestVersion.current === version) {
+        setError(normalizeClientError(caught, "Published Offerings could not be loaded.").message);
+      }
     } finally {
-      setLoading(false);
+      if (requestVersion.current === version) setLoading(false);
     }
   }
 
   const available = offerings?.filter(canPlanOffering) ?? [];
+  const targetId = targetComponentId || (components.length === 1 ? components[0]?.id ?? "" : "");
+  const linkedAttached = !!linkedOffering && selected.some(intent =>
+    intent.componentId === targetId &&
+    intent.offeringVersionId === linkedOffering.offeringVersionId);
   return <fieldset className="border p-4" disabled={disabled} aria-label="Published Offering adoption">
     <legend className="px-2 font-semibold">Adopt a published Offering</legend>
     <p className="mt-2 text-sm text-muted-foreground">
       Connect a published educational product to a selected program component.
       Its availability is advisory. Independent review is required before execution.
     </p>
+    {linkedOffering && <article className="mt-4 border bg-background p-4">
+      <h3 className="text-sm font-semibold">Published learning product included in this Solution</h3>
+      <p className="mt-1 text-sm">{linkedOffering.title} · v{linkedOffering.versionNo}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{linkedOffering.code}</p>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+        You can include this published product in your private plan now.
+        Site availability, resources, qualification, approval and learner
+        enrollment must be verified independently.
+      </p>
+      <Button type="button" variant="outline" className="mt-3"
+        disabled={disabled || !targetId || linkedAttached}
+        onClick={() => {
+          if (!linkedOffering || !targetId || linkedAttached) return;
+          onChange([...selected, {
+            componentId: targetId,
+            offeringVersionId: linkedOffering.offeringVersionId,
+            configuration: {},
+          }]);
+        }}>
+        {linkedAttached ? "Included in private plan" : "Include in private plan"}
+      </Button>
+      {!targetId && <p className="mt-2 text-xs text-muted-foreground">
+        Choose a Program component below to attach this learning product.
+      </p>}
+    </article>}
     <div className="mt-4 flex flex-wrap items-end gap-3">
       <Label htmlFor="blueprint-offering-delivery" className="min-w-44 flex-1 text-sm">
         Delivery model
         <Select id="blueprint-offering-delivery" className="mt-2" value={deliveryContext}
           onChange={event => {
             const next = event.currentTarget.value as typeof deliveryContext;
+            requestVersion.current += 1;
             setDeliveryContext(next);
             setOfferings(null);
+            setLoading(false);
+            setError(null);
+            setTargetComponentId("");
           }}>
           <option value="onsite">On site</option>
           <option value="remote">Remote</option>
@@ -80,9 +132,12 @@ export function BlueprintOfferingAdoptionPicker({
     </div>
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     {offerings && offerings.length === 0 && <p role="status" className="mt-3 text-sm">
-      No published Offerings were found for this Site and delivery model.
+      No published availability decisions currently match this Site and delivery model.
+      CAN must publish applicable qualification rules before it can establish
+      whether an Offering may operate here. This does not prevent private planning.
     </p>}
-    {available.length > 0 && <Label htmlFor="blueprint-offering-component"
+    {(available.length > 0 || (linkedOffering && components.length > 1)) &&
+      <Label htmlFor="blueprint-offering-component"
       className="mt-4 block text-sm">
       Add to Blueprint component
       <Select id="blueprint-offering-component" className="mt-2"
@@ -100,7 +155,7 @@ export function BlueprintOfferingAdoptionPicker({
         const selectable = canPlanOffering(item);
         const attached = selected.some(intent =>
           intent.offeringVersionId === item.offering.offeringVersionId &&
-          intent.componentId === targetComponentId
+          intent.componentId === targetId
         );
         return <article key={item.offering.offeringVersionId} className="border bg-background p-4">
           <h3 className="font-semibold">{item.offering.title}</h3>
@@ -115,9 +170,9 @@ export function BlueprintOfferingAdoptionPicker({
             Not available for planning with this Site and delivery selection
           </p>}
           <Button className="mt-3" type="button" variant="outline"
-            disabled={!selectable || !targetComponentId || attached}
+            disabled={!selectable || !targetId || attached}
             onClick={() => onChange([...selected, {
-              componentId: targetComponentId,
+              componentId: targetId,
               offeringVersionId: item.offering.offeringVersionId,
               configuration: {},
             }])}>
@@ -134,7 +189,9 @@ export function BlueprintOfferingAdoptionPicker({
             className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
             <span>
               {offerings?.find(item => item.offering.offeringVersionId === intent.offeringVersionId)
-                ?.offering.title ?? `Offering ${intent.offeringVersionId}`}
+                ?.offering.title ??
+                (linkedOffering?.offeringVersionId === intent.offeringVersionId
+                  ? linkedOffering.title : `Offering ${intent.offeringVersionId}`)}
               {" · "}
               {components.find(item => item.id === intent.componentId)?.key.replaceAll("_", " ") ??
                 intent.componentId}

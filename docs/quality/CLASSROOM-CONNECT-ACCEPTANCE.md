@@ -1,3 +1,18 @@
+## November 20 Classroom Connect reliability and integration follow-up
+
+**Source work only; not a release approval.** This feature branch now includes:
+
+- One React Query learner-room reader shared by native Class Sessions, in-Class pairing and legacy companion; denied/failed revalidation hides room controls.
+- A reusable, native embedded feedback/survey panel backed by the existing canonical Course Attempt and survey services, without parallel participation or grading tables.
+- Explicit learner connection states and a private facilitator health surface. Polling and projector command acceptance remain observations, not verified attendance, delivered video minutes or academic outcomes.
+- Exact-answer, exact-client-instance retry recovery using tab-only `sessionStorage`, capped at 15 minutes; malformed entries and account-handoff state are cleared.
+- Classroom preflight signals for current Class roster, authorized staff/Site, scheduled sessions and the separate media-rights check. The human preparation checklist does not bypass server authorization.
+- New unit/source contracts for recovery and shared components, plus guarded authenticated browser negative-access tests.
+
+**Timezone logic was explicitly excluded from this work.** Calendar time interpretation must be resolved at the application-wide scheduling/domain layer, not patched again in an individual classroom component.
+
+**Release gate remains blocked** until the matching source is built and typechecked, Classroom Connect unit tests pass, a disposable QA database is aligned with the current canonical `public` schema and purpose-specific database roles, and the full two-Site authenticated facilitator-to-learner browser journey actually passes. Existing `test01` still has Classroom Connect tables in `education_v30` while current main and the separately inspected V6.1 validation branch have those tables in `public`; do not silently treat the older branch as production-schema-equivalent. Live Netlify deployment and current-source authorization configuration must be independently verified. No QA fixture-writing commands should target production Neon main.
+
 # Classroom Connect release acceptance register
 
 **Updated:** 2026-11-14

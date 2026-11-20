@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EvidenceUploadSection } from "@/components/evidence";
@@ -77,7 +80,7 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
       setError("Evidence could not be submitted. Refresh the current requirement, verify your role and selected document, then retry.");
     }finally{setSubmitting(false);}
   }
-  return <section className="mt-4 rounded-xl border bg-card p-4" aria-labelledby="school-jurisdiction-title">
+  return <section className="mt-4  border bg-card p-4" aria-labelledby="school-jurisdiction-title">
     <h3 id="school-jurisdiction-title" className="font-semibold">State-specific legal review</h3>
     <p className="mt-1 text-sm text-muted-foreground">
       CAN checks the actual school's state, program, delivery model, responsible entity and authoritative policy evidence.
@@ -86,11 +89,11 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
     {loading&&<p className="mt-3 text-sm" role="status">Loading your school's jurisdiction review…</p>}
     {!loading&&review&&<div className="mt-3 space-y-3 text-sm">
       <p className="font-medium">{review.reviewRequired?"CAN legal review is required":"This school's current jurisdiction scope has been independently reviewed"}</p>
-      {review.schoolReviewReason&&<p role="status" className="rounded-lg border p-3 text-sm">{review.schoolReviewReason}</p>}
+      {review.schoolReviewReason&&<p role="status" className=" border p-3 text-sm">{review.schoolReviewReason}</p>}
       {review.locationReviewReason&&<p className="text-xs text-muted-foreground">Please correct the physical Site address in school configuration before requesting independent verification.</p>}
       <p className="text-xs text-muted-foreground">Profile revision: {review.revision??"not published"}. This is a scoped evaluation, not authorization to open or enroll.</p>
       {review.readiness.status==="verified_policy"&&<>
-        <details className="rounded-lg border p-3">
+        <details className=" border p-3">
           <summary className="cursor-pointer font-medium">School-specific legal requirements ({review.readiness.requirements.length})</summary>
           <ul className="mt-2 space-y-3">{review.readiness.requirements.map(item=><li key={item.id}>
             <p className="font-medium">{item.title} · {item.applicability.replaceAll("_"," ")}</p>
@@ -101,7 +104,7 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
               target="_blank" rel="noopener noreferrer">{source.title} · checked {source.checkedAt.slice(0,10)}</a>)}
           </li>)}</ul>
         </details>
-        <details className="rounded-lg border p-3">
+        <details className=" border p-3">
           <summary className="cursor-pointer font-medium">Sourced funding research ({review.readiness.fundingOpportunities.length})</summary>
           <p className="mt-2 text-xs text-muted-foreground">These are researched opportunities, not confirmed school eligibility, provider participation, government approval or revenue.</p>
           <ul className="mt-2 space-y-3">{review.readiness.fundingOpportunities.map(item=><li key={item.id}>
@@ -113,10 +116,10 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
           </li>)}</ul>
         </details>
       </>}
-      {work&&work.items.length>0&&<details className="rounded-lg border p-3">
+      {work&&work.items.length>0&&<details className=" border p-3">
         <summary className="cursor-pointer font-medium">Assigned legal requirement Actions ({work.items.length})</summary>
         <p className="mt-2 text-xs text-muted-foreground">These Actions track obligations and independently reviewed evidence. Completing an Action does not authorize opening, enrollment or government funding.</p>
-        <ul className="mt-2 space-y-3">{work.items.map(item=><li key={item.id} className="rounded border p-3">
+        <ul className="mt-2 space-y-3">{work.items.map(item=><li key={item.id} className=" border p-3">
           <p className="font-medium">{item.title}</p>
           <p className="text-xs text-muted-foreground">{item.responsibleParty.toUpperCase()} responsibility · {item.phase?.replaceAll("_"," ")??"review phase pending"} · {item.effectiveStatus.replaceAll("_"," ")}</p>
           <p className="text-xs">{item.reviewState.replaceAll("_"," ")}</p>
@@ -128,7 +131,7 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
             Submit existing Program evidence
           </Button>}
         </li>)}</ul>
-        {selectedAction&&<div className="mt-3 space-y-2 rounded-lg border p-3">
+        {selectedAction&&<div className="mt-3 space-y-2  border p-3">
           <EvidenceUploadSection<LegalEvidenceUpload>
             heading="Upload an actual legal filing or requirement document to private Program storage"
             adapter={{
@@ -145,22 +148,22 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
             }}
             submitLabel="Upload legal evidence"
           />
-          <label className="block text-sm font-medium" htmlFor="legal-doc-selection">Select previously uploaded, verified-storage Program evidence</label>
-          <select id="legal-doc-selection" value={selectedDocument}
+          <Label className="block text-sm font-medium" htmlFor="legal-doc-selection">Select previously uploaded, verified-storage Program evidence</Label>
+          <Select id="legal-doc-selection" value={selectedDocument}
             onChange={event=>setSelectedDocument(event.target.value)}
-            className="w-full rounded-md border bg-background p-2">
+            className="w-full  border bg-background p-2">
             <option value="">Choose a document</option>
             {work.evidenceDocuments.filter(document=>document.actionId===selectedAction)
               .map(document=><option key={document.id} value={document.id}>
               {document.fileName}
             </option>)}
-          </select>
+          </Select>
           {!work.evidenceDocuments.some(document=>document.actionId===selectedAction)&&
             <p className="text-xs text-muted-foreground">No eligible documents are available. Upload the correctly scoped file above, then select it for independent CAN review.</p>}
-          <label className="block text-sm font-medium" htmlFor="legal-evidence-statement">Evidence statement</label>
-          <textarea id="legal-evidence-statement" rows={3} value={evidenceStatement}
+          <Label className="block text-sm font-medium" htmlFor="legal-evidence-statement">Evidence statement</Label>
+          <Textarea id="legal-evidence-statement" rows={3} value={evidenceStatement}
             onChange={event=>setEvidenceStatement(event.target.value)}
-            className="w-full rounded-md border bg-background p-2" placeholder="Explain how this document addresses the particular required filing or obligation."/>
+            className="w-full  border bg-background p-2" placeholder="Explain how this document addresses the particular required filing or obligation."/>
           <Button type="button" disabled={submitting||!selectedDocument||evidenceStatement.trim().length<10}
             onClick={()=>void submitEvidence()}>
             {submitting?"Submitting…":"Submit for independent review"}
@@ -168,7 +171,7 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
           <Button type="button" variant="ghost" onClick={()=>setSelectedAction("")}>Cancel</Button>
         </div>}
       </details>}
-      {review.decisions.length>0&&<details className="rounded-lg border p-3">
+      {review.decisions.length>0&&<details className=" border p-3">
         <summary className="cursor-pointer font-medium">Requirement evaluation ({review.decisions.length})</summary>
         <ul className="mt-2 space-y-2">{review.decisions.map(item=><li key={item.id}>
           <span className="font-medium">{item.status.replaceAll("_"," ")}</span>

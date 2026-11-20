@@ -18,7 +18,7 @@ export function LaunchSectionRow({section,staff,busy,authority,assign,saveCredit
  const candidate=section.candidates.find(candidate=>candidate.personId===personId);
  const [attempted,setAttempted]=useState(false);
  const alreadyAssigned=section.teachers.some(teacher=>teacher.personId===personId);
- return <article className="rounded-lg border bg-card p-4">
+ return <article className=" border bg-card p-4">
   <h3 className="font-semibold">{section.title} · {section.code}</h3>
   <p className="mt-2 text-xs text-muted-foreground">
    {section.teachers.length?section.teachers.map(t=>t.first+" "+t.last).join(", "):"Instructor not yet assigned"}
@@ -45,18 +45,18 @@ export function LaunchSectionRow({section,staff,busy,authority,assign,saveCredit
    </form>
    <p className="mt-2 text-xs text-muted-foreground">The school sets actual credit units. Changes are audited and locked after finalized grades.</p>
    <div className="mt-3 grid gap-2 sm:grid-cols-4">
-   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Enrollment</span><br/>{section.readiness.metrics.activeEnrollment}/{section.readiness.metrics.enrollmentCapacity}</div>
-   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Forecast</span><br/>{section.readiness.metrics.expectedDemand??"Not set"}</div>
-   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Reserved seats</span><br/>{section.readiness.metrics.reservedInstructionalSeats}</div>
-   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Readiness</span><br/>{section.readiness.ready?"Ready":"Needs attention"}</div>
+   <div className=" border p-2 text-xs"><span className="text-muted-foreground">Enrollment</span><br/>{section.readiness.metrics.activeEnrollment}/{section.readiness.metrics.enrollmentCapacity}</div>
+   <div className=" border p-2 text-xs"><span className="text-muted-foreground">Forecast</span><br/>{section.readiness.metrics.expectedDemand??"Not set"}</div>
+   <div className=" border p-2 text-xs"><span className="text-muted-foreground">Reserved seats</span><br/>{section.readiness.metrics.reservedInstructionalSeats}</div>
+   <div className=" border p-2 text-xs"><span className="text-muted-foreground">Readiness</span><br/>{section.readiness.ready?"Ready":"Needs attention"}</div>
   </div>
   <div className="mt-3 flex flex-wrap gap-2">
    {section.readiness.items.filter(item=>item.state!=="ready").map(item=>
-    <span key={item.key} className="rounded border px-2 py-1 text-xs">
+    <span key={item.key} className=" border px-2 py-1 text-xs">
      {item.state==="blocked"?"Blocked":"Review"} · {item.message}
     </span>)}
   </div>
-  <section className="mt-4 rounded-lg border p-3" aria-label={"First week readiness for "+section.title}>
+  <section className="mt-4  border p-3" aria-label={"First week readiness for "+section.title}>
    <h3 className="text-sm font-semibold">First week: {section.classroom.ready?"ready to teach and learn":"setup incomplete"}</h3>
    <p className="mt-1 text-xs text-muted-foreground">Readiness comes from the pinned lesson, published instructed assessment, independently qualified coverage and live class membership.</p>
    {section.classroom.ready?<p className="mt-2 text-sm">Start with “{section.classroom.firstWeek.lesson!.title}”, then assign “{section.classroom.firstWeek.assessment!.title}” to {section.classroom.activeStudentCount} enrolled {section.classroom.activeStudentCount===1?"student":"students"}.</p>:

@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -32,11 +33,11 @@ function NoncreditCompletionWorkspace(){
     title="Completion history and correction"
     subtitle="Review independently authorized completion decisions for an existing noncredit Registration. Source history and issued awards remain distinct.">
     <form onSubmit={open} className="mt-6 flex flex-wrap items-end gap-3 border border-border bg-card p-4">
-      <label className="min-w-60 flex-1 space-y-2 text-sm font-medium">
+      <Label className="min-w-60 flex-1 space-y-2 text-sm font-medium">
         Canonical Registration ID
         <Input required placeholder="Existing Registration UUID"
           value={draft} onChange={event=>setDraft(event.target.value)}/>
-      </label>
+      </Label>
       <Button type="submit" disabled={!isUuid(draft.trim())}>
         Open authorized registration
       </Button>

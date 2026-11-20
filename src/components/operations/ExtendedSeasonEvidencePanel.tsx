@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { EvidenceUploadSection, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentSummary } from "@/components/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -22,7 +23,7 @@ export function ExtendedSeasonEvidencePanel({ seasonId, onChange }: {
 }) {
   const { session } = useWorkspaceSession();
   if (session?.authenticated && session.demoAccountSwitching) {
-    return <section className="mt-3 rounded-lg border bg-card p-4" aria-label="Extended-learning operational approvals">
+    return <section className="mt-3  border bg-card p-4" aria-label="Extended-learning operational approvals">
       <h3 className="text-sm font-semibold">Independent operating approval</h3>
       <p role="status" className="mt-1 text-xs text-muted-foreground">
         Shared demo accounts cannot access restricted operating evidence.
@@ -51,25 +52,25 @@ function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
         setModel(null);
         setError(mutationErrorMessage(cause, "Unable to read evidence"));
       }
-      throw cause;
+      // The loader reports failures through the visible error state.
     } finally { if (request === requestSequence.current) setLoading(false); }
   }, [seasonId]);
-  useEffect(() => { void load().catch(() => {}); return () => { requestSequence.current++; }; }, [load]);
+  useEffect(() => { void load(); return () => { requestSequence.current++; }; }, [load]);
   async function changed() {
     const result = await readExtendedEvidenceFn({ data: { seasonId } });
     setModel(result);
     await onChange?.();
   }
-  return <section className="mt-3 rounded-lg border bg-card p-4" aria-label="Extended-learning operational approvals">
+  return <section className="mt-3  border bg-card p-4" aria-label="Extended-learning operational approvals">
     <h3 className="text-sm font-semibold">Independent operating approval</h3>
     <p className="mt-1 text-xs text-muted-foreground">
       Four restricted documents must be reviewed by a separate CAN network officer.
       Scheduled sessions must also have currently active, assigned onsite staff.
       Expired or superseded evidence blocks new registrations immediately.
     </p>
-    <button type="button" className="mt-2 text-xs underline" onClick={() => void load().catch(() => {})} disabled={loading}>
+    <Button variant="ghost" type="button" className="mt-2 text-xs underline" onClick={() => void load()} disabled={loading}>
       {loading ? "Refreshing…" : "Refresh evidence"}
-    </button>
+    </Button>
     {error && <p role="alert" className="mt-2 text-xs">{error}</p>}
     {model && <>
       <p className="mt-2 text-xs font-medium">{model.opening.ready ? "Opening prerequisites approved" :

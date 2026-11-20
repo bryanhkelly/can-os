@@ -31,11 +31,11 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
    if(destination==="editor")query.set("returnGrantId",session.activeGrantId);
     await switchVerifiedMembership({grants:session.grants,activeGrantId:session.activeGrantId,
      grantId:grant.id,queryClient,
-     redirectTo:`${destination==="editor"?"/launch/website":"/launch/school"}?${query.toString()}`});
+     redirectTo:`${destination==="editor"?"/launch/website":"/launch/site"}?${query.toString()}`});
   }catch(cause){setError(mutationErrorMessage(cause, "The website workspace could not be opened."));setBusy(false);}
  }
  return <span className="inline-block">
-  <Button type="button" variant="outline" disabled={busy} onClick={()=>void open()} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy?"Opening verified workspace…":destination==="editor"?"Edit school website":"Return to school setup"}</Button>
+  <Button type="button" variant="outline" disabled={busy} onClick={()=>void open()}>{busy?"Opening verified workspace…":destination==="editor"?"Edit school website":"Return to school setup"}</Button>
   {error&&<span role="alert" className="mt-2 block max-w-xl text-sm font-normal">{error}</span>}
  </span>;
 }

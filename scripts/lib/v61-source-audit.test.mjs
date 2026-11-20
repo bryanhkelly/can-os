@@ -33,6 +33,37 @@ test("AST ignores JSX-like comments and literal text; hidden inputs remain nativ
   assert.equal(result.syntaxErrors.length, 0);
 });
 
+test("brand shape discriminants are not Tailwind classes, but standalone rounded utilities are", () => {
+  const source = [
+    'const isRoundedEmblem = design.emblem === "rounded";',
+    'export const Card = () => <div className="rounded" />;',
+  ].join("\n");
+  const audit = analyzeSource(source, "/demo/src/components/launch-studio/BrandCard.tsx");
+  assert.deepEqual(audit.corners.map(corner => corner.utility), ["rounded"]);
+});
+
+test("full-card checkbox/radio labels are deliberate accessible wrappers, not migration debt", () => {
+  const source = [
+    "export const Options = () => <section>",
+    "  <label><Checkbox name='approval'/> Agree</label>",
+    "  <label><Radio name='level' value='beginner'/> Beginner</label>",
+    "  <label><Input type='text'/> Invalid text-input wrapper</label>",
+    "  <label><Input type='checkbox'/> Canonical Input is not the choice primitive</label>",
+    "</section>;",
+  ].join("\n");
+  const result = analyzeSource(source, "/demo/src/components/feature/Options.tsx");
+  assert.deepEqual(result.native.map(node => node.tag), ["label", "label"]);
+  assert.equal(result.syntaxErrors.length, 0);
+});
+
+test("native dialogs outside UI primitives must use the shared Modal", () => {
+  const source = 'export const Page = () => <dialog open>Details</dialog>;';
+  const feature = analyzeSource(source, "/demo/src/components/learning/Details.tsx");
+  const primitive = analyzeSource(source, "/demo/src/components/ui/modal.tsx");
+  assert.deepEqual(feature.native.map(node => node.tag), ["dialog"]);
+  assert.equal(primitive.native.length, 0);
+});
+
 test("routes and reachable components are discovered, without route manifests", () => temp(({ root, write }) => {
   write("src/routes/home.tsx", 'import { Widget } from "@/components/cards"; export const Page = () => <Widget/>;');
   write("src/routes/old.tsx", 'export const Page = () => <button className="rounded-xl">Legacy</button>;');

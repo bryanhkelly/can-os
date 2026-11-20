@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
-import { CreateAction, DirectoryPagination, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
+import { useEffect, useState, type FormEvent } from "react";
+import { ActionFooter, CreateAction, DirectoryPagination, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, WorkspacePanel, secondaryActionClassName } from "@/components/workspace";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -42,12 +42,20 @@ function InterestEventsPage() {
   return <InterestEventsWorkspace data={result.data} selection={selection} />;
 }
 
-export function InterestEventsWorkspace({ data, selection={}, mode="directory", eventId }: {
+export function InterestEventsWorkspace({
+  data, selection={}, mode="directory", eventId,
+  suggestedTitle=null, suggestedDescription=null, titleSource=null,
+}: {
   data: Data; selection?: { siteId?: string; programId?: string }; mode?: "directory"|"create"|"detail"; eventId?: string;
+  suggestedTitle?:string|null;suggestedDescription?:string|null;titleSource?:string|null;
 }) {
   const router = useRouter();
   const search = selection;
-  const events = data.events.filter(event => (!search.siteId || data.programs.some(program => program.id === event.programId && program.siteId === search.siteId)) &&
+  // A Launch Studio handoff carries an exact Site. Present only Programs
+  // belonging to that Site, even when this registrar can access several.
+  const scopedPrograms = data.programs.filter(program =>
+    !search.siteId || program.siteId === search.siteId);
+  const events = data.events.filter(event => (!search.siteId || scopedPrograms.some(program => program.id === event.programId)) &&
     (!search.programId || event.programId === search.programId));
   const [eventPage, setEventPage] = useState(1);
   const eventPageSize = 20;
@@ -55,20 +63,38 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   const visibleEventPage = Math.min(eventPage, eventTotalPages);
   const visibleEvents = events.slice((visibleEventPage - 1) * eventPageSize, visibleEventPage * eventPageSize);
   const selectedEvent = mode==="detail" ? events.find(event => event.id===eventId) : undefined;
-  const [programId, setProgramId] = useState(
-    data.programs.find(program => program.id === search.programId)?.id ?? data.programs[0]?.id ?? "",
-  );
-  const selectedProgram = data.programs.find(program => program.id === programId);
+  const siteForProgram = (id: string) => data.programs.find(program => program.id === id)?.siteId;
+  const defaultProgramId = scopedPrograms.find(program => program.id === search.programId)?.id ??
+    scopedPrograms[0]?.id ?? "";
+  const [programId, setProgramId] = useState(defaultProgramId);
+  // Derive selection immediately if the route changes to another Site without
+  // remounting the workspace. Never submit the previous Site's stale ID.
+  const selectedProgramId = scopedPrograms.some(program => program.id === programId)
+    ? programId : defaultProgramId;
+  const selectedProgram = scopedPrograms.find(program => program.id === selectedProgramId);
+  const defaultProgramTimezone = scopedPrograms.find(program => program.id === defaultProgramId)?.timezone;
   const timezone = siteTimezoneSchema.safeParse(selectedProgram?.timezone).success ? selectedProgram!.timezone : null;
-  const [title, setTitle] = useState("Parent information session");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(suggestedTitle?.trim() || "Parent information session");
+  const [description, setDescription] = useState(suggestedDescription?.trim()??"");
   const [kind, setKind] = useState<"information_session" | "open_house" | "campus_tour" | "family_experience" | "other">("information_session");
   const [visibility, setVisibility] = useState<"public" | "invitation_only">("invitation_only");
   const [location, setLocation] = useState("");
   const [startsAt, setStartsAt] = useState(() => timezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000), timezone) : "");
   const [endsAt, setEndsAt] = useState(() => timezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), timezone) : "");
+  useEffect(() => {
+    setProgramId(defaultProgramId);
+    const parsedTimezone = siteTimezoneSchema.safeParse(defaultProgramTimezone);
+    const validTimezone = parsedTimezone.success ? parsedTimezone.data : null;
+    setStartsAt(validTimezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000), validTimezone) : "");
+    setEndsAt(validTimezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), validTimezone) : "");
+  }, [defaultProgramId, defaultProgramTimezone, search.siteId, search.programId]);
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
   const [createdEventId, setCreatedEventId] = useState("");
+  const [createdProgramId, setCreatedProgramId] = useState("");
+  // Preserve the same idempotency key across uncertain transport failures.
+  // The server deduplicates by requestId; a new key is issued only after an
+  // acknowledged create, preventing duplicate events on manual retry.
+  const [createRequestId, setCreateRequestId] = useState(()=>crypto.randomUUID());
   const [attempted, setAttempted] = useState(false);
   const [timeValidationError, setTimeValidationError] = useState("");
   const mutation = useMutationFeedback(() => router.invalidate());
@@ -92,8 +118,8 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
     }
     await mutation.run(async () => {
       const result = await createSchoolInterestEvent({ data: {
-        requestId: crypto.randomUUID(),
-        programId,
+        requestId: createRequestId,
+        programId:selectedProgram.id,
         title:title.trim(),
         description,
         kind,
@@ -105,6 +131,8 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       } });
       const rsvpUrl = result.rsvpUrl;
       setCreatedEventId(result.eventId);
+      setCreatedProgramId(selectedProgram.id);
+      setCreateRequestId(crypto.randomUUID());
       if (rsvpUrl) setShareLinks(current => ({ ...current, [result.eventId]: rsvpUrl }));
       return result;
     }, {
@@ -144,20 +172,28 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       <Link to="/operations/interest-events" search={{siteId:selection.siteId,programId:selection.programId}} className={secondaryActionClassName}>{mode==="create"?"Cancel":"All events"}</Link>}
   />} main={<>
     <MutationFeedback state={mutation} pendingMessage="Saving event..." />
-    {mode==="create"&&<form noValidate onSubmit={event => void submit(event)} className="mt-6 space-y-4">
-      <h2 className="font-semibold">Create an interest event</h2>
-      {!data.programs.length && <p role="status" className="text-sm">No school programs are available in your authorized scope.</p>}
+    {mode==="create"&&<WorkspacePanel title="Create an interest event" className="mt-6">
+    <form noValidate onSubmit={event => void submit(event)} className="space-y-4">
+      {titleSource && titleSource!=="none" && <p className="text-sm text-muted-foreground">
+        {titleSource==="saved-package"
+          ? "The event title and description were started from your saved Marketing Package."
+          : "The event copy was suggested from your saved Site Story and planned Programs & Audiences."}
+        {" "}Review and edit the wording. You must still confirm the Program, date, time,
+        location and event permissions here. Saving Marketing Packages never creates events.
+      </p>}
+      {!scopedPrograms.length && <p role="status" className="text-sm">No Programs are available for this selected Site.</p>}
       <Field label="School Program" required
         error={attempted&&!selectedProgram?"Choose a Program with a valid Site timezone.":undefined}>
-        <Select value={programId} onChange={event => {
-          const next = data.programs.find(program => program.id === event.target.value);
+        <Select value={selectedProgramId} onChange={event => {
+          const next = scopedPrograms.find(program => program.id === event.target.value);
           setProgramId(event.target.value);
-          if (next?.timezone) {
-            setStartsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000), next.timezone));
-            setEndsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), next.timezone));
+          const parsedZone=siteTimezoneSchema.safeParse(next?.timezone);
+          if (parsedZone.success) {
+            setStartsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000), parsedZone.data));
+            setEndsAt(dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), parsedZone.data));
           } else { setStartsAt(""); setEndsAt(""); }
         }}>
-          {data.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
+          {scopedPrograms.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
         </Select>
       </Field>
       <Field label="Event name" required
@@ -186,7 +222,8 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       </div>
       {timeValidationError&&<FieldError>{timeValidationError}</FieldError>}
       {timezone ? <p className="text-xs text-muted-foreground">Times use the selected Site's timezone: {timezone}.</p>
-        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/launch/school" search={{ siteId: selectedProgram?.siteId, programId }} className="underline">Configure school timezone</Link></p>}
+        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/launch/site" search={{ siteId: selectedProgram?.siteId??selection.siteId, module:"site-profile" }}
+          className="underline">Configure school timezone</Link></p>}
       <Field label="Location or meeting details">
         <Input maxLength={300} value={location} onChange={event => setLocation(event.target.value)} />
       </Field>
@@ -196,13 +233,21 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
           <option value="public">Public RSVP (requires the current published Site and Program)</option>
         </Select>
       </Field>
-      <Button type="submit" disabled={busy || !timezone}>
-        Create event
-      </Button>
-    </form>}
+      <ActionFooter layout="form">
+        <Button type="submit" disabled={busy || !timezone} loading={busy} loadingLabel="Creating event...">Create event</Button>
+      </ActionFooter>
+    </form>
+    </WorkspacePanel>}
     {mode==="create"&&createdEventId&&<div className="space-y-3 border-t pt-4">
-      <Link to="/operations/interest-events/$eventId" params={{eventId:createdEventId}} search={selection} className="underline">Open created event</Link>
+      <Link to="/operations/interest-events/$eventId" params={{eventId:createdEventId}}
+          search={{siteId:siteForProgram(createdProgramId),programId:createdProgramId}}
+          className="underline">Open created event</Link>
       {shareLinks[createdEventId]&&<p className="break-all text-sm">Invite-only RSVP link: <a className="underline" href={shareLinks[createdEventId]}>{shareLinks[createdEventId]}</a></p>}
+      {visibility==="invitation_only"&&!shareLinks[createdEventId]&&
+        <p role="status" className="text-sm text-muted-foreground">
+          This event is saved. Open the event and choose Generate invite link if a
+          previous response was interrupted. Generating a new link disables older links.
+        </p>}
     </div>}
     {mode==="directory"&&<DirectoryTable label="Interest events" caption="Events in your authorized school scope."
       rows={visibleEvents} rowKey={event=>event.id}
@@ -211,7 +256,8 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
         onPageChange={setEventPage} /> : undefined} empty={<EmptyState title="No interest events yet"/>}
       columns={[
         {id:"event",title:"Event",render:event=><Link to="/operations/interest-events/$eventId" params={{eventId:event.id}} search={selection} className="font-semibold underline">{event.title}</Link>},
-        {id:"program",title:"Program",render:event=><Link to="/launch/school" search={{programId:event.programId}} className="underline">{event.programName}</Link>},
+        {id:"program",title:"Program",render:event=><Link to="/launch/site" search={{siteId:siteForProgram(event.programId),module:"program-catalog"}}
+              className="underline">{event.programName}</Link>},
         {id:"starts",title:"Starts",render:event=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",timeZone:event.timezone}).format(new Date(event.startsAt))},
         {id:"rsvps",title:"RSVPs",render:event=>event.registrations.length},
       ]}/>}
@@ -222,7 +268,8 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{event.title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{event.siteName} · <Link to="/launch/school" search={{programId:event.programId}} className="underline">{event.programName}</Link> · {event.visibility.replace("_", " ")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{event.siteName} · <Link to="/launch/site" search={{siteId:siteForProgram(event.programId),module:"program-catalog"}}
+              className="underline">{event.programName}</Link> · {event.visibility.replace("_", " ")}</p>
             <p className="mt-1 text-sm">{new Intl.DateTimeFormat("en-US", {
               dateStyle: "medium", timeStyle: "short", timeZone: event.timezone,
             }).format(new Date(event.startsAt))} ({event.timezone})</p>

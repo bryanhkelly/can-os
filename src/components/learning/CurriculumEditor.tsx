@@ -100,7 +100,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
       <p className="text-xs text-muted-foreground">{content.modules.length} units · {lessonTotal} lessons · {lessonsWithContent} lessons with authored content. These counts do not certify academic credit.</p></div>
      <Label className="text-sm">Unit to edit
       <Select aria-label="Unit to edit" value={activeModule?.id??""} onChange={e=>setSelectedModuleId(e.target.value)}
-       className="mt-1 block min-w-48  border bg-background p-2">
+       className="mt-1 min-w-48">
        {!activeModule&&<option value="">Add a unit to start</option>}
        {content.modules.map((module,index)=><option value={module.id} key={module.id}>
          Unit {index+1}: {module.title} ({module.lessons.length} lessons)</option>)}
@@ -267,7 +267,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
    </div>)}
    <Button type="button" variant="outline" disabled={content.resources.length>=500} 
     onClick={()=>setContent({...content,resources:[...content.resources,{id:crypto.randomUUID(),title:"New resource",url:"https://"}]})}>Add resource link</Button>
-   <div><Button type="button" variant="outline" onClick={()=>void save()} className=" border px-4 py-2 text-sm">Save draft</Button>
+   <div><Button type="button" variant="outline" onClick={()=>void save()} >Save draft</Button>
     {dirty&&<span className="ml-3 text-sm">Unsaved changes</span>}</div>
   </fieldset>
   <fieldset disabled={busy}><PublisherTeacherGuideEditor courseCode={courseCode} content={content}

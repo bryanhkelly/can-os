@@ -48,7 +48,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
         {items.length > 0 ? <ul className="space-y-3">
         {items.map(x => (
           <li key={x.assessmentId + ":" + x.studentProfileId} className="border border-border bg-card p-4 sm:p-5">
-            <p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:x.sectionId}} className="underline">{x.course}</Link> · due {formatDateOnly(dateKeyInTimezone(x.dueAt,x.timezone))}</p>
+            <p className="text-xs text-muted-foreground"><Link to="/class"  className="underline">{x.course}</Link> · due {formatDateOnly(dateKeyInTimezone(x.dueAt,x.timezone))}</p>
             <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:x.sectionId,assessment:x.assessmentId,student:x.studentProfileId}} className="underline underline-offset-4">{x.title}</Link></h2>
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">

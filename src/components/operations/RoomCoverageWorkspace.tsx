@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRoomCoverageWorkspaceFn, createRoomAtSiteFn, saveRoomCoverageFn } from "@/modules/operations/room-coverage.functions";
@@ -16,7 +17,11 @@ type Model = Awaited<ReturnType<typeof getRoomCoverageWorkspaceFn>>;
 type Schedule = Model["schedules"][number];
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
+/** One authorized room registry and schedule service, reused across Prepare. */
+export function RoomCoverageWorkspace({ siteId, view = "all" }: {
+  siteId?: string;
+  view?: "all" | "rooms" | "schedules";
+}) {
   const query = useQuery({ queryKey: ["room-coverage", siteId ?? "own"],
     queryFn: () => getRoomCoverageWorkspaceFn({ data: siteId ? { siteId } : {} }), retry: false });
   const feedback = useMutationFeedback(() => query.refetch({ throwOnError: true }));
@@ -26,17 +31,27 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
   const [roomAttempted, setRoomAttempted] = useState(false);
   const busy = feedback.pending || feedback.refreshFailed;
   const model = query.data;
-  return <section aria-label="All-day room coverage" className="mt-6 border border-border bg-card p-5">
-    <h2 className="font-serif text-2xl">{model?.canManage ? "All-day room coverage" : "My assigned room coverage"}</h2>
-    <p className="mt-2 text-sm">One onsite facilitator supervises a physical room while its students take
-      different virtual courses. Course teaching assignments remain separate.</p>
-    <p className="mt-2 text-sm text-muted-foreground">A saved assignment is a plan, not verified arrival,
+  return <section aria-label={view === "rooms" ? "Site physical rooms" :
+    view === "schedules" ? "Existing school Program room coverage" : "All-day room coverage"}
+    className="mt-6 border border-border bg-card p-5">
+    <h2 className="font-serif text-2xl">{view === "rooms"
+      ? "Physical rooms & occupancy capacity"
+      : view === "schedules" ? "Facilitator coverage & room schedules"
+      : model?.canManage ? "All-day room coverage" : "My assigned room coverage"}</h2>
+    {view === "rooms" ? <p className="mt-2 text-sm">
+      Record physical rooms and self-reported occupancy limits for this Site.
+      Accessibility, equipment and building-use verification remain separate.
+    </p> : <p className="mt-2 text-sm">
+      Existing school Program room coverage assigns onsite facilitators while
+      learners attend Courses. Teaching assignments remain separate.
+    </p>}
+    {view !== "rooms" && <p className="mt-2 text-sm text-muted-foreground">A saved assignment is a plan, not verified arrival,
       continuous supervision, safety approval or permission to open. Independently reviewed daily room
       plans, qualified primary and backup adults, occupancy and school-calendar checks still apply.
-      Breaks or absences require an approved coverage handoff; report interruptions rather than assuming coverage continues.</p>
-    <p className="mt-2 text-sm text-muted-foreground">For standalone schools, this is planning only:
+      Breaks or absences require an approved coverage handoff; report interruptions rather than assuming coverage continues.</p>}
+    {view !== "rooms" && <p className="mt-2 text-sm text-muted-foreground">For standalone schools, this is planning only:
       the existing reviewed daily supervision and witnessed-presence workflow supports independently
-      church-hosted CAN programs. Saving a room assignment does not activate that workflow for a standalone school.</p>
+      church-hosted CAN programs. Saving a room assignment does not activate that workflow for a standalone school.</p>}
     {query.isPending && <p role="status" className="mt-3">Loading room coverage...</p>}
     {query.error && <div role="alert" className="mt-3">
       {mutationErrorMessage(query.error, "Room coverage is unavailable.")}
@@ -44,6 +59,19 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
     </div>}
     {model && <>
       <p className="mt-3 text-sm">School timezone: {model.timezone}</p>
+      {view === "rooms" && <div className="mt-4 space-y-2">
+        <h3 className="font-semibold">Recorded rooms ({model.rooms.length})</h3>
+        {!model.rooms.length && <p className="text-sm text-muted-foreground">
+          No rooms are recorded yet. Add a room and its occupancy limit below.
+        </p>}
+        {model.rooms.map(room => <div key={room.id}
+          className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
+          <span className="font-medium">{room.name}</span>
+          <span className="text-muted-foreground">Capacity: {room.capacity}
+            {room.retiredAt ? " · retired" : ""}</span>
+        </div>)}
+      </div>}
+      {view !== "rooms" && <>
       {!model.schedules.length && <p role="status" className="mt-3 border border-border bg-muted/30 p-4 text-sm">
          {model.canManage
            ? "No room coverage assignments recorded. Assign an accepted facilitator, backup, room and linked classes before opening the onsite day."
@@ -70,7 +98,9 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
           <RoomCoverageForm model={model} schedule={schedule} changed={() => query.refetch({ throwOnError: true })}/>
         </details>}
       </li>)}</ul>
+      </>}
       {model.canManage && <>
+        {view !== "schedules" && <>
         <h3 className="mt-5 font-semibold">Create a physical room</h3>
         <form noValidate className="mt-3 grid gap-3 sm:grid-cols-3" onSubmit={event => {
           event.preventDefault();
@@ -95,9 +125,12 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
         </form>
         <MutationFeedback state={feedback} className="mt-3" pendingMessage="Saving physical room..."/>
         {feedback.refreshFailed && <Button onClick={() => void feedback.retryRefresh()} disabled={feedback.pending}>Refresh saved rooms</Button>}
+        </>}
+        {view !== "rooms" && <>
         <h3 className="mt-5 font-semibold">Assign all-day room coverage</h3>
         {!model.staff.length && <p role="status" className="mt-2 text-sm">Invite a room facilitator and have them accept before assigning coverage.</p>}
         <RoomCoverageForm key={"new:" + model.schedules.length} model={model} changed={() => query.refetch({ throwOnError: true })}/>
+        </>}
       </>}
     </>}
   </section>;
@@ -162,17 +195,17 @@ function RoomCoverageForm({ model, schedule, changed }: {
       </Field>
     </div>
     <fieldset disabled={busy} className="flex flex-wrap gap-3"><legend className="mb-2 text-sm font-semibold">Coverage weekdays</legend>
-      {days.map((day, value) => <label key={day} className="flex items-center gap-2 text-sm"><Checkbox checked={weekdays.includes(value)}
-        onChange={event => setWeekdays(current => event.target.checked ? [...current, value].sort() : current.filter(item => item !== value))}/>{day}</label>)}
+      {days.map((day, value) => <Label key={day} className="flex items-center gap-2 text-sm"><Checkbox checked={weekdays.includes(value)}
+        onChange={event => setWeekdays(current => event.target.checked ? [...current, value].sort() : current.filter(item => item !== value))}/>{day}</Label>)}
       {attempted&&!weekdays.length&&<FieldError className="w-full">Select at least one coverage weekday.</FieldError>}
     </fieldset>
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-semibold">Classes whose onsite students use this room</legend>
       <p className="text-sm text-muted-foreground">Different simultaneous courses may share this room. Enrollment stays in the original classes; occupancy counts each student once.</p>
       {!model.classes.length && <p role="status" className="text-sm">No onsite classes exist yet. Save the room assignment now, then link classes after academic setup.</p>}
-      {model.classes.map(section => <label key={section.id} className="flex items-center gap-2 text-sm">
+      {model.classes.map(section => <Label key={section.id} className="flex items-center gap-2 text-sm">
         <Checkbox checked={sectionIds.includes(section.id)} onChange={event => setSectionIds(current =>
           event.target.checked ? [...current, section.id] : current.filter(id => id !== section.id))}/>{section.title} · {section.programName}
-      </label>)}
+      </Label>)}
     </fieldset>
     <Button type="submit" disabled={busy}>{feedback.pending ? "Saving coverage..." : "Save room coverage"}</Button>
     <MutationFeedback state={feedback} className="mt-3" pendingMessage="Saving room coverage..."/>

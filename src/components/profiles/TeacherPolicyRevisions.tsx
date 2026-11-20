@@ -28,7 +28,7 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
     <h3 className="font-semibold">Published policy versions</h3>
     <p className="mt-2 text-sm">Effective instants are shown in UTC. Earlier requirements remain in force before each change.
       Every assigned instructor must satisfy each applicable version throughout instruction, or opening is blocked.</p>
-    <ol className="mt-3 space-y-2">{policies.map(policy => <li key={policy.id} className="rounded border p-3 text-sm">
+    <ol className="mt-3 space-y-2">{policies.map(policy => <li key={policy.id} className="border p-3 text-sm">
       <strong>Version {policy.version}</strong> · {policy.status}
       <p>From {policy.effectiveFrom ?? "initial publication (unbounded start)"} until {policy.effectiveThrough ?? "no scheduled end"} (end exclusive)</p>
       <p>{policy.qualificationKeys?.map(key => `${catalog.find(item => item.key === key)?.title ?? key} (${key})`).join(", ")

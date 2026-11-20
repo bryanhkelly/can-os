@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { replaceStudioSchedulePeriods, type getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
 import { SCHEDULE_PERIOD_TYPES, type SchedulePeriodType } from "@/domain/schedule-period-types";
+import { WEEKDAY_ABBREVIATIONS } from "@/domain/weekdays";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ export function SchoolYearScheduleEditor({schedule,busy,run}:{
   <div className="mt-3 space-y-2">{periods.map((p,i)=><div key={i} className="flex flex-wrap items-end gap-2 border-t pt-2">
    <Field label="Day" className="w-24">
     <Select value={p.dayOfWeek} onChange={e=>change(i,"dayOfWeek",Number(e.target.value))}>
-    {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d,n)=><option key={n} value={n}>{d}</option>)}
+    {WEEKDAY_ABBREVIATIONS.map((d,n)=><option key={n} value={n}>{d}</option>)}
     </Select>
    </Field>
    <Field label="Order" className="w-20">

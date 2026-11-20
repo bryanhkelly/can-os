@@ -32,7 +32,7 @@ function StaffTeachersPage() {
             { id: "teacher", title: "Teacher", render: teacher => <>
               <ProfilePhoto personId={teacher.personId} name={teacher.name} readPhoto={getProfilePhoto}/>
               <Link to="/profiles" search={{person:teacher.personId}}
-                className="mt-2 inline-block rounded font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{teacher.name}</Link>
+                className="mt-2 inline-block font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{teacher.name}</Link>
             </> },
             { id: "sections", title: "Sections", render: teacher => teacher.sections.join(", ") },
             { id: "students", title: "Students", render: teacher => teacher.studentCount },

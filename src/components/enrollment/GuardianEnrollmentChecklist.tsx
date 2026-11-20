@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
@@ -57,7 +60,7 @@ function GuardianEnrollmentChecklistView({ applicationId, protectUnsaved }: { ap
     const { downloadUrl } = await getEnrollmentDocumentDownload({ data: { applicationId, requirementId, documentId } });
     return downloadUrl;
   }
-  return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3 rounded-lg border p-4">
+  return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3  border p-4">
     {protectUnsaved && <LaunchUnsavedChangesGuard dirty={Object.values(files).some(Boolean) ||
       Object.values(dirtyForms).some(Boolean) || mutation.pending || mutation.refreshFailed}
       message="Leave enrollment? Unsaved form answers or selected documents will be lost. Stay to save or submit them, or leave without saving." />}
@@ -100,7 +103,7 @@ export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAva
       You can still complete forms; contact admissions to submit documents.</p>}
     {!checklist.closed && !uploadsEnabled && !uploadsAvailabilityPending && !uploadsAvailabilityError && <p role="status">Online document uploads are not enabled for this application.
       Contact admissions to arrange submission. You can still view recorded document reviews.</p>}
-    {checklist.requirements.map(requirement => <article key={requirement.id} className="space-y-2 rounded border p-3">
+    {checklist.requirements.map(requirement => <article key={requirement.id} className="space-y-2  border p-3">
       <h4 className="font-semibold">{requirement.title}{requirement.blocking ? " (required)" : " (optional)"}</h4>
       {requirement.form && <GuardianEnrollmentForm key={requirement.form.submission?.id ?? requirement.form.revision}
         applicationId={checklist.applicationId} requirementId={requirement.id} record={requirement.form}
@@ -116,13 +119,13 @@ export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAva
           onGetDownloadUrl={() => onOpen(requirement.id, document.id)}/>}
       </li>)}</ul>
       {!requirement.form && !checklist.closed && uploadsEnabled && requirement.status !== "complete" && <fieldset disabled={busy !== null}>
-        <label className="block text-sm">Supporting document (PDF, JPEG or PNG, up to 10 MB)
-          <input key={requirement.documents.filter(document => document.current).map(document => document.id).join(":")}
+        <Label className="block text-sm">Supporting document (PDF, JPEG or PNG, up to 10 MB)
+          <Input key={requirement.documents.filter(document => document.current).map(document => document.id).join(":")}
             type="file" accept="application/pdf,image/jpeg,image/png" className="mt-2 block w-full"
             onChange={event => onFile(requirement.id, event.target.files?.[0] ?? null)} />
-        </label>
-        <button type="button" disabled={!files[requirement.id]} className="mt-2 rounded border px-3 py-2 text-sm"
-          onClick={() => void onUpload(requirement.id)}>{requirement.documents.length ? "Submit replacement document" : "Submit document"}</button>
+        </Label>
+        <Button variant="outline" type="button" disabled={!files[requirement.id]} className="mt-2"
+          onClick={() => void onUpload(requirement.id)}>{requirement.documents.length ? "Submit replacement document" : "Submit document"}</Button>
       </fieldset>}
     </article>)}
     {!checklist.requirements.length && <p>No checklist requirements have been configured. Contact admissions for next steps.</p>}

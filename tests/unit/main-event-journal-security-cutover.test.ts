@@ -35,18 +35,39 @@ describe("CAN OS public journal security and native writer cutover",()=>{
     expect(shared).toContain("occurredAt: event.occurredAt");
   });
 
-  it("keeps restricted-role governance writes on the existing authorized path",()=>{
+  it("routes restricted Blueprint writes to one public journal with scoped roles",()=>{
+    const gateway=read("src/modules/blueprints/blueprint-journal.server.ts");
+    const migration=read("drizzle/0097_blueprint_public_journal_gateway.sql");
+    const provision=read("database/canonical/v3.0.1/provision-blueprint-roles.sql");
     for(const path of [
       "src/modules/blueprints/blueprint-review.server.ts",
       "src/modules/blueprints/blueprint-execution.server.ts",
       "src/modules/blueprints/blueprint-configuration.server.ts",
+    ]){
+      const source=read(path);
+      expect(source).toContain("SET LOCAL ROLE");
+      expect(source).toContain("writeBlueprintTransition(");
+      expect(source).not.toContain("tx.insert(auditEvents)");
+      expect(source).not.toContain("tx.insert(domainEvents)");
+    }
+    expect(gateway).toContain("writeCanonicalAudit(tx, audit)");
+    expect(gateway).toContain("emitCanonicalDomainEvent(tx, event)");
+    expect(gateway).toContain("public.append_restricted_blueprint_transition(");
+    expect(migration).toContain("current_setting('role',true)");
+    expect(migration).toContain("public.database_role_organization_bindings");
+    expect(migration).toContain("public.audit_events");
+    expect(migration).toContain("public.domain_events");
+    expect(migration).toContain("blueprint_author_history_reviewer_read");
+    expect(provision).toContain("GRANT SELECT (actor_person_id,action,resource_type,resource_id) ON public.audit_events");
+    expect(provision).not.toContain("education_v30.audit_events");
+    expect(provision).not.toContain("education_v30.evidence_documents");
+    for(const path of [
       "src/modules/operations/canonical-survey-draft.functions.ts",
       "src/modules/operations/canonical-survey-approvals.functions.ts",
     ]){
       const source=read(path);
       expect(source).toContain("SET LOCAL ROLE");
       expect(source).toContain("tx.insert(auditEvents)");
-      expect(source).not.toContain("writeCanonicalAudit(");
     }
     const gate=read("scripts/acceptance/check-native-event-journal-cutover.mjs");
     expect(gate).toContain("roleScopedSharedWriters");

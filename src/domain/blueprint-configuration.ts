@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-type JsonValue = null | string | number | boolean | JsonValue[] | { [key: string]: JsonValue };
+import type { JsonValue } from "@/domain/json-types";
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
   z.null(),
   z.string(),
@@ -109,6 +108,14 @@ export const blueprintLocalExperienceProposalSchema = z.object({
   summary: z.string().max(4000).default(""),
   configuration: jsonObjectSchema.default({}),
 }).strict();
+
+/** One definition of locally proposed experience kinds, sourced from the
+ * canonical validated schema rather than a second hard-coded UI list. */
+export function isBlueprintLocalExperienceKind(
+  value: string,
+): value is z.infer<typeof blueprintLocalExperienceProposalSchema>["kind"] {
+  return blueprintLocalExperienceProposalSchema.shape.kind.options.some(kind => kind === value);
+}
 
 export const blueprintConfigurationVersionInputSchema = z.object({
   config: jsonObjectSchema.default({}),

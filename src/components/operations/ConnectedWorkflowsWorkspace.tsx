@@ -136,7 +136,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
                 Unmarked days are <strong>not</strong> automatically absences.
               </p>
               {program.attendance.outsideConfiguredExpectations > 0 &&
-                <div role="alert" className="mt-3  border border-amber-500 p-3 text-sm">
+                <div role="alert" className="mt-3  border border-warning/40 p-3 text-sm">
                   <p className="font-semibold">
                     {plural(program.attendance.outsideConfiguredExpectations, "recorded onsite mark")}
                     {" "}{agree(program.attendance.outsideConfiguredExpectations, "no longer matches", "no longer match")} configured expected student-days.
@@ -162,7 +162,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
                   </details>
                 </div>}
               {program.attendance.coverage.configuration !== "configured" &&
-                <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                <p className="mt-2 text-xs font-semibold text-warning dark:text-warning">
                   Coverage limitation: {program.attendance.coverage.configuration.replaceAll("_"," ")}
                   {program.attendance.coverage.daysWithoutCalendarConfiguration > 0
                     ? " · " + program.attendance.coverage.daysWithoutCalendarConfiguration + " scheduled dates lack calendar entries"

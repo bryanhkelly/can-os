@@ -24,7 +24,7 @@ export function StudentSuccessSupportPanel({
         No outstanding student-owned support actions. You can still ask your school for help.
       </p>}
       <ul className="grid gap-3">
-        {support.tasks.map(task => <li key={task.id} className="rounded-lg border p-3">
+        {support.tasks.map(task => <li key={task.id} className=" border p-3">
           <p className="text-xs text-muted-foreground">
             {task.status === "resolved" ? "Teacher confirmed goal met" : task.status.replaceAll("_", " ")}
             {task.dueAt ? ` · Due ${new Date(task.dueAt).toLocaleDateString()}` : ""}

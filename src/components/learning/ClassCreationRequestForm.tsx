@@ -6,6 +6,7 @@ import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   submitTeacherClassRequest,
@@ -121,9 +122,11 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
               onChange={event => { resetRequestId(); setNotes(event.target.value); }}
               rows={3}/>
           </Field>
-          <Button type="submit" disabled={busy}>
-            Submit class request
-          </Button>
+          <ActionFooter layout="inline" className="mt-0 sm:col-span-2">
+            <Button type="submit" disabled={busy} loading={mutation.pending} loadingLabel="Submitting class request...">
+              Submit class request
+            </Button>
+          </ActionFooter>
           </fieldset>
         </form>
       )}

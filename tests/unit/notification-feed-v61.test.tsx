@@ -5,7 +5,7 @@ import type { CenterNotice } from "@/domain/notification-center";
 
 const notice:CenterNotice={
   id:"notice-1",title:"Review recorded assignment",body:"Assigned by school.",
-  status:"unread",date:"2026-11-17T19:00:00.000Z",href:"/classes",
+  status:"unread",date:"2026-11-17T19:00:00.000Z",href:"/class",
 };
 const callbacks={
   onStatus:()=>undefined,
@@ -19,7 +19,7 @@ describe("V6.1 notification feed",()=>{
     expect(html).toContain('dateTime="2026-11-17T19:00:00.000Z"');
     expect(html).toContain("1 unread update");
     expect(html).toContain("Unread");
-    expect(html).toContain('href="/classes"');
+    expect(html).toContain('href="/class"');
     expect(html).toContain("Mark as read");
     expect(html).not.toContain("Delivered");
   });

@@ -1,9 +1,10 @@
+import { Label } from "@/components/ui/label";
 import {Link} from "@tanstack/react-router";
 import {useQuery,useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/choice";
-import {DirectoryTable, StatCard} from "@/components/workspace";
+import { StatCard } from "@/components/workspace";
 import {selectedCohortSessionPlanIds} from "@/domain/noncredit-cohort-schedule";
 import {
   attachClassroomPlanToNoncreditRelease,getNoncreditReleaseOperations,
@@ -12,6 +13,7 @@ import {
 } from "@/modules/enrollment/noncredit-cohort-operations.functions";
 import {normalizeClientError} from "@/lib/client-error";
 import {NoncreditDeliveryRecoveryPanel} from "./NoncreditDeliveryRecoveryPanel";
+import { NoncreditParticipantRoster } from "./NoncreditParticipantRoster";
 
 export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
   const client=useQueryClient();
@@ -34,7 +36,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       await client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]});
       await client.invalidateQueries({queryKey:["noncredit-open-releases"]});
       setSelectedPlanIds(current=>current.filter(id=>id!==planId));
-      setMessage("This scheduled meeting now belongs to the selected cohort.");
+      setMessage("This scheduled Class is linked to the selected registration release.");
     }catch(cause){
       setMessage(normalizeClientError(cause,"Could not assign the meeting to this enrollment release.").message);
     }finally{setBusy(null);}
@@ -49,7 +51,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       }});
       setSelectedPlanIds([]);
       setMessage(result.attached+" selected session"+(result.attached===1?"":"s")+
-        " linked to this cohort. Enrollment and attendance records were not changed.");
+        " linked to this registration release. Enrollment and attendance records were not changed.");
       try{
         await Promise.all([
           client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]}),
@@ -60,7 +62,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       }
     }catch(cause){
       setMessage(normalizeClientError(cause,
-        "No session assignments were saved. Check each date, current Site permission and existing cohort links.").message);
+        "No Class session assignments were saved. Check each date, current Site permission and existing release links.").message);
     }finally{setBusy(null);}
   }
   async function invite(){
@@ -91,12 +93,12 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       setMessage(normalizeClientError(cause,"Could not release the withdrawn seat.").message);
     }finally{setBusy(null);}
   }
-  return <section className="mt-5 border border-border bg-card p-5" aria-label="Cohort management">
-    <h2 className="font-serif text-2xl">Cohort & participant management</h2>
+  return <section className="mt-5 border border-border bg-card p-5" aria-label="Course registration management">
+    <h2 className="font-serif text-2xl">Course registration and participants</h2>
     {query.isPending&&<p role="status" className="mt-4 text-sm">Loading authorized course operations…</p>}
     {query.isError&&<p role="alert" className="mt-4 text-sm">
-      Cohort records are unavailable. Check current provider scope and the cohort schema migration.
-      <button type="button" className="ml-2 underline" onClick={()=>void query.refetch()}>Retry</button>
+      Course registration records are unavailable. Check current provider scope and the registration schema migration.
+      <Button variant="ghost" type="button" className="ml-2 underline" onClick={()=>void query.refetch()}>Retry</Button>
     </p>}
     {message&&<p role="status" className="mt-4 border border-border p-3 text-sm">{message}</p>}
     {query.data&&<>
@@ -127,23 +129,23 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           onClick={()=>void invite()}>{busy==="invite"?"Reserving…":"Invite next waiting adult"}</Button>
       </div>
       <NoncreditDeliveryRecoveryPanel releaseId={releaseId}/>
-      <h3 className="mt-7 text-base font-semibold">Dated classroom sessions</h3>
+      <h3 className="mt-7 text-base font-semibold">Dated Classes</h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        Facilitators schedule approved courses in <Link to="/canonical/lab/facilitated" className="text-primary underline">Facilitated learning</Link>.
-        Attach a scheduled meeting here to include it in this cohort's learner-facing calendar.
+        Facilitators schedule approved courses in <Link to="/canonical/lab/facilitated" search={{siteId:query.data.siteId}} className="text-primary underline">Facilitated learning</Link>.
+        Attach a scheduled Class here to include it in the learners' existing Course calendar.
       </p>
-      {query.data.deliveryMode==="independent"&&<p className="mt-3 text-sm">Self-paced training has no required in-person cohort.</p>}
+      {query.data.deliveryMode==="independent"&&<p className="mt-3 text-sm">Self-paced training has no required in-person Class meetings.</p>}
       {query.data.deliveryMode==="facilitated"&&<section className="mt-3 border border-border bg-muted/20 p-4"
-        aria-label="Cohort session assignments">
+        aria-label="Class session assignments">
         <h4 className="text-sm font-semibold">Linked sessions: {linkedMeetingCount}</h4>
         <p className="mt-1 text-sm text-muted-foreground">
-          The COGIC pilot targets four delivered sessions, but they need not occur
-          in consecutive weeks. Sites may meet twice weekly, skip holidays, or use
-          other authorized dates. Other Programs may have different requirements.
+          Some Solutions require four delivered Classes. The actual required count belongs
+          to the approved Course and Solution. Sites may meet twice weekly, skip
+          holidays, or use other authorized dates.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
           Select up to four unallocated future meetings below, review their dates, and
-          attach them to this specific cohort in one transaction.
+          attach them to this exact registration release in one transaction.
           Existing linked meetings are preserved. Per-session attendance is independently attested; a booked or opened room is not proof of presence.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -165,7 +167,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
         {!query.data.sessions.some(row=>!row.linked&&row.state==="scheduled"&&
           Date.parse(row.startsAt)>Date.now())&&<p role="status" className="mt-2 text-sm text-muted-foreground">
           There are no unallocated upcoming meetings at this authorized Site.
-          <Link to="/canonical/lab/facilitated" className="ml-1 text-primary underline">
+          <Link to="/canonical/lab/facilitated" search={{siteId:query.data.siteId}} className="ml-1 text-primary underline">
             Schedule meetings
           </Link> first.
         </p>}
@@ -175,7 +177,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           <div className="flex items-center gap-3">
             {query.data.deliveryMode==="facilitated"&&!session.linked&&
               session.state==="scheduled"&&Date.parse(session.startsAt)>Date.now()&&
-              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs font-medium">
+              <Label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs font-medium">
                 <Checkbox checked={selectedPlanIds.includes(session.planId)}
                   disabled={busy!==null||(!selectedPlanIds.includes(session.planId)&&selectedPlanIds.length>=4)}
                   onChange={event=>setSelectedPlanIds(current=>
@@ -183,7 +185,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
                       ?current.includes(session.planId)||current.length>=4?current:[...current,session.planId]
                       :current.filter(id=>id!==session.planId))}/>
                 Select
-              </label>}
+              </Label>}
             <div><p className="text-sm font-medium">{new Date(session.startsAt).toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">Ends {new Date(session.endsAt).toLocaleString()} · {session.state}</p>
             {session.linked&&<p className="mt-1 text-xs text-muted-foreground">
@@ -192,50 +194,18 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
             </p>}
             </div>
           </div>
-          {session.linked?<span className="text-xs text-muted-foreground">Assigned to this cohort</span>:
+          {session.linked?<span className="text-xs text-muted-foreground">Linked to this registration release</span>:
           <Button size="sm" variant="outline" disabled={busy!==null} onClick={()=>void attach(session.planId)}>
             {busy===session.planId?"Assigning…":"Attach meeting"}
           </Button>}
         </div>)}
         {!query.data.sessions.length&&<p className="p-3 text-sm text-muted-foreground">No scheduled meetings at this authorized Site yet.</p>}
       </div>
-      <h3 className="mt-7 text-base font-semibold">Participant roster</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Named records are visible only to the authorized provider. Classroom pairing is not attendance.</p>
-      <DirectoryTable label="Participant roster" caption="Authorized participant records for this release."
-        rows={query.data.roster} rowKey={person=>person.registrationId}
-        empty={<p className="p-4 text-sm text-muted-foreground">No participants registered for this release.</p>}
-        columns={[
-          {id:"participant",title:"Participant",render:person=>person.displayName},
-          {id:"registration",title:"Registration",render:person=><>
-
-                {person.status}
-                {person.seatReleased&&<p className="text-xs text-muted-foreground">Seat released</p>}
-                {["withdrawn","cancelled"].includes(person.status)&&!person.seatReleased&&
-                  person.completionOutcome!=="completed"&&
-                  <div className="mt-2">
-                    <button type="button" className="text-xs text-primary underline"
-                      onClick={()=>{setSeatTarget(person.registrationId);setSeatReason("");}}>
-                      Review capacity release
-                    </button>
-                    {seatTarget===person.registrationId&&<div className="mt-2 space-y-2 border border-border p-2">
-                      <label className="block text-xs font-medium">Reason for releasing the seat
-                        <textarea value={seatReason} maxLength={500} onChange={event=>setSeatReason(event.target.value)}
-                          className="mt-2 w-full min-w-48 border border-border bg-background p-2" rows={2}
-                          placeholder="Describe verified withdrawal and seat-release reason"/>
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" disabled={busy!==null||seatReason.trim().length<15}
-                          onClick={()=>void releaseSeat(person.registrationId)}>Confirm release</Button>
-                        <Button size="sm" variant="outline" disabled={busy!==null}
-                          onClick={()=>setSeatTarget(null)}>Cancel</Button>
-                      </div>
-                    </div>}
-                  </div>}
-              
-          </>},
-          {id:"attendance",title:"Attendance",render:person=>person.attendedLinkedSession?"Present at linked session":"Not verified"},
-          {id:"completion",title:"Completion",render:person=>person.completionOutcome??"No final decision"},
-        ]}/>
+      <NoncreditParticipantRoster roster={query.data.roster}
+        busy={busy!==null} seatTarget={seatTarget} seatReason={seatReason}
+        onStartRelease={id=>{setSeatTarget(id);setSeatReason("");}}
+        onReasonChange={setSeatReason} onConfirmRelease={releaseSeat}
+        onCancelRelease={()=>setSeatTarget(null)} />
       {query.data.partial&&<p role="alert" className="mt-3 text-sm">The roster or evidence query was truncated. Do not use these figures as complete network totals.</p>}
       <p className="mt-3 text-xs leading-6 text-muted-foreground">{query.data.evidenceNote}</p>
     </>}

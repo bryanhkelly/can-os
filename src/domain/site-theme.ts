@@ -1,3 +1,5 @@
+import { contrastRatio } from "./color-contrast";
+export { contrastRatio } from "./color-contrast";
 /** CAN School Sites: finite, server-renderable visual identity tokens.
  * No external font, CSS, remote image or untrusted church-source style is injected.
  * A suggested brand is private draft data, NOT a published theme.
@@ -77,19 +79,7 @@ export type SiteTheme = {
   displayFont: string; bodyFont: string; onDark: "#ffffff";
 };
 
-/** Compare theme colors at 4.5:1 for ordinary body and 3:1 for large text. */
-export function contrastRatio(a: string,b: string): number {
-  function luminance(hex: string): number {
-    if (!/^#[0-9a-f]{6}$/i.test(hex)) throw new Error("Only bounded hex color tokens are supported");
-    const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255)
-      .map(c=>c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4));
-    return rgb[0]!*.2126+rgb[1]!*.7152+rgb[2]!*.0722;
-  }
-  const x=luminance(a),y=luminance(b);
-  return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
-}
-
-export function resolveSiteTheme(paletteId?: string, typographyId?: string, headingFontId?: SiteFontId, bodyFontId?: SiteFontId, templateId?: SiteTemplateId): SiteTheme {
+export function resolveSiteTheme(paletteId?: string, typographyId?: string, headingFontId?: SiteFontId, bodyFontId?: SiteFontId, _templateId?: SiteTemplateId): SiteTheme {
   const palette = sitePaletteIds.includes(paletteId as SitePaletteId)
     ? paletteId as SitePaletteId : "signature";
   const typography = siteTypographyIds.includes(typographyId as SiteTypographyId)
@@ -101,7 +91,8 @@ export function resolveSiteTheme(paletteId?: string, typographyId?: string, head
     return resolveSiteTheme("signature","editorial");
   }
   return {paletteId:palette,typographyId:typography,...colors,
-    displayFont:isSiteFontId(headingFontId)?siteFontCatalog[headingFontId].css:templateId === "modern" ? (isSiteFontId(bodyFontId)?siteFontCatalog[bodyFontId].css:type.body) : type.display,bodyFont:isSiteFontId(bodyFontId)?siteFontCatalog[bodyFontId].css:type.body,onDark:"#ffffff"};
+    displayFont:isSiteFontId(headingFontId)?siteFontCatalog[headingFontId].css:type.display,
+    bodyFont:isSiteFontId(bodyFontId)?siteFontCatalog[bodyFontId].css:type.body,onDark:"#ffffff"};
 }
 
 /** P may suggest but never publish. No network fetch or imported font binary. */

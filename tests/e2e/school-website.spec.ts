@@ -18,14 +18,27 @@ test("school administrator reviews, publishes and renames a standalone school we
   const name = `Website School ${suffix}`;
   const renamedName = `Renamed School ${suffix}`;
 
-  await page.goto("/schools/new");
-  await expect(page.getByRole("button", { name: "Create demo school" })).toBeEnabled();
-  await page.getByLabel("School name", { exact: true }).fill(name);
-  await page.getByLabel("School domain").fill(domain);
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Create demo school" }).click();
-  await expect(page.getByRole("heading", { name: "Your demo school is ready" })).toBeVisible();
-  await page.getByRole("link", { name: "Sign in and continue setup" }).click();
+  // Provision synthetic identity exclusively in this guarded disposable test database.
+  // No public demo-school signup endpoint or legacy redirect is used.
+  const orgId = await insertFixtureId(sql,
+    "INSERT INTO organizations (type,name,slug,metadata) VALUES ('christian_school',$1,$2,'{}'::jsonb) RETURNING id",
+    [name, "demo-"+domain.slice(0,-5)]);
+  const siteId = await insertFixtureId(sql,
+    "INSERT INTO sites (organization_id,name,slug,timezone,metadata) VALUES ($1,$2,$3,'UTC','{}'::jsonb) RETURNING id",
+    [orgId, name, "demo-"+domain.slice(0,-5)]);
+  const personId = await insertFixtureId(sql,
+    "INSERT INTO people (legal_first_name,legal_last_name,metadata) VALUES ('Demo','Administrator','{}'::jsonb) RETURNING id", []);
+  const accountId = await createVerifiedAccessAccount(sql, "admin.demo@"+domain);
+  const grantId = await createSyntheticPersonaGrant(sql, {
+    accountId, personId, role: "site_admin", organizationId: orgId, siteId,
+  });
+  await sql.query("INSERT INTO memberships(person_id,organization_id,title) VALUES ($1,$2,'Site Administrator')",
+    [personId, orgId]);
+  await sql.query("INSERT INTO role_assignments(person_id,organization_id,site_id,role_key,capabilities) VALUES ($1,$2,$3,'site_admin',$4)",
+    [personId, orgId, siteId, ["site.publication.manage"]]);
+  await sql.query("INSERT INTO demo_school_tenants (domain,organization_id,site_id,admin_account_id,admin_person_id,admin_grant_id) VALUES ($1,$2,$3,$4,$5,$6)",
+    [domain,orgId,siteId,accountId,personId,grantId]);
+  await page.goto("/access");
   await page.getByLabel("Email", { exact: true }).fill(`admin.demo@${domain}`);
   await page.getByLabel("Demo access code (000000)").fill("000000");
   const verificationRequest = page.waitForRequest(request =>
@@ -37,29 +50,20 @@ test("school administrator reviews, publishes and renames a standalone school we
   await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible();
 
   const [tenant] = await sql`SELECT organization_id, site_id FROM demo_school_tenants WHERE domain = ${domain}`;
-  if (!tenant) throw new Error("The browser-created school was not persisted.");
-  const orgId = String(tenant.organization_id);
-  const siteId = String(tenant.site_id);
-  // Browser acceptance of exact-Site Launch Hub and Website Studio navigation.
+  expect(tenant).toMatchObject({ organization_id: orgId, site_id: siteId });
+  // The new Site-scoped V6.1 frame replaces the former Launch Hub.
   const navigationErrors: string[] = [];
   page.on("pageerror", error => navigationErrors.push(error.message));
-  await page.goto(`/launch/hub/school?siteId=${siteId}`);
-  await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
-  await page.getByRole("link", { name: "Open Website Studio" }).click();
-  await expect(page).toHaveURL(/\/launch\/website\?/);
+  await page.goto(`/launch/site?siteId=${siteId}`);
+  await expect(page.getByRole("heading", { name: "Bring your learning community to life." })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Preview Website/ }))
+    .toHaveAttribute("href", `/launch/site-preview?siteId=${siteId}`);
+  await page.goto(`/launch/website?siteId=${siteId}`);
   await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Launch steps" }).getByRole("button")).toHaveCount(1);
   await page.reload();
   await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
-  await page.getByRole("link", { name: "Back to Launch Hub" }).click();
-  await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
-  await page.getByRole("link", { name: "Open Website Studio" }).click();
-  await page.goBack();
-  await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
-  await page.goto(`/launch/hub/school/website?siteId=${siteId}`);
-  await expect(page).toHaveURL(/\/launch\/website\?/);
-  await page.goto(`/launch/hub/school?siteId=${randomUUID()}`);
-  await expect(page.getByRole("heading", { name: "Choose your school" })).toBeVisible();
+  await page.goto(`/launch/site?siteId=${randomUUID()}`);
+  await expect(page.getByRole("heading", { name: "Choose your Site" })).toBeVisible();
   await page.goto(`/settings?siteId=${siteId}`);
   await page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Website", exact: true }) })
     .getByRole("link", { name: "Open Website Studio" }).click();
@@ -81,17 +85,10 @@ test("school administrator reviews, publishes and renames a standalone school we
   await page.goto(`/sites/${siteId}/publish`);
   await page.getByLabel("Public site subdomain").fill(publicSlug);
   await page.getByRole("button", { name: "Reserve address" }).click();
-  // Site-first Launch Studio must display its actual authenticated preview,
-  // not an empty/blocked frame. This catches endpoint errors in browser QA;
-  // the Cloudflare Worker CSP source is separately verified in unit tests.
-  await page.goto(`/launch/site?siteId=${siteId}&step=preview`);
-  await expect(page.getByRole("heading", { name: "Your Site is taking shape." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open full-page preview" })).toHaveAttribute(
-    "href", `/launch/site-preview?siteId=${siteId}`,
-  );
-  const siteFrame = page.frameLocator('iframe[title^="Private rendered website preview for"]');
-  await expect(siteFrame.getByText("Private Site website preview")).toBeVisible();
-  await expect(siteFrame.locator("body")).toContainText(name);
+  // V6.1 uses the same authorized private preview endpoint, without the retired embedded wizard.
+  await page.goto(`/launch/site?siteId=${siteId}`);
+  await expect(page.getByRole("link", { name: /Preview Website/ }))
+    .toHaveAttribute("href", `/launch/site-preview?siteId=${siteId}`);
   const embeddedResponse = await page.request.get(`/launch/site-preview?siteId=${siteId}`);
   expect(embeddedResponse.status()).toBe(200);
   expect(embeddedResponse.headers()["x-frame-options"]).toBe("SAMEORIGIN");
@@ -164,7 +161,7 @@ test("school administrator reviews, publishes and renames a standalone school we
   await expect(page.getByText("Church content published.", { exact: false })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "See what families will see." })).toBeVisible();
-  await page.getByRole("link", { name: "Back to Launch Hub" }).click();
+  await page.getByRole("link", { name: "Back to Launch Studio" }).click();
   await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
   await page.goto(`/published-site?site=${renamedSlug}`);
   await expect(page.getByRole("heading", { name: renamedName, exact: true })).toBeVisible();
@@ -217,8 +214,7 @@ test("a new Site Administrator prepares a school website directly in Website Stu
   if (!tenant) throw new Error("The synthetic Site must be persisted before editing.");
   const siteId = String(tenant.site_id);
 
-  await page.goto(`/launch/hub/school?siteId=${siteId}`);
-  await page.getByRole("link", { name: "Open Website Studio" }).click();
+  await page.goto(`/launch/website?siteId=${siteId}`);
   await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
   await page.getByRole("button", { name: "Prepare school website" }).click();
   await expect(page.getByRole("heading", { name: "Find the right first impression." })).toBeVisible();

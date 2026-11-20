@@ -100,7 +100,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       <Label className="block text-sm font-medium sm:col-span-2">
         Authorized Site and Course
-        <Select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2"
           value={selected} onChange={e=>{
             setSelected(e.target.value);
             setShowSessionPlanner(false);
@@ -117,12 +117,12 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       <Label className="block text-sm font-medium">Starts (your local time)
         <Input type="datetime-local" value={startsAt}
           onChange={e=>setStartsAt(e.target.value)}
-          className="mt-2 min-h-10 w-full border border-border bg-background p-2"/>
+          className="mt-2"/>
       </Label>
       <Label className="block text-sm font-medium">Ends (your local time)
         <Input type="datetime-local" value={endsAt}
           onChange={e=>setEndsAt(e.target.value)}
-          className="mt-2 min-h-10 w-full border border-border bg-background p-2"/>
+          className="mt-2"/>
       </Label>
     </div>
     <Button className="mt-4" type="button"
@@ -213,7 +213,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       </div>}
       <p className="mt-3 text-xs text-muted-foreground">
         Scheduling does not enroll learners or verify attendance. Attach meetings to
-        the appropriate enrollment release in Cohort & participant management.
+        the appropriate authorized Class Enrollment before recording participation.
       </p>
     </div>
     <div className="mt-6 border-t border-border pt-4">
@@ -265,12 +265,11 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
               <Button type="button" size="sm" variant="outline" disabled={blocked}
                 onClick={()=>setCancelPlanId(plan.id)}>Cancel meeting</Button>
             </div>}
-            {plan.nativeClassId&&<Link
+            {plan.nativeClassId&&<Button asChild variant="outline"><Link
               to="/class/$classId" params={{classId:plan.nativeClassId}}
-              search={{view:"manage",tab:"sessions",lesson:undefined,session:undefined}}
-              className="inline-flex min-h-10 items-center border border-border px-3 text-sm font-medium">
+              search={{view:"manage",tab:"sessions",lesson:undefined,session:undefined}}>
               Manage native Class Sessions
-            </Link>}
+            </Link></Button>}
             {plan.state==="started"&&plan.facilitatedSessionId&&
               <p className="text-xs text-muted-foreground">
                 Room started. Find it under Your rooms and refresh its joining code as needed.
@@ -280,12 +279,12 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
             <Label className="text-sm font-medium">New start
               <Input type="datetime-local" value={edit.start}
                 onChange={e=>setEdit(current=>current?{...current,start:e.target.value}:null)}
-                className="mt-2 w-full border border-border bg-background p-2"/>
+                className="mt-2"/>
             </Label>
             <Label className="text-sm font-medium">New end
               <Input type="datetime-local" value={edit.end}
                 onChange={e=>setEdit(current=>current?{...current,end:e.target.value}:null)}
-                className="mt-2 w-full border border-border bg-background p-2"/>
+                className="mt-2"/>
             </Label>
             <div className="flex gap-2 sm:col-span-2">
               <Button type="button" size="sm" disabled={blocked}

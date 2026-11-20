@@ -30,7 +30,7 @@ export function QualificationCatalog({ programId, canAuthor, changed }: {
       },
     );
   }
-  return <section className="mt-7 rounded-xl border bg-card p-5">
+  return <section className="mt-7  border bg-card p-5">
     <h2 className="font-serif text-2xl">Shared qualification catalog</h2>
     <p className="mt-2 text-sm">Reuse an existing definition before adding one. Definitions describe qualifications;
       program policies decide which are required. Creating a definition does not approve evidence or authorize teaching.</p>

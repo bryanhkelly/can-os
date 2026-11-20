@@ -30,7 +30,7 @@ vi.mock("drizzle-orm/neon-serverless", () => ({
   }),
 }));
 
-import { db, withRequestDatabase } from "@/db/client";
+import { db, withRequestDatabase, withCanonicalOperationsDatabase } from "@/db/client";
 
 const identity = () => Reflect.get(db, "marker") as number;
 const boundSelect = () => (Reflect.get(db, "select") as () => number)();
@@ -80,6 +80,55 @@ describe("Cloudflare and Netlify Neon pooling", () => {
       throw new Error("simulated route failure");
     }, "postgresql://failure")).rejects.toThrow("simulated route failure");
     expect(state.ended).toContain(id);
+  });
+
+  it("isolates and closes a delegated Blueprint database pool without replacing the owner's request scope", async () => {
+    const url="postgresql://can_os_canonical_ops_app:operations@ep-test-pooler.example.org/neondb";
+    const owner="postgresql://neondb_owner:owner@ep-test-pooler.example.org/neondb";
+    const previous=process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL;
+    const previousAuth=process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
+    let restricted=0, request=0;
+    try {
+      process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL=url;
+      delete process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
+      await withRequestDatabase(async () => {
+        request=identity();
+        restricted=await withCanonicalOperationsDatabase(async () => {
+          const id=identity();
+          expect(id).not.toBe(request);
+          expect(boundSelect()).toBe(id);
+          expect(await db.transaction(async tx=>(tx as unknown as {connection:number}).connection)).toBe(id);
+          expect(await withCanonicalOperationsDatabase(async()=>identity())).toBe(id);
+          return id;
+        });
+        expect(identity()).toBe(request);
+        expect(state.ended).not.toContain(restricted);
+      },owner);
+      expect(state.ended).toContain(request);
+      expect(state.ended).toContain(restricted);
+      expect(state.connectionStrings).toContain(url);
+    }finally{
+      if(previous===undefined)delete process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL;
+      else process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL=previous;
+      if(previousAuth===undefined)delete process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
+      else process.env.CAN_CANONICAL_AUTH_DATABASE_URL=previousAuth;
+    }
+  });
+
+  it("denies missing operations credentials rather than using the owner database", async () => {
+    const previous=process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL;
+    try{
+      delete process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL;
+      await withRequestDatabase(async()=>{
+        const ownerId=identity();
+        await expect(withCanonicalOperationsDatabase(async()=>identity()))
+          .rejects.toThrow("Restricted canonical operations database is not configured");
+        expect(identity()).toBe(ownerId);
+      },"postgresql://neondb_owner:owner@ep-test-pooler.example.org/neondb");
+    }finally{
+      if(previous===undefined)delete process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL;
+      else process.env.CAN_CANONICAL_OPERATIONS_DATABASE_URL=previous;
+    }
   });
 
   it("preserves the reusable Node/Netlify pool outside the Worker wrapper", () => {

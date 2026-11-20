@@ -1,5 +1,6 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { DomainError } from "@/domain/errors";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -104,9 +105,11 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
         </Field>
         <p className="text-xs">Your authenticated identity, answers, exact form version and signing time are recorded.
           A registrar must review this form before the requirement is complete.</p>
-        <Button type="submit" disabled={busy || !interactive}>
-          {busy ? "Submitting signed form..." : record.submission ? "Sign and resubmit corrected form" : "Sign and submit enrollment form"}
-        </Button>
+        <ActionFooter layout="form">
+          <Button type="submit" disabled={busy || !interactive} loading={busy} loadingLabel="Submitting signed form...">
+            {record.submission ? "Sign and resubmit corrected form" : "Sign and submit enrollment form"}
+          </Button>
+        </ActionFooter>
       </fieldset>
     </form>}
   </section>;
@@ -155,7 +158,9 @@ export function RegistrarEnrollmentFormReview({ applicationId, requirementId, re
           error={attempted&&!confirmed?"Confirm this decision before recording it.":undefined}>
           <Checkbox checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
         </Field>
-        <Button type="submit" disabled={busy || !interactive}>Record form review</Button>
+        <ActionFooter layout="form">
+          <Button type="submit" disabled={busy || !interactive} loading={busy} loadingLabel="Recording form review...">Record form review</Button>
+        </ActionFooter>
       </fieldset>
     </form>}
   </section>;

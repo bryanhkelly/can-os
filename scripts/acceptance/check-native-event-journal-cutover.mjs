@@ -52,10 +52,12 @@ for(const absolute of files){
       if(occurrences.length)directWriters.push({file,model:identifier,count:occurrences.length});
     }
   }
-  // Public event journals deliberately reject reads/writes from restricted
-  // database roles. A caller that SET LOCAL ROLE must retain an independently
-  // authorized native writer until an explicitly reviewed SQL permission path exists.
-  if(/SET\s+LOCAL\s+ROLE/i.test(content)
+  // Flag *actual* role-switching writes through the owner-only shared
+  // adapter. A source comment mentioning SET LOCAL ROLE is not a SQL role
+  // switch. The verified-CAN planning path does not switch roles, while
+  // delegated Blueprint callers use the separately authorized journal
+  // gateway without direct public INSERT privileges.
+  if(/tx\.execute\(\s*sql\.raw\(\s*`SET\s+LOCAL\s+ROLE|tx\.execute\(\s*sql`SET\s+LOCAL\s+ROLE/i.test(content)
      && /\b(?:writeCanonicalAudit|emitCanonicalDomainEvent)\s*\(/.test(content)){
     roleScopedSharedWriters.push(file);
   }

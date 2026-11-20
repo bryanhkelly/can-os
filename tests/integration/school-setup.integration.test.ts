@@ -232,8 +232,11 @@ integration("public demo school canonical setup", () => {
         const [signup] = await tx.select().from(schema.schoolSetupSignups)
           .where(eq(schema.schoolSetupSignups.accountId, account!.id));
         expect(site?.name).toBe(`Real School ${suffix}`);
+        expect(site?.lifecycleStatus).toBe("planning");
         expect(organization?.type).toBe("christian_school");
+        expect(organization?.lifecycleStatus).toBe("active");
         expect(account?.emailVerifiedAt).toBeInstanceOf(Date);
+        expect(account?.personId).toBe(grant?.personId);
         expect(grant).toMatchObject({ role: "site_admin", active: true, organizationId: organization!.id, siteId: site!.id });
         expect(signup).toMatchObject({ consumedAt: expect.any(Date), organizationId: organization!.id, siteId: site!.id });
         expect(await isDemoTenantOrganization(organization!.id, tx)).toBe(false);

@@ -20,6 +20,7 @@ export interface BlueprintReferenceSourceRow {
   versionNo: number;
   title: string;
   summary: string;
+  metadata?: unknown;
   lifecycle: "draft" | "published";
 }
 
@@ -32,6 +33,7 @@ export interface BlueprintReferenceCatalogItem {
   title: string;
   summary: string;
   versionNo: number;
+  academicGradeRange?: { min: string; max: string } | null;
   status: "reference_only";
 }
 
@@ -55,6 +57,15 @@ export function projectBlueprintReferenceCatalog(
   for (const row of published) {
     if (seen.has(row.itemId)) continue;
     seen.add(row.itemId);
+    const metadata = row.metadata && typeof row.metadata === "object" &&
+      !Array.isArray(row.metadata) ? row.metadata as Record<string, unknown> : {};
+    const rawRange = metadata.grade_range;
+    const academicGradeRange = rawRange && typeof rawRange === "object" &&
+      !Array.isArray(rawRange) &&
+      typeof (rawRange as Record<string, unknown>).min === "string" &&
+      typeof (rawRange as Record<string, unknown>).max === "string"
+        ? { min: (rawRange as Record<string, string>).min,
+            max: (rawRange as Record<string, string>).max } : null;
     catalog.push({
       itemId: row.itemId,
       versionId: row.versionId,
@@ -64,6 +75,7 @@ export function projectBlueprintReferenceCatalog(
       title: row.title,
       summary: row.summary,
       versionNo: row.versionNo,
+      ...(academicGradeRange ? { academicGradeRange } : {}),
       status: "reference_only",
     });
   }

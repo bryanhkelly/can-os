@@ -25,8 +25,8 @@ export function StudentNextStepsPanel({
     >
       {nextSteps.nextLessonId ? (
         <Link
-          to="/classes"
-          search={{ ...search, tab: "lessons", lesson: nextSteps.nextLessonId }}
+          to="/class"
+          
           className="text-sm underline"
         >
           Continue the next uncompleted lesson →

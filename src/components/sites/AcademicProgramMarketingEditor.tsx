@@ -53,7 +53,7 @@ export function AcademicProgramMarketingEditor({
     });
   }
 
-  return <article className="rounded-xl border bg-card p-5">
+  return <article className=" border bg-card p-5">
     <h3 className="text-lg font-semibold">{program.name}</h3>
     <p className="mt-1 text-xs text-muted-foreground">
       {program.type.replaceAll("_", " ")} · Grades {program.gradeRange.min}–{program.gradeRange.max}
@@ -62,7 +62,7 @@ export function AcademicProgramMarketingEditor({
       Academic operations: {program.status}. Public marketing: {program.marketing?.status ?? "not approved"}.
     </p>
     {published && program.marketing?.current === false && <p role="alert"
-      className="mt-3 rounded-lg border border-amber-500 p-3 text-sm">
+      className="mt-3  border border-warning/40 p-3 text-sm">
       This approved listing no longer matches the canonical Program title,
       grades, delivery schedule or current protected-claim rules. It is
       withheld from the public catalog. Withdraw the outdated listing,
@@ -70,7 +70,7 @@ export function AcademicProgramMarketingEditor({
     </p>}
     {published && program.marketing?.current === true &&
       program.marketing?.catalogEligible === false && <p role="alert"
-      className="mt-3 rounded-lg border border-amber-500 p-3 text-sm">
+      className="mt-3  border border-warning/40 p-3 text-sm">
       This Program is not eligible for the public catalog. Its underlying
       institutional operating authorization may be absent, expired, suspended
       or revoked, or the Program may no longer be eligible. Review and restore

@@ -5,10 +5,21 @@ import { describe, expect, it } from "vitest";
 function source(path: string) { return readFileSync(resolve(path), "utf8"); }
 
 describe("canonical v3.0.1 stays net-new", () => {
-  it("uses canonical session context for every Blueprint handler", () => {
+  it("reuses the verified CAN Site grant for planning and retains canonical review authority", () => {
     const handler = source("src/modules/blueprints/blueprint-studio.functions.ts");
+    const verified = source("src/modules/blueprints/verified-site-planning.server.ts");
+    expect(handler).toContain("getBlueprintPlanningContext(getRequest())");
     expect(handler).toContain("getCanonicalCommandContext(getRequest())");
     expect(handler).not.toContain("getCommandContext(getRequest())");
+    expect(verified).toContain("getIdentityContext(request)");
+    expect(verified).toContain("verifiedCanPlanningContexts.add(context)");
+    expect(verified).toContain("assertVerifiedCanPlanningSite");
+    expect(verified).not.toContain("siteOrganizationRoles");
+    // Neither review decisions nor Deployment execution inherit plan-edit rights.
+    expect(handler.slice(handler.indexOf("export const decideCanonicalBlueprintReview")))
+      .toContain("getCanonicalCommandContext(getRequest())");
+    expect(handler.slice(handler.indexOf("export const executeCanonicalBlueprintConfiguration")))
+      .toContain("getCanonicalCommandContext(getRequest())");
   });
 
   it("uses native authorization without a global Blueprint write feature toggle", () => {
@@ -22,12 +33,36 @@ describe("canonical v3.0.1 stays net-new", () => {
       expect(module).not.toContain("requireCanonicalBlueprintWriteEnabled");
     }
     const handlers = source("src/modules/blueprints/blueprint-studio.functions.ts");
+    expect(handlers).toContain("getBlueprintPlanningContext(getRequest())");
     expect(handlers).toContain("getCanonicalCommandContext(getRequest())");
     expect(handlers).toContain("requireBlueprintSiteScope");
     expect(source("src/modules/blueprints/blueprint-workspace.server.ts"))
       .toContain('blueprintDatabaseRole(context, "blueprint_author")');
     expect(source("src/modules/blueprints/blueprint-review-queue.server.ts"))
       .toContain('blueprintDatabaseRole(context, "blueprint_reviewer")');
+  });
+
+  it("allows first-party CAN Site planning without a second operator or SQL-role binding", () => {
+    const workspace = source("src/modules/blueprints/blueprint-workspace.server.ts");
+    const configuration = source("src/modules/blueprints/blueprint-configuration.server.ts");
+    const catalog = source("src/modules/blueprints/blueprint-reference-catalog.server.ts");
+    const offerings = source("src/modules/programs/program-discovery.server.ts");
+    const reviews = source("src/modules/blueprints/blueprint-review.server.ts");
+    const signup = source("src/modules/identity/school-setup-signup.server.ts");
+    expect(workspace).toContain("isVerifiedCanSitePlanning(context)");
+    expect(workspace).toContain("await assertVerifiedCanPlanningSite(tx, context, siteId)");
+    expect(workspace).toContain("if (databaseRole) await tx.execute");
+    expect(workspace).toContain("siteOrganizationRoles");
+    for (const service of [configuration, catalog, offerings, reviews]) {
+      expect(service).toContain("isVerifiedCanSitePlanning(context)");
+      expect(service).toContain("assertVerifiedCanPlanningSite(");
+      expect(service).toContain("if (databaseRole) await tx.execute");
+    }
+    expect(configuration).toContain("Blueprint configuration Site cannot be reassigned");
+    expect(signup).toContain('lifecycleStatus: "planning"');
+    expect(signup).toContain('lifecycleStatus: "active"');
+    expect(signup).toContain("personId, updatedAt: now");
+    expect(signup).not.toContain("siteOrganizationRoles");
   });
 
   it("keeps the author and reviewer pages outside old School Hub and sign-in", () => {
@@ -61,6 +96,57 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(editor).toContain("saved.revision > detail.revision");
   });
 
+  it("reopens newly saved and resumed plans using the refreshed authorized Site projection", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const catalog = source("src/components/launch-studio/SolutionCatalogV61.tsx");
+    const workspaceReader = source("src/modules/blueprints/blueprint-workspace.server.ts");
+    const save = editor.slice(editor.indexOf("async function save()"), editor.indexOf("async function submit()"));
+    expect(save.match(/const current = await reload\(\)/g)).toHaveLength(2);
+    expect(save).toContain("await openConfiguration(configurationId, current)");
+    expect(save).toContain("await openConfiguration(detail.configurationId, current)");
+    expect(save).toContain("onWorkspaceChanged?.(current)");
+    expect(editor).toContain("initialConfigurationId");
+    expect(editor).toContain("openConfiguration(initialConfigurationId, result)");
+    expect(editor).toContain("result.blueprintVersionId !== initialBlueprintVersionId");
+    expect(editor).toContain("result.config.siteId !== siteId");
+    expect(catalog).toContain("Continue saved plans");
+    expect(catalog).toContain("initialConfigurationId={resumeConfigurationId ?? undefined}");
+    expect(catalog).toContain("selectSavedSolutionPlans");
+    expect(workspaceReader).toContain('assertCapability(context, "blueprint.configure")');
+    expect(workspaceReader).toContain('eq(blueprintVersions.lifecycle, "published")');
+  });
+
+  it("requires reconciliation after an uncertain Solution write rather than blind replay", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const save = editor.slice(editor.indexOf("async function save()"), editor.indexOf("async function submit()"));
+    const submit = editor.slice(editor.indexOf("async function submit()"), editor.indexOf("async function createPlanningDeployment()"));
+    expect(save).toContain("let attemptedWrite = false");
+    expect(submit).toContain("let attemptedWrite = false");
+    expect(submit).toContain("attemptedWrite = true");
+    expect(save).toContain("setReconciliationRequired(true)");
+    expect(submit).toContain("setReconciliationRequired(true)");
+    expect(editor).toContain("reconciliationRequired ||");
+    expect(editor).toContain("Reload before creating or updating another Solution plan");
+  });
+
+  it("guards unsaved changes and ignores stale published-product discovery", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const catalog = source("src/components/launch-studio/SolutionCatalogV61.tsx");
+    const picker = source("src/components/launch-studio/BlueprintOfferingAdoptionPicker.tsx");
+    expect(editor).toContain("useLaunchUnsavedChanges(");
+    expect(editor).toContain("solutionDraftSnapshot");
+    expect(editor).toContain("replaceVisibleOfferingIntents(previous, next, editableProgramComponentIds)");
+    expect(editor).toContain('initialDelivery = "onsite"');
+    expect(catalog).toContain('ActionDialog open={Boolean(pendingSwitch)}');
+    expect(catalog).toContain("editorState.reconciliationRequired");
+    expect(catalog).toContain("editorState.busy");
+    expect(catalog).toContain("onUnsavedChange={setEditorState}");
+    expect(catalog).toContain("initialDelivery={preferredCatalogDelivery(delivery)}");
+    expect(picker).toContain("const version = ++requestVersion.current");
+    expect(picker).toContain("requestVersion.current === version");
+    expect(picker).toContain("return () => { requestVersion.current += 1; }");
+  });
+
   it("keeps approved plans read-only until the author explicitly starts a revision", () => {
     const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
     expect(editor).toContain('detail?.lifecycle === "frozen" && !revisingFrozen');
@@ -78,7 +164,7 @@ describe("canonical v3.0.1 stays net-new", () => {
       review.indexOf("const authors = await tx.select"),
       review.indexOf("const selectedComponents = await tx.select"),
     );
-    expect(independence).toContain("eq(auditEvents.entityId, version.configurationId)");
+    expect(independence).toContain("eq(sharedAuditEvents.resourceId, version.configurationId)");
     expect(independence).toContain("authors.some(author => author.actorPersonId === actorPersonId)");
     expect(independence).not.toContain("payload}->>'versionId'");
     const filterStart = queue.indexOf("return pending");

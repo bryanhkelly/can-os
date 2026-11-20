@@ -13,7 +13,11 @@ vi.mock("react", async importOriginal => {
   const actual = await importOriginal<typeof import("react")>();
   return { ...actual, useState: (initial: unknown) => {
     const [value, setValue] = actual.useState(initial);
-    return [initial === null ? state.model : value, setValue];
+    // The panel now keeps server results tagged with their program/date so a
+    // previous planning context is never rendered for another site selection.
+    return [initial === null && state.model
+      ? { programId: state.model.programId, date: state.model.date, value: state.model }
+      : value, setValue];
   } };
 });
 
@@ -26,6 +30,22 @@ beforeEach(() => {
       assignedPrimaryPersonId: null, staff: [], current: null }],
   };
 });
+describe("room planning scope isolation", () => {
+  it("never displays another program's staffing and rooms during a program change", () => {
+    const html = renderToStaticMarkup(
+      <OnsiteRoomPlanningPanel programId="different-program" initialDate="2030-01-01"/>);
+    expect(html).not.toContain("Science");
+    expect(html).not.toContain("Library");
+    expect(html).toContain("Room and adult coverage planning");
+  });
+  it("never displays the previous date's staff during a school-day change", () => {
+    const html = renderToStaticMarkup(
+      <OnsiteRoomPlanningPanel programId="program" initialDate="2030-01-02"/>);
+    expect(html).not.toContain("Science");
+    expect(html).not.toContain("Library");
+  });
+});
+
 describe("retired classrooms in daily planning", () => {
   it("shows a real empty selection rather than visually selecting a different active room", () => {
     const html = renderToStaticMarkup(<OnsiteRoomPlanningPanel programId="program" initialDate="2030-01-01"/>);

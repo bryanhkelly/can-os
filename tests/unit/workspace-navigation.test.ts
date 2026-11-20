@@ -39,11 +39,14 @@ describe("canonical workspace navigation",()=>{
    expect(links.some(item=>item.title==="Notifications"),role).toBe(false);
   }
  });
- it("exposes Site Blueprint Studio without granting independent review",()=>{
-  expect(workspaceLinks.site_admin.some(item=>item.path==="/canonical/blueprints")).toBe(true);
-  expect(workspaceLinks.registrar.some(item=>item.path==="/canonical/blueprints")).toBe(true);
-  expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/canonical/blueprints")).toBe("/canonical/blueprints");
-  expect(workspaceLinks.student.some(item=>item.path==="/canonical/blueprints")).toBe(false);
+ it("uses Launch Studio as the operator entry point for Solution planning",()=>{
+  for(const role of ["site_admin","registrar"] as const){
+   expect(workspaceLinks[role].some(item=>item.path==="/launch/site")).toBe(true);
+   expect(workspaceLinks[role].some(item=>item.path==="/canonical/blueprints")).toBe(false);
+  }
+  // The legacy authorized deep link may remain, but must not be a second
+  // user-facing Blueprint Studio in Site operator navigation.
+  expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/canonical/blueprints")).toBeUndefined();
   expect(roleCapabilities.site_admin).not.toContain("blueprint.review");
  });
  it("keeps the platform administrator separate from school operations",()=>{

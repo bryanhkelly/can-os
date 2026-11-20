@@ -68,7 +68,7 @@ export function SiteTodayPriorities({
     >
       <div className="grid gap-3 sm:grid-cols-3">
         {signals.map(signal => (
-          <article key={signal.label} className="rounded-xl border bg-background p-4">
+          <article key={signal.label} className=" border bg-background p-4">
             <h3 className="text-sm font-semibold">{signal.label}</h3>
             <p className="mt-2 text-base font-semibold">{signal.value}</p>
             <p className="mt-1 text-xs text-muted-foreground">{signal.description}</p>
@@ -80,7 +80,7 @@ export function SiteTodayPriorities({
       </div>
 
       {nextAction ? (
-        <article id="next-authorized-action" className="mt-4 rounded-xl border-2 border-primary/30 bg-muted/20 p-4 sm:p-5">
+        <article id="next-authorized-action" className="mt-4  border-2 border-primary/30 bg-muted/20 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -110,13 +110,13 @@ export function SiteTodayPriorities({
           </div>
         </article>
       ) : (
-        <p id="next-authorized-action" role="status" className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground">
+        <p id="next-authorized-action" role="status" className="mt-4  border p-4 text-sm text-muted-foreground">
           No next action is listed in the current authorized priority view. Review the staffing and student records below.
         </p>
       )}
 
       {otherItems.length > 0 && (
-        <details className="mt-4 rounded-xl border p-4">
+        <details className="mt-4  border p-4">
           <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             {otherItems.length} more priority {otherItems.length === 1 ? "item" : "items"}
           </summary>

@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { getExcuseAttachmentDownload } from "@/modules/learning/submission-attachments.functions";
@@ -16,9 +17,9 @@ export function ExcuseAttachments({ attendanceEventId, attachments, disabled }: 
 }) {
   const [error, setError] = useState("");
   if (!attachments.length) return null;
-  return <div className="mt-3 rounded-lg border p-3" aria-label="Excuse attachments">
+  return <div className="mt-3  border p-3" aria-label="Excuse attachments">
     <p className="text-xs font-semibold">Attached documents</p>
-    {attachments.map(file => <button
+    {attachments.map(file => <Button variant="ghost"
       type="button"
       key={file.documentId}
       disabled={disabled}
@@ -34,7 +35,7 @@ export function ExcuseAttachments({ attendanceEventId, attachments, disabled }: 
           setError(mutationErrorMessage(cause, "Unable to open attachment"));
         }
       }}
-    >{file.fileName}</button>)}
+    >{file.fileName}</Button>)}
     {error && <p role="alert" className="mt-1 text-xs">{error}</p>}
   </div>;
 }

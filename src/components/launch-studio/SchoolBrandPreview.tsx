@@ -1,4 +1,5 @@
 import type { SiteLocalBranding } from "@/domain/site-local-content";
+import { Button } from "@/components/ui/button";
 import {
   resolveSchoolBrand, schoolBrandSvgDataUrl,
 } from "@/domain/school-brand-identity";
@@ -23,35 +24,34 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
     ["Accent", brand.theme.accent], ["Secondary", brand.theme.secondary],
   ] as const;
   return <section aria-labelledby="school-brand-preview-title"
-    className="rounded-xl border bg-card p-4 sm:p-6">
+    className=" border bg-card p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h3 id="school-brand-preview-title" className="font-serif text-xl font-semibold">Your school brand, in one place</h3>
+        <h3 id="school-brand-preview-title" className="font-serif text-xl font-semibold">Your Site identity, in one place</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {brand.design.name} · School-specific identity from your current template, colors and typography.
+          {brand.design.name} · Site identity from your current template, colors and typography.
         </p>
       </div>
-      <a href={wordmark} download={filename}
-        className="inline-flex min-h-11 items-center rounded-md border px-4 py-2 text-sm font-semibold text-primary">
-        Download SVG wordmark
-      </a>
+      <Button asChild variant="outline">
+        <a href={wordmark} download={filename}>Download SVG wordmark</a>
+      </Button>
     </div>
-    <div className="mt-5 overflow-hidden rounded-lg border" style={{background:brand.background}}>
-      <img src={wordmark} alt={`${brand.schoolName} school brand wordmark`}
+    <div className="mt-5 overflow-hidden  border" style={{background:brand.background}}>
+      <img src={wordmark} alt={`${brand.schoolName} Site wordmark`}
         className="block h-auto w-full" />
     </div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      <div className="rounded-lg border p-4">
+      <div className=" border p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand colors</p>
         <div className="mt-3 grid grid-cols-4 gap-2">
           {tokens.map(([name, color])=><div key={name} className="min-w-0">
-            <span aria-hidden="true" className="block h-12 rounded-md border" style={{background:color}}/>
+            <span aria-hidden="true" className="block h-12  border" style={{background:color}}/>
             <span className="mt-1 block text-xs font-medium">{name}</span>
-            <code className="block text-[10px] text-muted-foreground">{color}</code>
+            <code className="block text-3xs text-muted-foreground">{color}</code>
           </div>)}
         </div>
       </div>
-      <div className="rounded-lg border p-4">
+      <div className=" border p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Typography</p>
         <p className="mt-2 text-2xl leading-tight" style={{fontFamily:brand.theme.displayFont}}>
           Learning with purpose.
@@ -64,7 +64,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
     <div className="mt-4 border-t pt-4">
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand applications · visual preview only</p>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="overflow-hidden rounded-md border" aria-label="Website header brand preview">
+        <div className="overflow-hidden  border" aria-label="Website header brand preview">
           <div className="px-4 py-5" style={{background:brand.background,color:brand.foreground}}>
             <div className="flex items-center gap-3">
               <span className="flex size-11 shrink-0 items-center justify-center border-2 text-lg font-bold"
@@ -77,7 +77,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
                 <p className="break-words text-sm font-bold" style={{fontFamily:brand.theme.displayFont}}>
                   {brand.schoolName}
                 </p>
-                <p className="mt-1 text-[10px] font-medium tracking-wider" style={{color:brand.accent}}>
+                <p className="mt-1 text-3xs font-medium tracking-wider" style={{color:brand.accent}}>
                   {brand.design.caption}
                 </p>
               </div>
@@ -85,16 +85,16 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
           </div>
           <p className="p-2 text-xs text-muted-foreground">Website identity</p>
         </div>
-        <div className="overflow-hidden rounded-md border" aria-label="Branded email header preview">
+        <div className="overflow-hidden  border" aria-label="Branded email header preview">
           <div className="px-4 py-5" style={{background:brand.background,color:brand.foreground}}>
             <p className="text-xs font-bold uppercase tracking-widest" style={{color:brand.accent}}>
               {brand.schoolName}
             </p>
             <p className="mt-3 text-xl" style={{fontFamily:brand.theme.displayFont}}>
-              A message from your school
+              A message from your learning community
             </p>
           </div>
-          <p className="p-2 text-xs text-muted-foreground">Branded email header · live invitation transport uses approved school templates</p>
+          <p className="p-2 text-xs text-muted-foreground">Branded email header · actual invitations use approved communication templates</p>
         </div>
       </div>
     </div>
@@ -102,7 +102,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
       <h4 id="brand-family-application-title" className="font-semibold">Family-facing brand applications</h4>
       <p className="mt-1 text-sm text-muted-foreground">
         Open full-page versions of the branded family-interest page, survey, and three email layouts.
-        All seven school designs use the same saved Site colors and typography.
+        All seven Site designs use the same saved colors and typography.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {([
@@ -111,15 +111,16 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
           ["email-survey","Survey invitation email"],
           ["email-confirmation","Interest confirmation email"],
           ["email-update","Family update email"],
-        ] as const).map(([view,label])=><a key={view}
-          href={`/brand-preview?siteId=${encodeURIComponent(siteId)}&view=${view}`}
-          target="_blank" rel="noopener noreferrer"
-          className="inline-flex min-h-12 items-center rounded-md border bg-background px-4 py-3 text-sm font-semibold text-primary hover:bg-muted">
-            {label} <span aria-hidden="true" className="ml-auto">↗</span>
-          </a>)}
+        ] as const).map(([view,label])=><Button key={view} asChild variant="outline"
+          className="min-h-12 w-full justify-between whitespace-normal text-left">
+          <a href={`/brand-preview?siteId=${encodeURIComponent(siteId)}&view=${view}`}
+            target="_blank" rel="noopener noreferrer">
+            {label} <span aria-hidden="true">↗</span>
+          </a>
+        </Button>)}
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Previews are private and read-only, using the last saved school design (or a starter if none is saved).
+        Previews are private and read-only, using the last saved Site design (or a starter if none is saved).
         Save your current changes before opening them. Previews do not send messages or collect responses.
         Approved Program-linked invitations are sent separately through the existing recruitment service.
       </p>

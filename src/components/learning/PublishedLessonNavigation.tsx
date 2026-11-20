@@ -18,12 +18,12 @@ export function PublishedLessonNavigation({
     completedCount={isStudent?completedCount:undefined}
     progressLabel="lessons self-reported complete"
     previousLesson={previousLesson} nextLesson={nextLesson}
-    renderPrevious={lesson=><Link to="/classes"
-      search={{...search,tab:"lessons",lesson:lesson.id}} className="underline">
+    renderPrevious={lesson=><Link to="/class"
+       className="underline">
       ← Previous: {lesson.title}
     </Link>}
-    renderNext={lesson=><Link to="/classes"
-      search={{...search,tab:"lessons",lesson:lesson.id}} className="underline">
+    renderNext={lesson=><Link to="/class"
+       className="underline">
       Next: {lesson.title} →
     </Link>}/>;
 }

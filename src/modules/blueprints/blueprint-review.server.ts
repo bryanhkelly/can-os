@@ -1,13 +1,14 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
+import { auditEvents as sharedAuditEvents } from "@/db/schema";
+import { writeBlueprintTransition } from "./blueprint-journal.server";
 import {
-  auditEvents,
   blueprintComponentApprovalDecisions,
   blueprintConfigurationComponents,
   blueprintConfigurations,
   blueprintConfigurationVersions,
   configurationReviews,
-  domainEvents,
   evidenceDocuments,
   evidenceDocumentVersions,
   type JsonObject,
@@ -21,6 +22,7 @@ import { assertCapability, AuthorizationError, type CommandContext } from "@/dom
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole, blueprintReadDatabaseRole } from "@/domain/blueprint-database-role";
 import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
+import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "./verified-site-planning.server";
 
 type ReviewInput = ReturnType<typeof decideBlueprintReviewInputSchema.parse>;
 
@@ -80,10 +82,15 @@ export async function getBlueprintReview(
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.read");
   const { configurationVersionId } = blueprintReviewReadInputSchema.parse(rawInput);
-  const databaseRole = blueprintReadDatabaseRole(context);
-  return db.transaction(async tx => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
+    if (isCanPlanning) {
+      const siteId = requireBlueprintSiteScope(context, version.config);
+      await assertVerifiedCanPlanningSite(tx, context, siteId, version.owningOrganizationId);
+    }
     const [latestReview] = await tx.select({
       id: configurationReviews.id,
       decision: configurationReviews.decision,
@@ -122,7 +129,7 @@ export async function getBlueprintReview(
           decision: latestByComponent.get(item.componentId) ?? "not_reviewed",
         })),
     };
-  });
+  }));
 }
 
 /**
@@ -137,10 +144,15 @@ export async function getBlueprintReviewHistory(
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.read");
   const { configurationVersionId, page } = blueprintReviewHistoryInputSchema.parse(rawInput);
-  const databaseRole = blueprintReadDatabaseRole(context);
-  return db.transaction(async tx => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
+    if (isCanPlanning) {
+      const siteId = requireBlueprintSiteScope(context, version.config);
+      await assertVerifiedCanPlanningSite(tx, context, siteId, version.owningOrganizationId);
+    }
     requireBlueprintSiteScope(context, version.config);
     const rows = await tx.select({
       id: configurationReviews.id,
@@ -169,7 +181,7 @@ export async function getBlueprintReviewHistory(
             ? row.conditions.rationale : null,
       })),
     };
-  });
+  }));
 }
 
 /**
@@ -186,7 +198,7 @@ export async function decideBlueprintReview(
   const actorPersonId = context.actorPersonId;
 
   const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, input.configurationVersionId);
     await tx.select({ id: blueprintConfigurations.id })
@@ -225,12 +237,12 @@ export async function decideBlueprintReview(
       };
     }
 
-    const authors = await tx.select({ actorPersonId: auditEvents.actorPersonId })
-      .from(auditEvents)
+    const authors = await tx.select({ actorPersonId: sharedAuditEvents.actorPersonId })
+      .from(sharedAuditEvents)
       .where(and(
-        eq(auditEvents.entityKind, "blueprint_configuration"),
-        eq(auditEvents.entityId, version.configurationId),
-        inArray(auditEvents.eventCode, [
+        eq(sharedAuditEvents.resourceType, "blueprint_configuration"),
+        eq(sharedAuditEvents.resourceId, version.configurationId),
+        inArray(sharedAuditEvents.action, [
           "blueprint.configuration.created",
           "blueprint.configuration.saved",
           "blueprint.configuration.submitted",
@@ -300,6 +312,7 @@ export async function decideBlueprintReview(
       conditions: { rationale: input.rationale } satisfies JsonObject,
     });
     const payload: JsonObject = {
+      owningOrganizationId: version.owningOrganizationId,
       configurationVersionId: version.id,
       reviewId: input.reviewId,
       decision: input.decision,
@@ -309,15 +322,14 @@ export async function decideBlueprintReview(
       })),
       requestId: context.requestId ?? null,
     };
-    await tx.insert(auditEvents).values({
+    await writeBlueprintTransition(tx, context, {
       actorPersonId,
       owningOrganizationId: version.owningOrganizationId,
       eventCode: "blueprint.configuration.reviewed",
       entityKind: "blueprint_configuration",
       entityId: version.configurationId,
       payload,
-    });
-    await tx.insert(domainEvents).values({
+    }, {
       eventType: "BlueprintConfigurationReviewed",
       aggregateType: "blueprint_configuration",
       aggregateId: version.configurationId,
@@ -330,5 +342,5 @@ export async function decideBlueprintReview(
       decision: input.decision,
       created: true,
     };
-  });
+  }));
 }

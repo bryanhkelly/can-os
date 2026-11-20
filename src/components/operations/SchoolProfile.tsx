@@ -130,7 +130,7 @@ export function SchoolProfile({ data, tab = "overview", tabLink }: {
     <section aria-labelledby="school-profile-about" className="mt-9">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 id="school-profile-about" className="text-lg font-semibold">About</h2>
-        {canManageSchool && <Link to="/launch/school" search={setupSearch} className={linkClass}>Edit in school setup</Link>}
+        {canManageSchool && <Link to="/launch/site" search={setupSearch} className={linkClass}>Edit in school setup</Link>}
       </div>
       <dl className="mt-3 divide-y border bg-card px-4">
         <Fact term="School name">{site.name}</Fact>
@@ -169,7 +169,7 @@ export function SchoolProfile({ data, tab = "overview", tabLink }: {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <StatusBadge tone={programTones[program.status] ?? "neutral"}>{label(program.status)}</StatusBadge>
-            {canManageSchool && <Link to="/launch/school" search={{ siteId: site.id, programId: program.id }} className={linkClass} aria-label={`Open setup for ${program.name}`}>Setup</Link>}
+            {canManageSchool && <Link to="/launch/site" search={{ siteId: site.id, programId: program.id }} className={linkClass} aria-label={`Open setup for ${program.name}`}>Setup</Link>}
           </div>
         </li>)}</ul>
         : <EmptyState className="mt-3" title="No programs yet" description="Programs appear here once the school starts them in school setup." />}

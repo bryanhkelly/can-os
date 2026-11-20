@@ -18,7 +18,8 @@ describe("learning interaction evidence boundary", () => {
   it("accepts a bounded lesson event without assigning a student or school role", () => {
     expect(parseLearnerInteraction(lessonEvent, now)).toEqual(lessonEvent);
     expect(learnerInteractionInputSchema.options.map(option => option.shape.kind.value)).toEqual([
-      "lesson_opened", "lesson_resumed", "resource_opened", "engaged_interval",
+      "lesson_opened", "lesson_resumed", "video_opened", "video_played", "video_paused", "video_ended",
+      "resource_opened", "engaged_interval",
     ]);
   });
 
@@ -51,11 +52,20 @@ describe("learning interaction evidence boundary", () => {
         ...lessonEvent, kind: "resource_opened", resourceId,
       }, now)).toThrow();
     }
-    // Only resource_opened may carry the resource ID.
+    // Only typed resource and video events may carry resource identity.
     expect(() => parseLearnerInteraction({
       ...lessonEvent, kind: "engaged_interval", resourceId: "lesson-reading_01",
       durationMs: 5_000, pageVisible: true, windowFocused: true,
     }, now)).toThrow();
+  });
+
+  it("accepts native playback observations but never self-declared watch completion", () => {
+    const resourceId = "33333333-3333-4333-8333-333333333333";
+    for (const kind of ["video_opened","video_played","video_paused","video_ended"]) {
+      expect(parseLearnerInteraction({...lessonEvent,kind,resourceId},now).kind).toBe(kind);
+      expect(() => parseLearnerInteraction({...lessonEvent,kind},now)).toThrow();
+      expect(() => parseLearnerInteraction({...lessonEvent,kind,resourceId,watchedSeconds:60},now)).toThrow();
+    }
   });
 
   it("rejects replay outside the live telemetry window and future-timestamp inflation", () => {

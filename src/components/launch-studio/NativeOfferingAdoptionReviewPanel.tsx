@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspacePanel, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, WorkspacePanel, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { invalidateNativeClassAvailability } from "@/lib/native-class-availability-cache";
 import { publisherReleaseAvailableForAdoption } from "@/domain/native-offering-adoption-publication";
@@ -66,9 +66,9 @@ function AdoptionReview({item}:{item:Adoption}){
       <Field label="Verified adoption evidence version UUID">
         <Input required value={evidence} onChange={event=>setEvidence(event.target.value)}/>
       </Field>
-      <div><Button type="submit" disabled={!prerequisitesVisible||feedback.pending||feedback.refreshFailed||reason.trim().length<10||!evidence.trim()}>
-        {feedback.pending?"Checking approval…":"Approve verified adoption"}
-      </Button></div>
+      <ActionFooter layout="form">
+        <Button type="submit" disabled={!prerequisitesVisible||feedback.pending||feedback.refreshFailed||reason.trim().length<10||!evidence.trim()} loading={feedback.pending} loadingLabel="Checking approval...">Approve verified adoption</Button>
+      </ActionFooter>
     </form>
     <MutationFeedback state={feedback} className="mt-3"
       pendingMessage="Verifying independent adoption, exact-version provenance, evidence and current Site authority…"/>

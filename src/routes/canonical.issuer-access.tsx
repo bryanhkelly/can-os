@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Radio } from "@/components/ui/choice";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
@@ -110,12 +113,12 @@ function CredentialIssuerAccess(){
           <p className="mt-2 text-destructive">This approval has expired. An independent reviewer must revoke or close the old approval before a new request.</p>}
       </div>}
       <form className="mt-5 space-y-4" onSubmit={request}>
-        <label className="block text-sm font-semibold">Evidence supporting the requested issuer responsibility
-          <textarea required minLength={25} maxLength={1200} value={evidence}
+        <Label className="block text-sm font-semibold">Evidence supporting the requested issuer responsibility
+          <Textarea required minLength={25} maxLength={1200} value={evidence}
             onChange={e=>setEvidence(e.target.value)}
             placeholder="Reference your organization’s independently reviewed authorization and credential policy."
-            className="mt-2 min-h-28 w-full border border-border bg-background p-3 text-sm"/>
-        </label>
+            className="mt-2 min-h-28"/>
+        </Label>
         <Button type="submit" disabled={busy||my.isPending||my.isError||
           my.data?.status==="approved"||my.data?.status==="pending"||
           evidence.trim().length<25}>Submit for independent review</Button>
@@ -129,28 +132,28 @@ function CredentialIssuerAccess(){
       {pending.data?.length===0&&<p className="mt-4 text-sm">No pending issuer requests.</p>}
       {pending.data?.length===101&&<p className="mt-4 text-sm text-destructive">The review queue exceeds this view's limit. Narrow the review period before proceeding.</p>}
       <div className="mt-5 space-y-3">
-        {pending.data?.slice(0,100).map(item=><label key={item.id}
+        {pending.data?.slice(0,100).map(item=><Label key={item.id}
           className={`flex cursor-pointer gap-3 border p-4 text-sm ${reviewId===item.id?"border-primary":"border-border"}`}>
-          <input type="radio" name="issuer-review" checked={reviewId===item.id}
+          <Radio name="issuer-review" checked={reviewId===item.id}
             onChange={()=>setReviewId(item.id)}/>
           <span>
             <strong>{item.role} · Site {item.siteId}</strong>
             <span className="mt-1 block text-muted-foreground">Requested {new Date(item.requestedAt).toLocaleDateString()} · Organization {item.organizationId}</span>
             <span className="mt-2 block">Evidence: {item.evidenceReference}</span>
           </span>
-        </label>)}
+        </Label>)}
       </div>
       {reviewId&&<div className="mt-5 space-y-4 border-t pt-5">
-        <label className="block text-sm font-semibold">Independent verification evidence
-          <textarea minLength={25} maxLength={1200} value={reviewEvidence}
+        <Label className="block text-sm font-semibold">Independent verification evidence
+          <Textarea minLength={25} maxLength={1200} value={reviewEvidence}
             onChange={e=>setReviewEvidence(e.target.value)}
-            className="mt-2 min-h-28 w-full border border-border bg-background p-3 text-sm"
+            className="mt-2 min-h-28"
             placeholder="Record the institutional authority and policy evidence reviewed."/>
-        </label>
-        <label className="block text-sm font-semibold">Approval expiration (UTC)
+        </Label>
+        <Label className="block text-sm font-semibold">Approval expiration (UTC)
           <Input type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}
             className="mt-2 max-w-xs"/>
-        </label>
+        </Label>
         <div className="flex flex-wrap gap-3">
           <Button disabled={busy||reviewEvidence.trim().length<25||!expiry||
             !Number.isFinite(new Date(expiry+"T23:59:59Z").getTime())||
@@ -169,19 +172,19 @@ function CredentialIssuerAccess(){
       {active.isError&&<p role="alert" className="mt-4 text-sm text-destructive">Only independent institutional reviewers can revoke an issuer's authorization.</p>}
       {active.data?.length===0&&<p className="mt-4 text-sm">No approved issuer authorities found.</p>}
       <div className="mt-5 space-y-3">{active.data?.slice(0,100).map(item=>
-        <label key={item.id} className="flex cursor-pointer gap-3 border border-border p-4 text-sm">
-          <input type="radio" name="issuer-revoke" checked={revokeId===item.id}
+        <Label key={item.id} className="flex cursor-pointer gap-3 border border-border p-4 text-sm">
+          <Radio name="issuer-revoke" checked={revokeId===item.id}
             onChange={()=>setRevokeId(item.id)}/>
           <span><strong>Site {item.siteId}</strong>
             <span className="mt-1 block text-muted-foreground">Expires {item.approvedUntil?new Date(item.approvedUntil).toLocaleDateString():"Unknown"} · Organization {item.organizationId}</span>
           </span>
-        </label>)}</div>
+        </Label>)}</div>
       <form className="mt-5 space-y-4" onSubmit={revoke}>
-        <label className="block text-sm font-semibold">Reason for revocation
-          <textarea required minLength={25} maxLength={1200} value={revokeReason}
+        <Label className="block text-sm font-semibold">Reason for revocation
+          <Textarea required minLength={25} maxLength={1200} value={revokeReason}
             onChange={e=>setRevokeReason(e.target.value)}
-            className="mt-2 min-h-24 w-full border border-border bg-background p-3 text-sm"/>
-        </label>
+            className="mt-2 min-h-24"/>
+        </Label>
         <Button variant="outline" type="submit"
           disabled={!revokeId||revokeReason.trim().length<25||busy}>Revoke selected issuer</Button>
       </form>

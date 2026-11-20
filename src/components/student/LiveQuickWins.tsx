@@ -38,7 +38,7 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
     <div className="mt-5 space-y-3">
       {visible.map(action => {
         const assessmentId = action.subjectType === "assessment" ? action.subjectId : undefined;
-        return <div key={action.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background p-4">
+        return <div key={action.id} className="flex flex-wrap items-center gap-3  border border-border bg-background p-4">
         <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{String(action.metadata.source ?? action.type)} · {action.priority} priority</p><p className="mt-1 text-sm font-semibold">{assessmentId
           ? <StudentAssignmentLink assessmentId={assessmentId} className="hover:underline">{action.title}</StudentAssignmentLink>
           : <Link to="/student/experiences" search={{action:action.id}} className="hover:underline">{action.title}</Link>}</p><p className="mt-1 text-xs text-muted-foreground">{action.description}</p></div>

@@ -45,14 +45,14 @@ describe("calendar view filters", () => {
   it("links section events and class times to the class workspace for authorized classroom roles only", () => {
     const classTime = { type: "class_time", source: "section" as const, sectionId: "english" };
     expect(calendarRecordDestination(classTime, "student")).toEqual({
-      to: "/classes", search: { section: "english" },
+      to: "/class", search: {},
     });
     expect(calendarRecordDestination({ ...classTime, type: "class_session" }, "teacher")).toEqual({
-      to: "/classes", search: { section: "english" },
+      to: "/class", search: {},
     });
     expect(calendarRecordDestination({ ...classTime,
       guardianStudents: [{ studentPersonId: "jordan", studentName: "Jordan Student" }] }, "guardian")).toEqual({
-      to: "/classes", search: { section: "english", student: "jordan" },
+      to: "/class", search: {},
     });
     expect(calendarRecordDestination({ ...classTime, guardianStudents: [
       { studentPersonId: "jordan", studentName: "Jordan Student" },

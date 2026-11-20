@@ -8,7 +8,7 @@
  * reconciliation are proven. Expand coverage only after removing dependencies,
  * never by adding exceptions to new Class code.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
@@ -21,6 +21,10 @@ const nativeOwners = [
   "src/routes/class_.$classId.tsx",
   "src/routes/class.tsx",
   "src/components/learning/NativeClassManager.tsx",
+  "src/components/learning/native-class/OfferingCard.tsx",
+  "src/components/learning/native-class/ApprovedClassCard.tsx",
+  "src/components/learning/native-class/InvitationCard.tsx",
+  "src/components/learning/native-class/EnrolledClassCard.tsx",
   "src/components/learning/NativeClassHomeNavigation.tsx",
   "src/components/learning/PublisherCourseActivityEditor.tsx",
   "src/components/learning/ProviderInstructionHome.tsx",
@@ -34,6 +38,16 @@ const forbidden = [
   { term: /["']@\/modules\/learning\/class-access(?:\.server)?["']/, reason: "legacy classroom authorization" },
 ];
 let errors = 0;
+if (existsSync(resolve(root, "src/routes/classes.tsx"))) {
+  console.error("Native Class architecture: duplicate classroom route is forbidden");
+  errors++;
+}
+const canonicalDirectory = readFileSync(resolve(root, "src/routes/class.tsx"), "utf8");
+if (/LegacySectionClassPage|SectionClassEntry|import\(["']\.\/classes["']\)/.test(canonicalDirectory)) {
+  console.error("Native Class architecture: canonical directory must not embed retired classroom code");
+  errors++;
+}
+
 for (const path of nativeOwners) {
   const source = readFileSync(resolve(root, path), "utf8");
   for (const rule of forbidden) {
@@ -61,38 +75,30 @@ if (coreStart < 0 || legacyStart < 0 ||
   console.error("Core identity must not project retiring school Section scope");
   errors++;
 }
-// Once a staged Class interface is promoted, the parking-lot route must
-// never reacquire independent business logic. Keep publisher commands in
-// the reusable editor and server authorization boundaries.
-const stagedActivities = readFileSync(
-  resolve(root, "src/routes/canonical.course-activities.tsx"), "utf8");
-const productionClasses = readFileSync(resolve(root, "src/routes/class.tsx"), "utf8");
-const promotedActivities = readFileSync(
-  resolve(root, "src/components/learning/PublisherCourseActivityEditor.tsx"), "utf8");
-if (!stagedActivities.includes('to="/class" search={{view:"activities"}}') ||
-    stagedActivities.includes("createCanonicalSurveyDraft") ||
-    stagedActivities.includes("createCanonicalObjectiveDraft") ||
-    !productionClasses.includes('value.view==="activities"') ||
-    !productionClasses.includes("PublisherCourseActivityEditor") ||
-    !promotedActivities.includes("getPublisherCourseActivityOptions")) {
-  console.error("Native Class architecture: publisher activities must be owned by /class");
-  errors++;
-}
-
-// The canonical/ pages are deliberately staging redirects only. Keep
-// independently governed author and reviewer commands in reusable /class
-// components and their original server-side authority gates.
-for (const [stagingPath,searchHint,forbiddenCommand] of [
-  ["src/routes/canonical.content.tsx",'view:"content"',"createRecordedInstructionDraft"],
-  ["src/routes/canonical.content_.$trackVersionId.tsx",'trackVersionId',"saveRecordedInstructionDraft"],
-  ["src/routes/canonical.content-reviews.tsx",'view:"reviews"',"decideRecordedInstructionReview"],
-]) {
-  const staged=readFileSync(resolve(root,stagingPath),"utf8");
-  if(!staged.includes('Navigate to="/class"')||
-     !staged.includes(searchHint)||staged.includes(forbiddenCommand)) {
-    console.error("Native Class architecture: staged content route must only redirect: "+stagingPath);
+// Old staging route files must stay absent; the native Class entry owns their operations.
+const retiredPaths = [
+  "src/routes/classes.tsx",
+  "src/routes/canonical.classes.tsx",
+  "src/routes/canonical.classes_.completion.tsx",
+  "src/routes/canonical.course-activities.tsx",
+  "src/routes/canonical.content.tsx",
+  "src/routes/canonical.content_.$trackVersionId.tsx",
+  "src/routes/canonical.content-reviews.tsx",
+  "src/routes/reports.classes_.$classId.tsx",
+];
+for(const file of retiredPaths){
+  if(existsSync(resolve(root,file))){
+    console.error("Native Class architecture: retired route unexpectedly exists: "+file);
     errors++;
   }
+}
+const productionClasses=readFileSync(resolve(root,"src/routes/class.tsx"),"utf8");
+const promotedActivities=readFileSync(resolve(root,"src/components/learning/PublisherCourseActivityEditor.tsx"),"utf8");
+if(!productionClasses.includes('value.view==="activities"')||
+   !productionClasses.includes("PublisherCourseActivityEditor")||
+   !promotedActivities.includes("getPublisherCourseActivityOptions")){
+  console.error("Native Class architecture: publisher activities must be owned by /class");
+  errors++;
 }
 for (const [component,requiredCommand] of [
   ["ProviderInstructionHome","createRecordedInstructionDraft"],
@@ -106,6 +112,29 @@ for (const [component,requiredCommand] of [
     console.error("Native Class architecture: missing promoted content component "+component);
     errors++;
   }
+}
+
+// The route composes independently testable learner actions. Do not move
+// enrollment, invitation, transfer, or withdrawal commands back into /class.
+const learnerCards = [
+  "OfferingCard", "ApprovedClassCard", "InvitationCard", "EnrolledClassCard",
+];
+for (const name of learnerCards) {
+  const card=readFileSync(resolve(root, "src/components/learning/native-class/"+name+".tsx"), "utf8");
+  if (!productionClasses.includes('import { '+name+' } from "@/components/learning/native-class/'+name+'";') ||
+      !productionClasses.includes("<"+name) ||
+      productionClasses.includes("function "+name+"(") ||
+      !card.includes("export function "+name+"(")) {
+    console.error("Native Class architecture: learner action card must stay in reusable component "+name);
+    errors++;
+  }
+}
+if (productionClasses.includes("enrollCurrentPersonInClass") ||
+    productionClasses.includes("transferMyNativeClassEnrollment") ||
+    productionClasses.includes("withdrawMyNativeClassEnrollment") ||
+    productionClasses.includes("declineNativeClassInvitation")) {
+  console.error("Native Class architecture: learner mutation commands must not be duplicated in the route");
+  errors++;
 }
 
 if (errors > 0) process.exitCode = 1;

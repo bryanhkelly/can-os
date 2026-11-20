@@ -38,7 +38,7 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
   const operations=programActive?activeProgramOperationsHref({programId:program.id,siteId:program.siteId,status:program.status}):
     `/home?programId=${encoded}${site?`&siteId=${site}`:""}`;
   const academic=`/launch/school/${encoded}`;
-  const checklist=`/launch/school?programId=${encoded}${site?`&siteId=${site}`:""}`;
+  const checklist=`/launch/site?programId=${encoded}${site?`&siteId=${site}`:""}`;
   const blocking=journey?.requirements.filter(r=>r.blocking&&r.status!=="complete")??[];
   const staffed=c.sections>0&&c.publishedSections===c.sections&&c.staffedSections===c.sections;
   // Do not mark enrollment-to-classroom complete while any active student

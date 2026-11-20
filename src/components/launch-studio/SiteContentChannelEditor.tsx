@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, LayoutGrid, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -26,11 +26,12 @@ function newBlockId(channel:SiteContentChannelId,blocks:readonly SiteContentBloc
 }
 /** Site-owned presentation registry. Editors never input Program data, course
  * permissions or registration URLs; every channel pulls its own approved feed. */
-export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,onSaved}:{
+export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,onSaved,onDirtyChange}:{
   siteId:string;
   initialConfig?:SiteContentChannelConfig|null;
   canPublish?:boolean;
   onSaved:()=>void;
+  onDirtyChange?: (dirty:boolean)=>void;
 }) {
   const initial=initialConfig??defaultSiteContentChannelConfig;
   const [revision,setRevision]=useState(initial.revision);
@@ -39,6 +40,8 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
     revision:initial.revision,blocks:initial.blocks,
   }));
   const unsavedChanges = JSON.stringify({revision,blocks})!==savedSnapshot;
+  useEffect(()=>{onDirtyChange?.(unsavedChanges);},[onDirtyChange,unsavedChanges]);
+  useEffect(()=>()=>{onDirtyChange?.(false);},[onDirtyChange]);
   // This editor lives inside step-based Launch and Website Studio routes.
   // Moving to another step unmounts it, so block only truly unsaved changes.
   useLaunchUnsavedChanges(unsavedChanges,

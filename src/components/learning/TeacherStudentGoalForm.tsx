@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -80,13 +81,13 @@ export function TeacherStudentGoalForm({
         <Checkbox checked={confirmedStudentSafe} disabled={busy || shared}
           onChange={event => setConfirmedStudentSafe(event.target.checked)} />
       </Field>
-      {!shared && <div className="flex gap-3 text-sm">
-        <Button type="submit" disabled={busy}>
-          {busy ? "Sharing…" : "Share approved goal"}
+      {!shared && <ActionFooter layout="inline" className="mt-0">
+        <Button type="submit" disabled={busy} loading={busy} loadingLabel="Sharing goal...">
+          Share approved goal
         </Button>
         <Button type="button" variant="ghost" disabled={busy}
           onClick={() => setExpanded(false)}>Cancel</Button>
-      </div>}
+      </ActionFooter>
       {result && <p role="status" className="text-sm">{result}</p>}
     </form>}
   </div>;

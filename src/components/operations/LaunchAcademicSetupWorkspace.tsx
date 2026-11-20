@@ -4,6 +4,8 @@ import { LaunchTeacherQualificationPolicy } from "@/components/operations/Launch
 import { SchoolYearScheduleSetup } from "@/components/operations/SchoolYearScheduleSetup";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSectionRow } from "@/components/operations/LaunchSectionRow";
+import { LaunchTeacherClassRequests } from "@/components/operations/LaunchTeacherClassRequests";
+import { LaunchClassroomPrerequisites } from "@/components/operations/LaunchClassroomPrerequisites";
 import {useState} from "react";
 import { prepareLaunchAcademicYear } from "@/modules/programs/launch-year-preparation.functions";
 import {Link,useRouter} from "@tanstack/react-router";
@@ -24,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { StatCard } from "@/components/workspace/stat-card";
 import { SchoolRoomsSetup } from "@/components/operations/SchoolRoomsSetup";
 
@@ -74,11 +75,11 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
   steps={schoolLaunchSteps.map(id=>({id,title:{welcome:"Welcome",school:"School details",academics:"Academics",website:"School website",families:"Families & staff",readiness:"Readiness review",next:"What's next"}[id]}))}
   currentId="academics" onStepChange={id=>{
     const step=schoolLaunchSteps.find(item=>item===id);
-    if(step)void router.navigate({to:"/launch/school",search:{siteId:data.program.siteId??undefined,programId:data.program.id,step}});
+    if(step)void router.navigate({to:"/launch/site",search:{siteId:data.program.siteId??undefined,programId:data.program.id,step}});
   }}
   exit={hubMode ? <Link to={navigation.homePath} search={{siteId:data.program.siteId??undefined}} className="text-primary">Back to {navigation.homeLabel}</Link> : <Link to="/home" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Skip to dashboard</Link>}
   actions={!hubMode && <Button asChild variant="outline" size="sm">
-   <Link to="/launch/school" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
+   <Link to="/launch/site" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
   </Button>}>
   {error&&<WorkspaceNotice tone="danger" className="mt-5">{error}</WorkspaceNotice>}
   {mutation.refreshError&&<Button type="button" variant="outline" className="mt-3"
@@ -94,7 +95,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
    <StatCard label="Published course versions" value={data.catalog.length}/>
    <StatCard label="Sections provisioned" value={data.sections.length}/>
   </div>
-  <section aria-label="Instruction and support readiness" className="mt-5 rounded-xl border bg-card p-5">
+  <section aria-label="Instruction and support readiness" className="mt-5  border bg-card p-5">
     <h2 className="font-serif text-2xl">Instruction and support readiness</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Published curriculum determines the instructional content. Each Section still needs a verified responsible instructor for academic records, oversight and support. This administrative assignment does not select the presenter of recorded lessons or require live teaching.
@@ -108,7 +109,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
   {data.program.siteId&&<SchoolJurisdictionReviewPanel programId={data.program.id}/>}
   <ProgramSiteAuthorizationPanel key={data.program.id} programId={data.program.id}/>
   {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
-   <p role="status" className="mt-4 rounded-lg border border-warning/40 p-4 text-sm">
+   <p role="status" className="mt-4  border border-warning/40 p-4 text-sm">
     Current academic authority is incomplete. Existing assignments, credits and official records remain visible,
     but new instructor assignments or issuer-bearing credit changes are disabled until the required CAN–church
     agreement services are current. Planning and revocation remain available.
@@ -121,7 +122,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
     <LocalSiteDelegationPanel programId={data.program.id}/>
     <SectionFacilitatorPanel programId={data.program.id}/>
   </>}
-  {!data.years.length&&<section className="mt-6 rounded-lg border p-4">
+  {!data.years.length&&<section className="mt-6  border p-4">
    <h2 className="font-semibold">Prepare the recommended school year</h2>
    <p className="mt-2 text-sm">Use the saved launch date to prepare a school year, standard grading scale,
     two terms, grading periods and a draft instructional calendar. Review local holidays,
@@ -139,85 +140,45 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
     </Button>
    </div>
   </section>}
-  <section className="mt-6 rounded-lg border p-4 text-sm" aria-label="Classroom setup guidance">
-   <h2 className="font-semibold">Classroom setup prerequisites</h2>
-   <ul className="mt-2 list-disc space-y-2 pl-5">
-    {!data.terms.length&&<li>Prepare an academic year and its terms using the recommended-year action above.</li>}
-    {!data.scheduleOptions.some(option=>option.schoolYearId===selectedTerm?.schoolYearId)&&<li>No instructional schedule exists for the selected year. <Link to="/operations/school-years" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Configure and review a school-year schedule</Link>.</li>}
-    {!data.catalog.some(course=>course.recommendation.recommended)&&<li>No available published course has an accessible first lesson. <Link to="/operations/curriculum" className="underline">Review and publish instruction-ready curriculum</Link>.</li>}
-    {!data.teachingStaff.length&&<li>No eligible instructor is assigned to this school. Ask your CAN academic staffing administrator to assign a teacher to this Program, then refresh this workspace. The teacher must submit qualification evidence from their profile for independent review.</li>}
-    {!data.academicAuthority.teacherAssignment&&<li>Complete institutional instructional service authorization before assigning teachers.</li>}
-    {data.terms.length>0&&data.scheduleOptions.some(option=>option.schoolYearId===selectedTerm?.schoolYearId)&&data.catalog.some(course=>course.recommendation.recommended)&&data.teachingStaff.length>0&&data.academicAuthority.teacherAssignment&&<li>Reviewed choices are available. The recommended course and a matching schedule are preselected; a sole authorized instructor is suggested but must be reviewed.</li>}
-   </ul>
-  </section>
+  <LaunchClassroomPrerequisites data={data} schoolYearId={selectedTerm?.schoolYearId}/>
   {selectedYear&&!suggestedSchedule&&<SchoolYearScheduleSetup key={selectedYear.id}
    schoolYearId={selectedYear.id} programId={data.program.id} startsOn={selectedYear.startsOn}
    endsOn={selectedYear.endsOn} timezone={selectedYear.timezone} disabled={busy}
    changed={()=>router.invalidate()}/>}
-  {!data.teachingStaff.length&&<section aria-label="Instructor staffing handoff" className="mt-4 rounded-xl border bg-card p-5 text-sm">
+  {!data.teachingStaff.length&&<section aria-label="Instructor staffing handoff" className="mt-4  border bg-card p-5 text-sm">
    <h3 className="font-semibold">Get your instructor assigned</h3>
    <p className="mt-2">Request an instructor for {data.program.name} from your CAN academic staffing administrator. Include the planned course and term. A local website or registrar invitation does not appoint a CAN teacher.</p>
 
    <Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>void router.invalidate()} className="mt-3">Refresh instructor choices</Button>
   </section>}
-  <section className="mt-7 rounded-xl border bg-card p-5" aria-labelledby="teacher-class-requests">
-   <h2 id="teacher-class-requests" className="font-serif text-2xl">Teacher class requests</h2>
-   <p className="mt-2 text-sm text-muted-foreground">Review teacher proposals here. Creating a request does not create a Section; approved course content, school-year schedule, instructor qualifications and the existing launch checks still apply.</p>
-   <div className="mt-4 space-y-3">
-    {data.classRequests.map(request=><article key={request.id} className="rounded-lg border p-4">
-     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-       <p className="text-xs text-muted-foreground">Requested by {request.requesterName} · {request.requestedCourseOrSubject} · {request.desiredTerm}</p>
-       <h3 className="mt-1 font-semibold">{request.requestedClassTitle}</h3>
-       {request.schedulePreference&&<p className="mt-2 text-sm">Schedule preference: {request.schedulePreference}</p>}
-       {request.notes&&<p className="mt-2 whitespace-pre-wrap text-sm">{request.notes}</p>}
-      </div>
-      <Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>{
-       setClassRequestId(request.id);
-       setTitle(request.requestedClassTitle);
-       setCode("");
-       const course=data.catalog.find(item=>
+  <LaunchTeacherClassRequests requests={data.classRequests} busy={busy}
+    declineReasons={declineReasons}
+    onPrepare={request=>{
+      setClassRequestId(request.id);
+      setTitle(request.requestedClassTitle);
+      setCode("");
+      const course=data.catalog.find(item=>
         item.code.toLowerCase()===request.requestedCourseOrSubject.toLowerCase()||
         item.title.toLowerCase()===request.requestedCourseOrSubject.toLowerCase());
-       if(course)setVersionId(course.versionId);
-       const normalizedTerm=request.desiredTerm.trim().toLowerCase();
-       const term=data.terms.find(item=>item.name.toLowerCase()===normalizedTerm||
+      if(course)setVersionId(course.versionId);
+      const normalizedTerm=request.desiredTerm.trim().toLowerCase();
+      const term=data.terms.find(item=>item.name.toLowerCase()===normalizedTerm||
         data.years.find(year=>year.id===item.schoolYearId)?.name.toLowerCase()===normalizedTerm);
-       if(term)setTermId(term.id);
-       setTeacherId(data.teachingStaff.some(staff=>staff.personId===request.requesterPersonId)
+      if(term)setTermId(term.id);
+      setTeacherId(data.teachingStaff.some(staff=>staff.personId===request.requesterPersonId)
         ?request.requesterPersonId:"");
-       document.getElementById("classroom-create")?.scrollIntoView({behavior:"smooth"});
-      }}>
-       Prepare class setup
-      </Button>
-     </div>
-     <details className="mt-3 border-t pt-3">
-      <summary className="cursor-pointer text-sm font-medium">Decline request</summary>
-      <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={event=>{
-       event.preventDefault();
-       const reason=declineReasons[request.id]?.trim();
-       if(!reason)return;
-       if(classRequestId===request.id)setClassRequestId(null);
-       void run(()=>declineLaunchClassRequest({data:{programId:data.program.id,
-        requestId:request.id,reason}}),"Class request declined with a recorded reason.");
-      }}>
-       <Label className="min-w-60 flex-1">Reason
-        <Textarea required minLength={5} maxLength={1000} value={declineReasons[request.id]??""}
-         onChange={event=>setDeclineReasons(current=>({...current,[request.id]:event.target.value}))}
-         rows={2} className="mt-1"/>
-       </Label>
-       <Button type="submit" variant="outline" size="sm"
-        disabled={busy||(declineReasons[request.id]?.trim().length??0)<5}>Decline request</Button>
-      </form>
-     </details>
-    </article>)}
-    {!data.classRequests.length&&<p role="status" className="rounded-lg border p-4 text-sm text-muted-foreground">No pending teacher class requests for this program.</p>}
-   </div>
-  </section>
-  {!data.catalog.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
+      document.getElementById("classroom-create")?.scrollIntoView({behavior:"smooth"});
+    }}
+    onReasonChange={(id,value)=>setDeclineReasons(current=>({...current,[id]:value}))}
+    onDecline={(requestId,reason)=>{
+      if(classRequestId===requestId)setClassRequestId(null);
+      return run(()=>declineLaunchClassRequest({data:{programId:data.program.id,
+        requestId,reason}}),"Class request declined with a recorded reason.");
+    }}/>
+  {!data.catalog.length&&<p className="mt-6  border p-4 text-sm">
    No published course templates are available from this program's academic provider. Publish curriculum before creating sections.
   </p>}
-  <details className="mt-5 rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Teacher requirements and shared qualification definitions</summary>
+  <details className="mt-5  border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Teacher requirements and shared qualification definitions</summary>
    <p className="mt-2 text-sm">Review existing requirements before creating definitions or publishing a new policy. These controls are for authorized academic administrators.</p>
    <p className="mt-2 text-sm">Your school chooses which documented qualifications its program requires, such as degrees, licenses or training.
     Teacher evidence is reusable across schools. Applicable institutional and jurisdiction requirements still apply; catalog entries alone are not mandatory.</p>
@@ -225,9 +186,9 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
     changed={async()=>{await router.invalidate();}}/>
    <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
   </details>
-  <section id="classroom-create" className="mt-7 rounded-xl border bg-card p-5">
+  <section id="classroom-create" className="mt-7  border bg-card p-5">
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
-   {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists in the selected term. <a href={"#classroom-"+matchingSection!.id} className="font-semibold underline">Resume its saved classroom and instructor assignment</a> instead of submitting a duplicate.</p>}
+   {reviewedSectionAlreadyExists&&<p role="status" className="mt-2  border p-3 text-sm">A class with this code already exists in the selected term. <a href={"#classroom-"+matchingSection!.id} className="font-semibold underline">Resume its saved classroom and instructor assignment</a> instead of submitting a duplicate.</p>}
    <p className="mt-2 text-sm">Choose published curriculum and a term, then assign a verified responsible instructor to the Section. This administrative assignment does not determine who produced its lessons or require live classes. Scheduling and readiness remain separate checks.</p>
    <form noValidate className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();setCreationAttempted(true);
@@ -252,7 +213,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
       {x.code} · {x.title} · v{x.version} · {x.origin==="adopted"?`Adopted from ${x.publisherName}`:"Institution-owned"} · {x.recommendation.recommended?"Recommended for a first class":"Needs instructional content"}
      </option>)}
     </Select></Field>
-    {selectedTerm&&<div className="sm:col-span-2 rounded border p-3 text-sm" role="status">
+    {selectedTerm&&<div className="sm:col-span-2  border p-3 text-sm" role="status">
       <p>Scheduling for <strong>{selectedYear?.name??"the selected school year"}</strong> · {selectedTerm.name}.</p>
       {selectedCourse&&<div className="mt-1">
         <p>Course release: {selectedCourse.code} · v{selectedCourse.version} ·
@@ -283,7 +244,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
     <Button type="submit" disabled={busy||reviewedSectionAlreadyExists||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)}>{reviewedSectionAlreadyExists?"Class already saved":"Save classroom and staffing assignment"}</Button>
    </form>
   </section>
-  {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
+  {createdSectionId&&<div role="status" className="mt-4  border p-4 text-sm">
    <strong>Section command accepted.</strong> The server validated the requested Section and assignment. Confirm the latest persisted readiness after refreshing; this is not an opening approval.
    {data.sections.find(section=>section.id===createdSectionId)?<div className="mt-3">
     <p className="font-medium">Remaining first-day requirements</p>
@@ -297,11 +258,11 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
      <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Set enrollment policies</Link>
     </Button>
     <Button asChild variant="outline" size="sm">
-     <Link {...(hubMode?{to:navigation.modulePath,params:{module:"compliance"},search:{siteId:data.program.siteId??undefined,programId:data.program.id}}:{to:"/launch/school" as const,search:{siteId:data.program.siteId??undefined,programId:data.program.id}})}>{navigation.context==="settings" ? "Review compliance" : "Return to launch checklist"}</Link>
+     <Link {...(hubMode?{to:navigation.modulePath,params:{module:"compliance"},search:{siteId:data.program.siteId??undefined,programId:data.program.id}}:{to:"/launch/site" as const,search:{siteId:data.program.siteId??undefined,programId:data.program.id}})}>{navigation.context==="settings" ? "Review compliance" : "Return to launch checklist"}</Link>
     </Button>
    </div>
   </div>}
-  <div className="mt-6 rounded-lg border p-4 text-sm">
+  <div className="mt-6  border p-4 text-sm">
    After provisioning sections, <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="font-semibold underline">
     configure enrollment windows, prerequisites, seat capacity and credit limits →
    </Link>
@@ -314,9 +275,9 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
      programId:data.program.id,sectionId:section.id,credits,reason}}),"Academic credit units recorded.")}
     assign={(personId)=>run(()=>assignLaunchTeacher({data:{
      programId:data.program.id,sectionId:section.id,teacherPersonId:personId}}),"Instructor assigned.")}/></div>)}
-   {!data.sections.length&&<p className="rounded-lg border p-4 text-sm text-muted-foreground">No sections have been provisioned for this program.</p>}
+   {!data.sections.length&&<p className=" border p-4 text-sm text-muted-foreground">No sections have been provisioned for this program.</p>}
   </section>
-  <section className="mt-7 rounded-xl border bg-card p-5">
+  <section className="mt-7  border bg-card p-5">
    <h2 className="font-serif text-2xl">Independent credential review</h2>
    <p className="mt-2 text-sm">Teachers submit private evidence from their own profile. Review here requires an explicit credential-verifier grant and an institutional relationship; publishing requirements alone does not grant review authority.</p>
    <Label className="mt-3 block">Teacher to review<Select value={reviewTeacherId}

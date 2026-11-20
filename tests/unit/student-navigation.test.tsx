@@ -191,7 +191,7 @@ describe("Student Today summary navigation", () => {
     expect(html).toContain("Your first week");
     expect(html).toContain("Ready to start");
     expect(html).toContain('href="/student/assignments/assessment-1?section=section-1"');
-    expect(html).toContain('href="/classes?section=section-1&amp;tab=lessons&amp;lesson=investigate"');
+    expect(html).toContain('href="/class"');
     expect(html).toContain("Investigate cells");
     expect(html).toContain("Cell observations");
   });

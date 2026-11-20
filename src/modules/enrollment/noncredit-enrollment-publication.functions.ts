@@ -38,6 +38,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
     trainingTitle:noncreditTrainingVersions.title,
     courseVersionId:courseVersions.id,
     offeringId:offerings.id,
+    offeringCode:offerings.code,
     assessmentVersionId:noncreditTrainingVersions.assessmentVersionId,
     providerOrganizationId:noncreditTrainingVersions.providerOrganizationId,
     providerName:canonicalEnrollmentOrganizations.displayName,
@@ -173,6 +174,7 @@ export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
       id:noncreditSelfEnrollmentReleases.id,
       deploymentId:noncreditSelfEnrollmentReleases.deploymentId,
       title:noncreditTrainingVersions.title,
+      offeringCode:offerings.code,
       status:noncreditSelfEnrollmentReleases.status,
       deliveryMode:noncreditSelfEnrollmentReleases.deliveryMode,
       siteId:noncreditSelfEnrollmentReleases.siteId,
@@ -182,6 +184,9 @@ export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
     }).from(noncreditSelfEnrollmentReleases)
       .innerJoin(noncreditTrainingVersions,eq(
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
+      .innerJoin(offeringVersions,eq(
+        offeringVersions.id,noncreditTrainingVersions.offeringVersionId))
+      .innerJoin(offerings,eq(offerings.id,offeringVersions.offeringId))
       .where(and(
         eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
         // A Site Admin can see only releases for their authorized Sites.

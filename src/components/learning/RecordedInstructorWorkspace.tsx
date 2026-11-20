@@ -1,3 +1,4 @@
+import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -300,6 +301,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
             key={`${courseAttemptId}:${instruction.selection.trackVersionId}:${presentation.assetVersionId}`}
             title={`${currentLesson.title} recording`}
             resourceId={presentation.assetVersionId}
+            resumeKey={courseAttemptId}
             onPlaybackEvent={(kind, resourceId) => observe(kind, currentLesson.id, resourceId)}
              onVideoEngagement={durationMs => observeNativeVideo(currentLesson.id, durationMs)}
             loadUrl={async () => (await getRecordedInstructionAssetDownload({ data: {
@@ -328,7 +330,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
           <h4 className="font-semibold">Supplemental practice</h4>
           <p className="text-sm">{material.practice?.instructions}</p>
           {material.practice?.prompts.map(prompt => <Field key={prompt.key} label={prompt.text}>
-            <Textarea className="min-h-24 w-full border bg-background p-3" required maxLength={20_000}
+            <Textarea className="min-h-24" required maxLength={20_000}
               value={answers[`${material.id}:${prompt.key}`] ?? ""}
               disabled={pending} onChange={event => setAnswers(current => ({
                 ...current,
@@ -390,11 +392,11 @@ export function RecordedLessonCompletionAction({ allowed, completed, waived, pen
 }
 
 export function RecordedOfficialCourseLinks({ sectionId }: { sectionId: string }) {
-  return <nav aria-label="Official course records" className="flex flex-wrap gap-4 border bg-card p-4 text-sm">
-    <Link to="/classes" search={{ section: sectionId, tab: "lessons" }} className="underline">Official class lessons</Link>
+  return <WorkspaceLinkNavigation label="Official course records">
+    <Link to="/class"  className="underline">Official class lessons</Link>
     <Link to="/student/assignments" search={{ section: sectionId }} className="underline">Assignments and feedback</Link>
     <Link to="/student/courses" search={{ section: sectionId, tab: "grades" }} className="underline">Grades</Link>
-  </nav>;
+  </WorkspaceLinkNavigation>;
 }
 
 export function RecordedPracticeHistory({ history }: { history: PracticeHistory }) {

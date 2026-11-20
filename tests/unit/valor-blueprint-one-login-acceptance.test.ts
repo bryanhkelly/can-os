@@ -11,7 +11,7 @@ describe("Valor single CAN login and independent Blueprint acceptance contracts"
   const blueprintRunner=read("scripts/acceptance/run-valor-blueprint-roles-test01.mjs");
   const issuerFixture=read("database/canonical/v3.0.1/accept-sensitive-credential-issuer-test01.sql");
 
-  it("authoring requires one original CAN Site Admin session with reviewed identity link",()=>{
+  it("private authoring uses the verified CAN Site grant; independent review stays separate",()=>{
     expect(bridge).toContain("resolveCanonicalSiteStaffFromCan(actor, request)");
     for(const endpoint of [
       "createCanonicalBlueprintConfiguration",
@@ -20,7 +20,12 @@ describe("Valor single CAN login and independent Blueprint acceptance contracts"
       "decideCanonicalBlueprintReview",
       "executeCanonicalBlueprintConfiguration",
     ])expect(blueprint).toContain(endpoint);
+    expect(blueprint).toContain("getBlueprintPlanningContext(getRequest())");
     expect(blueprint).toContain("getCanonicalCommandContext(getRequest())");
+    const privatePlanning=read("src/modules/blueprints/verified-site-planning.server.ts");
+    expect(privatePlanning).toContain("getIdentityContext(request)");
+    expect(privatePlanning).toContain("assertVerifiedCanPlanningSite");
+    expect(privatePlanning).not.toContain("canonical_account_grants");
     expect(staffFixture).toContain("v301_can_staff_session_context(repeat('a',64))");
     expect(staffFixture).toContain("second CAN Person grant was not rejected");
     expect(staffFixture).toContain("ROLLBACK TO SAVEPOINT can_staff_sso_accept");

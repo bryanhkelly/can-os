@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { DirectoryWindowPagination } from "@/components/workspace/directory-window-pagination";
 import { StatusTimeline } from "@/components/workflow";
 import { readCanonicalBlueprintReviewHistory } from "@/modules/blueprints/blueprint-studio.functions";
 
@@ -49,12 +50,9 @@ export function BlueprintReviewHistoryPanel({ configurationVersionId }: {
         </div>,
       }))}/>}
     {history.data && (page > 0 || history.data.hasMore) &&
-      <nav aria-label="Blueprint review history pages" className="flex flex-wrap items-center gap-3 text-sm">
-        <Button type="button" size="sm" variant="outline" disabled={page === 0}
-          onClick={() => setPage(value => Math.max(0, value - 1))}>Newer</Button>
-        <span>Page {page + 1}</span>
-        <Button type="button" size="sm" variant="outline" disabled={!history.data.hasMore || page >= 100}
-          onClick={() => setPage(value => value + 1)}>Older</Button>
-      </nav>}
+      <DirectoryWindowPagination label="Blueprint review history"
+        pageIndex={page} hasMore={history.data.hasMore && page < 100}
+        previousLabel="Newer" nextLabel="Older" disabled={history.isFetching}
+        onPageChange={setPage} />}
   </section>;
 }

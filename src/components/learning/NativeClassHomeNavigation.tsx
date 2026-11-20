@@ -11,7 +11,7 @@ type Props = {
   offeringVersionId?: string;
 };
 
-/** One route, two sections. Menu visibility is a UX hint only: server
+/** One Class route with role-aware views. Menu visibility is a UX hint only: server
  * commands independently verify role, adoption, Site, and Class authority. */
 export function NativeClassHomeNavigation({
   mode, siteId, search, classId, offeringVersionId,
@@ -23,7 +23,7 @@ export function NativeClassHomeNavigation({
   // not a general Class/Site management capability.
   const canAuthorContent = (grant?.role as string|undefined)==="academic_content_creator";
   const canReviewContent = (grant?.role as string|undefined)==="academic_content_reviewer";
-  return <DetailNavigation label="Class workspace sections" variant="record">
+  return <DetailNavigation label="Class workspace" variant="record">
     <Link to="/class" search={{siteId,search,classId,view:undefined}}
       aria-current={mode==="explore"?"page":undefined}>
       Explore and enroll

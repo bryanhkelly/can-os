@@ -77,10 +77,10 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
               </StatusBadge>
             </div>
             {!request.programActive && (
-              <p className="mt-3 text-sm text-amber-700">The student's program enrollment is no longer active.</p>
+              <p className="mt-3 text-sm text-warning">The student's program enrollment is no longer active.</p>
             )}
             {request.deadlinePassed && (
-              <p className="mt-3 text-sm text-amber-700">The registration deadline has passed.</p>
+              <p className="mt-3 text-sm text-warning">The registration deadline has passed.</p>
             )}
             {request.operation === "add" && !request.contentReady && <div className="mt-3  border p-3 text-sm">
               <p className="font-semibold">Next: school curriculum setup</p>

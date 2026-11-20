@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
+import { getClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
 import {
   getClassroomHostActivity, releaseClassroomActivity, closeClassroomActivity,
 } from "@/modules/learning/classroom-evidence.functions";
@@ -23,6 +24,8 @@ export function ClassroomFacilitatorConsole({
   const [prompt, setPrompt] = useState("");
   const [kind, setKind] = useState<"single_choice" | "text">("single_choice");
   const [choicesText, setChoicesText] = useState("Yes\nNo");
+  const [failedCommands,setFailedCommands]=useState(0);
+  const [lastLocalCommand,setLastLocalCommand]=useState("");
   // Preserve one request identity across uncertain network failures.
   // A new prompt/options payload receives its own activity identity.
   const activityRequests = useRef(new Map<string, string>());
@@ -30,6 +33,11 @@ export function ClassroomFacilitatorConsole({
     queryKey: ["classroom-host-activities", facilitatedSessionId],
     queryFn: () => getClassroomHostActivity({ data: { facilitatedSessionId } }),
     staleTime: 0, refetchInterval: 8000, retry: false,
+  });
+  const projector=useQuery({
+    queryKey:["classroom-projector-control",facilitatedSessionId],
+    queryFn:()=>getClassroomProjectorCommand({data:{facilitatedSessionId}}),
+    staleTime:0,refetchInterval:8000,retry:false,
   });
   const feedback = useMutationFeedback(() => room.refetch({throwOnError:true}));
   const busy = feedback.pending || feedback.refreshFailed;
@@ -79,6 +87,44 @@ export function ClassroomFacilitatorConsole({
         <p className="mt-2 font-serif text-2xl font-semibold tabular-nums">{room.data.activeDevicesEstimate}</p>
       </div>
     </div>}
+    <section className="border border-border bg-card p-4" aria-label="Classroom connection health">
+      <h5 className="text-sm font-semibold">Classroom health</h5>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3 text-sm">
+        <p><strong>Room:</strong> {room.isError?"Access not verified":room.isPending?"Checking…":currentState}</p>
+        <p><strong>Latest check:</strong> {room.isError?"Failed":room.isFetching?"Refreshing…":
+          room.dataUpdatedAt?new Date(room.dataUpdatedAt).toLocaleTimeString():"Not yet checked"}</p>
+        <p><strong>Local projector errors:</strong> {failedCommands} (this open console)</p>
+        <p><strong>Last local command:</strong> {lastLocalCommand||"None"}</p>
+        <p><strong>Projector commands:</strong> {projector.isError?"Unavailable":
+          projector.isPending?"Checking…":
+          projector.data.roomState!=="live"?"Stopped ("+projector.data.roomState+")":
+          projector.data.latest?"Last request: "+projector.data.latest.commandKind:
+          "No commands yet"}</p>
+        <p><strong>Activity:</strong> {room.isSuccess?
+          room.data.releases.filter(release=>!release.closed).length+" open, "+
+          room.data.releases.reduce((count,release)=>count+release.responseEvents,0)+" response events":
+          "Unavailable"}</p>
+      </div>
+      {projector.isError&&<p role="alert" className="mt-2 text-sm text-destructive">
+        The latest projector command could not be verified. This is not a playback confirmation.
+      </p>}
+      {projector.isSuccess&&projector.data.roomState==="blocked"&&<p role="alert" className="mt-2 text-sm text-destructive">
+        Projector authorization is blocked. Recheck audience enrollment and recording rights.
+      </p>}
+      {room.isError&&<p role="alert" className="mt-2 text-sm text-destructive">
+        Current facilitator or room access cannot be verified. Do not rely on previous counts or command states.
+      </p>}
+      {room.isSuccess&&room.data.partial&&<p role="status" className="mt-2 text-xs">
+        Counts are partial because this room exceeds the bounded summary.
+      </p>}
+      <p className="mt-2 text-xs text-muted-foreground">
+        Device activity is an estimate, not attendance, proof of watching, or delivery confirmation.
+        Projector command acknowledgements are separate from confirmed playback observations.
+      </p>
+      <Button type="button" size="sm" variant="outline" className="mt-3"
+        disabled={room.isFetching}
+        onClick={()=>{void room.refetch();void projector.refetch();}}>Recheck classroom health</Button>
+    </section>
     {room.isSuccess && room.data?.partial && <p role="status" className="text-xs text-muted-foreground">
       This room exceeded the bounded live summary. The counts shown are partial.
     </p>}
@@ -87,7 +133,11 @@ export function ClassroomFacilitatorConsole({
       physical attendance, video consumption, academic grades or completion.
     </p>
     {isLive && <ClassroomPlaybackControls facilitatedSessionId={facilitatedSessionId}
-      preferredLessonIds={preferredLessonIds}/>}
+      preferredLessonIds={preferredLessonIds}
+      onCommandStatus={(status,kind)=>{
+        setLastLocalCommand(kind+" "+(status==="accepted"?"accepted":"refused"));
+        if(status==="failed")setFailedCommands(count=>count+1);
+      }}/>}
     {room.isSuccess && room.data && !isLive && <p role="status" className="border border-border p-4 text-sm">
       This classroom is {currentState}. New prompts and playback controls are closed.
     </p>}

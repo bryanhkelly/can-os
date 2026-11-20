@@ -7,12 +7,13 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
-import { WorkspaceShell, RosterList } from "@/components/workspace";
+import { DetailNavigation, SectionTab, WorkspaceShell, RosterList } from "@/components/workspace";
 import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
 import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline";
 import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
+import { NativeClassActivationStatus } from "@/components/learning/NativeClassActivationStatus";
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
@@ -69,28 +70,24 @@ const viewLabels:Record<ClassView,string>={
 };
 
 function ClassNavigation({workspace}:{workspace:Workspace}){
-  return <nav aria-label="Class navigation" className="border-b border-border bg-card">
-    <div className="flex flex-wrap gap-1 border-b border-border p-2">
-      {workspace.availableViews.map(view=><Link key={view} to="/class/$classId"
-        params={{classId:workspace.classId}}
-        search={{view,tab:undefined,lesson:undefined,session:undefined}}
-        aria-current={view===workspace.view?"page":undefined}
-        className={"px-3 py-2 text-sm font-semibold "+
-          (view===workspace.view?"bg-primary text-primary-foreground":"hover:bg-muted")}>
+  return <div className="space-y-2">
+    <DetailNavigation label="Class views" variant="record">
+      {workspace.availableViews.map(view=><SectionTab key={view}
+        current={view===workspace.view}
+        link={{to:"/class/$classId",params:{classId:workspace.classId},
+          search:{view,tab:undefined,lesson:undefined,session:undefined}}}>
         {viewLabels[view]}
-      </Link>)}
-    </div>
-    <div className="flex flex-wrap gap-1 p-2">
-      {workspace.availableTabs.map(tab=><Link key={tab} to="/class/$classId"
-        params={{classId:workspace.classId}}
-        search={{view:workspace.view,tab,lesson:undefined,session:undefined}}
-        aria-current={workspace.tab===tab?"page":undefined}
-        className={"px-3 py-2 text-sm "+
-          (workspace.tab===tab?"border-b-2 border-primary font-semibold":"text-muted-foreground hover:text-foreground")}>
+      </SectionTab>)}
+    </DetailNavigation>
+    <DetailNavigation label="Class details" variant="record">
+      {workspace.availableTabs.map(tab=><SectionTab key={tab}
+        current={workspace.tab===tab}
+        link={{to:"/class/$classId",params:{classId:workspace.classId},
+          search:{view:workspace.view,tab,lesson:undefined,session:undefined}}}>
         {tabLabels[tab]??tab}
-      </Link>)}
-    </div>
-  </nav>;
+      </SectionTab>)}
+    </DetailNavigation>
+  </div>;
 }
 function OneClassWorkspace(){
   const {classId}=Route.useParams();
@@ -437,6 +434,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           <p className="mt-3 text-sm text-muted-foreground">
             One Course version, one Class identity, one enrollment model. Official grades and awards remain individual, authorized outcomes.
           </p>
+          <div className="mt-5"><NativeClassActivationStatus classId={workspace.classId}/></div>
         </>}
         {workspace.tab==="offering"&&<>
           <h2 className="font-serif text-2xl">Class Offering</h2>
@@ -470,7 +468,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             <Textarea id="class-approval-reason" value={reviewReason}
               maxLength={1000} onChange={event=>setReviewReason(event.target.value)}
               placeholder="Record the independent eligibility review and reason for approving or rejecting"
-              className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
+              className="mt-2"/>
             <ul className="mt-3 space-y-2">
               {approvals.data?.map(item=><li key={item.approvalRequestId}
                 className="border border-border p-3 text-sm">
@@ -501,7 +499,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             <Textarea id="class-repeat-reason" maxLength={1000} value={repeatReason}
               onChange={e=>setRepeatReason(e.target.value)}
               placeholder="Document the independent reason for allowing the learner to repeat this completed Class"
-              className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
+              className="mt-2"/>
             <ul className="mt-3 space-y-2">
               {repeats.data?.map(item=><li key={item.completionOutcomeId}
                 className="border border-border p-3 text-sm">
@@ -528,7 +526,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </Label>
             <Select id="class-assign-learner" value={learnerPersonId}
               onChange={event=>setLearnerPersonId(event.target.value)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11">
               <option value="">Choose an authorized learner</option>
               {workspace.learnerCandidates.map(person=><option
                 key={person.personId} value={person.personId}>{person.name}</option>)}
@@ -538,7 +536,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </Label>
             <Select id="class-assign-credit" value={learnerCreditMode}
               onChange={event=>setLearnerCreditMode(event.target.value as typeof learnerCreditMode)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11">
               <option value="not_applicable">No academic credit</option>
               <option value="audit">Audit</option>
             </Select>
@@ -589,7 +587,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         {workspace.siteId?<div className="mt-4 space-y-3">
           <Label htmlFor="class-staff-person" className="block text-sm font-semibold">Verified Site staff</Label>
           <Select id="class-staff-person" value={staffPersonId} onChange={e=>setStaffPersonId(e.target.value)}
-            className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+            className="min-h-11">
             <option value="">Select an authorized person</option>
             {workspace.staffCandidates.map(person=><option key={person.personId} value={person.personId}>
               {person.name}
@@ -597,7 +595,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           </Select>
           <Label htmlFor="class-staff-role" className="block text-sm font-semibold">Class responsibility</Label>
           <Select id="class-staff-role" value={staffRole} onChange={e=>setStaffRole(e.target.value as typeof staffRole)}
-            className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+            className="min-h-11">
             <option value="facilitator">Facilitator</option>
             <option value="teacher">Class teacher</option>
           </Select>

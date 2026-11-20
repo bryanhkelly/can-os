@@ -2,17 +2,16 @@ import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, ClipboardList, CalendarDays, MessageCircle, School, Users } from "lucide-react";
+import { BookOpen, ClipboardList, CalendarDays, MessageCircle, School, Users } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
-import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
+import { TeacherLearningParticipationPanel } from "@/components/teacher/TeacherLearningParticipationPanel";
+import { TeacherNextActionPanel } from "@/components/teacher/TeacherNextActionPanel";
 import { TeacherLearningFollowUpsPanel } from "@/components/learning/TeacherLearningFollowUpsPanel";
 import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePanel";
 import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
 import { TeacherDaySchedule } from "@/components/teacher/TeacherDaySchedule";
 import { StatCard, EmptyState } from "@/components/workspace";
-import { Button } from "@/components/ui/button";
-import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
@@ -63,8 +62,8 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
   firstName={ready ? data.teacher.firstName : null}
   subtitle="Your sections, grading queue, and missing work across your school today."
   shortcuts={<>
-    <DashboardShortcut title="My classes" description="Open your assigned sections" icon={<BookOpen className="size-5" />}>
-     <Link to="/classes" />
+    <DashboardShortcut title="My classes" description="Open your assigned Classes" icon={<BookOpen className="size-5" />}>
+     <Link to="/class" />
     </DashboardShortcut>
     <DashboardShortcut title="Study groups" description="Facilitate sessions and group discussion" icon={<Users className="size-5" />}>
      <Link to="/groups" />
@@ -92,36 +91,14 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
 
    {ready && <>
     <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Today summary">
-     <StatCard asChild label="Sections" value={data.sections.length}><Link to="/classes" /></StatCard>
+     <StatCard asChild label="Classes" value={data.sections.length}><Link to="/class" /></StatCard>
      <StatCard asChild label="Needs grading" value={data.ungradedCount}><Link to="/teacher/gradebook" /></StatCard>
      <StatCard asChild label="Missing work" value={data.missingWorkCount}><Link to="/teacher/missing-work" /></StatCard>
      <StatCard asChild label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length}><a href="#grade-follow-ups" /></StatCard>
     </div>
 
-    <DashboardPanel title="What needs you next" className="mt-7">
-      {data.ungradedCount>0 ? <div className="mt-3">
-        <p className="font-semibold">{data.ungradedCount} submitted work item{data.ungradedCount===1?"":"s"} to review</p>
-        <p className="mt-1 text-sm text-muted-foreground">Start with a submission from your current assigned sections.</p>
-        <Button asChild size="lg" className="mt-3">
-          {nextUngraded
-            ? <Link to="/teacher/gradebook" search={{section:nextUngraded.sectionId,assessment:nextUngraded.assessmentId,student:nextUngraded.studentProfileId}}>
-                Grade next submission <ArrowUpRight aria-hidden="true" className="size-4"/>
-              </Link>
-            : <Link to="/teacher/gradebook">
-                Open grading queue <ArrowUpRight aria-hidden="true" className="size-4"/>
-              </Link>}
-        </Button>
-      </div> : data.missingWorkCount>0 ? <div className="mt-3">
-        <p className="font-semibold">{data.missingWorkCount} missing-work follow-up{data.missingWorkCount===1?"":"s"}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Review missing work and follow up with students through the existing teacher workflow.</p>
-        <Button asChild size="lg" className="mt-3">
-          <Link to="/teacher/missing-work">Review missing work <ArrowUpRight aria-hidden="true" className="size-4"/></Link>
-        </Button>
-      </div> : <div className="mt-3">
-        <p className="text-sm text-muted-foreground">No grading or missing-work items in the current snapshot. Review your schedule and prepare your next class.</p>
-        <Link to="/classes" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Open my classes →</Link>
-      </div>}
-    </DashboardPanel>
+    <TeacherNextActionPanel ungradedCount={data.ungradedCount} missingWorkCount={data.missingWorkCount}
+      nextUngraded={nextUngraded} />
 
     <section className="mt-10">
      <p className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">My sections</p>
@@ -137,35 +114,8 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
 
     <TeacherGradeResponsesPanel selectedAction={gradeAction} onQuestionsChange={onQuestionsChange}/>
 
-    <section className="mt-10" aria-label="Observed learning participation">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Learning participation</p>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Verified CAN OS interaction evidence from your assigned sections, not attendance, grades or a diagnosis of disengagement.
-        Uninstrumented and offline learning may not appear.
-      </p>
-      {activityError && <p role="status" className="mt-3 text-sm">{activityError}</p>}
-      {!activity && !activityError && <p role="status" className="mt-3 text-sm">Loading observed activity…</p>}
-      {activity && <>
-        <p className="mt-2 text-xs text-muted-foreground">{activity.note}</p>
-        {activity.truncated && <p className="mt-2 text-xs">Large roster: showing a limited evidence sample.</p>}
-        <div className="mt-4 grid gap-3">
-          {activity.students.filter(student => student.observedEvents7d > 0).slice(0, 12).map(student =>
-            <article key={student.sectionId + ":" + student.studentProfileId} className="border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground">{student.sectionTitle}</p>
-              <Link to="/staff/students/$personId" params={{ personId: student.studentPersonId }} className="mt-1 block font-semibold underline">{student.studentName}</Link>
-              <p className="mt-1 text-xs text-muted-foreground">{student.observedEvents7d} recorded interactions in 7 days
-                · latest {student.latestObservedAt ? new Date(student.latestObservedAt).toLocaleString() : "not recorded"}
-                · up to {Math.round(student.estimatedActiveMs7d / 60_000)} min estimated active time</p>
-              {student.latestEventId && <TeacherLearningFollowUpForm
-                sectionId={student.sectionId} studentProfileId={student.studentProfileId}
-                learningEventId={student.latestEventId} onCreated={() => setFollowUpRevision(value => value + 1)} />}
-            </article>)}
-          {!activity.students.some(student => student.observedEvents7d > 0) &&
-            <p className="text-sm">No interaction evidence has been collected for these classes yet. This does not mean students have not been learning.</p>}
-        </div>
-        <p className="mt-3 text-sm">Use existing <Link to="/teacher/missing-work" className="underline">missing-work follow-up</Link> and authorized support referrals for human-reviewed interventions.</p>
-      </>}
-    </section>
+    <TeacherLearningParticipationPanel activity={activity} error={activityError}
+      onCreated={() => setFollowUpRevision(value => value + 1)} />
 
     <TeacherLearningFollowUpsPanel revision={followUpRevision} />
     <TeacherConferencePanel />

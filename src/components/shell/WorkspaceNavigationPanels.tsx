@@ -49,8 +49,8 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
       </ContextTray>
       <ContextTray title="Ask CAN" open={tray === "ask"} onClose={onCloseTray}>
         <p className="text-sm text-muted-foreground">Your conversations follow you between workspaces. Answers and proposed actions use your verified permissions; this page does not expand them.</p>
-        <Link to="/ask" onClick={onCloseTray} className={`mt-2 inline-block rounded-sm text-sm underline ${focusRingClass}`}>Open full conversation page</Link>
-        {member.role === "guardian" && <Link to="/guardian/watching" onClick={onCloseTray} className={`ml-4 inline-block rounded-sm text-sm underline ${focusRingClass}`}>Things CAN Is Watching</Link>}
+        <Link to="/ask" onClick={onCloseTray} className={`mt-2 inline-block  text-sm underline ${focusRingClass}`}>Open full conversation page</Link>
+        {member.role === "guardian" && <Link to="/guardian/watching" onClick={onCloseTray} className={`ml-4 inline-block  text-sm underline ${focusRingClass}`}>Things CAN Is Watching</Link>}
         <Suspense fallback={<p role="status">Loading Ask CAN...</p>}>
           <AskCanConversation />
         </Suspense>

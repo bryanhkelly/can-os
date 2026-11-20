@@ -9,6 +9,7 @@ import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSiteSetupScope, assertSiteLocationProgramScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
+import { resolveSiteGeographicAreaId } from "./site-geographic-area.server";
 import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations, schoolYears, calendarEvents } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
 
@@ -43,8 +44,10 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       assertSiteSetupScope(actor,site,"program.launch.start");
       const oldAddress=site.address??null;
       const address=data.address;
+      const geographicAreaId=await resolveSiteGeographicAreaId(tx,address);
       const same=samePhysicalSiteAddress(oldAddress,address);
-      if(same && typeof site.metadata.sitePhysicalAddressRevision==="string")
+      if(same && site.geographicAreaId===geographicAreaId &&
+          typeof site.metadata.sitePhysicalAddressRevision==="string")
         return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString(),reviewRequested:false};
       if(site.updatedAt.toISOString()!==data.expectedRevision)
         throw new DomainError("CONFLICT", "Site revision has changed.");
@@ -78,7 +81,8 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         throw new DomainError("SITE_LOCATION_AMENDMENT_REQUIRED");
       const nextRevision=nextSiteConfigurationRevision(site.updatedAt);
       const [changed]=await tx.update(sites).set({
-        address,metadata:{...site.metadata,sitePhysicalAddressRevision:nextRevision.toISOString()},
+        address,geographicAreaId,
+        metadata:{...site.metadata,sitePhysicalAddressRevision:nextRevision.toISOString()},
         updatedAt:nextRevision,
       }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
       if(!changed)throw new Error("Unable to save Site configuration");
@@ -113,7 +117,8 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       await writeAudit(tx,actor,{
         action:"site.location.update",entityType:"site",entityId:site.id,
         scope:{organizationId:site.organizationId,siteId:site.id},
-        before:{address:oldAddress},after:{address,reason:data.changeReason,
+        before:{address:oldAddress,geographicAreaId:site.geographicAreaId},
+        after:{address,geographicAreaId,reason:data.changeReason,
           reviewRequired:attached.length>0},
       });
       return {siteId:site.id,updated:true,revision:changed.updatedAt.toISOString(),

@@ -1,5 +1,6 @@
 import { isValidElement, type EffectCallback, type ReactElement, type ReactNode, type SetStateAction } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Button } from "@/components/ui/button";
 import { GuardianPickupPanel } from "@/components/operations/GuardianPickupPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
 import { MutationFeedback } from "@/components/workspace";
@@ -35,6 +36,7 @@ vi.mock("react", async original => ({
 
 type Props = {
   children?: ReactNode; disabled?: boolean; onClick?: () => void;
+  "aria-label"?: string;
   state?: { pending: boolean; refreshFailed: boolean; retryRefresh: () => Promise<unknown> };
 };
 function nodes(node: ReactNode): ReactElement<Props>[] {
@@ -64,7 +66,7 @@ describe.each([
     return nodes(panel());
   }
   function button(label: string) {
-    const result = render().find(node => node.type === "button" && node.props.children === label);
+    const result = render().find(node => node.type === Button && node.props.children === label);
     if (!result) throw new Error(`Missing pickup control: ${label}`);
     return result;
   }
@@ -97,7 +99,7 @@ describe.each([
     state.read.mockRejectedValueOnce(new Error("Refresh unavailable"));
     button(second).props.onClick?.(); await settled();
     expect(feedback().refreshFailed).toBe(true);
-    expect(render().some(node => node.type === "button" &&
+    expect(render().some(node => node.type === Button &&
       [first, second].includes(String(node.props.children)) && !node.props.disabled)).toBe(false);
     await feedback().retryRefresh();
     expect(feedback().refreshFailed).toBe(false);
@@ -109,4 +111,90 @@ describe.each([
     expect(state.second).toHaveBeenCalledTimes(2);
     expect(state.second.mock.calls[0][0].data.mutationId).not.toBe(state.second.mock.calls[1][0].data.mutationId);
   });
+});
+
+it("never presents an out-of-order pickup roster from a previous school date", async () => {
+  let resolveFirst!: (value: unknown) => void;
+  const firstDay = new Promise<unknown>(resolve => { resolveFirst = resolve; });
+  state.read.mockImplementation(({ data }: { data: { date: string } }) =>
+    data.date === "2030-01-01"
+      ? firstDay
+      : Promise.resolve({
+          students: [{ ...student, studentName: "Next Date Student" }],
+          canRecordPickupObservations: true, note: "Second date",
+        }));
+
+  function renderDate(date: string) {
+    state.cursor = 0;
+    state.effects = [];
+    const elements = nodes(OnsitePickupPanel({ date }));
+    return { elements, effects: [...state.effects] };
+  }
+
+  const older = renderDate("2030-01-01");
+  const cleanups = older.effects.map(effect => effect());
+  const newer = renderDate("2030-01-02");
+  cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); });
+  newer.effects.forEach(effect => effect());
+
+  await vi.waitFor(() => expect(renderDate("2030-01-02").elements
+    .some(element => element.props["aria-label"] === "Pickup for Next Date Student")).toBe(true));
+
+  resolveFirst({
+    students: [{ ...student, studentName: "Previous Date Student" }],
+    canRecordPickupObservations: true, note: "First date",
+  });
+  // Let the delayed request settle; it must not replace the verified roster.
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const current = renderDate("2030-01-02").elements;
+  expect(current.some(element => element.props["aria-label"] === "Pickup for Next Date Student")).toBe(true);
+  expect(current.some(element => element.props["aria-label"] === "Pickup for Previous Date Student")).toBe(false);
+  // A prop change must hide the previously verified roster immediately,
+  // without waiting for the date-change effect or another network round-trip.
+  expect(renderDate("2030-01-03").elements.some(element =>
+    element.props["aria-label"] === "Pickup for Next Date Student")).toBe(false);
+});
+
+it("never presents an out-of-order guardian workspace after switching children", async () => {
+  let resolveOld!: (value: unknown) => void;
+  const previousChild = new Promise<unknown>(resolve => { resolveOld = resolve; });
+  state.read.mockImplementation(({ data }: { data: { studentPersonId?: string } }) =>
+    data.studentPersonId === "child-old"
+      ? previousChild
+      : Promise.resolve({
+          students: [{ ...student, studentName: "Current Child" }],
+          note: "Current child's verified authority",
+        }));
+
+  function renderChild(studentPersonId: string) {
+    state.cursor = 0;
+    state.effects = [];
+    const elements = nodes(GuardianPickupPanel({ studentPersonId }));
+    return { elements, effects: [...state.effects] };
+  }
+
+  const old = renderChild("child-old");
+  const cleanups = old.effects.map(effect => effect());
+  const current = renderChild("child-current");
+  cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); });
+  current.effects.forEach(effect => effect());
+
+  await vi.waitFor(() => expect(renderChild("child-current").elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Current Child")).toBe(true));
+
+  resolveOld({
+    students: [{ ...student, studentName: "Previous Child" }],
+    note: "Previous child's verified authority",
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  const elements = renderChild("child-current").elements;
+  expect(elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Current Child")).toBe(true);
+  expect(elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Previous Child")).toBe(false);
+  // Child-selection changes must not display another child's family authority
+  // for even a single render before React's effects run.
+  expect(renderChild("child-third").elements.some(element =>
+    element.props["aria-label"] === "Pickup authority for Current Child")).toBe(false);
 });

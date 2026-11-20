@@ -93,7 +93,13 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
       eq(learnerCourseAttempts.id,enrollment.courseAttemptId),
       eq(learnerCourseAttempts.classEnrollmentId,enrollment.id),
     )).limit(1);
-  if (!attempt || attempt.enrollmentId || attempt.noncreditRegistrationId ||
+  // When this Class is a delivery of a separately registered noncredit
+  // Course, the original Course registration remains the ONLY formal
+  // completion authority. Native Class attendance may contribute evidence,
+  // but must not issue an independent competing completion/award decision.
+  if(attempt?.noncreditRegistrationId)
+    throw new AuthorizationError("Complete this Course through its registered noncredit completion policy");
+  if (!attempt || attempt.enrollmentId ||
       attempt.sectionId || attempt.deploymentId!==cls.deploymentId ||
       attempt.adoptionId!==cls.adoptionId ||
       attempt.offeringVersionId!==cls.offeringVersionId ||

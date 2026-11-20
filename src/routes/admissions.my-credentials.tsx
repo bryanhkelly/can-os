@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { downloadBase64 } from "@/lib/download";
 import {useRef,useState} from "react";
@@ -20,17 +21,17 @@ function MyCredentials(){
  }catch(e){setError(mutationErrorMessage(e, "Download denied"))}finally{inFlight.current=false;setDownloading(false)}}
  return <WorkspaceShell eyebrow="Records" title="My official credentials" subtitle="Secure, time-limited access to records authorized for your verified account.">
   <div className="space-y-4 py-6">
-   {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
-   <button type="button" className="rounded-lg border px-3 py-2" disabled={busy} onClick={()=>void query.refetch()}>Refresh authorizations</button>
+   {error&&<p role="alert" className=" border p-3">{error}</p>}
+   <Button variant="outline" type="button"  disabled={busy} onClick={()=>void query.refetch()}>Refresh authorizations</Button>
    <QueryState loading={query.isPending?"Loading your records...":undefined}
     error={query.isError?mutationErrorMessage(query.error,"Unable to load your records"):undefined}
     onRetry={()=>void query.refetch()} retrying={busy}
     isEmpty={!releases.length} empty={<p className="text-sm text-muted-foreground">No active official-record releases are available for your account.</p>}>
-   {releases.map(row=><article key={row.id} className="space-y-2 rounded-xl border p-4">
+   {releases.map(row=><article key={row.id} className="space-y-2  border p-4">
     <h2 className="font-semibold">{row.transcriptId?"Official transcript":"Diploma"}</h2>
     <p className="text-sm">Purpose: {row.purpose}</p>
     <p className="text-sm">Access expires {new Date(row.expiresAt).toLocaleString()}</p>
-    <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void download(row.id)}>Download authorized PDF</button>
+    <Button variant="outline" type="button" disabled={busy}  onClick={()=>void download(row.id)}>Download authorized PDF</Button>
    </article>)}
    </QueryState>
   </div>
