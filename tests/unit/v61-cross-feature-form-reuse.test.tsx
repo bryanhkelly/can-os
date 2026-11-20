@@ -55,6 +55,33 @@ describe("V6.1 cross-feature form composition", () => {
     expect(source).not.toContain('layout="inline" className="justify-between border-t');
   });
 
+  it.each([
+    "src/routes/messages.tsx",
+    "src/routes/operations.family-alerts.tsx",
+    "src/routes/operations.curriculum.tsx",
+    "src/routes/guardian.enrichment.tsx",
+    "src/routes/operations.field-trips.tsx",
+    "src/routes/guardian.health.tsx",
+    "src/routes/platform.tsx",
+  ])("preserves canonical submit actions in migrated routes: %s", filePath => {
+    const source = readFileSync(new URL(`../../${filePath}`, import.meta.url), "utf8");
+    expect(source).toContain("<ActionFooter");
+    expect(source).toContain('type="submit"');
+    expect(source).not.toMatch(/<button\b/);
+  });
+
+  it("avoids custom Field Trip input labels and style overrides", () => {
+    const source = readFileSync(
+      new URL("../../src/routes/operations.field-trips.tsx", import.meta.url), "utf8",
+    );
+    expect(source).toContain('<Field label="Trip title" required>');
+    expect(source).toContain('<Field label="Destination" required>');
+    expect(source).toContain('label="School-approved guardian permission statement"');
+    expect(source).toContain('label="Invite an enrolled student"');
+    expect(source).not.toMatch(/<Label\b/);
+    expect(source).not.toContain('className="mt-1 block w-full  border bg-background p-2"');
+  });
+
   it("keeps classroom location labels and controls on the shared Field contract", () => {
     const source = readFileSync(
       new URL("../../src/components/operations/SchoolRoomsSetup.tsx", import.meta.url), "utf8",
