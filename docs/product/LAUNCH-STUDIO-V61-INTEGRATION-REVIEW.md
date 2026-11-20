@@ -371,3 +371,65 @@ normal Site planning path with approval/deployment role provisioning.
   acceptance. Authenticated browser and RLS/role tests remain necessary.
 - **Scope:** Feature branch only. No production writes, new schema, approval
   grants, website release or enrollment activation.
+
+
+## Functional and security follow-up (November 19, 2026)
+
+The source branch now includes the following integration changes, all written
+against existing Site, Blueprint and Program authorities:
+
+1. **Retired Program references:** Establish retains previously saved catalog
+   codes and displays an explicit Remove reference control for items missing
+   from the currently published catalog. The server allows removal but
+   validates newly added references against the published catalog inside the
+   locked Site update transaction.
+2. **Source-derived next action:** Launch Overview reads saved Site Information,
+   Programs & Audiences, current Brand, Marketing Packages and reserved website
+   draft. Missing and unavailable sources are distinct; no page visit is
+   treated as task completion. The navigation sidebar presents the canonical
+   Site lifecycle rather than a fixed Preparing label. Preview availability
+   requires an actual saved website address.
+3. **Operational readback:** Prepare and Open use a shared read-only component
+   showing existing Solution configuration drafts/submissions, current Program
+   launch requirements and their actual incomplete blockers, and Site
+   website publication. An unavailable read fails closed with a visible
+   unknown state. Neither Solution plan submission nor a Program requirement
+   count is an Offering enrollment authorization. The receiving Program/Class
+   services still own activation.
+4. **Unsaved navigation:** Launch Studio and Website & Brand mount the shared
+   focus-managed ActionDialog with TanStack's resolver flow. Active module
+   guards register their dirty state with the outer frame, with browser-native
+   beforeunload protection retained.
+5. **Visual acceptance:** Strict coverage now consults
+   `docs/verification/v61-visual-evidence.json` and requires source-hash
+   matching and independently reviewed mobile/tablet/desktop screenshots.
+   The ledger starts empty; visual certification is **not** claimed.
+6. **Planning authorization regression:** New tests target forged CAN context
+   objects, exact Site and Organization scope, disabled/unverified/demo
+   accounts, closed Sites, and permitted unclassified private planning.
+   These are test cases for the existing server authorization path, not a
+   substitute for real authenticated cross-tenant integration or database
+   RLS acceptance.
+
+### Read-only Neon policy inspection
+
+A read-only inspection of Neon project `can-os`, branch `main` on
+November 19, 2026 found RLS enabled and forced for
+`public.sites`, `public.blueprints`,
+`public.blueprint_versions`,
+`public.blueprint_configurations`, and
+`public.blueprint_configuration_versions`. The latter Blueprint tables
+include a trusted-owner policy and role-scoped canonical policies. The
+inspection does **not** establish effective app-login least privilege or prove
+that a verified CAN Site session cannot cross Site boundaries via HTTP.
+`public.site_publications` was reported without RLS, and
+`public.site_marketing_packages` had RLS enabled without standalone
+policies; their application-service authorization must be tested separately.
+Do not infer a vulnerability solely from a table's RLS flag.
+
+**Remaining acceptance:** Run the V6.1 build, TypeScript, unit tests,
+authenticated Site A / Site B / closed-Site planning journeys, fresh Site
+signup, retry/conflict tests, and mobile/keyboard/contrast visual review
+against a fixed SHA in an isolated environment. Existing hosted build/CI
+runs are not a proof of success. Production approval and data migrations
+remain separate.
