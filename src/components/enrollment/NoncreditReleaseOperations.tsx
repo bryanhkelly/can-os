@@ -131,7 +131,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       <NoncreditDeliveryRecoveryPanel releaseId={releaseId}/>
       <h3 className="mt-7 text-base font-semibold">Dated Classes</h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        Facilitators schedule approved courses in <Link to="/canonical/lab/facilitated" className="text-primary underline">Facilitated learning</Link>.
+        Facilitators schedule approved courses in <Link to="/canonical/lab/facilitated" search={{siteId:query.data.siteId}} className="text-primary underline">Facilitated learning</Link>.
         Attach a scheduled Class here to include it in the learners' existing Course calendar.
       </p>
       {query.data.deliveryMode==="independent"&&<p className="mt-3 text-sm">Self-paced training has no required in-person Class meetings.</p>}
@@ -167,7 +167,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
         {!query.data.sessions.some(row=>!row.linked&&row.state==="scheduled"&&
           Date.parse(row.startsAt)>Date.now())&&<p role="status" className="mt-2 text-sm text-muted-foreground">
           There are no unallocated upcoming meetings at this authorized Site.
-          <Link to="/canonical/lab/facilitated" className="ml-1 text-primary underline">
+          <Link to="/canonical/lab/facilitated" search={{siteId:query.data.siteId}} className="ml-1 text-primary underline">
             Schedule meetings
           </Link> first.
         </p>}
