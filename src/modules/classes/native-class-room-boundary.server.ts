@@ -131,7 +131,7 @@ export async function assertNativeClassAttendanceReader(
 }
 
 /** Native participant identity is Class Enrollment, NEVER deployment/Course
- * alone. A non-native Course Attempt cannot join a native Class room.
+ * alone. A Course Registration may share one Attempt after exact Class placement.
  */
 export async function nativeClassRoomParticipant(
   tx:Tx,room:Room,courseAttemptId:string,participantPersonId:string,
@@ -158,7 +158,6 @@ export async function nativeClassRoomParticipant(
       eq(learnerCourseAttempts.offeringVersionId,linked.offeringVersionId),
       eq(learnerCourseAttempts.status,"active"),
       isNull(learnerCourseAttempts.enrollmentId),
-      isNull(learnerCourseAttempts.noncreditRegistrationId),
     ))
     .where(and(
       eq(canonicalClassEnrollments.id,attempt.classEnrollmentId),
