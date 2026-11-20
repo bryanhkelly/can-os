@@ -1,5 +1,7 @@
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Radio } from "@/components/ui/choice";
@@ -58,39 +60,27 @@ export function NativeClassScheduleForm({
         </Label>)}
       </fieldset>
       {mode!=="custom"?<div className="grid gap-3 sm:grid-cols-2">
-        <div><Label htmlFor="native-series-start" className="block text-sm font-semibold">
-          {mode==="weekly"?"First Session":"Session"} start ({siteTimeZone})
-        </Label>
+        <Field label={`${mode==="weekly"?"First Session":"Session"} start (${siteTimeZone})`} required>
           <Input id="native-series-start" type="datetime-local" required value={first}
-            onChange={e=>onFirstChange(e.target.value)}
-            className="mt-2 min-h-11"/>
-        </div>
-        <div><Label htmlFor="native-series-duration" className="block text-sm font-semibold">
-          Duration (minutes)
-        </Label>
+            onChange={e=>onFirstChange(e.target.value)} className="min-h-11"/>
+        </Field>
+        <Field label="Duration (minutes)" required>
           <Input id="native-series-duration" type="number" required min={15} max={480}
-            value={minutes} onChange={e=>onMinutesChange(Number(e.target.value))}
-            className="mt-2 min-h-11"/>
-        </div>
+            value={minutes} onChange={e=>onMinutesChange(Number(e.target.value))} className="min-h-11"/>
+        </Field>
       </div>:<div className="space-y-3">
         {customRows.map((row,index)=><div key={row.id}
           className="grid items-end gap-3 border border-border p-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
-          <div>
-            <Label className="text-sm font-semibold" htmlFor={"class-custom-"+row.id}>
-              Session {index+1} start ({siteTimeZone})
-            </Label>
+          <Field label={`Session ${index+1} start (${siteTimeZone})`} required>
             <Input id={"class-custom-"+row.id} type="datetime-local" required
               value={row.localStart} onChange={e=>onRowChange(row.id,{localStart:e.target.value})}
-              className="mt-1 min-h-11"/>
-          </div>
-          <div>
-            <Label className="text-sm font-semibold" htmlFor={"class-minutes-"+row.id}>
-              Minutes
-            </Label>
+              className="min-h-11"/>
+          </Field>
+          <Field label="Minutes" required>
             <Input id={"class-minutes-"+row.id} type="number" min={15} max={480} required
               value={row.minutes} onChange={e=>onRowChange(row.id,{minutes:Number(e.target.value)})}
-              className="mt-1 min-h-11"/>
-          </div>
+              className="min-h-11"/>
+          </Field>
           <Button size="sm" variant="outline" type="button" disabled={customRows.length<=1||busy}
             onClick={()=>onRemoveRow(row.id)}>
             Remove
@@ -101,10 +91,13 @@ export function NativeClassScheduleForm({
           Add another Session
         </Button>
       </div>}
-      <Button type="submit" disabled={scheduled||busy||
-        (mode!=="custom"&&!first)||(mode==="custom"&&customRows.some(row=>!row.localStart))}>
-        {busy?"Scheduling…":scheduled?"Sessions scheduled":"Schedule "+(mode==="weekly"?"four Sessions":mode==="single"?"one Session":"custom Sessions")}
-      </Button>
+      <ActionFooter layout="inline" className="mt-0">
+        <Button type="submit" disabled={scheduled||busy||
+          (mode!=="custom"&&!first)||(mode==="custom"&&customRows.some(row=>!row.localStart))}
+          loading={busy} loadingLabel="Scheduling sessions...">
+          {scheduled?"Sessions scheduled":"Schedule "+(mode==="weekly"?"four Sessions":mode==="single"?"one Session":"custom Sessions")}
+        </Button>
+      </ActionFooter>
       {scheduled&&<p role="status" className="text-sm">
         Saved. Change the date, duration or schedule type to create another booking.
       </p>}
