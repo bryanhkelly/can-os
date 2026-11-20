@@ -93,3 +93,7 @@ The new publication and Organization/Site operator role records are **synthetic 
 **Caveat:** Current text-homework submission is not a complete file attachment, teacher gradebook or feedback workflow. It uses the existing immutable Course Attempt evidence and does not create parallel academic records.
 
 **Delivery format correction:** After the database read-back, all 12 synthetic Classes were switched from planned `hybrid` to `self_paced` because zero dated native Class Sessions exist. This enables independent lessons/homework without implying an available supervised session. The checked-in activation SQL includes that same transition for replay. Hybrid/Scheduled delivery must be reauthorized with real Class Sessions.
+
+## November 20 superseding fixture load
+
+The totals earlier in this recovery log describe the initial rehydration and activation. The later **seven-phase synthetic demo data load** added realistic academic, operations, family, admissions, authoring, and feedback scenarios. See [Valor V6.1 full demo fixture](./valor-v61-full-demo-fixture-20261120.md) for current canonical counts, exact replay order, limitations and the read-only acceptance script. On the final database read-back, the new SQL suite reported 31/31 checks passing. The application build and browser-level acceptance are independent and remain unverified here.
