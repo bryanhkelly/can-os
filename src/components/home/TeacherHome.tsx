@@ -63,7 +63,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
   subtitle="Your sections, grading queue, and missing work across your school today."
   shortcuts={<>
     <DashboardShortcut title="My classes" description="Open your assigned sections" icon={<BookOpen className="size-5" />}>
-     <Link to="/classes" />
+     <Link to="/class" />
     </DashboardShortcut>
     <DashboardShortcut title="Study groups" description="Facilitate sessions and group discussion" icon={<Users className="size-5" />}>
      <Link to="/groups" />
@@ -91,7 +91,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
 
    {ready && <>
     <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Today summary">
-     <StatCard asChild label="Sections" value={data.sections.length}><Link to="/classes" /></StatCard>
+     <StatCard asChild label="Sections" value={data.sections.length}><Link to="/class" /></StatCard>
      <StatCard asChild label="Needs grading" value={data.ungradedCount}><Link to="/teacher/gradebook" /></StatCard>
      <StatCard asChild label="Missing work" value={data.missingWorkCount}><Link to="/teacher/missing-work" /></StatCard>
      <StatCard asChild label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length}><a href="#grade-follow-ups" /></StatCard>
