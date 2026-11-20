@@ -1,10 +1,11 @@
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
 import { MarketingPackageReleaseHistoryV61 } from "./MarketingPackageReleaseHistoryV61";
+import { MarketingPackageLibraryList } from "./MarketingPackageLibraryList";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { Archive, ArrowRight, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowRight, Megaphone, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionDialog, ActionFooter, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {
@@ -369,27 +370,9 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
         {!visible.length&&<WorkspacePanel title="No packages in this view">
           <p className="text-sm text-muted-foreground">Create a package to save your messaging for future use.</p>
         </WorkspacePanel>}
-        <div className="space-y-3">{visible.map(item=><article key={item.id}
-          className="flex flex-wrap items-center gap-4 border bg-card p-4">
-          <div className="flex size-11 items-center justify-center bg-muted"><FileText className="size-5"/></div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold">{item.title}</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {marketingPurposeOptions.find(option=>option.id===item.content.purpose)?.label}
-              {" · "}{item.status==="archived"?"Archived":"Saved draft"}
-              {" · "}{new Date(item.updatedAt).toLocaleDateString()}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={()=>open(item)}>Open</Button>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void duplicate(item)}
-            aria-label={"Duplicate "+item.title}><Copy aria-hidden="true"/></Button>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void setArchived(item)}
-            aria-label={(item.status==="archived"?"Restore ":"Archive ")+item.title}>
-            {item.status==="archived"?<RotateCcw aria-hidden="true"/>:<Archive aria-hidden="true"/>}
-          </Button>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={()=>setDeleteCandidate(item)}
-            aria-label={"Delete "+item.title}><Trash2 aria-hidden="true"/></Button>
-        </article>)}</div>
+        <MarketingPackageLibraryList records={visible} busy={busy}
+          onOpen={open} onDuplicate={duplicate} onArchiveToggle={setArchived}
+          onDelete={setDeleteCandidate} />
         <WorkspacePanel title={module==="promote"?"Continue in Introduce":"Continue with existing capabilities"}
           description={context.handoffDescription}>
           <div className="grid gap-3">
