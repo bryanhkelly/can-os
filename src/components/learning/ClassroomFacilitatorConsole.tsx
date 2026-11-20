@@ -24,6 +24,8 @@ export function ClassroomFacilitatorConsole({
   const [prompt, setPrompt] = useState("");
   const [kind, setKind] = useState<"single_choice" | "text">("single_choice");
   const [choicesText, setChoicesText] = useState("Yes\nNo");
+  const [failedCommands,setFailedCommands]=useState(0);
+  const [lastLocalCommand,setLastLocalCommand]=useState("");
   // Preserve one request identity across uncertain network failures.
   // A new prompt/options payload receives its own activity identity.
   const activityRequests = useRef(new Map<string, string>());
@@ -91,6 +93,8 @@ export function ClassroomFacilitatorConsole({
         <p><strong>Room:</strong> {room.isError?"Access not verified":room.isPending?"Checking…":currentState}</p>
         <p><strong>Latest check:</strong> {room.isError?"Failed":room.isFetching?"Refreshing…":
           room.dataUpdatedAt?new Date(room.dataUpdatedAt).toLocaleTimeString():"Not yet checked"}</p>
+        <p><strong>Local projector errors:</strong> {failedCommands} (this open console)</p>
+        <p><strong>Last local command:</strong> {lastLocalCommand||"None"}</p>
         <p><strong>Projector commands:</strong> {projector.isError?"Unavailable":
           projector.isPending?"Checking…":
           projector.data.roomState!=="live"?"Stopped ("+projector.data.roomState+")":
@@ -129,7 +133,11 @@ export function ClassroomFacilitatorConsole({
       physical attendance, video consumption, academic grades or completion.
     </p>
     {isLive && <ClassroomPlaybackControls facilitatedSessionId={facilitatedSessionId}
-      preferredLessonIds={preferredLessonIds}/>}
+      preferredLessonIds={preferredLessonIds}
+      onCommandStatus={(status,kind)=>{
+        setLastLocalCommand(kind+" "+(status==="accepted"?"accepted":"refused"));
+        if(status==="failed")setFailedCommands(count=>count+1);
+      }}/>}
     {room.isSuccess && room.data && !isLive && <p role="status" className="border border-border p-4 text-sm">
       This classroom is {currentState}. New prompts and playback controls are closed.
     </p>}
