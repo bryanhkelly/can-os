@@ -171,7 +171,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         expiresAt: data.expiresAfterDays === null ? null
           : new Date(now.getTime() + data.expiresAfterDays * 86_400_000).toISOString(),
         revokedAt: null, sourceRevision: latest.revision,
-        brandVersionId:brand.version.id,pages,
+        brandVersionId:brand.version.id,synthetic,pages,
       };
       // Keep a bounded number of recorded links. Old revocations remain in
       // the canonical audit trail, not unlimited Site metadata.
