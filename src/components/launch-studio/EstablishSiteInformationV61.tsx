@@ -132,7 +132,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   responsibleOrganizationName: string | null;
   initial: SiteInformationV61Initial;
   onBackToSiteProfile: () => void;
-  onSaveAndExit: () => void;
+  onSaveAndExit: () => Promise<void>;
   onContinueToPrograms: () => void;
   onInternalStepChange?: (step: Step) => void;
 }) {
@@ -269,7 +269,13 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       } else {
         await router.invalidate(); // Confirm latest authorized Site before navigating.
         releaseNavigation();
-        if (mode === "exit") onSaveAndExit();
+        if (mode === "exit") {
+          try { await onSaveAndExit(); }
+          catch (failure) {
+            setError(failure instanceof Error ? failure.message :
+              "Changes saved, but sign-out failed. Use the Account menu to sign out.");
+          }
+        }
         else onContinueToPrograms();
       }
     } catch (cause) {
@@ -426,7 +432,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       }}><ArrowLeft className="size-4" />{step === 0 ? "Back to Site Profile" : "Previous step"}</Button>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="ghost" disabled={busy || reloadRequired} onClick={() => void act("exit")}>
-          Save & Exit</Button>
+          Save & Sign Out</Button>
         <Button type="button" disabled={reloadRequired} loading={busy}
           loadingLabel="Saving Site Information…" onClick={() => void act("next")}>
           {step === 3 ? "Finish Site Information" : "Save & Continue"}<ArrowRight aria-hidden="true" className="size-4" />
