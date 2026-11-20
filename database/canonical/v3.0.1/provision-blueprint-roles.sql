@@ -24,6 +24,7 @@ SELECT (
      AND 'public' = ANY(p.roles)
      AND p.qual LIKE '%v28_role_can_access_org%'
      AND p.qual LIKE '%site_organization_roles%')
+ AND to_regprocedure('public.append_restricted_blueprint_transition(text,text,uuid,uuid,uuid,jsonb,text,text,uuid,jsonb)') IS NOT NULL
  AND EXISTS(SELECT 1 FROM pg_roles r WHERE r.rolname=:'application_role'
    AND r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
    AND NOT r.rolcreatedb AND NOT r.rolcreaterole AND NOT r.rolinherit
@@ -131,13 +132,14 @@ SELECT format(
  :'author_role')
 \gexec
 
--- Reviewer can see verification *labels*, never document storage references.
+-- Reviewer sees only verified, current, Organization-owned evidence labels.
+-- Both canonical tables already live in public. Storage references are excluded.
 SELECT format(
- 'GRANT SELECT (id,kind_code,owning_organization_id,title) ON education_v30.evidence_documents TO %I',
+ 'GRANT SELECT (id,kind_code,owning_organization_id,title) ON public.evidence_documents TO %I',
  :'reviewer_role')
 \gexec
 SELECT format(
- 'GRANT SELECT (id,document_id,verified_at,valid_from,valid_through) ON education_v30.evidence_document_versions TO %I',
+ 'GRANT SELECT (id,document_id,verified_at,valid_from,valid_through) ON public.evidence_document_versions TO %I',
  :'reviewer_role')
 \gexec
 SELECT format('GRANT INSERT ON public.%I TO %I', t, :'reviewer_role')
@@ -148,16 +150,19 @@ SELECT format('GRANT USAGE ON SEQUENCE %s TO %I',
  :'reviewer_role')
 \gexec
 
--- The native audit journal remains separately in education_v30.
--- Do not substitute public.audit_events; the schemas and columns differ.
-SELECT format('GRANT SELECT ON education_v30.audit_events TO %I,%I',
-  :'author_role', :'reviewer_role')
+-- Public audit and outbox are the single authoritative journals.
+-- No direct INSERT privilege is given to these tables. The function
+-- validates the restricted role, approved purpose binding, action and
+-- exact Organization/entity lineage before appending both records atomically.
+SELECT format(
+ 'GRANT EXECUTE ON FUNCTION public.append_restricted_blueprint_transition(text,text,uuid,uuid,uuid,jsonb,text,text,uuid,jsonb) TO %I,%I',
+ :'author_role',:'reviewer_role')
 \gexec
-
--- Trace-only, append-friendly event rights. Neither role can erase history.
-SELECT format('GRANT INSERT ON education_v30.%I TO %I,%I',
- t, :'author_role',:'reviewer_role')
-FROM unnest(ARRAY['audit_events','domain_events']) AS t
+-- The independent reviewer reads only original author provenance.
+-- Public audit RLS additionally checks purpose and Organization.
+SELECT format(
+ 'GRANT SELECT (actor_person_id,action,resource_id) ON public.audit_events TO %I',
+ :'reviewer_role')
 \gexec
 
 INSERT INTO public.database_role_organization_bindings
