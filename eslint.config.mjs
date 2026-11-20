@@ -126,7 +126,7 @@ export default tseslint.config(
   {
     files: [
       "src/components/launch-studio/{LaunchSiteFrameV61,LaunchStudioOverviewV61,EstablishSiteProfileUnified,EstablishSiteInformationV61,EstablishProgramsAudiencesV61}.tsx",
-      "src/components/launch-studio/{MarketingPackagesV61,MarketingMaterialPreviewV61,LaunchPreviewSharing,LaunchPrepareV61,LaunchSitePublicationPanel,LaunchModuleDestinationV61}.tsx",
+      "src/components/launch-studio/{MarketingPackagesV61,MarketingMaterialPreviewV61,LaunchPreviewSharing,LaunchPrepareV61,LaunchSitePublicationPanel,LaunchModuleDestinationV61,LaunchReadinessPanelV61,LaunchNavigationGuardProvider}.tsx",
       "src/components/launch-studio/{SolutionCatalogV61,ProgramDiscoveryPanel,WebsiteTemplateGallery,WebsiteVisualIdentityStep,WebsiteArtworkField,WebsiteCopyField}.tsx",
       "src/components/launch-studio/{CanonicalBlueprintWorkspace,BlueprintOfferingAdoptionPicker,BlueprintReferenceCatalogPanel,BlueprintReviewHistoryPanel}.tsx",
       "src/components/launch-studio/{NativeAdoptionEvidenceChecklist,NativeOfferingAdoptionReviewPanel,SiteContentChannelEditor,SchoolBrandPreview}.tsx",
