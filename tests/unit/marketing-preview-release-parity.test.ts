@@ -29,6 +29,9 @@ describe("Launch Studio preview and atomic release share preflight",()=>{
     expect(functions).toContain("await Promise.all(content.formats.map");
     expect(functions).toContain("await tx.insert(siteMarketingPackageReleases).values");
     expect(functions).toContain("await tx.insert(siteArtifactReleases).values(outputs.map");
+    expect(functions).toContain("child.brandVersionId===parent.brandVersionId");
+    expect(functions).toContain("child.sourcePackageRevision===parent.sourcePackageRevision");
+    expect(functions).toContain("new Set(formats).size===formats.length");
     expect(page).toContain("createSiteMarketingPackageRelease");
     expect(page).toContain("downloadMarketingPackageZip");
     expect(page).not.toContain("createSiteMarketingRelease");
