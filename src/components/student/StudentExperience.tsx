@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { EmptyState, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
@@ -49,14 +50,14 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
   <details className="mt-6 border bg-card p-4">
   <summary className="cursor-pointer text-sm font-semibold">More learning details and school links</summary>
   <nav aria-label="Student workspace" className="mt-4 flex flex-wrap gap-2 text-sm">
-   <Link to="/student/assignments" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Assignments</Link>
-   <Link to="/student/courses" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Courses</Link>
-   <Link to="/student/support" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Support</Link>
-   <Link to="/groups" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Study groups</Link>
-   <Link to="/student/my-school" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; community</Link>
-   <Link to="/profiles" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">My profile</Link>
-   <Link to="/student/report-card" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Report card</Link>
-   <Link to="/calendar" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Calendar</Link>
+   <Button asChild variant="outline" size="sm"><Link to="/student/assignments">Assignments</Link></Button>
+   <Button asChild variant="outline" size="sm"><Link to="/student/courses">Courses</Link></Button>
+   <Button asChild variant="outline" size="sm"><Link to="/student/support">Support</Link></Button>
+   <Button asChild variant="outline" size="sm"><Link to="/groups">Study groups</Link></Button>
+   <Button asChild variant="outline" size="sm"><Link to="/student/my-school">School &amp; community</Link></Button>
+   <Button asChild variant="outline" size="sm"><Link to="/profiles">My profile</Link></Button>
+   <Button asChild variant="outline" size="sm"><Link to="/student/report-card">Report card</Link></Button>
+   <Button asChild variant="outline" size="sm"><Link to="/calendar">Calendar</Link></Button>
   </nav>
   {liveData.sections.length>0&&<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/classes" search={{section:section.sectionId,tab:"lessons"}} className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
