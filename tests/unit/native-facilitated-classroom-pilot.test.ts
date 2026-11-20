@@ -13,7 +13,7 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(page).toContain("<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>");
     expect(companion).toContain("FacilitatedLearnerPairing");
     expect(companion).toContain("ClassroomCompanionRoom");
-    expect(companion).toContain("getLearnerFacilitatedRoom");
+    expect(companion).toContain("useLearnerClassroomRooms");
     const learner=source("src/modules/learning/classroom-evidence.functions.ts");
     expect(learner).toContain("authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId)");
     expect(learner).toContain("submitClassroomResponse");
