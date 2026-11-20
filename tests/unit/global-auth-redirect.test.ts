@@ -13,7 +13,7 @@ describe("global protected-route authentication",()=>{
   });
   it("preserves only explicitly public Site signup, discovery, recruitment and auth routes",()=>{
     for(const path of ["/access","/access/verify","/access/register","/landing",
-      "/landing/cogic","/site/new","/explore","/interest-event","/family/interest"])
+      "/landing/cogic","/next/cogic","/site/new","/explore","/interest-event","/family/interest"])
       expect(isPublicCanPath(path)).toBe(true);
     expect(isPublicCanPath("/access-private")).toBe(false);
     expect(isPublicCanPath("/landing-admin")).toBe(false);
