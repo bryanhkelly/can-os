@@ -434,7 +434,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       window.location.reload();
     }}>Reload Site and review saved answers</Button>}
     <footer aria-label="Site Information actions">
-      <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
+      <ActionFooter layout="step">
       <Button type="button" variant="outline" disabled={busy} onClick={() => {
         if (step === 0) onBackToSiteProfile(); else selectStep((step - 1) as Step);
       }}><ArrowLeft className="size-4" />{step === 0 ? "Back to Site Profile" : "Previous step"}</Button>
