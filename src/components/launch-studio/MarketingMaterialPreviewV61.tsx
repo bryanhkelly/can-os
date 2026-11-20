@@ -7,8 +7,9 @@ import { marketingFormatOptions, type MarketingFormat, type MarketingPackageCont
 type MaterialPreview = Awaited<ReturnType<typeof previewSiteMarketingArtifact>>;
 
 /** Read-only preview. The server uses the exact renderer that creates immutable releases. */
-export function MarketingMaterialPreviewV61({siteId,brandVersionId,format,content}:{
+export function MarketingMaterialPreviewV61({siteId,title,brandVersionId,format,content}:{
   siteId:string;
+  title:string;
   brandVersionId:string|null;
   format:MarketingFormat;
   content:MarketingPackageContent;
@@ -26,7 +27,7 @@ export function MarketingMaterialPreviewV61({siteId,brandVersionId,format,conten
     // Debounce typing. Previous requests may finish after later edits, so
     // invalidate their results in cleanup and never show stale branded copy.
     const timer=window.setTimeout(()=>{
-      void previewSiteMarketingArtifact({data:{siteId,brandVersionId,format,content}})
+      void previewSiteMarketingArtifact({data:{siteId,title,brandVersionId,format,content}})
         .then(result=>{
           if(live){setPreview(result);setPending(false);}
         })
@@ -38,7 +39,7 @@ export function MarketingMaterialPreviewV61({siteId,brandVersionId,format,conten
         });
     },350);
     return ()=>{live=false;window.clearTimeout(timer);};
-  },[siteId,brandVersionId,format,content,retry]);
+  },[siteId,title,brandVersionId,format,content,retry]);
 
   const label=marketingFormatOptions.find(option=>option.id===format)?.label??format;
   const isEmail=preview?.state==="ready"&&preview.mimeType==="text/html";
