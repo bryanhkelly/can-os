@@ -61,6 +61,21 @@ describe("V6.1 Prepare operational integration boundaries", () => {
     expect(room).toContain("room.retiredAt");
   });
 
+  it("reuses the real academic-year reader and creator in the Site-locked schedule module", () => {
+    const operations = read("src/components/launch-studio/PrepareOperationsV61.tsx");
+    const editor = read("src/components/operations/SchoolYearCreateForm.tsx");
+    expect(operations).toContain("getSchoolYearStudio()");
+    expect(operations).toContain("<SchoolYearCreateForm");
+    expect(operations).toContain('selection={{siteId}} lockedSiteId={siteId} embedded');
+    expect(operations).toContain("onDataChanged={() => years.refetch({throwOnError:true})}");
+    expect(operations).toContain('year.siteId === siteId');
+    expect(editor).toContain('createStudioYear({ data: { siteId');
+    expect(editor).toContain("if (lockedSiteId && siteId !== lockedSiteId) return");
+    expect(editor).toContain("data.sites.filter(site => !lockedSiteId || site.id === lockedSiteId)");
+    expect(editor).toContain("if (onCreated) await onCreated(createdId)");
+    expect(editor).toContain("createStudioGradeScale");
+  });
+
   it("keeps Prepare Class creation draft-only, not an enrollment shortcut", () => {
     const operations = read("src/components/launch-studio/PrepareOperationsV61.tsx");
     const classes = read("src/components/learning/NativeClassManager.tsx");
