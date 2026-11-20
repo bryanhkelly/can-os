@@ -48,17 +48,20 @@ describe("V6.1 Prepare operational integration boundaries", () => {
     expect(admin).not.toContain("insert(accountPersonGrants)");
   });
 
-  it("reuses one room registry and Site-specific coverage schedule", () => {
+  it("uses existing canonical Site Spaces and Classes, not old Section coverage", () => {
     const operations = read("src/components/launch-studio/PrepareOperationsV61.tsx");
-    const room = read("src/components/operations/RoomCoverageWorkspace.tsx");
-    expect(operations).toContain('view="rooms"');
-    expect(operations).toContain('view="schedules"');
-    expect(room).toContain("getRoomCoverageWorkspaceFn");
-    expect(room).toContain("createRoomAtSiteFn");
-    expect(room).toContain("saveRoomCoverageFn");
-    expect(room).toContain('view !== "rooms"');
-    expect(room).toContain('view !== "schedules"');
-    expect(room).toContain("room.retiredAt");
+    const facilities = read("src/components/launch-studio/LaunchSiteFacilitiesWorkspaceV61.tsx");
+    const classes = read("src/components/launch-studio/LaunchClassFacilitiesWorkspaceV61.tsx");
+    expect(operations).toContain("<LaunchSiteFacilitiesWorkspaceV61");
+    expect(operations).toContain("<LaunchClassFacilitiesWorkspaceV61");
+    expect(operations).not.toContain("<RoomCoverageWorkspace");
+    expect(operations).toContain("onDraftCreated={()=>queryClient.invalidateQueries");
+    expect(facilities).toContain("readLaunchSiteFacilitiesV61");
+    expect(facilities).toContain("saveLaunchSiteSpaceV61");
+    expect(facilities).toContain("createLaunchSiteSpaceV61");
+    expect(classes).toContain("readLaunchClassFacilitiesV61");
+    expect(classes).toContain("saveLaunchClassPhysicalPlanV61");
+    expect(classes).toContain("assignNativeClassStaff");
   });
 
   it("reuses the real academic-year reader and creator in the Site-locked schedule module", () => {
