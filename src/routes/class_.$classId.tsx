@@ -228,6 +228,8 @@ function TeachingClass({workspace}:{workspace:Workspace}){
         </div>
       </section>
     </div>}>
+    {workspace.tab==="discussions"&&
+      <NativeClassDiscussionPanel classId={workspace.classId}/>}
     {workspace.tab==="overview"&&<section className="border border-border bg-card p-5">
       <h2 className="font-serif text-2xl">Teaching overview</h2>
       <p className="mt-3 text-sm">{workspace.lessons.length} published lessons · {workspace.rosterCount} current enrollments.</p>
