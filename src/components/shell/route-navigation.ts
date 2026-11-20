@@ -58,7 +58,6 @@ export const routeNavigation = {
   "/canonical/my-credentials": hidden("Temporary native learner noncredit credential reader pending placement in production learner navigation", []),
   "/class": page("/class", [...all, "academic_content_creator", "academic_content_reviewer"]),
   "/centers/demo": hidden("Synthetic center planning preview; Classes use /class", []),
-  "/classes": hidden("Section-only academic route pending migration", []),
   "/enrichment": hidden("Contextual extended-learning registration"),
   "/explore": publicPage,
   "/learn/enroll": publicPage,
