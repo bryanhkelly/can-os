@@ -13,7 +13,10 @@ import { emitCanonicalDomainEvent, writeCanonicalAudit } from "@/platform/canoni
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Release = Awaited<ReturnType<typeof readEligibleSelfEnrollmentReleases>>[number];
-export type CourseClassChoice = {id:string;title:string;deliveryMode:string;seatsRemaining:number|null};
+export type CourseClassChoice = {
+  id:string;title:string;deliveryMode:string;seatsRemaining:number|null;
+  sessions:{startsAt:string;endsAt:string}[];
+};
 
 /** Advisory Class choices. Admission rechecks source authority and seats under
  * the same Class-row lock as native self-enrollment and facilitator assignment. */
@@ -40,23 +43,29 @@ export async function listEligibleCourseClasses(
   for(const cls of candidates){
     try{await currentClassAuthority(tx,cls.id,now);}
     catch(error){if(error instanceof AuthorizationError)continue;throw error;}
-    if(cls.deliveryMode!=="self_paced"){
-      const [scheduled]=await tx.select({id:canonicalClassSessions.id})
-        .from(canonicalClassSessions)
-        .innerJoin(facilitatedClassroomPlans,
-          eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
-        .innerJoin(canonicalDeliverySessions,
-          eq(canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
-        .where(and(eq(canonicalClassSessions.classId,cls.id),
-          eq(facilitatedClassroomPlans.state,"scheduled"),
-          gt(canonicalDeliverySessions.startsAt,now))).limit(1);
-      if(!scheduled)continue;
-    }
+    const upcoming=cls.deliveryMode==="self_paced"?[]:await tx.select({
+      startsAt:canonicalDeliverySessions.startsAt,
+      endsAt:canonicalDeliverySessions.endsAt,
+    }).from(canonicalClassSessions)
+      .innerJoin(facilitatedClassroomPlans,
+        eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
+      .innerJoin(canonicalDeliverySessions,
+        eq(canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
+      .where(and(eq(canonicalClassSessions.classId,cls.id),
+        eq(facilitatedClassroomPlans.state,"scheduled"),
+        gt(canonicalDeliverySessions.startsAt,now)))
+      .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+    if(cls.deliveryMode!=="self_paced"&&!upcoming.length)continue;
+    if(upcoming.length>100)throw new AuthorizationError("Class schedule exceeds supported Session limit");
     const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
       .where(and(eq(canonicalClassEnrollments.classId,cls.id),
         inArray(canonicalClassEnrollments.status,["active","pending"])));
     result.push({id:cls.id,title:cls.title,deliveryMode:cls.deliveryMode,
-      seatsRemaining:cls.capacity===null?null:Math.max(0,cls.capacity-(occupancy?.total??0))});
+      seatsRemaining:cls.capacity===null?null:Math.max(0,cls.capacity-(occupancy?.total??0)),
+      sessions:upcoming.map(item=>({
+        startsAt:item.startsAt.toISOString(),endsAt:item.endsAt.toISOString(),
+      })),
+    });
   }
   return result;
 }
