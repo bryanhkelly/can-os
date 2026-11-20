@@ -124,10 +124,9 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
            content.resources.some(item => item.id === resource.id)));
         // Native-video events must refer to a published video, not an
         // arbitrary resource, and never accept client-supplied learner scope.
-        const publishedVideo = publisherResource &&
-          (publisherResource.kind === "video" ||
-           Boolean(publisherResource.url && (await import("@/domain/class-video"))
-             .resolveClassVideo(publisherResource.url, false)?.kind === "file"));
+        const publishedVideo = Boolean(publisherResource?.url &&
+          (await import("@/domain/class-video"))
+            .resolveClassVideo(publisherResource.url, false)?.kind === "file");
         let authorizedSupplement = false;
         if (!publisherResource || (data.interaction.kind.startsWith("video_") && !publishedVideo)) {
           const [supplement] = await tx.select({
