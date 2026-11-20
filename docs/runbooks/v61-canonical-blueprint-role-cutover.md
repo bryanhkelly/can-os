@@ -2,9 +2,11 @@
 
 **Target:** Neon CAN OS project `sweet-hall-62441909`, isolated V6.1
 validation branch `br-bitter-pine-ar7mjn70` only. Main stays untouched.
-**Status:** Code and migrations 0097–0098 applied on validation; restricted
-operator login, purpose roles and approved Organization bindings not yet
-provisioned. No schema-drop authorization.
+**Status (2026-11-20):** Code and migrations 0097–0098 applied on
+validation. A password-disabled, least-privilege operations LOGIN, three
+restricted NOLOGIN purpose roles, and seven-day QA-only bindings now exist
+for the Valor School test Organization. **These are not institutional
+approval or production-ready credentials.** No schema-drop authorization.
 
 ## What has moved
 
@@ -70,11 +72,55 @@ second audit/event journal.
    `database/canonical/v3.0.1/check-launch-prepare-readiness.sql`
    and `scripts/sql/report-v61-blueprint-public-journal-readiness.sql`.
 
+## QA-only restricted roles provisioned (2026-11-20)
+
+On isolated V6.1 Neon branch `br-bitter-pine-ar7mjn70`, an exact
+branch- and Organization-guarded transaction configured:
+
+- One isolated LOGIN `can_os_canonical_ops_app` with `NOINHERIT`,
+  `NOBYPASSRLS`, no database or role creation powers and **NULL password**.
+- Three Valor-scoped NOLOGIN, NOINHERIT, NOBYPASSRLS purpose roles for
+  `program_catalog`, `blueprint_author`, and `blueprint_reviewer`.
+  Membership on the operations login has `SET TRUE`, `INHERIT FALSE`,
+  `ADMIN FALSE`. No role owns application tables.
+- Three time-limited `approved` **QA fixtures** in
+  `public.database_role_organization_bindings`, expiring
+  **2026-11-27 11:07:31 UTC**. These do not grant a person, account or Site
+  operational authority; no `site_organization_roles` records were created.
+  The existing shared public audit journal records the QA fixture setup.
+
+Post-provision checks: role scopes recognized Valor and rejected Barton
+under real PostgreSQL `SET LOCAL ROLE`, with the temporary owner
+testing membership rolled back to its pre-test state. The Blueprint
+reviewer has no Blueprint-author INSERT privilege; the author has no
+review INSERT privilege. Neither can read account tables, access raw
+storage references, or insert directly into audit/outbox journals.
+`scripts/sql/report-v61-blueprint-public-journal-readiness.sql` now
+checks the complete active role triplet, isolated membership and role
+separation: **12/12 ready**. The broader Launch Prepare readiness
+check is **8/9 ready**, blocked only on an independently classified Site.
+
+**Important:** These test-scoped database-purpose approvals are not real
+institutional approvals. They are short-lived and cannot authenticate
+without separately enabling the operations login. No user/account,
+reviewer appointment, credential, Cloudflare secret or Netlify deployment
+was created or changed. Fully authenticated browser tests still need
+a separate verified actor and preview-only credential configuration.
+
+For early revocation, the designated validation-branch DBA may change
+these three rows to `status='revoked'` and set `valid_through=now()`
+inside a reviewed transaction, then revoke purpose-role membership from
+`can_os_canonical_ops_app`. Never run this cleanup against main or
+a production Organization.
+
 ## Known blockers, not repaired by creating SQL roles
 
-- Validation currently has **no** approved Organization-purpose bindings or
-  current `public.site_organization_roles` rows. No independent native
-  operator authority should be invented from a CAN Site's planning rights.
+- Validation now has three **temporary QA-only** Organization-purpose
+  bindings, scoped to existing synthetic Valor School (`f1000000-0000-4000-8000-000000000002`),
+  valid through **2026-11-27 11:07:31 UTC**. There are still **no**
+  `public.site_organization_roles` rows and no appointed independent native
+  staff. The `can_os_canonical_ops_app` login has a NULL password, so it
+  cannot currently connect. These fixtures must not be promoted to production.
 - The Sites have no verified `geographic_area_id`; Course availability must
   fail closed for those Sites.
 - The old `education_v30` schema still has 7 tables, 6 views, 244
