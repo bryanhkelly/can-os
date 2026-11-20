@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, type ReactNode } from "react";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { getWorkspaceSession, type WorkspaceSessionResult } from "@/modules/identity/workspace-session.functions";
 import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
+import { currentPageSignInUrl, isPublicCanPath } from "@/domain/auth-route-policy";
 import { WorkspaceSessionContext } from "./workspace-session-context";
 import {registerAccessClient,isSharedDeviceMode,clearLearnerBrowserState,observeSessionHandoffs} from "@/domain/session-client";
 
@@ -41,7 +42,14 @@ export function WorkspaceSessionProvider({ initial, children }: {
   const changed = previousIdentity.current !== null && identity !== null && previousIdentity.current !== identity;
   useEffect(() => {
     // A new identity/scope must never reuse the previous workspace's mounted state or caches.
-    if (changed) {clearLearnerBrowserState();window.location.reload();}
+    if (changed) {
+      clearLearnerBrowserState();
+      // Expired or revoked credentials return the member to the exact
+      // private page after reauthentication, not to a generic dashboard.
+      if(identity==="signed-out" && !isPublicCanPath(window.location.pathname))
+        window.location.replace(currentPageSignInUrl(window.location));
+      else window.location.reload();
+    }
     else if (identity !== null) previousIdentity.current = identity;
   }, [changed, identity]);
   useEffect(() => {
@@ -57,7 +65,9 @@ export function WorkspaceSessionProvider({ initial, children }: {
     let closing=false;
     const stopObserving=observeSessionHandoffs(()=>{
       if(closing)return;
-      closing=true;window.location.assign("/access");
+      closing=true;
+      clearLearnerBrowserState();
+      window.location.replace(currentPageSignInUrl(window.location));
     });
     // Registration never extends idle expiry; only actual trusted interaction does.
     void registerAccessClient().catch(()=>{});
@@ -66,7 +76,8 @@ export function WorkspaceSessionProvider({ initial, children }: {
       closing=true;
       void fetch("/access/logout",{method:"POST",credentials:"same-origin",
         headers:{"Content-Type":"application/json"}}).finally(()=>{
-        clearLearnerBrowserState();window.location.assign("/access");
+        clearLearnerBrowserState();
+        window.location.replace(currentPageSignInUrl(window.location));
       });
     },15_000);
     const onInteraction = (event: Event) => {
@@ -81,7 +92,10 @@ export function WorkspaceSessionProvider({ initial, children }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "activity" }),
       }).then(response => {
-        if (response.status === 401) window.location.reload();
+        if (response.status === 401) {
+          clearLearnerBrowserState();
+          window.location.replace(currentPageSignInUrl(window.location));
+        }
       }).catch(() => {
         // Transient network loss does not authorize a longer session.
         // The next real interaction may retry after the client throttle.
