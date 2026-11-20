@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { listLaunches } from "@/modules/programs/launch.functions";
@@ -60,13 +61,38 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
           Solution planning records are unavailable or your current account cannot view them. No status is inferred.
         </WorkspaceNotice>}
         {solutions.state==="ready" && (solutions.value.configurations.length
-          ? <ul className="mt-3 space-y-2">{solutions.value.configurations.map(plan=><li key={plan.configurationId}
-              className="flex flex-wrap items-center justify-between gap-3 border p-3">
-              <div className="min-w-0"><p className="text-sm font-medium">{plan.name}</p>
-                <p className="text-xs text-muted-foreground">Saved revision {plan.revision}</p></div>
-              <StatusBadge tone="neutral">{plan.lifecycle==="frozen"?"Submitted for review":"Private planning draft"}</StatusBadge>
-            </li>)}</ul>
-          : <p className="mt-2 text-sm text-muted-foreground">No saved Solution configurations for this Site. Open Program Catalog to begin.</p>)}
+          ? <ul className="mt-3 space-y-2">{solutions.value.configurations.map(plan=>{
+              const model = solutions.value.templates.find(template =>
+                template.blueprintVersionId === plan.blueprintVersionId);
+              return <li key={plan.configurationId}
+                className="flex flex-wrap items-center justify-between gap-3 border p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{plan.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {model ? model.title + " · v" + model.versionNo + " · " : ""}
+                    Saved revision {plan.revision}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {model?.components.filter(item => item.requirementMode === "required").length ?? 0}
+                    {" "}required model components. Their selection does not verify Site readiness.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone="neutral">{plan.lifecycle==="frozen"?"Submitted for review":"Private planning draft"}</StatusBadge>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/launch/site" search={{siteId, module:"program-catalog",
+                      solutionPlanId:plan.configurationId}}>
+                      {plan.lifecycle==="frozen" ? "Review plan" : "Continue plan"}
+                    </Link>
+                  </Button>
+                </div>
+              </li>;
+            })}</ul>
+          : <p className="mt-2 text-sm text-muted-foreground">
+              No saved Solution plans for this Site.{" "}
+              <Link to="/launch/site" search={{siteId, module:"program-catalog"}}
+                className="font-semibold text-primary underline">Open Program Catalog</Link> to begin.
+            </p>)}
       </section>
       <section className="border bg-background p-4" aria-label="Program readiness state">
         <h3 className="text-sm font-semibold">Program launch requirements</h3>
