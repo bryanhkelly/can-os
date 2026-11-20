@@ -143,6 +143,11 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
     // Classes. The Class workspace independently validates current exact
     // staff assignment, Course publication, Organization and Site on every
     // request. This is not a room-facilitator or grader authorization.
+    if (actor.role === "teacher" && hasNative) {
+      // A CAN academic teacher cannot silently inherit an unrelated native
+      // learner or provider bearer. Resolve the conflicting session first.
+      throw new AuthorizationError("incompatible native teacher session");
+    }
     if (actor.role === "teacher" && actor.actorPersonId &&
         !actor.sessionAccountId && actor.grantSiteId &&
         actor.scope.siteIds?.length === 1 &&
