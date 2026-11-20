@@ -470,7 +470,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             <Textarea id="class-approval-reason" value={reviewReason}
               maxLength={1000} onChange={event=>setReviewReason(event.target.value)}
               placeholder="Record the independent eligibility review and reason for approving or rejecting"
-              className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
+              className="mt-2"/>
             <ul className="mt-3 space-y-2">
               {approvals.data?.map(item=><li key={item.approvalRequestId}
                 className="border border-border p-3 text-sm">
@@ -501,7 +501,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             <Textarea id="class-repeat-reason" maxLength={1000} value={repeatReason}
               onChange={e=>setRepeatReason(e.target.value)}
               placeholder="Document the independent reason for allowing the learner to repeat this completed Class"
-              className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
+              className="mt-2"/>
             <ul className="mt-3 space-y-2">
               {repeats.data?.map(item=><li key={item.completionOutcomeId}
                 className="border border-border p-3 text-sm">
@@ -528,7 +528,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </Label>
             <Select id="class-assign-learner" value={learnerPersonId}
               onChange={event=>setLearnerPersonId(event.target.value)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11">
               <option value="">Choose an authorized learner</option>
               {workspace.learnerCandidates.map(person=><option
                 key={person.personId} value={person.personId}>{person.name}</option>)}
@@ -538,7 +538,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </Label>
             <Select id="class-assign-credit" value={learnerCreditMode}
               onChange={event=>setLearnerCreditMode(event.target.value as typeof learnerCreditMode)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11">
               <option value="not_applicable">No academic credit</option>
               <option value="audit">Audit</option>
             </Select>
@@ -589,7 +589,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         {workspace.siteId?<div className="mt-4 space-y-3">
           <Label htmlFor="class-staff-person" className="block text-sm font-semibold">Verified Site staff</Label>
           <Select id="class-staff-person" value={staffPersonId} onChange={e=>setStaffPersonId(e.target.value)}
-            className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+            className="min-h-11">
             <option value="">Select an authorized person</option>
             {workspace.staffCandidates.map(person=><option key={person.personId} value={person.personId}>
               {person.name}
@@ -597,7 +597,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           </Select>
           <Label htmlFor="class-staff-role" className="block text-sm font-semibold">Class responsibility</Label>
           <Select id="class-staff-role" value={staffRole} onChange={e=>setStaffRole(e.target.value as typeof staffRole)}
-            className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+            className="min-h-11">
             <option value="facilitator">Facilitator</option>
             <option value="teacher">Class teacher</option>
           </Select>
