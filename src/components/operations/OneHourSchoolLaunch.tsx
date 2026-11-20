@@ -190,7 +190,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     </Label>}
     {error && <div role="alert" className="mt-4  border border-destructive p-3 text-sm">
       <p>{error}</p>
-      <Button variant="outline" type="button" disabled={openingSaving} className="mt-3 min-h-11  border px-4 py-2 font-semibold"
+      <Button variant="outline" type="button" disabled={openingSaving} className="mt-3 min-h-11"
         onClick={() => { void router.invalidate().then(() => { setError(""); setActivationNeedsRefresh(false); }).catch(() =>
           setError("Unable to refresh the saved launch. Reopen this school from Launch before attempting activation again.")); }}>
         Refresh recorded launch status (do not reactivate)
