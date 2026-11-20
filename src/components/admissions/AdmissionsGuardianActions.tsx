@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,10 +70,10 @@ export function AdmissionsGuardianActions({applicationId,verified,loginProvision
      <Textarea minLength={12} maxLength={2000} rows={3} value={evidenceNote}
       onChange={event=>setEvidenceNote(event.target.value)}/>
     </Field>
-    <div className="flex gap-2">
-     <Button type="submit" disabled={busy}>Record guardian verification</Button>
+    <ActionFooter layout="inline" className="mt-0">
+     <Button type="submit" disabled={busy} loading={busy} loadingLabel="Recording verification...">Record guardian verification</Button>
      <Button type="button" variant="outline" disabled={busy} onClick={()=>{setVerifying(false);setAttempted(false);}}>Cancel verification</Button>
-    </div>
+    </ActionFooter>
    </fieldset>
   </form>}
  </>;
