@@ -138,6 +138,13 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   }
 
   async function openConfiguration(configurationId: string) {
+    if (embedded && initialBlueprintVersionId &&
+        !workspace?.configurations.some(configuration =>
+          configuration.configurationId === configurationId &&
+          configuration.blueprintVersionId === initialBlueprintVersionId)) {
+      setError("This saved plan belongs to a different published Solution.");
+      return;
+    }
     setBusy(true);
     setRevisingFrozen(false);
     setOperationId("");
@@ -309,6 +316,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
 
   const readOnlyFrozen = detail?.lifecycle === "frozen" && !revisingFrozen;
   const editingDisabled = busy || readOnlyFrozen;
+  // A selected Solution in Prepare must not display another Solution's saved drafts.
+  const visibleConfigurations = embedded && initialBlueprintVersionId
+    ? workspace?.configurations.filter(configuration =>
+        configuration.blueprintVersionId === initialBlueprintVersionId) ?? []
+    : workspace?.configurations ?? [];
 
   return <section className="mt-6 border bg-card p-6" aria-labelledby="canonical-blueprint-title">
     <h2 id="canonical-blueprint-title" className="font-serif text-2xl">
@@ -326,10 +338,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         setError(normalizeClientError(caught, "Blueprint planning could not load.").message)
       )}>Retry</Button>}
     {workspace && <>
-      {workspace.configurations.length > 0 && <div className="mt-5">
-        <h3 className="font-semibold">Saved Blueprint configurations</h3>
+      {visibleConfigurations.length > 0 && <div className="mt-5">
+        <h3 className="font-semibold">Saved Solution plans</h3>
         <div className="mt-3 flex flex-wrap gap-2">
-          {workspace.configurations.map(configuration =>
+          {visibleConfigurations.map(configuration =>
             <Button key={configuration.configurationId} type="button" variant="outline"
               disabled={busy}
               onClick={() => void openConfiguration(configuration.configurationId)}>
