@@ -4,11 +4,9 @@ import { Link } from "@tanstack/react-router";
 import { Building2, Globe2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { siteLaunchModules } from "./LaunchStudioOverviewV61";
+import { siteLaunchModules, siteLaunchStagesV61 } from "@/domain/launch-site-navigation-v61";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
 import { LaunchNavigationGuardProvider } from "./LaunchNavigationGuardProvider";
-
-const stages = ["Establish", "Introduce", "Prepare", "Open"] as const;
 
 export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previewAvailable = true, children }: {
   site: { id: string; name: string };
@@ -42,7 +40,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
         <Link to="/launch/site" search={{ siteId: site.id }} onClick={() => setDrawer(false)}
           className={"block border-b px-3 py-3 text-sm font-semibold " + (!active ? "text-primary" : "")}
           aria-current={!active ? "page" : undefined}>Overview</Link>
-        {stages.map((stage, index) => (
+        {siteLaunchStagesV61.map((stage, index) => (
           <div key={stage} className="border-b py-1">
             <Button type="button" variant="ghost" aria-expanded={expanded===stage}
               aria-controls={`${stagePanelBaseId}-${instance}-${stage}`} onClick={()=>setStageChoice({active, stage: expanded===stage ? "" : stage})}
