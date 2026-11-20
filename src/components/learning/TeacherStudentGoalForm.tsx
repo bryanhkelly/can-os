@@ -87,7 +87,7 @@ export function TeacherStudentGoalForm({
         </Button>
         <Button type="button" variant="ghost" disabled={busy}
           onClick={() => setExpanded(false)}>Cancel</Button>
-      </ActionFooter>
+      </ActionFooter>}
       {result && <p role="status" className="text-sm">{result}</p>}
     </form>}
   </div>;
