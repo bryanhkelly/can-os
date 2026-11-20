@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { accessClientInstance } from "@/domain/session-client";
+import { classroomPendingKey, readPendingClassroomResponse, writePendingClassroomResponse, clearPendingClassroomResponse } from "@/domain/classroom-response-recovery";
 import {
   getClassroomLearnerActivities, recordClassroomPresence,
   submitClassroomResponse,
@@ -25,6 +26,7 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
   // Freeze the original payload whenever the server outcome is unknown.
   // A replay must be byte-for-byte identical, even if the prompt closes.
   const pendingAnswers=useRef<Record<string,string>>({});
+  const [recoveries,setRecoveries]=useState(0);
   const state=useQuery({
     queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId],
     queryFn:()=>getClassroomLearnerActivities({data:{courseAttemptId,facilitatedSessionId}}),
@@ -50,6 +52,8 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
   },[queryClient,facilitatedSessionId,courseAttemptId]);
   useEffect(()=>{
     instance.current=accessClientInstance();
+    // Only restore matching tab/device identities; no enrollment authority is inferred.
+    setRecoveries(value=>value+1);
     const send=(eventKind:"joined"|"heartbeat"|"away")=>{
       if(!instance.current)return;
       void recordClassroomPresence({data:{
@@ -66,6 +70,23 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
     return ()=>{window.clearInterval(timer);document.removeEventListener("visibilitychange",visibility);};
   },[courseAttemptId,facilitatedSessionId]);
 
+  useEffect(()=>{
+    if(!state.isSuccess)return;
+    const recovered:Record<string,string>={};
+    for(const activity of state.data.activities){
+      const key=classroomPendingKey(courseAttemptId,facilitatedSessionId,activity.id);
+      if(activity.responded){clearPendingClassroomResponse(window.sessionStorage,key);continue;}
+      if(retryIds.current[activity.id])continue;
+      const stored=readPendingClassroomResponse(window.sessionStorage,key);
+      if(stored && stored.clientInstanceId===instance.current){
+        retryIds.current[activity.id]=stored.clientSubmissionId;
+        pendingAnswers.current[activity.id]=stored.answer;
+        recovered[activity.id]=stored.answer;
+      }
+    }
+    if(Object.keys(recovered).length)setAnswers(previous=>({...previous,...recovered}));
+  },[state.isSuccess,state.data,courseAttemptId,facilitatedSessionId,recoveries]);
+
   async function submit(activity:{id:string;answerType:"single_choice"|"text";choices:string[]}){
     if(busy)return;
     if(!online){
@@ -78,24 +99,30 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
     const clientSubmissionId=retryIds.current[key]??crypto.randomUUID();
     retryIds.current[key]=clientSubmissionId;
     pendingAnswers.current[key]=answer;
+    const storageKey=classroomPendingKey(courseAttemptId,facilitatedSessionId,key);
+    const clientInstanceId=instance.current||accessClientInstance();
+    if(!writePendingClassroomResponse(window.sessionStorage,storageKey,{
+      clientSubmissionId,clientInstanceId,answer,savedAt:Date.now(),
+    }))setNotice("Your browser cannot retain an interrupted answer after reload. Keep this tab open.");
     setBusy(key);setError("");setNotice("");
     try{
       await submitClassroomResponse({data:{
         facilitatedSessionId,courseAttemptId,activityReleaseId:activity.id,
-        clientInstanceId:instance.current||accessClientInstance(),
+        clientInstanceId,
         clientSubmissionId,
         answerChoice:activity.answerType==="single_choice"?Number(answer):null,
         answerText:activity.answerType==="text"?answer.trim():null,
       }});
       delete retryIds.current[key];
       delete pendingAnswers.current[key];
+      clearPendingClassroomResponse(window.sessionStorage,storageKey);
       setNotice("Response saved. This is formative work, not a graded submission.");
       // Refresh is best-effort: a refresh outage must not turn a confirmed
       // server write into a misleading failed-submission message.
       void queryClient.invalidateQueries({queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId]})
         .catch(()=>{});
     }catch{
-      setError("Response was not confirmed. Retry with the unchanged answer. If the question has closed, only a previously saved response can be confirmed.");
+      setError("Response not confirmed. Retry the identical answer. Closed questions can only confirm a previously saved response.");
     }
     finally{setBusy("");}
   }
