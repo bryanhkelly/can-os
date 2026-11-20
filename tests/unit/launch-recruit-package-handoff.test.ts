@@ -122,7 +122,7 @@ describe("Recruit from one saved Marketing Package and existing family invitatio
 
   it("rejects saved package subjects containing line breaks",async()=>{
     calls.listPackages.mockResolvedValue([packageRecord({
-      headline:"Family invitation\\nInjected header",message:"Welcome.",
+      headline:"Family invitation\nInjected header",message:"Welcome.",
     })]);
     const result=await loader({siteId:siteA,purpose:"interest",packageId});
     expect(result.ok).toBe(false);
