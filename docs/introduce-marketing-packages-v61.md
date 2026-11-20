@@ -10,12 +10,12 @@
 - Interest Events uses the existing Program-linked event service. A saved, active **event-invitation Marketing Package** can now hand its editable headline directly into event creation, with exact Site and package ID validation. When no package is selected, the create screen may suggest a title from the same Site Story and Programs & Audiences projection. The operator still supplies the Program, confirmed date, time, location, and description; no event is created or distributed by the marketing module.
 - The focused modules do not imply a new Site-wide prospect CRM, marketing distribution service, or event store.
 - Promote is a Site-scoped, server-authorized package library and four-step content workflow: Menu, Audience, Messages, Collateral & Assets.
-- Operators can create, save, reopen, duplicate, archive, restore and permanently delete draft package content.
+- Operators can create, save, reopen, duplicate, archive and restore editable Package drafts. **Only unreleased drafts can be permanently deleted**; Packages with generated releases are archived to preserve immutable audit and download references.
 - Dedicated site_marketing_packages table (migration 0088) with revision checks, exact Site/organization ownership, actor attribution and append-only audit metadata. Marketing Package records now select a canonical immutable Site Brand version through migrations 0089/0090.
 - Four purpose-specific starters read the same private Site Information Purpose & Story choices and Programs & Audiences intent saved in Establish. The builder proposes an audience and editable message, without publishing private narrative answers or inventing approved offerings.
 - Saved Website & Brand copy is offered as a separate explicit suggestion. Existing package edits and released assets never change automatically.
 - Flyer, handout and social SVG templates have format-specific V2 layouts; social releases retain a complete text caption. Generated SVG artwork can also be downloaded as PNG through the browser, from immutable output bytes.
-- The existing V6.1 LaunchSiteFrame, WorkspaceShell, ActionFooter, and form primitives are reused.
+- The existing V6.1 LaunchSiteFrame, WorkspaceShell, ActionFooter and form primitives are reused. A controlled `MarketingPackageWizardV61` presents all four Menu/Audience/Messages/Collateral steps, and `MarketingPackageReleaseHistoryV61` presents frozen releases, downloads and comparisons. `MarketingPackagesV61` remains their one lifecycle controller.
 - Collateral & Assets displays a large live visual preview beside the format picker. The authorized POST preview service calls the exact same Site artifact renderer used by immutable releases, using the package's saved Brand version (or the current saved Brand for a new package) and current unsaved copy. SVG layouts are displayed as images; email HTML is isolated in a sandboxed iframe. Previewing creates no artifact, publication, or distribution record.
 - No Brand: show a clear Establish handoff. No authorized durable public URL: explain why a QR card cannot be previewed. Protected claims: show a review message rather than rendering promotional output.
 
@@ -25,7 +25,7 @@
 - This integration is **committed only to the feature branch**; authenticated execution, build and end-to-end tests are not claimed.
 
 ## Not implemented (outside this slice)
-- Production server-generated PDF/ZIP exports and a fully unified R2 media-library interface. Initial SVG collateral, browser PNG conversion, and HTML email generation with immutable release snapshots are implemented in source but remain unverified.
+- Server-generated PDF exports, independent promotional-email sending, and a fully unified R2 media-library asset store. Initial SVG collateral, browser PNG conversion, complete downloadable Package Release ZIP bundles, and HTML email generation with immutable release snapshots are implemented in source but remain runtime-unverified.
 - A Marketing Package-specific audience/contact CRM, recipient import, opt-out subscription management, campaign sending and scheduling. The **existing** authorized family-invitation service handles its separate, consent-aware preopening interest and application workflows; it is not replaced or duplicated by Marketing Packages.
 - Creation of public interest forms or enrollment claims.
 - No pretend asset thumbnails, send metrics, delivery status or fake public links. The live collateral preview uses the exact production SVG/HTML renderer, with typing debounced. Material previews use the real SVG/email templates; native email sending is still out of scope.
@@ -37,8 +37,16 @@ Package records remain mutable while their selected canonical Brand version is e
 - Use a verified server session and assertSiteSetupScope for each read and mutation; a URL Site ID is not authorization.
 - Mutations use database transactions, package-row locking, revision checks and audit metadata that excludes private message bodies.
 - Statuses are draft or archived only. Ready, delivered, published, exported, or enrolled are not inferred from completion of a wizard page.
-- Delete is permanent for an unsent draft package (there is currently no distribution relationship to orphan).
+- Delete is permanent only for an **unreleased** draft Package. Once any immutable release exists, deletion is blocked and archive is the supported lifecycle, even if no actual email was sent.
 - A database without migration 0088 fails explicitly. Do not silently persist packages in generic Launch drafts or browser local storage.
+
+## Updated Brand and media contract
+
+- No Marketing Package owns Brand colors, typography, logo or marketing-only media assets. Its selected immutable `brandVersionId` is applied by the shared Site Brand resolver.
+- Immutable output manifests capture actual rendered files and asset identity/checksums, while the mutable Package remains independently editable.
+- `src/domain/site-media-rights.ts` supplies common public-media eligibility for Brand identity PNGs and existing approved R2 Site photographs. Those providers retain distinct storage and exact Site access boundaries. There is no second image-upload interface in Introduce.
+- Saved Package releases are preserved across later Brand changes; operators explicitly select a newer saved Brand, then deliberately generate another complete Package Release.
+- The approved Site publication and enrollment process stays separate. Unpublished Sites can create appropriately labeled introductory materials but cannot print an unauthorized temporary share-preview QR as a durable destination.
 
 ## Required before enabling live usage
 1. Review and apply migration 0088 in the authorized environment, including scope and RLS behavior.
@@ -61,4 +69,4 @@ The existing Program-linked Interest Events workspace now filters its Program ch
 - The Site-first private preview returns to Launch Studio for authorized registrar readers; the separately authorized Website & Brand preview returns to its Review & Finish step.
 - Focused loader tests now exercise package references, multiple Sites, eligibility, protected claims and preservation of family invitation consent boundaries. These tests have been added but cannot be reported as passing until a real test run.
 
-No changes were made to collateral update semantics, schema migrations, live distribution systems or main.
+This update also extracted the controlled wizard and immutable release-history presentation, and incorporated the current main canonical-schema work into the **feature branch only**. It did not apply migrations or change live distribution systems or `main`.
