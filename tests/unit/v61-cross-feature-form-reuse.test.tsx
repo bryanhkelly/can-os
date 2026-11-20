@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { ActionFooter } from "@/components/workspace/action-footer";
+import { Button } from "@/components/ui/button";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FamilyInvitationForm } from "@/components/admissions/FamilyInvitationForm";
@@ -9,8 +10,8 @@ import { ExtendedSeasonDraftForm } from "@/components/operations/ExtendedSeasonD
 describe("V6.1 cross-feature form composition", () => {
   it("renders the shared step footer with appropriate spacing and labeled workflow actions", () => {
     const html = renderToStaticMarkup(<ActionFooter layout="step">
-      <button type="button">Previous step</button>
-      <div><button type="button">Save and continue</button></div>
+      <Button type="button" variant="outline">Previous step</Button>
+      <div><Button type="button">Save and continue</Button></div>
     </ActionFooter>);
     expect(html).toContain('data-action-footer="step"');
     expect(html).toContain("justify-between");
