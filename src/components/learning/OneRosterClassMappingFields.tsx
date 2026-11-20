@@ -34,7 +34,7 @@ export function OneRosterClassMappingFields({
     <p role="status" className="text-xs text-muted-foreground">{complete
       ? "Ready for registrar review: all classes have distinct existing CAN Sections. No student identities or enrollments will be created."
       : `${pending.length} class mappings pending; ${new Set(duplicateSections).size} duplicate Section selections. All mappings must be resolved before saving.`}</p>
-    <Button variant="outline" type="button" className=" border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+    <Button variant="outline" type="button"
       disabled={busy || !complete} onClick={onSave}>Save class mappings</Button>
   </div>;
 }
