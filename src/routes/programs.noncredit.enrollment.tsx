@@ -84,7 +84,7 @@ function NoncreditPublicationPage(){
           ...base,siteIds:[siteId,...additionalSites],
         }});
         setCreated(result.releases[0]?.releaseId??"");
-        setMessage(result.releases.length+" independently authorized Site releases published. Each Site has its own capacity and cohort sessions.");
+        setMessage(result.releases.length+" independently authorized Site releases published. Each Site has its own capacity and dated Classes.");
       }else{
         const result=await publishNoncreditSelfEnrollment({data:{
           ...base,deliveryMode,siteId,
