@@ -7,7 +7,7 @@ import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import {
   filterPublishedSolutionRecipes, matchingSolutionInterests,
-  orderSolutionsByVision, resolveVisibleSolutionRecipe,
+  orderSolutionsByVision, resolveVisibleSolutionRecipe, selectSavedSolutionPlans,
 } from "@/domain/launch-prepare-v61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { CanonicalBlueprintWorkspace } from "./CanonicalBlueprintWorkspace";
@@ -61,6 +61,9 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
     intent?.programCodes ?? [], intent?.startingProgramCode,
   );
   const selected = resolveVisibleSolutionRecipe(visible, selectedId);
+  const savedForSelected = selected
+    ? selectSavedSolutionPlans(workspace?.configurations ?? [], selected.blueprintVersionId)
+    : [];
 
   return <WorkspacePanel title="Available Solutions"
     description="Browse CAN-published Solutions and configure your Site plan. Definitions are maintained separately by CAN app administrators.">
@@ -156,14 +159,11 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                   }}>
                     Start a Solution plan <ArrowRight aria-hidden="true" className="size-4" />
                   </Button>
-                  {workspace.configurations.filter(configuration =>
-                    configuration.blueprintVersionId === selected.blueprintVersionId).length > 0 &&
+                  {savedForSelected.length > 0 &&
                     <div className="border-t pt-3">
                       <h4 className="text-sm font-semibold">Continue saved plans</h4>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {workspace.configurations.filter(configuration =>
-                          configuration.blueprintVersionId === selected.blueprintVersionId)
-                          .map(configuration => <Button key={configuration.configurationId}
+                        {savedForSelected.map(configuration => <Button key={configuration.configurationId}
                             type="button" variant="outline" size="sm"
                             onClick={() => {
                               setResumeConfigurationId(configuration.configurationId);
