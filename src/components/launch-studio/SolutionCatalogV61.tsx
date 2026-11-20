@@ -7,11 +7,10 @@ import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import {
   filterPublishedSolutionRecipes, matchingSolutionInterests,
-  orderSolutionsByVision, preferredCatalogDelivery, resolveVisibleSolutionRecipe,
+  orderSolutionsByVision, resolveVisibleSolutionRecipe,
 } from "@/domain/launch-prepare-v61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { CanonicalBlueprintWorkspace } from "./CanonicalBlueprintWorkspace";
-import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 
 type BlueprintWorkspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 
@@ -32,6 +31,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
   const [workspace, setWorkspace] = useState<BlueprintWorkspace | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [configuringVersionId, setConfiguringVersionId] = useState<string | null>(null);
+  const [resumeConfigurationId, setResumeConfigurationId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
@@ -43,6 +43,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
     setWorkspace(null);
     setSelectedId(null);
     setConfiguringVersionId(null);
+    setResumeConfigurationId(null);
     setError(null);
     setQuery("");
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
@@ -62,7 +63,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
   const selected = resolveVisibleSolutionRecipe(visible, selectedId);
 
   return <WorkspacePanel title="Available Solutions"
-    description="Select a CAN-published Solution and configure its local implementation. Blueprint definitions are managed by CAN administrators.">
+    description="Browse CAN-published Solutions and configure your Site plan. Definitions are maintained separately by CAN app administrators.">
     {loading && <p role="status" className="text-sm">Loading published Solutions…</p>}
     {error && <div role="alert" className="border border-destructive/30 bg-card p-4 text-sm">
       <p className="font-semibold">Unable to load Solutions</p>
@@ -79,7 +80,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
       {templates.length === 0 ? <EmptyState title="No published Solutions"
         description="A Solution must be published and available to this Site before it can be configured." className="mt-4" /> : <>
         <FilterBar label="Published Solutions" query={query}
-          onQueryChange={value => { setQuery(value); setSelectedId(null); setConfiguringVersionId(null); }}
+          onQueryChange={value => { setQuery(value); setSelectedId(null); setConfiguringVersionId(null); setResumeConfigurationId(null); }}
           searchLabel="Search published Solutions"
           searchPlaceholder="Search titles or components" className="mt-5" />
         <p role="status" className="mt-3 text-xs text-muted-foreground">
@@ -101,6 +102,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                   variant="ghost" onClick={() => {
                     setSelectedId(template.blueprintVersionId);
                     setConfiguringVersionId(null);
+                    setResumeConfigurationId(null);
                   }}
                   aria-pressed={active}
                   className={"h-auto min-h-20 w-full justify-start whitespace-normal border p-4 text-left hover:bg-muted " +
@@ -145,10 +147,31 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                   </div>
                 </div>
                 <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the governed Solution and Site qualification workflows. This preview does not infer missing requirements.</p>
-                {workspace.canConfigure ? <Button type="button" onClick={() =>
-                  setConfiguringVersionId(selected.blueprintVersionId)}>
-                    Configure this Solution <ArrowRight aria-hidden="true" className="size-4" />
-                  </Button> : <p role="status" className="border bg-muted p-3 text-sm">
+                {workspace.canConfigure ? <div className="space-y-3">
+                  <Button type="button" onClick={() => {
+                    setResumeConfigurationId(null);
+                    setConfiguringVersionId(selected.blueprintVersionId);
+                  }}>
+                    Start a Solution plan <ArrowRight aria-hidden="true" className="size-4" />
+                  </Button>
+                  {workspace.configurations.filter(configuration =>
+                    configuration.blueprintVersionId === selected.blueprintVersionId).length > 0 &&
+                    <div className="border-t pt-3">
+                      <h4 className="text-sm font-semibold">Continue saved plans</h4>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {workspace.configurations.filter(configuration =>
+                          configuration.blueprintVersionId === selected.blueprintVersionId)
+                          .map(configuration => <Button key={configuration.configurationId}
+                            type="button" variant="outline" size="sm"
+                            onClick={() => {
+                              setResumeConfigurationId(configuration.configurationId);
+                              setConfiguringVersionId(selected.blueprintVersionId);
+                            }}>
+                            {configuration.name} · {configuration.lifecycle === "frozen" ? "In review" : "Draft"}
+                          </Button>)}
+                      </div>
+                    </div>}
+                </div> : <p role="status" className="border bg-muted p-3 text-sm">
                   You can review Solutions but are not authorized to configure them for this Site.
                 </p>}
               </div>
@@ -162,20 +185,15 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
           Return to Solution details
         </Button>
       </div>
-      <CanonicalBlueprintWorkspace key={siteId + ":" + configuringVersionId}
-        siteId={siteId} initialBlueprintVersionId={configuringVersionId} embedded enableReferences />
+      <CanonicalBlueprintWorkspace key={siteId + ":" + configuringVersionId + ":" + (resumeConfigurationId ?? "new")}
+        siteId={siteId} initialBlueprintVersionId={configuringVersionId}
+        initialConfigurationId={resumeConfigurationId ?? undefined}
+        embedded enableReferences />
     </>}
-    <details className="mt-6 border-t pt-5">
-      <summary className="cursor-pointer text-sm font-semibold">
-        Explore published learning products
-      </summary>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">
-        Published products have separate availability policies and may be included in an
-        approved Solution plan. Availability does not establish that a particular
-        product is part of the selected Solution or approved for this Site.
-      </p>
-      <ProgramDiscoveryPanel key={siteId + ":" + preferredCatalogDelivery(delivery)}
-        siteId={siteId} initialDelivery={preferredCatalogDelivery(delivery)} />
-    </details>
+    <p className="mt-6 border-t pt-4 text-xs leading-5 text-muted-foreground">
+      When a selected Solution includes a Program model, you can choose its approved
+      published learning products while configuring the Site plan. Adoption, class
+      publication, and enrollment each require separate authorization.
+    </p>
   </WorkspacePanel>;
 }
