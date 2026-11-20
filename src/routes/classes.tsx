@@ -52,6 +52,7 @@ import { getOrCreateAnnouncementAttempt, wasAnnouncementAccepted, type ClassAnno
 import { openClassDownload } from "@/lib/class-download";
 import { LearningActivityTracker } from "@/components/learning/LearningActivityTracker";
 import { deriveClassNextSteps } from "@/domain/student-success";
+import { assessmentsForPublishedLesson } from "@/domain/class-assessment-evidence";
 
 const tabs = ["overview", "lessons", "planning", "files", "syllabus", "announcements", "people", "teacher-guide"] as const;
 const meetingCommands = { get: getClassroomMeetings, schedule: scheduleClassroomMeeting, saveLink: setClassroomMeetingLink };
@@ -172,7 +173,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   // instruction, even if they precede the first authored lesson.
   const { lesson, lessonIndex, previousLesson, nextLesson } = selectPublishedLesson(lessons,
     lessonId ?? lessons.find(item => !completed.has(item.id))?.id ?? lessons[0]?.id);
-  const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
+  const currentModuleId = lesson ? data.content?.modules.find(module => module.lessons.some(item => item.id === lesson.id))?.id : undefined;
+  const relatedWork = lesson ? assessmentsForPublishedLesson(assessmentEvidence, lesson.id, currentModuleId) : [];
   const lessonDiscussions = lesson ? (data.discussions ?? []).filter(item => item.lessonId === lesson.id || item.lessonId === null) : [];
   const videoResource = (item: ClassContent["resources"][number]) => Boolean(item.url && resolveClassVideo(item.url));
   const videoSupplement = (item: typeof supplements[number]) => item.kind === "video" || Boolean(item.url && resolveClassVideo(item.url));
