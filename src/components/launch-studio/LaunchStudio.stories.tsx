@@ -54,6 +54,14 @@ export const Welcome: Story = {
     if (mobileNavigation) await userEvent.click(mobileNavigation);
     await expect(canvas.getByRole("button", { name: "2 School details" })).toHaveAttribute("aria-current", "step");
     await expect(canvas.queryByText("100%")).not.toBeInTheDocument();
+    // Standalone header and PageFrame share the V6.1 horizontal gutter.
+    const header = canvasElement.querySelector(".launch-studio > header");
+    const brand = header?.querySelector("a");
+    const main = canvas.getByRole("main");
+    await expect(header).toBeTruthy();
+    await expect(brand).toBeTruthy();
+    const contentLeft = main.getBoundingClientRect().left + parseFloat(getComputedStyle(main).paddingLeft);
+    await expect(Math.abs((brand?.getBoundingClientRect().left ?? 0) - contentLeft)).toBeLessThanOrEqual(1);
   },
 };
 export const PendingReview: Story = { render: () => <Journey state="pending" /> };
