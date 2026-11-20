@@ -4,11 +4,10 @@
  * Do not persist user-visible checkboxes as readiness or infer regulatory fit.
  */
 import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, Globe2, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
-import { prepareStageModulesV61, preferredCatalogDelivery, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
+import { prepareStageModulesV61, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
-import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
 import { LaunchSitePublicationPanel } from "./LaunchSitePublicationPanel";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
@@ -47,12 +46,11 @@ const scoped = (siteId: string) => encodeURIComponent(siteId);
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {
     question: "Which published Solutions support the programs your community wants to offer?",
-    decision: "Explore published Solutions and available Offerings. Configure your choices only in the existing governed Site planning workflow.",
-    canSupplies: "Published Solution models, Offering availability guidance and governed configuration workflows.",
+    decision: "Select a CAN-published Solution aligned with your Site vision and configure its operating requirements here in Prepare. Enrollable Classes remain independently authorized.",
+    canSupplies: "CAN-administered, versioned Solution definitions, published learning products, eligibility guidance and authorized configuration workflows.",
     siteProvides: "A selected operating model, physical capabilities, staff coverage, local constraints and evidence.",
     status: "governed",
     handoffs: [
-      { title: "Configure a Solution", detail: "Plan a published Solution using the existing governed configuration workflow. Site approval and learner enrollment remain separate.", href: id => "/canonical/blueprints?siteId=" + scoped(id) },
       { title: "Manage authorized Classes", detail: "Configure actual Classes only where the existing Course and Site gates allow it.", href: id => "/class?view=manage&siteId=" + scoped(id) },
     ],
   },
@@ -112,7 +110,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     handoffs: [
       { title: "Review opening and compliance", detail: "Resolve real opening blockers in the institutional preparation workflow.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
       { title: "Review Site qualification", detail: "Inspect recorded facility and program-fit evidence, where authorized.", href: () => "/canonical/lab/site-qualification" },
-      { title: "Return to Solution planning", detail: "Verify the selected operating model, not just the intended Program.", href: id => "/canonical/blueprints?siteId=" + scoped(id) },
+      { title: "Return to Solution planning", detail: "Verify the selected operating model, not just the intended Program.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=program-catalog" },
     ],
   },
   "publish-site": {
@@ -164,7 +162,6 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
   const definition = prepareModulesV61.find(item => item.id === module)!; // Module navigation is owned by LaunchSiteFrame.
   const plan = modulePlans[module];
   const Icon = definition.icon;
-  const discoveryDelivery = preferredCatalogDelivery(delivery);
   return <WorkspaceShell width="wide" title={definition.title}
     eyebrow="Launch Studio / Prepare"
     subtitle={definition.subtitle}
@@ -221,11 +218,10 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
             </div>)}
           </div>
         </WorkspacePanel>
-        <SolutionCatalogV61 key={siteId} siteId={siteId} />
-        <ProgramDiscoveryPanel key={`${siteId}:${discoveryDelivery}`} siteId={siteId} initialDelivery={discoveryDelivery} />
+        <SolutionCatalogV61 key={siteId} siteId={siteId} intent={intent} delivery={delivery} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
-          Discovery returns published Offerings and their availability policies, not a complete verified Solution fit.
-          Selection is recorded only in the existing authorized configuration workflow. Browsing does not create another record.
+          CAN administers the published Solution definition. Site operators configure their own plan with the existing governed commands.
+          Discovery and planning never grant Site qualification, publication or enrollment authority.
         </WorkspaceNotice>
       </>}
       {module === "publish-site" && <LaunchSitePublicationPanel key={siteId} siteId={siteId} />}
