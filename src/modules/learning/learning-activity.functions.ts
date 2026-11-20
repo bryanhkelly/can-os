@@ -116,7 +116,8 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
       if (!lesson) throw new AuthorizationError("published lesson");
       if (data.interaction.kind === "resource_opened" ||
           data.interaction.kind.startsWith("video_")) {
-        const resourceId = data.interaction.resourceId;
+        const resourceId = "resourceId" in data.interaction ? data.interaction.resourceId : undefined;
+        if (!resourceId) throw new AuthorizationError("published video reference");
         const publisherResource = classResources(content).find(resource =>
           resource.id === resourceId &&
           (lesson.resources.some(item => item.id === resource.id) ||
