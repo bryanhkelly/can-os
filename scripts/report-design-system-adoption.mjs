@@ -33,6 +33,7 @@ const canonicalTags = new Set([
   "GroupMembershipRequestRow", "GroupModerationReportRow",
   "CalendarWeekGrid", "CalendarMonthGrid", "CalendarEventComposer",
   "BlueprintComponentPicker", "BlueprintReferencesPicker",
+  "LaunchTeacherClassRequests", "LaunchClassroomPrerequisites",
   "OperationsActionCard",
   "ExtendedSeasonDraftForm", "ExtendedSeasonReadinessRequests",
 ]);
