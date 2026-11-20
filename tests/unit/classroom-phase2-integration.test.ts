@@ -103,6 +103,17 @@ describe("Classroom Connect Phase 2 learner activities", () => {
     expect(companion).toContain("void queryClient.invalidateQueries");
     expect(companion).toContain(".catch(()=>{})");
   });
+  it("shares existing classroom actions across native Class and companion", () => {
+    const native = source("src/components/learning/NativeClassroomCompanion.tsx");
+    const pairing = source("src/components/learning/FacilitatedLearnerPairing.tsx");
+    const companion = source("src/routes/classroom.companion.tsx");
+    expect(native).toContain("<ClassroomCompanionRoom");
+    expect(native).toContain('to="/classroom/companion" search={{courseAttemptId}}');
+    expect(companion).toContain("getRecentClassroomFeedback");
+    expect(companion).toContain("ClassroomGovernedLearnerSurveys");
+    expect(pairing).toContain('queryKey:["native-class-companion",courseAttemptId]');
+    expect(pairing).toContain("void refresh().catch(()=>setObservationUnavailable(true))");
+  });
   it("rehearses a specific approved adoption without a fabricated learner", () => {
     const preview = source("src/modules/learning/classroom-rehearsal.functions.ts");
     const rights = source("src/modules/learning/student-instructional-tracks.server.ts");
