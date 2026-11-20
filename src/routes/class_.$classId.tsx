@@ -17,6 +17,10 @@ import { NativeClassActivationStatus } from "@/components/learning/NativeClassAc
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassHomeworkPanel } from "@/components/learning/NativeClassHomeworkPanel";
+import { NativeClassKnowledgeCheckPanel } from "@/components/learning/NativeClassKnowledgeCheckPanel";
+import { NativeClassTeacherHomeworkPanel, NativeClassTeacherAssessmentPanel } from
+  "@/components/learning/NativeClassTeacherReviewPanels";
+import { NativeClassDiscussionPanel } from "@/components/learning/NativeClassDiscussionPanel";
 import { NativeValorLessonPanel } from "@/components/learning/NativeValorLessonPanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
 import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
@@ -63,7 +67,7 @@ export const Route=createFileRoute("/class_/$classId")({
 type Workspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
 
 const tabLabels:Record<string,string>={
-  overview:"Overview",lessons:"Lessons",assignments:"Assignments",
+  overview:"Overview",lessons:"Lessons",assignments:"Assignments",assessments:"Knowledge checks",discussions:"Discussions",
   progress:"My progress",sessions:"Sessions",roster:"Roster",
   classroom:"Classroom",offering:"Class Offering",reports:"Reports",completion:"Completion",
 };
@@ -188,10 +192,14 @@ function LearnerClass({workspace}:{workspace:Workspace}){
         <p className="mt-2 text-sm">{data.awards.filter(a=>!a.revokedAt).length} active awards recorded.</p>
       </>}
     </section>}
+    {workspace.tab==="discussions"&&
+      <NativeClassDiscussionPanel classEnrollmentId={learner.classEnrollmentId}/>}
     {workspace.tab==="assignments"&&<div className="space-y-5">
       <NativeClassHomeworkPanel classEnrollmentId={learner.classEnrollmentId}/>
       <NativeClassCanonicalEvidencePanel classEnrollmentId={learner.classEnrollmentId}/>
     </div>}
+    {workspace.tab==="assessments"&&
+      <NativeClassKnowledgeCheckPanel courseAttemptId={learner.courseAttemptId}/>}
     {workspace.tab==="sessions"&&<>
       <NativeClassSessionsPanel workspace={workspace}/>
       {learner.status==="active"&&<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>}
@@ -225,6 +233,22 @@ function TeachingClass({workspace}:{workspace:Workspace}){
         </div>
       </section>
     </div>}>
+    {workspace.tab==="discussions"&&
+      <NativeClassDiscussionPanel classId={workspace.classId}/>}
+    {workspace.tab==="assignments"&&(
+      workspace.staffRole==="teacher"
+        ?<NativeClassTeacherHomeworkPanel classId={workspace.classId}/>
+        :<section className="border border-border bg-card p-5 text-sm">
+          Class homework responses require a verified assigned academic teacher.
+        </section>
+    )}
+    {workspace.tab==="assessments"&&(
+      workspace.staffRole==="teacher"
+        ?<NativeClassTeacherAssessmentPanel classId={workspace.classId}/>
+        :<section className="border border-border bg-card p-5 text-sm">
+          Knowledge-check authoring and review require an authorized academic teaching role.
+        </section>
+    )}
     {workspace.tab==="overview"&&<section className="border border-border bg-card p-5">
       <h2 className="font-serif text-2xl">Teaching overview</h2>
       <p className="mt-3 text-sm">{workspace.lessons.length} published lessons · {workspace.rosterCount} current enrollments.</p>
@@ -243,10 +267,17 @@ function TeachingClass({workspace}:{workspace:Workspace}){
       </p>}
     </section>}
     {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}
-      canSchedule onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>}
-    {workspace.tab==="classroom"&&<NativeClassSessionsPanel workspace={workspace}
-      canSchedule showConsole
+      canSchedule={workspace.canControlRoom}
       onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>}
+    {workspace.tab==="classroom"&&(
+      workspace.canControlRoom
+      ?<NativeClassSessionsPanel workspace={workspace} canSchedule showConsole
+        onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>
+      :<section className="border border-border bg-card p-5 text-sm">
+        Facilitated classroom controls require a separately verified Site room-facilitator
+        grant, a current Class assignment and an authorized scheduled Session.
+      </section>
+    )}
     {workspace.tab==="roster"&&<Roster workspace={workspace} namesAllowed={canSeeNames}/>}
   </UnifiedCoursePlayer>;
 }

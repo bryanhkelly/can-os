@@ -125,6 +125,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       const now=new Date();
       let canLearn=false;
       let canTeach=false;
+      let canControlRoom=false;
       let canManage=false;
       let learner:{classEnrollmentId:string;courseAttemptId:string;creditMode:string;status:string}|null=null;
       let staffRole:"teacher"|"facilitator"|null=null;
@@ -134,7 +135,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       // they teach, operate or administer the same Class.
       if((actor.role==="learner"&&actor.capabilities.has("learning.participate")) ||
          (actor.role==="student"&&actor.capabilities.has("student:read") &&
-          !!instance.siteId && actor.grantSiteId===instance.siteId &&
+          !!instance.siteId && actor.scope.siteIds?.[0]===instance.siteId &&
           actor.scope.organizationIds?.includes(instance.operatingOrganizationId))){
         const active=await tx.select({
           id:canonicalClassEnrollments.id,
@@ -183,6 +184,32 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           await currentClassAuthority(tx,instance.id,now);
           staffRole=assignments.some(x=>x.roleCode==="teacher")?"teacher":"facilitator";
           canVerifyAttendance=assignments.some(x=>x.attendanceAuthorized);
+          canControlRoom=true;
+          canTeach=true;
+        }
+      }
+
+      // Direct CAN academic teachers can read the exact Class they teach,
+      // without inheriting room-facilitation or official-grading powers.
+      if(instance.siteId && actor.role==="teacher" &&
+          actor.capabilities.has("teacher:read") &&
+          actor.scope.siteIds?.length===1 &&
+          actor.scope.siteIds[0]===instance.siteId &&
+          actor.scope.organizationIds?.length===1 &&
+          actor.scope.organizationIds[0]===instance.operatingOrganizationId){
+        const [assigned]=await tx.select({id:canonicalClassStaffAssignments.id})
+          .from(canonicalClassStaffAssignments).where(and(
+            eq(canonicalClassStaffAssignments.classId,instance.id),
+            eq(canonicalClassStaffAssignments.personId,actor.actorPersonId!),
+            eq(canonicalClassStaffAssignments.roleCode,"teacher"),
+            eq(canonicalClassStaffAssignments.state,"approved"),
+            lte(canonicalClassStaffAssignments.beginsAt,now),
+            or(isNull(canonicalClassStaffAssignments.endsAt),
+               gt(canonicalClassStaffAssignments.endsAt,now)),
+          )).limit(1);
+        if(assigned){
+          await currentClassAuthority(tx,instance.id,now);
+          staffRole="teacher";
           canTeach=true;
         }
       }
@@ -229,7 +256,10 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       // Only the Class operator or an explicitly assigned teacher receives
       // personally identifying roster information. A facilitator sees counts.
       // A teaching assignment is not, by itself, permission to read minor or adult learner identities.
-      const rosterAllowed=canManage||(view==="teach"&&canVerifyAttendance);
+      const rosterAllowed=canManage||(view==="teach"&&(
+        canVerifyAttendance||
+        (actor.role==="teacher"&&staffRole==="teacher"&&actor.capabilities.has("teacher:read"))
+      ));
       let roster:Array<{enrollmentId:string;personId:string;name:string;status:string;creditMode:string}>=[];
       let rosterCount=0;
       if((view==="teach"||view==="manage")){
@@ -427,7 +457,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         deliveryMode:instance.deliveryMode,state:instance.state,
         view,tab,availableViews:permittedViews,
         availableTabs:classTabs[view],
-        learner,staffRole,canVerifyAttendance,
+        learner,staffRole,canVerifyAttendance,canControlRoom,
         canViewRoster:rosterAllowed,
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
         offering,lessons,staffCandidates,staffAssignments,learnerCandidates,

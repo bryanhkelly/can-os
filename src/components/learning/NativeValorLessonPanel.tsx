@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { markNativeClassLessonComplete } from "@/modules/classes/native-class-learning.functions";
 import { normalizeClientError } from "@/lib/client-error";
 
@@ -58,14 +59,12 @@ export function NativeValorLessonPanel({classEnrollmentId,lessons,selectedLesson
         These external demonstration videos are awaiting teacher and accessibility review.
         They are not required to complete the lesson.
       </p>
-      <ul className="space-y-2">
-        {selected.videoResources.map(video=><li key={video.url}>
-          <a href={video.url} target="_blank" rel="noopener noreferrer"
-            className="text-sm font-medium text-primary underline underline-offset-2">
-            {video.title}
-          </a>
-        </li>)}
-      </ul>
+      <div className="space-y-4">
+        {selected.videoResources.map(video=>
+          <ClassVideoPlayer key={video.url} title={video.title}
+            url={video.url} declaredVideo presentation="classroom"/>
+        )}
+      </div>
     </section>}
     <div className="border-t border-border pt-4">
       <Button type="button" variant={done?"outline":"default"}

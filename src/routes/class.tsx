@@ -19,6 +19,7 @@ import { getMyNativeClassInvitations } from "@/modules/classes/native-class-invi
 import { getMyNativeClassApprovals } from "@/modules/classes/native-class-approvals.functions";
 import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
 import { getValorStudentClasses } from "@/modules/classes/native-valor-demo-student.functions";
+import { getMyNativeTeachingClasses } from "@/modules/classes/native-class-teacher-home.functions";
 import { ValorStudentClassHome } from "@/components/learning/ValorStudentClassHome";
 
 /** Load privileged Class management composition only when requested,
@@ -122,6 +123,46 @@ function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
   </WorkspaceShell>;
   if(student.data?.kind==="student")return <ValorStudentClassHome
     classes={student.data.classes} navigation={navigation}/>;
+  return <NativeTeacherOrAdultClasses navigation={navigation}/>;
+}
+
+
+/** A direct CAN teacher sees only Classes with an approved current
+ * Person-to-Class appointment. Their home does not use the adult learner
+ * cookie or infer authority from a generic teacher role. */
+function NativeTeacherOrAdultClasses({navigation}:{navigation:ReactNode}){
+  const teacher=useQuery({
+    queryKey:["native-my-teaching-classes"],
+    queryFn:()=>getMyNativeTeachingClasses(),retry:false,
+  });
+  if(teacher.isPending)return <WorkspaceShell width="wide" eyebrow="CAN OS"
+    title="My Classes">
+    <p role="status" className="mt-5 text-sm">Checking your assigned Classes…</p>
+  </WorkspaceShell>;
+  if(teacher.data?.kind==="teacher")return <WorkspaceShell width="wide"
+    eyebrow="CAN OS · Teaching" title="My Classes"
+    subtitle="Only current, approved Class teaching appointments appear here. This is not independent grading or room supervision authority.">
+    {navigation}
+    <section aria-label="Assigned Classes" className="mt-5 space-y-3">
+      {teacher.data.classes.length===0&&<p className="text-sm text-muted-foreground">
+        No active native Classes have been assigned to your current teacher grant.
+      </p>}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {teacher.data.classes.map(item=><article key={item.classId}
+          className="space-y-3 border border-border bg-card p-4">
+          <h2 className="font-serif text-xl">{item.title}</h2>
+          <p className="text-xs text-muted-foreground">
+            {item.deliveryMode.replaceAll("_"," ")} · Current teacher assignment
+          </p>
+          <Link className="text-sm font-semibold text-primary underline underline-offset-4"
+            to="/class/$classId" params={{classId:item.classId}}
+            search={{view:"teach",tab:"assignments"}}>
+            Open Class teaching workspace
+          </Link>
+        </article>)}
+      </div>
+    </section>
+  </WorkspaceShell>;
   return <NativeAdultLearnerClasses navigation={navigation}/>;
 }
 

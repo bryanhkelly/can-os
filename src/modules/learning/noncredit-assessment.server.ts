@@ -29,9 +29,17 @@ type Question = {
 const objectiveKinds=["single_select","multi_select","true_false"] as const;
 
 function requireLearner(context:CommandContext): asserts context is CommandContext & {actorPersonId:string} {
-  if(context.role!=="learner"||!context.actorPersonId)
-    throw new AuthorizationError("authenticated noncredit learner");
-  assertCapability(context,"learning.participate");
+  if(!context.actorPersonId)throw new AuthorizationError("authenticated Course learner");
+  if(context.role==="learner"){
+    assertCapability(context,"learning.participate");
+  }else if(context.role==="student"){
+    // School students use the same canonical assessment engine, but their
+    // grant comes from their exact Class and CAN Student membership. No adult
+    // noncredit role or bearer is fabricated for a school student.
+    assertCapability(context,"student:read");
+  }else{
+    throw new AuthorizationError("authenticated Course learner");
+  }
 }
 function publicText(raw:Record<string,unknown>,field:string):string {
   const value=raw.text ?? raw.prompt ?? raw.label;
@@ -51,8 +59,8 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
     return loadNativeClassAssessmentScope(
       tx,context as CommandContext & {actorPersonId:string},
       access,readHistory,phase);
-  if(access.source!=="noncredit"||!access.noncreditRegistrationId)
-    throw new AuthorizationError("active noncredit course attempt");
+  if(context.role!=="learner"||access.source!=="noncredit"||!access.noncreditRegistrationId)
+    throw new AuthorizationError("active noncredit learner Course Attempt");
   const [registration]=await tx.select().from(noncreditRegistrations)
     .where(eq(noncreditRegistrations.id,access.noncreditRegistrationId)).limit(1);
   if(!registration||!registration.learnerId||registration.participantPersonId!==context.actorPersonId)

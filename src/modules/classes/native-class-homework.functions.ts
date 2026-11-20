@@ -40,7 +40,7 @@ async function authorized(tx: Tx, actor: Actor, classEnrollmentId: string) {
   const [cls] = await tx.select().from(canonicalClasses)
     .where(eq(canonicalClasses.id, enrollment.classId)).limit(1);
   if (!cls || cls.state !== "active") throw new AuthorizationError("current Class");
-  if (actor.role === "student" && (actor.grantSiteId !== cls.siteId ||
+  if (actor.role === "student" && (actor.scope.siteIds?.[0] !== cls.siteId ||
       !actor.scope.organizationIds?.includes(cls.operatingOrganizationId))) {
     throw new AuthorizationError("own CAN student Site");
   }
@@ -94,7 +94,7 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
           id:String(item.id),
           title:String(spec.title??official.title??item.assignment_key),
           instructions:String(spec.instructions??official.instructions??"Submit your written response."),
-          dueAt:item.due_at?.toISOString()??null,
+          dueAt:item.due_at ? new Date(item.due_at).toISOString() : null,
           status:item.status??"not_started",
           submittedAt:item.submitted_at?.toISOString()??null,
           responseText:typeof response.text==="string"?response.text:"",

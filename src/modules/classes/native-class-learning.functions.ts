@@ -12,6 +12,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
+import { canonicalLessonVideoResources } from "@/domain/canonical-lesson-video-resources";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
@@ -36,7 +37,7 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
       if(!instance)throw new AuthorizationError("own Class");
       if(actor.role==="student" && (!instance.siteId ||
-        actor.grantSiteId!==instance.siteId ||
+        actor.scope.siteIds?.[0]!==instance.siteId ||
         !actor.scope.organizationIds?.includes(instance.operatingOrganizationId)))
         throw new AuthorizationError("own current CAN student Site");
       // Use the same native Course Attempt gate as recorded instructors,
@@ -89,15 +90,7 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         const content=lesson.content&&typeof lesson.content==="object" &&
           !Array.isArray(lesson.content)
           ?lesson.content as Record<string,unknown>:{};
-        const videoResources=Array.isArray(content.videoResources)
-          ?content.videoResources.flatMap(item=>{
-            if(!item||typeof item!=="object"||Array.isArray(item))return [];
-            const video=item as Record<string,unknown>;
-            if(typeof video.url!=="string" || !/^https:\/\/(?:www\.)?(?:youtube\.com\/watch|youtu\.be\/|vimeo\.com\/)/.test(video.url))
-              return [];
-            return [{url:video.url,title:typeof video.title==="string"?video.title:"Supplemental video",
-              reviewStatus:typeof video.reviewStatus==="string"?video.reviewStatus:"unreviewed"}];
-          }).slice(0,5):[];
+        const videoResources=canonicalLessonVideoResources(content);
         return {
           unitId:lesson.unitId,unitTitle:lesson.unitTitle,unitOrder:lesson.unitOrder,
           lessonId:lesson.lessonId,lessonTitle:lesson.lessonTitle,lessonOrder:lesson.lessonOrder,
@@ -130,10 +123,11 @@ export const markNativeClassLessonComplete=createServerFn({method:"POST"})
        !(actor.role==="student"&&actor.capabilities.has("student:read")||
          actor.role==="learner"&&actor.capabilities.has("learning.participate")))
       throw new AuthorizationError("own learning milestone capability");
+    const learnerPersonId=actor.actorPersonId;
     return db.transaction(async tx=>{
       const [enrollment]=await tx.select().from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
-          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
+          eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
           eq(canonicalClassEnrollments.status,"active"))).for("update").limit(1);
       if(!enrollment?.courseAttemptId)
         throw new AuthorizationError("own active Class Course Attempt");
@@ -141,7 +135,7 @@ export const markNativeClassLessonComplete=createServerFn({method:"POST"})
         .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
       if(!cls||cls.state!=="active")throw new AuthorizationError("current Class");
       if(actor.role==="student"&&
-         (actor.grantSiteId!==cls.siteId||
+         (actor.scope.siteIds?.[0]!==cls.siteId||
           !actor.scope.organizationIds?.includes(cls.operatingOrganizationId)))
         throw new AuthorizationError("own CAN student Site");
       const access=await authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId);
