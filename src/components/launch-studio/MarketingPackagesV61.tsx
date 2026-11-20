@@ -9,7 +9,7 @@ import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionDialog, ActionFooter, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { ActionDialog, ActionFooter, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
   marketingPackageContentSchema, marketingPurposeOptions, marketingStepIssue,
@@ -398,16 +398,9 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
         <WorkspacePanel title={module==="promote"?"Continue in Introduce":"Continue with existing capabilities"}
           description={context.handoffDescription}>
           <div className="grid gap-3">
-            {context.handoffs.map(item=><div key={item.title}
-              className="flex flex-wrap items-center justify-between gap-3 border bg-background p-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">{item.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
-              </div>
-              <Button asChild variant="outline" size="sm"><a href={item.href(siteId)}>
-                Continue <ArrowRight aria-hidden="true"/>
-              </a></Button>
-            </div>)}
+            {context.handoffs.map(item=><WorkspaceActionLink key={item.title}
+              title={item.title} description={item.description} href={item.href(siteId)}
+              actionLabel="Continue" />)}
           </div>
         </WorkspacePanel>
         <ActionFooter><Button variant="outline" onClick={()=>void exitLaunch()}>Back to Launch Overview</Button></ActionFooter>
