@@ -7,7 +7,8 @@ import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import {
   filterPublishedSolutionRecipes, matchingSolutionInterests,
-  orderSolutionsByVision, preferredCatalogDelivery, resolveVisibleSolutionRecipe, selectSavedSolutionPlans,
+  orderSolutionsByVision, preferredCatalogDelivery, resolveSavedSolutionPlan,
+  resolveVisibleSolutionRecipe, selectSavedSolutionPlans,
 } from "@/domain/launch-prepare-v61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { CanonicalBlueprintWorkspace } from "./CanonicalBlueprintWorkspace";
@@ -82,16 +83,14 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: 
         }
         setWorkspace(result);
         if (initialPlanId) {
-          const plan = result.configurations.find(item =>
-            item.configurationId === initialPlanId);
-          const selectedVersion = plan && result.templates.find(template =>
-            template.blueprintVersionId === plan.blueprintVersionId);
-          if (!plan || !selectedVersion) {
+          const saved = resolveSavedSolutionPlan(
+            result.configurations, result.templates, initialPlanId);
+          if (!saved) {
             setError("This saved Solution plan is unavailable for the selected Site. Choose an available plan.");
           } else {
-            setSelectedId(plan.blueprintVersionId);
-            setConfiguringVersionId(plan.blueprintVersionId);
-            setResumeConfigurationId(plan.configurationId);
+            setSelectedId(saved.template.blueprintVersionId);
+            setConfiguringVersionId(saved.template.blueprintVersionId);
+            setResumeConfigurationId(saved.plan.configurationId);
           }
         }
       })
