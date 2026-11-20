@@ -19,7 +19,8 @@ describe("canonical School Blueprint configuration", () => {
     const markup = renderToStaticMarkup(
       <CanonicalBlueprintWorkspace siteId="00000000-0000-4000-8000-000000000001" />,
     );
-    expect(markup).toContain("Configure your School Blueprint");
+    expect(markup).toContain("Configure your Solution");
+    expect(markup).toContain("CAN defines and publishes the Blueprint");
     expect(markup).toContain("Choose a published recipe");
     expect(markup).toContain("Review and approval are separate from operating authorization");
     expect(markup).toContain("Loading Blueprint workspace");
