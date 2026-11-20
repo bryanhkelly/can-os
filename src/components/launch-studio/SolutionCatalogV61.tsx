@@ -188,6 +188,8 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
       <CanonicalBlueprintWorkspace key={siteId + ":" + configuringVersionId + ":" + (resumeConfigurationId ?? "new")}
         siteId={siteId} initialBlueprintVersionId={configuringVersionId}
         initialConfigurationId={resumeConfigurationId ?? undefined}
+        onWorkspaceChanged={updated => setWorkspace(current =>
+          current?.siteId === updated.siteId ? updated : current)}
         embedded enableReferences />
     </>}
     <p className="mt-6 border-t pt-4 text-xs leading-5 text-muted-foreground">
