@@ -36,7 +36,7 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
       if(!instance)throw new AuthorizationError("own Class");
       if(actor.role==="student" && (!instance.siteId ||
-        actor.grantSiteId!==instance.siteId ||
+        actor.scope.siteIds?.[0]!==instance.siteId ||
         !actor.scope.organizationIds?.includes(instance.operatingOrganizationId)))
         throw new AuthorizationError("own current CAN student Site");
       // Use the same native Course Attempt gate as recorded instructors,
@@ -141,7 +141,7 @@ export const markNativeClassLessonComplete=createServerFn({method:"POST"})
         .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
       if(!cls||cls.state!=="active")throw new AuthorizationError("current Class");
       if(actor.role==="student"&&
-         (actor.grantSiteId!==cls.siteId||
+         (actor.scope.siteIds?.[0]!==cls.siteId||
           !actor.scope.organizationIds?.includes(cls.operatingOrganizationId)))
         throw new AuthorizationError("own CAN student Site");
       const access=await authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId);
