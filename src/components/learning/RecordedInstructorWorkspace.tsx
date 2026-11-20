@@ -328,7 +328,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
           <h4 className="font-semibold">Supplemental practice</h4>
           <p className="text-sm">{material.practice?.instructions}</p>
           {material.practice?.prompts.map(prompt => <Field key={prompt.key} label={prompt.text}>
-            <Textarea className="min-h-24 w-full border bg-background p-3" required maxLength={20_000}
+            <Textarea className="min-h-24" required maxLength={20_000}
               value={answers[`${material.id}:${prompt.key}`] ?? ""}
               disabled={pending} onChange={event => setAnswers(current => ({
                 ...current,
