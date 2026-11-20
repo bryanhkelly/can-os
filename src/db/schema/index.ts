@@ -40,6 +40,7 @@ export * from "./support";
 export * from "./conversations";
 export * from "./subscriptions";
 export * from "./notification-outbound";
+export * from "./class-participant-deliveries";
 export * from "./notification-preferences";
 export * from "./reminders";
 export * from "./educational-capacity";

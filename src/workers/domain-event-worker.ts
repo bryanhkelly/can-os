@@ -21,6 +21,7 @@ import {
   handleSubmissionReceivedEvent,
 } from "@/modules/learning/academic-event-handler";
 import { handleNotificationPolicyEvent } from "@/platform/notifications/policy-handler";
+import { handleClassParticipantEvent } from "@/modules/classes/class-participant-events.server";
 import { processEventSubscriptions } from "@/platform/subscriptions";
 import { handleFamilyInvitationBatch } from "@/modules/enrollment/family-invitations.server";
 
@@ -296,6 +297,13 @@ registerDomainEventHandler(EventTypes.SectionWaitlistSeatOffered, handleNotifica
 registerDomainEventHandler(EventTypes.SectionCreationRequestDeclined, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.SectionCreationRequestFulfilled, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.NoncreditTrainingCompleted, handleNotificationPolicyEvent);
+
+// Native Class receipts reuse authoritative Class/Enrollment/Session events.
+for (const type of [
+  "ClassEnrollmentCreated", "ClassEnrollmentAssigned", "ClassGuardianEnrollmentCreated",
+  "ClassInvitationIssued", "ClassSessionScheduled", "ClassSessionScheduleChanged",
+]) registerDomainEventHandler(type, handleClassParticipantEvent);
+
 
 /** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
 const MAX_ATTEMPTS = 5;

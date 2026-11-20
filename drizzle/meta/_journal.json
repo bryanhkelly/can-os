@@ -652,6 +652,13 @@
       "when": 1795130000000,
       "tag": "0092_marketing_package_atomic_releases",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1795131000000,
+      "tag": "0093_class_participant_delivery",
+      "breakpoints": true
     }
   ]
 }
