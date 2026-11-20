@@ -1,11 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { OperationsHealthSummary } from "./OperationsHealthSummary";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ to, params, search: _search, children }: {
-    to: string; params?: Record<string, string>; search?: unknown; children: React.ReactNode;
-  }) => <a href={to.replace(/\\$([^/]+)/g, (_match, key: string) => params?.[key] ?? key)}>{children}</a>,
+    to: string; params?: Record<string, string>; search?: unknown; children: ReactNode;
+  }) => <a href={to.replace("$programId",params?.programId ?? "programId")}>{children}</a>,
 }));
 
 describe("operational health summaries", () => {
