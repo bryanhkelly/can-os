@@ -116,6 +116,20 @@ describe("V6.1 Prepare to Open", () => {
     expect(recipes.map(recipe => recipe.blueprintVersionId)).toEqual(["other", "summer", "after"]);
   });
 
+  it("prioritizes exact saved Program codes over heuristic Solution title matches", () => {
+    const recipes = [
+      { blueprintVersionId: "generic", title: "AI Guidance", components: [{ key: "skills" }] },
+      { blueprintVersionId: "ai", title: "Digital Learning", programCode: "can.program.ai_digital_skills",
+        offeringCode: "CLC-DIGITAL-01", components: [{ key: "four_session_calendar" }] },
+      { blueprintVersionId: "custom", title: "Custom Training", programCode: "can.program.custom_training",
+        offeringCode: "CLC-CUSTOM-TRAINING-01", components: [{ key: "knowledge_check" }] },
+    ];
+    const result = orderSolutionsByVision(recipes, [], null,
+      ["can.program.ai_digital_skills", "can.program.custom_training"], "can.program.custom_training");
+    expect(result.map(item => item.blueprintVersionId)).toEqual(["custom", "ai", "generic"]);
+    expect(filterPublishedSolutionRecipes(recipes, "CLC-DIGITAL-01")).toEqual([recipes[1]]);
+  });
+
   it("links to authorized workspaces without duplicating sidebar module navigation", () => {
     const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="facilities-resources" />);
     expect(html).toContain("Facilities &amp; Resources");
