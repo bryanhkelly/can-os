@@ -139,7 +139,7 @@ function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
         <li>Use one configurable experience, with separate offerings for the one-hour and four-week pilots.</li>
         <li>Authenticate or verify the participant before creating an enrollment. Never accept a client-supplied person ID as authority.</li>
-        <li>Resolve a published offering to an authorized deployment, adoption, training version and available cohort before creating a noncredit registration and course attempt.</li>
+        <li>Resolve a published offering to an authorized deployment, adoption, training version and available Class offering before creating a noncredit registration and course attempt.</li>
         <li>Enforce duplicate enrollment, capacity, age/guardian, consent, privacy and idempotency rules on the server.</li>
         <li>Capture referral network, organization, site, invitation and campaign attribution without granting implicit organizational access.</li>
         <li>Track invitation, started, submitted, accepted, active, attended, assessed and completed events for pilot reporting.</li>
