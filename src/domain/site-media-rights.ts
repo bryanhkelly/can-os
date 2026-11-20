@@ -14,3 +14,17 @@ export function approvedSiteMediaUsage(review:SiteMediaUsageReview,requiresAltTe
     (review.subjectReleaseStatus==="cleared"||review.subjectReleaseStatus==="not_required") &&
     (!requiresAltText||Boolean(review.altText?.trim()));
 }
+
+/** Current approved Documents in the existing immutable R2 media library.
+ * Filename heuristics and automatic tags never confer usage permission.
+ */
+export function approvedSiteDocumentMediaUsage(metadata:Record<string,unknown>):boolean{
+  return metadata.mediaReviewStatus==="approved" &&
+    approvedSiteMediaUsage({
+      rightsStatus:metadata.rightsStatus==="approved"?"approved":"pending",
+      subjectReleaseStatus:metadata.subjectReleaseStatus==="cleared"?"cleared":
+        metadata.subjectReleaseStatus==="not_required"?"not_required":"pending",
+      revoked:Boolean(metadata.revokedAt)||metadata.rightsStatus==="revoked",
+      altText:typeof metadata.altText==="string"?metadata.altText:null,
+    });
+}
