@@ -310,6 +310,9 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
 /** Room schedules and Class drafts reuse canonical operational owners.
  * Prepare hides Class activation/Offering publishing; Open is independent. */
 export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
+  // Do not request older Program coverage until the operator explicitly
+  // chooses it. Canonical Classes are the default Prepare experience.
+  const [showExistingProgramCoverage, setShowExistingProgramCoverage] = useState(false);
   return <div className="space-y-5">
     <PrepareSchoolYearsV61 key={siteId} siteId={siteId} />
     <Suspense fallback={<p role="status" className="border p-4 text-sm">
@@ -319,11 +322,14 @@ export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
     </Suspense>
     <WorkspacePanel title="Existing school Program room coverage"
       description="Optional for Sites already using the older school Program room-coverage service. This is not the canonical Class Session scheduler.">
-      <details className="mt-3">
+      <details className="mt-3" onToggle={event => {
+        if (event.currentTarget.open) setShowExistingProgramCoverage(true);
+      }}>
         <summary className="min-h-11 cursor-pointer text-sm font-semibold text-primary">
           Manage existing Program room coverage
         </summary>
-        <RoomCoverageWorkspace key={siteId} siteId={siteId} view="schedules"/>
+        {showExistingProgramCoverage &&
+          <RoomCoverageWorkspace key={siteId} siteId={siteId} view="schedules"/>}
       </details>
       <p className="mt-3 text-xs text-muted-foreground">
         These schedules link existing school Program class records, not canonical
