@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -99,9 +100,9 @@ function CanonicalAssessmentReviewerPage(){
         current authorized role.
       </p>}
       {queue.data&&<>
-        <label htmlFor="assessment-review-version" className="mt-4 block text-sm font-semibold">
+        <Label htmlFor="assessment-review-version" className="mt-4 block text-sm font-semibold">
           Publisher assessment draft
-        </label>
+        </Label>
         <Select id="assessment-review-version" value={selected}
           onChange={e=>{setSelected(e.target.value);setItemVersionId("");setNotice("");setError("");}}
           className="mt-2">
@@ -175,7 +176,7 @@ function CanonicalAssessmentReviewerPage(){
           Publication is a separate privilege.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-semibold">
+          <Label className="text-sm font-semibold">
             Review target
             <Select className="mt-1"
               value={target} disabled={busy}
@@ -184,8 +185,8 @@ function CanonicalAssessmentReviewerPage(){
               <option value="assessment">Assessment version</option>
               <option value="form">Question form</option>
             </Select>
-          </label>
-          {target==="item"&&<label className="text-sm font-semibold">
+          </Label>
+          {target==="item"&&<Label className="text-sm font-semibold">
             Question
             <Select className="mt-1"
               value={itemVersionId} disabled={busy}
@@ -195,16 +196,16 @@ function CanonicalAssessmentReviewerPage(){
                 Question {index+1}
               </option>)}
             </Select>
-          </label>}
-          <label className="text-sm font-semibold">
+          </Label>}
+          <Label className="text-sm font-semibold">
             Review domain
             <Select className="mt-1"
               value={kind} disabled={busy}
               onChange={e=>setKind(e.target.value as typeof kind)}>
               {requiredKinds.map(k=><option key={k} value={k}>{k}</option>)}
             </Select>
-          </label>
-          <label className="text-sm font-semibold">
+          </Label>
+          <Label className="text-sm font-semibold">
             Decision
             <Select className="mt-1"
               value={decision} disabled={busy}
@@ -212,25 +213,25 @@ function CanonicalAssessmentReviewerPage(){
               <option value="approved">Approve</option>
               <option value="rejected">Reject</option>
             </Select>
-          </label>
+          </Label>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
           Current {kind} decision: {latestState(currentReviews,kind)}
         </p>
-        <label className="mt-4 block text-sm font-semibold" htmlFor="assessment-review-reason">
+        <Label className="mt-4 block text-sm font-semibold" htmlFor="assessment-review-reason">
           Evidence-based review rationale
-        </label>
+        </Label>
         <Textarea id="assessment-review-reason" value={rationale}
           rows={4} minLength={20} maxLength={1500} disabled={busy}
           onChange={e=>setRationale(e.target.value)}
           className="mt-2"
           placeholder="Describe the content checks, answer correctness, rights and accessibility evidence reviewed."/>
-        <label className="mt-3 flex items-start gap-3 text-sm">
+        <Label className="mt-3 flex items-start gap-3 text-sm">
           <Checkbox checked={ack} disabled={busy}
             onChange={e=>setAck(e.target.checked)} className="mt-1"/>
           I personally performed this independent review. The decision will
           be attributed to my verified Person and recorded in the audit log.
-        </label>
+        </Label>
         {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
         {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
         <Button type="button" className="mt-4" disabled={busy||!ack||
