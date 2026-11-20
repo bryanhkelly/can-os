@@ -104,7 +104,12 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
     {error && <div role="alert" className="border border-destructive/30 bg-card p-4 text-sm">
       <p className="font-semibold">Unable to load Solutions</p>
       <p className="mt-2 text-muted-foreground">{error}</p>
-      <p className="mt-2 text-muted-foreground">Published learning-product discovery has an independent access check.</p>
+      <p className="mt-2 text-muted-foreground">
+        Published Solution planning requires a current Site operator relationship
+        and CAN-provisioned catalog access. If this is a new Site, those permissions
+        may not be active yet. A transient service error can also prevent loading.
+        Your saved Site vision remains unchanged.
+      </p>
       <Button type="button" variant="outline" size="sm" className="mt-3"
         onClick={() => setReload(value => value + 1)}>Retry Program Catalog</Button>
     </div>
