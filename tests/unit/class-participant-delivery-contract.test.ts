@@ -22,6 +22,10 @@ describe("enrollment-to-Class communication integration",()=>{
   it("rechecks recipient and Session eligibility immediately before email",()=>{
     const delivery=read("src/modules/classes/class-participant-delivery.server.ts");
     expect(delivery).toContain("verifiedRecipient(");
+    expect(delivery).toContain("async function upcomingMeetings(");
+    expect(delivery.match(/upcomingMeetings\(cls\.id,\s*now\)/g)).toHaveLength(2);
+    expect(delivery).toContain("if(upcoming.length>100)");
+    expect(delivery).toContain("if (scheduled.length > 100)");
     expect(delivery).toContain('eq(canonicalClassEnrollments.status, "active")');
     expect(delivery).toContain('eq(canonicalAccountGrants.roleCode, "learner")');
     expect(delivery).toContain('eq(accountPersonGrants.role, "guardian")');
