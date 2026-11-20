@@ -47,7 +47,7 @@ export function renderPrivateWebsitePreviewHtml(
   const returnLabel = kind==="site"?"Return to Launch Studio":"Return to Website &amp; Brand Studio";
   const banner = `<aside class="can-private-preview" role="status">
   <strong>Private ${kind === "site" ? "Site" : "school"} website preview</strong>
-  <span>${saved ? "Saved design" : kind === "site" ? "Unsaved Site starter · illustrative only" : "Unsaved school starter · illustrative only"} · not published · sign-in required</span>
+  <span>${saved ? "Saved design" : "Unsaved illustrative design"} · not published · sign-in required · Images may be illustrative · Forms disabled</span>
   <a href="${returnHref}">${returnLabel}</a>
   </aside>`;
   const style = `<style>
