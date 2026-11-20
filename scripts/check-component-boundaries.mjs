@@ -9,7 +9,7 @@
  * Source-only check: no DB, generated assets, login, or network required.
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { resolve, relative, join } from "node:path";
+import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
@@ -35,8 +35,8 @@ function collect(directory) {
   for (const entry of readdirSync(resolve(root, directory), { withFileTypes: true })) {
     const name = join(directory, entry.name).replaceAll("\\", "/");
     if (entry.isDirectory()) collect(name);
-    else if (entry.isFile() && /\\.(ts|tsx)$/.test(name) &&
-      !/\\.(test|spec|stories)\\.(ts|tsx)$/.test(name)) files.push(name);
+    else if (entry.isFile() && /\.(ts|tsx)$/.test(name) &&
+      !/\.(test|spec|stories)\.(ts|tsx)$/.test(name)) files.push(name);
   }
 }
 for (const dir of guardedDirectories) collect(dir);
@@ -58,7 +58,7 @@ for (const file of files) {
       failures.push(file + ": reusable UI must not depend on oversized feature orchestrators");
     }
   }
-  if (/\\bcreateFileRoute\\s*\\(/.test(source) || /\\bcreateServerFn\\s*\\(/.test(source))
+  if (/\bcreateFileRoute\s*\(/.test(source) || /\bcreateServerFn\s*\(/.test(source))
     failures.push(file + ": shared presentation must not own a route or server command");
 }
 
