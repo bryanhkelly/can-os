@@ -1,3 +1,4 @@
+import { approvedSiteDocumentMediaUsage } from "@/domain/site-media-rights";
 import {randomUUID} from "node:crypto";
 import {and,desc,eq,inArray,isNotNull} from "drizzle-orm";
 import {db} from "@/db/client";
@@ -204,9 +205,7 @@ export async function readApprovedSchoolSitePhotos(
   return rows.filter(row=>
     row.storageProvider==="cloudflare_r2"&&
     row.metadata.storageVerified===true &&
-    row.metadata.mediaReviewStatus==="approved"&&
-    row.metadata.rightsStatus==="approved"&&
-    ["cleared","not_required"].includes(String(row.metadata.subjectReleaseStatus))&&
+    approvedSiteDocumentMediaUsage(row.metadata)&&
     siteMediaKeyPattern.test(row.storageKey)&&
     row.storageKey.startsWith(`school-site-media/${siteId}/`)&&
     row.mimeType!==null&&["image/png","image/jpeg"].includes(row.mimeType)
@@ -243,9 +242,7 @@ export async function readPublishedSchoolSitePhoto(slug:string,documentId:string
   const doc=row.document;
   const m=doc.metadata;
   if(doc.storageProvider!=="cloudflare_r2"||
-    m.storageVerified!==true||m.rightsStatus!=="approved"||
-    m.mediaReviewStatus!=="approved"||
-    !["cleared","not_required"].includes(String(m.subjectReleaseStatus))||
+    m.storageVerified!==true||!approvedSiteDocumentMediaUsage(m)||
     !siteMediaKeyPattern.test(doc.storageKey)||
     !doc.storageKey.startsWith(`school-site-media/${row.siteId}/`)||
     !["image/jpeg","image/png"].includes(doc.mimeType??""))
