@@ -36,14 +36,15 @@ export function ClassroomMediaSurface({
   captionTracks?:readonly ApprovedClassCaptionTrack[];
 }&VideoEvents){
   if(video.kind==="embed"){
+    // YouTube requires an HTTP Referer for embedded playback (error 153).
+    // Send only the app origin, never a student's private lesson URL.
+    // Vimeo retains the stricter no-referrer policy.
+    const referrerPolicy = video.src.startsWith("https://www.youtube-nocookie.com/embed/")
+      ? "strict-origin-when-cross-origin" : "no-referrer";
     return <iframe key={video.src} title={title} src={video.src}
       className={iframeClassName}
       allow="fullscreen; picture-in-picture; encrypted-media"
-      // YouTube requires an HTTP Referer for embedded playback (error 153).
-      // Send only the app origin, never a student's private lesson URL.
-      // Vimeo retains the stricter no-referrer policy.
-      allowFullScreen referrerPolicy={video.src.startsWith("https://www.youtube-nocookie.com/embed/")
-        ? "strict-origin-when-cross-origin" : "no-referrer"}/>;
+      allowFullScreen referrerPolicy={referrerPolicy}/>;
   }
   return <video key={video.src} ref={videoRef} src={video.src}
     playsInline controls preload="metadata" aria-label={title}
