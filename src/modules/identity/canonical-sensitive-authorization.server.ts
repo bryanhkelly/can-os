@@ -36,7 +36,7 @@ export async function assertCurrentCredentialIssuer(
       ON can_session.id=staff.session_id
         AND can_session.secret_hash=${digest}::text
     JOIN public.canonical_sensitive_capability_approvals approval
-      ON approval.canonical_grant_id=staff.grant_id
+      ON approval.account_person_grant_id=staff.grant_id
         AND approval.requested_by_can_account_id=can_session.account_id
     WHERE education_v30.v301_can_sensitive_capability(
       ${digest}::text,'credential.issue'::text
