@@ -1,3 +1,4 @@
+import { approvedSiteMediaUsage } from "./site-media-rights";
 import { z } from "zod";
 import { siteBrandDirectionIds } from "./site-brand-direction";
 import { siteFontCatalog, sitePaletteIds, siteTypographyIds, resolveSiteTheme } from "./site-theme";
@@ -54,8 +55,13 @@ export function resolveSiteBrandVersion(version:SavedSiteBrandVersion,assets:Rea
     logo,hero};
 }
 export function assertSiteBrandMediaRights(asset:SiteBrandAsset|null):boolean {
-  return !asset || asset.revokedAt===null && asset.rightsConfirmed &&
-    asset.childImageConsent!=="unconfirmed" && Boolean(asset.altText.trim());
+  return !asset || approvedSiteMediaUsage({
+    rightsStatus:asset.rightsConfirmed?"approved":"pending",
+    subjectReleaseStatus:asset.childImageConsent==="no_identifiable_children"
+      ?"not_required":asset.childImageConsent==="guardian_consent_confirmed"?"cleared":"pending",
+    revoked:asset.revokedAt!==null,
+    altText:asset.altText,
+  },true);
 }
 
 /** This is a one-way presentation projection, never another Brand store.
