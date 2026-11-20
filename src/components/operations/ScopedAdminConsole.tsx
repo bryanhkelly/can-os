@@ -222,7 +222,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem className="sm:col-span-2">
                   <FormLabel className="text-sm font-semibold">Exact Site (required)</FormLabel>
                   <FormControl>
-                    <Select className={fieldClass} required disabled={busy || Boolean(lockedSiteId)} {...field}>
+                    <Select className={fieldClass} required {...field} disabled={busy || Boolean(lockedSiteId)}>
                       <option value="">Select a permitted school</option>
                       {sites.filter(site => !lockedSiteId || site.id === lockedSiteId)
                         .map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
