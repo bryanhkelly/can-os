@@ -164,13 +164,13 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    <h2 className="text-sm font-semibold">Filter operational records</h2>
    <div className="mt-3 flex flex-wrap gap-4">
     <Label className="min-w-52 flex-1 text-sm">School
-     <Select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="mt-2 block min-h-11 w-full  border bg-background px-3 py-2">
+     <Select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="mt-2">
       <option value="">All authorized schools</option>
       {data.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
      </Select>
     </Label>
     <Label className="min-w-52 flex-1 text-sm">Program
-     <Select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="mt-2 block min-h-11 w-full  border bg-background px-3 py-2">
+     <Select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="mt-2">
       <option value="">All authorized programs</option>
       {data.programs.filter(program=>!selected.siteId||program.siteId===selected.siteId)
        .map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
@@ -276,7 +276,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    <Link to="/launch/school/$programId" params={{programId:i.programId}} className="text-sm underline">Review teacher class request in academic setup →</Link>:
    <WorkspaceNotice tone="danger">This class request is missing its program. Contact your school administrator.</WorkspaceNotice>:
    i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><Label className="flex items-center gap-2 text-xs">Assigned to
- <Select aria-label={"Assign "+i.title} className=" border bg-background px-2 py-1" disabled={commandsBlocked} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
+ <Select aria-label={"Assign "+i.title} className="min-w-0" disabled={commandsBlocked} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
  <option value="" disabled={i.type==="onsite_coverage_gap"&&!!i.eligibleOwnerPersonId}>Unassigned</option>
  {i.type==="onsite_coverage_gap"&&i.ownerPersonId&&i.ownerPersonId!==i.eligibleOwnerPersonId&&
   <option value={i.ownerPersonId} disabled>Previous assignee — reassign to the current director</option>}
@@ -285,7 +285,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  </Select></Label>
  <Label className="flex flex-col gap-1 text-xs">Due date (your local time)
   <Input type="datetime-local" aria-label={"Deadline for "+i.title}
-   className=" border bg-background px-2 py-1"
+   className="min-w-0"
    disabled={commandsBlocked}
    value={dueDrafts[i.id]??localDue(i.dueAt)}
    onChange={event=>setDueDrafts(prev=>({...prev,[i.id]:event.target.value}))}/>
