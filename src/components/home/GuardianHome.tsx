@@ -1,6 +1,7 @@
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { Link } from "@tanstack/react-router";
+import { buttonVariants } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { BookOpen, CalendarDays, ClipboardList, MessageCircle } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
@@ -15,6 +16,8 @@ import { GuardianEnrollmentNextSteps } from "@/components/home/GuardianEnrollmen
 import { GuardianGradeQuestions } from "@/components/home/GuardianGradeQuestions";
 import { GuardianChildSummaryCard } from "@/components/home/GuardianChildSummaryCard";
 import { dateTimeInputInTimezone } from "@/modules/calendar/timezone";
+
+const guardianResourceLinkClass = buttonVariants({ variant: "outline", size: "lg" }) + " h-auto whitespace-normal";
 
 type Child = Awaited<ReturnType<typeof getFamilyHome>>["children"][number];
 type NeedItem = Awaited<ReturnType<typeof getGuardianNeedsYou>>["items"][number];
@@ -196,7 +199,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      <p className="font-semibold">No active enrollments to show yet</p>
      <p className="mt-2 text-sm text-muted-foreground">Children with an application or enrollment step in progress appear below by name and school stage. Once enrollment is active, their school information appears here.</p>
      <Link to="/guardian/admission-offers" search={{student:undefined}}
-       className="mt-3 inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
+       className={guardianResourceLinkClass + " mt-3"}>
        View applications and enrollment offers →
      </Link>
     </div>}
@@ -235,14 +238,14 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    <section aria-label="Family shortcuts" className="mt-12">
     <h2 className="font-serif text-2xl font-semibold tracking-tight">Family resources</h2>
     <div className="mt-4 flex flex-wrap gap-3 text-sm">
-     <Link to="/ask" className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">Ask CAN</Link>
-     <Link to="/guardian/experiences" className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">School calendar &amp; teacher conferences</Link>
-     <Link to="/guardian/group-permissions" className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">Study group permissions</Link>
-     <Link to="/guardian/watching" className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">Things CAN Is Watching</Link>
-     <Link to="/guardian/admission-offers" search={{student:undefined}} className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">Admission offers</Link>
-     <Link to="/guardian/course-approvals" className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">Course approvals</Link>
-     <Link to="/admissions/my-credentials" className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">Official records and credentials</Link>
-     <Link to="/messages" className="inline-flex min-h-11 items-center  border px-4 py-2 hover:bg-muted focus-visible:outline-2">Messages</Link>
+     <Link to="/ask" className={guardianResourceLinkClass}>Ask CAN</Link>
+     <Link to="/guardian/experiences" className={guardianResourceLinkClass}>School calendar &amp; teacher conferences</Link>
+     <Link to="/guardian/group-permissions" className={guardianResourceLinkClass}>Study group permissions</Link>
+     <Link to="/guardian/watching" className={guardianResourceLinkClass}>Things CAN Is Watching</Link>
+     <Link to="/guardian/admission-offers" search={{student:undefined}} className={guardianResourceLinkClass}>Admission offers</Link>
+     <Link to="/guardian/course-approvals" className={guardianResourceLinkClass}>Course approvals</Link>
+     <Link to="/admissions/my-credentials" className={guardianResourceLinkClass}>Official records and credentials</Link>
+     <Link to="/messages" className={guardianResourceLinkClass}>Messages</Link>
     </div>
    </section>
   </QueryState>
