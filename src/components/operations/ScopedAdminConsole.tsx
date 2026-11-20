@@ -41,7 +41,7 @@ type Person = Awaited<ReturnType<typeof listPeople>>["people"][number];
 
 const authMessage = "Sign in with an authorized registrar account to manage access.";
 
-export function ScopedAdminConsole({selection, mode="access", hubMode=false, onChanged}: {onChanged?:()=>Promise<unknown>;hubMode?:boolean;selection: {siteId?: string; inviteRole?: string}; mode?: "access"|"invite"|"people"}) {
+export function ScopedAdminConsole({selection, mode="access", hubMode=false, includeRoomCoverage=true, onChanged}: {onChanged?:()=>Promise<unknown>;hubMode?:boolean;includeRoomCoverage?:boolean;selection: {siteId?: string; inviteRole?: string}; mode?: "access"|"invite"|"people"}) {
   const [sites, setSites] = useState<Site[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -248,7 +248,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
               onClick:({grant})=>void toggleGrant(grant.grantId,grant.active)}]}/>
         </section>}
 
-        {mode==="access"&&form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
+        {mode==="access"&&includeRoomCoverage&&form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
         {mode==="people"&&<section className="mt-8">
           <h2 className="text-lg font-semibold">People directory</h2>
           <Label className="mt-4 block max-w-sm text-sm font-semibold">
