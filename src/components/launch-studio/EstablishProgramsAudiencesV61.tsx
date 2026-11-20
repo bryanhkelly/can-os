@@ -382,7 +382,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       }}>Reload Site and review saved choices</Button>
     </>
     <footer aria-label="Programs & Audiences actions">
-      <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
+      <ActionFooter layout="step">
       <Button variant="outline" disabled={busy} onClick={() => step === 0 ? onBackToSiteInformation() : selectStep(0)}>
         <ArrowLeft aria-hidden="true" />{step === 0 ? "Back to Site Information" : "Previous step"}
       </Button>
