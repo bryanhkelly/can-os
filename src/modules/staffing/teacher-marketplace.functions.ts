@@ -18,10 +18,8 @@ import {
 } from "@/modules/staffing/educational-capacity-service";
 
 /**
- * One CAN teacher marketplace for real and synthetic data.
- * Demo classification is derived from the provider's stored metadata.
- * Discovery identifies only real candidates currently eligible and reservable
- * for at least one active class; final assignment still rechecks transactionally.
+ * Provider-authorized teacher discovery requires a current eligible Class assignment
+ * and applies the same capability, schedule, and authorization checks to every Person.
  */
 export const getTeacherMarketplace = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ programId: z.string().uuid() }).strict().parse(value))
@@ -62,14 +60,10 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
       inArray(sections.courseTemplateVersionId, versionIds),
     )).orderBy(asc(sections.title), asc(sections.code)) : [];
 
-    // A real CAN instructor belongs to the school's authorized academic provider.
-    // A synthetic instructor belongs to an explicitly tagged teaching provider,
-    // and can only match an explicitly tagged synthetic course template.
     const rows = await db.select({
       versionId: courseTemplateVersions.id,
       personId: people.id,
       firstName: people.legalFirstName, lastName: people.legalLastName,
-      providerMetadata: organizations.metadata,
       modality: instructionalCapacityOfferings.modality,
       maxSeats: instructionalCapacityOfferings.maxSeats,
       weeklyPattern: instructorAvailabilityWindows.weeklyPattern,
@@ -94,17 +88,7 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
         or(isNull(instructionalCapacityOfferings.programId), eq(instructionalCapacityOfferings.programId, data.programId)),
         or(isNull(instructionalCapacityOfferings.jurisdictionId), eq(instructionalCapacityOfferings.jurisdictionId, school.jurisdictionId)),
         gte(instructorAvailabilityWindows.endsAt, new Date()),
-        or(
-          and(eq(organizations.id, school.academicProviderOrganizationId),
-            sql`coalesce(${organizations.metadata}->>'isSynthetic', 'false') <> 'true'`,
-            sql`coalesce(${instructionalCapacityOfferings.metadata}->>'previewOnly', 'false') <> 'true'`),
-          and(
-            sql`${courseTemplates.metadata}->>'sourceSystem' = 'can-demo-catalog-factory'`,
-            sql`${organizations.metadata}->>'isSynthetic' = 'true'`,
-            sql`${organizations.metadata}->>'demoProvider' = 'true'`,
-            sql`${instructionalCapacityOfferings.metadata}->>'previewOnly' = 'true'`,
-          ),
-        ),
+        eq(organizations.id, school.academicProviderOrganizationId),
         eq(instructorCapabilities.active, true),
         eq(people.active, true),
         eq(instructorAvailabilityWindows.active, true),
@@ -135,10 +119,9 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
         }
       }
       const teacherOptions = matches.flatMap(row => {
-        const isSynthetic = row.providerMetadata.isSynthetic === true;
         const eligibleOffers = eligibleBySection.get(row.personId) ?? new Map();
         const eligibleSectionIds = [...eligibleOffers.keys()];
-        if (!isSynthetic && !eligibleSectionIds.length) return [];
+        if (!eligibleSectionIds.length) return [];
         const offers = [...eligibleOffers.values()];
         return [{
           personId: row.personId,
@@ -148,7 +131,6 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
             ? Math.max(...offers.map(offer => offer.maxSeats))
             : row.maxSeats,
           weeklyDays: row.weeklyPattern?.days ?? [],
-          isSynthetic,
           eligibleSectionIds,
         }];
       });
@@ -161,42 +143,6 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
     return { program: market.program, courses: entries,
       matchedTeachers: new Set(entries.flatMap(course =>
         course.teacherOptions.map(teacher => teacher.personId))).size };
-  });
-
-/** Registrar-only discovery of synthetic teacher previews. No adoption or entitlement is
- * required to browse; these profiles can never be engaged through this endpoint. */
-export const getDemoTeacherPreviews = createServerFn({ method: "GET" })
-  .validator((value: unknown) => z.object({ programId: z.string().uuid() }).strict().parse(value))
-  .handler(async ({ data }) => {
-    setResponseHeader("Cache-Control", "private, no-store");
-    const actor = await requireActor(["registrar"]);
-    await readMarketplace(actor, data.programId); // Institutional authorization and scope.
-    const rows = await db.select({
-      personId: people.id, firstName: people.legalFirstName, lastName: people.legalLastName,
-      courseCode: courseTemplates.code, courseTitle: courseTemplates.title,
-      subject: courseTemplates.subject,
-    }).from(instructorCapabilities)
-      .innerJoin(people, eq(people.id, instructorCapabilities.personId))
-      .innerJoin(memberships, eq(memberships.personId, people.id))
-      .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
-      .innerJoin(courseTemplates, eq(courseTemplates.id, instructorCapabilities.courseTemplateId))
-      .where(and(
-        sql`${organizations.metadata}->>'demoProvider' = 'true'`,
-        sql`${organizations.metadata}->>'isSynthetic' = 'true'`,
-        sql`${courseTemplates.metadata}->>'sourceSystem' = 'can-demo-catalog-factory'`,
-        eq(instructorCapabilities.active, true), eq(people.active, true),
-      )).orderBy(asc(people.legalLastName), asc(people.legalFirstName), asc(courseTemplates.code));
-    const teachers = new Map<string, {personId:string;name:string;courses:{code:string;title:string;subject:string}[]}>();
-    for (const row of rows) {
-      let teacher = teachers.get(row.personId);
-      if (!teacher) {
-        teacher = {personId:row.personId,name:`${row.firstName} ${row.lastName}`,courses:[]};
-        teachers.set(row.personId,teacher);
-      }
-      if (!teacher.courses.some(course=>course.code===row.courseCode))
-        teacher.courses.push({code:row.courseCode,title:row.courseTitle,subject:row.subject});
-    }
-    return {teachers:[...teachers.values()],synthetic:true as const,engagementAllowed:false as const};
   });
 
 const engageInput = z.object({
@@ -292,8 +238,6 @@ export const engageMarketplaceTeacher = createServerFn({ method: "POST" })
           or(isNull(instructionalCapacityOfferings.jurisdictionId),
             eq(instructionalCapacityOfferings.jurisdictionId, program.jurisdictionId)),
           gte(instructorAvailabilityWindows.endsAt, new Date()),
-          sql`coalesce(${organizations.metadata}->>'isSynthetic', 'false') <> 'true'`,
-          sql`coalesce(${instructionalCapacityOfferings.metadata}->>'previewOnly', 'false') <> 'true'`,
           eq(instructorCapabilities.active, true),
           eq(people.active, true),
           eq(instructorAvailabilityWindows.active, true),
