@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { LaunchModuleDestinationV61, launchModuleDestinationsV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
-import { filterPublishedSolutionRecipes, preferredCatalogDelivery, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
+import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, search, ...props }: {
@@ -103,6 +103,19 @@ describe("V6.1 Prepare to Open", () => {
     expect(resolveVisibleSolutionRecipe([], "one")).toBeUndefined();
   });
 
+  it("orders published Solution recipes by saved vision without claiming approval", () => {
+    const recipes = [
+      { blueprintVersionId: "other", title: "Community Learning", components: [{ key: "mentorship" }] },
+      { blueprintVersionId: "summer", title: "Summer Discovery", components: [{ key: "science" }] },
+      { blueprintVersionId: "after", title: "After School STEM", components: [{ key: "digital_skills" }] },
+    ];
+    const result = orderSolutionsByVision(recipes, ["afterschool", "summer"], "summer");
+    expect(result.map(recipe => recipe.blueprintVersionId)).toEqual(["summer", "after", "other"]);
+    expect(matchingSolutionInterests(recipes[0], ["afterschool"])).toEqual([]);
+    expect(matchingSolutionInterests(recipes[1], ["summer"])).toEqual(["summer"]);
+    expect(recipes.map(recipe => recipe.blueprintVersionId)).toEqual(["other", "summer", "after"]);
+  });
+
   it("links to authorized workspaces without duplicating sidebar module navigation", () => {
     const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="facilities-resources" />);
     expect(html).toContain("Facilities &amp; Resources");
@@ -124,7 +137,9 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("From Program to Solution to Offering");
     expect(html).toContain("Browse available Offerings");
     expect(html).toContain("Available Solutions");
-    expect(html).toContain("Selection is recorded only in the existing authorized configuration workflow");
+    expect(html).toContain("CAN administers the published Solution definition");
+    expect(html).toContain("Explore published learning products");
+    expect(html).not.toContain("/canonical/blueprints?siteId=" + siteId);
     expect(html).not.toContain("Approved for enrollment");
   });
 
