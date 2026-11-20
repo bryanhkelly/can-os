@@ -64,6 +64,12 @@ describe("platform-owned Program Catalog and Solution Blueprint authority", () =
     expect(source).toContain('action: "platform.catalog.version.published"');
     expect(source).toContain('eq(organizations.type, "can_network")');
     expect(source).not.toContain("SET LOCAL ROLE");
+    expect(source).toContain("gradeRange: latest?.gradeRange");
+    expect(source).toContain("scheduleSuggestion: latest?.scheduleSuggestion");
+    expect(source).toContain("configurationGuidance: latest?.configurationGuidance");
+    expect(source).toContain("FROM public.blueprint_facility_requirements");
+    expect(source).toContain("FROM public.blueprint_component_dependencies");
+    expect(source).toContain("Cannot remove a component with Blueprint dependencies");
     expect(source).not.toContain("enrollMyselfInNoncredit");
     expect(source).not.toContain("site_organization_roles");
   });
