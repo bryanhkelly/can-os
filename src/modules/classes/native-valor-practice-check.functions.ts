@@ -71,7 +71,7 @@ async function draftQuestions(tx:Tx,courseVersionId:string,deploymentId:string,o
     SELECT aa.id AS administration_id,av.id AS assessment_version_id,
       (SELECT cu.id FROM public.course_units cu
        WHERE cu.course_version_id=${courseVersionId}::uuid
-       ORDER BY cu.ordinal,cu.id LIMIT 1) AS course_unit_id,
+       ORDER BY cu.sequence_no,cu.id LIMIT 1) AS course_unit_id,
       iv.id,iv.item_prompt AS prompt
     FROM public.assessment_administrations aa
     JOIN public.assessment_versions av ON av.id=aa.assessment_version_id
