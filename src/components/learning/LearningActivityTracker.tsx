@@ -41,7 +41,18 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
         : kind === "resource_opened"
           ? { ...base, kind, resourceId: options?.resourceId ?? "" }
           : { ...base, kind };
-      await recordLearningInteraction({ data: { learningSessionId: sessionId, interaction } });
+      // Keep the same client event ID on retries: the server deduplicates
+      // successful writes when an acknowledgment is lost.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (cancelled) return;
+        try {
+          await recordLearningInteraction({ data: { learningSessionId: sessionId, interaction } });
+          return;
+        } catch (error) {
+          if (attempt === 2 || cancelled) throw error;
+          await new Promise<void>(resolve => window.setTimeout(resolve, 300 * (attempt + 1)));
+        }
+      }
     }
 
     void startLearningActivitySession({ data: { sectionId } })
@@ -61,6 +72,11 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
         }
       });
 
+    const recordFailure = () => {
+      if (cancelled) return;
+      setStatus("unavailable");
+      setMessage("Some learning activity could not be saved. Retry tracking to start a new session.");
+    };
     const onInteraction = (event: Event) => {
       const sessionId = sessionRef.current;
       // Workspace navigation, menus and unrelated app controls never count as
@@ -74,7 +90,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
         mustResume = false;
         lastSent = now;
         void record(sessionId, "lesson_resumed")
-          .catch(() => { if (!cancelled) setMessage("Some activity could not be recorded."); });
+          .catch(recordFailure);
         return;
       }
       const elapsed = now - lastSent;
@@ -83,7 +99,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
       // Only foreground interaction at both ends. This is an estimated upper
       // bound on engaged time, not attendance or verified study.
       void record(sessionId, "engaged_interval", { durationMs: Math.min(60_000, elapsed) })
-        .catch(() => { if (!cancelled) setMessage("Some activity could not be recorded."); });
+        .catch(recordFailure);
     };
     const onResourceClick = (event: MouseEvent) => {
       const sessionId = sessionRef.current;
@@ -96,7 +112,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
       // Records a user-initiated access attempt, NOT successful download,
       // reading, watching, mastery, attendance, or earned course credit.
       void record(sessionId, "resource_opened", { resourceId })
-        .catch(() => { if (!cancelled) setMessage("Some resource activity could not be recorded."); });
+        .catch(recordFailure);
     };
     const onVisibilityChange = () => {
       // Never count time spent in a hidden or unfocused page.
