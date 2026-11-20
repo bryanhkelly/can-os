@@ -112,3 +112,36 @@ export const InlineRecordActions: Story = {
     await expect(canvas.getByRole("status")).toHaveTextContent("Review pending");
   },
 };
+
+function StepNavigationExample() {
+  const [step, setStep] = useState(0);
+  return <div className="max-w-2xl bg-background p-6">
+    <p role="status" className="text-sm text-muted-foreground">Step {step + 1} of 3</p>
+    <ActionFooter layout="step">
+      <Button variant="outline" disabled={step === 0} onClick={() => setStep(value => Math.max(0, value - 1))}>
+        Previous step
+      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ghost" onClick={() => setStep(0)}>Save &amp; Exit (preview)</Button>
+        <Button disabled={step === 2} onClick={() => setStep(value => Math.min(2, value + 1))}>
+          Save &amp; Continue
+        </Button>
+      </div>
+    </ActionFooter>
+  </div>;
+}
+export const StepNavigationActions: Story = {
+  render: () => <StepNavigationExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const footer = canvasElement.querySelector('[data-action-footer="step"]');
+    await expect(footer).toBeInTheDocument();
+    await expect(footer).toHaveClass("justify-between");
+    await expect(canvas.getByRole("status")).toHaveTextContent("Step 1 of 3");
+    const previous = canvas.getByRole("button", { name: "Previous step" });
+    await expect(previous).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: "Save & Continue" }));
+    await expect(canvas.getByRole("status")).toHaveTextContent("Step 2 of 3");
+    await expect(previous).toBeEnabled();
+  },
+};
