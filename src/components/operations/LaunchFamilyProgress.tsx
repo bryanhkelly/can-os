@@ -1,3 +1,4 @@
+import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { Link } from "@tanstack/react-router";
 import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
@@ -42,7 +43,7 @@ export function LaunchFamilyProgress({ admissionsCounts, enrollmentCounts, famil
           <p className="mt-3 text-sm"><strong className="mr-2 text-2xl">{enrollmentCounts.filter(row=>!programId||row.programId===programId).reduce((total,row)=>total+row.activeStudents,0)}</strong>Active program enrollments</p>
           <Link to="/admissions" search={{siteId:siteId,programId:programId,application:undefined}} className="mt-2 inline-block text-sm font-semibold underline">Review enrollment records</Link>
         </section>}
-        <nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3  border bg-card p-4">
+        <WorkspaceLinkNavigation label="Family enrollment handoff" className="mt-5 gap-3">
           <span className="text-sm font-semibold">After inviting families</span>
           <Link to="/operations/interest-events" search={{siteId:siteId,programId:programId}}
             className="text-sm font-semibold underline">Create an interest event</Link>
@@ -50,7 +51,7 @@ export function LaunchFamilyProgress({ admissionsCounts, enrollmentCounts, famil
             className="text-sm font-semibold underline">Review inquiries and applications</Link>
           <Link to="/admissions" search={{siteId:siteId,programId:programId,application:undefined}}
             className="text-sm font-semibold underline">Manage offers and enrollment</Link>
-        </nav>
+        </WorkspaceLinkNavigation>
         <section aria-label="Saved family invitation progress" className="mt-5  border bg-card p-4">
           <h2 className="text-sm font-semibold">Outreach recorded for this school</h2>
           {familyInvitations&&!invitationAccess&&<p role="status" className="mt-2 text-sm">You cannot create new outreach for this selected school with your current permissions. Existing batches remain visible only if the server authorized their return.</p>}
