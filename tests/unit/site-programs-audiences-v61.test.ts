@@ -87,6 +87,27 @@ describe("V6.1 private Site planning", () => {
       ...plan, interestIds: ["senior"], startingFocus: "grades-9-12",
     }).success).toBe(false);
   });
+  it("keeps canonical Program references as private intent, separate from Offerings", () => {
+    const withPrograms = siteProgramsAudiencesV61Schema.parse({
+      ...plan,
+      programCodes: ["can.program.custom_training", "can.program.ai_digital_skills"],
+      startingProgramCode: "can.program.custom_training",
+    });
+    const saved = applySiteProgramsAudiencesV61({ delivery: "physical", interestIds: [] }, withPrograms);
+    expect(saved.programCodes).toEqual(withPrograms.programCodes);
+    expect(saved.startingProgramCode).toBe("can.program.custom_training");
+    expect(readSiteProgramsAudiencesV61(saved)).toEqual(withPrograms);
+    expect(siteProgramsAudiencesV61Schema.safeParse({
+      ...withPrograms, programCodes: ["can.program.custom_training", "can.program.custom_training"],
+    }).success).toBe(false);
+    expect(siteProgramsAudiencesV61Schema.safeParse({
+      ...withPrograms, startingProgramCode: "can.program.unknown",
+    }).success).toBe(false);
+    expect(siteProgramsAudiencesV61Schema.safeParse({
+      ...withPrograms, offeringId: "unapproved-offering",
+    }).success).toBe(false);
+  });
+
   it("opens as an entirely optional planning form for new Sites", () => {
     expect(readSiteProgramsAudiencesV61(null)).toEqual(emptySiteProgramsAudiencesV61());
   });
