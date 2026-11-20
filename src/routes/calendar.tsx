@@ -27,10 +27,10 @@ import { countCalendarInvitees } from "@/domain/calendar-invitees";
 import { CalendarInviteesPicker } from "@/components/calendar/CalendarInviteesPicker";
 import { CalendarAgendaList } from "@/components/calendar/CalendarAgendaList";
 import { CalendarWeekGrid } from "@/components/calendar/CalendarWeekGrid";
+import { CalendarMonthGrid } from "@/components/calendar/CalendarMonthGrid";
 import { CalendarEventFactsPanels } from "@/components/calendar/CalendarEventFactsPanels";
 import { CalendarRecordContextPanel } from "@/components/calendar/CalendarRecordContextPanel";
-import { WEEKDAY_ABBREVIATIONS } from "@/domain/weekdays";
-import { formatTime, formatEventDate, typeLabel, chipClass } from "@/components/calendar/calendar-presentation";
+import { formatTime, formatEventDate, typeLabel } from "@/components/calendar/calendar-presentation";
 
 export const Route = createFileRoute("/calendar")({
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:CalendarView;q?:string}=>({
@@ -205,17 +205,6 @@ function CalendarPage() {
     return map;
   }, [periodItems]);
 
-  const cells = useMemo(() => {
-    const first = new Date(year, month - 1, 1);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const blanks = first.getDay();
-    const list: ({ key: string; day: number } | null)[] = [];
-    for (let i = 0; i < blanks; i += 1) list.push(null);
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      list.push({ key: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, day });
-    }
-    return list;
-  }, [year, month]);
 
   const isTeacher = data?.viewerRole === "teacher";
   const isRoomFacilitator = data?.viewerRole === "room_facilitator";
@@ -560,63 +549,11 @@ function CalendarPage() {
           <CalendarAgendaList className="md:hidden" label="Calendar agenda"
             heading={`Agenda · ${monthLabel}`} items={visibleItems}
             loading={loading} selection={search} />
-          <div className="hidden min-w-0 overflow-x-auto border border-border bg-card p-5 md:block">
-            <div className="min-w-[28rem]">
-            <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {WEEKDAY_ABBREVIATIONS.map((day) => <div key={day} className="py-1">{day}</div>)}
-            </div>
-            <div className="mt-1 grid grid-cols-7 gap-1">
-              {cells.map((cell, index) =>
-                cell ? (
-                  <div
-                    key={cell.key}
-                    onClick={(event) => {
-                      if (!(event.target instanceof Element) || !event.target.closest("a, button")) openDay(cell.key);
-                    }}
-                    onDragOver={(event) => {
-                      if (isTeacher) event.preventDefault();
-                    }}
-                    onDrop={(event) => onDrop(event, cell.key)}
-                    className={`min-h-24 cursor-pointer border p-1.5 text-xs ${
-                      selectedDay === cell.key ? "border-primary ring-1 ring-primary" : "border-border"
-                    }`}
-                  >
-                    <Button variant="ghost" size="sm"
-                      id={`calendar-day-${cell.key}`}
-                      type="button"
-                      onClick={() => openDay(cell.key)}
-                      onKeyDown={event=>onCalendarDayKeyDown(event,cell.key)}
-                      tabIndex={selectedDay===cell.key||(!selectedDay&&cell.day===1)?0:-1}
-                      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
-                      className="block h-auto min-h-10 w-full p-0 text-left font-normal"
-                      aria-label={`Select ${cell.key}`}
-                    >
-                      <span className="font-semibold">{cell.day}</span>
-                    </Button>
-                    <span className="mt-1 flex flex-col gap-1">
-                      {(byDay.get(cell.key) ?? []).map((item) => (
-                        <Link
-                          key={item.id}
-                          {...itemDestination(item)}
-                          draggable={isTeacher && item.source === "assessment"}
-                          onDragStart={(event) => onDragStart(event, item)}
-                          title={`${item.cancelled?"Cancelled · ":""}${typeLabel(item)} · ${item.title}`}
-                          className={`block truncate border px-1 py-0.5 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${item.cancelled?"border-danger/50 bg-danger/10 text-danger":chipClass()} ${
-                            isTeacher && item.source === "assessment" ? "cursor-grab" : ""
-                          }`}
-                        >
-                          {item.cancelled?"Cancelled · ":""}{typeLabel(item)} · {item.title}
-                        </Link>
-                      ))}
-                    </span>
-                  </div>
-                ) : (
-                  <div key={`blank-${index}`} className="min-h-24 border border-transparent" />
-                ),
-              )}
-            </div>
-            </div>
-          </div></>}
+          <CalendarMonthGrid year={year} month={month}
+             byDay={byDay} selection={search} selectedDay={selectedDay}
+             canDragDeadlines={isTeacher} onSelectDay={openDay}
+             onDayKeyDown={onCalendarDayKeyDown}
+             onDragStart={onDragStart} onDrop={onDrop}/></>}
 
           <aside className="border border-border bg-card p-5">
             <h3 className="font-semibold">{selectedDay ? `Events on ${selectedDay}` : "Select a day"}</h3>
