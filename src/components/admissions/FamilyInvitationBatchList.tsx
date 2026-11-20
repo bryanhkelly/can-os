@@ -37,7 +37,7 @@ export function FamilyInvitationBatchList({
         </p>
         <p className="mt-2 text-sm">{plural(batch.recipients.length, "recipient")}: {responded} verified a link; {providerAccepted} provider accepted; {retrying} require retry.</p>
         {retrying > 0 && <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onRetry(batch.id)}
-          className="mt-3  border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          className="mt-3">
           Retry unaccepted invitations
         </Button>}
         <p className="mt-2 text-xs text-muted-foreground">
