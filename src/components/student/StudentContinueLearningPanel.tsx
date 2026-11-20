@@ -19,8 +19,8 @@ export function StudentContinueLearningPanel({
 }) {
   const textLink = "student-dashboard-link";
   return <DashboardPanel id="continue-learning" title="Continue Learning"
-          action={resume?<Link to="/classes" search={{section:resume.sectionId,tab:"lessons"}} className={textLink}>View class →</Link>:
-            <Link to="/classes" className={textLink}>View my classes →</Link>}>
+          action={resume?<Link to="/class" className={textLink}>View Classes →</Link>:
+            <Link to="/class" className={textLink}>View my classes →</Link>}>
           {resume ? <div className="student-resume-grid">
             <div>
               <div className="flex items-start gap-3">
@@ -31,9 +31,9 @@ export function StudentContinueLearningPanel({
                     max={resume.total} className="mt-4" /> : <p className="mt-3 text-xs text-muted-foreground">No published instructional lessons available.</p>}
                 </div>
               </div>
-              {resume.lesson ? <Link to="/classes" search={{section:resume.sectionId,tab:"lessons",lesson:resume.lesson.id}}
-                className="student-resume-action">Resume Lesson <span aria-hidden="true">→</span></Link>
-                : <Link to="/classes" search={{section:resume.sectionId,tab:"lessons"}} className="student-resume-action">Review class →</Link>}
+              {resume.lesson ? <Link to="/class"
+                className="student-resume-action">Find Lesson in Classes <span aria-hidden="true">→</span></Link>
+                : <Link to="/class" className="student-resume-action">Find Class →</Link>}
               <p className="mt-2 text-3xs text-muted-foreground">Self-reported completion is not mastery or earned credit.</p>
             </div>
             <div className="student-up-next">
@@ -42,7 +42,7 @@ export function StudentContinueLearningPanel({
                 <p className="text-xs">{resume.lesson?.title ?? "Check your classwork and feedback"}</p></div>
               {resume.lesson?.estimatedMinutes && <div className="mt-3 flex gap-2"><Clock3 aria-hidden="true" className="size-4 shrink-0" />
                 <p className="text-xs">About {resume.lesson.estimatedMinutes} min · estimated duration</p></div>}
-              <Link to="/classes" search={{section:resume.sectionId,tab:"lessons"}} className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">View Course →</Link>
+              <Link to="/class" className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">Open Classes →</Link>
               {nextWork && <div className="mt-4 space-y-2 border-t border-border pt-3">
                 <p className="text-xs font-semibold">Assignment needing attention</p>
                 <p className="text-xs text-muted-foreground">{nextWork.title}</p>
@@ -57,7 +57,7 @@ export function StudentContinueLearningPanel({
             {nextWork && <><p className="text-sm font-semibold">{nextWork.title}</p>
               <StudentAssignmentLink assessmentId={nextWork.assessmentId} sectionId={nextWork.sectionId}
                 className="student-resume-action">Continue assignment →</StudentAssignmentLink></>}
-            <Link to="/classes" className={textLink}>View my classes →</Link>
+            <Link to="/class" className={textLink}>View my classes →</Link>
           </div>}
         </DashboardPanel>;
 }
