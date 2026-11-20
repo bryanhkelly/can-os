@@ -7,6 +7,7 @@ import { CircleAlert } from "lucide-react";
 import { StatusBadge, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import type { siteLaunchModules } from "./LaunchStudioOverviewV61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
+import { LaunchReadinessPanelV61 } from "./LaunchReadinessPanelV61";
 import type { PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 
 type ModuleId = typeof siteLaunchModules[number]["id"];
@@ -56,6 +57,7 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
         <StatusBadge tone="info">Independently governed workflow</StatusBadge>
         <span className="text-xs text-muted-foreground">Your Site remains the same; no new Site is created.</span>
       </div>
+      {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
       <WorkspacePanel title={module === "open" ? "Enable Enrollment" : "Continue with existing capabilities"}
         description={module === "open"
           ? "Review readiness, then use each Offering’s authorized registration workspace to enable enrollment independently."
