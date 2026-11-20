@@ -1,7 +1,7 @@
 
 import { useId, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Building2, Globe2, HelpCircle, Menu, X } from "lucide-react";
+import { Building2, Globe2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { siteLaunchModules } from "./LaunchStudioOverviewV61";
@@ -27,7 +27,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
   const renderSidebar = (instance: "desktop" | "drawer") => (
     <div className="flex h-full flex-col bg-card">
       <div className="border-b px-4 py-5">
-        <p className="text-base font-extrabold">CAN OS</p>
+        <p className="text-base font-bold">CAN OS</p>
         <p className="text-3xs font-bold uppercase tracking-eyebrow text-muted-foreground">Christian Academic Network</p>
       </div>
       <div className="m-3 border p-3">
@@ -50,7 +50,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
                 <Link key={item.id} to="/launch/site" search={{ siteId: site.id, module: item.id }}
                   onClick={() => setDrawer(false)}
                   aria-current={active===item.id ? "page" : undefined}
-                  className={"block border-l-2 px-3 py-2 text-xs " +
+                  className={"flex min-h-11 items-center border-l-2 px-3 py-2 text-xs " +
                     (active===item.id ? "border-primary bg-accent font-bold text-primary" : "border-transparent text-muted-foreground hover:bg-muted")}>
                   {item.title}
                 </Link>
@@ -66,12 +66,12 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
       </div>
     </div>
   );
-  return <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[14rem_minmax(0,1fr)]">
-    <aside className="hidden min-h-0 border-r bg-card lg:sticky lg:top-0 lg:block lg:h-dvh">{renderSidebar("desktop")}</aside>
+  return <div className="min-h-screen bg-background text-foreground xl:grid xl:grid-cols-[14rem_minmax(0,1fr)]">
+    <aside className="hidden min-h-0 border-r bg-card xl:sticky xl:top-0 xl:block xl:h-dvh">{renderSidebar("desktop")}</aside>
     <div className="min-w-0">
       <header className="flex min-h-16 items-center justify-between gap-3 border-b bg-card px-4 sm:px-7">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" className="lg:hidden" onClick={()=>setDrawer(true)} aria-label="Open launch menu">
+          <Button variant="outline" size="sm" className="xl:hidden" onClick={()=>setDrawer(true)} aria-label="Open launch menu">
             <Menu className="size-4" />
           </Button>
           <strong className="text-sm">Launch Studio</strong>
@@ -83,7 +83,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
             className="inline-flex items-center gap-2 text-xs font-semibold text-primary">
             <Globe2 className="size-4"/> Preview Website
           </a>
-          <a href="#launch-help" aria-label="Launch help"><HelpCircle className="size-4" /></a>
+
         </div>
       </header>
       <Modal open={drawer} onClose={() => setDrawer(false)}
@@ -96,7 +96,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
           <div className="min-h-0 flex-1 overflow-hidden">{renderSidebar("drawer")}</div>
         </div>
       </Modal>
-      <div id="launch-help">{children}</div>
+      <div>{children}</div>
     </div>
   </div>;
 }
