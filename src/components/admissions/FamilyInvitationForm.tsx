@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { ActionFooter, WorkspacePanel } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -41,9 +42,9 @@ export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit,purp
  if(!programs.length)return <p className="mt-6 border p-4 text-sm">{purpose==="interest"
    ? "No eligible developing school Programs are available for interest outreach at this Site. Creating a Site alone does not authorize invitations."
    : "No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations."}</p>;
- return <form noValidate onSubmit={submit} className="mt-6 max-w-3xl space-y-4  border bg-card p-5">
-  <h2 className="font-semibold">{purpose==="interest"
-    ? "Invite consenting adults to express interest" : "Send a private receiving-school application invitation"}</h2>
+ return <WorkspacePanel className="mt-6 max-w-3xl" title={purpose==="interest"
+    ? "Invite consenting adults to express interest" : "Send a private receiving-school application invitation"}>
+  <form noValidate onSubmit={submit} className="space-y-4">
     <Field label={purpose==="interest"?"Eligible developing Program":"Authorized school Program"} required error={errors.program}>
      <Select value={draft.programId} onChange={e=>onChange({programId:e.target.value})}>
         <option value="">Choose a Program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
@@ -60,6 +61,9 @@ export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit,purp
     <Field label="School introduction" required error={errors.introduction}>
      <Textarea rows={3} maxLength={2000} value={draft.introduction} onChange={e=>onChange({introduction:e.target.value})}/>
     </Field>
-    <Button type="submit" disabled={busy}>{busy?"Queuing…":"Queue secure invitations"}</Button>
- </form>;
+    <ActionFooter layout="form">
+      <Button type="submit" disabled={busy} loading={busy} loadingLabel="Queuing invitations...">Queue secure invitations</Button>
+    </ActionFooter>
+  </form>
+ </WorkspacePanel>;
 }
