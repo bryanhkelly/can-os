@@ -51,6 +51,23 @@ const serverPresentation = walk(src)
     return /\b(?:renderPublicSiteHtml|renderPublicSitePage|srcDoc|DOCTYPE html|siteArtifactHtml)\b/.test(contents);
   }).map(relativeName);
 
+// Check the shared token source used by every internal application page.
+// This establishes source ownership only; light/dark/browser contrast must
+// still be verified with the rendered page and BrandTheme where applicable.
+const sharedCss = readFileSync(join(src, "styles.css"), "utf8");
+const sharedThemeTokens = {
+  fontSans: /--font-sans:\\s*"DM Sans"/.test(sharedCss),
+  fontSerif: /--font-serif:\\s*"Instrument Serif"/.test(sharedCss),
+  squareGeometry: /--radius:\\s*0(?:px|rem)?\\s*;/.test(sharedCss),
+  semanticSuccess: /--color-success:\\s*var\\(--success\\)/.test(sharedCss),
+  semanticWarning: /--color-warning:\\s*var\\(--warning\\)/.test(sharedCss),
+  semanticDanger: /--color-danger:\\s*var\\(--danger\\)/.test(sharedCss),
+  shellWidth: /--sidebar-width:\\s*[^;]+;/.test(sharedCss),
+  shellHeight: /--topbar-height:\\s*[^;]+;/.test(sharedCss),
+};
+const missingThemeTokens = Object.entries(sharedThemeTokens)
+  .filter(([, found]) => !found).map(([token]) => token);
+
 const report = {
   contract: "CAN OS V6.1 source coverage",
   applicationTsx: allUi.length,
@@ -59,6 +76,7 @@ const report = {
   extraUi: inventory.totals.extraUiFiles,
   inspectedTsx: reviewed.size,
   omittedTsx: missing,
+  sharedThemeTokens,
   sourceDebt: { count: unresolvedSource.length, files: unresolvedSource },
   independentlyReviewedRequired: {
     note: "These render public HTML or Storybook content outside the application TSX audit; inspect their actual output independently.",
@@ -73,6 +91,10 @@ const report = {
   ],
 };
 console.log(JSON.stringify(report, null, 2));
+if (missingThemeTokens.length) {
+  console.error("V6.1 SHARED THEME TOKEN MISSING: " + missingThemeTokens.join(", "));
+  process.exitCode = 1;
+}
 if (missing.length) {
   console.error("V6.1 COMPONENT OMITTED: " + missing.join(", "));
   process.exitCode = 1;
