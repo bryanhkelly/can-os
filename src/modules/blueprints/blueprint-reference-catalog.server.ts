@@ -29,7 +29,32 @@ type BlueprintCatalogTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export async function readPublishedBlueprintReferences(
   tx: BlueprintCatalogTx,
 ): Promise<BlueprintReferenceCatalogItem[]> {
-    return readPublishedBlueprintReferences(tx);
+    const rows = await tx.select({
+      itemId: blueprintReferenceItems.id,
+      versionId: blueprintReferenceItemVersions.id,
+      code: blueprintReferenceItems.code,
+      referenceKind: blueprintReferenceItems.referenceKind,
+      category: blueprintReferenceItems.category,
+      status: blueprintReferenceItems.status,
+      sortOrder: blueprintReferenceItems.sortOrder,
+      versionNo: blueprintReferenceItemVersions.versionNo,
+      title: blueprintReferenceItemVersions.title,
+      summary: blueprintReferenceItemVersions.summary,
+      lifecycle: blueprintReferenceItemVersions.lifecycle,
+    }).from(blueprintReferenceItems)
+      .innerJoin(blueprintReferenceItemVersions,
+        eq(blueprintReferenceItemVersions.itemId, blueprintReferenceItems.id))
+      .where(and(
+        eq(blueprintReferenceItems.status, "active"),
+        eq(blueprintReferenceItemVersions.lifecycle, "published"),
+      ))
+      .orderBy(
+        asc(blueprintReferenceItems.sortOrder),
+        asc(blueprintReferenceItems.code),
+        desc(blueprintReferenceItemVersions.versionNo),
+      );
+
+    return projectBlueprintReferenceCatalog(rows);
 }
 
 /** Catalog discovery is scoped to a real Site and a purpose-bound DB role. */
@@ -59,31 +84,6 @@ export async function getBlueprintReferenceCatalog(
     }
     if (isCanPlanning) await assertVerifiedCanPlanningSite(tx, context, siteId);
 
-    const rows = await tx.select({
-      itemId: blueprintReferenceItems.id,
-      versionId: blueprintReferenceItemVersions.id,
-      code: blueprintReferenceItems.code,
-      referenceKind: blueprintReferenceItems.referenceKind,
-      category: blueprintReferenceItems.category,
-      status: blueprintReferenceItems.status,
-      sortOrder: blueprintReferenceItems.sortOrder,
-      versionNo: blueprintReferenceItemVersions.versionNo,
-      title: blueprintReferenceItemVersions.title,
-      summary: blueprintReferenceItemVersions.summary,
-      lifecycle: blueprintReferenceItemVersions.lifecycle,
-    }).from(blueprintReferenceItems)
-      .innerJoin(blueprintReferenceItemVersions,
-        eq(blueprintReferenceItemVersions.itemId, blueprintReferenceItems.id))
-      .where(and(
-        eq(blueprintReferenceItems.status, "active"),
-        eq(blueprintReferenceItemVersions.lifecycle, "published"),
-      ))
-      .orderBy(
-        asc(blueprintReferenceItems.sortOrder),
-        asc(blueprintReferenceItems.code),
-        desc(blueprintReferenceItemVersions.versionNo),
-      );
-
-    return projectBlueprintReferenceCatalog(rows);
+    return readPublishedBlueprintReferences(tx);
   });
 }
