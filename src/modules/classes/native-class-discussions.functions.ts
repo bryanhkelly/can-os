@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -54,17 +54,12 @@ async function requirePrivateDiscussionAccess(tx:Tx,actor:Learner,classEnrollmen
       eq(communicationParticipants.participantType,"person"),
       eq(communicationParticipants.participantId,actor.actorPersonId)))
     .where(and(eq(communicationThreads.contextType,"class"),
-      eq(communicationThreads.contextId,cls.id)))
+      eq(communicationThreads.contextId,cls.id),
+      sql`${communicationThreads.metadata} @> '{"fixture":"valor-v61-class-discussions","synthetic":true,"demoOnly":true,"notPublic":true}'::jsonb`))
     .limit(20);
-  // Only these explicitly private synthetic Class discussions qualify.
-  // Unrelated communication threads and even other Class participants never
-  // become visible through this purpose-specific feature.
-  return {cls,threads:threads.filter(t=>
-    t.id===(
-      cls.courseVersionId==="6a21d4e9-cd7d-27cb-0b88-ec3b3bf0ca4d"
-      ?"d9a06036-9946-f207-d2ac-c69f175c10ac"
-      :t.id
-    ))};
+  // Only explicitly private synthetic threads with this Person as an
+  // immutable participant qualify; no schoolwide broadcast authorization.
+  return {cls,threads};
 }
 
 export const getNativeClassDiscussions=createServerFn({method:"GET"})
