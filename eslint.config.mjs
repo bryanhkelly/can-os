@@ -120,6 +120,24 @@ export default tseslint.config(
       }],
     },
   },
+  // The current V6.1 Launch Studio journey is fully migrated. Prevent it
+  // from regressing to custom native controls or role-specific palette classes.
+  // Wrapped <label> remains valid for full-card checkbox/radio hit targets.
+  {
+    files: [
+      "src/components/launch-studio/{LaunchSiteFrameV61,LaunchStudioOverviewV61,EstablishSiteProfileUnified,EstablishSiteInformationV61,EstablishProgramsAudiencesV61}.tsx",
+      "src/components/launch-studio/{MarketingPackagesV61,MarketingMaterialPreviewV61,LaunchPreviewSharing,LaunchPrepareV61,LaunchSitePublicationPanel,LaunchModuleDestinationV61}.tsx",
+      "src/components/launch-studio/{SolutionCatalogV61,ProgramDiscoveryPanel,WebsiteTemplateGallery,WebsiteVisualIdentityStep,WebsiteArtworkField,WebsiteCopyField}.tsx",
+      "src/routes/{launch.site,site-website}.tsx",
+    ],
+    rules: {
+      "can-os-design/no-hardcoded-colors": "error",
+      "no-restricted-syntax": ["error", {
+        selector: "JSXOpeningElement[name.name=/^(button|input|select|textarea)$/]",
+        message: "Use shared V6.1 Button, Input, Select, or Textarea components.",
+      }],
+    },
+  },
   // Shared workspace, workflow and evidence families must use canonical controls.
   {
     files: ["src/components/{workspace,workflow,evidence}/**/*.tsx"],
