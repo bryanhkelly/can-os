@@ -1,7 +1,7 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { z } from "zod";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -22,9 +22,8 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Modal } from "@/components/ui/modal";
 import { countCalendarInvitees } from "@/domain/calendar-invitees";
-import { CalendarInviteesPicker } from "@/components/calendar/CalendarInviteesPicker";
+import { CalendarEventComposer } from "@/components/calendar/CalendarEventComposer";
 import { CalendarAgendaList } from "@/components/calendar/CalendarAgendaList";
 import { CalendarWeekGrid } from "@/components/calendar/CalendarWeekGrid";
 import { CalendarMonthGrid } from "@/components/calendar/CalendarMonthGrid";
@@ -639,59 +638,29 @@ function CalendarPage() {
             )}
           </aside>
         </div>
-        <Modal open={composerOpen} onClose={() => { if (!saving) setComposerOpen(false); }}
-          label="Create calendar event" labelledBy="calendar-event-dialog-title" initialFocus={titleInput}
-          className="max-w-4xl" busy={saving} dismissible={!saving}>
-          <form noValidate onSubmit={event => { event.preventDefault(); submitEvent(); }}>
-            <header className="flex items-start justify-between gap-5 border-b border-border px-6 py-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calendar</p>
-                <h2 id="calendar-event-dialog-title" className="mt-1 font-serif text-2xl">Create event</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Add an event and invite people from your authorized address list.</p>
-              </div>
-              <Button type="button" variant="ghost" size="icon" aria-label="Close event composer"
-                disabled={saving} onClick={() => setComposerOpen(false)}><X aria-hidden="true" /></Button>
-            </header>
-            <div className="grid gap-6 p-6 md:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-              <div className="space-y-4">
-                <Field label="Title" required error={eventAttempted && formTitle.trim().length < 3 ? "Enter a title with at least 3 characters." : undefined}>
-                  <Input ref={titleInput} value={formTitle} onChange={event => setFormTitle(event.target.value)}
-                    minLength={3} maxLength={200} placeholder="Add a title" />
-                </Field>
-                <Field label="Description">
-                  <Textarea value={formDescription} onChange={event => setFormDescription(event.target.value)}
-                    maxLength={2000} rows={4} placeholder="Add details" />
-                </Field>
-                <Field label="Date" required error={eventAttempted && !formDate ? "Choose an event date." : undefined}>
-                  <Input type="date" value={formDate} onChange={event => setFormDate(event.target.value)} />
-                </Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Starts" required error={eventAttempted && !formStart ? "Choose a start time." : undefined}>
-                    <Input type="time" value={formStart} onChange={event => setFormStart(event.target.value)} />
-                  </Field>
-                  <Field label="Ends" error={eventAttempted && formEnd && formEnd <= formStart ? "Choose an end after the start." : undefined}>
-                    <Input type="time" value={formEnd} onChange={event => setFormEnd(event.target.value)} />
-                  </Field>
-                </div>
-                <p className="text-xs text-muted-foreground">Times use {viewerTimezone}.</p>
-              </div>
-              <CalendarInviteesPicker
-                inviteGroups={inviteGroups} inviteContacts={inviteContacts}
-                inviteGroupsError={inviteGroupsError} inviteContactsError={inviteContactsError}
-                loading={loading} inviteSearch={inviteSearch} setInviteSearch={setInviteSearch}
-                inviteGroupIds={inviteGroupIds} setInviteGroupIds={setInviteGroupIds}
-                inviteePersonIds={inviteePersonIds} setInviteePersonIds={setInviteePersonIds} />
-            </div>
-            {error && <p role="alert" className="mx-6 mb-4 border border-danger/50 bg-danger/10 p-3 text-sm">{error}</p>}
-            <MutationFeedback state={mutation} className="px-6 pb-4" pendingMessage="Creating event and sending invitations…" />
-            <footer className="flex flex-wrap justify-end gap-3 border-t border-border px-6 py-4">
-              <Button type="button" variant="outline" disabled={saving} onClick={() => setComposerOpen(false)}>Cancel</Button>
-              <Button type="submit" size="lg" disabled={saving || selectedInviteeCount > 100 || inviteGroupIds.length > 50} className="min-w-40">
-                {saving ? "Creating…" : "Create event"}
-              </Button>
-            </footer>
-          </form>
-        </Modal>
+        <CalendarEventComposer
+          open={composerOpen} busy={saving} attempted={eventAttempted}
+          error={error} mutation={mutation} initialFocus={titleInput}
+          form={{title:formTitle,description:formDescription,date:formDate,
+            start:formStart,end:formEnd,timezone:viewerTimezone}}
+          onFieldChange={(field,value)=>{
+            switch(field){
+              case "title": setFormTitle(value);break;
+              case "description": setFormDescription(value);break;
+              case "date": setFormDate(value);break;
+              case "start": setFormStart(value);break;
+              case "end": setFormEnd(value);break;
+            }
+          }}
+          invitees={{
+            inviteGroups,inviteContacts,inviteGroupsError,inviteContactsError,
+            loading,inviteSearch,setInviteSearch,
+            inviteGroupIds,setInviteGroupIds,inviteePersonIds,setInviteePersonIds,
+          }}
+          selectedInviteeCount={selectedInviteeCount}
+          inviteGroupCount={inviteGroupIds.length}
+          onClose={()=>setComposerOpen(false)}
+          onSubmit={submitEvent}/>
     </WorkspaceShell>
   );
 }
