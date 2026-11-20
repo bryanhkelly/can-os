@@ -22,8 +22,8 @@ import {
 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketingPackageZip } from "./marketing-output-download";
-import { packageReleaseChangesV61, packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
-import { siteMarketingTemplateVersions } from "@/domain/site-marketing-template-versions";
+import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
+import { MarketingPackageReleaseControlsV61 } from "./MarketingPackageReleaseControlsV61";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
@@ -316,12 +316,6 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const visible=packages.filter(item=>context.purposes.includes(item.content.purpose) &&
     (showArchived?item.status==="archived":item.status!=="archived"));
   const currentSuggestion=suggestions?.[content.purpose]??null;
-  const latestPackageRelease=packageReleases[0]??null;
-  const packageChanges=record?packageReleaseChangesV61(record,latestPackageRelease,{
-    templateVersions:siteMarketingTemplateVersions,
-    publicDestinationUrl:latestPackageRelease?.currentPublicDestinationUrl,
-  }):[];
-  const packageUpToDate=Boolean(latestPackageRelease?.complete && packageChanges.length===0);
   const legacyReleases=releases.filter(item=>!item.packageReleaseId);
   const packageHandoff=record && context.packageHandoff?.purpose===record.content.purpose
     ?context.packageHandoff:null;
@@ -437,50 +431,14 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
               }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
           </WorkspacePanel>}
         <WorkspaceNotice tone="info">The package's content is saved. New branded releases are available to download. Sending marketing email requires separate authorization.</WorkspaceNotice>
-        <WorkspacePanel title="Package release"
-          description="Release every selected format together. A Package Release is a frozen set; edits never change an earlier download or email.">
-          <div className="space-y-4">
-            <p className="text-sm">Selected identity:
-              <strong>{record.brandVersionId
-                ? selectedBrandRevision!==null
-                  ? " Brand v"+selectedBrandRevision
-                  : " Saved Site Brand"
-                : " No saved Brand selected"}</strong>
-            </p>
-            {currentBrand&&currentBrand.id!==record.brandVersionId&&
-              <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
-                <p className="text-sm">Brand v{currentBrand.revision} is available in Establish.
-                  Updating your working Package will not change older releases.</p>
-                <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
-                  onClick={()=>void selectCurrentBrand()}>Use newer Brand</Button>
-              </div>}
-            {releasesLoading&&<p role="status" className="text-sm text-muted-foreground">Loading Package Release history…</p>}
-            {releasesUnavailable&&<WorkspaceNotice tone="attention">Package history is unavailable. To avoid duplicate releases, reload the history before generating new material.
-              <Button type="button" variant="outline" size="sm"
-                onClick={()=>setReleaseRefreshKey(value=>value+1)}>Retry history</Button>
-            </WorkspaceNotice>}
-            {!releasesLoading&&latestPackageRelease&&<div className="space-y-2 border bg-muted/25 p-4">
-              <p className="text-sm font-semibold">Latest generated: Package Release v{latestPackageRelease.releaseNumber}</p>
-              {packageChanges.length
-                ? <p className="text-sm">Updates available: {packageChanges.map(change=>({templates:"creative templates",destination:"public link",withdrawn:"withdrawn materials",incomplete:"incomplete release"} as Record<string,string>)[change]??change).join(", ")}. Preview and release an updated Package when ready.</p>
-                : <p className="text-sm text-muted-foreground">The working Package matches the latest generated release. Reuse that release instead of creating a duplicate.</p>}
-            </div>}
-            {!releasesLoading&&!latestPackageRelease&&
-              <p className="text-sm text-muted-foreground">This Package has no grouped release yet. Your first release will contain every selected format.</p>}
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
-                onClick={()=>{setTitle(record.title);setContent(record.content);setStep(3);setView("wizard");}}>
-                Preview Package
-              </Button>
-              <Button type="button" disabled={busy||releasesLoading||releasesUnavailable||record.status==="archived"||!record.brandVersionId||packageUpToDate}
-                onClick={()=>void releasePackage()}>
-                {latestPackageRelease?"Release Updated Package":"Release Package"}
-              </Button>
-            </div>
-            <WorkspaceNotice tone="info">Release creates all selected formats atomically. It does not publish the website,
-              send email, update scheduled communications, or change earlier Package Releases.</WorkspaceNotice>
-          </div>
-        </WorkspacePanel>
+        <MarketingPackageReleaseControlsV61 record={record} versions={packageReleases}
+          currentBrand={currentBrand} selectedBrandRevision={selectedBrandRevision}
+          busy={busy} releasesLoading={releasesLoading}
+          releasesUnavailable={releasesUnavailable}
+          onSelectCurrentBrand={() => {void selectCurrentBrand();}}
+          onRetryHistory={() => setReleaseRefreshKey(value=>value+1)}
+          onPreview={() => {setTitle(record.title);setContent(record.content);setStep(3);setView("wizard");}}
+          onRelease={() => {void releasePackage();}} />
         <MarketingPackageReleaseHistoryV61
           siteId={siteId} record={record} versions={packageReleases}
           historicalSingles={legacyReleases} loading={releasesLoading}
