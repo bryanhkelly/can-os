@@ -90,6 +90,19 @@ describe("canonical Blueprint reference catalog", () => {
     )).rejects.toMatchObject({ name: "AuthorizationError" });
   });
 
+  it("uses one published reference projection for both Site browse and Site save", () => {
+    const catalog = readFileSync("src/modules/blueprints/blueprint-reference-catalog.server.ts","utf8");
+    const establishRead = readFileSync("src/modules/blueprints/blueprint-reference-catalog.functions.ts","utf8");
+    const establishSave = readFileSync("src/modules/programs/site-programs-audiences-v61.functions.ts","utf8");
+    expect(catalog).toContain("export async function readPublishedBlueprintReferences");
+    expect(catalog).toContain("return readPublishedBlueprintReferences(tx);");
+    expect(catalog).toContain('eq(blueprintReferenceItemVersions.lifecycle, "published")');
+    expect(catalog).toContain('eq(blueprintReferenceItems.status, "active")');
+    expect(establishRead).toContain("getBlueprintPlanningContext(getRequest())");
+    expect(establishSave).toContain("readPublishedBlueprintReferences(tx)");
+    expect(establishSave).not.toContain("getBlueprintReferenceCatalog(actor");
+  });
+
   it("keeps Site authorization while removing the catalog rollout gate",()=>{
     const source=readFileSync("src/modules/blueprints/blueprint-reference-catalog.server.ts","utf8");
     expect(source).not.toContain("CAN_CANONICAL_CATALOG_ENABLED");
