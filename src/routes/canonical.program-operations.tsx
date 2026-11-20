@@ -94,7 +94,7 @@ function ProgramOperations(){
           Program, Course or Deployment
           <Input id="program-search" value={searchInput} maxLength={100}
             onChange={event=>setSearchInput(event.target.value)}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+            className="mt-1 min-h-11"
             placeholder="Search approved products"/>
         </Label>
         <Button type="submit">Search</Button>
