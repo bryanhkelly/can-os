@@ -141,7 +141,7 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
           a final lock of attendance.
         </Label>
         <Button variant="outline" type="button" disabled={!ready||!confirmed||busy}
-          className="mt-3 border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className="mt-3"
           onClick={async()=>{
             if(!ready||busy||!confirmed)return;
             const outcome=await mutation.run(
