@@ -7,6 +7,7 @@ import { ArrowRight, CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import type { siteLaunchModules } from "./LaunchStudioOverviewV61";
+import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import type { PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 
 type ModuleId = typeof siteLaunchModules[number]["id"];
@@ -50,14 +51,7 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
   const destination = launchModuleDestinationsV61[module];
   return <WorkspaceShell title={title} eyebrow={`${stage} / ${title}`}
     subtitle={destination.subtitle} width="wide"
-    rail={<div className="space-y-4">
-      <WorkspacePanel title="Why this matters">
-        <p className="text-sm leading-6 text-muted-foreground">{destination.intro}</p>
-      </WorkspacePanel>
-      <WorkspacePanel title="What comes next">
-        <p className="text-sm leading-6 text-muted-foreground">{destination.note}</p>
-      </WorkspacePanel>
-    </div>}>
+    rail={<LaunchGuidancePanels guidance={{ why: destination.intro, next: destination.note }} />}>
     <div className="mt-5 space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge tone="info">Independently governed workflow</StatusBadge>
