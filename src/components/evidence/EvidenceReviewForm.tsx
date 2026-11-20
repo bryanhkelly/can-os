@@ -1,6 +1,7 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -45,7 +46,7 @@ export function EvidenceReviewForm({
         value={reason} minLength={10} maxLength={2000} disabled={busy}
         onChange={event => setReason(event.target.value)} />
     </Field>
-    <div className="mt-2 flex flex-wrap gap-2">
+    <ActionFooter layout="inline" className="mt-2">
       <Button type="button" variant="outline" size="sm"
         disabled={busy || reason.trim().length < 10 || reason.trim().length > 2000} onClick={() => void submit("approve")}>
         {pending ? "Recording review…" : approveLabel}
@@ -54,7 +55,7 @@ export function EvidenceReviewForm({
         disabled={busy || reason.trim().length < 10 || reason.trim().length > 2000} onClick={() => void submit("reject")}>
         {rejectLabel}
       </Button>
-    </div>
+    </ActionFooter>
     {error && <p role="alert" className="mt-2 text-danger">{error}</p>}
   </div>;
 }
