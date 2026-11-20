@@ -29,6 +29,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
   // Preserve the server idempotency identity if a witnessed custody command
   // succeeds but its response is lost. A second click must not invent a new event.
   const pendingMutationIds = useRef(new Map<string, string>());
+  const requestSequence = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -45,31 +46,55 @@ export function OnsitePickupPanel({ date, onChanged }: {
   const [resolutionReferences,setResolutionReferences]=useState<Record<string,string>>({});
   const [resolutionBases,setResolutionBases]=useState<Record<string,string>>({});
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (propagateFailure = false) => {
+    const request = ++requestSequence.current;
     setLoading(true);
     setError("");
+    setRoster(null); // Never permit actions against an unverified, previous-date roster.
     try {
-      setRoster(await getOnsitePickupRoster({ data: { date } }));
+      const next = await getOnsitePickupRoster({ data: { date } });
+      if (request !== requestSequence.current) {
+        if (propagateFailure) throw new Error("Pickup roster context changed; retry refresh.");
+        return;
+      }
+      setRoster(next);
     } catch (cause) {
-      setRoster(null);
-      setError(mutationErrorMessage(cause, "Unable to load the verified pickup roster"));
-      throw cause;
+      if (request === requestSequence.current) {
+        setRoster(null);
+        setError(mutationErrorMessage(cause, "Unable to load the verified pickup roster"));
+      }
+      // Mutation feedback requires a rejection when its authoritative
+      // post-command refresh fails. UI refreshes render their own error.
+      if (propagateFailure) throw cause;
     } finally {
-      setLoading(false);
+      if (request === requestSequence.current) setLoading(false);
     }
   }, [date]);
   const mutation = useMutationFeedback(async () => {
-    await load();
+    await load(true);
     await onChanged?.();
   });
   const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
+    // These drafts describe witnessed child custody events. Never carry them
+    // into another date or retain a previous day's authorized adults.
     setSelected({});
     setEvidence({});
     setVerifiedNames({});
+    setDenialNames({});
+    setDenialReasons({});
+    setDenialHouseholds({});
+    setFollowUpPlans({});
+    setHoldReasons({});
+    setHoldKinds({});
+    setHoldHouseholds({});
+    setResolutions({});
+    setResolutionReferences({});
+    setResolutionBases({});
     pendingMutationIds.current.clear(); // Never carry observation IDs across dates.
-    void load().catch(() => {});
+    void load();
+    return () => { requestSequence.current++; };
   }, [load]);
 
   async function run(key: string, message: string, command: (mutationId: string) => Promise<unknown>) {
@@ -106,7 +131,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
     className="mt-9">
     {error && <p role="alert" className="mb-4 border p-3 text-sm">{error}</p>}
     <MutationFeedback state={{...mutation,retryRefresh}} className="mb-4" pendingMessage="Updating verified pickup records…"/>
-    <Button variant="outline" type="button" disabled={loading||busy} onClick={()=>void load().catch(()=>{})}
+    <Button variant="outline" type="button" disabled={loading||busy} onClick={()=>void load()}
       className="mb-4">Refresh verified roster</Button>
     {loading && <p role="status" className="text-sm">Loading family release authority…</p>}
     {!loading && roster && <>
