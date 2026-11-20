@@ -68,6 +68,22 @@ export function selectSavedSolutionPlans<T extends { blueprintVersionId: string 
   return plans.filter(plan => plan.blueprintVersionId === blueprintVersionId);
 }
 
+/** A deep link must resolve inside the server-authorized Site workspace and
+ * pin the exact CAN-published Blueprint version. Never match by title or
+ * automatically substitute a different version when resuming a saved plan. */
+export function resolveSavedSolutionPlan<
+  P extends { configurationId: string; blueprintVersionId: string },
+  T extends { blueprintVersionId: string },
+>(plans: readonly P[], templates: readonly T[], planId: string | null | undefined):
+  { plan: P; template: T } | null {
+  if (!planId) return null;
+  const plan = plans.find(item => item.configurationId === planId);
+  if (!plan) return null;
+  const template = templates.find(item =>
+    item.blueprintVersionId === plan.blueprintVersionId);
+  return template ? { plan, template } : null;
+}
+
 /** Replace edits only for currently visible program-model components.
  * Preserve saved proposals belonging to hidden/proposed components; the UI
  * may render only the selected subset of a larger canonical configuration. */
