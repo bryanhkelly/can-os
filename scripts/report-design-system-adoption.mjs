@@ -23,6 +23,7 @@ const canonicalTags = new Set([
   "CoachOutreachPanel", "TeacherLearningParticipationPanel",
   "StudentDashboardRail", "StudentUpcomingAssignments",
   "StudentReleasedGradesPanel", "StudentSchoolLifePanel",
+  "StudentContinueLearningPanel", "StudentTodayAtGlance",
   "ExtendedSeasonDraftForm",
 ]);
 const files = [];
