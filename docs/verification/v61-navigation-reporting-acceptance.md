@@ -10,16 +10,16 @@
 | Unknown-total review pagination | `DirectoryWindowPagination` | BlueprintReviewHistoryPanel | Zero-based index, newer/older wording, max page 100, server `hasMore`, loading state |
 | Cursor-based delivery links | `PageNavigation` | DeliveryHistory | Latest/older notification cursor links; refresh remains a separate action |
 | Contextual destinations | `WorkspaceLinkNavigation` | RecordedInstructorWorkspace, LaunchFamilyProgress, LaunchCreatedHandoff, TeacherFirstWeekCard, ClassTeacherPlanningPanel, LaunchPreparationWorkspace | Named landmarks, route-specific search values, existing action eligibility |
-| Fixed-column evidence table | `Table` and `TableRowHead` from `ui/table.tsx` | NoncreditNetworkReportPanel (3 tables), NativeClassReportPanel (1), NoncreditPilotOutcomesPanel (1), NoncreditProviderEvidencePanel (2) | Private report values, source metadata, server filters, denominators, CSV output and publication restrictions |
+| Fixed-column evidence table | `Table` and `TableRowHead` from `ui/table.tsx` | NoncreditNetworkReportPanel (3 tables), NativeClassReportPanel (1), NoncreditPilotOutcomesPanel (1), NoncreditProviderEvidencePanel (2), UserFlowMap (1), facilitated Impact Lab (1), student grading rubric (1) | Private report values, source metadata, server filters, denominators, CSV output and publication restrictions |
 | Search/sort/mutation directory | `DirectoryPage`, `DirectoryTable` | Existing directories | Independently authorized actions, sorted results and server pagination |
 
-The `Table` component owns one keyboard-focusable horizontal scrolling region. All seven migrated tables have accessible names, captions, column headers and `scope="row"` headers. The one existing visible provider caption is retained rather than duplicated.
+The `Table` component owns one keyboard-focusable horizontal scrolling region. All ten migrated tables have accessible names, captions, column headers and `scope="row"` headers. The one existing visible provider caption is retained rather than duplicated.
 
 Complex gradebook matrices, private grade-editing flows, and specialized active lesson navigation are **not** treated as interchangeable with read-only report tables or pagination.
 
 ## Test contracts added or extended
 
-- `tests/unit/v61-navigation-reporting-reuse.test.tsx` verifies semantic table markup, seven table implementations, destination navigation, and separate cursor/page ownership.
+- `tests/unit/v61-navigation-reporting-reuse.test.tsx` verifies semantic table markup, ten table implementations, destination navigation, and separate cursor/page ownership.
 - `tests/unit/workspace-directory-window-pagination.test.tsx` verifies contextual labels and suppression of unknown totals.
 - `tests/unit/design-system-rules.test.ts` covers the `no-native-feature-tables` lint rule.
 - `src/components/workspace/report-table.stories.tsx` provides desktop (1440px), tablet (768px), mobile (390px), and dark-mode compositions. Its mobile interaction asserts that the actual table can be horizontally scrolled and focused; cursor interactions exercise first, middle and terminal pages.
@@ -29,7 +29,7 @@ Complex gradebook matrices, private grade-editing flows, and specialized active 
 
 - `src/components/shell/ShellAlignment.stories.tsx` already covers app-shell geometry and active navigation.
 
-Raw native `<table>` in migrated reporting modules is an ESLint **error**; elsewhere it is a warning until the particular table's interactive behavior is evaluated. Shared destination navigation is protected by source regression tests.
+Raw native `<table>` in migrated reporting, workflow and rubric modules is an ESLint **error**; elsewhere it is a warning until the particular table's interactive behavior is evaluated. Shared destination navigation is protected by source regression tests.
 
 ## Acceptance commands
 
