@@ -3,6 +3,36 @@
 **Branch:** `feature/launch-studio-v61-clean-cutover-20261118` · **Date:** 2026-11-19  
 **Status:** **Major application-wide source realignment implemented; executable and visual acceptance pending. Not certified.**
 
+## Current coverage addendum
+
+**November 19 evening source migration update:** The high-debt examples and
+counts below are preserved as a historical **pre-migration snapshot**, not
+a claim that those exact native controls or rounded classes still exist.
+Subsequent feature-branch commits have mechanically migrated the affected
+application screens to shared V6.1 controls and square geometry, and extracted
+additional shared components. Review the branch's current source and run
+`npm run design:coverage`, `npm run design:routes -- --strict` and
+`npm run test:design-audit` for the actual current totals.
+
+**Omitted-component alerting is now explicit.** The coverage guard lists every
+uninspected application TSX, every included file with legacy source debt,
+and independently rendered content. It also verifies that global application
+font, geometry, semantic-color and shell-layout tokens remain defined.
+The strict coverage mode (`node scripts/check-v61-coverage.mjs --strict`)
+refuses blanket certification while independent renderers remain unverified.
+
+**Known independent visual surfaces:** `src/domain/public-site-html.ts`
+(generated branded websites), `.storybook/preview.tsx`, and
+`src/styles.css`. Public Site template geometry, imagery and typography
+may be intentionally brand-specific; do not overwrite their authored identity
+with the internal operator palette or claim they passed the React checker.
+V6.1 Storybook visual-review viewports are now 390/768/1024/1440 px.
+
+No full-repository compile, interactive Storybook capture, visual diff,
+accessible browser walkthrough or authenticated persisted journey was executed
+in this audit. The feature branch must not be labeled fully visually accepted
+based on static checks or Netlify's usage-skipped preview.
+
 ## Scope and authority
 
 Inspected the GitHub branch's application source inventory: 176 route TSX files,
