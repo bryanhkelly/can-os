@@ -15,60 +15,8 @@ import ts from "typescript";
 import { sharedUiImportViolation, sourceDependencySpecifiers } from "./lib/v61-component-dependencies.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const guardedDirectories = [
-  "src/components/ui",
-  "src/components/workspace",
-  "src/components/workflow",
-  "src/components/calendar",
-  "src/components/groups",
-  "src/components/sites",
-  "src/components/learning/native-class",
-];
-const guardedFiles = [
-  "src/components/operations/SchoolImprovementPanel.tsx",
-  "src/components/operations/OperationsHealthSummary.tsx",
-  "src/components/operations/OperationsIssueList.tsx",
-  "src/components/learning/ClassParticipationAcknowledgments.tsx",
-  "src/components/learning/ClassOfferingTermsFields.tsx",
-  "src/components/enrollment/GuardianApplicationDetailsFields.tsx",
-  "src/components/admissions/PublicInterestRecordCard.tsx",
-  "src/components/admissions/PublicInterestTimeline.tsx",
-  "src/components/launch-studio/MarketingPackageLibraryList.tsx",
-  "src/components/learning/NativeApprovedOfferingsPanel.tsx",
-  "src/components/enrollment/NoncreditParticipantRoster.tsx",
-  "src/components/launch-studio/LaunchGuidancePanels.tsx",
-  "src/components/home/GuardianEnrollmentNextSteps.tsx",
-  "src/components/home/GuardianGradeQuestions.tsx",
-  "src/components/home/GuardianChildSummaryCard.tsx",
-  "src/components/support/CoachOutreachPanel.tsx",
-  "src/components/teacher/TeacherLearningParticipationPanel.tsx",
-  "src/components/student/StudentDashboardRail.tsx",
-  "src/components/student/StudentUpcomingAssignments.tsx",
-  "src/components/operations/ExtendedSeasonDraftForm.tsx",
-  "src/components/student/StudentReleasedGradesPanel.tsx",
-  "src/components/student/StudentSchoolLifePanel.tsx",
-  "src/components/student/StudentContinueLearningPanel.tsx",
-  "src/components/student/StudentTodayAtGlance.tsx",
-  "src/components/learning/ClassTeacherGuidePanel.tsx",
-  "src/components/learning/ClassLessonDiscussions.tsx",
-  "src/components/learning/ClassLessonAssessmentLinks.tsx",
-  "src/components/calendar/CalendarEventFactsPanels.tsx",
-  "src/components/calendar/CalendarRecordContextPanel.tsx",
-  "src/components/learning/ClassPublishedResourcesList.tsx",
-  "src/components/learning/ClassSupplementContent.tsx",
-  "src/components/operations/FullFlowOperationalRecord.tsx",
-  "src/components/operations/ExtendedSeasonReadinessRequests.tsx",
-  "src/components/learning/NativeClassScheduleForm.tsx",
-  "src/components/operations/OperationsActionCard.tsx",
-  "src/components/launch-studio/BlueprintComponentPicker.tsx",
-  "src/components/launch-studio/BlueprintReferencesPicker.tsx",
-  "src/components/operations/LaunchTeacherClassRequests.tsx",
-  "src/components/operations/LaunchClassroomPrerequisites.tsx",
-  "src/components/support/CoachCaseloadList.tsx",
-  "src/components/support/CoachStudentTimeline.tsx",
-];
 const failures = [];
-const files = [];
+const files = new Set();
 
 /** A build-independent syntax gate for extracted shared UI and its owners.
  * TypeScript's parser catches malformed JSX and incomplete refactor edits,
@@ -88,11 +36,11 @@ function collect(directory) {
     const name = join(directory, entry.name).replaceAll("\\", "/");
     if (entry.isDirectory()) collect(name);
     else if (entry.isFile() && /\.(ts|tsx)$/.test(name) &&
-      !/\.(test|spec|stories)\.(ts|tsx)$/.test(name)) files.push(name);
+      !/\.(test|spec|stories)\.(ts|tsx)$/.test(name)) files.add(name);
   }
 }
-for (const dir of guardedDirectories) collect(dir);
-files.push(...guardedFiles);
+// Every production feature component is checked, not a growing hand-maintained allowlist.
+collect("src/components");
 
 for (const file of files) {
   const source = readFileSync(resolve(root, file), "utf8");
@@ -181,6 +129,6 @@ if (failures.length) {
   for (const failure of failures) console.error("Component architecture: " + failure);
   process.exitCode = 1;
 } else {
-  console.log("Component architecture: " + files.length +
+  console.log("Component architecture: " + files.size +
     " shared presentation sources and " + owners.length + " feature owners verified.");
 }
