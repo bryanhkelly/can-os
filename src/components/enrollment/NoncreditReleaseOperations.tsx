@@ -36,7 +36,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       await client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]});
       await client.invalidateQueries({queryKey:["noncredit-open-releases"]});
       setSelectedPlanIds(current=>current.filter(id=>id!==planId));
-      setMessage("This scheduled meeting now belongs to the selected cohort.");
+      setMessage("This scheduled Class is linked to the selected registration release.");
     }catch(cause){
       setMessage(normalizeClientError(cause,"Could not assign the meeting to this enrollment release.").message);
     }finally{setBusy(null);}
@@ -51,7 +51,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       }});
       setSelectedPlanIds([]);
       setMessage(result.attached+" selected session"+(result.attached===1?"":"s")+
-        " linked to this cohort. Enrollment and attendance records were not changed.");
+        " linked to this registration release. Enrollment and attendance records were not changed.");
       try{
         await Promise.all([
           client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]}),
@@ -62,7 +62,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       }
     }catch(cause){
       setMessage(normalizeClientError(cause,
-        "No session assignments were saved. Check each date, current Site permission and existing cohort links.").message);
+        "No Class session assignments were saved. Check each date, current Site permission and existing release links.").message);
     }finally{setBusy(null);}
   }
   async function invite(){
@@ -94,10 +94,10 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
     }finally{setBusy(null);}
   }
   return <section className="mt-5 border border-border bg-card p-5" aria-label="Cohort management">
-    <h2 className="font-serif text-2xl">Cohort & participant management</h2>
+    <h2 className="font-serif text-2xl">Course registration and participants</h2>
     {query.isPending&&<p role="status" className="mt-4 text-sm">Loading authorized course operations…</p>}
     {query.isError&&<p role="alert" className="mt-4 text-sm">
-      Cohort records are unavailable. Check current provider scope and the cohort schema migration.
+      Course registration records are unavailable. Check current provider scope and the registration schema migration.
       <Button variant="ghost" type="button" className="ml-2 underline" onClick={()=>void query.refetch()}>Retry</Button>
     </p>}
     {message&&<p role="status" className="mt-4 border border-border p-3 text-sm">{message}</p>}
@@ -129,23 +129,23 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           onClick={()=>void invite()}>{busy==="invite"?"Reserving…":"Invite next waiting adult"}</Button>
       </div>
       <NoncreditDeliveryRecoveryPanel releaseId={releaseId}/>
-      <h3 className="mt-7 text-base font-semibold">Dated classroom sessions</h3>
+      <h3 className="mt-7 text-base font-semibold">Dated Classes</h3>
       <p className="mt-2 text-sm text-muted-foreground">
         Facilitators schedule approved courses in <Link to="/canonical/lab/facilitated" className="text-primary underline">Facilitated learning</Link>.
-        Attach a scheduled meeting here to include it in this cohort's learner-facing calendar.
+        Attach a scheduled Class here to include it in the learners' existing Course calendar.
       </p>
-      {query.data.deliveryMode==="independent"&&<p className="mt-3 text-sm">Self-paced training has no required in-person cohort.</p>}
+      {query.data.deliveryMode==="independent"&&<p className="mt-3 text-sm">Self-paced training has no required in-person Class meetings.</p>}
       {query.data.deliveryMode==="facilitated"&&<section className="mt-3 border border-border bg-muted/20 p-4"
-        aria-label="Cohort session assignments">
+        aria-label="Class session assignments">
         <h4 className="text-sm font-semibold">Linked sessions: {linkedMeetingCount}</h4>
         <p className="mt-1 text-sm text-muted-foreground">
-          The COGIC pilot targets four delivered sessions, but they need not occur
-          in consecutive weeks. Sites may meet twice weekly, skip holidays, or use
-          other authorized dates. Other Programs may have different requirements.
+          Some Solutions require four delivered Classes. The actual required count belongs
+          to the approved Course and Solution. Sites may meet twice weekly, skip
+          holidays, or use other authorized dates.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
           Select up to four unallocated future meetings below, review their dates, and
-          attach them to this specific cohort in one transaction.
+          attach them to this exact registration release in one transaction.
           Existing linked meetings are preserved. Per-session attendance is independently attested; a booked or opened room is not proof of presence.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -194,7 +194,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
             </p>}
             </div>
           </div>
-          {session.linked?<span className="text-xs text-muted-foreground">Assigned to this cohort</span>:
+          {session.linked?<span className="text-xs text-muted-foreground">Linked to this registration release</span>:
           <Button size="sm" variant="outline" disabled={busy!==null} onClick={()=>void attach(session.planId)}>
             {busy===session.planId?"Assigning…":"Attach meeting"}
           </Button>}
