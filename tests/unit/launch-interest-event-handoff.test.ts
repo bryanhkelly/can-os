@@ -95,6 +95,18 @@ describe("Introduce Interest Event handoff uses exact authorized Site and saved 
     expect(calls.readSuggestions).not.toHaveBeenCalled();
   });
 
+  it("rejects a saved event headline containing a line break",async()=>{
+    calls.listPackages.mockResolvedValue([{
+      ...eventPackage(siteA),
+      content:{purpose:"event-invitation",
+        headline:"Community open house\\nJoin our planning team",
+        message:"Meet our neighbors."},
+    }]);
+    const result=await load({siteId:siteA,packageId});
+    expect(result.ok).toBe(false);
+    expect(calls.readSuggestions).not.toHaveBeenCalled();
+  });
+
   it("rejects archived and foreign packages instead of silently suggesting unrelated copy",async()=>{
     for(const wrong of [eventPackage(siteA,"archived"),eventPackage(siteB)]){
       calls.listPackages.mockResolvedValue([wrong]);
