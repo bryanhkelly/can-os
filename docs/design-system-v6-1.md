@@ -212,6 +212,29 @@ implementation files are exempt. Native `dialog` is owned by the shared
 routes. Storybook is the interactive catalog; browser and visual QA remain
 separate release gates.
 
+**Shared action composition:** `FormActions` and `CreateAction` compose
+`Button` instead of duplicating Radix slots or hand-copying button classes.
+A slotted `Button asChild` preserves the child link and its navigation props.
+When disabled or pending, it announces `aria-disabled`, removes sequential
+keyboard focus, and prevents user navigation without emitting the invalid
+HTML `disabled` attribute on an anchor.
+
+**Managed form accessibility:** `FormField`, `FormItem`, `FormControl`
+and `FormLabel` enforce their required React Hook Form context, preserve
+control-specific and form-level descriptions in `aria-describedby`, and share
+one generated label/control ID. Incorrect composition throws an explicit
+developer error instead of rendering an inaccessible orphan label.
+Unit tests cover composed forms, missing context and descriptions.
+
+**Build-time dependency guard:** `scripts/check-component-boundaries.mjs`
+runs `sharedUiImportViolation` against aliased and relative imports in all
+V6.1 UI, workspace and workflow sources. Primitives may depend on peer
+primitives, never on features. Shared patterns may compose peer patterns and
+primitives, never feature components or server commands. A single existing
+thin shell session-context import in `DashboardHome` is explicitly
+documented as a narrow exception rather than allowing arbitrary shell
+dependencies. The pure dependency tests are included in `test:design-audit`.
+
 **Dependency direction:** `ui` does not import features; shared
 `workspace` and `workflow` patterns compose `ui`; feature-specific
 components compose those layers. Server authorization, identity, evidence,
