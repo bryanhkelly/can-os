@@ -435,7 +435,7 @@ function CalendarPage() {
         : recordDestination &&
           <Link {...recordDestination} className="text-sm font-semibold text-primary underline">{recordLabel}</Link>}
       rail={<CalendarRecordContextPanel event={selectedEvent}
-        recordDestination={recordDestination} />}
+        recordDestination={recordDestination ?? null} />}
     >
       <div className="mt-6 grid gap-5">
         <CalendarEventFactsPanels event={selectedEvent} eventTime={eventTime}/>
