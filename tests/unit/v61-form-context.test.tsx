@@ -8,15 +8,19 @@ import {
 
 interface Fields { siteName: string }
 
-function CanonicalForm({ includeItem = true, includeProvider = true }: {
+function CanonicalForm({ includeItem = true, includeProvider = true, descriptionIds = false }: {
   includeItem?: boolean;
   includeProvider?: boolean;
+  descriptionIds?: boolean;
 }) {
   const form = useForm<Fields>({ defaultValues: { siteName: "Valor Academy" } });
   const field = <FormField control={form.control} name="siteName" render={({ field: value }) => {
     const contents = <>
       <FormLabel>Site name</FormLabel>
-      <FormControl><Input {...value} aria-label="Site name" /></FormControl>
+      <FormControl aria-describedby={descriptionIds ? "form-level-help" : undefined}>
+        <Input {...value} aria-label="Site name"
+          aria-describedby={descriptionIds ? "field-level-help" : undefined} />
+      </FormControl>
       <FormMessage />
     </>;
     return includeItem ? <FormItem>{contents}</FormItem> : contents;
@@ -32,6 +36,14 @@ describe("V6.1 canonical form context contract", () => {
     expect(html).toContain(`id="${id}"`);
     expect(html).toContain('value="Valor Academy"');
     expect(html).toContain("border-input");
+  });
+
+  it("preserves the form label and merges parent and child descriptions", () => {
+    const html = renderToStaticMarkup(<CanonicalForm descriptionIds />);
+    const id = html.match(/<label[^>]*for="([^"]+)"/)?.[1];
+    expect(html).toContain(`id="${id}"`);
+    expect(html).toContain('aria-describedby="field-level-help form-level-help"');
+    expect(html).not.toContain('aria-describedby="form-level-help"');
   });
 
   it("reports absent FormField rather than accessing an undefined field", () => {
