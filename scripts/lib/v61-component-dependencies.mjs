@@ -9,16 +9,20 @@ const privilegedModules = /^src\/(?:modules|routes|db|workers|server)(?:\/|$)/;
  * This accepts both @/ aliases and relative paths, so a feature import
  * cannot evade the boundary simply by changing its import spelling.
  */
+/** Resolve aliases and relative module references consistently for audits and gates. */
+export function resolveSourceDependency(file, specifier) {
+  const normalizedFile = file.replaceAll("\\", "/");
+  if (specifier.startsWith("@/")) return posix.normalize(`src/${specifier.slice(2)}`);
+  if (specifier.startsWith(".")) return posix.normalize(posix.join(posix.dirname(normalizedFile), specifier));
+  return null;
+}
+
 export function sharedUiImportViolation(file, specifier) {
   const normalizedFile = file.replaceAll("\\", "/");
   const match = normalizedFile.match(sharedPattern);
   if (!match) return null;
   const layer = match[1];
-  const target = specifier.startsWith("@/")
-    ? `src/${specifier.slice(2)}`
-    : specifier.startsWith(".")
-      ? posix.normalize(posix.join(posix.dirname(normalizedFile), specifier))
-      : null;
+  const target = resolveSourceDependency(normalizedFile, specifier);
 
   if (!target) return null; // External packages and builtins are allowed.
   if (privilegedModules.test(target))
