@@ -61,6 +61,26 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(editor).toContain("saved.revision > detail.revision");
   });
 
+  it("reopens newly saved and resumed plans using the refreshed authorized Site projection", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const catalog = source("src/components/launch-studio/SolutionCatalogV61.tsx");
+    const workspaceReader = source("src/modules/blueprints/blueprint-workspace.server.ts");
+    const save = editor.slice(editor.indexOf("async function save()"), editor.indexOf("async function submit()"));
+    expect(save.match(/const current = await reload\(\)/g)).toHaveLength(2);
+    expect(save).toContain("await openConfiguration(configurationId, current)");
+    expect(save).toContain("await openConfiguration(detail.configurationId, current)");
+    expect(save).toContain("onWorkspaceChanged?.(current)");
+    expect(editor).toContain("initialConfigurationId");
+    expect(editor).toContain("openConfiguration(initialConfigurationId, result)");
+    expect(editor).toContain("result.blueprintVersionId !== initialBlueprintVersionId");
+    expect(editor).toContain("result.config.siteId !== siteId");
+    expect(catalog).toContain("Continue saved plans");
+    expect(catalog).toContain("initialConfigurationId={resumeConfigurationId ?? undefined}");
+    expect(catalog).toContain("selectSavedSolutionPlans");
+    expect(workspaceReader).toContain('assertCapability(context, "blueprint.configure")');
+    expect(workspaceReader).toContain('eq(blueprintVersions.lifecycle, "published")');
+  });
+
   it("keeps approved plans read-only until the author explicitly starts a revision", () => {
     const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
     expect(editor).toContain('detail?.lifecycle === "frozen" && !revisingFrozen');
