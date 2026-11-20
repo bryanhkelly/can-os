@@ -149,10 +149,11 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("Summer");
     expect(html).toContain("After-School");
     expect(html).toContain("From Program to Solution to Offering");
-    expect(html).toContain("Browse available Offerings");
+    expect(html).not.toContain("Browse available Offerings");
     expect(html).toContain("Available Solutions");
     expect(html).toContain("CAN administers the published Solution definition");
-    expect(html).toContain("Explore published learning products");
+    expect(html).not.toContain("Explore published learning products");
+    expect(html).toContain("Available Solutions");
     expect(html).not.toContain("/canonical/blueprints?siteId=" + siteId);
     expect(html).not.toContain("Approved for enrollment");
   });
