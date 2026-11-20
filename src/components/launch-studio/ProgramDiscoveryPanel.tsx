@@ -5,7 +5,6 @@ import { normalizeClientError } from "@/lib/client-error";
 import { discoverLaunchSitePrograms, getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { ActionFooter, EmptyState, FilterBar, StatusBadge } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 
