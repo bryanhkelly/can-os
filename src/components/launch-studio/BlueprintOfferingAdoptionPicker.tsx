@@ -132,7 +132,9 @@ export function BlueprintOfferingAdoptionPicker({
     </div>
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     {offerings && offerings.length === 0 && <p role="status" className="mt-3 text-sm">
-      No published Offerings were found for this Site and delivery model.
+      No published availability decisions currently match this Site and delivery model.
+      CAN must publish applicable qualification rules before it can establish
+      whether an Offering may operate here. This does not prevent private planning.
     </p>}
     {(available.length > 0 || (linkedOffering && components.length > 1)) &&
       <Label htmlFor="blueprint-offering-component"
@@ -187,7 +189,9 @@ export function BlueprintOfferingAdoptionPicker({
             className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
             <span>
               {offerings?.find(item => item.offering.offeringVersionId === intent.offeringVersionId)
-                ?.offering.title ?? `Offering ${intent.offeringVersionId}`}
+                ?.offering.title ??
+                (linkedOffering?.offeringVersionId === intent.offeringVersionId
+                  ? linkedOffering.title : `Offering ${intent.offeringVersionId}`)}
               {" · "}
               {components.find(item => item.id === intent.componentId)?.key.replaceAll("_", " ") ??
                 intent.componentId}
