@@ -4,7 +4,7 @@ import {
   programs, programSiteAuthorizations, schoolConfigurationVersions,
 } from "@/db/schema";
 import {
-  noSchoolYearAvailability, type SchoolYearAvailability,
+  noSchoolYearAvailability, type SchoolYearAvailability, type SchoolYearGradeBand,
 } from "@/domain/site-program-access-v61";
 import { preparesSchoolYear } from "@/domain/site-launch-preparation";
 import { AuthorizationError } from "@/domain/command-context";
@@ -61,7 +61,7 @@ export async function readSiteSchoolYearAvailability(
       isNull(programSiteAuthorizations.suspendedAt),
     ));
 
-  const available: SchoolYearAvailability = { ...noSchoolYearAvailability };
+  const available: Record<SchoolYearGradeBand, boolean> = { ...noSchoolYearAvailability };
   for (const candidate of candidates) {
     if (!preparesSchoolYear(candidate) ||
         !candidate.approvedAt || candidate.approvedAt > now ||
