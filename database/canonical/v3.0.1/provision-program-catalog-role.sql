@@ -2,7 +2,7 @@
 -- Canonical Site, Offering, reference, qualification and geographic records now
 -- live in public. The availability function remains in education_v30.
 -- Requires the scoped public.sites RLS policy before any privileges are granted.
--- Never use an owner/bypass-RLS login for the application or catalog role.
+-- Never use an owner/bypass-RLS application login. The catalog role is NOLOGIN.
 
 \set ON_ERROR_STOP on
 
@@ -22,118 +22,72 @@
 \quit 3
 \endif
 
+-- One role per approved Organization. This is a NOLOGIN purpose role
+-- selected by an isolated application login using SET LOCAL ROLE.
+-- A pre-existing LOGIN role is not silently converted or reused.
 SELECT (
   :'program_catalog_role' = 'can_v30_program_catalog_' || lower(replace(:'organization_id', '-', ''))
   AND :'application_role' <> :'program_catalog_role'
-  AND EXISTS (
-    SELECT 1
-    FROM public.organizations
-    WHERE id = :'organization_id'::uuid
-  )
-  AND EXISTS (
-    SELECT 1
-    FROM pg_roles
-    WHERE rolname = :'program_catalog_role'
-      AND rolcanlogin
-      AND NOT rolsuper
-      AND NOT rolbypassrls
-      AND NOT rolcreatedb
-      AND NOT rolcreaterole
-      AND NOT rolinherit
-      AND NOT rolreplication
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pg_auth_members m
-        WHERE m.member = pg_roles.oid
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
-          AND c.relowner = pg_roles.oid
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
-          AND p.proowner = pg_roles.oid
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pg_namespace n
-        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
-          AND n.nspowner = pg_roles.oid
-      )
-  )
+  AND EXISTS(SELECT 1 FROM public.organizations
+    WHERE id=:'organization_id'::uuid)
   AND EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'sites'
-      AND policyname = 'sites_canonical_catalog_operator_read'
-      AND permissive = 'PERMISSIVE' AND cmd = 'SELECT'
-      AND 'public' = ANY(roles)
+    WHERE schemaname='public' AND tablename='sites'
+      AND policyname='sites_canonical_catalog_operator_read'
+      AND permissive='PERMISSIVE' AND cmd='SELECT'
+      AND 'public'=ANY(roles)
       AND qual LIKE '%v28_role_can_access_org%'
       AND qual LIKE '%site_organization_roles%'
   )
   AND EXISTS (
-    SELECT 1
-    FROM pg_roles app_role
-    WHERE app_role.rolname = :'application_role'
-      AND app_role.rolcanlogin
-      AND NOT app_role.rolsuper
-      AND NOT app_role.rolbypassrls
-      AND NOT app_role.rolcreatedb
-      AND NOT app_role.rolcreaterole
-      AND NOT app_role.rolinherit
+    SELECT 1 FROM pg_roles app_role
+    WHERE app_role.rolname=:'application_role'
+      AND app_role.rolcanlogin AND NOT app_role.rolsuper
+      AND NOT app_role.rolbypassrls AND NOT app_role.rolcreatedb
+      AND NOT app_role.rolcreaterole AND NOT app_role.rolinherit
       AND NOT app_role.rolreplication
-      AND NOT pg_has_role(
-        app_role.oid,
-        (SELECT nspowner FROM pg_namespace WHERE nspname = 'education_v30'),
-        'MEMBER'
+      AND NOT pg_has_role(app_role.oid,
+        (SELECT nspowner FROM pg_namespace WHERE nspname='education_v30'),
+        'MEMBER')
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname IN ('public','education_v30','education_v30_secure')
+          AND c.relowner=app_role.oid
       )
       AND NOT EXISTS (
-        SELECT 1
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
-          AND c.relowner = app_role.oid
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
-          AND p.proowner = app_role.oid
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pg_namespace n
-        WHERE n.nspname IN ('public', 'education_v30', 'education_v30_secure')
-          AND n.nspowner = app_role.oid
+        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname IN ('public','education_v30','education_v30_secure')
+          AND p.proowner=app_role.oid
       )
   )
   AND NOT EXISTS (
-    SELECT 1
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    JOIN pg_roles r ON r.oid = c.relowner
-    WHERE n.nspname = 'education_v30'
-      AND r.rolname = :'program_catalog_role'
-  )
-  AND NOT pg_has_role(
-    (SELECT oid FROM pg_roles WHERE rolname = :'program_catalog_role'),
-    (SELECT nspowner FROM pg_namespace WHERE nspname = 'education_v30'),
-    'MEMBER'
+    SELECT 1 FROM pg_roles r WHERE r.rolname=:'program_catalog_role'
+      AND (r.rolcanlogin OR r.rolsuper OR r.rolbypassrls
+        OR r.rolcreatedb OR r.rolcreaterole OR r.rolinherit
+        OR r.rolreplication
+        OR EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.member=r.oid)
+        OR EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n
+          ON n.oid=c.relnamespace WHERE c.relowner=r.oid
+          AND n.nspname IN ('public','education_v30','education_v30_secure'))
+        OR EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n
+          ON n.oid=p.pronamespace WHERE p.proowner=r.oid
+          AND n.nspname IN ('public','education_v30','education_v30_secure')))
   )
 ) AS role_is_valid
 \gset
-
 \if :role_is_valid
 \else
-\echo "Catalog and application roles must be isolated non-owner, non-superuser logins with NOINHERIT."
+\echo 'Catalog provisioning requires an isolated non-owner app login and a restricted role'
 \quit 3
 \endif
+
+SELECT format(
+  'CREATE ROLE %I NOLOGIN NOINHERIT NOBYPASSRLS NOCREATEDB NOCREATEROLE',
+  :'program_catalog_role'
+) WHERE NOT EXISTS(
+  SELECT 1 FROM pg_roles WHERE rolname=:'program_catalog_role'
+)
+\gexec
 
 BEGIN;
 SELECT pg_advisory_xact_lock(hashtextextended(
