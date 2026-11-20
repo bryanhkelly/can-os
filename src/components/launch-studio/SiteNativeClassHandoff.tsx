@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarDays } from "lucide-react";
 import { WorkspacePanel } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
 import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions, getNativeClassOperatorSites } from "@/modules/classes/unified-class.functions";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
@@ -74,14 +75,12 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
       }}/>
     </div>
     <div className="mt-4 flex flex-wrap gap-3">
-     <Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}
-      className="inline-flex min-h-11 items-center gap-2 border bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
+     <Button asChild size="lg"><Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}>
       Create Class from approved Course <ArrowRight className="size-4"/>
-     </Link>
-     <Link to="/canonical/blueprints" search={{siteId:canonicalSiteId}}
-      className="inline-flex min-h-11 items-center gap-2 border px-4 py-3 text-sm font-semibold text-primary">
+     </Link></Button>
+     <Button asChild size="lg" variant="outline"><Link to="/canonical/blueprints" search={{siteId:canonicalSiteId}}>
       Review Course adoption <ArrowRight className="size-4"/>
-     </Link>
+     </Link></Button>
     </div>
     {classes.length>0&&<ul className="mt-4 grid gap-3 md:grid-cols-2">
       {classes.map(item=><li key={item.classId}>
