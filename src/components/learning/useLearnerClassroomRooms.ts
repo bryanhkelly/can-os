@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 
 /** One authorization-aware room query shared by all learner classroom surfaces.
@@ -21,8 +21,3 @@ export function useLearnerClassroomRooms(courseAttemptId: string) {
   });
 }
 
-export function useRefreshLearnerClassroomRooms() {
-  const client = useQueryClient();
-  return (courseAttemptId: string) =>
-    client.invalidateQueries({ queryKey: learnerRoomQueryKey(courseAttemptId) });
-}
