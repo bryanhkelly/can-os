@@ -231,7 +231,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      })}
     </div>}
     {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
-     {visibleChildren.map(child => <GuardianChildSummaryCard key={child.studentProfileId} child={child} />)
+     {visibleChildren.map(child => <GuardianChildSummaryCard key={child.studentProfileId} child={child} />)}
     </div>}
    </section>
 
