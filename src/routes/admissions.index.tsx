@@ -109,7 +109,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       subtitle="Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox."
       actions={<div className="flex flex-wrap items-center gap-2">
         <CreateAction><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}}>New inquiry</Link></CreateAction>
-        <Link to="/admissions/invite-families" className={secondaryActionClassName}>Invite transfer families</Link>
+        <Link to="/admissions/invite-families" search={{siteId:selected.siteId,purpose:"application"}} className={secondaryActionClassName}>Invite transfer families</Link>
         <Link to="/admissions/transcripts" search={{query:""}} className={secondaryActionClassName}>Official transcripts</Link>
         <Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:selected.programId}} className={secondaryActionClassName}>Program capacity</Link>
       </div>}
