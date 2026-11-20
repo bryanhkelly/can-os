@@ -18,7 +18,13 @@ type Reachability = Awaited<ReturnType<typeof verifySitePublicationReachability>
  * accreditation, approval to operate, or authority to enroll from this result.
  */
 export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
-  const [state, setState] = useState<Publication | null>(null);
+  const [publicationSnapshot, setPublicationSnapshot] = useState<{
+    siteId: string; value: Publication;
+  } | null>(null);
+  // A site switch must hide the previous site's publication claims even
+  // during the render before the new load effect executes.
+  const state = publicationSnapshot?.siteId === siteId
+    ? publicationSnapshot.value : null;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,29 +34,53 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
   const [reachability, setReachability] = useState<Reachability | null>(null);
   const [checking, setChecking] = useState(false);
   const requestId = useRef(0);
+  const reachabilityRequestId = useRef(0);
+  const activeSiteId = useRef(siteId);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (propagateFailure = false) => {
+    if (activeSiteId.current !== siteId) {
+      if (propagateFailure) throw new Error("Publication context changed. Reload this Site.");
+      return;
+    }
     const current = ++requestId.current;
     setLoading(true);
     setError(null);
+    setPublicationSnapshot(null);
     try {
       const result = await readLaunchSitePublication({ data: { siteId } });
-      if (current === requestId.current) setState(result);
+      if (current !== requestId.current || activeSiteId.current !== siteId) {
+        if (propagateFailure) throw new Error("Publication context changed. Reload this Site.");
+        return;
+      }
+      setPublicationSnapshot({ siteId, value: result });
     } catch (cause) {
-      if (current === requestId.current) {
-        setState(null);
+      if (current === requestId.current && activeSiteId.current === siteId) {
+        setPublicationSnapshot(null);
         setError(normalizeClientError(cause,
           "Site publication status is unavailable or you do not have publishing permission.").message);
       }
+      // A completed publication command must not be treated as verified if
+      // this authoritative refresh fails or its Site context has changed.
+      if (propagateFailure) throw cause;
     } finally {
-      if (current === requestId.current) setLoading(false);
+      if (current === requestId.current && activeSiteId.current === siteId)
+        setLoading(false);
     }
   }, [siteId]);
 
   useEffect(() => {
+    activeSiteId.current = siteId;
+    setReviewed(false);
+    setCopyReviewed(false);
+    setReason("");
+    setReachability(null);
+    reachabilityRequestId.current += 1;
     void load();
-    return () => { requestId.current += 1; };
-  }, [load]);
+    return () => {
+      requestId.current += 1;
+      reachabilityRequestId.current += 1;
+    };
+  }, [load, siteId]);
 
   async function change(action: "publish" | "unpublish" | "republish") {
     if (!state?.address || !state.canPublishSite || busy ||
@@ -59,6 +89,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
       state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required")) return;
     setBusy(true);
     setError(null);
+    let commandAccepted = false;
     try {
       await setSitePublicationStatus({ data: {
         siteId,
@@ -67,13 +98,18 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
         reason: reason.trim(),
         contentReviewed: action !== "unpublish" && reviewed,
       } });
+      commandAccepted = true;
+      if (activeSiteId.current !== siteId) return;
       setReason("");
       setReviewed(false);
       setReachability(null);
-      await load();
+      await load(true);
     } catch (cause) {
-      setError(normalizeClientError(cause,
-        "Publication was not changed. Review the Site and retry.").message);
+      if (activeSiteId.current === siteId)
+        setError(commandAccepted
+          ? "The publication decision was saved, but the current Site state could not be verified. Reload and reconcile before any further publication action."
+          : normalizeClientError(cause,
+            "Publication could not be confirmed. Reload the Site before retrying.").message);
     } finally { setBusy(false); }
   }
 
@@ -82,36 +118,51 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
       !copyReviewed || busy) return;
     setBusy(true);
     setError(null);
+    let commandAccepted = false;
     try {
       const result = await reviewLaunchSiteWebsiteCopy({ data: {
         siteId, expectedRevision: state.latestWebsiteRevision, contentReviewed: true,
       } });
+      commandAccepted = true;
+      if (activeSiteId.current !== siteId) return;
       setCopyReviewed(false);
-      await load();
+      await load(true);
       if (result.status !== "published") {
         setError("The website copy contains protected claims that require independent review.");
       }
     } catch (cause) {
-      setError(normalizeClientError(cause, "Website copy could not be approved.").message);
+      if (activeSiteId.current === siteId)
+        setError(commandAccepted
+          ? "The website copy review was saved, but its current status could not be verified. Reload and reconcile before taking another action."
+          : normalizeClientError(cause, "Website copy review could not be confirmed.").message);
     } finally { setBusy(false); }
   }
 
   async function checkLive() {
-    if (checking) return;
+    if (checking || !state) return;
+    const request = ++reachabilityRequestId.current;
     setChecking(true);
     setError(null);
+    setReachability(null);
     try {
       const result = await verifySitePublicationReachability({ data: { siteId } });
-      setReachability(result.status);
+      if (request === reachabilityRequestId.current && activeSiteId.current === siteId)
+        setReachability(result.status);
     } catch (cause) {
-      setError(normalizeClientError(cause, "Public website reachability could not be checked.").message);
-      setReachability(null);
-    } finally { setChecking(false); }
+      if (request === reachabilityRequestId.current && activeSiteId.current === siteId) {
+        setError(normalizeClientError(cause, "Public website reachability could not be checked.").message);
+        setReachability(null);
+      }
+    } finally {
+      if (request === reachabilityRequestId.current && activeSiteId.current === siteId)
+        setChecking(false);
+    }
   }
 
   return <WorkspacePanel title="Publish your Site website"
     description="This is the official public Site decision. Your shared preview, website publication and learner enrollment are independent.">
-    {loading ? <p role="status" className="text-sm text-muted-foreground">Checking your Site publication authorization…</p>
+    {loading || (publicationSnapshot !== null && publicationSnapshot.siteId !== siteId)
+      ? <p role="status" className="text-sm text-muted-foreground">Checking your Site publication authorization…</p>
       : state ? <div className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3 border bg-background p-4">
           <div className="min-w-0">
