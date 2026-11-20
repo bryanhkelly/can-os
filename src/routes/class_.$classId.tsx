@@ -16,6 +16,7 @@ import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessi
 import { NativeClassActivationStatus } from "@/components/learning/NativeClassActivationStatus";
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
+import { NativeClassHomeworkPanel } from "@/components/learning/NativeClassHomeworkPanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
 import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
 import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
@@ -181,8 +182,10 @@ function LearnerClass({workspace}:{workspace:Workspace}){
         <p className="mt-2 text-sm">{data.awards.filter(a=>!a.revokedAt).length} active awards recorded.</p>
       </>}
     </section>}
-    {workspace.tab==="assignments"&&
-      <NativeClassCanonicalEvidencePanel classEnrollmentId={learner.classEnrollmentId}/>}
+    {workspace.tab==="assignments"&&<div className="space-y-5">
+      <NativeClassHomeworkPanel classEnrollmentId={learner.classEnrollmentId}/>
+      <NativeClassCanonicalEvidencePanel classEnrollmentId={learner.classEnrollmentId}/>
+    </div>}
     {workspace.tab==="sessions"&&<>
       <NativeClassSessionsPanel workspace={workspace}/>
       {learner.status==="active"&&<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>}
