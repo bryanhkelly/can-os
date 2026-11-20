@@ -2,6 +2,8 @@ import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { listLaunchOptions } from "@/modules/programs/launch.functions";
+import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
+import { launchSiteLifecycleLabel, nextLaunchAction } from "@/domain/launch-overview-v61";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules, LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
@@ -34,7 +36,36 @@ export const Route = createFileRoute("/launch/site")({
     const site = deps.siteId
       ? options.sites.find(candidate => candidate.id === deps.siteId)
       : options.sites.length === 1 ? options.sites[0] : null;
+    // Project next steps from real Site-scoped reads. A failed read must never
+    // be confused with an empty saved answer or falsely reported as complete.
+    const overview = site && !deps.module ? await (async () => {
+      const [info, programs, brand, marketing] = await Promise.allSettled([
+        readSiteInformationV61({ data: { siteId: site.id } }),
+        readSiteProgramsAudiencesV61({ data: { siteId: site.id } }),
+        readSiteBrandVersionView({ data: { siteId: site.id } }),
+        listSiteMarketingPackagesV61({ data: { siteId: site.id } }),
+      ]);
+      return {
+        information: info.status === "fulfilled"
+          ? { state: "ready" as const, value: {
+              hostingSaved: info.value.hostingSaved,
+              environmentSaved: info.value.environmentSaved,
+            } } : { state: "unavailable" as const },
+        programs: programs.status === "fulfilled"
+          ? { state: "ready" as const, value: { saved: programs.value.saved } }
+          : { state: "unavailable" as const },
+        brand: brand.status === "fulfilled"
+          ? { state: "ready" as const, value: { saved: !!brand.value.current } }
+          : { state: "unavailable" as const },
+        marketing: marketing.status === "fulfilled"
+          ? { state: "ready" as const, value: {
+              hasPackages: marketing.value.some(item => item.status !== "archived"),
+            } } : { state: "unavailable" as const },
+        websiteDraftAvailable: Boolean(site.websiteDraft),
+      };
+    })() : null;
     return {
+      overview,
       site: site ?? null,
       organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
@@ -70,7 +101,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, siteInformation, programsAudiences, marketingPackages, marketingSuggestions, prepareIntent, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, programsAudiences, marketingPackages, marketingSuggestions, prepareIntent, overview, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -82,7 +113,9 @@ function SiteLaunchPage() {
   </WorkspaceShell>;
   const base = "/launch/site?siteId=" + encodeURIComponent(site.id);
   const selected = siteLaunchModules.find(item=>item.id===search.module);
-  return <LaunchSiteFrame site={site} active={search.module}>
+  const statusLabel = launchSiteLifecycleLabel(site.lifecycleStatus);
+  return <LaunchSiteFrame site={site} active={search.module} statusLabel={statusLabel}
+    previewAvailable={Boolean(site.websiteDraft)}>
     {selected?.id === "site-profile" ? <WorkspaceShell title="Site Profile"
       eyebrow="Establish / Site Profile"
       subtitle="Confirm your Site identity and add contact or location details when available."
@@ -134,10 +167,14 @@ function SiteLaunchPage() {
       width="wide"><a href={base} className="inline-flex min-h-11 items-center text-primary underline">
         Back to Site overview</a>
     </WorkspaceShell> : <LaunchStudioOverview
-      site={{ ...site, statusLabel: "Site established", statusTone: "neutral" }}
+      site={{ ...site, statusLabel, statusTone: "neutral" }}
       mode="returning"
-      nextAction={{ title: "Begin with Site Profile", description: "Confirm the Site identity you already created.", href: base + "&module=site-profile" }}
-      previewUrl={"/launch/site-preview?siteId=" + encodeURIComponent(site.id)}
+      nextAction={overview ? nextLaunchAction(site.id, overview) : {
+        title: "Review Site Information",
+        description: "Saved launch progress has not yet been verified.",
+        href: base + "&module=site-information",
+      }}
+      previewUrl={site.websiteDraft ? "/launch/site-preview?siteId=" + encodeURIComponent(site.id) : null}
       workspaceUrl={"/sites/" + encodeURIComponent(site.id)}
     />}
   </LaunchSiteFrame>;
