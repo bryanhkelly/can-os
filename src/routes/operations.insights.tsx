@@ -8,7 +8,7 @@ import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {ActionDialog} from "@/components/workspace/action-dialog";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import {EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import {EmptyState, QueryState, StatusBadge, WorkspaceLinkNavigation, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 const insightsSearchSchema=siteProgramSelectionSchema.extend({insight:optionalSearchString});
 
@@ -99,10 +99,10 @@ function InsightsPage() {
  };
 
  return <WorkspaceShell width="standard" eyebrow="Insights" title="Insights">
-   <nav aria-label="School review navigation" className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
+   <WorkspaceLinkNavigation label="School review navigation" surface="plain" className="mt-4 font-semibold">
     <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Back to operations</Link>
     <Link to="/operations/school-years" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">School-year planning</Link>
-   </nav>
+   </WorkspaceLinkNavigation>
    <section aria-label="Review process" className="mt-5  border bg-card p-4">
     <h2 className="font-semibold">School-health review</h2>
     <p className="mt-2 text-sm text-muted-foreground">Review the latest recorded signals in your authorized scope. Inspect supporting evidence before creating a follow-up Action; dismiss signals with a documented reason when appropriate. The page does not establish that a monthly review has been performed.</p>
