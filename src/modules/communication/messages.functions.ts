@@ -12,6 +12,7 @@ import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { assertCurrentCanonicalClassThread } from "./current-canonical-class-thread.server";
 
 /**
  * Contextual messaging surface (GF1 step 12, Experience Flow N1).
@@ -517,8 +518,23 @@ export const listMyThreads = createServerFn({ method: "GET" }).handler(async () 
       }
     }
   }
+  const classThreads=candidates.filter(thread=>thread.contextType==="class");
+  const authorizedClassIds=new Set<string>();
+  for(let offset=0;offset<classThreads.length;offset+=4){
+    const valid=await Promise.all(classThreads.slice(offset,offset+4).map(async thread=>{
+      try{
+        await assertCurrentCanonicalClassThread(context,thread);
+        return thread.id;
+      }catch(cause){
+        if(cause instanceof AuthorizationError)return null;
+        throw cause;
+      }
+    }));
+    for(const id of valid)if(id)authorizedClassIds.add(id);
+  }
   const threads = candidates.filter(thread =>
-    thread.metadata?.kind !== "academic_conversation" || authorizedAcademicIds.has(thread.id));
+    (thread.metadata?.kind !== "academic_conversation" || authorizedAcademicIds.has(thread.id)) &&
+    (thread.contextType!=="class" || authorizedClassIds.has(thread.id)));
   if (!threads.length) return { threads: [] };
 
   const latest = await db
@@ -579,6 +595,7 @@ export const getThread = createServerFn({ method: "GET" })
       .where(eq(s.communicationThreads.id, data.threadId))
       .limit(1);
     if (!thread) throw new Error("Thread not found");
+    await assertCurrentCanonicalClassThread(context,thread);
     let contextHref: string | null = null;
     if (thread.metadata?.kind === "academic_conversation") {
       const { academicConversationHref } = await import("@/modules/learning/academic-conversation-access.server");
@@ -664,6 +681,9 @@ export const replyToThread = createServerFn({ method: "POST" })
       if (!participant) {
         throw new AuthorizationError("communication thread participation");
       }
+      await assertCurrentCanonicalClassThread(context,thread);
+      if (thread.contextType==="class" && thread.metadata?.demoOnly===true)
+        throw new AuthorizationError("Private synthetic Class replies are managed in the Class workspace.");
       if (thread.metadata?.kind === "academic_conversation") {
         const { academicConversationHref } = await import("@/modules/learning/academic-conversation-access.server");
         await academicConversationHref(thread, tx);
