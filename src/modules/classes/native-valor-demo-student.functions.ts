@@ -155,6 +155,12 @@ export const enrollInValorDemoClass=createServerFn({method:"POST"})
       if(prior){
         if(prior.courseAttemptId)throw new AuthorizationError("pending enrollment needs reconciliation");
         enrollmentId=prior.id;
+        // The native Course Attempt source trigger requires the Class
+        // Enrollment to be active BEFORE inserting its first Attempt.
+        // Both writes remain in one transaction and roll back together.
+        await tx.update(canonicalClassEnrollments).set({status:"active"})
+          .where(and(eq(canonicalClassEnrollments.id,enrollmentId),
+            eq(canonicalClassEnrollments.status,"pending")));
       } else {
         const [created]=await tx.insert(canonicalClassEnrollments).values({
           classId:c.id,classOfferingVersionId:terms.id,
