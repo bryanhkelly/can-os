@@ -70,6 +70,19 @@ const TableHead = React.forwardRef<
 ));
 TableHead.displayName = "TableHead";
 
+/**
+ * Accessible row heading for read-only metric and evidence tables. Column
+ * headings and row headings are distinct semantics, but share table geometry.
+ */
+const TableRowHead = React.forwardRef<
+  HTMLTableCellElement,
+  React.ThHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <th ref={ref} {...props} scope="row"
+    className={cn("p-2 text-left align-middle font-medium text-foreground", className)} />
+));
+TableRowHead.displayName = "TableRowHead";
+
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
@@ -93,4 +106,4 @@ const TableCaption = React.forwardRef<
 ));
 TableCaption.displayName = "TableCaption";
 
-export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRowHead, TableRow, TableCell, TableCaption };
