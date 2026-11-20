@@ -106,3 +106,15 @@ Follow-on integration also enables the existing `purpose=interest` family invita
 - After a new Interest Event is created, the detail link uses the created event's actual Program rather than an unrelated earlier URL filter. Event Program changes validate the timezone and send timezone corrections to Establish / Site Profile.
 - A saved event-invitation Marketing Package can now hand off its headline to the existing independently governed event creation screen, scoped by Site and package ID. With no usable package, the same Site editorial suggestion is available. No message distribution, event persistence or registration is triggered by the read-only prefill.
 - Added source contracts and server-rendered component tests, but none have been executed. Netlify PR deploys are currently skipped due to account build-usage limits, which do not establish a compile failure.
+
+## 2026-11-19 · Package-to-operation integration and failure recovery
+
+- Recruit and Interest Events now share a single presentation configuration for their specific active-package handoffs. This carries an exact Site/Package reference, not copied canonical state.
+- The existing family interest invitation form can start with a saved Package headline and message, with original text claim checks, email subject bounds, authorized Site/Program filtering, an explicit send confirmation and no imported contacts. New preopening interest batches and their delivery worker require a saved canonical Site Brand; this does not change legacy application sending.
+- The Interest Event create route now refuses stale/cross-Site Site, Program and Package hints rather than selecting a sibling Site. Valid saved event Packages supply editable title and description. The existing Story/Program editorial projection is used only when no Package was explicitly selected.
+- Event create retries preserve a stable request identifier across uncertain network outcomes and rotate it only after successful acknowledgment; the server continues to own idempotency and the independently governed calendar/event records.
+- The Introduce package library disables new work until a saved Site Brand has actually been verified and offers an explicit retry when the status query fails.
+- The Site-first private preview now links back to the authorized Launch overview, not a website editing role the viewer may not hold.
+- Added test fixtures: `launch-interest-event-handoff.test.ts`, `launch-recruit-package-handoff.test.ts`, plus updated page contracts. No tests or builds were executed, and Netlify deploy previews continue to be blocked by usage limits.
+
+**Acceptance still required:** TypeScript, unit/integration suite, V6.1 design-system lint, authenticated save/reload across Sites, controlled delivery tests and Playwright journey on an explicitly disposable migrated database. The user-directed order remains current-code integration, refinements, database, then main.
