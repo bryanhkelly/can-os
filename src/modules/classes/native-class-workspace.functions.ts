@@ -134,7 +134,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       // they teach, operate or administer the same Class.
       if((actor.role==="learner"&&actor.capabilities.has("learning.participate")) ||
          (actor.role==="student"&&actor.capabilities.has("student:read") &&
-          !!instance.siteId && actor.grantSiteId===instance.siteId &&
+          !!instance.siteId && actor.scope.siteIds?.[0]===instance.siteId &&
           actor.scope.organizationIds?.includes(instance.operatingOrganizationId))){
         const active=await tx.select({
           id:canonicalClassEnrollments.id,
