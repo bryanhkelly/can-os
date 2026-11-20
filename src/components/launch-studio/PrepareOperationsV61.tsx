@@ -1,8 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
+import { SchoolYearCreateForm } from "@/components/operations/SchoolYearCreateForm";
+import { getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
 import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   cleanSiteEnvironmentV61, siteEnvironmentV61Schema,
@@ -204,10 +208,75 @@ export function PrepareTeamV61({ siteId }: { siteId: string }) {
   </div>;
 }
 
+/** The real academic-year reader and creator are both available in Prepare.
+ * Calendar details stay on the authoritative year record; no duplicate term or
+ * calendar rows are authored by Launch Studio. */
+export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
+  const years = useQuery({
+    queryKey: ["launch-prepare-school-years", siteId],
+    queryFn: () => getSchoolYearStudio(),
+    retry: false,
+  });
+  const [creating, setCreating] = useState(false);
+  const siteYears = years.data?.years.filter(year => year.siteId === siteId) ?? [];
+  const authorizedSite = years.data?.sites.some(site => site.id === siteId) ?? false;
+  return <WorkspacePanel title="School years & academic calendars"
+    description="Create and review real Site school years. Terms, holidays, grading periods and calendar days belong to the existing academic-year record.">
+    {years.isPending && <p role="status" className="mt-3 text-sm">
+      Reading authorized school-year records…
+    </p>}
+    {years.isError && <p role="alert" className="mt-3 text-sm text-muted-foreground">
+      School years are unavailable for your current account. No calendar status is inferred.
+    </p>}
+    {years.data && !authorizedSite && <p role="alert" className="mt-3 text-sm">
+      The selected Site is not authorized for academic-year management.
+    </p>}
+    {years.data && authorizedSite && <>
+      {siteYears.length ? <ul className="mt-4 space-y-3">
+        {siteYears.map(year => <li key={year.id}
+          className="flex flex-wrap items-center justify-between gap-3 border bg-background p-3">
+          <div>
+            <p className="font-semibold">{year.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {year.startsOn} to {year.endsOn} · {year.status}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {year.terms.length} terms · {year.calendars.length} calendars · {year.schedules.length} schedules
+            </p>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/operations/school-years/$yearId" params={{yearId:year.id}}
+              search={{siteId,programId:undefined}}>Open calendar</Link>
+          </Button>
+        </li>)}
+      </ul> : <p className="mt-3 text-sm text-muted-foreground">
+        No academic year has been created for this Site.
+      </p>}
+      <Button type="button" variant="outline" className="mt-4" onClick={() => setCreating(value => !value)}>
+        {creating ? "Close school-year form" : "Add school year"}
+      </Button>
+      {creating && <div className="mt-5 border-t pt-5">
+        <SchoolYearCreateForm data={years.data}
+          selection={{siteId}} lockedSiteId={siteId} embedded
+          onDataChanged={() => years.refetch({throwOnError:true})}
+          onCreated={async () => {
+            await years.refetch({throwOnError:true});
+            setCreating(false);
+          }} />
+      </div>}
+    </>}
+    <p className="mt-3 text-xs text-muted-foreground">
+      Creating a school year is not academic approval, a Class schedule,
+      or evidence that learners may enroll.
+    </p>
+  </WorkspacePanel>;
+}
+
 /** Room schedules and Class drafts reuse canonical operational owners.
  * Prepare hides Class activation/Offering publishing; Open is independent. */
 export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
   return <div className="space-y-5">
+    <PrepareSchoolYearsV61 key={siteId} siteId={siteId} />
     <RoomCoverageWorkspace key={siteId} siteId={siteId} view="schedules"/>
     <Suspense fallback={<p role="status" className="border p-4 text-sm">
       Loading approved Class and capacity planning…
