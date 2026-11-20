@@ -58,6 +58,18 @@ export async function handleClassParticipantEvent(eventId: string): Promise<void
             "session_reminder",session.sessionId,when);
         }
       }
+    } else if(type==="ClassEnrollmentWithdrawn"||type==="ClassEnrollmentCancelled"){
+      if(event.aggregateType!=="class_enrollment")
+        throw new Error("Wrong Class exit aggregate");
+      const [enrollment]=await tx.select().from(canonicalClassEnrollments)
+        .where(eq(canonicalClassEnrollments.id,event.aggregateId)).limit(1);
+      // A replay may see a later terminal status but must never regenerate
+      // an invitation or send Class information to a new inferred recipient.
+      if(enrollment && ["withdrawn","cancelled"].includes(enrollment.status)){
+        const recipient=enrollment.enrollmentMethod==="approval"
+          ?enrollment.enrolledByPersonId:enrollment.learnerPersonId;
+        enqueue(enrollment.classId,enrollment.id,recipient,"enrollment_cancelled");
+      }
     } else if (type === "ClassInvitationIssued") {
       if (event.aggregateType !== "class_invitation") throw new Error("Wrong Class invitation aggregate");
       const [invitation] = await tx.select().from(canonicalClassEnrollmentInvitations)
