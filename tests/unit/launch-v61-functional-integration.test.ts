@@ -30,7 +30,7 @@ describe("Launch Studio current persisted workflows", () => {
     const view = read("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
     const prepare = read("src/components/launch-studio/LaunchPrepareV61.tsx");
     const open = read("src/components/launch-studio/LaunchModuleDestinationV61.tsx");
-    expect(view).toContain("listLaunches({data:{includeActive:true}})");
+    expect(view).toContain("listLaunches({data:{includeActive:true,siteId}})");
     expect(view).toContain("readCanonicalBlueprintWorkspace({data:{siteId}})");
     expect(view).toContain("readLaunchSitePublication({data:{siteId}})");
     expect(view).toContain("launches.value.launches.filter(item=>item.siteId===siteId)");
