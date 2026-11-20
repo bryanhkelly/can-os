@@ -40,13 +40,14 @@ function readable(value: string): string {
  * to a Site; freezing it requests review, not permission to operate.
  */
 export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
-  initialBlueprintVersionId, initialConfigurationId, embedded = false,
+  initialBlueprintVersionId, initialConfigurationId, embedded = false, onWorkspaceChanged,
 }: {
   siteId: string;
   enableReferences?: boolean;
   initialBlueprintVersionId?: string;
   initialConfigurationId?: string;
   embedded?: boolean;
+  onWorkspaceChanged?: (workspace: Workspace) => void;
 }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
@@ -256,6 +257,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
           version,
         } });
         const current = await reload();
+        onWorkspaceChanged?.(current);
         await openConfiguration(detail.configurationId, current);
         setMessage(saved.revision > detail.revision
           ? "A new Blueprint configuration revision was saved."
@@ -272,6 +274,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
           version,
         } });
         const current = await reload();
+        onWorkspaceChanged?.(current);
         await openConfiguration(configurationId, current);
         setMessage("Solution plan created.");
       }
@@ -301,6 +304,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         data: { configurationId: detail.configurationId, expectedRevision: saved.revision },
       });
       const current = await reload();
+      onWorkspaceChanged?.(current);
       await openConfiguration(detail.configurationId, current);
       setMessage("Current Solution plan submitted for independent review. No Program or enrollment is authorized.");
     } catch (caught) {
