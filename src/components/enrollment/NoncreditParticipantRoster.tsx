@@ -46,7 +46,7 @@ export function NoncreditParticipantRoster({
                     {seatTarget===person.registrationId&&<div className="mt-2 space-y-2 border border-border p-2">
                       <Label className="block text-xs font-medium">Reason for releasing the seat
                         <Textarea value={seatReason} maxLength={500} onChange={event=>onReasonChange(event.target.value)}
-                          className="mt-2 w-full min-w-48 border border-border bg-background p-2" rows={2}
+                          className="mt-2 min-w-48" rows={2}
                           placeholder="Describe verified withdrawal and seat-release reason"/>
                       </Label>
                       <div className="flex flex-wrap gap-2">
