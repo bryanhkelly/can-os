@@ -74,6 +74,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
     setCopyReviewed(false);
     setReason("");
     setReachability(null);
+    setChecking(false);
+    setError(null);
     reachabilityRequestId.current += 1;
     void load();
     return () => {
