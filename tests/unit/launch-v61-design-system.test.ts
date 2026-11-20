@@ -80,6 +80,24 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(frame).not.toContain('href="#launch-help"');
   });
 
+  it("reuses internal-step visuals and exposes selectable preview states", () => {
+    const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
+    const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
+    expect(wizard).toContain("<GuidedSetupProgress");
+    expect(wizard).toContain('label="Package progress"');
+    expect(gallery).toContain("aria-pressed={viewport === size}");
+    expect(gallery).toContain("aria-pressed:border-primary");
+    expect(gallery).toContain("aria-pressed:bg-accent");
+  });
+
+  it("keeps the Launch Studio navigation drawer accessible and aligned", () => {
+    const frame = read("src/components/launch-studio/LaunchSiteFrameV61.tsx");
+    expect(frame).toContain("aria-expanded={drawer} aria-controls={navigationDrawerId}");
+    expect(frame).toContain("<Modal id={navigationDrawerId} open={drawer}");
+    expect(frame).toContain("can-shell-bar");
+    expect(frame).toContain("px-[var(--page-gutter)]");
+  });
+
   it("uses the same V6.1 actions and confirmation pattern for saved work", () => {
     const guided = read("src/components/workflow/guided-setup-shell.tsx");
     const packages = read("src/components/launch-studio/MarketingPackagesV61.tsx");
