@@ -120,6 +120,14 @@ describe("Recruit from one saved Marketing Package and existing family invitatio
     expect(result.data?.packageStarter?.headline.length).toBe(120);
   });
 
+  it("rejects saved package subjects containing line breaks",async()=>{
+    calls.listPackages.mockResolvedValue([packageRecord({
+      headline:"Family invitation\\nInjected header",message:"Welcome.",
+    })]);
+    const result=await loader({siteId:siteA,purpose:"interest",packageId});
+    expect(result.ok).toBe(false);
+  });
+
   it("still offers the canonical Story/Programs suggestion when no package is selected",async()=>{
     const result=await loader({siteId:siteA,purpose:"interest"});
     expect(result.ok).toBe(true);
