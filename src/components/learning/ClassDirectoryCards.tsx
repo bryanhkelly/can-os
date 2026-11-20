@@ -28,11 +28,7 @@ export function ClassDirectoryCards({
           >
             <Link
                 to="/class"
-                search={{
-                  section: section.id,
-                  student: role === "guardian" ? section.studentPersonId ?? undefined : undefined,
-                  tab: role === "student" ? "lessons" : undefined,
-                }}
+                
                 className="inline-block  bg-foreground px-4 py-2 text-sm font-semibold text-background"
               >
                 Open class
