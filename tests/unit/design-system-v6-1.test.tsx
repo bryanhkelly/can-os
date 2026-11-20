@@ -80,12 +80,12 @@ describe("V6.1 reusable design system", () => {
 
   it("keeps a role dashboard's wallpaper independent from action panels and rail", () => {
     const html = renderToStaticMarkup(<DashboardLayout wallpaper={<div>Campaign artwork</div>}
-      quickActions={<DashboardShortcut title="Classes" description="My sections"><a href="/classes" /></DashboardShortcut>}
+      quickActions={<DashboardShortcut title="Classes" description="My Classes"><a href="/class" /></DashboardShortcut>}
       primary={<DashboardPanel title="Today's work"><p>Next assignment</p></DashboardPanel>}
       rail={<DashboardPanel title="Calendar"><p>Today</p></DashboardPanel>} />);
     expect(html).toContain("Campaign artwork");
     expect(html).toContain('aria-label="Dashboard shortcuts"');
-    expect(html).toContain('href="/classes"');
+    expect(html).toContain('href="/class"');
     expect(html).toContain('aria-label="Dashboard calendar and updates"');
     expect(html).toContain("Next assignment");
   });
