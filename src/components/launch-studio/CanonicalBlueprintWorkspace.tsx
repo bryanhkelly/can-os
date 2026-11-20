@@ -22,19 +22,17 @@ import {
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
 import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.server";
-import { blueprintEditorialIdentityKeys, includedBlueprintComponentIds } from "@/domain/blueprint-configuration";
+import { blueprintEditorialIdentityKeys, includedBlueprintComponentIds, isBlueprintLocalExperienceKind } from "@/domain/blueprint-configuration";
 import { replaceVisibleOfferingIntents, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { BlueprintLocalExperienceEditorV61, type LocalExperienceDraft } from "./BlueprintLocalExperienceEditorV61";
 
 type Workspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 type Template = Workspace["templates"][number];
 type Review = Awaited<ReturnType<typeof getBlueprintReview>>;
-type LocalExperienceDraft = BlueprintConfigurationDetail["localExperiences"][number] & {
-  source: "proposed_local_experience";
-};
 
 type SolutionDraftFields = {
   name: string;
@@ -439,6 +437,23 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     }
   }
 
+  const eligibleLocalCategories = selectedTemplate?.components.filter(component =>
+    selectedComponents.includes(component.id) && isBlueprintLocalExperienceKind(component.kind)) ?? [];
+  function addLocalExperience() {
+    const component = eligibleLocalCategories.find(item => item.id === localComponentId);
+    if (!component || !isBlueprintLocalExperienceKind(component.kind) ||
+        localTitle.trim().length < 2) return;
+    setLocalExperiences(current => current.length >= 200 ? current : [...current, {
+      source: "proposed_local_experience",
+      componentId: component.id,
+      kind: component.kind,
+      title: localTitle.trim(),
+      summary: localSummary.trim(),
+      configuration: {},
+    }]);
+    setLocalTitle("");
+    setLocalSummary("");
+  }
   const editableProgramComponents = selectedTemplate?.components.filter(component =>
     component.kind === "program_model" && selectedComponents.includes(component.id)) ?? [];
   const editableProgramComponentIds = editableProgramComponents.map(component => component.id);
@@ -559,71 +574,15 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 replaceVisibleOfferingIntents(previous, next, editableProgramComponentIds))}
               disabled={editingDisabled}
             />}
-          {selectedTemplate.components.some(component =>
-            selectedComponents.includes(component.id) &&
-            ["community", "experience", "club", "activity"].includes(component.kind)
-          ) && <fieldset className="border p-4" disabled={editingDisabled}>
-            <legend className="px-2 font-semibold">Propose a local experience</legend>
-            <p className="mb-3 text-sm text-muted-foreground">
-              Describe a club, activity, community project, or experience unique to your Site.
-              A proposal is not an approved activity.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Label className="text-sm" htmlFor="canonical-local-component">
-                Category
-                <Select id="canonical-local-component" className="mt-2"
-                  value={localComponentId}
-                  onChange={event => setLocalComponentId(event.currentTarget.value)}>
-                  <option value="">Choose category</option>
-                  {selectedTemplate.components
-                    .filter(component => selectedComponents.includes(component.id) &&
-                      ["community", "experience", "club", "activity"].includes(component.kind))
-                    .map(component => <option key={component.id} value={component.id}>
-                      {readable(component.key)}
-                    </option>)}
-                </Select>
-              </Label>
-              <Label className="text-sm" htmlFor="canonical-local-title">
-                Name
-                <Input id="canonical-local-title" className="mt-2" maxLength={160}
-                  value={localTitle} onChange={event => setLocalTitle(event.currentTarget.value)}/>
-              </Label>
-              <Label className="text-sm" htmlFor="canonical-local-summary">
-                Summary
-                <Input id="canonical-local-summary" className="mt-2" maxLength={4000}
-                  value={localSummary} onChange={event => setLocalSummary(event.currentTarget.value)}/>
-              </Label>
-            </div>
-            <Button type="button" variant="outline" className="mt-3"
-              disabled={!localComponentId || localTitle.trim().length < 2 || localExperiences.length >= 200}
-              onClick={() => {
-                const component = selectedTemplate.components.find(item => item.id === localComponentId);
-                if (!component || !["community", "experience", "club", "activity"].includes(component.kind)) return;
-                setLocalExperiences(current => [...current, {
-                  source: "proposed_local_experience",
-                  componentId: component.id,
-                  kind: component.kind as LocalExperienceDraft["kind"],
-                  title: localTitle.trim(),
-                  summary: localSummary.trim(),
-                  configuration: {},
-                }]);
-                setLocalTitle("");
-                setLocalSummary("");
-              }}>
-              Add to private Blueprint draft
-            </Button>
-            {localExperiences.length > 0 && <ul className="mt-4 space-y-2 text-sm">
-              {localExperiences.map((item, index) => <li key={index}
-                className="flex items-center justify-between gap-3 border p-3">
-                <span>{item.title} · {readable(item.kind)}</span>
-                <Button type="button" variant="outline"
-                  onClick={() => setLocalExperiences(current =>
-                    current.filter((_value, itemIndex) => itemIndex !== index))}>
-                  Remove
-                </Button>
-              </li>)}
-            </ul>}
-          </fieldset>}
+          {eligibleLocalCategories.length > 0 && <BlueprintLocalExperienceEditorV61
+            categories={eligibleLocalCategories} categoryId={localComponentId}
+            title={localTitle} summary={localSummary} experiences={localExperiences}
+            disabled={editingDisabled}
+            onCategoryChange={setLocalComponentId}
+            onTitleChange={setLocalTitle} onSummaryChange={setLocalSummary}
+            onAdd={addLocalExperience}
+            onRemove={index => setLocalExperiences(current =>
+              current.filter((_value,itemIndex) => itemIndex !== index))} />}
           <div className="flex flex-wrap gap-3">
             {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || reconciliationRequired || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
