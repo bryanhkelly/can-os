@@ -78,5 +78,6 @@ export function CoachOutreachPanel({
                     Log outreach
                   </Button>
                 </>
-              )};
+              )}
+            </section>;
 }
