@@ -5,10 +5,12 @@ import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
-import { ArrowUpRight, BookOpen, CalendarDays, ClipboardList, School } from "lucide-react";
+import { BookOpen, CalendarDays, ClipboardList, School } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import { type listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
+import { SchoolImprovementPanel } from "@/components/operations/SchoolImprovementPanel";
+import { OperationsHealthSummary } from "@/components/operations/OperationsHealthSummary";
 import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
 import {useRef,useState} from "react";
 import {Link,useRouter} from "@tanstack/react-router";
@@ -190,77 +192,8 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    Retry institutional change refresh
   </Button>}
   <AttentionQueue items={attentionItems.filter(item=>item.priority!=="critical")}/>
-  <section aria-label="School improvement and planning" className="mt-7  border border-border/70 bg-card p-5 shadow-sm">
-    <p className="text-xs font-bold uppercase tracking-widest text-primary">Sustain · Review and plan</p>
-    <h2 className="mt-2 font-serif text-2xl font-semibold">Keep your school moving forward</h2>
-    <p className="mt-2 text-sm text-muted-foreground">Use the existing school records for recurring review. These links are suggested routines, not proof that a review or compliance requirement is complete.</p>
-    <div className="mt-4 grid gap-3 md:grid-cols-3">
-      <article className=" border p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Weekly · Operational review</p>
-        <h3 className="mt-2 font-semibold">Resolve open issues</h3>
-        <p className="mt-2 text-sm text-muted-foreground">Review assigned actions, staffing exceptions and unresolved follow-ups.</p>
-        <a href="#operations-actions" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Review action queue →</a>
-      </article>
-      <article className=" border p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monthly · School health</p>
-        <h3 className="mt-2 font-semibold">Review evidence and insights</h3>
-        <p className="mt-2 text-sm text-muted-foreground">Inspect observed signals, accept follow-up actions, or dismiss with a recorded reason.</p>
-        <Link to="/operations/insights" search={{siteId:selected.siteId,programId:selected.programId}}
-          className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Open insights →</Link>
-      </article>
-      <article className=" border p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Term / Annual · Planning</p>
-        <h3 className="mt-2 font-semibold">Prepare the next school period</h3>
-        <p className="mt-2 text-sm text-muted-foreground">Review saved school years, calendars and academic requirements before configuring new periods.</p>
-        <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}}
-          className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Review school years →</Link>
-      </article>
-    </div>
-    <p className="mt-4 text-xs text-muted-foreground">Reenrollment is not represented as a completed workflow here. Use authorized admissions and enrollment records to review returning families; do not infer renewal from previous enrollment.</p>
-  </section>
-
-  {commandCenterData&&<section aria-label="Operations exception summary" className="mt-8">
-    <h2 className="font-serif text-3xl font-semibold">Operational health</h2>
-    <p className="mt-2 text-sm text-muted-foreground">Prioritize verified staffing and capacity exceptions before routine school monitoring. Readiness approvals remain controlled by their owning workflows.</p>
-    <div className="mt-5 grid gap-4 md:grid-cols-3">
-      <div className=" border border-destructive/40 bg-card p-5">
-        <h3 className="text-sm font-semibold">Needs intervention</h3>
-        <p className="mt-2 text-3xl font-semibold">{commandCenterData.issues.length}</p>
-        <p className="mt-2 text-xs text-muted-foreground">Reported staffing and capacity exceptions</p>
-      </div>
-      <div className=" border bg-card p-5">
-        <h3 className="text-sm font-semibold">Watching</h3>
-        <p className="mt-2 text-sm text-muted-foreground">Use the existing action workspace and live program details to review emerging concerns. No inferred warning counts.</p>
-      </div>
-      <div className=" border bg-muted/30 p-5">
-        <h3 className="text-sm font-semibold">Active sections</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{commandCenterData.summary.sections} active sections in scope. Individual readiness is not inferred from this count.</p>
-      </div>
-    </div>
-    {commandCenterData.issues.length>0&&<div className="mt-5 divide-y  border bg-card">
-      {commandCenterData.issues.map(issue=><article key={issue.kind+issue.sectionId} className="flex flex-wrap items-start justify-between gap-4 p-5">
-        <div><h3 className="font-semibold">{issue.title}</h3><p className="mt-1 text-sm text-muted-foreground">{issue.description}</p></div>
-        <Link to="/launch/school/$programId" params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}} className="inline-flex min-h-11 items-center gap-2  border px-4 py-2 text-sm font-semibold">Review workflow <ArrowUpRight className="size-4"/></Link>
-      </article>)}
-    </div>}
-  </section>}
-  {commandCenterData&&<section className="mt-7  border border-border/70 bg-card p-6 shadow-sm">
-    <h2 className="font-serif text-2xl">Live school operations</h2>
-    <div className="mt-3 flex flex-wrap gap-4 text-sm">
-    <span>{commandCenterData.summary.sections} active sections</span>
-    <span>{commandCenterData.summary.unstaffed} without verified instructional staffing</span>
-    <span>{commandCenterData.summary.underCapacity} capacity gaps</span>
-    <span>{commandCenterData.summary.waitlisted} open section waitlist entries</span>
-    </div>
-    <div className="mt-4 space-y-2">
-    {commandCenterData.issues.map(issue=><div key={issue.kind+issue.sectionId} className=" border p-3 text-sm">
-       <strong>{issue.title}</strong><p className="text-muted-foreground">{issue.description}</p>
-       <Link className="mt-2 inline-block underline" to="/launch/school/$programId"
-        params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}}>Review lifecycle →</Link>
-     </div>)}
-    {!commandCenterData.issues.length&&<p className="text-sm">No instructional staffing, capacity or section waitlist exceptions detected.</p>}
-    </div>
-   </section>}
+  <SchoolImprovementPanel selected={selected} />
+  <OperationsHealthSummary commandCenterData={commandCenterData} />
   {dashboardData&&<section className="mt-7 space-y-4" aria-label="Guided school launch and operations">
     <h2 className="font-serif text-2xl">Get your first students into class</h2>
     <p className="text-sm text-muted-foreground">Follow the existing launch, course, admissions and classroom workflows for each school. A website is optional to begin registrar-assisted applications; school opening and child attendance still require independent approvals.</p>
