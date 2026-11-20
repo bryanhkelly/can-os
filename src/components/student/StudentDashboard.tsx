@@ -7,7 +7,8 @@ import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { DashboardProgress, DashboardMediaTile } from "@/components/workspace/dashboard-widgets";
-import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
+import { StudentDashboardRail } from "./StudentDashboardRail";
+import { formatCalendarDateTime } from "@/components/calendar/calendar-presentation";
 import { StatusBadge } from "@/components/workspace";
 import type { DashboardAssignment, StudentDashboardData } from "./student-dashboard-data";
 import { StudentAssignmentLink } from "./StudentAssignmentLink";
@@ -51,9 +52,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   const classesToday = scheduled.filter(event => Boolean(event.sectionId) && dateKeyInTimezone(event.startsAt, timezone) === localDate);
   const visible = assignments.filter(item => filter === "all" ||
     (filter === "due" ? dueIds.has(item.assessmentId) : item.hasDraft && (item.status === "assigned" || item.status === null)));
-  const format = (stamp: Date | string, zone = timezone) => new Intl.DateTimeFormat("en-US", {
-    dateStyle:"medium",timeStyle:"short",timeZone:zone,
-  }).format(new Date(stamp));
+  const format = (stamp: Date | string, zone = timezone) => formatCalendarDateTime(stamp,zone);
   const upcomingEvents = community?.events.filter(event => event.status !== "cancelled" && new Date(event.startsAt) >= at)
     .sort((a,b) => Date.parse(a.startsAt) - Date.parse(b.startsAt)) ?? [];
   return <DashboardLayout className="student-dashboard"
@@ -165,31 +164,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
               <Link to="/student/my-school" className={textLink}>School &amp; community →</Link></div>}
       </DashboardPanel>
     </>}
-    rail={<>
-      <DashboardCalendar date={localDate} timezone={timezone} />
-      <DashboardPanel id="student-schedule" title="Today's Schedule"
-        action={<Link to="/calendar" search={{date:localDate}} className={textLink}>View all →</Link>}>
-        <div className="student-schedule">{todayEvents.slice(0,5).map(event => <article key={event.id}>
-          <time dateTime={new Date(event.startsAt).toISOString()}>{new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZone:event.timezone}).format(new Date(event.startsAt))}</time>
-          <div><Link to="/calendar" search={{date:dateKeyInTimezone(new Date(event.startsAt).toISOString(),event.timezone),event:event.id}}
-            className="text-xs font-semibold hover:underline">{event.title}</Link>
-            {event.cancelled && <StatusBadge tone="attention">Cancelled</StatusBadge>}
-            <p className="mt-1 text-3xs text-muted-foreground">{format(event.startsAt,event.timezone)} · {event.timezone}</p>
-            {event.description && <p className="mt-1 text-xs text-muted-foreground">{event.description}</p>}
-          </div>
-        </article>)}</div>
-        {!todayEvents.length && <p className="text-xs text-muted-foreground">No scheduled events today.</p>}
-        {todayEvents.length > 5 && <p className="mt-2 text-xs text-muted-foreground">Open the calendar for all {todayEvents.length} events today.</p>}
-      </DashboardPanel>
-      <DashboardPanel title="Announcements">
-        {data && !data.community.ok ? <p role="alert" className="text-xs">Announcements could not be loaded.</p>
-          : community?.notices.length ? <div className="divide-y">{community.notices.slice(0,3).map(notice =>
-            <Link key={notice.id} to="/notifications" search={{notification:notice.id}} className="student-announcement">
-              <FileText aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0"><b className="block text-xs font-semibold">{notice.title}</b>
-                <span className="mt-1 block text-3xs text-muted-foreground">{notice.acknowledged ? "Read" : "New"} · {notice.body}</span></span>
-            </Link>)}</div> : <p role="status" className="text-xs text-muted-foreground">No announcements yet.</p>}
-      </DashboardPanel>
-    </>}
+    rail={<StudentDashboardRail localDate={localDate} timezone={timezone}
+      todayEvents={todayEvents} communityState={data?.community} />}
   />;
 }
