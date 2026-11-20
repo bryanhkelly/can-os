@@ -18,6 +18,7 @@ import { assertCapability, AuthorizationError, type CommandContext } from "@/dom
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 import { selectBlueprintWorkspaceRecipes } from "@/domain/blueprint-configuration";
+import { publicSolutionComponentDescription } from "@/domain/public-solution-component";
 import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "./verified-site-planning.server";
 import { z } from "zod";
 
@@ -160,6 +161,7 @@ export async function getCanonicalBlueprintWorkspace(
           key: blueprintComponents.componentKey,
           kind: blueprintComponents.componentKind,
           requirementMode: blueprintComponents.requirementMode,
+          componentSpec: blueprintComponents.componentSpec,
         }).from(blueprintComponents)
           .where(inArray(blueprintComponents.blueprintVersionId,
             templates.map(template => template.blueprintVersionId)))
@@ -184,7 +186,10 @@ export async function getCanonicalBlueprintWorkspace(
           offeringCode: typeof metadata.offeringCode === "string" ? metadata.offeringCode : null,
           components: components
             .filter(component => component.blueprintVersionId === template.blueprintVersionId)
-            .map(({ id, key, kind, requirementMode }) => ({ id, key, kind, requirementMode })),
+            .map(({ id, key, kind, requirementMode, componentSpec }) => ({
+              id, key, kind, requirementMode,
+              ...publicSolutionComponentDescription(componentSpec),
+            })),
         };
       }),
       configurations: configurations.flatMap(configuration => {
