@@ -54,7 +54,7 @@ function gradeNumber(value: string): number | null {
  */
 export function academyReferenceMayBeSelected(
   item: Pick<BlueprintReferenceCatalogItem,
-    "kind" | "category" | "academicGradeRange">,
+    "kind" | "category" | "code" | "academicGradeRange">,
   allowed: SchoolYearAvailability,
 ): boolean {
   if (!isSchoolYearAcademyReference(item)) return true;
