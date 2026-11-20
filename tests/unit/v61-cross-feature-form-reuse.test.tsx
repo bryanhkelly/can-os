@@ -32,6 +32,16 @@ describe("V6.1 cross-feature form composition", () => {
     expect(source).not.toContain('layout="inline" className="justify-between border-t');
   });
 
+  it("keeps classroom location labels and controls on the shared Field contract", () => {
+    const source = readFileSync(
+      new URL("../../src/components/operations/SchoolRoomsSetup.tsx", import.meta.url), "utf8",
+    );
+    expect(source).toContain('<Field className="min-w-48 flex-1"');
+    expect(source).not.toContain('className="mt-1 block w-full  border bg-background p-2"');
+    expect(source).not.toContain("<Label>");
+    expect((source.match(/<ActionFooter/g) ?? []).length).toBe(3);
+  });
+
   it("keeps Launch draft saves on canonical Button pending presentation", () => {
     const source = readFileSync(
       new URL("../../src/components/launch-studio/LaunchDraftButton.tsx", import.meta.url), "utf8",
@@ -108,6 +118,10 @@ describe("V6.1 cross-feature form composition", () => {
     "src/components/enrollment/EnrollmentForm.tsx",
     "src/routes/operations.interest-events.tsx",
     "src/components/operations/LaunchConfigurationForm.tsx",
+    "src/components/learning/ClassCreationRequestForm.tsx",
+    "src/components/learning/TeacherStudentGoalForm.tsx",
+    "src/components/admissions/AdmissionsGuardianActions.tsx",
+    "src/components/operations/SchoolRoomsSetup.tsx",
     "src/components/launch-studio/EstablishSiteProfileUnified.tsx",
     "src/components/launch-studio/PrepareOperationsV61.tsx",
     "src/components/launch-studio/NativeOfferingAdoptionReviewPanel.tsx",
