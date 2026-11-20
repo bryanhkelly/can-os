@@ -68,6 +68,19 @@ export function selectSavedSolutionPlans<T extends { blueprintVersionId: string 
   return plans.filter(plan => plan.blueprintVersionId === blueprintVersionId);
 }
 
+/** Replace edits only for currently visible program-model components.
+ * Preserve saved proposals belonging to hidden/proposed components; the UI
+ * may render only the selected subset of a larger canonical configuration. */
+export function replaceVisibleOfferingIntents<T extends { componentId: string }>(
+  previous: readonly T[], visible: readonly T[], visibleComponentIds: readonly string[],
+): T[] {
+  const allowed = new Set(visibleComponentIds);
+  return [
+    ...previous.filter(intent => !allowed.has(intent.componentId)),
+    ...visible.filter(intent => allowed.has(intent.componentId)),
+  ];
+}
+
 /** A hidden/out-of-filter recipe must never remain in the visible detail pane. */
 export function resolveVisibleSolutionRecipe<T extends { blueprintVersionId: string }>(
   visible: readonly T[], selectedId: string | null,
