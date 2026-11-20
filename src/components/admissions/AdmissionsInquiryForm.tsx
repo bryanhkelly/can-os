@@ -2,6 +2,7 @@ import { useEffect,useState } from "react";
 import { searchAdmissionsHouseholds } from "@/modules/enrollment/admissions-intake.functions";
 import { AdmissionsPageNavigation } from "./AdmissionsPageNavigation";
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -105,7 +106,9 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
     </>}
     <Field label="Inquiry source"><Select value={source} disabled={convertibleInterest} onChange={e=>setSource(e.target.value)}><option value="school_direct">School inquiry</option><option value="published_site">Published Site</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></Select></Field>
     <Field className="sm:col-span-2" label="Notes"><Textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2}/></Field>
-    <Button type="submit" disabled={busy}>Create inquiry</Button>
+    <ActionFooter layout="form" className="sm:col-span-2">
+      <Button type="submit" disabled={busy} loading={busy} loadingLabel="Creating inquiry...">Create inquiry</Button>
+    </ActionFooter>
     </fieldset>
    </form>
  </>;
