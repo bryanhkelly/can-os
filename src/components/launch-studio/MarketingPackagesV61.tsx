@@ -10,7 +10,7 @@ import { ActionDialog, ActionFooter, WorkspaceActionLink, WorkspaceNotice, Works
 import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
   marketingPackageContentSchema, marketingPurposeOptions, marketingStepIssue,
-  type MarketingFormat, type MarketingPackageContent, type MarketingPackageStep,
+  type MarketingFormat, type MarketingPackageContent,
 } from "@/domain/marketing-package-v61";
 import {
   archiveSiteMarketingPackageV61, createSiteMarketingPackageV61,
@@ -25,7 +25,6 @@ import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/laun
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
 type MarketingSuggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
-const steps: readonly MarketingPackageStep[] = ["menu", "audience", "messages", "assets"];
 
 function message(error:unknown) {
   return error instanceof Error ? error.message : "The package operation could not be completed.";
