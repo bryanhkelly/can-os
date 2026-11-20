@@ -12,7 +12,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { sharedUiImportViolation } from "./lib/v61-component-dependencies.mjs";
+import { sharedUiImportViolation, sourceDependencySpecifiers } from "./lib/v61-component-dependencies.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const guardedDirectories = [
@@ -99,9 +99,7 @@ for (const file of files) {
   const program = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   checkParseDiagnostics(file, source, program);
-  for (const node of program.statements) {
-    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) continue;
-    const importPath = node.moduleSpecifier.text;
+  for (const importPath of sourceDependencySpecifiers(program, ts)) {
     const dependencyProblem = sharedUiImportViolation(file, importPath);
     if (dependencyProblem) failures.push(file + ": " + dependencyProblem);
     if (importPath.startsWith("@/routes/") || importPath.startsWith("@/db/") ||
