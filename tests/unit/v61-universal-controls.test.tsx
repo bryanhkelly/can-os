@@ -90,7 +90,7 @@ describe("V6.1 universal action and surface contracts", () => {
     const html = renderToStaticMarkup(<CreateAction>
       <a href="/sites/new">Create site</a>
     </CreateAction>);
-    expect(html).toMatch(/^<a\\b/);
+    expect(html).toMatch(/^<a\b/);
     expect(html).toContain('data-create-action=""');
     expect(html).toContain('href="/sites/new"');
     expect(html).toContain("bg-primary");
