@@ -162,7 +162,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
       title={mode==="invite"?"Invite staff":mode==="people"?"People directory":"Staff access"}
       breadcrumbs={!hubMode && mode!=="access"?<Link to="/admin" search={{siteId:selection.siteId}} className="underline">Administration</Link>:undefined}
       actions={!hubMode && <div className="flex flex-wrap gap-2">
-        {mode!=="invite"&&<CreateAction><Link to="/admin/invite" search={{siteId:selection.siteId, inviteRole:selection.inviteRole}}>Invite staff</Link></CreateAction>}
+        {mode!=="invite"&&<CreateAction><Link to="/admin/invite" search={{siteId:selection.siteId, inviteRole:selection.inviteRole==="registrar" || selection.inviteRole==="site_website_editor" ? selection.inviteRole : undefined}}>Invite staff</Link></CreateAction>}
         {mode!=="people"&&<Link to="/admin/people" search={{siteId:selection.siteId}} className={secondaryActionClassName}>People directory</Link>}
       </div>}
     >
