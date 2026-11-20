@@ -3,12 +3,11 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { LaunchDraftButton } from "@/components/launch-studio/LaunchDraftButton";
 import type { LaunchDraftRecord } from "@/domain/launch-draft";
 import { guardianApplicationSelection } from "@/domain/guardian-application-selection";
-import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, WorkspaceNotice } from "@/components/workspace";
 import { GuidedSetupShell, type GuidedSetupStep } from "@/components/workflow";
 import { useLaunchDraftChanges, LaunchUnsavedChangesGuard } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
@@ -256,17 +255,17 @@ export function GuardianApplicationForm({ programs, households, students = [], t
           attempted={attempted} onHouseholdChange={setHouseholdId}
           onFirstNameChange={setFirstName} onLastNameChange={setLastName}
           onGradeChange={setGrade} />
-        <div className="sm:col-span-2">
+        <ActionFooter layout="inline" className="mt-0 sm:col-span-2">
           {draftContext !== undefined && <LaunchDraftButton initial={draft ?? null}
             selection={{ audience: "family", context: draftContext }} disabled={busy || unavailableDraftStudent}
             onSaved={value => { if (value.audience === "family") changes.markSaved(value.fields); }}
             value={() => ({ audience: "family", fields: { requestId, programId, schoolYearId,
               studentOptionId, householdId, firstName, lastName, grade } })} />}
-          <Button type="submit" size="lg" disabled={busy || unavailableDraftStudent || selection.unavailable || !!linkedTransfer&&!linkedStudent} aria-busy={busy}>
-            {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
-            {busy ? "Submitting application…" : "Submit application"}
+          <Button type="submit" size="lg" disabled={busy || unavailableDraftStudent || selection.unavailable || !!linkedTransfer&&!linkedStudent}
+            loading={busy} loadingLabel="Submitting application…" aria-busy={busy}>
+            Submit application
           </Button>
-        </div>
+        </ActionFooter>
       </fieldset>
     </form>}
   </>;
