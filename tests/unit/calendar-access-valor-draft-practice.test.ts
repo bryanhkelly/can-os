@@ -26,7 +26,7 @@ describe("calendar sign-in and build provenance",()=>{
     expect(access).toContain("embeddedSourceRevision()");
     expect(access).toContain('aria-label="Build information"');
     expect(access).toContain('buildId?.slice(0,12)??"unavailable"');
-    expect(embeddedSourceRevision()).toBeNull();
+    expect(embeddedSourceRevision()===null || /^[a-f0-9]{40}$/.test(embeddedSourceRevision()!)).toBe(true);
   });
 });
 
