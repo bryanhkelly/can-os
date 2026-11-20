@@ -16,6 +16,7 @@ export { ActionDialog } from "./action-dialog";
 export { ActionFooter } from "./action-footer";
 export { DisclosureSection } from "./disclosure-section";
 export { PageNavigation } from "./page-navigation";
+export { WorkspaceLinkNavigation } from "./workspace-link-navigation";
 export { DirectoryPagination } from "./directory-pagination";
 export { DirectoryWindowPagination } from "./directory-window-pagination";
 export { DirectoryBulkActions, type DirectoryBulkAction } from "./directory-bulk-actions";
