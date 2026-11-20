@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { Modal } from "@/components/ui/modal";
 import { FormActions } from "@/components/workspace/form-page";
+import { CreateAction } from "@/components/workspace/create-action";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { EmptyState, WorkspaceNotice, PageNavigation } from "@/components/workspace";
 
@@ -83,6 +84,19 @@ describe("V6.1 universal action and surface contracts", () => {
     expect(html).toContain('aria-disabled="true"');
     expect(html).toMatch(/tabindex="-1"/i);
     expect(html).not.toMatch(/<a[^>]*\sdisabled(?:=|\s|>)/);
+  });
+
+  it("renders one canonical primary CreateAction without nested buttons", () => {
+    const html = renderToStaticMarkup(<CreateAction>
+      <a href="/sites/new">Create site</a>
+    </CreateAction>);
+    expect(html).toMatch(/^<a\\b/);
+    expect(html).toContain('data-create-action=""');
+    expect(html).toContain('href="/sites/new"');
+    expect(html).toContain("bg-primary");
+    expect(html).toContain("Create site");
+    expect(html).toContain("<svg");
+    expect(html).not.toContain("<button");
   });
 
   it("renders the public sign-in links without an invalid Radix Slot child array", () => {
