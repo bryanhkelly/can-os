@@ -51,7 +51,7 @@ describe("Classroom Connect P1 authorization and feedback boundaries", () => {
   it("stores optional feedback only for a person's own paired Course attempt", () => {
     const feedback = read("src/modules/learning/classroom-feedback.functions.ts");
     const mapping = read("src/db/canonical-v301/facilitated-room-feedback.ts");
-    const companion = read("src/routes/classroom.companion.tsx");
+    const companion = read("src/components/learning/ClassroomFeedbackPanel.tsx");
     const report = read("src/modules/learning/facilitated-impact.functions.ts");
     expect(feedback).toContain("authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId, true)");
     expect(feedback).toContain("eq(facilitatedLearningParticipants.participantPersonId, actor.actorPersonId!)");
@@ -68,7 +68,7 @@ describe("Classroom Connect P1 authorization and feedback boundaries", () => {
     expect(migration).toContain("REVOKE ALL ON TABLE education_v30.facilitated_room_feedback FROM PUBLIC");
     expect(companion).toContain("getRecentClassroomFeedback");
     expect(companion).toContain("submitClassroomFeedback");
-    expect(companion).toContain('aria-pressed={room.ratings[questionKey] === rating}');
+    expect(companion).toContain('aria-pressed={room.ratings[key] === rating}');
     expect(report).toContain("countDistinct(facilitatedRoomFeedback.participantPersonId)");
     expect(report).toContain("people>=5");
     expect(feedback).not.toContain("assessmentAttempts");
