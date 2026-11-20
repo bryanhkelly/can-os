@@ -105,12 +105,27 @@ FormLabel.displayName = "FormLabel";
 const FormControl = React.forwardRef<
   React.ElementRef<typeof Slot>,
   React.ComponentPropsWithoutRef<typeof Slot>
->(({ ...props }, ref) => {
+>(({ children, ...props }, ref) => {
   const { error, formItemId, formMessageId } = useFormField();
+  // Radix Slot merges its child's ARIA attributes after its own. Combine the
+  // caller's descriptions before passing the child so a control-specific
+  // aria-describedby cannot silently hide a server validation message.
+  const child = React.Children.only(children) as React.ReactElement<{
+    id?: string;
+    "aria-describedby"?: string;
+    "aria-invalid"?: React.AriaAttributes["aria-invalid"];
+  }>;
   const describedBy = [...new Set([
+    ...(child.props["aria-describedby"]?.split(/\s+/).filter(Boolean) ?? []),
     ...(props["aria-describedby"]?.split(/\s+/).filter(Boolean) ?? []),
     ...(error ? [formMessageId] : []),
   ])].join(" ") || undefined;
+  const invalid = error ? true : child.props["aria-invalid"];
+  const control = React.cloneElement(child, {
+    id: formItemId,
+    "aria-describedby": describedBy,
+    "aria-invalid": invalid,
+  });
 
   return (
     <Slot
@@ -118,8 +133,8 @@ const FormControl = React.forwardRef<
       {...props}
       id={formItemId}
       aria-describedby={describedBy}
-      aria-invalid={!!error}
-    />
+      aria-invalid={invalid}
+    >{control}</Slot>
   );
 });
 FormControl.displayName = "FormControl";
