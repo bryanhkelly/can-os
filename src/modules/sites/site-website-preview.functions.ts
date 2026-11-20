@@ -1,3 +1,7 @@
+import { db } from "@/db/client";
+import { siteBrandConfigurationSchema } from "@/domain/site-brand";
+import { assetInputSchema, saveSiteBrandVersionWithinTransaction } from "./site-brand.functions";
+import { publishPartnerLocalContentWithinTransaction } from "./site-local-content.server";
 import { siteBrandDirectionIds } from "@/domain/site-brand-direction";
 import { sitePaletteIds, siteTypographyIds, siteTemplateIds, siteFontCatalog, type SiteFontId } from "@/domain/site-theme";
 import { createServerFn } from "@tanstack/react-start";
@@ -91,35 +95,42 @@ export const previewChurchWebsiteDraft = createServerFn({ method: "POST" })
     return { previewHtml: preview.previewHtml, previewPages: preview.previewPages };
   });
 
-/** Private, immutable website draft revision. Public content is unchanged. */
-export const saveChurchWebsiteDraft = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({
-    expectedRevision: z.number().int().nonnegative(),
-    siteId: z.string().uuid().optional(),
-    content: localContentSchema,
-  }).strict().parse(value))
-  .handler(async ({ data }) => {
-    setResponseHeader("Cache-Control", "private, no-store");
-    const actor = await getCommandContext(getRequest());
-    if (data.siteId && actor.grantSiteId !== data.siteId) throw new AuthorizationError("intended church website Site");
-    return publishPartnerLocalContent(actor, {
-      operation: "draft", expectedRevision: data.expectedRevision, content: data.content,
-    });
-  });
+/** One atomic Website & Brand save. Unlike separate browser mutations, either
+ * both independently versioned documents commit, or neither does.
+ * Draft saves do not grant institutional publication or enrollment.
+ */
+const websiteAndBrandSaveSchema=z.object({
+  siteId:z.string().uuid(),
+  operation:z.enum(["draft","save"]),
+  expectedRevision:z.number().int().nonnegative(),
+  expectedBrandVersionId:z.string().uuid().nullable(),
+  brand:siteBrandConfigurationSchema,
+  content:localContentSchema,
+}).strict();
 
-export const publishChurchWebsiteContent = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({
-    expectedRevision: z.number().int().nonnegative(),
-    siteId:z.string().uuid().optional(),
-    content: localContentSchema,
-  }).strict().parse(value))
-  .handler(async ({ data }) => {
-    setResponseHeader("Cache-Control", "private, no-store");
+export const saveSiteWebsiteAndBrand=createServerFn({method:"POST"})
+  .validator((value:unknown)=>websiteAndBrandSaveSchema.parse(value))
+  .handler(async ({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
-    if(data.siteId&&actor.grantSiteId!==data.siteId)throw new AuthorizationError("intended church website Site");
-    return publishPartnerLocalContent(actor, {
-      operation: "save", expectedRevision: data.expectedRevision,
-      content: data.content,
+    if(actor.grantSiteId!==data.siteId)
+      throw new AuthorizationError("intended church website Site");
+    return db.transaction(async tx=>{
+      // Publication row is locked by the existing copy command before Brand
+      // storage locks the Site. This lock order matches Prepare publishing.
+      const website=await publishPartnerLocalContentWithinTransaction(actor,{
+        operation:data.operation,
+        expectedRevision:data.expectedRevision,
+        content:data.content,
+      },tx);
+      const brand=await saveSiteBrandVersionWithinTransaction(actor,{
+        siteId:data.siteId,
+        expectedBrandVersionId:data.expectedBrandVersionId,
+        configuration:data.brand,
+        logoImage:assetInputSchema.nullable().parse(data.content.branding.logoImage??null),
+        heroImage:assetInputSchema.nullable().parse(data.content.branding.heroImage??null),
+      },tx);
+      return {website,brand};
     });
   });
 
