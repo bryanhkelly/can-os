@@ -37,7 +37,9 @@ export const Facilities: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { name: "Facilities & Resources" })).toBeInTheDocument();
-    await expect(canvas.getByRole("navigation", { name: "Prepare modules" })).toBeInTheDocument();
+    // Prepare modules live in the persistent Launch sidebar, not a duplicated
+    // navigation inside the center pane of this story.
+    await expect(canvas.getByRole("heading", { name: "The decision to make" })).toBeInTheDocument();
     await expect(canvas.queryByText("100%")).not.toBeInTheDocument();
   },
 };
