@@ -258,11 +258,31 @@ export const savePlatformBlueprintDraft = createServerFn({ method: "POST" })
       if (existing && existing.title !== data.title) {
         throw new Error("An existing Blueprint title cannot be changed by a version draft.");
       }
+      // Preserve versioned recipe metadata and component requirements that the
+      // compact App Admin form does not expose. Editing must never erase
+      // compatibility, facilities, safety, or publisher-authored guidance.
+      const formerSpec = latest?.spec &&
+        typeof latest.spec === "object" && !Array.isArray(latest.spec)
+          ? latest.spec : {};
+      const formerComponents = latest
+        ? await tx.select({
+            key: blueprintComponents.componentKey,
+            componentSpec: blueprintComponents.componentSpec,
+          }).from(blueprintComponents)
+            .where(eq(blueprintComponents.blueprintVersionId, latest.id))
+        : [];
+      const componentSpecByKey = new Map(formerComponents.map(component => [
+        component.key,
+        component.componentSpec &&
+        typeof component.componentSpec === "object" && !Array.isArray(component.componentSpec)
+          ? component.componentSpec : {},
+      ]));
+      const spec = { ...formerSpec, programCode: data.programCode,
+        ...(data.offeringCode ? { offeringCode: data.offeringCode } : {}) };
+      if (!data.offeringCode) delete spec.offeringCode;
       const [version] = await tx.insert(blueprintVersions).values({
         blueprintId: item.id, versionNo: data.expectedVersion + 1,
-        targetKind: data.targetKind,
-        spec: { programCode: data.programCode,
-          ...(data.offeringCode ? { offeringCode: data.offeringCode } : {}) },
+        targetKind: data.targetKind, spec,
         lifecycle: "draft", publishedAt: null,
       }).returning({ id: blueprintVersions.id });
       if (!version) throw new Error("Blueprint draft could not be created");
@@ -271,7 +291,10 @@ export const savePlatformBlueprintDraft = createServerFn({ method: "POST" })
         componentKey: component.key,
         componentKind: component.kind,
         requirementMode: component.requirementMode,
-        componentSpec: { description: component.description },
+        componentSpec: {
+          ...(componentSpecByKey.get(component.key) ?? {}),
+          description: component.description,
+        },
       })));
       await writeAudit(tx, actor, {
         action: "platform.catalog.version.created", entityType: auditResource.blueprint,
