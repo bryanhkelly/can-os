@@ -92,6 +92,31 @@ AS $fn$
  );
 $fn$;
 
+-- A grant ID cannot be spoofed to request another account's issuer authority.
+-- An independent reviewer also cannot transfer approvals between accounts.
+CREATE OR REPLACE FUNCTION public.guard_issuer_approval_shared_grant()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'pg_catalog','pg_temp'
+AS $owner$
+DECLARE grant_account uuid;
+BEGIN
+  IF TG_OP='UPDATE'
+    AND (NEW.account_person_grant_id IS DISTINCT FROM OLD.account_person_grant_id
+      OR NEW.requested_by_can_account_id IS DISTINCT FROM OLD.requested_by_can_account_id)
+  THEN RAISE EXCEPTION 'Issuer approval grant and requester are immutable'; END IF;
+  SELECT g.account_id INTO grant_account
+    FROM public.account_person_grants g
+    WHERE g.id=NEW.account_person_grant_id
+    FOR SHARE;
+  IF grant_account IS DISTINCT FROM NEW.requested_by_can_account_id
+  THEN RAISE EXCEPTION 'Issuer approval must use the exact requesting CAN grant'; END IF;
+  RETURN NEW;
+END $owner$;
+
+CREATE TRIGGER issuer_approval_shared_grant_owner
+BEFORE INSERT OR UPDATE ON public.canonical_sensitive_capability_approvals
+FOR EACH ROW EXECUTE FUNCTION public.guard_issuer_approval_shared_grant();
+
 DO $verify$
 DECLARE body text;
 BEGIN
@@ -108,6 +133,9 @@ BEGIN
     OR NOT EXISTS(SELECT 1 FROM pg_constraint
       WHERE conrelid='public.canonical_sensitive_capability_approvals'::regclass
       AND confrelid='public.account_person_grants'::regclass)
+    OR NOT EXISTS(SELECT 1 FROM pg_trigger
+      WHERE tgrelid='public.canonical_sensitive_capability_approvals'::regclass
+        AND tgname='issuer_approval_shared_grant_owner' AND NOT tgisinternal)
   THEN RAISE EXCEPTION 'Shared-grant issuer cutover incomplete'; END IF;
   IF education_v30.v301_can_sensitive_capability(repeat('0',64),'credential.issue')
   THEN RAISE EXCEPTION 'Unknown session authorized as issuer'; END IF;
