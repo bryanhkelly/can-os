@@ -195,7 +195,7 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
         learningSessionId: learningSession.id, studentProfileId,
         sectionId: section.id, courseTemplateVersionId: section.versionId,
         lessonId: interaction.lessonId,
-        resourceId: interaction.kind === "resource_opened" ? interaction.resourceId : null,
+        resourceId: "resourceId" in interaction ? interaction.resourceId : null,
         kind: interaction.kind, clientEventId: interaction.clientEventId, requestDigest: digest,
         reportedAt: new Date(interaction.occurredAt), receivedAt: now, estimatedActiveMs,
       }).returning({ id: s.learningActivityEvents.id });
