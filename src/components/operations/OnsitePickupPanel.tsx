@@ -107,7 +107,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
     {error && <p role="alert" className="mb-4 border p-3 text-sm">{error}</p>}
     <MutationFeedback state={{...mutation,retryRefresh}} className="mb-4" pendingMessage="Updating verified pickup records…"/>
     <Button variant="outline" type="button" disabled={loading||busy} onClick={()=>void load().catch(()=>{})}
-      className="mb-4 border px-3 py-2 text-sm disabled:opacity-50">Refresh verified roster</Button>
+      className="mb-4">Refresh verified roster</Button>
     {loading && <p role="status" className="text-sm">Loading family release authority…</p>}
     {!loading && roster && <>
       <p className="mb-5 text-xs text-muted-foreground">{roster.note}</p>
@@ -191,7 +191,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Button variant="outline" type="button"
                   disabled={!!busy || (resolutions[hold.id] ?? "").trim().length < 20 ||
                     (resolutionReferences[hold.id] ?? "").trim().length < 15}
-                  className="mt-2 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  className="mt-2"
                   onClick={() => void run(hold.id + ":propose", "Resolution proposed for independent review.",
                     mutationId => proposePickupCustodyResolution({ data: {
                       holdId: hold.id,
@@ -211,7 +211,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <p className="mt-1 text-xs">Proposal: {hold.pendingResolution.resolutionNote}</p>
                 {hold.pendingResolution.proposerPersonId !== roster.reviewerPersonId
                   ? <Button variant="outline" type="button" disabled={!!busy}
-                      className="mt-2 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      className="mt-2"
                       onClick={() => void run(hold.id + ":resolve", "Independent release approved; hold cleared.",
                         mutationId => resolvePickupCustodyHold({ data: {
                           holdId: hold.id,
@@ -233,7 +233,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     setSelected(current => ({ ...current, [key]: adult.id }));
                     setVerifiedNames(current => ({ ...current, [key]: adult.pickupName }));
                   }}
-                  className="border px-3 py-2 text-left text-sm disabled:opacity-50 aria-pressed:bg-muted"
+                  className="w-full flex-col items-start text-left whitespace-normal aria-pressed:bg-muted"
                   aria-pressed={selected[key] === adult.id}>
                   <span className="font-semibold">{adult.pickupName}</span>
                   <span className="block text-xs text-muted-foreground">{adult.relationshipLabel} · require {adult.identityVerificationMethod.replaceAll("_", " ")}</span>
@@ -256,7 +256,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
               </Label>
               <p className="mt-2 text-xs text-muted-foreground">By recording this command you attest that you checked the required credential, matched the adult, and personally witnessed the handoff.</p>
               <Button variant="default" type="button" disabled={!!busy}
-                className="mt-3 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                className="mt-3"
                 onClick={() => void run(key, `Verified release recorded for ${student.studentName}.`, (mutationId) => recordVerifiedPickupRelease({ data: {
                   date,
                   studentProfileId: student.studentProfileId,
@@ -298,7 +298,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                   </Select>
                 </Label>
                 <Button variant="outline" type="button" disabled={!!busy || !student.householdIds.length}
-                  className="mt-3 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  className="mt-3"
                   onClick={() => void run(key + ":deny", `Denied pickup recorded for ${student.studentName}; school supervision continues.`, (mutationId) => recordDeniedPickup({ data: {
                     date,
                     studentProfileId: student.studentProfileId,
@@ -334,7 +334,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     className="mt-1 w-full border bg-background p-2" />
                 </Label>
                 <Button variant="outline" type="button" disabled={!!busy || !student.householdIds.length}
-                  className="mt-3 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  className="mt-3"
                   onClick={() => void run(key + ":hold", `All pickup release held for ${student.studentName}.`, (mutationId) => createPickupCustodyHold({ data: {
                     studentProfileId: student.studentProfileId,
                     programId: student.programId,
@@ -354,7 +354,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     className="mt-1 w-full border bg-background p-2" />
                 </Label>
                 <Button variant="outline" type="button" disabled={!!busy || !!student.uncollectedActionId}
-                  className="mt-3 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  className="mt-3"
                   onClick={() => void run(key + ":uncollected", `Uncollected-child follow-up opened for ${student.studentName}.`, (mutationId) => recordUncollectedChild({ data: {
                     date,
                     studentProfileId: student.studentProfileId,
