@@ -112,6 +112,16 @@ describe("V6.1 cross-feature form composition", () => {
 
   it.each([
     "src/components/learning/ClassVideoUploadForm.tsx",
+    "src/components/launch-studio/ProgramDiscoveryPanel.tsx",
+    "src/components/launch-studio/PrepareOperationsV61.tsx",
+  ])("uses the canonical WorkspaceNotice for important feature states in %s", filePath => {
+    const source = readFileSync(new URL(`../../${filePath}`, import.meta.url), "utf8");
+    expect(source).toContain("<WorkspaceNotice");
+    expect(source).toMatch(/tone="(?:danger|attention|info)"/);
+  });
+
+  it.each([
+    "src/components/learning/ClassVideoUploadForm.tsx",
     "src/components/learning/ClassSupplementForm.tsx",
     "src/components/operations/ExtendedSeasonDraftForm.tsx",
     "src/components/admissions/FamilyInvitationForm.tsx",
