@@ -137,6 +137,52 @@ export const listPlatformCatalogDefinitions = createServerFn({ method: "GET" })
     return { programModels, blueprintRecipes };
   });
 
+export const readPlatformBlueprintTemplate = createServerFn({ method: "GET" })
+  .validator((raw: unknown) => z.object({ versionId: z.string().uuid() }).strict().parse(raw))
+  .handler(async ({ data }) => {
+    noStore();
+    await currentPlatformActor("blueprint.template.manage");
+    const [row] = await db.select({
+      code: blueprints.code, title: blueprints.title,
+      publisherOrganizationId: blueprints.publisherOrganizationId,
+      versionNo: blueprintVersions.versionNo,
+      targetKind: blueprintVersions.targetKind,
+      spec: blueprintVersions.spec,
+    }).from(blueprintVersions)
+      .innerJoin(blueprints, eq(blueprints.id, blueprintVersions.blueprintId))
+      .where(eq(blueprintVersions.id, data.versionId)).limit(1);
+    if (!row || row.publisherOrganizationId !==
+        process.env.CAN_PLATFORM_CATALOG_PUBLISHER_ORGANIZATION_ID) {
+      throw new AuthorizationError("platform-owned Blueprint template");
+    }
+    const components = await db.select({
+      key: blueprintComponents.componentKey,
+      kind: blueprintComponents.componentKind,
+      requirementMode: blueprintComponents.requirementMode,
+      componentSpec: blueprintComponents.componentSpec,
+    }).from(blueprintComponents)
+      .where(eq(blueprintComponents.blueprintVersionId, data.versionId))
+      .orderBy(asc(blueprintComponents.componentKey));
+    const spec = row.spec as Record<string, unknown>;
+    return {
+      code: row.code, title: row.title, versionNo: row.versionNo,
+      targetKind: row.targetKind,
+      programCode: typeof spec.programCode === "string" ? spec.programCode : "",
+      offeringCode: typeof spec.offeringCode === "string" ? spec.offeringCode : "",
+      components: components.map(component => {
+        const value = component.componentSpec &&
+          typeof component.componentSpec === "object" &&
+          !Array.isArray(component.componentSpec)
+          ? component.componentSpec as Record<string, unknown> : {};
+        return {
+          key: component.key, kind: component.kind,
+          requirementMode: component.requirementMode,
+          description: typeof value.description === "string" ? value.description : "",
+        };
+      }),
+    };
+  });
+
 export const savePlatformProgramDraft = createServerFn({ method: "POST" })
   .validator((raw: unknown) => savePlatformProgramSchema.parse(raw))
   .handler(async ({ data }) => {
