@@ -187,6 +187,31 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         }
       }
 
+      // Direct CAN academic teachers can read the exact Class they teach,
+      // without inheriting room-facilitation or official-grading powers.
+      if(instance.siteId && actor.role==="teacher" &&
+          actor.capabilities.has("teacher:read") &&
+          actor.scope.siteIds?.length===1 &&
+          actor.scope.siteIds[0]===instance.siteId &&
+          actor.scope.organizationIds?.length===1 &&
+          actor.scope.organizationIds[0]===instance.operatingOrganizationId){
+        const [assigned]=await tx.select({id:canonicalClassStaffAssignments.id})
+          .from(canonicalClassStaffAssignments).where(and(
+            eq(canonicalClassStaffAssignments.classId,instance.id),
+            eq(canonicalClassStaffAssignments.personId,actor.actorPersonId!),
+            eq(canonicalClassStaffAssignments.roleCode,"teacher"),
+            eq(canonicalClassStaffAssignments.state,"approved"),
+            lte(canonicalClassStaffAssignments.beginsAt,now),
+            or(isNull(canonicalClassStaffAssignments.endsAt),
+               gt(canonicalClassStaffAssignments.endsAt,now)),
+          )).limit(1);
+        if(assigned){
+          await currentClassAuthority(tx,instance.id,now);
+          staffRole="teacher";
+          canTeach=true;
+        }
+      }
+
       if(["site_admin","registrar"].includes(actor.role??"") &&
          actor.capabilities.has("class.manage") &&
          actor.scope.organizationIds?.includes(instance.operatingOrganizationId) &&
@@ -229,7 +254,10 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       // Only the Class operator or an explicitly assigned teacher receives
       // personally identifying roster information. A facilitator sees counts.
       // A teaching assignment is not, by itself, permission to read minor or adult learner identities.
-      const rosterAllowed=canManage||(view==="teach"&&canVerifyAttendance);
+      const rosterAllowed=canManage||(view==="teach"&&(
+        canVerifyAttendance||
+        (actor.role==="teacher"&&staffRole==="teacher"&&actor.capabilities.has("teacher:read"))
+      ));
       let roster:Array<{enrollmentId:string;personId:string;name:string;status:string;creditMode:string}>=[];
       let rosterCount=0;
       if((view==="teach"||view==="manage")){
