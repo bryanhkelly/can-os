@@ -25,11 +25,15 @@ export function OnsitePickupPanel({ date, onChanged }: {
   date: string;
   onChanged?: () => Promise<void> | void;
 }) {
-  const [roster, setRoster] = useState<Roster | null>(null);
+  const [rosterSnapshot, setRoster] = useState<{ date: string; value: Roster } | null>(null);
+  // Even before effects invalidate the previous request, never render a
+  // custody roster under a different school's local day.
+  const roster = rosterSnapshot?.date === date ? rosterSnapshot.value : null;
   // Preserve the server idempotency identity if a witnessed custody command
   // succeeds but its response is lost. A second click must not invent a new event.
   const pendingMutationIds = useRef(new Map<string, string>());
   const requestSequence = useRef(0);
+  const activeDate = useRef(date);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -47,19 +51,23 @@ export function OnsitePickupPanel({ date, onChanged }: {
   const [resolutionBases,setResolutionBases]=useState<Record<string,string>>({});
 
   const load = useCallback(async (propagateFailure = false) => {
+    if (date !== activeDate.current) {
+      if (propagateFailure) throw new Error("Pickup roster date changed; retry refresh.");
+      return;
+    }
     const request = ++requestSequence.current;
     setLoading(true);
     setError("");
     setRoster(null); // Never permit actions against an unverified, previous-date roster.
     try {
       const next = await getOnsitePickupRoster({ data: { date } });
-      if (request !== requestSequence.current) {
+      if (request !== requestSequence.current || date !== activeDate.current) {
         if (propagateFailure) throw new Error("Pickup roster context changed; retry refresh.");
         return;
       }
-      setRoster(next);
+      setRoster({ date, value: next });
     } catch (cause) {
-      if (request === requestSequence.current) {
+      if (request === requestSequence.current && date === activeDate.current) {
         setRoster(null);
         setError(mutationErrorMessage(cause, "Unable to load the verified pickup roster"));
       }
@@ -67,7 +75,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
       // post-command refresh fails. UI refreshes render their own error.
       if (propagateFailure) throw cause;
     } finally {
-      if (request === requestSequence.current) setLoading(false);
+      if (request === requestSequence.current && date === activeDate.current) setLoading(false);
     }
   }, [date]);
   const mutation = useMutationFeedback(async () => {
@@ -77,6 +85,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
   const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
+    activeDate.current = date;
     // These drafts describe witnessed child custody events. Never carry them
     // into another date or retain a previous day's authorized adults.
     setSelected({});
