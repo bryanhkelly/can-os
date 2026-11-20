@@ -664,6 +664,30 @@ screen-reader review, 200% zoom, approved-reference visual comparison and
 Chromatic approval remain **unverified**. This evidence does not authorize a
 production release or certify product-wide route migration.
 
+### Navigation and data table reuse (November 20, 2026)
+
+**Related destinations** compose `WorkspaceLinkNavigation` with an explicit
+accessible label. **Selected route sections** compose `DetailNavigation`
+with `SectionTab` and one explicit `current` selection. A feature remains
+responsible for authorization, route parameters and search state. It should
+not duplicate the shared nav geometry or create a second selection model.
+A record's main views and its inner sections may be separate labeled
+navigation regions, as in the unified Class workspace.
+
+**Tabular data** use `ui/Table`, `TableCaption`, `TableHeader`,
+`TableBody`, `TableRow`, `TableHead`, `TableRowHead` and `TableCell`.
+`DirectoryTable` remains the higher-level pattern when sorting,
+selection, row actions and pagination apply. Complex keyboard-operated
+grids such as the teacher gradebook retain their domain interactions
+while reusing semantic table primitives and a labeled focusable scroll
+region. Do not replace evidence/report tables with `DirectoryTable`
+solely to achieve visual consistency.
+
+Verification source, Storybook interaction cases, viewport matrix,
+and outstanding authenticated visual approval are tracked in
+`docs/verification/v61-navigation-table-acceptance-20261120.md`.
+These are not a claim that fresh branch screenshot approval has passed.
+
 ## 9. Scope boundaries
 
 This PR provides the **complete shared design foundation and reusable implementation templates**, not a claim that every route has been migrated. Product-wide route migration must proceed through the checklist in `docs/design-system-v6-1-migration.md`, with business flows owned by their existing services.
