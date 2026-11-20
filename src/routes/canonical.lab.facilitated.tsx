@@ -181,8 +181,9 @@ function FacilitatedLabContent({data,preferredSiteId}:{
       {rehearsalOptions?.partial&&<p role="status" className="mt-3 text-xs text-muted-foreground">
         The Site preview list is limited. Narrow the authorized deployment before rehearsing additional courses.
       </p>}
-      {rehearsalScope&&<ClassroomRehearsalPlayer
-        scope={rehearsalScope} onClose={()=>setRehearsalScope(null)}/>}
+      {rehearsalScope&&(!preferredSiteId||rehearsalScope.siteId===preferredSiteId)&&
+        <ClassroomRehearsalPlayer scope={rehearsalScope}
+          onClose={()=>setRehearsalScope(null)}/>}
     </section>
     <ClassroomSchedulePanel choices={visibleChoices}
       onRoomStarted={value=>{
