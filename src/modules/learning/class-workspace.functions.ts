@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "@/domain/class-assessment-evidence";
+import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence, visibleClassAssessments } from "@/domain/class-assessment-evidence";
 import { z } from "zod";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { classResources, readClassContent } from "@/domain/class-content";
@@ -57,12 +57,13 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const assessmentRows = await db.select({
       id:s.assessments.id,title:s.assessments.title,
       status:s.assessments.status,pointsPossible:s.assessments.pointsPossible,
-      metadata:s.assessments.metadata,
+      availableAt:s.assessments.availableAt,metadata:s.assessments.metadata,
     }).from(s.assessments).where(and(
       eq(s.assessments.sectionId,section.id),
       inArray(s.assessments.status,["published","closed"]),
     )).orderBy(s.assessments.createdAt);
-    const assessmentIds=assessmentRows.map(row=>row.id);
+    const visibleAssessments=visibleClassAssessments(assessmentRows,actor.role);
+    const assessmentIds=visibleAssessments.map(row=>row.id);
     const attemptRows=studentProfileId && assessmentIds.length
       ?await db.select({
         assessmentId:s.submissions.assessmentId,
@@ -73,7 +74,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
         eq(s.submissions.studentProfileId,studentProfileId),
       )).orderBy(desc(s.submissions.attemptNumber))
       :[];
-    const assessmentEvidence=buildClassAssessmentEvidence(assessmentRows,attemptRows,section.versionId);
+    const assessmentEvidence=buildClassAssessmentEvidence(visibleAssessments,attemptRows,section.versionId);
     const activeProgramMembership=alias(s.enrollments,"workspace_active_program_enrollment");
     const roster = actor.role === "teacher" ? await db.select({ profileId: s.studentProfiles.id, personId: s.people.id,
       firstName: s.people.legalFirstName, lastName: s.people.legalLastName, preferredName: s.people.preferredName })
