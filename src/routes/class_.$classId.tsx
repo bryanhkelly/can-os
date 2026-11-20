@@ -267,10 +267,17 @@ function TeachingClass({workspace}:{workspace:Workspace}){
       </p>}
     </section>}
     {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}
-      canSchedule onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>}
-    {workspace.tab==="classroom"&&<NativeClassSessionsPanel workspace={workspace}
-      canSchedule showConsole
+      canSchedule={workspace.canControlRoom}
       onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>}
+    {workspace.tab==="classroom"&&(
+      workspace.canControlRoom
+      ?<NativeClassSessionsPanel workspace={workspace} canSchedule showConsole
+        onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>
+      :<section className="border border-border bg-card p-5 text-sm">
+        Facilitated classroom controls require a separately verified Site room-facilitator
+        grant, a current Class assignment and an authorized scheduled Session.
+      </section>
+    )}
     {workspace.tab==="roster"&&<Roster workspace={workspace} namesAllowed={canSeeNames}/>}
   </UnifiedCoursePlayer>;
 }
