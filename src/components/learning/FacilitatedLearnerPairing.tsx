@@ -54,6 +54,8 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
       setCode("");
       setMessageTone("success");
       setMessage("Your device is paired with the facilitator's room.");
+      void refresh().catch(()=>setObservationUnavailable(true));
+      void queryClient.invalidateQueries({queryKey:["native-class-companion",courseAttemptId]}).catch(()=>{});
     } catch {
       setMessageTone("danger");
       setMessage("Unable to pair. Check the code, room expiry, or current course registration.");
@@ -66,6 +68,8 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
       await leaveFacilitatedRoom({data:{courseAttemptId,facilitatedSessionId:roomId}});
       setMessageTone("success");
       setMessage("You left the facilitator's room.");
+      void refresh().catch(()=>setObservationUnavailable(true));
+      void queryClient.invalidateQueries({queryKey:["native-class-companion",courseAttemptId]}).catch(()=>{});
     } catch {
       setMessageTone("danger");
       setMessage("Unable to leave the room. Try again.");
