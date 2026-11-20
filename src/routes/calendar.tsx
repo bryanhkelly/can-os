@@ -27,6 +27,7 @@ import { countCalendarInvitees } from "@/domain/calendar-invitees";
 import { CalendarInviteesPicker } from "@/components/calendar/CalendarInviteesPicker";
 import { CalendarAgendaList } from "@/components/calendar/CalendarAgendaList";
 import { CalendarEventFactsPanels } from "@/components/calendar/CalendarEventFactsPanels";
+import { CalendarRecordContextPanel } from "@/components/calendar/CalendarRecordContextPanel";
 import { WEEKDAY_ABBREVIATIONS } from "@/domain/weekdays";
 import { formatTime, formatEventDate, typeLabel, chipClass } from "@/components/calendar/calendar-presentation";
 
@@ -444,34 +445,8 @@ function CalendarPage() {
         ? <Link {...assignmentDestination} className="text-sm font-semibold text-primary underline">Open assignment</Link>
         : recordDestination &&
           <Link {...recordDestination} className="text-sm font-semibold text-primary underline">{recordLabel}</Link>}
-      rail={<WorkspacePanel title="Record context" className=" shadow-none">
-        <dl className="space-y-4 text-sm">
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calendar status</dt>
-            <dd className="mt-1">
-              <span className={`inline-flex items-center border px-2 py-1 text-xs font-medium ${selectedEvent.cancelled
-                ? "border-danger/50 bg-danger/10 text-danger"
-                : "border-border bg-muted text-muted-foreground"}`}>
-                {selectedEvent.cancelled ? "Cancelled" : "On calendar"}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event type</dt>
-            <dd className="mt-1">{typeLabel(selectedEvent)}</dd>
-          </div>
-          {selectedEvent.studyGroup && <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Study group</dt>
-            <dd className="mt-1">{recordDestination
-              ? <Link {...recordDestination} className="text-primary underline">{selectedEvent.studyGroup.title}</Link>
-              : selectedEvent.studyGroup.title}</dd>
-          </div>}
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time zone</dt>
-            <dd className="mt-1">{selectedEvent.timezone}</dd>
-          </div>
-        </dl>
-      </WorkspacePanel>}
+      rail={<CalendarRecordContextPanel event={selectedEvent}
+        recordDestination={recordDestination} />}
     >
       <div className="mt-6 grid gap-5">
         <CalendarEventFactsPanels event={selectedEvent} eventTime={eventTime}/>
