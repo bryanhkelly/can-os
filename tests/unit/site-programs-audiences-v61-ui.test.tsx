@@ -53,8 +53,8 @@ describe("V6.1 Programs & Audiences route and screen", () => {
       "Adult Learning", "Older Adult Learning",
       "Weekdays", "Weekends", "Daytime", "Evenings",
     ]) expect(html).toContain(label);
-    expect(html).toContain("Select any experiences");
-    expect(html).toContain("Choose a starting focus");
+    expect(html).toContain("Other learning ideas");
+    expect(html).toContain("Which idea would you begin with?");
     expect(html).toContain("I'll decide later");
     expect(html).toContain('value="grades-9-12"');
     expect(html).toContain("Save &amp; Exit");
@@ -81,7 +81,7 @@ describe("V6.1 Programs & Audiences route and screen", () => {
     expect(server.indexOf("const addedCodes")).toBeGreaterThan(
       server.indexOf("site.updatedAt.toISOString() !== data.expectedRevision"));
     expect(ui).toContain("exploreBlueprintReferenceCatalog");
-    expect(ui).toContain("Programs under consideration");
+    expect(ui).toContain("Published Program ideas");
     expect(ui).toContain("programCodes");
     expect(server).toContain('assertSiteSetupScope(actor, site, "program.read")');
     expect(server).toContain('.for("update")');
@@ -104,6 +104,6 @@ describe("V6.1 Programs & Audiences route and screen", () => {
     expect(ui).toContain('id: "audiences"');
     expect(ui).not.toContain('id: "review"');
     expect(ui).toContain('SummaryRow label="Days & times"');
-    expect(ui).toContain('SummaryRow label="Starting focus"');
+    expect(ui).toContain('SummaryRow label="Starting idea"');
   });
 });
