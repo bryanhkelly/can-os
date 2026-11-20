@@ -27,7 +27,7 @@ export function NoncreditPilotOutcomesPanel(){
           registrations. Learning, feedback and completion are tracked per registration.
         </p>
         {report&&<p className="text-xs text-muted-foreground">
-          Registration cohort: {report.from.slice(0,10)} through {report.to.slice(0,10)} (UTC).
+          Reporting period: {report.from.slice(0,10)} through {report.to.slice(0,10)} (UTC).
         </p>}
       </div>
       <Button type="button" size="sm" variant="outline" disabled={query.isFetching}
