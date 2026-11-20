@@ -23,6 +23,7 @@ import {
 } from "@/domain/command-context";
 import { programCatalogDatabaseRole } from "@/domain/program-catalog-database-role";
 import { DomainError } from "@/domain/errors";
+import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "@/modules/blueprints/verified-site-planning.server";
 
 const catalogAvailabilityRowSchema = z.object({
   policyVersionId: z.string().uuid(),
@@ -42,10 +43,14 @@ export async function getAvailableOfferings(
   // Fail closed before attempting purpose-specific PostgreSQL roles. The
   // canonical catalog must be explicitly provisioned before it can be exposed
   // through either native Blueprint planning or the legacy School Hub.
-  const databaseRole = programCatalogDatabaseRole(context);
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  if (isCanPlanning && input.subject.kind !== "site") {
+    throw new AuthorizationError("verified CAN planning requires an exact Site");
+  }
+  const databaseRole = isCanPlanning ? null : programCatalogDatabaseRole(context);
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     let geographicAreaId: string | null;
     if (input.subject.kind === "site") {
       if (!context.scope.siteIds?.includes(input.subject.siteId)) {
@@ -59,6 +64,9 @@ export async function getAvailableOfferings(
         .limit(1);
       if (!isCanonicalSiteDiscoverable(site?.status)) {
         throw new DomainError("UNAVAILABLE", "The selected Site is unavailable for program discovery.");
+      }
+      if (isCanPlanning) {
+        await assertVerifiedCanPlanningSite(tx, context, input.subject.siteId);
       }
       // A missing classification is unknown, not a location where an
       // Offering is supported. Never evaluate jurisdiction-dependent policy
