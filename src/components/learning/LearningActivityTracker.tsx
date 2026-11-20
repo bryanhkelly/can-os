@@ -130,9 +130,13 @@ export function LearningActivityTracker({ sectionId, lessonId, controllerRef }: 
         void enqueue(kind, { resourceId });
       },
       observeNativeVideo(durationMs) {
-        if (cancelled || failed || !videoPlaying || currentStatus !== "recording" ||
+        if (cancelled || failed || currentStatus !== "recording" ||
             !Number.isFinite(durationMs) || durationMs < 1_000 ||
             document.visibilityState !== "visible" || !document.hasFocus()) return;
+        // This callback is emitted only by verified advancing native media.
+        // After a focus transition it reestablishes native playback as the
+        // active accounting source without trusting passive wall-clock time.
+        videoPlaying = true;
         lastPointerAt = Date.now();
         void enqueue("engaged_interval", { durationMs: Math.min(60_000, Math.floor(durationMs)) });
       },
