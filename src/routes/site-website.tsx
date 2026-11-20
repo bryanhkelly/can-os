@@ -1,14 +1,12 @@
+import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
 import { type SiteBrandConfiguration } from "@/domain/site-brand";
 import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
-import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
 import { brandRecommendedLayout } from "@/domain/site-brand-direction";
 import { type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
-import { WebsiteInformationChecklist, WebsiteSourceMappingPanel, WebsiteDesignChecklist } from "@/components/sites/WebsiteReadinessPanels";
-import { WebsitePreviewPanel } from "@/components/sites/WebsitePreviewPanel";
 import { privateWebsitePreviewUrl } from "@/domain/private-website-preview";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
@@ -524,88 +522,18 @@ function LocalWebsiteCopyEditor({
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
         setContent={setContent} onSelectArtwork={selectArtwork}/>}
-      {step === 4 && <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">Review your website</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Preview your pages. Family information and institutional approvals are managed separately.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" disabled={previewPending} onClick={() => void previewCurrentDraft()}
-            className="min-h-11 border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-            {previewPending ? "Generating secure preview..." : "Preview unsaved changes"}
-          </Button>
-          {<a
-            href={privateWebsitePreviewUrl(data.siteId)}
-            target="_blank" rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center border border-primary px-4 py-2 text-sm font-semibold text-primary">
-            {data.currentRevision === 0 ? "Open full-page sample preview" : "Open full-page preview"}
-          </a>}
-          {data.currentRevision > 0 && <Button type="button" variant="outline" className="min-h-11 border"
-            onClick={() => void navigator.clipboard.writeText(
-              new URL(privateWebsitePreviewUrl(data.siteId), window.location.origin).href,
-            ).then(() => setShareMessage("Preview link copied. Reviewers must sign in with their own authorized Site account."))
-              .catch(() => setShareMessage("Copy the address from Open full-page preview; clipboard permission was unavailable."))}>
-            Copy private preview link
-          </Button>}
-        </div>
-        <p className="text-xs text-muted-foreground">This private full-page link requires a CAN OS sign-in; use Share preview for external reviewers. It never publishes a draft. {data.currentRevision > 0 ? "It shows the latest saved revision." : "Until the first save, it shows a clearly marked sample, not your unsaved edits."} {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
-        {data.currentRevision === 0 && <p className="border p-3 text-sm" role="status">No saved website draft exists yet. The full-page preview shows an illustrative sample. You can test unsaved changes below; sharing your customized design requires saving.</p>}
-        {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>}
-        {previewError&&<WorkspaceNotice tone="danger">{previewError}</WorkspaceNotice>}
-        <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
-        {!dirty && editor.revision > 0 && !revisionConflict
-          ? <div className="flex flex-wrap items-center justify-between gap-3 border p-4">
-              <div>
-                <p className="text-sm font-semibold">Ready to show your proposed website?</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Share your proposed Site website, including planned Programs, without publishing the Site or opening enrollment.
-                </p>
-              </div>
-              <LaunchPreviewSharing siteId={data.siteId}/>
-            </div>
-          : <p role="status" className="border p-3 text-sm">
-              Save your latest website edits before sharing a review link.
-            </p>}
-        <WebsiteSourceMappingPanel data={data} />
-        <details className="border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
-          <div className="mt-4"><WebsiteInformationChecklist data={data} /></div>
-        </details>
-        <details className="border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Review website content quality</summary>
-          <div className="mt-4"><WebsiteDesignChecklist data={data} /></div>
-        </details>
-
-        {!data.canPublish && <p role="status" className="border p-3 text-sm">
-          You can preview this Site, but your verified Site assignment does not include local website publishing.
-        </p>}
-        {allowPublication && <Button type="button" variant="outline"
-          disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}>
-          {busy ? "Publishing…" : "Publish reviewed church-owned content"}
-        </Button>}
-        {!allowPublication && <p className="text-sm text-muted-foreground">
-          The Launch Studio saves a private draft only. Official Site publication belongs in Prepare.
-        </p>}
-        <p className="text-xs text-muted-foreground">
-          Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links are not supported.
-          Only church-owned content is published here; CAN controls institutional information.
-        </p>
-        {data.localHistory.length > 0 && <details className="border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Version history and rollback</summary>
-          <ul className="mt-3 space-y-2">
-            {data.localHistory.map(version => <li key={version.revision}
-              className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
-              <span>Revision {version.revision} · {version.status === "published" ? "Published" : version.status === "draft" ? "Private draft" : "Held for review"}
-                {" · "}{new Date(version.createdAt).toLocaleString()}</span>
-              {allowPublication && data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
-                <Button variant="outline" type="button" disabled={busy || revisionConflict} onClick={() => dirty ? setConfirmation({kind:"restore",revision:version.revision}) : void restore(version.revision)}
-                  className=" border px-3 py-1 text-xs disabled:opacity-50">
-                  Restore as new revision
-                </Button>}
-            </li>)}
-          </ul>
-        </details>}
-      </div>}
+      {step===4&&<WebsiteReviewStep
+        data={data} content={content} draftPreview={draftPreview}
+        dirty={dirty} editorRevision={editor.revision}
+        revisionConflict={revisionConflict} busy={busy}
+        previewPending={previewPending} previewError={previewError}
+        shareMessage={shareMessage} allowPublication={allowPublication}
+        onPreview={()=>{void previewCurrentDraft();}}
+        onShareMessage={setShareMessage}
+        onSubmit={()=>{void submit();}}
+        onRestore={revision=>dirty
+          ?setConfirmation({kind:"restore",revision})
+          :void restore(revision)}/>}
       {!data.draftStorageReady && <WorkspaceNotice tone="attention">
         <strong>Private draft storage requires an update.</strong> This Cloudflare-connected database has not
         applied website migration 0077. Draft saving is unavailable until an authorized database
