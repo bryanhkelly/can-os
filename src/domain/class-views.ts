@@ -3,7 +3,7 @@ import { AuthorizationError } from "./command-context";
 export const classViews = ["learn", "teach", "manage"] as const;
 export type ClassView = typeof classViews[number];
 export const classTabs = {
-  learn: ["lessons", "assignments", "progress", "sessions"] as const,
+  learn: ["lessons", "assignments", "discussions", "progress", "sessions"] as const,
   teach: ["overview", "lessons", "sessions", "classroom", "roster"] as const,
   manage: ["overview", "offering", "roster", "sessions", "reports", "completion"] as const,
 };
