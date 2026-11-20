@@ -40,6 +40,20 @@ describe("Launch Studio current persisted workflows", () => {
     expect(prepare).toContain('context="prepare"');
     expect(open).toContain('context="open"');
   });
+  it("reads publisher-authorized noncredit Offering releases only in Open", () => {
+    const view = read("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
+    const publisher = read("src/modules/enrollment/noncredit-enrollment-publication.functions.ts");
+    expect(view).toContain('context === "open" ? getNoncreditEnrollmentPublisher()');
+    expect(view).toContain("releases=noncredit.value.published.filter(item=>item.siteId===siteId)");
+    expect(view).toContain("...item.siteOptions,...item.digitalSiteOptions");
+    expect(view).toContain('context==="open" && <section');
+    expect(view).toContain('publicSiteId:siteId');
+    expect(view).toContain('noncredit.state==="unavailable"');
+    expect(publisher).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
+    expect(view).not.toContain("publishNoncreditSelfEnrollment(");
+    expect(view).not.toContain("publishNoncreditAcrossAuthorizedSites(");
+  });
+
   it("renders shared V6.1 navigation dialog with browser unload protection", () => {
     const hook=read("src/components/launch-studio/useLaunchUnsavedChanges.ts");
     const provider=read("src/components/launch-studio/LaunchNavigationGuardProvider.tsx");
