@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -125,21 +126,21 @@ export function NativeClassReportPanel({classId}:{classId:string}){
           className="flex min-h-11 w-full items-center justify-between gap-3 text-left font-semibold">
           <span>Metric definitions and audit trail</span><span aria-hidden="true">{expanded?"−":"+"}</span>
         </Button>
-        {expanded&&<div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[42rem] text-left text-sm">
-            <thead className="border-b border-border bg-muted/40"><tr>
-              <th scope="col" className="p-3">Metric</th>
-              <th scope="col" className="p-3">Authoritative source</th>
-              <th scope="col" className="p-3">Counting rule</th>
-              <th scope="col" className="p-3">Time basis</th>
-            </tr></thead>
-            <tbody>{data.definitions.map(def=><tr key={def.key} className="border-b border-border">
-              <th scope="row" className="p-3">{def.label}</th>
-              <td className="p-3 font-mono text-xs">{def.source}</td>
-              <td className="p-3">{def.rule}</td>
-              <td className="p-3">{def.timeBasis}</td>
-            </tr>)}</tbody>
-          </table>
+        {expanded&&<div className="mt-3">
+          <Table scrollLabel="Class metric definitions and audit trail" aria-label="Class metric definitions and audit trail" className="w-full min-w-[42rem] text-left text-sm"><TableCaption className="sr-only">Class metric definitions and audit trail</TableCaption>
+            <TableHeader className="border-b border-border bg-muted/40"><TableRow>
+              <TableHead scope="col" className="p-3">Metric</TableHead>
+              <TableHead scope="col" className="p-3">Authoritative source</TableHead>
+              <TableHead scope="col" className="p-3">Counting rule</TableHead>
+              <TableHead scope="col" className="p-3">Time basis</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>{data.definitions.map(def=><TableRow key={def.key} className="border-b border-border">
+              <TableRowHead  className="p-3">{def.label}</TableRowHead>
+              <TableCell className="p-3 font-mono text-xs">{def.source}</TableCell>
+              <TableCell className="p-3">{def.rule}</TableCell>
+              <TableCell className="p-3">{def.timeBasis}</TableCell>
+            </TableRow>)}</TableBody>
+          </Table>
         </div>}
       </section>
       <div className="border-t border-border pt-3 text-xs text-muted-foreground">
