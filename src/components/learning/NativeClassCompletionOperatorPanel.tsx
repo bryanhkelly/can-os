@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
+import { Select } from "@/components/ui/select";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -175,28 +178,28 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
                 reviewer, independent of the Class creator, with verified policy evidence.
                 Existing enrollment policies cannot be rewritten.
               </p>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={policyRequireLessons}
+              <Label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={policyRequireLessons}
                   onChange={e=>setPolicyRequireLessons(e.target.checked)}/>
                 Require every canonical Course lesson
-              </label>
-              <label className="block space-y-1 text-sm font-medium">
+              </Label>
+              <Label className="block space-y-1 text-sm font-medium">
                 Required independently verified Sessions
                 <Input type="number" min={0} max={52} value={policySessions}
                   onChange={e=>setPolicySessions(
                     Math.max(0,Math.min(52,Number(e.target.value)||0)))}/>
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={policyRequireAssessment}
+              </Label>
+              <Label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={policyRequireAssessment}
                   onChange={e=>setPolicyRequireAssessment(e.target.checked)}/>
                 Require a finalized passing canonical assessment
-              </label>
-              <label className="block space-y-1 text-sm font-medium">
+              </Label>
+              <Label className="block space-y-1 text-sm font-medium">
                 Independently verified policy evidence version
                 <Input value={policyEvidence}
                   onChange={e=>setPolicyEvidence(e.target.value)}
                   placeholder="Verified evidence UUID"/>
-              </label>
+              </Label>
               <Button disabled={publishPolicy.isPending ||
                   !(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
                     .test(policyEvidence.trim())) ||
@@ -212,7 +215,7 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
           </details>
           <div className="divide-y divide-border border border-border">
             {list.data.participants.map(person=>
-              <button key={person.classEnrollmentId} type="button"
+              <Button variant="ghost" key={person.classEnrollmentId} type="button"
                 className="flex w-full items-start justify-between gap-4 p-3 text-left hover:bg-muted"
                 aria-pressed={selectedId===person.classEnrollmentId}
                 onClick={()=>{
@@ -237,7 +240,7 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
                 </span>
                 <span className="text-xs">{selectedId===person.classEnrollmentId?
                   "Selected":"Review"}</span>
-              </button>)}
+              </Button>)}
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" disabled={page===0}
@@ -264,26 +267,26 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
                 "Requirements outstanding: "+detail.data.readiness.blockers.join(", "):
                 "Evidence requirements are satisfied for independent adjudication."}
             </p>
-            <label className="block space-y-1 text-sm font-medium">
+            <Label className="block space-y-1 text-sm font-medium">
               Completion decision
-              <select className="w-full border border-input bg-background p-2"
+              <Select className="w-full border border-input bg-background p-2"
                 value={outcome} onChange={e=>setOutcome(e.target.value as typeof outcome)}>
                 <option value="completed">Completed</option>
                 <option value="not_yet_completed">Not yet completed</option>
                 <option value="voided">Void previous decision</option>
-              </select>
-            </label>
-            <label className="block space-y-1 text-sm font-medium">
+              </Select>
+            </Label>
+            <Label className="block space-y-1 text-sm font-medium">
               Verified evidence document version ID
               <Input value={evidenceVersionId}
                 onChange={e=>setEvidenceVersionId(e.target.value)}
                 placeholder="UUID for original provider-owned verified evidence"/>
-            </label>
-            <label className="block space-y-1 text-sm font-medium">
+            </Label>
+            <Label className="block space-y-1 text-sm font-medium">
               Documented evidence review reason
               <Textarea value={reason} onChange={e=>setReason(e.target.value)}
                 placeholder="Document the independent basis (10–1000 characters)"/>
-            </label>
+            </Label>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" disabled={!ready}
                 onClick={()=>request.mutate()}>Request independent approval</Button>

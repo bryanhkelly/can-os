@@ -1,3 +1,7 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
 import { useEffect,useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,9 +80,9 @@ export function NoncreditCompletionPolicyPanel(){
     {catalog.length===0?<p role="status" className="text-sm">
       No independently approvable noncredit training is available in your scope.
     </p>:<>
-      <label className="block space-y-1 text-sm">
+      <Label className="block space-y-1 text-sm">
         <span className="font-medium">Training</span>
-        <select className="w-full max-w-lg border border-border bg-background p-2"
+        <Select className="w-full max-w-lg border border-border bg-background p-2"
           value={chosen} onChange={event=>{
             const row=catalog.find(item=>item.trainingVersionId===event.target.value);
             if(row)selectTraining(row);
@@ -86,52 +90,52 @@ export function NoncreditCompletionPolicyPanel(){
           {catalog.map(row=><option key={row.trainingVersionId} value={row.trainingVersionId}>
             {row.title}
           </option>)}
-        </select>
-      </label>
+        </Select>
+      </Label>
       <p className="text-xs text-muted-foreground">
         Current policy: {selected?.latest?`v${selected.latest.policyVersion}`:"Not yet published"}
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block space-y-1 text-sm">
+        <Label className="block space-y-1 text-sm">
           <span className="font-medium">Verified participation minutes required</span>
-          <input type="number" min={0} max={100000} step={1}
+          <Input type="number" min={0} max={100000} step={1}
             className="w-full border border-border bg-background p-2" value={minutes}
             onChange={event=>setMinutes(event.target.value)}/>
-        </label>
-        <label className="block space-y-1 text-sm">
+        </Label>
+        <Label className="block space-y-1 text-sm">
           <span className="font-medium">Completion decision mode</span>
-          <select className="w-full border border-border bg-background p-2"
+          <Select className="w-full border border-border bg-background p-2"
             value={mode} onChange={event=>{
               setMode(event.target.value as "automatic"|"provider_review");
               setConfirmed(false);
             }}>
             <option value="provider_review">Provider review (default)</option>
             <option value="automatic">Automatic when requirements are satisfied</option>
-          </select>
-        </label>
+          </Select>
+        </Label>
       </div>
-      <label className="flex gap-2 text-sm">
-        <input type="checkbox" checked={allLessons}
+      <Label className="flex gap-2 text-sm">
+        <Checkbox checked={allLessons}
           onChange={e=>setAllLessons(e.target.checked)}/>
         Require all course lessons to be marked complete
-      </label>
-      <label className="flex gap-2 text-sm">
-        <input type="checkbox" checked={checkRequired}
+      </Label>
+      <Label className="flex gap-2 text-sm">
+        <Checkbox checked={checkRequired}
           disabled={!selected?.hasFinalKnowledgeCheck}
           onChange={e=>setCheckRequired(e.target.checked)}/>
         Require a finalized after-course knowledge check
-      </label>
-      {checkRequired&&<label className="block space-y-1 text-sm">
+      </Label>
+      {checkRequired&&<Label className="block space-y-1 text-sm">
         <span className="font-medium">Minimum final knowledge-check fraction (0–1)</span>
-        <input type="number" min={0} max={1} step={0.05} value={fraction}
+        <Input type="number" min={0} max={1} step={0.05} value={fraction}
           className="w-full max-w-xs border border-border bg-background p-2"
           onChange={e=>setFraction(e.target.value)}/>
-      </label>}
-      {mode==="automatic"&&<label className="flex gap-2 border border-border p-3 text-sm">
-        <input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>
+      </Label>}
+      {mode==="automatic"&&<Label className="flex gap-2 border border-border p-3 text-sm">
+        <Checkbox checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>
         I authorize automatic noncredit training completion under this published policy.
         Exceptions and corrections remain provider-controlled.
-      </label>}
+      </Label>}
       {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
       {notice&&<p role="status" className="text-sm">{notice}</p>}
       <Button type="button" disabled={busy||(mode==="automatic"&&!confirmed)}

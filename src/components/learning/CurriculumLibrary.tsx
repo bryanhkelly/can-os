@@ -23,7 +23,7 @@ export function CurriculumLibrary({ marketplaces }: { marketplaces: readonly Mar
                 <h2 className="mt-1 font-serif text-2xl">Your curriculum</h2>
               </div>
               <Link to="/operations/curriculum-marketplace" search={{ programId: market.program.id }}
-                hash="curriculum-packs" className="rounded-lg border px-4 py-2 text-sm font-medium">
+                hash="curriculum-packs" className=" border px-4 py-2 text-sm font-medium">
                 Browse curriculum
               </Link>
             </div>
@@ -32,12 +32,12 @@ export function CurriculumLibrary({ marketplaces }: { marketplaces: readonly Mar
                 {selected.map((pack) => <CurriculumCard key={pack.versionId} pack={pack} programId={market.program.id} selected />)}
               </div>
             ) : (
-              <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed bg-card p-6">
+              <div className="flex flex-col items-start gap-3  border border-dashed bg-card p-6">
                 <BookOpen aria-hidden="true" className="size-8 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">You haven't selected a curriculum</h3>
                 <p className="text-sm text-muted-foreground">Browse published curriculum and review a release for {market.program.name}.</p>
                 <Link to="/operations/curriculum-marketplace" search={{ programId: market.program.id }}
-                  hash="curriculum-packs" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+                  hash="curriculum-packs" className=" bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
                   Choose curriculum
                 </Link>
               </div>
@@ -68,7 +68,7 @@ export function CurriculumLibrary({ marketplaces }: { marketplaces: readonly Mar
 
 function CurriculumCard({ pack, programId, selected }: { pack: Pack; programId: string; selected: boolean }) {
   return (
-    <article className={`flex flex-col overflow-hidden rounded-xl border bg-card ${selected ? "border-primary/40" : ""}`}>
+    <article className={`flex flex-col overflow-hidden  border bg-card ${selected ? "border-primary/40" : ""}`}>
       <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-5 py-4">
         <BookOpen aria-hidden="true" className="size-7 text-primary" />
         {selected ? (
@@ -100,7 +100,7 @@ function CurriculumCard({ pack, programId, selected }: { pack: Pack; programId: 
           </p>
         )}
         <Link to="/operations/curriculum-marketplace" search={{ programId }} hash={`curriculum-pack-${pack.versionId}`}
-          className="mt-auto inline-flex justify-center rounded-lg border px-4 py-2 text-sm font-semibold">
+          className="mt-auto inline-flex justify-center  border px-4 py-2 text-sm font-semibold">
           {selected ? "View curriculum" : "Review curriculum"}
         </Link>
       </div>

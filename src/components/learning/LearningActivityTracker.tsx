@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import {
   endLearningActivitySession, getLearningActivityHistory,
@@ -129,15 +130,15 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
     }
   }
 
-  return <section className="my-4 rounded-lg border p-3 text-sm" aria-label="Learning activity">
+  return <section className="my-4  border p-3 text-sm" aria-label="Learning activity">
     <p className="font-medium">Learning activity</p>
     <p className="mt-1 text-xs text-muted-foreground">
       {available ? "Lesson activity is being recorded." : "Activity tracking is not active yet."}
       {" "}Estimated active time is not attendance, mastery, or a grade.
     </p>
-    <button type="button" className="mt-2 underline" onClick={() => void loadHistory()}>
+    <Button variant="ghost" type="button" className="mt-2 underline" onClick={() => void loadHistory()}>
       View recent learning history
-    </button>
+    </Button>
     {message && <p role="status" className="mt-2 text-xs">{message}</p>}
     {history && <ul className="mt-3 space-y-1 text-xs">
       {history.map(item => <li key={item.id}>

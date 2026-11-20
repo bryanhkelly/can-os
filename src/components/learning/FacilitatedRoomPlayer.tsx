@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,7 @@ export function FacilitatedRoomPlayer({ facilitatedSessionId }: {
       }}>Recheck approved recordings</Button>
     </div>}
     {catalog?.media.length ? <div className="mt-3 space-y-3">
-      <label className="block text-sm font-medium">
+      <Label className="block text-sm font-medium">
         Select a recorded lesson
         <Select className="mt-2"
           value={selected} onChange={event=>setSelected(event.target.value)}>
@@ -83,7 +84,7 @@ export function FacilitatedRoomPlayer({ facilitatedSessionId }: {
             {item.lessonTitle}
           </option>)}
         </Select>
-      </label>
+      </Label>
       {current&&<ClassVideoPlayer
         key={facilitatedSessionId+":"+selected}
         title={current.lessonTitle+" · facilitator screen"}

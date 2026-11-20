@@ -24,7 +24,7 @@ export function CurriculumProgramNavigation({
           to={destination}
           search={{ programId: program.id }}
           aria-current={selectedProgramId === program.id ? "page" : undefined}
-          className="rounded-lg border px-3 py-2 text-sm"
+          className=" border px-3 py-2 text-sm"
         >
           {program.name}
         </Link>
@@ -33,7 +33,7 @@ export function CurriculumProgramNavigation({
         <Link
           to="/operations/curriculum"
           search={{ programId: selectedProgramId }}
-          className="rounded-lg border px-3 py-2 text-sm underline"
+          className=" border px-3 py-2 text-sm underline"
         >
           Curriculum
         </Link>

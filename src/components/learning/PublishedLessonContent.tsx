@@ -21,7 +21,7 @@ export function PublishedLessonContent({ lesson }: { lesson: Lesson }) {
     {lesson.activities?.length ? <section aria-label="Lesson activities" data-learning-content className="mb-5">
       <h3 className="mb-3 text-sm font-semibold">Learning activities</h3>
       <ol className="space-y-5">
-        {lesson.activities.map((activity,index) => <li key={activity.id} className="rounded-lg border p-4">
+        {lesson.activities.map((activity,index) => <li key={activity.id} className=" border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-semibold">{index+1}. {activity.title}</h3>
             <span className="text-xs text-muted-foreground">

@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -131,7 +132,7 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
           The reviewer must have current exact-Site authority. Evidence must be independently
           verified, current and owned by the training provider. This action does not issue or revoke a credential.
         </p>
-        <label className="block space-y-1 text-sm font-medium">
+        <Label className="block space-y-1 text-sm font-medium">
           Correction decision
           <Select
             value={outcome} onChange={event=>
@@ -139,17 +140,17 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
             <option value="not_yet_completed">Not yet completed</option>
             <option value="voided">Void prior decision</option>
           </Select>
-        </label>
-        <label className="block space-y-1 text-sm font-medium">
+        </Label>
+        <Label className="block space-y-1 text-sm font-medium">
           Verified evidence version ID
           <Input value={evidenceVersionId} onChange={event=>setEvidenceVersionId(event.target.value)}
             placeholder="Approved evidence UUID" required/>
-        </label>
-        <label className="block space-y-1 text-sm font-medium">
+        </Label>
+        <Label className="block space-y-1 text-sm font-medium">
           Correction reason (minimum 10 characters)
           <Textarea value={reason} onChange={event=>setReason(event.target.value)}
             placeholder="Document the independently verified reason" required/>
-        </label>
+        </Label>
         <p className="text-xs text-muted-foreground">
           First request independent approval for this exact registration,
           current decision, proposed outcome, provider Site and evidence.

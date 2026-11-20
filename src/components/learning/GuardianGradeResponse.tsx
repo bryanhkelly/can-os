@@ -72,19 +72,19 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
       commandErrorMessage:"Unable to submit your question."});
   }
 
-  return <section className="mt-5 rounded-lg border p-4" aria-label="School grade follow-up">
+  return <section className="mt-5  border p-4" aria-label="School grade follow-up">
     <h3 className="font-semibold">Ask the school about this grade</h3>
     <p className="mt-1 text-xs text-muted-foreground">Your question creates a school follow-up. It does not change the grade.</p>
-    <button type="button" onClick={() => void refresh()} disabled={mutation.pending || loading}
-      className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+    <Button variant="outline" type="button" onClick={() => void refresh()} disabled={mutation.pending || loading}
+      className="mt-3  border px-3 py-2 text-xs font-semibold disabled:opacity-50">
       {loading ? "Checking…" : "Refresh school response"}
-    </button>
+    </Button>
     {loading ? <p className="mt-3 text-sm" role="status">Checking school response…</p> :
       current ? <div className="mt-3 space-y-2 text-sm">
         <p><strong>School response status:</strong> {current.status==="resolved" ? "School responded" : "Awaiting school response"}</p>
         <p className="text-xs text-muted-foreground">Last updated {new Date(current.updatedAt).toLocaleString()}</p>
         {current.requestMessage && <p className="whitespace-pre-wrap text-muted-foreground">Your question: {current.requestMessage}</p>}
-        {current.resolutionNote && <p className="rounded-lg bg-muted p-3 whitespace-pre-wrap">School response: {current.resolutionNote}</p>}
+        {current.resolutionNote && <p className=" bg-muted p-3 whitespace-pre-wrap">School response: {current.resolutionNote}</p>}
       </div> : savedRequest ? (
         <p className="mt-3 text-sm" role="status">Your question is recorded. Refresh the school response to see its current status.</p>
       ) : <form noValidate className="mt-3 space-y-3" onSubmit={request}>
@@ -109,7 +109,7 @@ function PreviousGradeResponse({ submissionId, attemptNumber, focusSubmissionId 
   const focused = submissionId === focusSubmissionId;
   const [open, setOpen] = useState(focused);
   useEffect(() => { if (focused) setOpen(true); }, [focused]);
-  return <details open={open} className="mt-4 rounded-lg border p-3" onToggle={event=>setOpen(event.currentTarget.open)}>
+  return <details open={open} className="mt-4  border p-3" onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary className="cursor-pointer text-sm font-semibold">School follow-up for released attempt {attemptNumber}</summary>
     {open && <GuardianGradeResponse submissionId={submissionId}/>}
   </details>;
