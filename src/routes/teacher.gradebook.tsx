@@ -5,6 +5,7 @@ import { GradebookAssessmentComposer, emptyAssessmentContentInput } from "@/comp
 import { AssessmentResourcesManager } from "@/components/learning/AssessmentResourcesManager";
 import { GradebookReviewedFeedback } from "@/components/learning/GradebookReviewedFeedback";
 import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
 import { GradebookOverview } from "@/components/learning/GradebookOverview";
 import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
@@ -370,11 +371,11 @@ function TeacherGradebookPage() {
       assessmentTitle={gradebook.assessments.find(item=>item.id===search.assessment)?.title??""} />}
 
     {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No assessments yet. Create one above to begin.</p>}
-    {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 overflow-x-auto  border bg-card">
-     <table className="w-full border-collapse text-sm">
-      <thead>
-       <tr className="border-b text-left">
-        <th className="p-3 font-semibold">Student</th>
+    {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 border bg-card">
+     <Table scrollLabel="Gradebook student assessment grid" aria-label="Gradebook student assessment grid" className="border-collapse text-sm"><TableCaption className="sr-only">Gradebook student assessment grid</TableCaption>
+      <TableHeader>
+       <TableRow className="border-b text-left">
+        <TableHead scope="col" className="p-3 font-semibold">Student</TableHead>
         {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment =>
          <GradebookAssessmentHeader key={assessment.id} assessment={assessment} sectionId={selected} timezone={gradebook.section.timezone} busy={busy}
           dueDate={assessmentDueDates[assessment.id]??""}
@@ -382,17 +383,17 @@ function TeacherGradebookPage() {
           onAction={action=>void changeAssessment(assessment.id,action)}
           onDraftSaved={()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");return loadGradebook(selected);}}
           onScheduleSaved={()=>loadGradebook(selected)}/>)}
-       </tr>
-      </thead>
-      <tbody>
-       {gradebook.students.filter(item=>!search.student||item.studentProfileId===search.student).map((student, rowIndex) => <tr key={student.studentProfileId} className="border-b last:border-0">
-        <th className="p-3 text-left font-semibold"><Link to="/staff/students/$personId" params={{personId:student.personId}} className="underline">{student.displayName}</Link></th>
+       </TableRow>
+      </TableHeader>
+      <TableBody>
+       {gradebook.students.filter(item=>!search.student||item.studentProfileId===search.student).map((student, rowIndex) => <TableRow key={student.studentProfileId} className="border-b last:border-0">
+        <TableRowHead className="p-3 text-left font-semibold"><Link to="/staff/students/$personId" params={{personId:student.personId}} className="underline">{student.displayName}</Link></TableRowHead>
         {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map((assessment, colIndex) => {
          const cell = cellFor(student.studentProfileId, assessment.id);
          const label = cellLabel(cell, assessment);
          const gradeable = cell?.status === "submitted";
          const reviewable = !!cell && (cell.status === "graded" || cell.status === "returned");
-         return <td key={assessment.id} className="p-3 align-top">
+         return <TableCell key={assessment.id} className="p-3 align-top">
           {cell && (gradeable||reviewable) ? <Button type="button" variant="outline" size="sm"
            data-cell={`${rowIndex}:${colIndex}`}
            onKeyDown={event => onCellKeyDown(event, rowIndex, colIndex)}
@@ -403,12 +404,12 @@ function TeacherGradebookPage() {
            }}
           >{label.text}{gradeable ? " · Grade" : reviewable ? " · View" : ""}</Button>
            : <span data-cell={`${rowIndex}:${colIndex}`} tabIndex={-1} className={`inline-block  px-3 py-1 text-xs ${label.tone}`}>{label.text}</span>}
-         </td>;
+         </TableCell>;
         })}
-       </tr>)}
-       {gradebook.students.length === 0 && <tr><td className="p-5 text-sm text-muted-foreground" colSpan={gradebook.assessments.length + 1}>No active students are enrolled in this section.</td></tr>}
-      </tbody>
-     </table>
+       </TableRow>)}
+       {gradebook.students.filter(item=>!search.student||item.studentProfileId===search.student).length === 0 && <TableRow><TableCell className="p-5 text-sm text-muted-foreground" colSpan={gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).length + 1}>No students match the selected gradebook scope.</TableCell></TableRow>}
+      </TableBody>
+     </Table>
     </div>}
     {gradebook.assessments.length > 0 &&     <p className="mt-2 text-xs text-muted-foreground">Tip: use arrow keys to move across the grid and Enter to open submitted work for review.</p>}
     <SectionGradeFinalization sectionId={gradebook.section.id}/>
