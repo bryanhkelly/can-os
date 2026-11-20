@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { QueryState } from "@/components/workspace";
+import { QueryState, StatCard } from "@/components/workspace";
 import { plural } from "@/lib/format";
 import type { getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 
@@ -28,9 +28,7 @@ export function FullFlowOperationalRecord({
          ["Class placements",dashboardData.totals.placedStudents],
          ["Graded submissions",dashboardData.totals.gradedWork],
          ["Guardian questions open",dashboardData.totals.unresolvedGuardianResponses]]
-       .map(([label,value])=><div key={label} className=" border p-3">
-        <p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p>
-       </div>)}
+       .map(([label,value])=><StatCard key={label} label={String(label)} value={value}/>)}
     </div>
     <div className="mt-5 space-y-4">
     {dashboardData.programs.map(program=><article key={program.id} className=" border p-4">
