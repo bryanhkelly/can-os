@@ -1,9 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { SchoolImprovementPanel } from "./SchoolImprovementPanel";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, search: _search, children }: { to: string; search?: unknown; children: React.ReactNode }) =>
+  Link: ({ to, search: _search, children }: { to: string; search?: unknown; children: ReactNode }) =>
     <a href={to}>{children}</a>,
 }));
 
