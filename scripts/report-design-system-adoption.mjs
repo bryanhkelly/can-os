@@ -17,7 +17,7 @@ const canonicalTags = new Set([
   "ClassParticipationAcknowledgments", "LaunchGuidancePanels",
   "CalendarInviteesPicker", "CalendarAgendaList", "NativeApprovedOfferingsPanel",
   "ClassOfferingTermsFields", "GuardianStudentIdentityFields", "GuardianTransferAuthorizationFields",
-  "GuardianEnrollmentNextSteps", "GuardianGradeQuestions", "GuardianChildSummaryCard", "PublicInterestRecordCard",
+  "GuardianEnrollmentNextSteps", "GuardianGradeQuestions", "GuardianChildSummaryCard", "CoachCaseloadList", "CoachStudentTimeline", "PublicInterestRecordCard",
   "PublicInterestTimeline", "MarketingPackageLibraryList", "NoncreditParticipantRoster",
   "SchoolImprovementPanel", "OperationsHealthSummary", "OperationsIssueList",
 ]);
