@@ -21,18 +21,14 @@ describe("one native Class route and reusable manager",()=>{
   });
 
   it("reuses /class rather than duplicating class operations",()=>{
-    const compatibility=read("src/routes/canonical.classes.tsx");
-    expect(compatibility).toContain('<Navigate to="/class"');
-    expect(compatibility).not.toContain("createUnifiedClassDraft");
     for(const path of [
-      "src/routes/class_.$classId.tsx",
-      "src/routes/canonical.program-operations.tsx",
-      "src/routes/reports.index.tsx",
+      "src/routes/classes.tsx",
+      "src/routes/canonical.classes.tsx",
       "src/routes/canonical.course-activities.tsx",
-      "src/components/launch-studio/SiteNativeClassHandoff.tsx",
-    ]){
-      expect(read(path)).not.toContain('to="/canonical/classes"');
-    }
+      "src/routes/canonical.content.tsx",
+      "src/routes/canonical.content_.$trackVersionId.tsx",
+      "src/routes/canonical.content-reviews.tsx",
+    ]) expect(existsSync(path)).toBe(false);
     const nav=read("src/components/shell/workspace-navigation.registry.ts");
     expect(nav).toContain('path: "/class"');
     expect(nav).not.toContain('path: "/canonical/classes"');
@@ -41,24 +37,19 @@ describe("one native Class route and reusable manager",()=>{
   it("keeps Class evidence within the authorized Class workspace",()=>{
     const detail=read("src/routes/class_.$classId.tsx");
     const manager=read("src/components/learning/NativeClassManager.tsx");
-    const legacy=read("src/routes/reports.classes_.$classId.tsx");
     expect(detail).toContain("<NativeClassReportPanel classId={workspace.classId}/>");
     expect(detail).not.toContain('to="/reports/classes/$classId"');
     expect(manager).toContain('search={{view:"manage",tab:"reports"}}');
-    expect(legacy).toContain('<Navigate to="/class/$classId"');
-    expect(legacy).not.toContain("<NativeClassReportPanel");
+    expect(existsSync("src/routes/reports.classes_.$classId.tsx")).toBe(false);
   });
 
   it("promotes governed completion without creating another Class authority",()=>{
     const detail=read("src/routes/class_.$classId.tsx");
-    const staging=read("src/routes/canonical.classes_.completion.tsx");
     const permissions=read("src/domain/class-views.ts");
     expect(permissions).toContain('"reports", "completion"');
     expect(detail).toContain('completion:"Completion"');
     expect(detail).toContain("<NativeClassCompletionOperatorPanel classId={workspace.classId}/>");
-    expect(staging).toContain('<Navigate to="/class/$classId"');
-    expect(staging).toContain('tab:"completion"');
-    expect(staging).not.toContain("NativeClassCompletionOperatorPanel");
+    expect(existsSync("src/routes/canonical.classes_.completion.tsx")).toBe(false);
   });
 
   it("uses shared 6.1 navigation and the canonical role matrix",()=>{
@@ -68,7 +59,7 @@ describe("one native Class route and reusable manager",()=>{
     expect(landing).toContain("<NativeClassHomeNavigation");
     expect(landing).toContain("<NativeLearnerClasses navigation={navigation}/>");
     expect(manage).toContain("{navigation}");
-    expect(nav).toContain('DetailNavigation label="Class workspace sections"');
+    expect(nav).toContain('DetailNavigation label="Class workspace"');
     expect(nav).toContain("canonicalRoleCapabilities");
     expect(nav).toContain('includes("class.manage")');
     expect(nav).not.toContain("roleCapabilities } from \"@/domain/access-context\"");
@@ -87,7 +78,6 @@ describe("one native Class route and reusable manager",()=>{
     const home=read("src/routes/class.tsx");
     const tabs=read("src/components/learning/NativeClassHomeNavigation.tsx");
     const editor=read("src/components/learning/PublisherCourseActivityEditor.tsx");
-    const staging=read("src/routes/canonical.course-activities.tsx");
     const manager=read("src/components/learning/NativeClassManager.tsx");
     expect(home).toContain('value.view==="activities"');
     expect(home).toContain("<PublisherCourseActivityEditor key={selected.courseVersionId");
@@ -99,7 +89,7 @@ describe("one native Class route and reusable manager",()=>{
     expect(editor).toContain("createCanonicalObjectiveDraft");
     expect(editor).toContain("createCanonicalSurveyDraft");
     expect(editor).not.toContain("createFileRoute");
-    expect(staging).toContain('<Navigate to="/class" search={{view:"activities"}}');
+    expect(existsSync("src/routes/canonical.course-activities.tsx")).toBe(false);
     expect(manager).not.toContain('to="/canonical/course-activities"');
   });
 
