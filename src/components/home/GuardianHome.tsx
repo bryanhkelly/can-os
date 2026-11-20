@@ -11,6 +11,8 @@ import { QueryState, StatCard, PersonMark, StatusBadge } from "@/components/work
 import { prioritizeFamilyNeeds } from "@/domain/family-needs";
 import { buildGuardianAttention } from "@/domain/daily-operations";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
+import { GuardianEnrollmentNextSteps } from "@/components/home/GuardianEnrollmentNextSteps";
+import { GuardianGradeQuestions } from "@/components/home/GuardianGradeQuestions";
 import { dateTimeInputInTimezone } from "@/modules/calendar/timezone";
 import { plural, agree } from "@/lib/format";
 
@@ -164,37 +166,8 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      <Link to="/guardian/health" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Health &amp; clearance</Link>
      <Link to="/guardian/enrollment-changes" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Transfer &amp; family changes</Link>
    </nav>
-   {(visibleEnrollmentApplications.length>0||enrollmentWarning)&&<section aria-label="Enrollment next steps" className="mt-6  border border-border/70 bg-card p-5 shadow-sm">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-     <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Getting started</p>
-      <h2 className="mt-1 font-serif text-2xl font-semibold">School enrollment</h2></div>
-     <Link to="/guardian/admission-offers" search={{student:activeStudent}}
-      className="inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold">View applications and offers</Link>
-    </div>
-    {enrollmentWarning&&<p role="status" className="mt-3  border p-3 text-sm">{enrollmentWarning}</p>}
-    {!enrollmentWarning&&visibleEnrollmentApplications.length>0&&<div className="mt-4 grid gap-3">
-     {visibleEnrollmentApplications.map(app=>{
-      const active=app.offers.find(o=>o.enrollmentActive);
-      const issued=app.offers.find(o=>o.status==="issued"&&o.progress.canAccept);
-      const accepted=app.offers.find(o=>o.status==="accepted");
-      const next=active?"Enrollment is active. Review first-day preparation and student access.":
-       accepted?"Your offer is accepted. The school is completing enrollment and class placement.":
-       issued?"An enrollment offer is ready for your decision.":
-       app.waitlisted?"Your application is on the waitlist. Contact admissions for an update.":
-       app.blockers.length>0||app.offers.some(o=>o.progress.state==="requirements_pending")
-         ?"Review the outstanding enrollment requirements before accepting an offer.":
-       "Your application is with the school. Review its status and any requested steps.";
-      return <article key={app.applicationId} className=" border p-4">
-       <p className="font-semibold">{app.studentName} <span className="font-normal text-muted-foreground">· {app.program}</span></p>
-       <p className="mt-2 text-sm">{next}</p>
-       <Link to="/guardian/admission-offers" search={{student:app.studentPersonId,application:app.applicationId}}
-        className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">
-        {active?"Prepare for school":accepted?"View enrollment steps":issued?"Review offer":"View enrollment steps"} →
-       </Link>
-      </article>;
-     })}
-    </div>}
-   </section>}
+   <GuardianEnrollmentNextSteps applications={visibleEnrollmentApplications}
+    enrollmentWarning={enrollmentWarning} activeStudent={activeStudent} />
    {children.length>1&&<nav aria-label="Filter family overview by child" className="mt-6 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Show</span><Link to="/home" search={{action,student:undefined}} aria-current={!selectedChild?"page":undefined} className={"inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(!selectedChild?"bg-primary text-primary-foreground":"bg-card")}>All children</Link>{children.map(child=><Link key={child.studentPersonId} to="/home" search={{action,student:child.studentPersonId}} aria-current={selectedChild?.studentPersonId===child.studentPersonId?"page":undefined} className={"inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(selectedChild?.studentPersonId===child.studentPersonId?"bg-primary text-primary-foreground":"bg-card")}>{child.displayName}</Link>)}</nav>}
    {student&&!selectedChild&&!selectedEnrollment&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -213,29 +186,8 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
     {action&&!needsWarning&&!visibleNeeds.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4  border p-4">This action is unavailable in your current family workspace.</p>}
    </div>
 
-   <section aria-label="School responses to your grade questions" className="mt-10">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-     <h2 className="font-serif text-2xl font-semibold tracking-tight">Your school grade questions</h2>
-     <Link to="/guardian/students" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">Academic progress</Link>
-    </div>
-    <p className="mt-2 text-sm text-muted-foreground">Questions you sent about released grades, and your school's responses. Pending questions are awaiting school action, not another family task.</p>
-    {gradeFollowUpsWarning&&<p className="mt-3  border p-3 text-sm" role="status">{gradeFollowUpsWarning}</p>}
-    {!gradeFollowUpsWarning&&visibleQuestions.length===0&&<p className="mt-3 text-sm text-muted-foreground">No school grade questions to review in the current academic view.</p>}
-    <div className="mt-4 space-y-3">
-     {visibleQuestions.slice(0,6).map(question=><article key={question.id} className=" border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-       <p className="font-semibold">{question.studentName} · {question.assessmentTitle}</p>
-       <StatusBadge tone={question.status==="resolved"?"success":"info"}>{question.status==="resolved"?"School responded":"Awaiting school response"}</StatusBadge>
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">Your question: {question.question}</p>
-      {question.status==="resolved"&&question.resolutionNote&&<p className="mt-3 whitespace-pre-wrap  bg-muted p-3 text-sm">School response: {question.resolutionNote}</p>}
-      <Link to="/guardian/students"
-       search={{student:question.studentPersonId,section:question.sectionId,assessment:question.assessmentId,submission:question.submissionId}}
-       className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">View grade and school follow-up</Link>
-     </article>)}
-    </div>
-    {visibleQuestions.length>6&&<p className="mt-3 text-sm text-muted-foreground">Showing 6 of {visibleQuestions.length} recent questions. Open academic progress for your child's full assignment history.</p>}
-   </section>
+   <GuardianGradeQuestions questions={visibleQuestions}
+    warning={gradeFollowUpsWarning} selectedStudentId={selectedChild?.studentPersonId} />
 
    <section aria-label="Your children" className="mt-12">
     <h2 className="font-serif text-2xl font-semibold tracking-tight">Your children</h2>
