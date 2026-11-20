@@ -152,7 +152,7 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
                 className="font-semibold text-primary underline">
                 {journey.savedPlan?"Continue Site Solution":"Configure Solution"}
               </Link>
-              {journey.facilitatedFourSessions&&<Link to="/canonical/lab/facilitated"
+              {journey.facilitatedFourSessions&&<Link to="/canonical/lab/facilitated" search={{siteId}}
                 className="font-semibold text-primary underline">Manage dated Classes</Link>}
               {journey.solution?.offeringCode && <Link to="/programs/noncredit/enrollment"
                 search={{publicSiteId:siteId,offeringCode:journey.solution.offeringCode}}
