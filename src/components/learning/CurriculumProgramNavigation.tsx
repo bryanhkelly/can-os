@@ -20,14 +20,14 @@ export function CurriculumProgramNavigation({
   return (
     <nav className="flex flex-wrap gap-3" aria-label="Curriculum program scope">
       {programs.map((program) => (
-        <Button asChild key={program.id} variant="outline" size="sm"
-          className={selectedProgramId === program.id ? "border-primary bg-accent text-primary" : undefined}>
+        <Button asChild key={program.id} variant="outline" size="sm" className="min-h-11"
+          className={selectedProgramId === program.id ? "min-h-11 border-primary bg-accent text-primary" : "min-h-11"}>
           <Link to={destination} search={{ programId: program.id }}
             aria-current={selectedProgramId === program.id ? "page" : undefined}>{program.name}</Link>
         </Button>
       ))}
       {canPublish && selectedProgramId && (
-        <Button asChild variant="outline" size="sm"><Link to="/operations/curriculum"
+        <Button asChild variant="outline" size="sm" className="min-h-11"><Link to="/operations/curriculum"
           search={{ programId: selectedProgramId }}>Curriculum</Link></Button>
       )}
     </nav>
