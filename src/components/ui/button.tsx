@@ -42,6 +42,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // guard as native buttons, without emitting an invalid disabled attribute.
     if (asChild) {
       const inactive = disabled || loading;
+      // Radix Slot gives child props precedence. Apply disabled semantics
+      // directly to the child so an existing tabIndex/aria-disabled or
+      // capture callback cannot re-enable a pending navigation.
+      const child = React.Children.only(children) as React.ReactElement<{
+        tabIndex?: number;
+        "aria-disabled"?: React.AriaAttributes["aria-disabled"];
+        onClickCapture?: React.MouseEventHandler<HTMLElement>;
+      }>;
+      const guardedChild = inactive ? React.cloneElement(child, {
+        tabIndex: -1,
+        "aria-disabled": true,
+        onClickCapture: event => { event.preventDefault(); event.stopPropagation(); },
+      }) : child;
       return <Slot ref={ref} {...props}
         className={cn(classes, inactive && "pointer-events-none opacity-50")}
         aria-busy={loading || props["aria-busy"] || undefined}
@@ -54,7 +67,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             return;
           }
           props.onClickCapture?.(event as React.MouseEvent<HTMLButtonElement>);
-        }}>{children}</Slot>;
+        }}>{guardedChild}</Slot>;
     }
     return <button ref={ref} type={type ?? "button"} disabled={disabled || loading}
       aria-busy={loading || undefined} className={classes} {...props}>
