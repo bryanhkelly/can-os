@@ -37,7 +37,7 @@ describe("V6.1 universal action and surface contracts", () => {
       <Button asChild variant="outline"><a href="/site/new">Create a Site</a></Button>
     </div>);
     expect(html).toContain('href="/access/register"');
-    expect(html).toContain('href="/schools/new"');
+    expect(html).toContain('href="/site/new"');
     expect(html.match(/<a\b/g)).toHaveLength(2);
     expect(html).not.toContain("<button");
   });
