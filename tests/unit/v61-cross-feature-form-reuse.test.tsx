@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FamilyInvitationForm } from "@/components/admissions/FamilyInvitationForm";
@@ -6,6 +7,40 @@ import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
 import { ExtendedSeasonDraftForm } from "@/components/operations/ExtendedSeasonDraftForm";
 
 describe("V6.1 cross-feature form composition", () => {
+  it("renders the shared step footer with appropriate spacing and labeled workflow actions", () => {
+    const html = renderToStaticMarkup(<ActionFooter layout="step">
+      <button type="button">Previous step</button>
+      <div><button type="button">Save and continue</button></div>
+    </ActionFooter>);
+    expect(html).toContain('data-action-footer="step"');
+    expect(html).toContain("justify-between");
+    expect(html).toContain("border-t");
+    expect(html).toContain("border-border/60");
+    expect(html).toContain("pt-5");
+    expect(html).toContain("Previous step");
+    expect(html).toContain("Save and continue");
+  });
+
+  it.each([
+    "src/components/launch-studio/EstablishSiteProfileUnified.tsx",
+    "src/components/launch-studio/EstablishSiteInformationV61.tsx",
+    "src/components/launch-studio/EstablishProgramsAudiencesV61.tsx",
+    "src/components/launch-studio/MarketingPackageWizardV61.tsx",
+  ])("shares the canonical step footer in %s", filePath => {
+    const source = readFileSync(new URL(`../../${filePath}`, import.meta.url), "utf8");
+    expect(source).toContain('<ActionFooter layout="step">');
+    expect(source).not.toContain('layout="inline" className="justify-between border-t');
+  });
+
+  it("keeps Launch draft saves on canonical Button pending presentation", () => {
+    const source = readFileSync(
+      new URL("../../src/components/launch-studio/LaunchDraftButton.tsx", import.meta.url), "utf8",
+    );
+    expect(source).toContain('loading={mutation.pending}');
+    expect(source).toContain('loadingLabel="Saving draft..."');
+    expect(source).not.toContain('mutation.pending ? "Saving draft..." : buttonLabel');
+  });
+
   it("uses the canonical panel and form actions for eligible family invitations", () => {
     const html = renderToStaticMarkup(<FamilyInvitationForm
       programs={[{ id: "program-1", name: "Weekend learning" }]}
