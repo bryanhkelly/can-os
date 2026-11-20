@@ -331,7 +331,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
         <TableCell className="py-3 text-right whitespace-nowrap">{criterion.maxPoints}</TableCell>
        </TableRow>)}
        <TableRow className="bg-muted">
-        <TableCell colSpan={2} className="py-3 pr-3 font-semibold">Total</TableCell>
+        <TableRowHead colSpan={2} className="py-3 pr-3 font-semibold">Total</TableRowHead>
         <TableCell className="py-3 text-right font-semibold">{criteriaTotal}</TableCell>
        </TableRow>
       </TableBody>
