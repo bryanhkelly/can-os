@@ -52,7 +52,7 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
     }catch(cause){setError(mutationErrorMessage(cause, "Unable to revoke staff"));}
     finally{setBusy(false);}
   };
-  return <div className="mt-3 space-y-3 rounded-lg border p-4 text-sm">
+  return <div className="mt-3 space-y-3  border p-4 text-sm">
     <p className="text-muted-foreground">Grant only to an already verified CAN staff account.
       Teacher grants permit subsequent Section assignment, not immediate student access.
       Registrar grants allow official records only for this contracted Program.
@@ -88,7 +88,7 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
         <ul className="mt-2 space-y-2">
           {desk.current.map(grant=>{
             const person=desk.candidates.find(c=>c.personId===grant.personId);
-            return <li key={grant.id} className="flex items-center justify-between gap-2 rounded border p-2">
+            return <li key={grant.id} className="flex items-center justify-between gap-2  border p-2">
               <span>{person?person.firstName+" "+person.lastName:"Previously delegated CAN employee"} · {grant.role}</span>
               <Button type="button" variant="outline" disabled={busy}
                 onClick={()=>void revoke(grant.id)}

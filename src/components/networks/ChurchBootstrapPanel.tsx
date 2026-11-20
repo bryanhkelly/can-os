@@ -1,9 +1,12 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { prepareChurchOnboarding } from "@/modules/networks/network-steward.functions";
 
-const field = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
+const field = "mt-1 block w-full  border bg-background p-2 text-sm";
 const defaults = {
   churchName: "", churchSlug: "", siteName: "", siteSlug: "",
   timezone: "America/Los_Angeles", contactEmail: "",
@@ -37,7 +40,7 @@ export function ChurchBootstrapPanel() {
       setError(mutationErrorMessage(cause, "Unable to prepare church onboarding"));
     } finally { setBusy(false); }
   }
-  return <section className="mt-6 rounded-xl border bg-card p-5" aria-label="Church onboarding">
+  return <section className="mt-6  border bg-card p-5" aria-label="Church onboarding">
     <h2 className="font-serif text-2xl">Prepare a church for school launch</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       A verified CAN steward can create the church organization, its first Site and a
@@ -47,8 +50,8 @@ export function ChurchBootstrapPanel() {
       and metadata matching the church slug and authorized contact email.
       It does not authorize the church to open a school.
     </p>
-    {error && <p role="alert" className="mt-3 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
-    {success && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">{success}</p>}
+    {error && <p role="alert" className="mt-3  border border-destructive p-3 text-sm">{error}</p>}
+    {success && <p role="status" className="mt-3  border p-3 text-sm">{success}</p>}
     <form onSubmit={prepare} className="mt-4 grid gap-3 sm:grid-cols-2">
       {([
         ["churchName", "Church name"], ["churchSlug", "Church identifier"],
@@ -57,18 +60,18 @@ export function ChurchBootstrapPanel() {
         ["firstName", "Lead first name"], ["lastName", "Lead last name"],
         ["authorityDocumentId", "Independently verified authority document ID"],
       ] as const).map(([key, label]) =>
-        <label key={key} className="text-sm font-medium">{label}
-          <input required type={key === "contactEmail" ? "email" : "text"}
+        <Label key={key} className="text-sm font-medium">{label}
+          <Input required type={key === "contactEmail" ? "email" : "text"}
             className={field} value={draft[key]}
             maxLength={key === "authorityDocumentId" ? 36 : 160}
             pattern={key === "churchSlug" || key === "siteSlug"
               ? "[a-z0-9]+(-[a-z0-9]+)*" : undefined}
             onChange={e => set(key, e.target.value)}/>
-        </label>)}
-      <button type="submit" disabled={busy}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50 sm:col-span-2">
+        </Label>)}
+      <Button variant="ghost" type="submit" disabled={busy}
+        className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50 sm:col-span-2">
         {busy ? "Preparing…" : "Prepare church and invite launch administrator"}
-      </button>
+      </Button>
     </form>
   </section>;
 }

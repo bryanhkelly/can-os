@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
+import { Textarea } from "@/components/ui/textarea";
 import {useEffect,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {DirectoryTable} from "@/components/workspace";
@@ -92,7 +95,7 @@ export function CANSchoolJurisdictionReviewDesk(){
     }finally{setSubmitting(false);}
   }
 
-  return <section className="rounded-xl border bg-card p-4" aria-labelledby="can-school-jurisdiction-desk">
+  return <section className=" border bg-card p-4" aria-labelledby="can-school-jurisdiction-desk">
     <h2 id="can-school-jurisdiction-desk" className="font-semibold">School-specific CAN jurisdiction reviews</h2>
     <p className="mt-1 text-sm text-muted-foreground">
       Review canonical church Site, Program, government policy sources and existing evidence.
@@ -114,7 +117,7 @@ export function CANSchoolJurisdictionReviewDesk(){
           onClick:item=>{setSelected(item);setNote("");setMessage("");setError("");}}]}/>
       {truncated&&<p className="mt-2 text-xs text-muted-foreground">More review Actions exist; filter the canonical Actions workspace.</p>}
     </div>}
-    {selected&&<div className="mt-4 space-y-3 rounded-lg border p-4">
+    {selected&&<div className="mt-4 space-y-3  border p-4">
       <p className="font-medium">{selected.programName} — {selected.siteName}</p>
       <p className="text-xs text-muted-foreground">Action {selected.id} · {selected.reviewState.replaceAll("_"," ")}</p>
       {selected.type==="school_jurisdiction_legal_review"&&review&&<>
@@ -123,13 +126,13 @@ export function CANSchoolJurisdictionReviewDesk(){
         {!review.policyReady&&<p role="alert" className="text-sm">Policy or applicability is not ready for independent verification. Request corrections.</p>}
         <div className="space-y-2">
           <p className="text-sm font-medium">Independently check current official source records</p>
-          {review.reviewSources.map(source=><label key={source.url} className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={sourceUrls.includes(source.url)}
+          {review.reviewSources.map(source=><Label key={source.url} className="flex items-start gap-2 text-sm">
+            <Checkbox checked={sourceUrls.includes(source.url)}
               onChange={event=>setSourceUrls(current=>event.target.checked?
                 [...current,source.url]:current.filter(url=>url!==source.url))}/>
             <span><a className="underline" target="_blank" rel="noopener noreferrer"
               href={source.url}>{source.title}</a> · {source.authority} · checked {source.checkedAt.slice(0,10)}</span>
-          </label>)}
+          </Label>)}
         </div>
       </>}
       {selected.type==="school_jurisdiction_requirement"&&<>
@@ -149,10 +152,10 @@ export function CANSchoolJurisdictionReviewDesk(){
         {evidence&&!evidence.evidence&&<p role="alert" className="text-sm">No submitted, current, private legal evidence is available for this Action. Request corrections or have the responsible party submit documentation.</p>}
         {evidence&&!evidence.scopeCurrent&&<p role="alert" className="text-sm">This evidence cannot be approved for the current policy and school configuration until its legal scope is renewed.</p>}
       </>}
-      <label className="block text-sm font-medium" htmlFor="can-jurisdiction-note">Independent decision rationale</label>
-      <textarea id="can-jurisdiction-note" value={note} rows={4}
+      <Label className="block text-sm font-medium" htmlFor="can-jurisdiction-note">Independent decision rationale</Label>
+      <Textarea id="can-jurisdiction-note" value={note} rows={4}
         onChange={event=>setNote(event.target.value)}
-        className="w-full rounded-md border bg-background p-2 text-sm"
+        className="w-full  border bg-background p-2 text-sm"
         placeholder="Record which current official requirements and evidence were verified, or why corrections are necessary."/>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={submitting||note.trim().length<25||
