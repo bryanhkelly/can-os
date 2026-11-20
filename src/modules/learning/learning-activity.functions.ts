@@ -114,13 +114,45 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
       const lesson = content.modules.flatMap(module => module.lessons)
         .find(candidate => candidate.id === data.interaction.lessonId);
       if (!lesson) throw new AuthorizationError("published lesson");
-      if (data.interaction.kind === "resource_opened") {
+      if (data.interaction.kind === "resource_opened" ||
+          data.interaction.kind.startsWith("video_")) {
         const resourceId = data.interaction.resourceId;
-        if (!classResources(content).some(resource =>
-            resource.id === resourceId &&
-            (lesson.resources.some(item => item.id === resource.id) ||
-             content.resources.some(item => item.id === resource.id)))) {
-          throw new AuthorizationError("published lesson resource");
+        const publisherResource = classResources(content).find(resource =>
+          resource.id === resourceId &&
+          (lesson.resources.some(item => item.id === resource.id) ||
+           content.resources.some(item => item.id === resource.id)));
+        // Native-video events must refer to a published video, not an
+        // arbitrary resource, and never accept client-supplied learner scope.
+        const publishedVideo = publisherResource &&
+          (publisherResource.kind === "video" ||
+           Boolean(publisherResource.url && (await import("@/domain/class-video"))
+             .resolveClassVideo(publisherResource.url, false)?.kind === "file"));
+        let authorizedSupplement = false;
+        if (!publisherResource || (data.interaction.kind.startsWith("video_") && !publishedVideo)) {
+          const [supplement] = await tx.select({
+            id: s.curriculumOverlays.id,
+            lessonId: s.curriculumOverlays.lessonId,
+            kind: s.curriculumOverlays.kind,
+            url: s.curriculumResources.url,
+          }).from(s.curriculumOverlays)
+            .innerJoin(s.curriculumResources,
+              eq(s.curriculumResources.id, s.curriculumOverlays.resourceId))
+            .where(and(
+              eq(s.curriculumOverlays.resourceId, resourceId),
+              eq(s.curriculumOverlays.sectionId, section.id),
+              eq(s.curriculumOverlays.courseTemplateVersionId, section.versionId),
+              eq(s.curriculumOverlays.status, "active"),
+            )).limit(1);
+          authorizedSupplement = Boolean(supplement &&
+            (!supplement.lessonId || supplement.lessonId === lesson.id) &&
+            supplement.kind === "video" &&
+            supplement.url &&
+            (await import("@/domain/class-video")).resolveClassVideo(supplement.url)?.kind === "file");
+        }
+        if (data.interaction.kind.startsWith("video_")
+          ? !publishedVideo && !authorizedSupplement
+          : !publisherResource && !authorizedSupplement) {
+          throw new AuthorizationError("published lesson video or resource");
         }
       }
       const [learningSession] = await tx.select().from(s.learningActivitySessions)
