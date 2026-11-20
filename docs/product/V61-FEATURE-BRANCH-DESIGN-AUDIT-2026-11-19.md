@@ -1,7 +1,7 @@
 # CAN OS V6.1 design-system feature-branch audit
 
 **Branch:** `feature/launch-studio-v61-clean-cutover-20261118` · **Date:** 2026-11-19  
-**Status:** **Partial remediation, outstanding application-wide debt. Not certified.**
+**Status:** **Major application-wide source realignment implemented; executable and visual acceptance pending. Not certified.**
 
 ## Scope and authority
 
@@ -40,9 +40,9 @@ not in operational state semantics.
 These are **source changes**, not evidence of executed tests. No main merge,
 production data mutation, authorization policy change, or release occurred.
 
-## Outstanding migration inventory
+## Baseline migration inventory (historical findings)
 
-The following are **representative high-signal source findings**, not a
+The following are **historical pre-migration source findings**, not a
 complete list of files needing manual UX review. Numbers below describe the
 source snapshot before this audit's edits and may change with subsequent commits.
 
@@ -109,3 +109,76 @@ replace native widgets only after verifying their event/validation behavior,
 and add Storybook and behavioral coverage with each migrated feature. Do not
 introduce a parallel V6.1 component library or make route-specific exceptions
 in the shared checker to declare success.
+
+## Subsequent V6.1 migration passes
+
+The follow-on application-wide pass moved the identified legacy route and
+feature-component form controls to existing `Button`, `Input`, `Select`,
+`Textarea`, `Label`, `Checkbox` and `Radio` primitives. Legacy rounded
+utilities and fixed Tailwind state palettes were replaced on the affected
+Surfaces. Where a native button omitted `type`, the migration explicitly
+retains its HTML default `type="submit"`. Actions, server grants, persistence,
+validation schemas, audit commands and approval transitions were not designed
+to change in this presentation pass. A successful build and behavioral
+acceptance must still establish that these invariants hold.
+
+The committed source migration includes Admissions, enrollment and noncredit,
+Guardian/Coach/Network/Steward dashboards, learning/classroom/curriculum,
+Network approvals, Site and Operations workflows, media and family invitations,
+safeguarding, staff profiles, and learner/teacher interfaces. The full-screen
+Classroom presentation has been aligned to shared `PageFrame` and
+`PageHeader`, preserving its facilitator-only data and fullscreen control.
+
+`scripts/codemods/v61-canonical-control-transform.mjs` documents the
+repeatable mechanical transformation; its use is intentionally no substitute
+for reviewing individual controls and their execution. The source inventory
+gate is now `npm run design:coverage` and is chained into `npm run lint`.
+`scripts/check-v61-coverage.mjs` discovers non-test TSX from the actual
+checkout and fails on an uninspected component, including newly added ones.
+The latest known repository source tree has **176 route TSX, 386 component
+TSX and five other application TSX modules** (567 total). Five components
+were newly added after the baseline inventory: LaunchGuidancePanels,
+ClassParticipationAcknowledgments, WebsitePreviewPanel,
+WebsiteReadinessPanels and WorkspaceActionLink. Their fetched source uses
+shared V6.1 primitives without direct raw controls, rounded utilities or
+hard-coded Tailwind palette classes under this inspection.
+
+### Explicitly separate presentation outputs
+
+These must be **reported, not silently considered V6.1-certified**:
+
+- `src/domain/public-site-html.ts` and `src/domain/public-site-templates.ts`
+  render user-branded public Site websites, with intentionally independent
+  template curves, colors and typography. They are not internal CAN OS
+  operator pages and must retain the selected Site's saved design.
+- `src/domain/site-artifact-renderer.ts` builds Site-branded marketing
+  outputs and emails. Their immutable Brand-version rendering is separate
+  from operational UI semantic colors.
+- Public HTML and private-preview response handlers, including
+  `src/routes/website-preview.ts`, `src/routes/brand-preview.ts`,
+  `src/routes/site-preview-share.ts`, are server-rendered documents rather
+  than React TSX workspace pages.
+- `.storybook/preview.tsx` is outside `src` and requires its own Storybook
+  rendering pass. It loads the same CAN style sheet but is not included in
+  the application route/component source inventory.
+- Standalone signed-out entry pages may intentionally own their own
+  `main` element; they still use V6.1 shared controls, fonts and tokens.
+  Only the actual full-screen classroom route was moved into PageFrame
+  during this pass.
+
+The first three groups are **intentional distinct design surfaces**, not
+unknown missing application components. They still require visual and
+accessibility acceptance appropriate to their public context. The coverage
+script explicitly outputs such independent sources as `independentlyReviewedRequired`.
+
+### Remaining acceptance
+
+No TypeScript, bundling, lint, Storybook, Playwright, axe, database, or
+authenticated browser acceptance has been executed by this migration.
+The Netlify preview status is failing because account build usage is
+exhausted; no compile verdict can be inferred from it.
+
+**Do not merge to `main` or claim 100% design-system compliance** until
+`npm run design:coverage`, `npm run design:routes -- --strict`,
+`npm run lint`, `npm run typecheck`, `npm run build`,
+Storybook and representative browser/keyboard/screen-reader runs pass.
