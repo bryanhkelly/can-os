@@ -29,8 +29,8 @@ export function LaunchDraftButton({ selection, initial, value, disabled = false,
   }
   return <div className="space-y-2">
     <Button type="button" variant="outline" disabled={disabled || mutation.pending}
-      onClick={() => void saveDraft()}>
-      {mutation.pending ? "Saving draft..." : buttonLabel}
+      loading={mutation.pending} loadingLabel="Saving draft..." onClick={() => void saveDraft()}>
+      {buttonLabel}
     </Button>
     {savedAt && <p className="text-xs text-muted-foreground">Last draft save: <time dateTime={savedAt}>{savedAt.slice(0, 16).replace("T", " ")} UTC</time></p>}
     <MutationFeedback state={mutation} pendingMessage="Saving draft..." />
