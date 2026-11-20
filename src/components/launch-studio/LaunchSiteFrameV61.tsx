@@ -9,10 +9,12 @@ import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
 
 const stages = ["Establish", "Introduce", "Prepare", "Open"] as const;
 
-export function LaunchSiteFrame({ site, active, previewHref, children }: {
+export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previewAvailable = true, children }: {
   site: { id: string; name: string };
   active?: string;
   previewHref?: string;
+  statusLabel?: string;
+  previewAvailable?: boolean;
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
@@ -33,7 +35,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
       </div>
       <div className="m-3 border p-3">
         <p className="text-sm font-semibold">{site.name}</p>
-        <p className="mt-1 text-xs text-muted-foreground">Preparing · Site setup</p>
+        <p className="mt-1 text-xs text-muted-foreground">{statusLabel ?? "Site setup"}</p>
       </div>
       <nav aria-label="Launch Studio navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-3">
         <Link to="/launch/site" search={{ siteId: site.id }} onClick={() => setDrawer(false)}
@@ -83,11 +85,13 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           {active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
-          <Button asChild variant="ghost" size="sm" className="min-h-11">
+          {previewAvailable ? <Button asChild variant="ghost" size="sm" className="min-h-11">
             <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer">
               <Globe2 className="size-4"/> Preview Website
             </a>
-          </Button>
+          </Button> : <Button type="button" variant="ghost" size="sm" disabled
+            title="Save a website draft in Website & Brand to enable private preview."
+            className="min-h-11"><Globe2 className="size-4"/> Preview unavailable</Button>}
 
         </div>
       </header>
