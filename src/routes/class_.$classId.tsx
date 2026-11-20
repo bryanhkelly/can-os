@@ -17,6 +17,7 @@ import { NativeClassActivationStatus } from "@/components/learning/NativeClassAc
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassHomeworkPanel } from "@/components/learning/NativeClassHomeworkPanel";
+import { NativeValorDraftPracticePanel } from "@/components/learning/NativeValorDraftPracticePanel";
 import { NativeClassKnowledgeCheckPanel } from "@/components/learning/NativeClassKnowledgeCheckPanel";
 import { NativeClassTeacherHomeworkPanel, NativeClassTeacherAssessmentPanel } from
   "@/components/learning/NativeClassTeacherReviewPanels";
@@ -198,8 +199,10 @@ function LearnerClass({workspace}:{workspace:Workspace}){
       <NativeClassHomeworkPanel classEnrollmentId={learner.classEnrollmentId}/>
       <NativeClassCanonicalEvidencePanel classEnrollmentId={learner.classEnrollmentId}/>
     </div>}
-    {workspace.tab==="assessments"&&
-      <NativeClassKnowledgeCheckPanel courseAttemptId={learner.courseAttemptId}/>}
+    {workspace.tab==="assessments"&&<div className="space-y-5">
+      <NativeClassKnowledgeCheckPanel courseAttemptId={learner.courseAttemptId}/>
+      <NativeValorDraftPracticePanel classEnrollmentId={learner.classEnrollmentId}/>
+    </div>}
     {workspace.tab==="sessions"&&<>
       <NativeClassSessionsPanel workspace={workspace}/>
       {learner.status==="active"&&<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>}
