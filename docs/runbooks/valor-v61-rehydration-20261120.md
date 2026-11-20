@@ -67,6 +67,7 @@ The user requested that Valor's restored academic material be usable as interact
 | Jordan unsubmitted assigned homework entries | 18 |
 | Jordan preserved historic withdrawn Class | 1 |
 | Dated canonical Class Sessions | 0 |
+| Current demo delivery format | Self-paced (12 Classes) |
 
 The new publication and Organization/Site operator role records are **synthetic test authorizations only**. They are not a real accreditation, school-of-record approval, credit award, actual minor consent or independent provider rights clearance. The Offering version's test-only release requirements have zero minimum approved primary recording tracks; external candidate videos remain subject to review. The Site metadata remains `synthetic:true` and enrollment remains noncredit only.
 
@@ -90,3 +91,5 @@ The new publication and Organization/Site operator role records are **synthetic 
 6. Recheck any activated deployment's build results, `npm run typecheck`, `npm run check:class-architecture`, focused unit/integration tests, and actual login/browser acceptance. The Netlify `can-os-demo-new` deployment checks for the latest source commits were **skipped due to exceeded build usage**. No successful deployment of this source has been established, and Cloudflare Worker deployment has not been independently inspected.
 
 **Caveat:** Current text-homework submission is not a complete file attachment, teacher gradebook or feedback workflow. It uses the existing immutable Course Attempt evidence and does not create parallel academic records.
+
+**Delivery format correction:** After the database read-back, all 12 synthetic Classes were switched from planned `hybrid` to `self_paced` because zero dated native Class Sessions exist. This enables independent lessons/homework without implying an available supervised session. The checked-in activation SQL includes that same transition for replay. Hybrid/Scheduled delivery must be reauthorized with real Class Sessions.
