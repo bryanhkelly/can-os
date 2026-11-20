@@ -15,6 +15,8 @@ const sources = [
   "src/components/launch-studio/MarketingMaterialPreviewV61.tsx",
   "src/components/launch-studio/LaunchPreviewSharing.tsx",
   "src/components/launch-studio/LaunchPrepareV61.tsx",
+  "src/components/launch-studio/LaunchReadinessPanelV61.tsx",
+  "src/components/launch-studio/LaunchNavigationGuardProvider.tsx",
   "src/components/launch-studio/LaunchSitePublicationPanel.tsx",
   "src/components/launch-studio/CanonicalBlueprintWorkspace.tsx",
   "src/components/launch-studio/BlueprintOfferingAdoptionPicker.tsx",
