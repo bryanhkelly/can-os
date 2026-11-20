@@ -34,7 +34,10 @@ function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:st
   return [o.deploymentId,o.adoptionId,o.offeringVersionId,o.courseVersionId].join(":");
 }
 
-export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation}: {preferredSiteId?: string;preferredOfferingVersionId?:string;navigation?:ReactNode}) {
+export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation,embedded=false}: {
+  preferredSiteId?: string; preferredOfferingVersionId?:string;
+  navigation?: ReactNode; embedded?: boolean;
+}) {
   const client=useQueryClient();
   const feedback=useMutationFeedback(refresh);
   const [searchDraft,setSearchDraft]=useState("");
@@ -306,7 +309,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       });
     }finally{setBusy(false)}
   }
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Classes" title="Class management"
+  return <WorkspaceShell embedded={embedded} width="wide" eyebrow={embedded ? "Prepare / Classes" : "CAN OS · Classes"} title="Class management"
     subtitle="Create a Class from an adopted Course. Class Offerings are optional: school and private assignment do not require a public or private registration listing."
     actions={<div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
       <Link to="/canonical/program-operations" className="underline underline-offset-4">
