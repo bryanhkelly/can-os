@@ -185,7 +185,19 @@ function FacilitatedLabContent({data,preferredSiteId}:{
         <ClassroomRehearsalPlayer scope={rehearsalScope}
           onClose={()=>setRehearsalScope(null)}/>}
     </section>
-    <ClassroomSchedulePanel choices={visibleChoices}
+    {/* Calendar planning may happen before the first learner registers.
+        The live-room choices above intentionally require active attempts;
+        the independently authorized rehearsal reader exposes approved Course
+        adoption without inventing a learner or bypassing scheduling grants. */}
+    {!rehearsalOptions&&!rehearsalFailed&&<p role="status"
+      className="mt-4 text-sm text-muted-foreground">
+      Checking approved Course options for scheduling…
+    </p>}
+    {rehearsalFailed&&<WorkspaceNotice tone="attention" className="mt-4">
+      Class scheduling options could not be verified. No Course will be
+      made available until the authorized catalog loads.
+    </WorkspaceNotice>}
+    <ClassroomSchedulePanel choices={visibleRehearsalChoices}
       onRoomStarted={value=>{
         setCode({roomId:value.roomId,code:value.pairingCode,expiresAt:value.pairingExpiresAt});
         setExpandedRoomId(value.roomId);
