@@ -8,6 +8,7 @@
 import { ArrowRight, BookOpen, Building2, ClipboardCheck, Globe, Info, Megaphone, Rocket, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
+import { siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
 import { WorkspaceShell, WorkspacePanel, WorkspaceNotice, StatusBadge, type StatusTone } from "@/components/workspace";
 
 export type LaunchOverviewProps = {
@@ -20,12 +21,16 @@ export type LaunchOverviewProps = {
   workspaceUrl: string;
 };
 
-const stages = [
-  { id: "Establish", icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
-  { id: "Introduce", icon: Megaphone, summary: "Promote your community, connect with prospective learners and host events." },
-  { id: "Prepare", icon: ClipboardCheck, summary: "Select Solutions, verify facilities, people, safeguards and funding, then explicitly publish the public Site website." },
-  { id: "Open", icon: Rocket, summary: "Enable Enrollment only for independently approved, enrollable Offerings." },
-] as const;
+const stagePresentation: Record<SiteLaunchStageV61, {
+  icon: typeof Building2;
+  summary: string;
+}> = {
+  Establish: { icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
+  Introduce: { icon: Megaphone, summary: "Promote your community, connect with prospective learners and host events." },
+  Prepare: { icon: ClipboardCheck, summary: "Select Solutions, verify facilities, people, safeguards and funding, then explicitly publish the public Site website." },
+  Open: { icon: Rocket, summary: "Enable Enrollment only for independently approved, enrollable Offerings." },
+};
+const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }));
 
 /**
  * Preview Website belongs in shared WorkspaceTopBar (not in the left nav).
