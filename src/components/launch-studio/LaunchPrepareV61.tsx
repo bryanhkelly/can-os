@@ -5,9 +5,8 @@
  */
 import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, Globe2, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
 import { prepareStageModulesV61, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
-import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
-import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
 import { LaunchSitePublicationPanel } from "./LaunchSitePublicationPanel";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
@@ -139,15 +138,9 @@ function PrepareModuleHandoffs({ siteId, handoffs }: { siteId: string; handoffs:
   return <WorkspacePanel title="Continue in the authorized workspace"
     description="These actions use the existing business records, permissions and verification gates.">
     <div className="grid gap-3">
-      {handoffs.map(item => <div key={item.title} className="flex flex-wrap items-center justify-between gap-3 border bg-background p-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">{item.title}</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <a href={item.href(siteId)}>{item.title}<ArrowRight aria-hidden="true" className="size-4" /></a>
-        </Button>
-      </div>)}
+      {handoffs.map(item => <WorkspaceActionLink key={item.title}
+        title={item.title} description={item.detail}
+        href={item.href(siteId)} actionLabel={item.title} />)}
     </div>
   </WorkspacePanel>;
 }
