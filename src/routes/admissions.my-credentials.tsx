@@ -22,7 +22,7 @@ function MyCredentials(){
  return <WorkspaceShell eyebrow="Records" title="My official credentials" subtitle="Secure, time-limited access to records authorized for your verified account.">
   <div className="space-y-4 py-6">
    {error&&<p role="alert" className=" border p-3">{error}</p>}
-   <Button variant="outline" type="button" className=" border px-3 py-2" disabled={busy} onClick={()=>void query.refetch()}>Refresh authorizations</Button>
+   <Button variant="outline" type="button"  disabled={busy} onClick={()=>void query.refetch()}>Refresh authorizations</Button>
    <QueryState loading={query.isPending?"Loading your records...":undefined}
     error={query.isError?mutationErrorMessage(query.error,"Unable to load your records"):undefined}
     onRetry={()=>void query.refetch()} retrying={busy}
@@ -31,7 +31,7 @@ function MyCredentials(){
     <h2 className="font-semibold">{row.transcriptId?"Official transcript":"Diploma"}</h2>
     <p className="text-sm">Purpose: {row.purpose}</p>
     <p className="text-sm">Access expires {new Date(row.expiresAt).toLocaleString()}</p>
-    <Button variant="outline" type="button" disabled={busy} className=" border px-3 py-2" onClick={()=>void download(row.id)}>Download authorized PDF</Button>
+    <Button variant="outline" type="button" disabled={busy}  onClick={()=>void download(row.id)}>Download authorized PDF</Button>
    </article>)}
    </QueryState>
   </div>
