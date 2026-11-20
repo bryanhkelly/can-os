@@ -160,7 +160,7 @@ const noRepeatedPrimary = {
  * Hidden form fields and accessible choice-card labels are deliberate HTML
  * exceptions; the same exceptions are used by v61-source-audit.mjs.
  */
-const nativeControlTags = new Set(["button", "input", "select", "textarea", "label"]);
+const nativeControlTags = new Set(["button", "input", "select", "textarea", "label", "dialog"]);
 const choiceControlTags = new Set(["Checkbox", "Radio"]);
 const nestedControlTags = new Set([
   ...nativeControlTags, "Button", "Input", "Select", "Textarea", "Checkbox", "Radio",
