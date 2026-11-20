@@ -1,10 +1,14 @@
 import { WorkspaceNavigation } from "@/components/shell/WorkspaceNavigation";
+import { ProtectedRouteAuthGate } from "@/components/shell/ProtectedRouteAuthGate";
+import { isPublicCanPath } from "@/domain/auth-route-policy";
+import { accessReturnToFromLocation } from "@/domain/access-navigation";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { WorkspaceSessionProvider, workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
+  redirect,
   HeadContent,
   Outlet,
   Scripts,
@@ -25,7 +29,15 @@ import { isEngagementPath } from "@/domain/engagement-context";
 import favicon from "../assets/can-os-favicon.svg?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  loader: ({ context }) => context.queryClient.fetchQuery(workspaceSessionQueryOptions()),
+  loader: async ({ context, location }) => {
+    const result=await context.queryClient.fetchQuery(workspaceSessionQueryOptions());
+    if (!isPublicCanPath(location.pathname) && !result.error && !result.session?.authenticated) {
+      throw redirect({ to: "/access", search: {
+        returnTo: accessReturnToFromLocation(location),
+      }, replace: true });
+    }
+    return result;
+  },
   staleTime: Infinity,
   headers: () => ({ "Cache-Control": "private, no-store" }),
   head: () => ({
@@ -81,6 +93,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <WorkspaceSessionProvider initial={session}>
+        <ProtectedRouteAuthGate>
         {engagement
           ? <EngagementChrome><Outlet /></EngagementChrome>
           : publicSiteSignup || siteLaunch
@@ -88,6 +101,7 @@ function RootComponent() {
           : standalone
             ? <LaunchStudioChrome><AccessReturnRecovery><Outlet /></AccessReturnRecovery></LaunchStudioChrome>
             : <><WorkspaceNavigation><AccessReturnRecovery><Outlet /></AccessReturnRecovery></WorkspaceNavigation><CommandPalette /></>}
+        </ProtectedRouteAuthGate>
       </WorkspaceSessionProvider>
     </QueryClientProvider>
   );
