@@ -68,6 +68,10 @@ describe("Classroom Connect reliability and integration",()=>{
     expect(preflight).toContain("Video authorization:</strong> Checked at playback");
     expect(host).toContain('aria-label="Classroom connection health"');
     expect(host).toContain("room.dataUpdatedAt");
+    expect(host).toContain("getClassroomProjectorCommand");
+    expect(host).toContain("failedCommands");
+    expect(host).toContain("onCommandStatus=");
+    expect(source("src/components/learning/ClassroomPlaybackControls.tsx")).toContain("onCommandStatus?.(\"failed\",kind)");
     expect(projector).not.toContain("Classroom connection health");
     expect(projector).not.toContain("respondingLearners");
   });
