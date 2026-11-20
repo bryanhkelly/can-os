@@ -53,8 +53,6 @@ export const Route = createFileRoute("/groups")({
 });
 
 type Data = Awaited<ReturnType<typeof loadGroups>>;
-type Workspace = NonNullable<Data["workspace"]>;
-type Group = Workspace["groups"][number];
 
 export { groupKindLabel, nextGroupSession } from "@/domain/study-group-display";
 
