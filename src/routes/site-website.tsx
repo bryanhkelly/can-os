@@ -17,7 +17,7 @@ import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionFooter, type StatusTone } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionDialog, ActionFooter, type StatusTone } from "@/components/workspace";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -515,6 +515,7 @@ function LocalWebsiteCopyEditor({
   const artworkGaps = [content.branding.heroImage, content.branding.logoImage ?? null]
     .flatMap(siteLocalImagePublicationGaps);
   const [error, setError] = useState("");
+  const [confirmation,setConfirmation] = useState<null | {kind:"reload"} | {kind:"restore";revision:number}>(null);
   const [draftPreview, setDraftPreview] = useState<{source: SiteLocalContent; rendered: Awaited<ReturnType<typeof previewChurchWebsiteDraft>>} | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
   const [previewError, setPreviewError] = useState("");
@@ -539,7 +540,6 @@ function LocalWebsiteCopyEditor({
       data.currentBrandVersionId]);
 
   function loadLatestRevision() {
-    if (dirty && !window.confirm("Discard unsaved Website & Brand changes and load the latest saved revision?")) return;
     const latest = prepareWebsiteEditorContent(data.editingContent, data.siteName);
     setEditor({ content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId });
     setBrandDisplayName(data.currentBrandConfiguration?.displayName??data.siteName);
@@ -650,7 +650,6 @@ function LocalWebsiteCopyEditor({
 
   async function restore(revision: number) {
     if (busy || revisionConflict) return;
-    if (dirty && !window.confirm("Restoring an older revision will discard unsaved changes. Continue?")) return;
     setError("");
     const outcome = await mutation.run(() => restoreChurchWebsiteContent({
         data: { expectedRevision: editor.revision, restoreRevision: revision,siteId:data.siteId },
@@ -699,21 +698,21 @@ function LocalWebsiteCopyEditor({
       onRestore={()=>setContent(old=>restoreOriginalWebsiteField(old,field.key))}/>;
 
   return <section aria-label="Website content setup">
-    {data.demonstration && !data.editingContent && <div role="note" className="mt-3  border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
+    {data.demonstration && !data.editingContent && <WorkspaceNotice tone="attention" className="mt-3">
       <p className="font-semibold">Fictional sample prepared for this demo Site</p>
       <p className="mt-1">We filled the draft with an example welcome, community story, vision and theme.
         This content has not been saved or published. Review and edit the story, then
         save your private draft. Site publication and legal authorization are separate.</p>
       <p className="mt-2">To change any suggested wording, go to Your Content and use the Reset to original action
         beside that individual field. No other answers are affected.</p>
-    </div>}
-    {revisionConflict && <div role="alert" className="mt-3 space-y-2 border border-amber-500 p-4 text-sm">
+    </WorkspaceNotice>}
+    {revisionConflict && <WorkspaceNotice tone="attention" className="mt-3 space-y-2">
       <p className="font-semibold">A newer website revision ({data.currentRevision}) is available.</p>
       <p>Your unsaved edits remain here. Saving is paused to prevent overwriting someone else's revision.
         You can review or copy your current wording, then load the latest saved version.</p>
-      <Button variant="outline" type="button" onClick={loadLatestRevision}
+      <Button variant="outline" type="button" onClick={() => dirty ? setConfirmation({kind:"reload"}) : loadLatestRevision()}
         className="min-h-11 border px-3 py-2 font-semibold">Discard my edits and load latest</Button>
-    </div>}
+    </WorkspaceNotice>}
     {!data.canEdit && <WorkspaceNotice tone="attention" className="mt-3">
       This Site is view-only for your current assignment. A private Site Brand and
       website draft require an authorized editor. Public publication is reviewed separately.
@@ -959,7 +958,7 @@ function LocalWebsiteCopyEditor({
               <span>Revision {version.revision} · {version.status === "published" ? "Published" : version.status === "draft" ? "Private draft" : "Held for review"}
                 {" · "}{new Date(version.createdAt).toLocaleString()}</span>
               {allowPublication && data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
-                <Button variant="outline" type="button" disabled={busy || revisionConflict} onClick={() => void restore(version.revision)}
+                <Button variant="outline" type="button" disabled={busy || revisionConflict} onClick={() => dirty ? setConfirmation({kind:"restore",revision:version.revision}) : void restore(version.revision)}
                   className=" border px-3 py-1 text-xs disabled:opacity-50">
                   Restore as new revision
                 </Button>}
@@ -967,11 +966,22 @@ function LocalWebsiteCopyEditor({
           </ul>
         </details>}
       </div>}
-      {!data.draftStorageReady && <p role="alert" className="border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950">
+      {!data.draftStorageReady && <WorkspaceNotice tone="attention">
         <strong>Private draft storage requires an update.</strong> This Cloudflare-connected database has not
         applied website migration 0077. Draft saving is unavailable until an authorized database
         migration is completed. You can still preview the website, but your changes are not saved.
-      </p>}
+      </WorkspaceNotice>}
+      <ActionDialog open={confirmation!==null}
+        title={confirmation?.kind==="reload" ? "Discard changes and load latest?" : "Restore an earlier website revision?"}
+        description="Unsaved website copy and Brand edits will be discarded. Previously saved versions stay in history."
+        confirmLabel={confirmation?.kind==="reload" ? "Discard edits and reload" : "Restore revision"}
+        destructive pending={busy} onClose={()=>setConfirmation(null)}
+        onConfirm={()=>{
+          const action=confirmation;
+          setConfirmation(null);
+          if(action?.kind==="reload") loadLatestRevision();
+          else if(action?.kind==="restore") void restore(action.revision);
+        }} />
       <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
         <Button type="button" variant="outline" disabled={busy || step === 0}
           onClick={()=>onStepChange(Math.max(0,step-1))}>Back</Button>
