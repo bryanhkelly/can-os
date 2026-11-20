@@ -1,10 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { LaunchModuleDestinationV61, launchModuleDestinationsV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
-import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, replaceVisibleOfferingIntents, resolveVisibleSolutionRecipe, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
+import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, replaceVisibleOfferingIntents, resolveSavedSolutionPlan, resolveVisibleSolutionRecipe, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, search, ...props }: {
@@ -140,6 +141,42 @@ describe("V6.1 Prepare to Open", () => {
       .toEqual(["b", "c"]);
     expect(selectSavedSolutionPlans(plans, "missing")).toEqual([]);
     expect(plans).toHaveLength(3);
+  });
+
+  it("resolves only the exact saved Solution plan and published version", () => {
+    const plans = [
+      { configurationId: "mine", blueprintVersionId: "v1", revision: 2 },
+      { configurationId: "other", blueprintVersionId: "v2", revision: 1 },
+    ];
+    const templates = [{ blueprintVersionId: "v1", title: "Pilot v1" }];
+    expect(resolveSavedSolutionPlan(plans, templates, "mine")).toEqual({
+      plan: plans[0], template: templates[0],
+    });
+    expect(resolveSavedSolutionPlan(plans, templates, "other")).toBeNull();
+    expect(resolveSavedSolutionPlan(plans, templates, "missing")).toBeNull();
+    expect(resolveSavedSolutionPlan(plans, templates, null)).toBeNull();
+    expect(resolveSavedSolutionPlan(plans, [{ blueprintVersionId: "v2" }], "mine"))
+      .toBeNull();
+    expect(plans).toHaveLength(2);
+  });
+
+  it("links Prepare and Open readiness directly to the saved Solution plan", () => {
+    const read = (path: string) => readFileSync(
+      new URL("../../" + path, import.meta.url), "utf8");
+    const route = read("src/routes/launch.site.tsx");
+    const prepare = read("src/components/launch-studio/LaunchPrepareV61.tsx");
+    const catalog = read("src/components/launch-studio/SolutionCatalogV61.tsx");
+    const readiness = read("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
+    expect(route).toContain("solutionPlanId: z.string().uuid().optional()");
+    expect(route).toContain('selected.id === "program-catalog" ? search.solutionPlanId : undefined');
+    expect(prepare).toContain("initialPlanId={solutionPlanId}");
+    expect(catalog).toContain("resolveSavedSolutionPlan(");
+    expect(catalog).toContain("setResumeConfigurationId(saved.plan.configurationId)");
+    expect(readiness).toContain("solutionPlanId:plan.configurationId");
+    expect(readiness).toContain("View published Solution requirements");
+    expect(readiness).toContain("Their selection does not verify");
+    expect(readiness).toContain("Continue plan");
+    expect(readiness).toContain("Review plan");
   });
 
   it("preserves invisible proposed Offering intents when editing a visible Program component", () => {
