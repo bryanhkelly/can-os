@@ -49,6 +49,24 @@ describe("V6.1 navigation consolidation", () => {
     expect(code).not.toMatch(/<nav\b/);
   });
 
+  it("reuses canonical program scope navigation without duplicated JSX attributes", () => {
+    const code = source("src/components/learning/CurriculumProgramNavigation.tsx");
+    expect(code).toContain('<WorkspaceLinkNavigation label="Curriculum program scope"');
+    expect(code).not.toMatch(/<nav\b/);
+    expect(code).toContain('selectedProgramId === program.id');
+    expect(code).toContain('aria-current={selectedProgramId === program.id ? "page" : undefined}');
+    expect(code).not.toMatch(/className="min-h-11"\s+className=/);
+  });
+
+  it("uses shared selected tabs across all Capability Lab sections", () => {
+    const code = source("src/components/capability-lab/CapabilityLabNav.tsx");
+    expect(code).toContain('<DetailNavigation label="Capability Lab sections"');
+    expect(code).toContain("<SectionTab");
+    expect(code).not.toMatch(/<nav\b/);
+    expect(code).toContain('surveyDraftEnabled || current === "survey-drafts"');
+    expect(code).toContain('surveyPublicationEnabled || current === "survey-publications"');
+  });
+
   it("retains the independent class view and class section selection inputs", () => {
     const code = source("src/routes/class_.$classId.tsx");
     expect(code).toContain('label="Class views"');
