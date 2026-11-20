@@ -230,9 +230,10 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   }
   // Only native video playback can produce timing observations. Third-party
   // iframe playback remains uninstrumented by explicit product decision.
-  function nativeVideoCallbacks(url?: string | null) {
-    if (data.role !== "student" || !lesson || !url ||
-        resolveClassVideo(url)?.kind !== "file") return {};
+  function nativeVideoCallbacks() {
+    // The shared player emits these callbacks only for native media,
+    // including private assets whose signed URL is resolved after Play.
+    if (data.role !== "student" || !lesson) return {};
     return {
       onPlaybackEvent: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) =>
         videoActivityController.current?.observeVideo(kind, resourceId),
@@ -243,7 +244,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
     return <ClassSupplementContent item={item} presentation={presentation}
       resumeKey={nativeVideoResumeKey}
-      {...nativeVideoCallbacks(item.url)}
+      {...nativeVideoCallbacks()}
       programId={data.section.programId} sectionId={data.section.id}
       disabled={busy || downloading}
       loadPrivateUrl={async supplementId => {
@@ -299,7 +300,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       <Link to="/student/assignments" search={{ section: data.section.id }} className="underline">Class assignments and feedback</Link>;
   const recorded = mainVideoResource?.url ? <ClassVideoPlayer key={mainVideoResource.id} title={mainVideoResource.title}
     url={mainVideoResource.url} resourceId={mainVideoResource.id} declaredVideo={false} presentation="classroom"
-    resumeKey={nativeVideoResumeKey} {...nativeVideoCallbacks(mainVideoResource.url)}/> :
+    resumeKey={nativeVideoResumeKey} {...nativeVideoCallbacks()}/> :
     mainVideoSupplement ? supplementContent(mainVideoSupplement, "classroom") : <ClassVideoPlaceholder
       title={lesson ? "No lesson recording yet" : "No class recording yet"}
       message={lesson ? "Your teacher has not attached a recorded video. Use the published reading and activities below." :
