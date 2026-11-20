@@ -66,7 +66,9 @@ for (const file of files) {
 const owners = [
   ["src/routes/class.tsx", ["function OfferingCard(", "function ApprovedClassCard(",
     "function InvitationCard(", "function EnrolledClassCard("]],
-  ["src/routes/calendar.tsx", ["const groupPeople = new Map", "visibleInvitePeople.map("]],
+  ["src/routes/calendar.tsx", ["const groupPeople = new Map", "visibleInvitePeople.map(",
+    '<ul className="mt-4 divide-y">{periodItems.map',
+    '<ul className="mt-4 divide-y">{visibleItems.map']],
   ["src/routes/site-website.tsx", ["function WebsiteInformationChecklist(",
     "function WebsiteSourceMappingPanel(", "function WebsiteDesignChecklist(",
     "function WebsitePreviewPanel("]],
