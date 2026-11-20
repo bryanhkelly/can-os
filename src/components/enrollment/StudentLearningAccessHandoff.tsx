@@ -94,7 +94,7 @@ function ApplicationLearningAccessHandoff({
    ?<Link to="/launch/school/$programId" params={{programId:blocker.programId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>
    :<Link to="/admissions" search={{siteId:blocker.siteId??undefined,programId:blocker.programId,application:blocker.applicationId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>)
    :<Link to="/messages" className="mt-3 inline-block underline">Ask admissions to complete this requirement</Link>}
-  <Button variant="outline" type="button" onClick={()=>setRetry(value=>value+1)} className="ml-3  border px-3 py-2">Check again</Button>
+  <Button variant="outline" type="button" onClick={()=>setRetry(value=>value+1)} className="ml-3">Check again</Button>
  </section>;
  if(status==="access_unavailable")return <section aria-label="Student learning account"
   className="mt-4  border p-4 text-sm">
@@ -160,7 +160,7 @@ function ApplicationLearningAccessHandoff({
      </>}
     </>:status==="approved"?<>
      <p>Student access is approved. The student uses their own verified email address—not the parent’s account—to request a short-lived sign-in link and open assigned classes.</p>
-     {role==="guardian"&&<Link to="/access" className="mt-3 inline-block  border px-3 py-2 font-semibold">Open student sign-in</Link>}
+     {role==="guardian"&&<Button asChild variant="outline" className="mt-3"><Link to="/access">Open student sign-in</Link></Button>}
      {hasRegistrarAuthority(role)&&<Button type="submit" variant="outline" disabled={busy}
        >
        {busy?"Requesting…":"Request student sign-in link again"}
