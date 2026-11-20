@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { useHydrated } from "@/lib/use-hydrated";
 import {clearLearnerBrowserState} from "@/domain/session-client";
+import {embeddedSourceRevision} from "@/domain/build-source-revision";
 export const Route=createFileRoute("/access/")({
  validateSearch:(search:Record<string,unknown>):{email?:string;error?:keyof typeof accessFormErrors;returnTo?:string}=>({
   email:typeof search.email==="string"?search.email:undefined,
@@ -18,6 +19,7 @@ export const Route=createFileRoute("/access/")({
 });
 function AccessPage(){
  const search=Route.useSearch();
+ const buildId=embeddedSourceRevision();
  // Reusing the /access route with a different email query must update the prefill
  // without discarding a draft when an unrelated returnTo parameter changes.
  const[emailDraft,setEmailDraft]=useState({forEmail:search.email,value:search.email??""});
@@ -61,5 +63,8 @@ function AccessPage(){
    <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
   </div>
  </WorkspacePanel>
+ <footer className="mx-auto mt-6 max-w-md border-t border-border pt-3 text-center text-xs text-muted-foreground" aria-label="Build information">
+   Build: <span className="font-mono" title={buildId??"Build revision not embedded"}>{buildId?.slice(0,12)??"unavailable"}</span>
+ </footer>
  </WorkspaceShell>;
 }
