@@ -1,5 +1,6 @@
 import {createFileRoute} from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {createServerOnlyFn} from "@tanstack/react-start";
 import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
@@ -102,13 +103,21 @@ function VerifyAccess(){
   }
   setReady(true);
  },[]);
- return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
-  <h1 className="font-serif text-3xl">Confirm your CAN OS access</h1>
-  <p role="status">{ready&&!token?"The access link is missing. Request a new sign-in link to continue.":"Use the button to complete your sign-in."}</p>
-  <form action={verifyAction} method="post" onSubmit={()=>{clearLearnerBrowserState();setWorking(true);}}>
-  <input type="hidden" name="token" value={token??""}/>
-  <input type="hidden" name="returnTo" value={search.returnTo??""}/>
-  <Button type="submit" disabled={working||!ready||!token} loading={working} loadingLabel="Signing in securely…">Sign in securely</Button>
-  </form>
- </main>;
+ return <WorkspaceShell width="reading" eyebrow="Access" title="Confirm your CAN OS access"
+   subtitle="Complete the secure sign-in using your one-time access link.">
+   <WorkspacePanel title="Verify your access" className="mt-6">
+     <div className="space-y-5">
+       <p role="status" className="text-sm text-muted-foreground">{ready&&!token
+         ?"The access link is missing. Request a new sign-in link to continue."
+         :"Use the button to complete your sign-in."}</p>
+       <form action={verifyAction} method="post" onSubmit={()=>{clearLearnerBrowserState();setWorking(true);}}
+         className="space-y-4">
+         <input type="hidden" name="token" value={token??""}/>
+         <input type="hidden" name="returnTo" value={search.returnTo??""}/>
+         <Button type="submit" disabled={working||!ready||!token}
+           loading={working} loadingLabel="Signing in securely…">Sign in securely</Button>
+       </form>
+     </div>
+   </WorkspacePanel>
+ </WorkspaceShell>;
 }
