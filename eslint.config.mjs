@@ -118,6 +118,7 @@ export default tseslint.config(
       "src/components/workflow/user-flow-map.tsx",
       "src/routes/canonical.lab.impact.tsx",
       "src/routes/student.assignments_.$assessmentId.tsx",
+      "src/routes/teacher.gradebook.tsx",
     ],
     rules: { "can-os-design/no-native-feature-tables": "error" },
   },
