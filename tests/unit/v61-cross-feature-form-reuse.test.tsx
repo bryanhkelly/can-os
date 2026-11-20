@@ -66,6 +66,6 @@ describe("V6.1 cross-feature form composition", () => {
     const source = readFileSync(new URL(`../../${filePath}`, import.meta.url), "utf8");
     expect(source).toContain("<ActionFooter");
     expect(source).toContain('type="submit"');
-    expect(source).not.toMatch(/<button\\b/);
+    expect(source).not.toMatch(/<button\b/);
   });
 });
