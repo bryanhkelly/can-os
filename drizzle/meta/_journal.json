@@ -680,6 +680,13 @@
       "when": 1795134000000,
       "tag": "0096_class_enrollment_calendar_cancellation",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1795135000000,
+      "tag": "0097_blueprint_public_journal_gateway",
+      "breakpoints": true
     }
   ]
 }
