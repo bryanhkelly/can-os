@@ -26,7 +26,15 @@ export function launchSiteLifecycleLabel(status: "planning" | "active" | "closed
   return "Lifecycle not recorded";
 }
 
-export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidence) {
+export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidence,
+  lifecycleStatus?: "planning" | "active" | "closed" | null) {
+  // Closed Sites may retain historical drafts. Never present those as work
+  // that can be reopened or make enrollment-ready without a new authorization.
+  if (lifecycleStatus === "closed") {
+    return { title: "Review Closed Site",
+      description: "This Site is closed. Review its authorized record before any further planning.",
+      href: "/sites/" + encodeURIComponent(siteId) };
+  }
   const route = (module: string) => "/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=" + module;
   if (evidence.information.state === "unavailable") {
     return { title: "Review Site Information",
