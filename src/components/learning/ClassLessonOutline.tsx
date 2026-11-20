@@ -29,7 +29,7 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
       <UnifiedLessonOutline lessons={published} selectedId={currentLessonId}
         label="Published lesson outline"
         renderAction={item=><Link to="/class"
-          search={{...search,tab:"lessons",lesson:item.id}}
+          
           className="underline-offset-2 hover:underline">{item.title}</Link>}/>
     </div>
     {showCompletion&&published.length>0&&<div className="mt-4 border-t pt-4">
