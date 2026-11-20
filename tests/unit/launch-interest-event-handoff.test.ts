@@ -99,7 +99,7 @@ describe("Introduce Interest Event handoff uses exact authorized Site and saved 
     calls.listPackages.mockResolvedValue([{
       ...eventPackage(siteA),
       content:{purpose:"event-invitation",
-        headline:"Community open house\\nJoin our planning team",
+        headline:"Community open house\nJoin our planning team",
         message:"Meet our neighbors."},
     }]);
     const result=await load({siteId:siteA,packageId});
