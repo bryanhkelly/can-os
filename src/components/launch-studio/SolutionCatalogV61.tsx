@@ -57,6 +57,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
   const filtered = filterPublishedSolutionRecipes(templates, query);
   const visible = orderSolutionsByVision(
     filtered, intent?.interestIds ?? [], intent?.startingFocus,
+    intent?.programCodes ?? [], intent?.startingProgramCode,
   );
   const selected = resolveVisibleSolutionRecipe(visible, selectedId);
 
@@ -83,7 +84,9 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
           searchPlaceholder="Search titles or components" className="mt-5" />
         <p role="status" className="mt-3 text-xs text-muted-foreground">
           {visible.length} matching published Solutions.
-          {intent?.interestIds.length ? " Title or component matches to your vision appear first; these are suggestions, not verified qualification." : ""}
+          {(intent?.interestIds.length || intent?.programCodes?.length)
+            ? " Exact saved Program matches appear first. These are planning suggestions, not Site authorization."
+            : ""}
         </p>
         {visible.length === 0 ? <EmptyState kind="matches" className="mt-4"
           title="No matching Solutions" description="Try another title or component." /> :
@@ -92,6 +95,8 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
               {visible.map(template => {
                 const active = selected?.blueprintVersionId === template.blueprintVersionId;
                 const visionMatches = matchingSolutionInterests(template, intent?.interestIds ?? []);
+                const matchesProgram = !!template.programCode &&
+                  !!intent?.programCodes?.includes(template.programCode);
                 return <Button key={template.blueprintVersionId} type="button"
                   variant="ghost" onClick={() => {
                     setSelectedId(template.blueprintVersionId);
@@ -107,6 +112,9 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                       <span className="mt-1 block text-xs text-muted-foreground">
                         Version {template.versionNo} · {template.components.length} components
                       </span>
+                      {matchesProgram && <span className="mt-1 block text-xs font-semibold text-primary">
+                        Matches a Program selected in Establish
+                      </span>}
                       {visionMatches.length > 0 && <span className="mt-1 block text-xs font-medium text-primary">
                         Matches {visionMatches.length} saved {visionMatches.length === 1 ? "interest" : "interests"} by title or component
                       </span>}
@@ -120,6 +128,9 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                 <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><BookOpen aria-hidden="true" className="size-4" /> Published Solution model</div>
                 <h3 className="mt-3 font-serif text-2xl">{selected.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">Version {selected.versionNo} · {selected.components.length} components in this published configuration</p>
+                {selected.offeringCode && <p className="mt-2 text-xs text-muted-foreground">
+                  Linked Offering: {selected.offeringCode}. Publication, adoption and learner enrollment must each be authorized independently.
+                </p>}
               </div>
               <div className="space-y-5 p-5">
                 <div>
