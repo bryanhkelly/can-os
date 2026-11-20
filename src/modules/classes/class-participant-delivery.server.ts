@@ -43,6 +43,23 @@ async function meeting(sessionId: string): Promise<Meeting | null> {
     .where(eq(canonicalClassSessions.id, sessionId)).limit(1);
   return record ?? null;
 }
+/** Single canonical query for upcoming calendar invitations and cancellations.
+ * Keep the 101-row cap so both paths fail closed above 100 Sessions. */
+async function upcomingMeetings(classId: string, now: Date): Promise<Meeting[]> {
+  return db.select({
+    id: canonicalClassSessions.id, classId: canonicalClassSessions.classId,
+    startsAt: canonicalDeliverySessions.startsAt, endsAt: canonicalDeliverySessions.endsAt,
+    state: facilitatedClassroomPlans.state,
+  }).from(canonicalClassSessions)
+    .innerJoin(canonicalDeliverySessions,
+      eq(canonicalDeliverySessions.id, canonicalClassSessions.deliverySessionId))
+    .innerJoin(facilitatedClassroomPlans,
+      eq(facilitatedClassroomPlans.id, canonicalClassSessions.classroomPlanId))
+    .where(and(eq(canonicalClassSessions.classId, classId),
+      eq(facilitatedClassroomPlans.state, "scheduled"),
+      gt(canonicalDeliverySessions.startsAt, now)))
+    .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+}
 function calendarEvent(row: Meeting, title: string, attendeeEmail: string, organizerEmail?: string): CalendarInvitationEvent {
   return {
     uid: classSessionCalendarUid(row.id), summary: title,
@@ -229,19 +246,7 @@ const adapter = {
     const assets: NonNullable<Mail["attachments"]> = [];
     let subject: string, text: string;
     if(cancellation){
-      const upcoming=await db.select({
-        id:canonicalClassSessions.id,classId:canonicalClassSessions.classId,
-        startsAt:canonicalDeliverySessions.startsAt,endsAt:canonicalDeliverySessions.endsAt,
-        state:facilitatedClassroomPlans.state,
-      }).from(canonicalClassSessions)
-        .innerJoin(canonicalDeliverySessions,
-          eq(canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
-        .innerJoin(facilitatedClassroomPlans,
-          eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
-        .where(and(eq(canonicalClassSessions.classId,cls.id),
-          eq(facilitatedClassroomPlans.state,"scheduled"),
-          gt(canonicalDeliverySessions.startsAt,now)))
-        .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+      const upcoming=await upcomingMeetings(cls.id,now);
       if(upcoming.length>100)
         return {kind:"fail",reason:"Class_cancellation_schedule_exceeds_limit"};
       if(upcoming.length)assets.push(attachment("cancelled-class-sessions.ics",
@@ -259,19 +264,7 @@ const adapter = {
         ". This invitation expires " + localTime(invitation!.expiresAt, site.timezone) +
         ". Your seat is not reserved until you accept the current published terms.\n\n" + view;
     } else if (record.kind === "enrollment_confirmed") {
-      const scheduled = await db.select({
-        id: canonicalClassSessions.id, classId: canonicalClassSessions.classId,
-        startsAt: canonicalDeliverySessions.startsAt, endsAt: canonicalDeliverySessions.endsAt,
-        state: facilitatedClassroomPlans.state,
-      }).from(canonicalClassSessions)
-        .innerJoin(canonicalDeliverySessions,
-          eq(canonicalDeliverySessions.id, canonicalClassSessions.deliverySessionId))
-        .innerJoin(facilitatedClassroomPlans,
-          eq(facilitatedClassroomPlans.id, canonicalClassSessions.classroomPlanId))
-        .where(and(eq(canonicalClassSessions.classId, cls.id),
-          eq(facilitatedClassroomPlans.state, "scheduled"),
-          gt(canonicalDeliverySessions.startsAt, now)))
-        .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+      const scheduled = await upcomingMeetings(cls.id, now);
       if (scheduled.length > 100)
         return { kind: "fail", reason: "Class_schedule_exceeds_email_series_limit" };
       if (scheduled.length) assets.push(attachment("class-schedule.ics",
