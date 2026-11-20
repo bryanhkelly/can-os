@@ -24,7 +24,7 @@ const canonicalTags = new Set([
   "StudentDashboardRail", "StudentUpcomingAssignments",
   "StudentReleasedGradesPanel", "StudentSchoolLifePanel",
   "StudentContinueLearningPanel", "StudentTodayAtGlance",
-  "ExtendedSeasonDraftForm",
+  "ExtendedSeasonDraftForm", "ExtendedSeasonReadinessRequests",
 ]);
 const files = [];
 function walk(directory) {
