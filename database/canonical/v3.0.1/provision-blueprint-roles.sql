@@ -10,9 +10,10 @@
 \quit 3
 \endif
 
--- Trusted-operator provisioning only. Shared Organization, Site and Blueprint
--- records are in public; legacy evidence labels and audit journals remain in
--- education_v30. Execute only after scoped public.sites RLS is reviewed.
+-- Trusted-operator provisioning only. Shared Organization, Site, Blueprint,
+-- evidence labels and audit journals are in public. Selected authorization
+-- functions still reside in education_v30 until the separately reviewed
+-- function dependency cutover. Execute only after public.sites RLS review.
 -- Committing this script does not execute any database mutation.
 SELECT (
  EXISTS(SELECT 1 FROM public.organizations
@@ -42,6 +43,11 @@ SELECT 'can_v30_blueprint_author_' || lower(replace(:'organization_id','-','')) 
        'can_v30_blueprint_reviewer_' || lower(replace(:'organization_id','-','')) AS reviewer_role
 \gset
 
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtextextended(
+  :'organization_id' || ':' || :'application_role' || ':blueprint-role-provisioning', 0
+));
+
 SELECT format('CREATE ROLE %I NOLOGIN NOINHERIT NOBYPASSRLS NOCREATEDB NOCREATEROLE',
   :'author_role')
 WHERE NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=:'author_role')
@@ -63,7 +69,6 @@ SELECT (
 \quit 3
 \endif
 
-BEGIN;
 SELECT format('GRANT USAGE ON SCHEMA public, education_v30 TO %I,%I',
  :'author_role',:'reviewer_role')
 \gexec
