@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
-import { MutationFeedback } from "@/components/workspace";
+import { ActionFooter, MutationFeedback } from "@/components/workspace";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { classVideoFileSchema, videoUploadPolicy } from "@/domain/class-video";
@@ -114,13 +114,14 @@ export function ProviderVideoUploadForm({
         error={validationAttempted&&!rights?"Confirm upload rights.":undefined}>
         <Checkbox checked={rights} onChange={event=>{reset();setRights(event.target.checked);}}/>
       </Field>
-      <div className="sm:col-span-2 flex flex-wrap gap-3">
-        <Button type="submit" disabled={!versions.length||busy}>
+      <ActionFooter layout="inline" className="mt-0 sm:col-span-2">
+        <Button type="submit" disabled={!versions.length||busy}
+          loading={feedback.pending} loadingLabel="Uploading private video...">
           {attempted?"Retry private upload":"Upload private video draft"}
         </Button>
         {attempted&&<Button type="button" variant="outline"
           disabled={busy} onClick={reset}>Start a new upload</Button>}
-      </div>
+      </ActionFooter>
     </form>
     <MutationFeedback state={feedback} pendingMessage="Uploading and verifying private media. Keep this page open."/>
     {courseVersionId&&<div className="mt-6 border-t border-border pt-5">
