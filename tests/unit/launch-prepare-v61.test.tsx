@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { LaunchModuleDestinationV61, launchModuleDestinationsV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
-import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, resolveVisibleSolutionRecipe, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
+import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, replaceVisibleOfferingIntents, resolveVisibleSolutionRecipe, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, search, ...props }: {
@@ -140,6 +140,25 @@ describe("V6.1 Prepare to Open", () => {
       .toEqual(["b", "c"]);
     expect(selectSavedSolutionPlans(plans, "missing")).toEqual([]);
     expect(plans).toHaveLength(3);
+  });
+
+  it("preserves invisible proposed Offering intents when editing a visible Program component", () => {
+    const previous = [
+      { componentId: "proposed", offeringVersionId: "prior" },
+      { componentId: "editable", offeringVersionId: "old" },
+      { componentId: "other", offeringVersionId: "untouched" },
+    ];
+    const edited = [{ componentId: "editable", offeringVersionId: "new" }];
+    expect(replaceVisibleOfferingIntents(previous, edited, ["editable"])).toEqual([
+      previous[0], previous[2], edited[0],
+    ]);
+    expect(previous).toHaveLength(3);
+    expect(replaceVisibleOfferingIntents(previous, [], ["editable"])).toEqual([
+      previous[0], previous[2],
+    ]);
+    expect(replaceVisibleOfferingIntents(previous, [
+      { componentId: "other", offeringVersionId: "invalid-outside-visible" },
+    ], ["editable"])).toEqual([previous[0], previous[2]]);
   });
 
   it("links to authorized workspaces without duplicating sidebar module navigation", () => {
