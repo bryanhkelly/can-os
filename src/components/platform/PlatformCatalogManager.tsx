@@ -58,7 +58,7 @@ export function PlatformCatalogManager() {
     try {
       const result = await savePlatformProgramDraft({ data: program });
       setSelected({ kind: "program", versionId: result.versionId });
-      setMessage("Program draft v" + result.versionNo + " saved. Independent planning review is required before publication.");
+      setMessage("Program draft v" + result.versionNo + " saved. App Admin can publish this planning version.");
       await refresh();
       setProgram({ ...program, expectedVersion: result.versionNo });
     } catch (reason) {
@@ -124,8 +124,8 @@ export function PlatformCatalogManager() {
       <h2 className="font-serif text-xl">Program Catalog and Blueprint Studio</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         CAN App Admins manage reusable Program definitions and Solution recipes here.
-        Site Admins select and configure these recipes within Launch Studio. A different
-        verified App Admin must review a draft before it can be published.
+        Site Admins select and configure these recipes within Launch Studio. App Admin
+        may publish planning definitions directly; independent peer review is optional.
         Academic content licensing, institutional readiness, and enrollment authorization remain independent.
       </p>
     </div>
@@ -290,8 +290,9 @@ export function PlatformCatalogManager() {
     <section className="space-y-3 border border-border bg-card p-5" aria-label="Review and publish planning definitions">
       <h3 className="font-semibold">Review and publish</h3>
       <p className="text-sm text-muted-foreground">
-        Select the latest draft version. The author cannot approve their own draft.
-        Publication makes a planning definition discoverable, not an enrollable Course or approved Site.
+        Select the latest draft version. Another App Admin may record an optional
+        independent review. The author can publish planning-only definitions
+        directly. Publication does not authorize Courses, Sites, or enrollment.
       </p>
       <Field label="Draft awaiting review">
         <Select value={selected ? selected.kind + ":" + selected.versionId : ""}
@@ -313,7 +314,7 @@ export function PlatformCatalogManager() {
       </Field>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" disabled={!selected || busy}
-          onClick={() => void decide("review")}>Record independent review</Button>
+          onClick={() => void decide("review")}>Optional peer review</Button>
         <Button type="button" disabled={!selected || busy}
           onClick={() => void decide("publish")}>Publish reviewed planning version</Button>
       </div>
