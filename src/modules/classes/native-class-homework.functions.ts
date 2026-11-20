@@ -123,6 +123,25 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
       throw new AuthorizationError("own homework submission capability");
     return db.transaction(async tx=>{
       const {cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      // Real submissions to the fictional Valor Site must remain explicitly
+      // noncredit/synthetic so Riley can return practice feedback without
+      // accidentally manufacturing a grade or overwriting official evidence.
+      const demo=cls.siteId==="f1000000-0000-4000-8000-000000000003"
+        ?await tx.execute(sql`
+          SELECT EXISTS(SELECT 1 FROM public.people p
+            JOIN public.sites s ON s.id=${cls.siteId}::uuid
+            WHERE p.id=${actor.actorPersonId}::uuid
+              AND p.metadata @> '{"synthetic":true}'::jsonb
+              AND s.metadata @> '{"synthetic":true}'::jsonb) AS eligible
+        `)
+        :null;
+      const syntheticPractice=demo?.rows[0]?.eligible===true;
+      const responseValue=JSON.stringify({
+        text:data.responseText,format:"text",
+        ...(syntheticPractice
+          ?{synthetic:true,practiceResponse:true,noncredit:true}
+          :{}),
+      });
       const assignment=await tx.execute(sql`
         SELECT a.id FROM public.graded_assignments a
         JOIN public.official_course_assignment_versions o
@@ -151,7 +170,7 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
           throw new AuthorizationError("this submission cannot be edited");
         const next=await tx.execute(sql`
           UPDATE public.graded_submissions
-          SET response=jsonb_build_object('text',${data.responseText},'format','text'),
+          SET response=${responseValue}::jsonb,
               status='submitted',submitted_at=now()
           WHERE id=${prior.id}::uuid AND status IN ('assigned','returned')
           RETURNING id
@@ -169,7 +188,7 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
           (course_attempt_id,course_version_id,assignment_id,submitted_at,status,response)
         VALUES (${courseAttemptId}::uuid,${cls.courseVersionId}::uuid,
           ${data.assignmentId}::uuid,now(),'submitted',
-          jsonb_build_object('text',${data.responseText},'format','text'))
+          ${responseValue}::jsonb)
         ON CONFLICT (course_attempt_id,assignment_id) DO NOTHING
         RETURNING id
       `);
