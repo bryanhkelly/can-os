@@ -1,4 +1,4 @@
-import { isCanonicalSiteDiscoverable } from "@/domain/canonical-site-availability";
+import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -40,7 +40,9 @@ export async function getBlueprintReferenceCatalog(
       id: catalogSites.id,
       status: catalogSites.status,
     }).from(catalogSites).where(eq(catalogSites.id, siteId)).limit(1);
-    if (!isCanonicalSiteDiscoverable(site?.status)) {
+    if (!site || (isCanPlanning
+      ? !isPrivateCanSitePlanningAllowed(site.status)
+      : !isCanonicalSiteDiscoverable(site.status))) {
       throw new DomainError("UNAVAILABLE", "This Site is unavailable for Blueprint planning.");
     }
     if (isCanPlanning) await assertVerifiedCanPlanningSite(tx, context, siteId);
