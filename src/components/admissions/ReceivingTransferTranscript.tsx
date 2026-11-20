@@ -32,7 +32,7 @@ export function ReceivingTransferTranscript({applicationId,consentRequested}:{
    Every successful read is recorded in the institutional audit.
   </p>
   <Button type="button" variant="outline" size="sm" disabled={busy||!consentRequested}
-   onClick={()=>void open()} className="mt-3  border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+   onClick={()=>void open()} className="mt-3">
    {busy?"Verifying authorization…":result?"Refresh authorized transcript":"View authorized official transcript"}
   </Button>
   {error&&<WorkspaceNotice tone="danger" className="mt-2">{error}</WorkspaceNotice>}
