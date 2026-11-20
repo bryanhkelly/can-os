@@ -95,7 +95,8 @@ function renderSiteContentChannelBlock(block: SiteContentBlockProjection): strin
     escapePublicHtml(block.eyebrow) + '</p><h2>' + escapePublicHtml(block.title) +
     '</h2></div><p>' + escapePublicHtml(block.description) + '</p></div>';
   const items = block.items.map(item => {
-    const label = '<p class="tag">' + escapePublicHtml(item.label) + '</p>';
+    const label = block.channel === "learning.interests" ? "" :
+      '<p class="tag">' + escapePublicHtml(item.label) + '</p>';
     const title = '<h3>' + escapePublicHtml(item.title) + '</h3>';
     const detail = '<p>' + escapePublicHtml(item.description) + '</p>';
     // No URLs can be entered in Site block settings. Navigation comes solely
@@ -851,12 +852,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     if(!records.length) {
       if(authored || !privateDraftPages)return authored;
       const label=kind==="program"?"Programs":kind==="course"?"Courses":"Classes";
-      return '<section class="editorial-section site-private-empty-preview" role="status">'+
-        '<p class="tag">Private design preview · not published</p>'+
-        '<h2>No approved '+label+' to display yet</h2>'+
-        '<p>Once an eligible Offering is independently approved and published, '+
-        'this page will pull its current content and permitted registration actions. '+
-        'The public website does not show an empty catalog page.</p></section>';
+      return '<section class="editorial-section site-private-empty-preview">'+
+        '<h2>Explore '+label+'</h2>'+
+        '<p>We look forward to sharing more about our learning experiences here.</p></section>';
     }
     return authored+renderSiteContentChannelBlock({
       id:"auto-"+kind,channel:"learning.opportunities",
@@ -1104,8 +1102,7 @@ ${composePublicSiteChrome(templateId, {
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="${experienceCopy.navLabel}">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
-  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual learners or facilities of this Site.</p>` : ""}
-  ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
+  main: `<main id="main-content">\n  ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
 })}
 </body>
