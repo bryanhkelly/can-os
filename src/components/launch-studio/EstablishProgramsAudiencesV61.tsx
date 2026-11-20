@@ -14,6 +14,7 @@ import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-a
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { chooseStartingIdeaV61, selectedStartingIdeaV61 } from "@/domain/site-program-intent-focus-v61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 
 type InternalStep = 0 | 1;
@@ -241,23 +242,19 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
     <GuidedSetupShell title={step === 0 ? "What would you like to offer?" : "Who do you hope to serve?"}
       description={step === 0
-        ? "Choose learning interests, possible days and times, and an optional starting focus."
+        ? "Choose the Programs and learning ideas you hope to offer. Delivery details come later."
         : "Choose intended audiences and check your choices below. There is no separate review step."}
       steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : 1)}>
       <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : "Your Audiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">Learning experiences</legend>
-          <p className="text-xs text-muted-foreground">Select any experiences your Site is considering.</p>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {interests.map(choice => <ChoiceCard key={choice.id} {...choice} checked={draft.interestIds.includes(choice.id)}
-              disabled={disabled} onChange={value => toggleInterest(choice.id, value)} />)}
-          </div>
-        </fieldset>
-        <fieldset className="space-y-3 border-t pt-5">
-          <legend className="text-sm font-semibold">Programs under consideration</legend>
-          <p className="text-xs text-muted-foreground">These published Program references are reusable CAN catalog entries. Selecting one expresses interest only. The actual Solution and Offering are configured separately in Prepare.</p>
+        <fieldset className="space-y-4">
+          <legend className="text-sm font-semibold">Which Programs or learning ideas are you considering?</legend>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Start with the big idea. You'll select how to deliver it, including staff,
+            facilities and other requirements, when you choose a Solution in Prepare.
+          </p>
+          <h3 className="text-sm font-semibold">Published Program ideas</h3>
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
           {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
             <p>{catalogError}</p>
@@ -286,16 +283,17 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               </li>)}
             </ul>
           </WorkspaceNotice>}
-          {chosenPrograms.length > 0 && <Field label="Which Program would you start with?"
-            description="Optional planning priority. This does not adopt the Solution or authorize enrollment.">
-            <Select value={draft.startingProgramCode ?? ""} disabled={disabled}
-              onChange={event => setDraft(current => ({
-                ...current, startingProgramCode: event.target.value || null,
-              }))}>
-              <option value="">I'll decide later</option>
-              {chosenPrograms.map(item => <option key={item.code} value={item.code}>{item.title}</option>)}
-            </Select>
-          </Field>}
+          <div className="space-y-3 border-t pt-4">
+            <h3 className="text-sm font-semibold">Other learning ideas</h3>
+            <p className="text-xs text-muted-foreground">
+              You can also describe broad learning interests without selecting a published Program.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {interests.map(choice => <ChoiceCard key={choice.id} {...choice}
+                checked={draft.interestIds.includes(choice.id)}
+                disabled={disabled} onChange={value => toggleInterest(choice.id, value)} />)}
+            </div>
+          </div>
         </fieldset>
         <section aria-labelledby="pa-timing-title" className="space-y-3 border-t pt-5">
           <h3 id="pa-timing-title" className="text-sm font-semibold">When might you offer learning? <span className="font-normal text-muted-foreground">(optional)</span></h3>
@@ -321,20 +319,21 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           <p className="text-xs text-muted-foreground">These are private preferences, not days, hours or dates booked for a Class.</p>
         </section>
         <section className="space-y-3 border bg-muted/25 p-4" aria-labelledby="pa-focus-heading">
-          <h3 id="pa-focus-heading" className="text-sm font-semibold">Choose a starting focus (optional)</h3>
-          <Field label="Which learning experience would you like to begin with?"
-            description="Choose a selected learning interest, or decide later. This does not enroll anyone or adopt a Program.">
-            <Select value={draft.startingFocus ?? ""} disabled={disabled}
-              onChange={event => setDraft(current => ({
-                ...current, startingFocus: (event.target.value || null) as SiteProgramsAudiencesV61["startingFocus"],
-              }))}>
+          <h3 id="pa-focus-heading" className="text-sm font-semibold">One starting idea (optional)</h3>
+          <Field label="Which idea would you begin with?"
+            description="Choose one selected Program or broad learning idea. You can decide the Solution later.">
+            <Select value={selectedStartingIdeaV61(draft)} disabled={disabled}
+              onChange={event => setDraft(current => chooseStartingIdeaV61(current,event.target.value))}>
               <option value="">I'll decide later</option>
-              {options.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              {chosenPrograms.map(item =>
+                <option key={item.code} value={"program:"+item.code}>{item.title}</option>)}
+              {options.map(item =>
+                <option key={item.id} value={"interest:"+item.id}>{item.label}</option>)}
             </Select>
           </Field>
         </section>
         <WorkspaceNotice>These are private planning interests, not approved Programs, Courses, Classes or enrollments. Adopt real offerings later in <strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
-        <p className="text-xs text-muted-foreground">{draft.interestIds.length} learning interests and {(draft.programCodes ?? []).length} Program references selected. You can update your plans later in the Site Workspace.</p>
+        <p className="text-xs text-muted-foreground">{(draft.programCodes ?? []).length} published Program ideas and {draft.interestIds.length} other learning interests selected. You can update your plans later in the Site Workspace.</p>
       </> : <>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
@@ -364,7 +363,11 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           <SummaryRow label="Days & times"
             value={draft.timingIds.length ? draft.timingIds.map(id => timingLabels[id]).join(" · ") : "Not selected yet"}
             onEdit={() => selectStep(0)} />
-          <SummaryRow label="Starting focus" value={options.find(item => item.id === draft.startingFocus)?.label ?? "Not selected"}
+          <SummaryRow label="Starting idea" value={
+            (draft.startingProgramCode
+              ? programs.find(item => item.code === draft.startingProgramCode)?.title
+                ?? draft.startingProgramCode
+              : options.find(item => item.id === draft.startingFocus)?.label) ?? "Not selected"}
             onEdit={() => selectStep(0)} />
           <SummaryRow label="Intended audiences" value={labels(draft.audienceIds, audienceChoices)} />
         </section>
