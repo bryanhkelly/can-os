@@ -16,7 +16,7 @@ export function ClassLearningProgress({
       {isTeacher ? `${lessonCount} published lessons · ${studentCount} enrolled students`
         : `${completedCount} / ${lessonCount} published lessons marked complete`}
     </p>
-    <Link to="/class" search={{...search,tab:"lessons"}}
+    <Link to="/class" 
       className="mt-3 inline-block text-sm underline">Open lessons</Link>
   </WorkspacePanel>;
 }
