@@ -182,7 +182,7 @@ function SiteLaunchPage() {
     </WorkspaceShell> : <LaunchStudioOverview
       site={{ ...site, statusLabel, statusTone: "neutral" }}
       mode="returning"
-      nextAction={overview ? nextLaunchAction(site.id, overview) : {
+      nextAction={overview ? nextLaunchAction(site.id, overview, site.lifecycleStatus) : {
         title: "Review Site Information",
         description: "Saved launch progress has not yet been verified.",
         href: base + "&module=site-information",
