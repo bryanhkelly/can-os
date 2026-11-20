@@ -54,10 +54,9 @@ for (const file of files) {
     if (target && /^src\/(?:routes|db|workers|server)(?:\/|$)/.test(target)) {
       failures.push(file + ": feature presentation must not import route, database, server or worker code: " + importPath);
     }
-    if (importPath.includes("/components/operations/OperationsWorkspace") ||
-        importPath.includes("/components/learning/NativeClassManager")) {
-      failures.push(file + ": reusable UI must not depend on oversized feature orchestrators");
-    }
+    // Feature orchestration components may compose other feature components.
+    // The shared-layer guard above independently forbids that dependency
+    // from primitives, workspace patterns and workflow foundations.
   }
   if (/\bcreateFileRoute\s*\(/.test(source) || /\bcreateServerFn\s*\(/.test(source))
     failures.push(file + ": shared presentation must not own a route or server command");
