@@ -687,6 +687,13 @@
       "when": 1795135000000,
       "tag": "0097_blueprint_public_journal_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795136000000,
+      "tag": "0098_blueprint_journal_client_privilege_hardening",
+      "breakpoints": true
     }
   ]
 }
