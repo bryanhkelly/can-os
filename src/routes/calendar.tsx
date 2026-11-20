@@ -25,6 +25,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { countCalendarInvitees } from "@/domain/calendar-invitees";
 import { CalendarInviteesPicker } from "@/components/calendar/CalendarInviteesPicker";
+import { CalendarAgendaList } from "@/components/calendar/CalendarAgendaList";
+import { formatTime, formatEventDate, typeLabel, chipClass } from "@/components/calendar/calendar-presentation";
 
 export const Route = createFileRoute("/calendar")({
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:CalendarView;q?:string}=>({
@@ -45,52 +47,10 @@ type InviteContact = InviteOptions["contacts"][number];
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function formatTime(iso: string, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(new Date(iso));
-  } catch {
-    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
-  }
-}
-
-function formatEventDate(iso: string, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      timeZone: timezone,
-    }).format(new Date(iso));
-  } catch {
-    return new Intl.DateTimeFormat("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(iso));
-  }
-}
-
 type RevisionInput =
   | { action: "edit"; eventId: string; title: string; description?: string | null }
   | { action: "reschedule"; eventId: string; startsAt: string; endsAt?: string | null }
   | { action: "cancel"; eventId: string };
-
-function typeLabel(item: CalendarFeedItem): string {
-  if (item.source === "assessment") return "Due";
-  if (item.source === "personal") return "Personal";
-  if (item.source === "study_group") return "Study group";
-  if (item.type === "class_time") return "Class time";
-  if (item.type === "chapel") return "Chapel";
-  if (item.type === "field_trip") return "Field trip";
-  if (item.source === "section") return "Section";
-  return "School";
-}
-
-function chipClass(): string {
-  return "border-border bg-muted text-primary";
-}
 
 const MAX_CALENDAR_RANGE_MS = 3 * 24 * 60 * 60 * 1000;
 const CALENDAR_TIMEZONE_PADDING_MS = 14 * 60 * 60 * 1000;
@@ -647,14 +607,10 @@ function CalendarPage() {
         </div>
 
         <div className={`mt-6 grid gap-6 ${view==="week"?"":"lg:grid-cols-[2fr_1fr]"}`}>
-          {view==="agenda"||view==="day"?<section aria-label={view==="day"?`Events on ${anchorDate}`:"Calendar agenda"} className="border border-border bg-card p-5">
-            <h2 className="font-semibold">{view==="day"?`Agenda · ${formatDateOnly(anchorDate)}`:`Agenda · ${monthLabel}`}</h2>
-            <ul className="mt-4 divide-y">{periodItems.map(item=><li key={item.id} className="py-4">
-              <Link {...itemDestination(item)} className="font-semibold text-primary underline">{item.title}</Link>
-              <p className="mt-1 text-sm text-muted-foreground">{dateKeyInTimezone(item.startsAt,item.timezone)} · {formatTime(item.startsAt,item.timezone)} · {item.timezone} · {typeLabel(item)}{item.cancelled?" · Cancelled":""}</p>
-            </li>)}</ul>
-            {!periodItems.length&&!loading&&<p className="mt-4 text-sm text-muted-foreground">No events match this calendar view.</p>}
-          </section>:view==="week"?<section aria-label="Calendar week" className="grid grid-cols-1 border border-border bg-card md:grid-cols-7">
+          {view==="agenda"||view==="day"?<CalendarAgendaList
+            label={view==="day"?`Events on ${anchorDate}`:"Calendar agenda"}
+            heading={view==="day"?`Agenda · ${formatDateOnly(anchorDate)}`:`Agenda · ${monthLabel}`}
+            items={periodItems} loading={loading} selection={search} />:view==="week"?<section aria-label="Calendar week" className="grid grid-cols-1 border border-border bg-card md:grid-cols-7">
             {viewDates.map(day=><section key={day} aria-label={`Events on ${day}`} className="min-w-0 border-b border-border p-3 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
               <h3 className="border-b border-border pb-2 text-sm font-semibold">
                 <Link to="/calendar" search={{...search,view:"day",date:day,event:undefined}} className="text-primary underline">{new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric"}).format(new Date(`${day}T12:00:00Z`))}</Link>
@@ -666,14 +622,9 @@ function CalendarPage() {
               {!byDay.get(day)?.length&&!loading&&<p className="pt-3 text-xs text-muted-foreground">Nothing scheduled.</p>}
             </section>)}
           </section>:<>
-          <section aria-label="Calendar agenda" className="border border-border bg-card p-5 md:hidden">
-            <h2 className="font-semibold">Agenda · {monthLabel}</h2>
-            <ul className="mt-4 divide-y">{visibleItems.map(item=><li key={item.id} className="py-4">
-              <Link {...itemDestination(item)} className="font-semibold text-primary underline">{item.title}</Link>
-              <p className="mt-1 text-sm text-muted-foreground">{dateKeyInTimezone(item.startsAt,item.timezone)} · {formatTime(item.startsAt,item.timezone)} · {item.timezone} · {typeLabel(item)}{item.cancelled?" · Cancelled":""}</p>
-            </li>)}</ul>
-            {!visibleItems.length&&!loading&&<p className="mt-4 text-sm text-muted-foreground">No events match this calendar view.</p>}
-          </section>
+          <CalendarAgendaList className="md:hidden" label="Calendar agenda"
+            heading={`Agenda · ${monthLabel}`} items={visibleItems}
+            loading={loading} selection={search} />
           <div className="hidden min-w-0 overflow-x-auto border border-border bg-card p-5 md:block">
             <div className="min-w-[28rem]">
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
