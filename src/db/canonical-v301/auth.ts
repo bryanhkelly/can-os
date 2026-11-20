@@ -32,7 +32,8 @@ export const canonicalAccountGrants = educationV30.table("canonical_account_gran
 /** Independently approved time-bounded staff capability, not a role grant. */
 export const canonicalSensitiveCapabilityApprovals = pgTable("canonical_sensitive_capability_approvals", {
     id: id(),
-    canonicalGrantId: uuid("canonical_grant_id").notNull(),
+    /** Current authoritative CAN grant. Not a native v3 account grant. */
+    accountPersonGrantId: uuid("account_person_grant_id").notNull(),
     capabilityCode: text("capability_code").$type<"credential.issue">().notNull(),
     requestedByCanAccountId: uuid("requested_by_can_account_id").notNull(),
     requestEvidenceReference: text("request_evidence_reference").notNull(),
@@ -47,7 +48,7 @@ export const canonicalSensitiveCapabilityApprovals = pgTable("canonical_sensitiv
     revokedReason: text("revoked_reason"),
   }, t => [
     uniqueIndex("sensitive_approvals_open_grant_uq")
-      .on(t.canonicalGrantId,t.capabilityCode)
+      .on(t.accountPersonGrantId,t.capabilityCode)
       .where(sql`${t.status} IN ('pending','approved')`),
     index("sensitive_approvals_status_idx").on(t.status,t.requestedAt),
   ],
