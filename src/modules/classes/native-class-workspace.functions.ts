@@ -125,6 +125,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       const now=new Date();
       let canLearn=false;
       let canTeach=false;
+      let canControlRoom=false;
       let canManage=false;
       let learner:{classEnrollmentId:string;courseAttemptId:string;creditMode:string;status:string}|null=null;
       let staffRole:"teacher"|"facilitator"|null=null;
@@ -183,6 +184,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           await currentClassAuthority(tx,instance.id,now);
           staffRole=assignments.some(x=>x.roleCode==="teacher")?"teacher":"facilitator";
           canVerifyAttendance=assignments.some(x=>x.attendanceAuthorized);
+          canControlRoom=true;
           canTeach=true;
         }
       }
@@ -455,7 +457,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         deliveryMode:instance.deliveryMode,state:instance.state,
         view,tab,availableViews:permittedViews,
         availableTabs:classTabs[view],
-        learner,staffRole,canVerifyAttendance,
+        learner,staffRole,canVerifyAttendance,canControlRoom,
         canViewRoster:rosterAllowed,
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
         offering,lessons,staffCandidates,staffAssignments,learnerCandidates,
