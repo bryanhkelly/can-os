@@ -1,11 +1,40 @@
-import { useQuery } from "@tanstack/react-query";
-import { getNativeClassTeacherHomework, getNativeClassTeacherAssessments } from
-  "@/modules/classes/native-class-teacher-homework.functions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { normalizeClientError } from "@/lib/client-error";
+import {
+  getNativeClassTeacherHomework, getNativeClassTeacherAssessments,
+  returnNativeClassHomeworkForRevision,
+} from "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
 
 /** Read-only native Class teacher queue. Official grading is a separate
  * verified-grader workflow, not a state change to synthetic homework. */
 export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
+  const client=useQueryClient();
+  const [feedback,setFeedback]=useState<Record<string,string>>({});
+  const [busy,setBusy]=useState<string|null>(null);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  const returnForRevision=async(submissionId:string)=>{
+    if(busy)return;
+    const comment=feedback[submissionId]?.trim()??"";
+    if(comment.length<10)return;
+    setBusy(submissionId);setError("");setNotice("");
+    try{
+      await returnNativeClassHomeworkForRevision({
+        data:{classId,submissionId,feedback:comment},
+      });
+      setNotice("Homework returned for revision. The original student response remains saved.");
+      await Promise.all([
+        client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]}),
+        client.invalidateQueries({queryKey:["native-class-homework"]}),
+      ]);
+    }catch(failure){
+      setError(normalizeClientError(failure,
+        "Unable to return this submission. Check your current teacher assignment.").message);
+    }finally{setBusy(null);}
+  };
   const queue=useQuery({
     queryKey:["native-class-teacher-homework",classId],
     queryFn:()=>getNativeClassTeacherHomework({data:{classId}}),
@@ -43,12 +72,29 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
           {item.demoFeedback&&<p className="text-xs text-muted-foreground">
             Simulated feedback: {item.demoFeedback}
           </p>}
+          {item.status==="submitted"&&<div className="space-y-2 border-t border-border pt-3">
+            <label htmlFor={"revision-"+item.id} className="block text-sm font-medium">
+              Request a revision (synthetic, not an official grade)
+            </label>
+            <Textarea id={"revision-"+item.id} rows={3}
+              value={feedback[item.id]??""} maxLength={2000}
+              disabled={busy!==null}
+              onChange={event=>setFeedback(prev=>({...prev,[item.id]:event.target.value}))}
+              placeholder="Give the learner a concrete suggestion for revising the submitted response."/>
+            <Button size="sm" type="button" variant="outline"
+              disabled={busy!==null||(feedback[item.id]?.trim().length??0)<10}
+              onClick={()=>void returnForRevision(item.id)}>
+              {busy===item.id?"Returning…":"Return for revision"}
+            </Button>
+          </div>}
           {item.submittedAt&&<p className="text-xs text-muted-foreground">
             Submitted {new Date(item.submittedAt).toLocaleString()}
           </p>}
         </li>)}
       </ul>
       {queue.data.partial&&<p className="text-xs">Only the most recent 100 records are shown.</p>}
+      {notice&&<p role="status" className="text-sm">{notice}</p>}
+      {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
       <Button type="button" variant="outline" size="sm" disabled={queue.isFetching}
         onClick={()=>void queue.refetch()}>Refresh submissions</Button>
     </>}
