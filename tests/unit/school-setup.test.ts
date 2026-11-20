@@ -21,7 +21,12 @@ vi.mock("@/db/client", () => ({
       const tx = {
         execute: vi.fn(),
         select: () => {
-          const query = { from: () => query, where: () => query, limit: async () => state.reads.shift() ?? [] };
+          const query = {
+            from: () => query, where: () => query, for: () => query,
+            limit: async () => state.reads.shift() ?? [],
+            then: (resolve: (value: unknown[]) => unknown, reject?: (error: unknown) => unknown) =>
+              Promise.resolve(state.reads.shift() ?? []).then(resolve, reject),
+          };
           return query;
         },
         insert: (table: Parameters<typeof getTableName>[0]) => ({
@@ -33,7 +38,7 @@ vi.mock("@/db/client", () => ({
         update: (table: Parameters<typeof getTableName>[0]) => ({
           set: (value: Record<string, unknown>) => {
             state.updates.push({ table: getTableName(table), value });
-            return { where: () => ({ returning: async () => [{ id: `${getTableName(table)}-id` }] }) };
+            return { where: () => ({ returning: async () => [{ id: `${getTableName(table)}-id`, ...value }] }) };
           },
         }),
       };
@@ -170,6 +175,7 @@ describe("verified real-school signup provisioning", () => {
       expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
       organizationId: null, siteId: null, createdAt: now, updatedAt: now,
     } as never;
+    state.reads = [[], [{ personId: null }]];
     await expect(testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now)))
       .resolves.toEqual({ organizationId: "organizations-id", siteId: "sites-id",
         grantId: "account_person_grants-id" });
@@ -177,7 +183,13 @@ describe("verified real-school signup provisioning", () => {
       "organizations", "sites", "people", "account_person_grants", "memberships", "role_assignments",
     ]);
     expect(state.writes.find(row => row.table === "organizations")?.value)
-      .toMatchObject({ type: "christian_school", name: "Example Microschool" });
+      .toMatchObject({ type: "christian_school", name: "Example Microschool",
+        lifecycleStatus: "active" });
+    expect(state.writes.find(row => row.table === "sites")?.value)
+      .toMatchObject({ lifecycleStatus: "planning" });
+    expect(state.updates).toContainEqual(expect.objectContaining({
+      table: "access_accounts", value: expect.objectContaining({ personId: "people-id" }),
+    }));
     expect(state.writes.find(row => row.table === "account_person_grants")?.value)
       .toMatchObject({ accountId: "account-real", role: "site_admin", active: true });
     expect(state.updates).toContainEqual(expect.objectContaining({ table: "school_setup_signups",
@@ -195,6 +207,7 @@ describe("verified real-school signup provisioning", () => {
       expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
       organizationId: null, siteId: null, createdAt: now, updatedAt: now,
     } as never;
+    state.reads = [[], [{ personId: null }]];
     await testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now));
     expect(state.writes.find(row => row.table === "organizations")?.value)
       .toMatchObject({name: "Grace Community Church"});
