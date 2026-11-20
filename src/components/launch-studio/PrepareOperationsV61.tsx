@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -309,12 +309,16 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
 /** Canonical Class records own their Site Space and approved staff planning.
  * No legacy Section/room_coverage_schedule is mounted in Launch Studio. */
 export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
+  const queryClient=useQueryClient();
   const [showAcademicYears,setShowAcademicYears]=useState(false);
   return <div className="space-y-5">
     <Suspense fallback={<p role="status" className="border p-4 text-sm">
       Loading authorized Class preparation…
     </p>}>
-      <NativeClassManager key={siteId} preferredSiteId={siteId} embedded prepareOnly />
+      <NativeClassManager key={siteId} preferredSiteId={siteId} embedded prepareOnly
+        onDraftCreated={()=>queryClient.invalidateQueries({
+          queryKey:["launch-v61-class-facilities",siteId],
+        })} />
     </Suspense>
     <LaunchClassFacilitiesWorkspaceV61 key={siteId} siteId={siteId} />
     <details className="border bg-card p-4" onToggle={event=>{
