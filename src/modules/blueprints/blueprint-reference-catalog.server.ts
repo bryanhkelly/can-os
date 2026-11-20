@@ -1,6 +1,7 @@
 import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import {
   blueprintReferenceItems,
   blueprintReferenceItemVersions,
@@ -71,7 +72,7 @@ export async function getBlueprintReferenceCatalog(
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : programCatalogDatabaseRole(context);
 
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [site] = await tx.select({
       id: catalogSites.id,
@@ -85,5 +86,5 @@ export async function getBlueprintReferenceCatalog(
     if (isCanPlanning) await assertVerifiedCanPlanningSite(tx, context, siteId);
 
     return readPublishedBlueprintReferences(tx);
-  });
+  }));
 }
