@@ -225,6 +225,12 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   const options = interests.filter(item => draft.interestIds.includes(item.id));
   const programs = programCatalog ?? [];
   const chosenPrograms = programs.filter(item => draft.programCodes?.includes(item.code));
+  // Preserve historical selections until the operator removes them explicitly.
+  // A retired entry is absent from the active catalog, so it cannot render
+  // through the regular published Program choices.
+  const unavailablePrograms = programCatalog
+    ? (draft.programCodes ?? []).filter(code => !programs.some(item => item.code === code))
+    : [];
   const disabled = busy || reloadRequired;
   const sections = [
     { id: "interests", title: "Program Interests", description: "What you want to offer",
@@ -264,8 +270,22 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               disabled={disabled} onChange={checked => toggleProgram(item.code, checked)} />)}
           </div>}
           {programCatalog && programs.length === 0 && <p className="text-sm text-muted-foreground">No published Program references are available to plan.</p>}
-          {programCatalog && (draft.programCodes ?? []).some(code => !programs.some(item => item.code === code)) &&
-            <WorkspaceNotice tone="attention">A previously selected Program is no longer available. Remove the retired selection before saving.</WorkspaceNotice>}
+          {unavailablePrograms.length > 0 && <WorkspaceNotice tone="attention">
+            <p>These previously selected Programs are no longer in the published catalog.
+              They remain saved until you choose to remove them. You can remove a reference
+              without changing any independent Solution plan or Offering.</p>
+            <ul className="mt-3 space-y-2" aria-label="Unavailable selected Programs">
+              {unavailablePrograms.map(code => <li key={code}
+                className="flex flex-wrap items-center justify-between gap-3 border bg-background p-3">
+                <span className="min-w-0 break-all text-sm font-medium">{code}</span>
+                <Button type="button" size="sm" variant="outline" disabled={disabled}
+                  aria-label={"Remove unavailable Program " + code}
+                  onClick={() => toggleProgram(code, false)}>
+                  Remove reference
+                </Button>
+              </li>)}
+            </ul>
+          </WorkspaceNotice>}
           {chosenPrograms.length > 0 && <Field label="Which Program would you start with?"
             description="Optional planning priority. This does not adopt the Solution or authorize enrollment.">
             <Select value={draft.startingProgramCode ?? ""} disabled={disabled}
