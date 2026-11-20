@@ -60,17 +60,9 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
   }).strict().parse(value))
   .handler(async ({ data }) => {
     const actor = await authorizedRegistrar("program.launch.start");
-    // These are Site planning references, not academic Program creation.
-    // Validate against the same active, published reference catalog offered in
-    // Establish. Never accept an arbitrary client-provided Product/Offering ID.
-    const selectedPrograms = data.intent.programCodes ?? [];
-    if (selectedPrograms.length) {
-      const catalog = await getBlueprintReferenceCatalog(actor, { siteId: data.siteId });
-      const available = new Set(catalog.filter(item => item.kind === "program_model")
-        .map(item => item.code));
-      if (!selectedPrograms.every(code => available.has(code)))
-        throw new AuthorizationError("selected published Program references");
-    }
+    // Broad Program intent is independent from catalog provisioning.
+    // Existing saved references can remain while the Site edits its vision.
+    // Only newly selected catalog references require live published validation.
     return db.transaction(async tx => {
       const [site] = await tx.select().from(sites)
         .where(eq(sites.id, data.siteId)).for("update").limit(1);
@@ -78,6 +70,18 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
       if (site.updatedAt.toISOString() !== data.expectedRevision)
         throw new Error("This Site changed since you opened Programs & Audiences. Reload and review before saving.");
       const old = site.metadata.launchPreferences;
+      const previouslySelected = new Set(
+        normalizeSiteProgramsAudiencesV61(old).programCodes ?? [],
+      );
+      const addedCodes = (data.intent.programCodes ?? []).filter(code =>
+        !previouslySelected.has(code));
+      if (addedCodes.length) {
+        const catalog = await getBlueprintReferenceCatalog(actor, { siteId: data.siteId });
+        const available = new Set(catalog.filter(item => item.kind === "program_model")
+          .map(item => item.code));
+        if (!addedCodes.every(code => available.has(code)))
+          throw new AuthorizationError("selected published Program references");
+      }
       const rawEnvironment = site.metadata.siteEnvironmentV61;
       const environment = siteEnvironmentV61Schema.safeParse(rawEnvironment);
       if (rawEnvironment != null && !environment.success)
