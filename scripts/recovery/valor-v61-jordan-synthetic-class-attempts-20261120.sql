@@ -48,6 +48,11 @@ BEGIN
     ORDER BY c.id
   LOOP
     attempt_id:=md5('valor-v61:jordan-attempt:'||rec.enrollment_id::text)::uuid;
+    -- Native DB trigger requires the Class Enrollment active before an
+    -- attempted lesson record can be created. Preserve the same Enrollment ID.
+    UPDATE public.class_enrollments SET status='active'
+      WHERE id=rec.enrollment_id AND status='pending' AND course_attempt_id IS NULL;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Jordan pending status transition conflicted'; END IF;
     INSERT INTO public.learner_course_attempts
       (id,class_enrollment_id,enrollment_id,noncredit_registration_id,
        deployment_id,adoption_id,offering_version_id,course_version_id,
@@ -56,8 +61,8 @@ BEGIN
       (attempt_id,rec.enrollment_id,NULL,NULL,rec.deployment_id,rec.adoption_id,
        rec.offering_version_id,rec.course_version_id,NULL,1,'active')
     ON CONFLICT(id) DO NOTHING;
-    UPDATE public.class_enrollments SET status='active',course_attempt_id=attempt_id
-     WHERE id=rec.enrollment_id AND status='pending' AND course_attempt_id IS NULL;
+    UPDATE public.class_enrollments SET course_attempt_id=attempt_id
+     WHERE id=rec.enrollment_id AND status='active' AND course_attempt_id IS NULL;
     IF NOT FOUND THEN RAISE EXCEPTION 'Jordan Class Enrollment activation conflicted'; END IF;
     activated:=activated+1;
   END LOOP;
