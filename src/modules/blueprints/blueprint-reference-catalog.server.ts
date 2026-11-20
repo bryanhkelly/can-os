@@ -41,6 +41,7 @@ export async function readPublishedBlueprintReferences(
       versionNo: blueprintReferenceItemVersions.versionNo,
       title: blueprintReferenceItemVersions.title,
       summary: blueprintReferenceItemVersions.summary,
+      metadata: blueprintReferenceItemVersions.metadata,
       lifecycle: blueprintReferenceItemVersions.lifecycle,
     }).from(blueprintReferenceItems)
       .innerJoin(blueprintReferenceItemVersions,
