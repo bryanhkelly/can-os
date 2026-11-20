@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { plural } from "@/lib/format";
 import type { ReadinessRecord, LaunchReadinessNoncredit } from "./launch-readiness-types-v61";
 
 /** Presentation only: no independent readiness authorization, storage or commands. */
@@ -27,7 +28,7 @@ export function NoncreditPublisherReadinessV61({ siteId,noncredit }: {
           const releases=noncredit.value.published.filter(item=>item.siteId===siteId);
           return <div className="mt-3 space-y-4">
             <p className="text-xs text-muted-foreground">
-              {candidates.length} publisher candidates · {releases.length} recorded enrollment releases
+              {plural(candidates.length, "publisher candidate")} · {plural(releases.length, "recorded enrollment release")}
             </p>
             {releases.length>0 && <ul className="space-y-2">
               {releases.map(item=><li key={item.id}
