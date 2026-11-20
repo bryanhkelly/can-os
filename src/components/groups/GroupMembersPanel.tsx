@@ -6,7 +6,7 @@ import { FieldError } from "@/components/ui/field";
 import { WorkspacePanel } from "@/components/workspace";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { decideCanonicalGroupMembership, inviteCanonicalGroupMembers, listCanonicalGroupInvitees } from "@/modules/study-groups/canonical-membership.functions";
-import type { GroupPanelRecord, GroupPanelRole, GroupPanelAvailability, GroupPanelRun, GroupPanelMutation } from "./group-panel-contracts";
+import type { GroupPanelRecord, GroupPanelAvailability, GroupPanelRun } from "./group-panel-contracts";
 
 /** Invitations and membership decisions are distinct and rechecked by server commands. */
 export function GroupMembersPanel({ group, availability, busy, run }: {
