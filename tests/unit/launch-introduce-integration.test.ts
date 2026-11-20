@@ -54,7 +54,10 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     expect(component).toContain('brandReadiness!=="available"');
     expect(component).toContain("Retry Brand check");
     expect(component).toContain("Open Website &amp; Brand");
-    expect(component).toContain("createSiteMarketingRelease");
+    expect(component).toContain("createSiteMarketingPackageRelease");
+    expect(component).toContain("listSiteMarketingPackageReleases");
+    expect(component).toContain("downloadMarketingPackageZip");
+    expect(component).toContain("Release Package");
     expect(component).toContain("readSiteBrandVersionView");
     expect(component).not.toContain("localStorage");
   });
