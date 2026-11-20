@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Field } from "@/components/ui/field";
 import { normalizeClientError } from "@/lib/client-error";
 import { approveAdultClassLearnerReview, revokeAdultClassLearnerReview } from "@/modules/classes/native-class-adult-review.functions";
-import { DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { ActionFooter, DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
 import { NativePublisherReleaseReadinessPanel } from "@/components/learning/NativePublisherReleaseReadinessPanel";
@@ -177,9 +177,11 @@ function AdultLearnerReviewSection({ready,cases}:{
           I independently checked identity and adult eligibility, and the secure evidence
           reference identifies an independently approved, restricted document for this exact CAN Person.
         </Label>
-        <Button type="submit" disabled={!evidenceChecked||busy}>
-          {busy?"Recording review…":"Approve adult learner identity"}
-        </Button>
+        <ActionFooter layout="form">
+          <Button type="submit" disabled={!evidenceChecked||busy} loading={busy} loadingLabel="Recording review...">
+            Approve adult learner identity
+          </Button>
+        </ActionFooter>
       </form>
       <div className="mt-6 border-t border-border pt-5">
         <h3 className="text-sm font-semibold">Revoke an existing adult review</h3>
