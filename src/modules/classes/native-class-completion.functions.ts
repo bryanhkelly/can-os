@@ -93,7 +93,7 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
       eq(learnerCourseAttempts.id,enrollment.courseAttemptId),
       eq(learnerCourseAttempts.classEnrollmentId,enrollment.id),
     )).limit(1);
-  if (!attempt || attempt.enrollmentId || attempt.noncreditRegistrationId ||
+  if (!attempt || attempt.enrollmentId ||
       attempt.sectionId || attempt.deploymentId!==cls.deploymentId ||
       attempt.adoptionId!==cls.adoptionId ||
       attempt.offeringVersionId!==cls.offeringVersionId ||
