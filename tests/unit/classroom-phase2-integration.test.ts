@@ -77,6 +77,24 @@ describe("Classroom Connect Phase 2 learner activities", () => {
     expect(companion).toContain("retryIds.current[key]");
     expect(companion).toContain("recordClassroomPresence");
   });
+  it("preserves the exact unconfirmed response across closure and never treats refresh failure as write failure", () => {
+    const api = source("src/modules/learning/classroom-evidence.functions.ts");
+    const companion = source("src/components/learning/ClassroomCompanionRoom.tsx");
+    // Server checks an immutable matching submission before testing closure.
+    const handler = api.slice(api.indexOf("export const submitClassroomResponse"),
+      api.indexOf("const presenceInput"));
+    expect(handler.indexOf("if (prior)")).toBeLessThan(handler.indexOf("if (release.closedAt"));
+    expect(handler).toContain("prior.answerText !== data.answerText");
+    expect(handler).toContain("prior.answerChoice !== data.answerChoice");
+    // Client keeps both the idempotency key AND payload during unknown outcome.
+    expect(companion).toContain("pendingAnswers.current[key]=answer");
+    expect(companion).toContain("pendingAnswers.current[activity.id]??answers[activity.id]");
+    expect(companion).toContain("!activity.responded&&(!activity.closed||!!retryIds.current[activity.id])");
+    expect(companion).toContain("disabled={activity.closed||!!retryIds.current[activity.id]}");
+    expect(companion).toContain("Confirm previous submission");
+    expect(companion).toContain("void queryClient.invalidateQueries");
+    expect(companion).toContain(".catch(()=>{})");
+  });
   it("rehearses a specific approved adoption without a fabricated learner", () => {
     const preview = source("src/modules/learning/classroom-rehearsal.functions.ts");
     const rights = source("src/modules/learning/student-instructional-tracks.server.ts");
