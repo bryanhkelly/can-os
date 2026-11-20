@@ -44,11 +44,19 @@ describe("saved Site module green checks",()=>{
       websiteDraftAvailable:false,
     };
     const result=launchModuleCompletionV61({...site,siteIdentityRevision:null},evidence);
-    expect(result["site-profile"]).toBe("incomplete");
+    // Existing Sites remain a saved Site Profile even when they predate the
+    // optional v6.1 identity-revision metadata.
+    expect(result["site-profile"]).toBe("complete");
     expect(result["site-information"]).toBe("unavailable");
     expect(result["programs-audiences"]).toBe("incomplete");
     expect(result["website-brand"]).toBe("incomplete");
     expect(completedLaunchStageV61("Establish",result)).toBe(false);
+  });
+  it("still requires actual saved identity fields, but not optional revision metadata",()=>{
+    const result=launchModuleCompletionV61({...site,name:"",siteIdentityRevision:null},complete);
+    expect(result["site-profile"]).toBe("incomplete");
+    expect(launchModuleCompletionV61({...site,siteIdentityRevision:null},complete)["site-profile"])
+      .toBe("complete");
   });
   it("checks website publishing only when the Site really has published it",()=>{
     expect(launchModuleCompletionV61({
