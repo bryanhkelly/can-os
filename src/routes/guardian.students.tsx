@@ -122,7 +122,7 @@ function GuardianAcademicsPage() {
    {!loading && !loadingStudents && !error && assignments.length > 0 && !assessment && view === "list" && <DirectoryTable
     label="Assignments" caption="Assignments for this child." rows={visible} rowKey={item => item.assessmentId}
     columns={[
-     { id: "assignment", title: "Assignment", render: item => <><p className="text-xs text-muted-foreground"><Link to="/class" search={{section:item.sectionId,student:selected}} className="underline">{item.course}</Link></p><Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="font-semibold underline">{item.title}</Link></> },
+     { id: "assignment", title: "Assignment", render: item => <><p className="text-xs text-muted-foreground"><Link to="/class"  className="underline">{item.course}</Link></p><Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="font-semibold underline">{item.title}</Link></> },
      { id: "due", title: "Due", render: item => item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set" },
      { id: "status", title: "Status", render: item => <StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.status.replaceAll("_"," ")}{item.timeliness==="missing"?" · missing":item.timeliness==="late"?" · late":""}</StatusBadge> },
      { id: "grade", title: "Grade", render: item => item.score !== null ? `${item.score} / ${item.pointsPossible}` : "—" },
@@ -130,7 +130,7 @@ function GuardianAcademicsPage() {
    {!loading && !loadingStudents && !error && assignments.length > 0 && (!assessment && view === "cards" || assessment) && <div className="mt-8 grid gap-4">
     {visible.map(item => <section key={item.assessmentId} className=" border bg-card p-5">
      <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-xs text-muted-foreground"><Link to="/class" search={{section:item.sectionId,student:selected}} className="underline">{item.course}</Link></p><h2 className="mt-1 text-lg font-semibold"><Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="underline">{item.title}</Link></h2></div>
+      <div><p className="text-xs text-muted-foreground"><Link to="/class"  className="underline">{item.course}</Link></p><h2 className="mt-1 text-lg font-semibold"><Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="underline">{item.title}</Link></h2></div>
       <StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.status.replaceAll("_"," ")}{item.timeliness==="missing"?" · missing":item.timeliness==="late"?" · late":""}</StatusBadge>
      </div>
      <p className="mt-3 text-sm text-muted-foreground">Due: {item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set"}</p>
