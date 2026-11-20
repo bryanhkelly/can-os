@@ -8,8 +8,8 @@
 
 | Intent in Establish | Blueprint/Solution in Prepare | Offering in Prepare and Open | Course |
 | --- | --- | --- | --- |
-| `can.program.custom_training`: **Custom Training** | `can.pilot.custom-training.one-hour` (published planning model) | `CLC-CUSTOM-TRAINING-01` (draft) | `CLC-CUSTOM-TRAINING-01` (draft; 7 ordered segments) |
-| `can.program.ai_digital_skills`: **AI & Digital Skills** | `can.pilot.ai-digital-skills.four-session` (published planning model) | `CLC-DIGITAL-01` (draft) | `CLC-AI-DIGITAL-01` (draft; 4 sessions) |
+| `can.program.custom_training`: **Custom Training Pilot** | `can.pilot.custom-training.one-hour` (published planning model) | `CLC-CUSTOM-TRAINING-01` (draft) | `CLC-CUSTOM-TRAINING-01` (draft; 7 ordered segments) |
+| `can.program.ai_digital_skills`: **AI & Digital Skills Pilot** | `can.pilot.ai-digital-skills.four-session` (published planning model) | `CLC-DIGITAL-01` (draft) | `CLC-AI-DIGITAL-01` (draft; 4 sessions) |
 
 These reusable generic names intentionally do not hardcode COGIC or a denomination. The pilot can be deployed to an authorized COGIC Organization/Site only after independent governing approvals.
 
@@ -48,7 +48,7 @@ These reusable generic names intentionally do not hardcode COGIC or a denominati
 ## Verified persisted baseline
 
 At inspection after additive SQL insertion in Neon main:
-- two published Program reference versions;
+- two Program reference entries, each with immutable published v1 and a published v2 using the requested *Pilot* display name;
 - two published Solution/Blueprint recipe versions;
 - two **draft** Offering versions;
 - Custom Training Course draft with seven lesson rows;
@@ -66,5 +66,11 @@ The additive, re-runnable source is `database/seeds/2026-11-cogic-reusable-pilot
 - Test two independently authorized Site/Organization Phase 2 journeys (four dated sessions each, pairing, no-device facilitator attestation, corrections, completion, operator reporting).
 - Obtain separate national/portfolio delegation and disclosure review before publishing a COGIC-wide report.
 - Verify a clean candidate branch build, typecheck, unit tests, role-denial tests and authenticated browser acceptance on the exact SHA.
+
+## Current database authorization blocker
+
+**Verified on Neon `main` during this review:** `pg_roles` contains **zero** `can_v30_program_catalog_%` and `can_v30_blueprint_%` roles; `public.database_role_organization_bindings` has **zero** active, approved bindings for program-catalog and Blueprint author/reviewer purposes. `public.sites` enforces RLS and currently exposes only the restrictive `sites_no_direct_client_access` policy, not the required scoped catalog-operator read policy. The published records exist, but the authenticated Establish catalog and Prepare Solution screens **will fail closed** until Site RLS and purpose-bound roles are independently reviewed and provisioned.
+
+Do **not** bypass Site RLS, grant access to anonymous clients, log in as database owner, or grant an unscoped application role. Follow reviewed `database/canonical/v3.0.1/provision-program-catalog-role.sql` and `provision-blueprint-roles.sql` only **after** their RLS policy preconditions, restricted principals, and privilege reviews pass on a disposable test branch. Do not treat role provisioning or migration as part of the reusable content seed.
 
 **No build, UI session, or real partner-delivery acceptance is claimed by this record.**
