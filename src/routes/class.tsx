@@ -3,8 +3,8 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { WorkspaceShell, StatusBadge, MutationFeedback } from "@/components/workspace";
 import { NativeClassHomeNavigation } from "@/components/learning/NativeClassHomeNavigation";
+import { ClassParticipationAcknowledgments } from "@/components/learning/ClassParticipationAcknowledgments";
 import { Select } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/choice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -144,14 +144,10 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
         <p className="text-sm font-semibold">Participation and data-use terms</p>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{item.consentText}</p>
       </div>
-      <Label className="mt-4 flex items-start gap-3 text-sm"><Checkbox className="mt-1"
-        checked={adult} onChange={e=>setAdult(e.target.checked)}/>
-        I confirm that I am at least 18. Class admission requires a separately verified adult learner identity.
-      </Label>
-      <Label className="mt-3 flex items-start gap-3 text-sm"><Checkbox className="mt-1"
-        checked={consent} onChange={e=>setConsent(e.target.checked)}/>
-        I have read and accept these participation and data-use terms.
-      </Label>
+      <ClassParticipationAcknowledgments className="mt-4"
+        adultChecked={adult} onAdultChange={setAdult}
+        consentChecked={consent} onConsentChange={setConsent}
+        adultLabel="I confirm that I am at least 18. Class admission requires a separately verified adult learner identity." consentLabel="I have read and accept these participation and data-use terms." />
       <Button className="mt-4" disabled={!adult||!consent||busy||full} onClick={()=>void enroll()}>
         {busy?"Enrolling…":full?"Class full":"Enroll in Class"}
       </Button>
@@ -201,10 +197,10 @@ function ApprovedClassCard({item,onChanged}:{item:NativeApproval;onChanged:()=>P
         </Select>
       </Label>
       <p className="mt-3 whitespace-pre-wrap text-sm">{item.consentText}</p>
-      <Label className="mt-3 flex gap-2 text-sm"><Checkbox checked={adult}
-        onChange={e=>setAdult(e.target.checked)}/>I confirm that I am at least 18.</Label>
-      <Label className="mt-3 flex gap-2 text-sm"><Checkbox checked={consent}
-        onChange={e=>setConsent(e.target.checked)}/>I accept the current Class participation and data-use terms.</Label>
+      <ClassParticipationAcknowledgments className="mt-3"
+        adultChecked={adult} onAdultChange={setAdult}
+        consentChecked={consent} onConsentChange={setConsent}
+        adultLabel="I confirm that I am at least 18." consentLabel="I accept the current Class participation and data-use terms." />
       <Button className="mt-4" disabled={!adult||!consent||busy}
         onClick={()=>void accept()}>{busy?"Accepting…":"Accept approved place"}</Button>
     </>}
@@ -262,16 +258,10 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
           {item.consentText??"Published consent unavailable. Acceptance will be denied."}
         </p>
       </div>
-      <Label className="mt-4 flex items-start gap-3 text-sm">
-        <Checkbox className="mt-1" checked={adult}
-          onChange={e=>setAdult(e.target.checked)}/>
-        I confirm that I am at least 18. Class admission requires a separately verified adult learner identity.
-      </Label>
-      <Label className="mt-3 flex items-start gap-3 text-sm">
-        <Checkbox className="mt-1" checked={consent}
-          onChange={e=>setConsent(e.target.checked)}/>
-        I accept the current participation and data-use terms.
-      </Label>
+      <ClassParticipationAcknowledgments className="mt-4"
+        adultChecked={adult} onAdultChange={setAdult}
+        consentChecked={consent} onConsentChange={setConsent}
+        adultLabel="I confirm that I am at least 18. Class admission requires a separately verified adult learner identity." consentLabel="I accept the current participation and data-use terms." />
       <div className="mt-4 flex flex-wrap gap-2">
         <Button disabled={!adult||!consent||busy||!item.consentText}
           onClick={()=>void accept()}>{busy?"Processing…":"Accept invitation"}</Button>
@@ -380,16 +370,10 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
           <p className="mt-3 whitespace-pre-wrap border border-border bg-muted/20 p-3 text-sm">
             {target.consentText}
           </p>
-          <Label className="mt-3 flex gap-2 text-sm">
-            <Checkbox checked={transferAdult}
-              onChange={e=>setTransferAdult(e.target.checked)}/>
-            I confirm I am at least 18.
-          </Label>
-          <Label className="mt-3 flex gap-2 text-sm">
-            <Checkbox checked={transferConsent}
-              onChange={e=>setTransferConsent(e.target.checked)}/>
-            I accept the destination Class terms and understand my current Class access ends.
-          </Label>
+          <ClassParticipationAcknowledgments className="mt-3"
+            adultChecked={transferAdult} onAdultChange={setTransferAdult}
+            consentChecked={transferConsent} onConsentChange={setTransferConsent}
+            adultLabel="I confirm I am at least 18." consentLabel="I accept the destination Class terms and understand my current Class access ends." />
           <Button size="sm" className="mt-3" disabled={busy||!transferAdult||!transferConsent||
             !transferCredit||!allowedTransferModes.includes(transferCredit)}
             onClick={()=>void transfer()}>{busy?"Transferring…":"Confirm transfer"}</Button>
