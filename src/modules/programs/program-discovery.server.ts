@@ -1,4 +1,4 @@
-import { isCanonicalSiteDiscoverable } from "@/domain/canonical-site-availability";
+import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -62,7 +62,9 @@ export async function getAvailableOfferings(
       }).from(catalogSites)
         .where(eq(catalogSites.id, input.subject.siteId))
         .limit(1);
-      if (!isCanonicalSiteDiscoverable(site?.status)) {
+      if (!site || (isCanPlanning
+        ? !isPrivateCanSitePlanningAllowed(site.status)
+        : !isCanonicalSiteDiscoverable(site.status))) {
         throw new DomainError("UNAVAILABLE", "The selected Site is unavailable for program discovery.");
       }
       if (isCanPlanning) {
