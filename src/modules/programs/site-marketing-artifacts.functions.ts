@@ -193,6 +193,8 @@ export const listSiteMarketingPackageReleases=createServerFn({method:"GET"})
     const children=await db.select({
       id:siteArtifactReleases.id,
       packageReleaseId:siteArtifactReleases.packageReleaseId,
+      brandVersionId:siteArtifactReleases.brandVersionId,
+      sourcePackageRevision:siteArtifactReleases.sourcePackageRevision,
       format:siteArtifactReleases.artifactKind,
       templateVersion:siteArtifactReleases.templateVersion,
       checksum:siteArtifactReleases.outputChecksum,
@@ -206,7 +208,10 @@ export const listSiteMarketingPackageReleases=createServerFn({method:"GET"})
       const content=marketingPackageContentSchema.parse(snapshotContent);
       const formats=z.array(z.enum(marketingFormatIds)).parse(parent.formats);
       const outputs=formats.map(format=>children.find(child=>
-        child.packageReleaseId===parent.id&&child.format===format));
+        child.packageReleaseId===parent.id &&
+        child.brandVersionId===parent.brandVersionId &&
+        child.sourcePackageRevision===parent.sourcePackageRevision &&
+        child.format===format));
       return {
         id:parent.id,releaseNumber:parent.releaseNumber,
         packageRevision:parent.sourcePackageRevision,
