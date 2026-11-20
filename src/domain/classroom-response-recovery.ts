@@ -23,7 +23,7 @@ export function readPendingClassroomResponse(storage: Pick<Storage, "getItem" | 
       typeof item.clientInstanceId !== "string" ||
       !/^[0-9a-f-]{36}$/i.test(item.clientInstanceId) ||
       typeof item.answer !== "string" || item.answer.length > 1000 ||
-      !Number.isFinite(item.savedAt) || typeof item.savedAt !== "number" ||
+      typeof item.savedAt !== "number" || !Number.isFinite(item.savedAt) ||
       item.savedAt > now || now - item.savedAt > classroomPendingTtlMs) {
       storage.removeItem(key); return null;
     }
