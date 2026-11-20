@@ -6,8 +6,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "assets:prepare": "node scripts/prepare-template-images.mjs",
-    "prebuild": "npm run check:build-source-syntax && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && npm run assets:prepare",
-    "prebuild:cloudflare": "npm run check:build-source-syntax && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
+    "prebuild": "npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && npm run assets:prepare",
+    "prebuild:cloudflare": "npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
     "postbuild": "npm run typecheck",
     "postbuild:cloudflare": "npm run typecheck",
     "prebuild-storybook": "npm run assets:prepare",
@@ -121,7 +121,9 @@
     "db:check:main:native-release": "node scripts/acceptance/check-main-native-course-release.mjs",
     "verify:governance:main-consolidation": "node scripts/acceptance/check-main-governance-leaf-consolidation.mjs",
     "check:component-boundaries": "node scripts/check-component-boundaries.mjs",
-    "architecture:inventory": "node scripts/report-component-architecture.mjs"
+    "architecture:inventory": "node scripts/report-component-architecture.mjs",
+    "check:local-import-exports": "node scripts/acceptance/check-local-import-exports.mjs",
+    "test:local-import-exports": "node --test scripts/acceptance/check-local-import-exports.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
