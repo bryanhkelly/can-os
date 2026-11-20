@@ -17,6 +17,7 @@ import { NativeClassActivationStatus } from "@/components/learning/NativeClassAc
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassHomeworkPanel } from "@/components/learning/NativeClassHomeworkPanel";
+import { NativeValorLessonPanel } from "@/components/learning/NativeValorLessonPanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
 import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
 import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
@@ -166,9 +167,14 @@ function LearnerClass({workspace}:{workspace:Workspace}){
     {record.isError&&<p role="alert" className="border border-border bg-card p-5 text-sm">
       Class progress is unavailable under your current learner permissions.
     </p>}
-    {workspace.tab==="lessons"&&<RecordedInstructorWorkspace
-      key={learner.courseAttemptId} courseAttemptId={learner.courseAttemptId}
-      initialLessonId={workspace.selectedLessonId} mode="native"/>}
+    {workspace.tab==="lessons"&&(!data
+      ?<p role="status" className="border border-border bg-card p-5 text-sm">Loading your Course lessons…</p>
+      :data.lessons.some(lesson=>lesson.restoredDemo)
+        ?<NativeValorLessonPanel classEnrollmentId={learner.classEnrollmentId}
+          lessons={data.lessons} selectedLessonId={workspace.selectedLessonId}/>
+        :<RecordedInstructorWorkspace
+          key={learner.courseAttemptId} courseAttemptId={learner.courseAttemptId}
+          initialLessonId={workspace.selectedLessonId} mode="native"/> )}
     {workspace.tab==="progress"&&<section className="border border-border bg-card p-5">
       <h2 className="font-serif text-2xl">My progress and outcomes</h2>
       {!data?<p className="mt-4 text-sm">Checking verified learning records…</p>:<>
