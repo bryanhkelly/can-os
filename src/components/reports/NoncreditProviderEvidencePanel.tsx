@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import {useMemo,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Select} from "@/components/ui/select";
@@ -97,14 +98,14 @@ export function NoncreditProviderEvidencePanel(){
     </p>}
     {data&&<>
       <div className="grid gap-3 border border-border bg-card p-4 md:grid-cols-[minmax(0,18rem)_1fr]">
-        <label className="block text-sm font-medium">
+        <Label className="block text-sm font-medium">
           Delivery Site
           <Select className="mt-2"
             value={siteId} onChange={e=>setRequestedSite(e.target.value)}>
             <option value="">All authorized Sites</option>
             {data.sites.map(s=><option key={s.siteId} value={s.siteId}>{s.siteName}</option>)}
           </Select>
-        </label>
+        </Label>
         <div className="text-xs text-muted-foreground md:self-end md:pb-3">
           <p>As of {new Date(data.asOf).toLocaleString()}</p>
           <p>Lifetime registered releases in this authorized Organization. Historical

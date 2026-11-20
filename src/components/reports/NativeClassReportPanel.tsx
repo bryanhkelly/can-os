@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
 import {useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {getNativeClassReport} from "@/modules/reporting/native-class-report.functions";
@@ -63,24 +67,24 @@ export function NativeClassReportPanel({classId}:{classId:string}){
           Private, source-reconciled operational evidence. All times use UTC.
         </p>
       </div>
-      <button type="button" disabled={!data} onClick={()=>data&&exportReport(data)}
+      <Button variant="outline" type="button" disabled={!data} onClick={()=>data&&exportReport(data)}
         className="min-h-11 border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">
         Export evidence CSV
-      </button>
+      </Button>
     </div>
     <div className="grid gap-3 border border-border bg-card p-4 md:grid-cols-[1fr_1fr_auto]">
-      <label className="block text-sm font-medium">From (UTC, inclusive)
-        <input type="date" value={from} max={today} onChange={e=>setFrom(e.target.value)}
+      <Label className="block text-sm font-medium">From (UTC, inclusive)
+        <Input type="date" value={from} max={today} onChange={e=>setFrom(e.target.value)}
           className="mt-2 block min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-      </label>
-      <label className="block text-sm font-medium">Through (UTC, inclusive)
-        <input type="date" value={toInclusive} max={today} onChange={e=>setToInclusive(e.target.value)}
+      </Label>
+      <Label className="block text-sm font-medium">Through (UTC, inclusive)
+        <Input type="date" value={toInclusive} max={today} onChange={e=>setToInclusive(e.target.value)}
           className="mt-2 block min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-      </label>
-      <label className="flex items-center gap-2 self-end pb-3 text-sm">
-        <input type="checkbox" checked={compare} onChange={e=>setCompare(e.target.checked)}
+      </Label>
+      <Label className="flex items-center gap-2 self-end pb-3 text-sm">
+        <Checkbox checked={compare} onChange={e=>setCompare(e.target.checked)}
           className="h-4 w-4"/>Compare prior period
-      </label>
+      </Label>
     </div>
     {!valid&&<p role="alert" className="border border-border p-3 text-sm">
       Choose ascending dates covering no more than 366 days.
@@ -117,10 +121,10 @@ export function NativeClassReportPanel({classId}:{classId:string}){
         Prior-period comparison is unavailable. Current period remains independently sourced.
       </p>}
       <section className="border border-border bg-card p-4">
-        <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}
+        <Button variant="ghost" type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}
           className="flex min-h-11 w-full items-center justify-between gap-3 text-left font-semibold">
           <span>Metric definitions and audit trail</span><span aria-hidden="true">{expanded?"−":"+"}</span>
-        </button>
+        </Button>
         {expanded&&<div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[42rem] text-left text-sm">
             <thead className="border-b border-border bg-muted/40"><tr>
