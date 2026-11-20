@@ -25,6 +25,7 @@ const guardedDirectories = [
 const guardedFiles = [
   "src/components/operations/SchoolImprovementPanel.tsx",
   "src/components/operations/OperationsHealthSummary.tsx",
+  "src/components/operations/OperationsIssueList.tsx",
   "src/components/learning/ClassParticipationAcknowledgments.tsx",
   "src/components/learning/ClassOfferingTermsFields.tsx",
   "src/components/launch-studio/LaunchGuidancePanels.tsx",
@@ -72,6 +73,7 @@ const owners = [
   ["src/routes/site-website.tsx", ["function WebsiteInformationChecklist(",
     "function WebsiteSourceMappingPanel(", "function WebsiteDesignChecklist(",
     "function WebsitePreviewPanel("]],
+  ["src/components/operations/OperationsHealthSummary.tsx", ["commandCenterData.issues.map("]],
   ["src/components/learning/NativeClassManager.tsx", ["const methodOptions:", "const creditOptions:", "function toggle<T extends string>"]],
   ["src/components/operations/OperationsWorkspace.tsx", [
     '<section aria-label="School improvement and planning"',
