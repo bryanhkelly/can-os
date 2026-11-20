@@ -78,10 +78,11 @@ export function OnsitePickupPanel({ date, onChanged }: {
       if (request === requestSequence.current && date === activeDate.current) setLoading(false);
     }
   }, [date]);
-  const mutation = useMutationFeedback(async () => {
+  const refreshAfterChange = useCallback(async () => {
     await load(true);
     await onChanged?.();
-  });
+  }, [load, onChanged]);
+  const mutation = useMutationFeedback(refreshAfterChange);
   const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
