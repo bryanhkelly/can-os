@@ -1,11 +1,36 @@
-import { useQuery } from "@tanstack/react-query";
-import { getNativeClassTeacherHomework, getNativeClassTeacherAssessments } from
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { getNativeClassTeacherHomework, getNativeClassTeacherAssessments,
+  returnNativeClassPracticeFeedback } from
   "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { normalizeClientError } from "@/lib/client-error";
 
 /** Read-only native Class teacher queue. Official grading is a separate
  * verified-grader workflow, not a state change to synthetic homework. */
 export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
+  const client=useQueryClient();
+  const [feedback,setFeedback]=useState<Record<string,string>>({});
+  const [scores,setScores]=useState<Record<string,string>>({});
+  const [busy,setBusy]=useState<string|null>(null);
+  const [notice,setNotice]=useState("");
+  const [error,setError]=useState("");
+  async function returnFeedback(submissionId:string){
+    if(busy)return;
+    setBusy(submissionId);setNotice("");setError("");
+    const raw=scores[submissionId]?.trim();
+    const practiceScore=raw?Number(raw):null;
+    try{
+      await returnNativeClassPracticeFeedback({data:{
+        classId,submissionId,feedback:(feedback[submissionId]??"").trim(),practiceScore,
+      }});
+      setNotice("Practice feedback returned to the learner. No official grade was issued.");
+      await client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]});
+    }catch(failure){setError(normalizeClientError(failure,"Unable to return practice feedback.").message);}
+    finally{setBusy(null);}
+  }
   const queue=useQuery({
     queryKey:["native-class-teacher-homework",classId],
     queryFn:()=>getNativeClassTeacherHomework({data:{classId}}),
@@ -46,8 +71,34 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
           {item.submittedAt&&<p className="text-xs text-muted-foreground">
             Submitted {new Date(item.submittedAt).toLocaleString()}
           </p>}
+          {item.practiceScore!==null&&<p className="text-xs text-muted-foreground">
+            Practice score: {item.practiceScore} / {item.practiceScoreMax??10}. Not an official grade.
+          </p>}
+          {queue.data.canReturnPracticeFeedback&&item.isSyntheticPractice&&<div className="space-y-3 border-t border-border pt-3">
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold">Return practice feedback</span>
+              <Textarea rows={3} maxLength={3000} value={feedback[item.id]??item.demoFeedback??""}
+                onChange={event=>setFeedback(previous=>({...previous,[item.id]:event.target.value}))}
+                aria-label={"Practice feedback for "+item.studentName+" on "+item.assignmentTitle}/>
+            </label>
+            <label className="block max-w-28 space-y-1">
+              <span className="text-xs font-semibold">Practice score / 10</span>
+              <Input type="number" min={0} max={10} step={1}
+                value={scores[item.id]??(item.practiceScore===null?"":String(item.practiceScore))}
+                onChange={event=>setScores(previous=>({...previous,[item.id]:event.target.value}))}/>
+            </label>
+            <Button type="button" size="sm" disabled={!!busy||
+              (feedback[item.id]??item.demoFeedback??"").trim().length<3||
+              (scores[item.id]!==undefined&&scores[item.id]!==""&&
+                (!Number.isInteger(Number(scores[item.id]))||Number(scores[item.id])<0||Number(scores[item.id])>10))}
+              onClick={()=>void returnFeedback(item.id)}>
+              {busy===item.id?"Returning…":"Return practice feedback"}
+            </Button>
+          </div>}
         </li>)}
       </ul>
+      {notice&&<p role="status" className="text-sm">{notice}</p>}
+      {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
       {queue.data.partial&&<p className="text-xs">Only the most recent 100 records are shown.</p>}
       <Button type="button" variant="outline" size="sm" disabled={queue.isFetching}
         onClick={()=>void queue.refetch()}>Refresh submissions</Button>
