@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { WorkspacePanel } from "@/components/workspace";
+import { WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { typeLabel } from "@/components/calendar/calendar-presentation";
 import { calendarRecordDestination } from "@/domain/calendar-view";
 import type { CalendarFeedItem } from "@/modules/calendar/calendar.functions";
@@ -20,11 +20,7 @@ export function CalendarRecordContextPanel({
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calendar status</dt>
             <dd className="mt-1">
-              <span className={`inline-flex items-center border px-2 py-1 text-xs font-medium ${event.cancelled
-                ? "border-danger/50 bg-danger/10 text-danger"
-                : "border-border bg-muted text-muted-foreground"}`}>
-                {event.cancelled ? "Cancelled" : "On calendar"}
-              </span>
+              <StatusBadge tone={event.cancelled ? "danger" : "neutral"}>{event.cancelled ? "Cancelled" : "On calendar"}</StatusBadge>
             </dd>
           </div>
           <div>
