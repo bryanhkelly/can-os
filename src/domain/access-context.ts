@@ -30,7 +30,7 @@ const baseRoleCapabilities = {
  account_holder: [],
  // Explicit platform-only membership: no implicit Site/organization access.
  // Platform operations must independently enforce platform.admin and audit changes.
- app_admin: ["platform.admin"],
+ app_admin: ["platform.admin", "catalog.platform.manage", "blueprint.template.manage"],
  // Course-content roles are provider scoped and receive no learner-record powers.
  academic_content_creator: ["instructional_track.author"],
  academic_content_reviewer: ["instructional_track.review", "instructional_track.publish", "instructional_track.withdraw"],
