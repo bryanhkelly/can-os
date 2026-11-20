@@ -105,7 +105,7 @@ function ApplicationLearningAccessHandoff({
   <p className="mt-2">{hasRegistrarAuthority(role)
     ? "Review the original student grant, account status and school authorization. Restore access only through the independently authorized student-access restoration workflow."
     : "Contact admissions to review the student's separate school account. Your guardian sign-in does not restore the student's access."}</p>
-  <Button variant="outline" type="button" className="mt-3  border px-3 py-2 font-semibold"
+  <Button variant="outline" type="button" className="mt-3"
    onClick={()=>setRetry(value=>value+1)}>Recheck access</Button>
   <Link to="/messages" className="ml-3 inline-block text-sm underline">Contact admissions</Link>
  </section>;
@@ -114,7 +114,7 @@ function ApplicationLearningAccessHandoff({
   <h4 className="font-semibold">Student learning account</h4>
   <p className="mt-2" role="status">We could not verify this student's current school sign-in status.
    Admissions can confirm classroom placement and account eligibility. No invitation has been sent by this screen.</p>
-  <Button variant="outline" type="button" className="mt-3  border px-3 py-2 font-semibold"
+  <Button variant="outline" type="button" className="mt-3"
    onClick={()=>setRetry(value=>value+1)}>Check again</Button>
   <Link to="/messages" className="ml-3 inline-block text-sm underline">Ask admissions for help</Link>
  </section>;
@@ -162,7 +162,7 @@ function ApplicationLearningAccessHandoff({
      <p>Student access is approved. The student uses their own verified email address—not the parent’s account—to request a short-lived sign-in link and open assigned classes.</p>
      {role==="guardian"&&<Link to="/access" className="mt-3 inline-block  border px-3 py-2 font-semibold">Open student sign-in</Link>}
      {hasRegistrarAuthority(role)&&<Button type="submit" variant="outline" disabled={busy}
-       className=" border px-3 py-2 font-semibold disabled:opacity-50">
+       >
        {busy?"Requesting…":"Request student sign-in link again"}
      </Button>}
     </>:status==="not_requested"&&hasRegistrarAuthority(role)?
