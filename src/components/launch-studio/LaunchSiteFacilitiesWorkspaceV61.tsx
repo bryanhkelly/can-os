@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,7 +169,7 @@ function SpaceForm({siteId,space,onSaved}:{
   const [success,setSuccess]=useState("");
   useLaunchUnsavedChanges(dirty||busy||uncertain,
     "Leave Facilities & Resources? Room and equipment changes are not saved.");
-  async function submit(event:React.FormEvent<HTMLFormElement>){
+  async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
     if(busy||uncertain)return;
     const input={siteId,spaceId,name:draft.name,
