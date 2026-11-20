@@ -1,7 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import { buttonVariants } from "@/components/ui/button";
 import { PersonMark, StatusBadge } from "@/components/workspace";
 import { plural, agree } from "@/lib/format";
 import type { getFamilyHome } from "@/modules/family/family-home.functions";
+
+const guardianChildActionClass = buttonVariants({ variant: "outline", size: "lg" }) + " h-auto whitespace-normal";
 
 export type GuardianChild = Awaited<ReturnType<typeof getFamilyHome>>["children"][number];
 
@@ -37,13 +40,13 @@ export function GuardianChildSummaryCard({ child }: { child: GuardianChild }) {
        </li>)}</ul>
       </div>}
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
-      <Link to="/guardian/students" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center  border px-3 py-2 hover:bg-muted focus-visible:outline-2">Students</Link>
-       <Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center  border px-3 py-2 hover:bg-muted focus-visible:outline-2">Attendance</Link>
-       <Link to="/guardian/attendance" search={{student:child.studentPersonId}} hash="pickup" className="inline-flex min-h-11 items-center  border px-3 py-2 hover:bg-muted focus-visible:outline-2">Pickup &amp; safety</Link>
-       <Link to="/guardian/health" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center  border px-3 py-2 hover:bg-muted focus-visible:outline-2">Health &amp; clearance</Link>
-       <Link to="/guardian/enrollment-changes" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center  border px-3 py-2 hover:bg-muted focus-visible:outline-2">Transfer &amp; family changes</Link>
-       <Link to="/guardian/report-cards" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center  border px-3 py-2 hover:bg-muted focus-visible:outline-2">Report cards</Link>
-       <Link to="/guardian/admission-offers" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center  border px-3 py-2 hover:bg-muted focus-visible:outline-2">Offers</Link>
+      <Link to="/guardian/students" search={{student:child.studentPersonId}} className={guardianChildActionClass}>Students</Link>
+       <Link to="/guardian/attendance" search={{student:child.studentPersonId}} className={guardianChildActionClass}>Attendance</Link>
+       <Link to="/guardian/attendance" search={{student:child.studentPersonId}} hash="pickup" className={guardianChildActionClass}>Pickup &amp; safety</Link>
+       <Link to="/guardian/health" search={{student:child.studentPersonId}} className={guardianChildActionClass}>Health &amp; clearance</Link>
+       <Link to="/guardian/enrollment-changes" search={{student:child.studentPersonId}} className={guardianChildActionClass}>Transfer &amp; family changes</Link>
+       <Link to="/guardian/report-cards" search={{student:child.studentPersonId}} className={guardianChildActionClass}>Report cards</Link>
+       <Link to="/guardian/admission-offers" search={{student:child.studentPersonId}} className={guardianChildActionClass}>Offers</Link>
       </nav>
      </article>;
 }
