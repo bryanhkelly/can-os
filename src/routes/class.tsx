@@ -46,17 +46,43 @@ const ProviderInstructionReviews=lazy(async()=>{
   return {default:module.ProviderInstructionReviews};
 });
 
+/** Section-backed learning is served through the canonical /class entry.
+ * Section IDs are never treated as native Class IDs. */
+const SectionClassPage=lazy(async()=>{
+  const module=await import("./classes");
+  return {default:module.LegacySectionClassPage};
+});
+function SectionClassEntry({section,student,tab,lesson}:{
+  section:string;student?:string;tab?: "overview"|"lessons"|"planning"|"files"|"syllabus"|"announcements"|"people"|"teacher-guide";lesson?:string;
+}){
+  const result=useQuery({
+    queryKey:["section-class",section,student],
+    queryFn:async()=>(await import("./classes")).loadLegacySectionClasses({section,student}),
+    retry:false,
+  });
+  if(result.isPending)return <WorkspaceShell width="wide" title="Class" eyebrow="CAN OS"><p role="status">Loading class…</p></WorkspaceShell>;
+  if(result.isError||!result.data)return <WorkspaceShell width="wide" title="Class" eyebrow="CAN OS"><p role="alert">Unable to open this class. Check your access and retry.</p></WorkspaceShell>;
+  return <Suspense fallback={<WorkspaceShell width="wide" title="Class" eyebrow="CAN OS"><p role="status">Opening class…</p></WorkspaceShell>}>
+    <SectionClassPage outcome={result.data} search={{section,student,tab,lesson}}/>
+  </Suspense>;
+}
+
 const classUuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function selectedClassUuid(value:unknown):string|undefined{
   return typeof value==="string"&&classUuidPattern.test(value)?value:undefined;
 }
 
 export const Route=createFileRoute("/class")({
-  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;offeringVersionId?:string;courseVersionId?:string;trackVersionId?:string;view?:"manage"|"activities"|"content"|"reviews"}=>({
+  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;offeringVersionId?:string;courseVersionId?:string;trackVersionId?:string;section?:string;student?:string;lesson?:string;tab?:"overview"|"lessons"|"planning"|"files"|"syllabus"|"announcements"|"people"|"teacher-guide";view?:"manage"|"activities"|"content"|"reviews"}=>({
     view:value.view==="manage"||value.view==="activities"||value.view==="content"||value.view==="reviews"?value.view:undefined,
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
     classId:selectedClassUuid(value.classId),
+    section:selectedClassUuid(value.section),
+    student:selectedClassUuid(value.student),
+    lesson:typeof value.lesson==="string"&&value.lesson.length<=100?value.lesson:undefined,
+    tab:["overview","lessons","planning","files","syllabus","announcements","people","teacher-guide"].includes(String(value.tab))
+      ?value.tab as "overview"|"lessons"|"planning"|"files"|"syllabus"|"announcements"|"people"|"teacher-guide":undefined,
     siteId:selectedClassUuid(value.siteId),
     offeringVersionId:selectedClassUuid(value.offeringVersionId),
     courseVersionId:selectedClassUuid(value.courseVersionId),
@@ -69,6 +95,8 @@ export const Route=createFileRoute("/class")({
  * All commands remain independently scoped and authorized server-side. */
 function ClassHome(){
   const selected=Route.useSearch();
+  if(selected.section)return <SectionClassEntry section={selected.section}
+    student={selected.student} tab={selected.tab} lesson={selected.lesson}/>;
   const mode=selected.view==="manage"?"manage":
     selected.view==="activities"?"activities":selected.view==="content"?"content":selected.view==="reviews"?"reviews":"explore";
   const navigation=<NativeClassHomeNavigation mode={mode}
