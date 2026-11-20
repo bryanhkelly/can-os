@@ -54,7 +54,7 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
       <StatusBadge tone="info">Next scheduled class</StatusBadge>
       <p className="mt-1 font-semibold">{upcomingSection.title}</p>
       <p className="mt-1 text-sm text-muted-foreground">{format(upcomingClass.startsAt)}{upcomingClass.endsAt?` – ${format(upcomingClass.endsAt)}`:""}</p>
-      <Button asChild size="sm" variant="outline" className="mt-3"><Link to="/class" search={{section:upcomingSection.id}}>Open class workspace</Link></Button>
+      <Button asChild size="sm" variant="outline" className="mt-3"><Link to="/class" >Open class workspace</Link></Button>
     </div>}
     {available && <>
       {data.truncated && <p role="status" className="mt-3 text-sm">This schedule is incomplete. Open the calendar to review additional events.</p>}
@@ -71,7 +71,7 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
               </p>
             {item.cancelled ? <StatusBadge tone="danger">Cancelled</StatusBadge>
               : item.source === "assessment" ? <StatusBadge tone="attention">Due</StatusBadge> : null}
-            {section && <Link to="/class" search={{ section: section.id }} className="mt-2 inline-block text-sm underline">Open {section.title}</Link>}
+            {section && <Link to="/class"  className="mt-2 inline-block text-sm underline">Open {section.title}</Link>}
           </article>;
         })}
       </div>
