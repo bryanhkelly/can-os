@@ -80,3 +80,55 @@ The following was subsequently applied to Neon `main`:
 **Neon main remains unchanged** by validation: its journal still has 87 applied rows through 0085; `site_brand_versions`, `site_marketing_package_releases` and `class_participant_deliveries` do not exist there. Site Brand pointers have not been updated on production.
 
 The Neon project remains at its branch capacity limit (validation now consumes the released slot); the sole existing snapshot is historical, not a current production rollback. Do not delete recovery branches or old snapshots as an automatic workaround. For the production promotion, secure a current rollback strategy first, then recheck live preconditions and apply the exact immutable reviewed migration sequence 0086–0094 using the standard database migrator. If code branch migrations advance again, review the new entries separately before running them. Use verified deployment and application-authorization acceptance afterward. This validation alone does **not** authorize a COGIC pilot Site, publish Course/Offering content, enable enrollment or establish cross-Organization reporting.
+
+## Validation branch: migrations 0095–0096 independently verified (2026-11-20)
+
+**Target:** Neon project `sweet-hall-62441909`, nondefault branch
+`v61-launch-brand-migration-validation-20261119`
+(`br-bitter-pine-ar7mjn70`). This is a read-only reconciliation of an
+**already applied** migration state, not a new migration, schema write,
+production deployment, or enrollment fixture.
+
+- The branch's Drizzle journal has **98 applied rows**, from the existing
+  baseline through **0096**, with the latest timestamp `1795134000000`.
+  The exact Git feature-branch SQL SHA-256 checksums match the journal:
+  - 0094: `a2e90445e3ead6de1935621b03db3dbba154c383b4741a6adf81335dbd860c45`
+  - 0095: `fc8daa33f0aecc7a19d8e038da2e76f403ce9ef40f9fa119a1919e9429b7329d`
+  - 0096: `a3b2e8fa480de567e5c12a3286ad5899cf52e7973f8d1085e2e0e48a4e77473c`
+- The `public.learner_course_attempts` constraint
+  `course_attempt_one_registration_with_optional_class_ck` permits one
+  original source or an explicitly permitted noncredit Registration +
+  native Class Enrollment pair. The migration's provenance guard function
+  and its `BEFORE INSERT OR UPDATE` trigger are installed.
+- The `public.class_participant_deliveries`
+  `class_participant_delivery_kind_ck` constraint includes
+  `enrollment_cancelled`. The table has RLS enabled and neither
+  `authenticated` nor `anonymous` holds direct SELECT privileges;
+  `authenticated` also lacks direct INSERT privileges.
+- The branch has **zero** persisted native Class Enrollments, Course
+  Attempts, and Class participant delivery receipts, so this check does
+  **not** prove live self-enrollment, two-source Course Attempt insertion,
+  delivery dispatch, cancellation or deduplication.
+- The existing `learner_course_attempt_source_gate` trigger still calls
+  `education_v30.validate_course_attempt_source()`. Its inspected
+  function checks the active matching Class when `class_enrollment_id`
+  is present, while the newly installed public provenance trigger verifies
+  the combined Course/Class source. This legacy function dependency must be
+  reconciled before dropping the legacy schema. Do not drop this trigger
+  without a separately reviewed, positive/negative data-backed test.
+- CAN purpose-specific Program Catalog/Blueprint SQL roles and approved
+  Organization-purpose bindings remain absent. All nine Sites lack
+  a verified `geographic_area_id`. These are independent readiness
+  dependencies, not missing Drizzle migrations.
+- **Neon main was rechecked and not modified**: journal remains at
+  87 rows through 0085, with no `public.site_brand_versions`,
+  `public.class_participant_deliveries`, or new Course/Class guard function.
+
+**Outstanding validation before promotion:** Run authorized, disposable
+positive/negative Course registration → single Class placement tests,
+retries and last-seat concurrency; verify one Course Attempt, session
+invitations/ICS, Course-owned withdrawal and calendar cancellation,
+restricted-role cross-Site denials, and actual application build/tests
+against the exact source SHA. Do not reapply journaled 0095/0096, create
+a second Class/Attempt, or promote these migrations to main without
+separate production authorization and a current rollback plan.
