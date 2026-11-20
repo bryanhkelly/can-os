@@ -3,7 +3,6 @@ import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
-import { previewSyntheticSiteName, previewSyntheticSiteContent } from "@/domain/site-preview-presentation";
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -142,20 +141,10 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         : [];
       const plannedPrograms = projectPlannedSiteProgramsForPreview(
         preferences.success ? preferences.data : null, authored);
-      // Present one ordinary school website and retain the demonstration
-      // disclosure in the share-link banner. Do not mutate canonical names,
-      // protected rights/claim decisions or immutable Brand versions.
-      const synthetic = site.metadata.synthetic === true;
-      const presentationName = previewSyntheticSiteName(brand.resolved.displayName, synthetic);
-      const presentationContent = synthetic
-        ? previewSyntheticSiteContent(websiteContent, presentationName,
-            [site.name, brand.resolved.displayName])
-        : websiteContent;
       const page = projectShareableSitePreview({
-        siteName: presentationName,
-        organizationName: previewSyntheticSiteName(
-          organization?.name ?? "Proposed learning community", synthetic),
-        content: presentationContent,
+        siteName: brand.resolved.displayName,
+        organizationName: organization?.name ?? "Proposed learning community",
+        content: websiteContent,
         plannedPrograms,
       });
       const pages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
@@ -171,7 +160,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         expiresAt: data.expiresAfterDays === null ? null
           : new Date(now.getTime() + data.expiresAfterDays * 86_400_000).toISOString(),
         revokedAt: null, sourceRevision: latest.revision,
-        brandVersionId:brand.version.id,synthetic,pages,
+        brandVersionId:brand.version.id,synthetic:site.metadata.synthetic===true,pages,
       };
       // Keep a bounded number of recorded links. Old revocations remain in
       // the canonical audit trail, not unlimited Site metadata.
