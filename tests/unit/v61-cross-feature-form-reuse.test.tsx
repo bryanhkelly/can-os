@@ -18,6 +18,17 @@ describe("V6.1 cross-feature form composition", () => {
     expect(html).not.toMatch(/rounded-(?:lg|xl|full)/);
   });
 
+  it("keeps the invitation submit control inert and visibly busy while sending", () => {
+    const html = renderToStaticMarkup(<FamilyInvitationForm
+      programs={[{ id: "program-1", name: "Weekend learning" }]}
+      draft={{ programId: "program-1", contacts: "", subject: "", introduction: "" }}
+      busy onChange={() => undefined} onSubmit={() => undefined} />);
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain("Queuing invitations...");
+    expect(html).toContain("disabled");
+    expect(html).toContain('data-action-footer="form"');
+  });
+
   it("shows the shared empty state without creating an unauthorized invitation form", () => {
     const html = renderToStaticMarkup(<FamilyInvitationForm
       programs={[]}
@@ -62,6 +73,10 @@ describe("V6.1 cross-feature form composition", () => {
     "src/components/enrollment/EnrollmentForm.tsx",
     "src/routes/operations.interest-events.tsx",
     "src/components/operations/LaunchConfigurationForm.tsx",
+    "src/components/launch-studio/EstablishSiteProfileUnified.tsx",
+    "src/components/launch-studio/PrepareOperationsV61.tsx",
+    "src/components/launch-studio/NativeOfferingAdoptionReviewPanel.tsx",
+    "src/components/launch-studio/ProgramDiscoveryPanel.tsx",
   ])("guards canonical form-action reuse in %s", filePath => {
     const source = readFileSync(new URL(`../../${filePath}`, import.meta.url), "utf8");
     expect(source).toContain("<ActionFooter");
