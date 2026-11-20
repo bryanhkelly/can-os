@@ -233,9 +233,75 @@ export const getNativeClassTeacherDraftPractice=createServerFn({method:"GET"})
        return {
          id:String(row.id),studentName:String(row.studentName??"Learner"),
          recordedAt:new Date(String(row.recordedAt)).toISOString(),answers,
+         teacherFeedback:typeof raw.teacherFeedback==="string"?raw.teacherFeedback:null,
+         practiceScore:typeof raw.demoScore==="number"?raw.demoScore:null,
        };
      });
      return {items,partial:result.rows.length>50};
+   });
+ });
+
+
+const practiceReviewInput=input.extend({
+  practiceAttemptId:z.string().uuid(),
+  feedback:z.string().trim().min(3).max(3000),
+  practiceScore:z.number().int().min(0).max(10).nullable(),
+}).strict();
+
+/** Teacher review of genuine saved synthetic draft-practice responses. The
+ * academic assessment remains draft. An audit accompanies any returned
+ * practice-only feedback; this grants no official grading authority.
+ */
+export const returnNativeClassDraftPracticeFeedback=createServerFn({method:"POST"})
+ .validator((value:unknown)=>practiceReviewInput.parse(value))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   return db.transaction(async tx=>{
+     const {cls,actor}=await authorizedTeacher(tx,data.classId);
+     if(cls.siteId!=="f1000000-0000-4000-8000-000000000003")
+       throw new AuthorizationError("synthetic Valor practice review only");
+     const matched=await tx.execute(sql`
+       SELECT fp.id
+       FROM public.formative_practice_attempts fp
+       JOIN public.learner_course_attempts ca ON ca.id=fp.course_attempt_id
+         AND ca.course_version_id=fp.course_version_id
+       JOIN public.class_enrollments ce ON ce.id=ca.class_enrollment_id
+         AND ce.course_attempt_id=ca.id AND ce.status='active'
+       JOIN public.people p ON p.id=ce.learner_person_id
+       JOIN public.sites s ON s.id=${cls.siteId}::uuid
+       JOIN education_v30_secure.formative_practice_responses pr
+         ON pr.practice_attempt_id=fp.id
+       WHERE fp.id=${data.practiceAttemptId}::uuid
+         AND ce.class_id=${cls.id}::uuid
+         AND ca.status='active' AND ca.section_id IS NULL
+         AND fp.course_version_id=${cls.courseVersionId}::uuid
+         AND p.metadata @> '{"synthetic":true}'::jsonb
+         AND s.metadata @> '{"synthetic":true}'::jsonb
+         AND pr.response->>'mode'='valor_draft_assessment_practice'
+       FOR UPDATE OF pr
+     `);
+     if(matched.rows.length!==1)
+       throw new AuthorizationError("exact private synthetic practice response");
+     const updated=await tx.execute(sql`
+       UPDATE education_v30_secure.formative_practice_responses
+       SET response=response || jsonb_build_object(
+         'teacherFeedback',${data.feedback}::text,
+         'demoScore',${data.practiceScore}::int,
+         'maxDemoScore',10
+       )
+       WHERE practice_attempt_id=${data.practiceAttemptId}::uuid
+         AND response->>'mode'='valor_draft_assessment_practice'
+       RETURNING practice_attempt_id
+     `);
+     if(updated.rows.length!==1)
+       throw new AuthorizationError("practice response changed");
+     await writeCanonicalAudit(tx,{
+       actorPersonId:actor.actorPersonId!,owningOrganizationId:cls.operatingOrganizationId,
+       eventCode:"class.knowledge_check.practice_feedback.recorded",
+       entityKind:"formative_practice_attempt",entityId:data.practiceAttemptId,
+       payload:{classId:cls.id,practiceOnly:true,scoreRecorded:data.practiceScore!==null},
+     });
+     return {practiceAttemptId:data.practiceAttemptId,practiceOnly:true as const};
    });
  });
 
