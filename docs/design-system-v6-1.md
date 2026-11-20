@@ -290,6 +290,40 @@ The narrow detection intentionally does not claim to recognize every
 possible duplicated UI; cross-feature rendering tests and browser review
 remain complementary checks.
 
+**Shared navigation ownership (November 2026):** Use
+`DetailNavigation` with `SectionTab` for exclusive record views, `PageNavigation`
+for known forward/back links, `DirectoryPagination` for known totals,
+`DirectoryWindowPagination` for bounded server windows without a total, and
+`WorkspaceLinkNavigation` for a compact group of related destinations.
+`WorkspaceLinkNavigation` accepts `surface="panel" | "plain"` and owns the
+accessible navigation landmark, V6.1 spacing and panel tokens. Feature
+components still own their destination links, authorization and navigation
+eligibility. The reusable cursor pager accepts `previousLabel` and
+`nextLabel` for contextual wording without inventing an unavailable total.
+Do not use a record tab to present independent destinations or reuse a page
+navigator for active view selection.
+
+**Reporting table ownership (November 2026):** Use `Table`, `TableCaption`,
+`TableHeader`, `TableHead` (column header), `TableRowHead` (accessible
+`th scope="row"`), `TableBody`, `TableRow` and `TableCell` from
+`src/components/ui/table.tsx` for source-reconciled evidence tables.
+`Table` owns the focusable horizontal scroll region; feature panels own
+disclosure limits, server filtering, reporting scope and the data itself.
+Use `DirectoryTable` for record lists with sorting, permitted actions,
+selection or pagination. Reuse the low-level table family for fixed-column
+reporting and source metadata rather than adding directory affordances.
+The current migrated evidence panels have **seven read-only tables** across
+Noncredit Network, Native Class, Noncredit Pilot and Noncredit Provider reports.
+
+`can-os-design/no-native-feature-tables` warns across production TSX and
+is an error for those four migrated reporting panels. Complex legacy
+gradebook and assessment grids are not silently converted: retain their
+functional behavior until interaction, keyboard and source-of-truth
+acceptance is available. Storybook reports/table fixtures include mobile,
+tablet, desktop and dark-mode views, but they cannot count as reviewed
+screenshots until actually executed, inspected and recorded in
+`docs/verification/v61-visual-evidence.json`.
+
 **Dependency direction:** `ui` does not import features; shared
 `workspace` and `workflow` patterns compose `ui`; feature-specific
 components compose those layers. Server authorization, identity, evidence,
