@@ -1,10 +1,8 @@
-name: Platform and FullFlow Code Verification
+name: CAN OS V6.1 Source and Build Verification
 
 on:
   pull_request:
-    branches: [FullFlow]
-  push:
-    branches: [refactor/platform-foundations]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -35,16 +33,22 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
-      - name: Design-system checks
+      - name: V6.1 complete source coverage
+        run: npm run design:coverage
+      - name: V6.1 strict route and composed-component compliance
+        run: npm run design:routes -- --strict
+      - name: V6.1 source AST regression tests
+        run: npm run test:design-audit
+      - name: Design-system lint and coverage
         run: npm run lint
       - name: Record verification evidence
         if: always()
         shell: bash
         run: |
           {
-            echo "## Code verification"
+            echo "## CAN OS V6.1 code verification"
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Connected FullFlow acceptance is separate and requires isolated Neon credentials."
+            echo "- Connected Site/Program acceptance remains separate and requires isolated Neon credentials."
             echo "- No production authorization or compliance certification is implied."
           } >> "${GITHUB_STEP_SUMMARY}"
