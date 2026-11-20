@@ -7,7 +7,7 @@ import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import {
   filterPublishedSolutionRecipes, matchingSolutionInterests,
-  orderSolutionsByVision, resolveVisibleSolutionRecipe, selectSavedSolutionPlans,
+  orderSolutionsByVision, preferredCatalogDelivery, resolveVisibleSolutionRecipe, selectSavedSolutionPlans,
 } from "@/domain/launch-prepare-v61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { CanonicalBlueprintWorkspace } from "./CanonicalBlueprintWorkspace";
@@ -190,6 +190,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
       <CanonicalBlueprintWorkspace key={siteId + ":" + configuringVersionId + ":" + (resumeConfigurationId ?? "new")}
         siteId={siteId} initialBlueprintVersionId={configuringVersionId}
         initialConfigurationId={resumeConfigurationId ?? undefined}
+        initialDelivery={preferredCatalogDelivery(delivery)}
         onWorkspaceChanged={updated => setWorkspace(current =>
           current?.siteId === updated.siteId ? updated : current)}
         embedded enableReferences />
