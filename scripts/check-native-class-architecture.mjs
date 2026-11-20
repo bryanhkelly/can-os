@@ -8,7 +8,7 @@
  * reconciliation are proven. Expand coverage only after removing dependencies,
  * never by adding exceptions to new Class code.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
@@ -38,6 +38,16 @@ const forbidden = [
   { term: /["']@\/modules\/learning\/class-access(?:\.server)?["']/, reason: "legacy classroom authorization" },
 ];
 let errors = 0;
+if (existsSync(resolve(root, "src/routes/classes.tsx"))) {
+  console.error("Native Class architecture: duplicate classroom route is forbidden");
+  errors++;
+}
+const canonicalDirectory = readFileSync(resolve(root, "src/routes/class.tsx"), "utf8");
+if (/LegacySectionClassPage|SectionClassEntry|import\\(["']\\.\\/classes["']\\)/.test(canonicalDirectory)) {
+  console.error("Native Class architecture: canonical directory must not embed retired classroom code");
+  errors++;
+}
+
 for (const path of nativeOwners) {
   const source = readFileSync(resolve(root, path), "utf8");
   for (const rule of forbidden) {
