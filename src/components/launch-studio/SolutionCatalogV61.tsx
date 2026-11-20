@@ -184,9 +184,17 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                   <h4 className="text-sm font-semibold">Included operating components</h4>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">A required component comes from the published Solution model. It does not mean your Site has met that requirement or received legal approval.</p>
                   <div className="mt-3 space-y-2">
-                    {selected.components.map(component => <div key={component.id} className="flex flex-wrap items-center justify-between gap-3 border p-3">
-                      <span className="text-sm font-medium capitalize">{readable(component.key)}</span>
-                      <span className="text-xs text-muted-foreground">{readable(component.requirementMode)} · {readable(component.kind)}</span>
+                    {selected.components.map(component => <div key={component.id} className="flex flex-wrap items-start justify-between gap-3 border p-3">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-sm font-medium capitalize">{readable(component.key)}</span>
+                        {component.description && <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {component.description}
+                        </p>}
+                        {component.requiresIndependentReview && <p className="mt-1 text-xs text-muted-foreground">
+                          Independent review required before operation
+                        </p>}
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">{readable(component.requirementMode)} · {readable(component.kind)}</span>
                     </div>)}
                     {selected.components.length === 0 && <p className="text-sm text-muted-foreground">This Solution does not currently list any operating components.</p>}
                   </div>
