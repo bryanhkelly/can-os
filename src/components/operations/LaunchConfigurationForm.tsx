@@ -5,6 +5,7 @@ import { LaunchProgramIdentityFields } from "@/components/operations/LaunchProgr
 import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliveryModelFields";
 import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
 import { launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { siteAddressEditorDraft } from "@/domain/site-setup-configuration";
@@ -77,9 +78,11 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
                 </LaunchFieldHelp>
               </div>
             </section>
-            <Button type="submit" disabled={busy||Boolean(created)||jurisdictionMismatch}>
-              {busy?"Saving your school…":created?"School saved":"Save and continue"}
-            </Button>
+            <ActionFooter layout="form">
+              <Button type="submit" disabled={busy||Boolean(created)||jurisdictionMismatch} loading={busy} loadingLabel="Saving your school...">
+                {created?"School saved":"Save and continue"}
+              </Button>
+            </ActionFooter>
             {!savedSite&&delivery.onsite&&<p role="status" className="text-sm text-muted-foreground">
               Choose a school location or save a new one in step 1.
             </p>}
