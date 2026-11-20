@@ -71,8 +71,8 @@ BEGIN
      WHERE id IN(md5('valor-v61:survey-campaign:student-feedback')::uuid,
                  md5('valor-v61:survey-campaign:family-feedback')::uuid)
      AND status='draft')<>2
- OR (SELECT count(*) FROM public.survey_questions
-    WHERE survey_version_id IN
+ OR (SELECT count(*) FROM public.survey_questions sq
+    WHERE sq.survey_version_id IN
      (md5('valor-v61:survey-version:student-feedback')::uuid,
       md5('valor-v61:survey-version:family-feedback')::uuid))<>8
  THEN RAISE EXCEPTION 'Valor demo draft feedback surveys incomplete'; END IF;
