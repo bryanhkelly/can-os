@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { sites, siteMarketingPackages } from "@/db/schema";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
 import { readSiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { suggestMarketingStarterV61, type MarketingStarterSourcesV61 } from "@/domain/site-marketing-suggestions-v61";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
@@ -65,9 +66,10 @@ async function authorizedSite(
  * Only purpose-specific editorial suggestions leave the server; raw private
  * Story answers are never added to package metadata, audit or analytics.
  */
+type MarketingSourceTx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 async function marketingSource(
   site:{id:string;metadata:typeof sites.$inferSelect.metadata},
-  reader:Pick<typeof db,"select">=db,
+  reader:MarketingSourceTx,
 ):Promise<MarketingStarterSourcesV61>{
   const source=site.metadata.siteStoryV61;
   const story=source == null ? null : siteStorySourceV61Schema.parse(source).answers;
@@ -79,7 +81,17 @@ async function marketingSource(
   const copy=savedWebsite
     ? normalizeSiteLocalContent(savedWebsite.content,{allowIncompleteImage:true})
     : null;
-  return {story,intent,websiteCopy:copy
+  // A saved Program code represents intent, not a commissioned Solution.
+  // Only active published catalog names are suitable for editorial suggestions.
+  // Catalog unavailability does not prevent safe, generic Site outreach.
+  const publishedPrograms=intent?.programCodes?.length
+    ? await readPublishedBlueprintReferences(reader)
+        .then(items=>items.filter(item=>item.kind==="program_model" &&
+          intent.programCodes!.includes(item.code))
+          .map(item=>({code:item.code,title:item.title})))
+        .catch(()=>[])
+    : [];
+  return {story,intent,publishedPrograms,websiteCopy:copy
     ? {heroHeadline:copy.heroHeadline,welcomeMessage:copy.welcomeMessage,
         schoolVision:copy.schoolVision,communityOutreach:copy.communityOutreach}
     : null};
@@ -89,8 +101,10 @@ export const readSiteMarketingSuggestionsV61=createServerFn({method:"GET"})
   .validator((input:unknown)=>siteInput.parse(input))
   .handler(async ({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const {site}=await authorizedSite(data.siteId,"program.read");
-    const source=await marketingSource(site);
+    const {site,source}=await db.transaction(async tx=>{
+      const {site}=await authorizedSite(data.siteId,"program.read",tx);
+      return {site,source:await marketingSource(site,tx)};
+    });
     return Object.fromEntries(marketingPurposeIds.map(purpose=>
       [purpose,suggestMarketingStarterV61(site.name,purpose,source)])) as
       Record<(typeof marketingPurposeIds)[number],

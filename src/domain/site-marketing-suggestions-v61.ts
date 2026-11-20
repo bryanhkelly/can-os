@@ -13,6 +13,8 @@ import {
 export type MarketingStarterSourcesV61 = {
   story: SiteStoryV61 | null;
   intent: SiteProgramsAudiencesV61 | null;
+  /** Active published CAN Program titles; no Solution requirements or approvals. */
+  publishedPrograms?: readonly {code:string;title:string}[];
   websiteCopy: {
     heroHeadline?: string | null;
     welcomeMessage?: string | null;
@@ -81,10 +83,20 @@ export function suggestMarketingStarterV61(
   if(intent?.audienceIds.length){
     content.audiences=[...new Set(intent.audienceIds.map(id=>audienceFromPlan[id]))];
   }
+  const selectedPrograms=(intent?.programCodes??[])
+    .map(code=>source.publishedPrograms?.find(program=>program.code===code))
+    .filter((program):program is {code:string;title:string}=>Boolean(program))
+    .filter(program=>!containsProtectedInstitutionalClaim(program.title));
+  const preferredProgram=selectedPrograms.find(program=>
+    program.code===intent?.startingProgramCode)??selectedPrograms[0];
   const priority=intent?.startingFocus ?? intent?.interestIds[0] ?? null;
-  const focus=priority ? priorityLabels[priority] : "";
-  const secondFocus=intent?.interestIds.filter(id=>id!==priority)
-    .slice(0,1).map(id=>priorityLabels[id]).join("")??"";
+  const fallbackFocus=priority ? priorityLabels[priority] : "";
+  const focus=preferredProgram ? safeText(preferredProgram.title,90) : fallbackFocus;
+  const secondFocus=preferredProgram
+    ? selectedPrograms.filter(program=>program.code!==preferredProgram.code)
+      .slice(0,1).map(program=>safeText(program.title,90)).join("")
+    : intent?.interestIds.filter(id=>id!==priority)
+      .slice(0,1).map(id=>priorityLabels[id]).join("")??"";
   const emphasis=story ? phrase(story.values.length?story.values:story.motivations) : "";
   const approach=story ? phrase(story.distinctives) : "";
   const outcome=story ? phrase(story.experiences) : "";

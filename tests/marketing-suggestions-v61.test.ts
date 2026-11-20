@@ -38,6 +38,32 @@ describe("Introduce V6.1 reuses established Site information",()=>{
     expect(result.content.audiences).toEqual(["families","adult-learners","older-adults"]);
     expect(result.content).not.toHaveProperty("recipients");
   });
+  it("prioritizes selected published CAN Programs over broad learning interests",()=>{
+    const intent={...emptySiteProgramsAudiencesV61(),
+      interestIds:["summer"] as ["summer"],startingFocus:"summer" as const,
+      programCodes:["can.program.custom_training","can.program.ai_digital_skills"],
+      startingProgramCode:"can.program.ai_digital_skills"};
+    const result=suggestMarketingStarterV61("Riverbend","program-interest",{
+      story:null,intent,websiteCopy:null,
+      publishedPrograms:[
+        {code:"can.program.custom_training",title:"Custom Training"},
+        {code:"can.program.ai_digital_skills",title:"AI & Digital Skills"},
+      ],
+    });
+    expect(result.content.headline).toContain("AI & Digital Skills");
+    expect(result.content.message).toContain("exploring AI & Digital Skills");
+    expect(result.content.message).not.toContain("authorized");
+  });
+  it("does not expose retired or unknown Program codes in marketing copy",()=>{
+    const intent={...emptySiteProgramsAudiencesV61(),
+      interestIds:["afterschool"] as ["afterschool"],
+      programCodes:["retired.program"],startingProgramCode:"retired.program"};
+    const result=suggestMarketingStarterV61("Riverbend","program-interest",{
+      story:null,intent,websiteCopy:null,publishedPrograms:[],
+    });
+    expect(result.content.message).toContain("after-school activities");
+    expect(result.content.message).not.toContain("retired.program");
+  });
   it("provides saved Website copy as an explicit alternative, not an automatic override",()=>{
     const websiteCopy={heroHeadline:"A new kind of community",schoolVision:"An editable, saved Site vision"};
     const result=suggestMarketingStarterV61("Riverbend","interest-invitation",{
