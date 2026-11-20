@@ -173,15 +173,17 @@ export function MarketingPackageWizardV61({
           </WorkspaceNotice></div>
         </WorkspacePanel>}
 
-        <ActionFooter>
+        <ActionFooter layout="step">
           <Button variant="outline" disabled={busy} onClick={()=>onBack()}>
             <ArrowLeft aria-hidden="true"/> {step===0?"Cancel":"Back"}
           </Button>
-          {hasSavedPackage&&<Button variant="outline" disabled={busy} onClick={()=>onSaveExit()}>Save &amp; Exit</Button>}
-          <Button disabled={busy} onClick={()=>onNext()}>
-            {busy?"Saving…":step===3?"Save package":"Save & Continue"}
-            {step===3?<Check aria-hidden="true"/>:<ArrowRight aria-hidden="true"/>}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {hasSavedPackage&&<Button variant="outline" disabled={busy} onClick={()=>onSaveExit()}>Save &amp; Exit</Button>}
+            <Button disabled={busy} loading={busy} loadingLabel="Saving package…" onClick={()=>onNext()}>
+              {step===3?"Save package":"Save & Continue"}
+              {step===3?<Check aria-hidden="true"/>:<ArrowRight aria-hidden="true"/>}
+            </Button>
+          </div>
         </ActionFooter>
       
   </>;
