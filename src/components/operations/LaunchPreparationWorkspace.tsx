@@ -58,7 +58,7 @@ export function LaunchPreparationWorkspace({ hubMode=false, focus, currentLaunch
           <SchoolJurisdictionReviewPanel key={`jurisdiction-review-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <ProgramSiteAuthorizationPanel key={`site-authorization-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
-          <Link {...(hubMode?{to:navigation.modulePath,params:{module:"academics"},search:schoolSelection}:{to:"/launch/site" as const,search:{...schoolSelection,step:"academics" as const}})} className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</Link>
+          <Link to="/launch/site" search={{...schoolSelection,module:"program-catalog"}} className="mt-2 inline-block text-sm font-semibold underline">Continue planning your Solutions →</Link>
         </div>}
         {focus === "academics" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
         {focus === "academics" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section id="launch-first-class" className="mt-5 scroll-mt-6  border bg-card p-5" aria-label="Prepare your first classroom">
