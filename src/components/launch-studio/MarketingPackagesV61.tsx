@@ -1,9 +1,10 @@
+import { MarketingPackageReleaseHistoryV61 } from "./MarketingPackageReleaseHistoryV61";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { Archive, ArrowLeft, ArrowRight, Check, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2, Download } from "lucide-react";
+import { Archive, ArrowLeft, ArrowRight, Check, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
@@ -627,102 +628,16 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
               send email, update scheduled communications, or change earlier Package Releases.</WorkspaceNotice>
           </div>
         </WorkspacePanel>
-        <WorkspacePanel title="Package release history"
-          description="Downloads are grouped by Package Release. Every version preserves its original Brand, message and outputs.">
-          <div className="space-y-3">
-            {releasesLoading&&<p role="status" className="text-sm text-muted-foreground">Loading releases…</p>}
-            {!releasesLoading&&packageReleases.length===0&&
-              <p className="text-sm text-muted-foreground">No Package Releases yet.</p>}
-            {!releasesLoading&&packageReleases.map((version,index)=>
-              <details key={version.id} className="border bg-background" open={index===0}>
-                <summary className="cursor-pointer p-4 text-sm font-semibold">
-                  Package Release v{version.releaseNumber} {index===0?"· Latest generated":"· Previous version"}
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {new Date(version.createdAt).toLocaleDateString()} · {version.formats.length} materials
-                  </span>
-                </summary>
-                <div className="space-y-3 border-t p-4">
-                  <p className="text-xs text-muted-foreground">
-                    Saved content revision {version.packageRevision} · Brand preserved with this release
-                  </p>
-                  {!version.complete&&<WorkspaceNotice tone="attention">This historical release is incomplete.
-                    Download the available original files individually; do not treat it as a full Package.</WorkspaceNotice>}
-                  {version.outputs.some(item=>item.withdrawnAt)&&<WorkspaceNotice tone="attention">
-                    At least one material was withdrawn. The full Package is unavailable, but unaffected
-                    original files may still be downloaded individually.</WorkspaceNotice>}
-                  <Button type="button" variant="outline" size="sm" disabled={busy||!packageReleaseIsDownloadableV61(version)}
-                    onClick={()=>void downloadPackage(version)}>
-                    <Download className="size-4" aria-hidden="true"/> Download Package ZIP
-                  </Button>
-                  <ul className="space-y-2">
-                    {version.outputs.map(item=><li key={item.id}
-                      className="flex flex-wrap items-center justify-between gap-3 border p-3">
-                      <span className="text-sm">{marketingFormatOptions.find(x=>x.id===item.format)?.label??item.format}
-                        {item.withdrawnAt?" · Withdrawn":""}
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm"
-                          disabled={busy||Boolean(item.withdrawnAt)}
-                          onClick={()=>void compareRelease(item.id,item.format,version.releaseNumber)}>
-                          Compare
-                        </Button>
-                        <Button type="button" variant="outline" size="sm"
-                          disabled={busy||Boolean(item.withdrawnAt)}
-                          onClick={()=>void downloadRelease(item.id)}>Original</Button>
-                        {item.format!=="email"&&<Button type="button" variant="outline" size="sm"
-                          disabled={busy||Boolean(item.withdrawnAt)}
-                          onClick={()=>void downloadPng(item.id)}>PNG</Button>}
-                        {item.format==="social"&&<Button type="button" variant="outline" size="sm"
-                          disabled={busy||Boolean(item.withdrawnAt)}
-                          onClick={()=>void copyCaption(item.id)}>Copy caption</Button>}
-                      </div>
-                    </li>)}
-                  </ul>
-                </div>
-              </details>)}
-            {!releasesLoading&&legacyReleases.length>0&&<details className="border bg-background">
-              <summary className="cursor-pointer p-4 text-sm font-semibold">
-                Previous individually generated materials ({legacyReleases.length})
-              </summary>
-              <ul className="space-y-2 border-t p-4">
-                {legacyReleases.map(item=><li key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-2 border p-3">
-                  <span className="text-xs">{item.format} · {new Date(item.createdAt).toLocaleDateString()}
-                    {item.withdrawnAt?" · Withdrawn":""}</span>
-                  <Button type="button" variant="outline" size="sm"
-                    disabled={busy||Boolean(item.withdrawnAt)}
-                    onClick={()=>void downloadRelease(item.id)}>Download original</Button>
-                </li>)}
-              </ul>
-            </details>}
-            {compare&&<section aria-label="Compare Package material" className="space-y-3 border p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-semibold text-sm">Compare {compare.format} · Release v{compare.releaseNumber}</h3>
-                <Button type="button" variant="ghost" size="sm" onClick={()=>setCompare(null)}>Close</Button>
-              </div>
-              <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-                <div className="min-w-0 space-y-2">
-                  <p className="text-sm font-semibold">Original released material</p>
-                  {compare.mimeType==="image/svg+xml"
-                    ? <img src={"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(compare.body)}
-                        alt={"Original "+compare.format+" from Package Release v"+compare.releaseNumber}
-                        className="max-h-[36rem] max-w-full border bg-white object-contain"/>
-                    : <iframe title="Original released email" sandbox="" srcDoc={compare.body}
-                        className="h-[34rem] w-full border bg-white"/>}
-                </div>
-                <div className="min-w-0 space-y-2">
-                  <p className="text-sm font-semibold">Current saved Package preview</p>
-                  {record.content.formats.includes(compare.format)
-                    ? <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
-                        brandVersionId={record.brandVersionId}
-                        format={compare.format} content={record.content}/>
-                    : <p className="border p-4 text-sm">This format was removed from the working Package.
-                        It remains available in the original release.</p>}
-                </div>
-              </div>
-            </section>}
-          </div>
-        </WorkspacePanel>
+        <MarketingPackageReleaseHistoryV61
+          siteId={siteId} record={record} versions={packageReleases}
+          historicalSingles={legacyReleases} loading={releasesLoading}
+          busy={busy} compare={compare}
+          onDownloadPackage={version=>{void downloadPackage(version);}}
+          onCompare={(id,format,number)=>{void compareRelease(id,format,number);}}
+          onDownloadOriginal={id=>{void downloadRelease(id);}}
+          onDownloadPng={id=>{void downloadPng(id);}}
+          onCopyCaption={id=>{void copyCaption(id);}}
+          onCloseCompare={()=>setCompare(null)}/>
         <ActionFooter>
           <Button variant="outline" onClick={()=>{setView("library");setRecord(null);}}>All packages</Button>
           <Button variant="outline" disabled={busy} onClick={()=>void duplicate(record)}><Copy aria-hidden="true"/> Duplicate</Button>
