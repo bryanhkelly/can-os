@@ -172,7 +172,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
      {(["classwork","grades"] as const).map(value=><SectionTab key={value} current={tab===value} link={{to:"/student/courses",search:{section:course.id,tab:value}}}>{value==="classwork"?"Classwork":"Grades & feedback"}</SectionTab>)}
     </DetailNavigation>
     {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>
-      <p className="text-sm text-muted-foreground">Teaching team: {course.teachers?.length ? course.teachers.map(teacher=>teacher.name).join(", ") : "Not assigned"}</p>
+      <p className="text-sm text-muted-foreground">Teaching team: {course.teachers?.length ? course.teachers.map((teacher,index)=><span key={teacher.personId}>{index>0?", ":""}<Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></span>) : "Not assigned"}</p>
       <StudentClassActions sectionId={course.id}/>
     </WorkspacePanel> : <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>
