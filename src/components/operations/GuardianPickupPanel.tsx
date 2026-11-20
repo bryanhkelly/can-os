@@ -31,7 +31,6 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   const activeStudentPersonId = useRef(studentPersonId);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [firstNames, setFirstNames] = useState<Record<string, string>>({});
   const [lastNames, setLastNames] = useState<Record<string, string>>({});
   const [relationships, setRelationships] = useState<Record<string, string>>({});
@@ -72,12 +71,12 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
           studentPersonId === activeStudentPersonId.current) setLoading(false);
     }
   }, [studentPersonId]);
-  const mutation = useMutationFeedback(() => load(true));
+  const refreshAfterChange = useCallback(() => load(true), [load]);
+  const mutation = useMutationFeedback(refreshAfterChange);
   const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
     activeStudentPersonId.current = studentPersonId;
-    setNotice("");
     // Child-specific identity and custody drafts must never follow a guardian
     // into another child's release-authority workspace.
     setFirstNames({});
@@ -98,7 +97,6 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
     const mutationId = pendingMutationIds.current.get(key) ?? crypto.randomUUID();
     pendingMutationIds.current.set(key, mutationId);
     setError("");
-    setNotice("");
     const outcome=await mutation.run(()=>command(mutationId),{
       successMessage:message,
       commandErrorMessage:"Pickup change could not be confirmed.",
@@ -125,7 +123,6 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   return <WorkspacePanel id="pickup" title="Pickup authorization & release history"
     description="Authorize a person by legal name and required identity check. School staff must still verify the adult and witness every handoff."
     className="mt-8">
-    {notice && <p role="status" className="mb-4  border p-3 text-sm">{notice}</p>}
     {error && <p role="alert" className="mb-4  border p-3 text-sm">{error}</p>}
     <MutationFeedback state={{...mutation,retryRefresh}} className="mb-4" pendingMessage="Updating pickup authority…"/>
     {loading && <p role="status" className="text-sm">Loading pickup authority…</p>}
