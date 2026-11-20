@@ -14,6 +14,7 @@ import { readSiteInformationV61 } from "@/modules/programs/site-information-v61.
 import { EstablishProgramsAudiencesV61, ProgramsAudiencesV61Guidance,
   type ProgramsAudiencesV61Initial } from "@/components/launch-studio/EstablishProgramsAudiencesV61";
 import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
+import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import { WorkspaceShell } from "@/components/workspace";
 import { LaunchModuleDestinationV61, isDestinationModuleV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
 import { LaunchPrepareV61, isPrepareModuleV61 } from "@/components/launch-studio/LaunchPrepareV61";
@@ -40,11 +41,12 @@ export const Route = createFileRoute("/launch/site")({
     // Project next steps from real Site-scoped reads. A failed read must never
     // be confused with an empty saved answer or falsely reported as complete.
     const overview = site && !deps.module ? await (async () => {
-      const [info, programs, brand, marketing] = await Promise.allSettled([
+      const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
         readSiteInformationV61({ data: { siteId: site.id } }),
         readSiteProgramsAudiencesV61({ data: { siteId: site.id } }),
         readSiteBrandVersionView({ data: { siteId: site.id } }),
         listSiteMarketingPackagesV61({ data: { siteId: site.id } }),
+        readCanonicalBlueprintWorkspace({ data: { siteId: site.id } }),
       ]);
       return {
         information: info.status === "fulfilled"
@@ -62,6 +64,15 @@ export const Route = createFileRoute("/launch/site")({
           ? { state: "ready" as const, value: {
               hasPackages: marketing.value.some(item => item.status !== "archived"),
             } } : { state: "unavailable" as const },
+        solutions: solutionPlans.status === "fulfilled" &&
+            solutionPlans.value.siteId === site.id
+          ? { state: "ready" as const, value: {
+              plans: solutionPlans.value.configurations.map(plan => ({
+                configurationId: plan.configurationId,
+                lifecycle: plan.lifecycle,
+              })),
+            } }
+          : { state: "unavailable" as const },
         websiteDraftAvailable: Boolean(site.websiteDraft),
       };
     })() : null;
