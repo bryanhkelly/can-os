@@ -8,15 +8,14 @@ import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
 import { Textarea } from "@/components/ui/textarea";
 import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
-  marketingAudienceOptions, marketingFormatOptions, marketingPurposeOptions,
-  type MarketingFormat, type MarketingPackageContent, type MarketingPackageStep,
+  marketingAudienceOptions, marketingFormatOptions, marketingPurposeOptions, marketingPackageSteps,
+  type MarketingFormat, type MarketingPackageContent,
 } from "@/domain/marketing-package-v61";
 import type { readSiteMarketingSuggestionsV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 
 type MarketingSuggestions=Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
 type MarketingSuggestion=MarketingSuggestions[MarketingPackageContent["purpose"]];
-const steps:readonly MarketingPackageStep[]=["menu","audience","messages","assets"];
 const stepLabels=["Menu","Audience","Messages","Collateral & Assets"] as const;
 
 /** Controlled, reusable Introduce authoring flow. Package persistence and Brand
@@ -38,7 +37,7 @@ export function MarketingPackageWizardV61({
 }){
   return <>
 
-        <GuidedSetupProgress label="Package progress" steps={steps.map((id, index) => ({
+        <GuidedSetupProgress label="Package progress" steps={marketingPackageSteps.map((id, index) => ({
           id, title: stepLabels[index], status: index === step ? "current" as const : "upcoming" as const,
         }))} />
 

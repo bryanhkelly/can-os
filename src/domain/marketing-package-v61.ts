@@ -95,7 +95,8 @@ export function initialMarketingContent(siteName: string, purpose: MarketingPurp
   };
 }
 
-export type MarketingPackageStep = "menu" | "audience" | "messages" | "assets";
+export const marketingPackageSteps = ["menu", "audience", "messages", "assets"] as const;
+export type MarketingPackageStep = (typeof marketingPackageSteps)[number];
 
 /** Editing is allowed at any step; completion guidance never authorizes sending or publication. */
 export function marketingStepIssue(step: MarketingPackageStep, title: string, content: MarketingPackageContent): string | null {

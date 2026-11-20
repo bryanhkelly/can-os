@@ -5,12 +5,13 @@ import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowRight, Megaphone, Plus } from "lucide-react";
+import { ArrowRight, Copy, Megaphone, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionDialog, ActionFooter, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
   marketingPackageContentSchema, marketingPurposeOptions, marketingStepIssue,
+  marketingPackageSteps,
   type MarketingFormat, type MarketingPackageContent,
 } from "@/domain/marketing-package-v61";
 import {
@@ -149,10 +150,10 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   }
 
   async function next() {
-    const issue=marketingStepIssue(steps[step]!,title,content);
+    const issue=marketingStepIssue(marketingPackageSteps[step]!,title,content);
     if(issue){setError(issue);return;}
     if(step===3){
-      const incomplete=steps.map((item,index)=>({index,issue:marketingStepIssue(item,title,content)}))
+      const incomplete=marketingPackageSteps.map((item,index)=>({index,issue:marketingStepIssue(item,title,content)}))
         .find(item=>item.issue);
       if(incomplete){setStep(incomplete.index);setError(incomplete.issue!);return;}
     }
