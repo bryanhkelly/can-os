@@ -316,21 +316,45 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
       {label:"Instruction",value:release.requiredMinutes+" minutes"},
       {label:"Unreserved places",value:String(release.seatsRemaining)},
     ]}/>
-    {release.deliveryMode==="facilitated"&&<section className="mt-5 border-t border-border pt-4" aria-label="Class schedule">
-      <h3 className="text-sm font-semibold">Scheduled class meetings</h3>
-      <p className="mt-2 text-xs text-muted-foreground">Meeting times are shown in your device\'s timezone. Confirm the onsite schedule with the hosting location.</p>
-      {release.sessions.length?
-        <ol className="mt-2 space-y-2 text-sm">
-          {release.sessions.map((meeting,index)=><li key={index} className="border border-border p-2">
-            <time dateTime={meeting.startsAt}>{hydrated?new Date(meeting.startsAt).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}):"Loading local start time…"}</time>
-            {" to "}
-            <time dateTime={meeting.endsAt}>{hydrated?new Date(meeting.endsAt).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}):"Loading local end time…"}</time>
-          </li>)}
-        </ol>:
+    {!joinQueue&&<section className="mt-5 border-t border-border pt-4" aria-label="Choose your Class">
+      <h3 className="text-sm font-semibold">Choose your Class</h3>
+      {classChoiceLoading&&<QueryState loading="Checking authorized Classes and Sessions…"/>}
+      {classChoiceError&&<WorkspaceNotice tone="attention" className="mt-2">
+        Class availability could not be verified. Registration is temporarily unavailable.
+      </WorkspaceNotice>}
+      {!classChoiceLoading&&!classChoiceError&&classChoices.length===0&&
         <WorkspaceNotice tone="attention" className="mt-2">
-          No dated meetings have been published for this cohort. Confirm the schedule with the hosting Site before registering.
+          This Course does not yet have a ready Class at the selected Site. The Site must prepare and authorize a Class before registration opens.
         </WorkspaceNotice>}
-      {release.schedulePartial&&<p className="mt-2 text-xs text-muted-foreground">Additional meeting dates are available from the Site.</p>}
+      {classChoices.length>0&&<Label htmlFor="course-class-choice" className="mt-3 block text-sm font-medium">
+        Class
+        <Select id="course-class-choice" value={classId}
+          onChange={event=>onClassChange(event.target.value)}
+          className="mt-2 min-h-11">
+          <option value="">Choose an available Class</option>
+          {classChoices.map(item=><option key={item.id} value={item.id}
+            disabled={item.seatsRemaining!==null&&item.seatsRemaining<=0}>
+            {item.title}{item.seatsRemaining===0?" · Full":""}
+          </option>)}
+        </Select>
+      </Label>}
+      {classChoices.filter(item=>item.id===classId).map(item=><div key={item.id} className="mt-4">
+        <p className="text-sm text-muted-foreground">{item.deliveryMode==="self_paced"
+          ?"Self-paced Class: begin learning after registration."
+          :item.sessions.length+" scheduled Session"+(item.sessions.length===1?"":"s")+"."}</p>
+        {item.sessions.length>0&&<ol className="mt-3 space-y-2 text-sm" aria-label="Class Sessions">
+          {item.sessions.map((session,index)=><li key={session.startsAt+index}
+            className="border border-border p-2">
+            <time dateTime={session.startsAt}>{hydrated
+              ?new Date(session.startsAt).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"})
+              :"Loading Session time…"}</time>
+            {" to "}
+            <time dateTime={session.endsAt}>{hydrated
+              ?new Date(session.endsAt).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"})
+              :"Loading Session end time…"}</time>
+          </li>)}
+        </ol>}
+      </div>)}
     </section>}
     {signedIn&&!isStudent&&<AffiliateAttributionSelector releaseId={release.id} onMembershipChange={onMembershipChange}/>}
     <div className="mt-5 border-t border-border pt-5">
