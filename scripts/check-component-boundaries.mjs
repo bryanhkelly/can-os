@@ -59,6 +59,8 @@ const guardedFiles = [
   "src/components/operations/ExtendedSeasonReadinessRequests.tsx",
   "src/components/learning/NativeClassScheduleForm.tsx",
   "src/components/operations/OperationsActionCard.tsx",
+  "src/components/launch-studio/BlueprintComponentPicker.tsx",
+  "src/components/launch-studio/BlueprintReferencesPicker.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
 ];
@@ -111,6 +113,10 @@ for (const file of files) {
 }
 
 const owners = [
+  ["src/components/launch-studio/CanonicalBlueprintWorkspace.tsx", [
+    '<legend className="px-2 font-semibold">Blueprint components</legend>',
+    "referenceCatalog.filter(reference =>",
+  ]],
   ["src/routes/groups.tsx", [
     "pendingRequests.map(({ group, member }) => (",
     "openReports.map(({ group, report }) => (",
