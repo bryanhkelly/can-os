@@ -203,3 +203,50 @@ Neon main was not changed. All current numbered feature migrations are
 present and matching on the validation branch. The broader restricted-role
 and legacy-schema retirement projects still require approved independent
 work and real application acceptance.
+
+## 2026-11-20 · Applied Blueprint public journal cutover, migrations 0097–0098
+
+**Actual target:** Neon V6.1 validation branch `br-bitter-pine-ar7mjn70`.
+Two additive, reviewable migrations were applied atomically and journaled,
+without modifying Neon main or deleting old schema objects.
+
+- **0097**: `public.has_restricted_blueprint_purpose`,
+  `public.append_restricted_blueprint_transition`, and an exact
+  reviewer-author-history RLS read policy on the existing
+  `public.audit_events`. SHA-256:
+  `fe3a2107963af996ed43bfb7be34ae886c711ca2b402b7f702679610cfb47e65`.
+- **0098**: explicitly `REVOKE` client `EXECUTE` grants that were
+  supplied through default function privileges. SHA-256:
+  `a10de2e6ba67bdcfb199c75f6efa5aa9b082b5e616e9b3967d5f125362d0f31c`.
+- Post-apply journal: **100 rows**, through 0098. Both complete migration
+  files match their journal hashes byte-for-byte. Direct
+  `authenticated` and `anonymous` function execution is denied.
+  An owner-session attempt to append an unbound purpose event returned
+  SQLSTATE `42501`, without inserting an event.
+- Preserved existing 842 public audit entries, 268 public domain events
+  and the full preexisting learner data. No persisted Blueprint
+  configurations were present to require legacy author-event backfill.
+- Source now routes Blueprint configuration/review/execution journaling and
+  independent-review authorship through the shared public infrastructure.
+  The non-owner dedicated operations connection is validated by exact Neon
+  endpoint and selected through the existing Drizzle `db` proxy, rather
+  than substituting an owner or auth-reader login.
+- Standalone readiness query:
+  `scripts/sql/report-v61-blueprint-public-journal-readiness.sql`
+  returned **7 ready / 3 blocked**. Blockers are the real per-Organization
+  Program Catalog role, independently approved Blueprint author/reviewer
+  roles, and purpose bindings. A separate Site geography prerequisite
+  is also outstanding.
+- No real restricted principal, Canonical reviewer, Organization Site
+  operator appointment, or purpose binding was fabricated. An approved
+  `can_os_canonical_ops_app` LOGIN and preview-only
+  `CAN_CANONICAL_OPERATIONS_DATABASE_URL` must be independently
+  provisioned, as detailed in
+  `docs/runbooks/v61-canonical-blueprint-role-cutover.md`.
+
+**Not yet accepted:** A true scoped author/reviewer DB transaction,
+real browser flow, CI typecheck/build, or entire `education_v30`
+retirement. The old schema's seven tables and 13 dependent public FKs,
+244 legacy functions and 371 function-backed public triggers remain.
+The unrelated `education_v30.enrollments` and `public.enrollments`
+represent different models and must not be aliased or dropped.
