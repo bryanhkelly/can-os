@@ -13,7 +13,8 @@ type ActivityItem = Awaited<ReturnType<typeof getLearningActivityHistory>>["evid
  * Tracking is nonblocking; failure never marks a lesson complete or changes attendance.
  */
 export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: string; lessonId: string }) {
-  const [available, setAvailable] = useState(false);
+  const [status, setStatus] = useState<"connecting" | "recording" | "unavailable">("connecting");
+  const [retry, setRetry] = useState(0);
   const [history, setHistory] = useState<ActivityItem[] | null>(null);
   const [message, setMessage] = useState("");
   const sessionRef = useRef<string | null>(null);
@@ -22,7 +23,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
     let lastSent = Date.now();
     let mustResume = false;
     sessionRef.current = null;
-    setAvailable(false);
+    setStatus("connecting");
     setHistory(null);
     setMessage("");
 
@@ -51,10 +52,13 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
         }
         sessionRef.current = started.learningSessionId;
         await record(started.learningSessionId, "lesson_opened");
-        if (!cancelled) setAvailable(true);
+        if (!cancelled) setStatus("recording");
       })
       .catch(() => {
-        if (!cancelled) setMessage("Learning-activity tracking is unavailable. Your lesson is still accessible.");
+        if (!cancelled) {
+          setStatus("unavailable");
+          setMessage("The learning session could not be saved. Try reconnecting. Your lesson and assignments remain accessible.");
+        }
       });
 
     const onInteraction = (event: Event) => {
@@ -118,7 +122,7 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
           .catch(() => { /* Server idle expiry remains authoritative. */ });
       }
     };
-  }, [sectionId, lessonId]);
+  }, [sectionId, lessonId, retry]);
 
   async function loadHistory() {
     try {
@@ -133,13 +137,18 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
   return <section className="my-4  border p-3 text-sm" aria-label="Learning activity">
     <p className="font-medium">Learning activity</p>
     <p className="mt-1 text-xs text-muted-foreground">
-      {available ? "Lesson activity is being recorded." : "Activity tracking is not active yet."}
+      {status === "recording" ? "Lesson activity is being recorded." :
+        status === "connecting" ? "Connecting to the learning activity service…" :
+        "Learning activity is not being recorded."}
       {" "}Estimated active time is not attendance, mastery, or a grade.
     </p>
     <Button variant="ghost" type="button" className="mt-2 underline" onClick={() => void loadHistory()}>
       View recent learning history
     </Button>
-    {message && <p role="status" className="mt-2 text-xs">{message}</p>}
+    {message && <p role={status === "unavailable" ? "alert" : "status"} className="mt-2 text-xs">{message}</p>}
+    {status === "unavailable" && <Button type="button" variant="outline" size="sm" onClick={() => setRetry(value => value + 1)}>
+      Retry activity tracking
+    </Button>}
     {history && <ul className="mt-3 space-y-1 text-xs">
       {history.map(item => <li key={item.id}>
         {item.kind.replaceAll("_", " ")} · {item.lessonId} · {new Date(item.receivedAt).toLocaleString()}
