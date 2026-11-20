@@ -55,7 +55,7 @@ export function MySiteBioConsentPanel({siteId}:{siteId:string}) {
     }catch{setStatus("Unable to withdraw permission. Please retry.")}
     finally{setSaving(false)}
   }
-  return <section aria-label="My public Site biography" className="rounded-xl border bg-card p-5">
+  return <section aria-label="My public Site biography" className=" border bg-card p-5">
     <h2 className="font-serif text-xl">My public school biography</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Opt in to sharing only the name, title, and biography below on this school website.

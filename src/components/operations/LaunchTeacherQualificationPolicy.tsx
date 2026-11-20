@@ -18,7 +18,7 @@ export function LaunchTeacherQualificationPolicy({data,busy,run}:{
  const [policyConfirmed,setPolicyConfirmed]=useState(false);
  const [attempted,setAttempted]=useState(false);
  return <>
-  <section className="mt-7 rounded-xl border bg-card p-5">
+  <section className="mt-7  border bg-card p-5">
    <h2 className="font-serif text-2xl">Teacher qualification policy</h2>
    {data.policyPublished?<p className="mt-3 text-sm">Program requirements are published. Each instructor is checked against every applicable published policy for the full instructional window.</p>:
     !data.canPublishTeacherPolicy?<p className="mt-3 text-sm">Only a verified, program-scoped institutional staffing-policy publisher can approve the initial teacher qualification requirements. Ask your school administrator to assign that authority.</p>:

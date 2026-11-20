@@ -59,7 +59,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     siteId: selectedSiteId, programId: selectedProgramId,
   });
   const canReviewSelectedLaunch = launch?.canReviewEvidence === true;
-  if (unavailable) return <section role="alert" className="mt-8 rounded-2xl border bg-card p-6">
+  if (unavailable) return <section role="alert" className="mt-8  border bg-card p-6">
     <h2 className="font-serif text-2xl">This launch is unavailable</h2>
     <p className="mt-3 text-sm">The requested Program is no longer in your pre-opening launch scope.
       It may have opened or your access may have changed.</p>
@@ -68,25 +68,25 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     <Link to="/launch/site" search={{ siteId: selectedSiteId, programId: undefined }}
       className="ml-4 mt-4 inline-block font-semibold underline">Choose an available launch →</Link>
   </section>;
-  if (!launch && launches.length > 1) return <section className="mt-8 rounded-2xl border bg-card p-6">
+  if (!launch && launches.length > 1) return <section className="mt-8  border bg-card p-6">
     <h2 className="font-serif text-2xl">Choose the school to continue</h2>
     <p className="mt-3 text-sm">Each school resumes its own saved Program and Launch Journey.</p>
     <nav aria-label="Available school launches" className="mt-4 flex flex-wrap gap-3">
       {launches.map(item => <Link key={item.id} to="/launch/site"
         search={{ siteId: item.siteId ?? undefined, programId: item.id }}
-        className="min-h-11 rounded-xl border px-4 py-3 text-sm font-semibold">
+        className="min-h-11  border px-4 py-3 text-sm font-semibold">
         Continue {item.name}
       </Link>)}
     </nav>
   </section>;
-  if (!launch) return <section className="mt-8 rounded-2xl border bg-card p-6" aria-label="Launch your school">
+  if (!launch) return <section className="mt-8  border bg-card p-6" aria-label="Launch your school">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">School launch</p>
     <h2 className="mt-2 font-serif text-3xl">Let&apos;s open your school</h2>
     <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
       Start with a school name, church, and location. CAN will create the school Program and Launch Journey,
       then guide you through the remaining setup. Starting a launch never authorizes opening.
     </p>
-    <a href="#new-school-launch" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">
+    <a href="#new-school-launch" className="mt-5 inline-flex min-h-11 items-center  bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">
       Launch a school
     </a>
   </section>;
@@ -143,7 +143,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     }
   }
 
-  return <section className="mt-8 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Guided school launch">
+  return <section className="mt-8  border bg-card p-5 sm:p-7" aria-label="Guided school launch">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Guided school launch</p>
     <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -162,7 +162,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           : guidance.ready ? "Journey ready" : "Review launch record"}
       </StatusBadge>
     </div>
-    <section aria-label="School opening readiness" className="mt-5 rounded-xl border bg-background p-4">
+    <section aria-label="School opening readiness" className="mt-5  border bg-background p-4">
       <h3 className="text-sm font-semibold">Opening authority</h3>
       <p className="mt-2 text-sm">
         {launch.status === "active"
@@ -184,24 +184,24 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           to: "/launch/site",
           search: { programId: event.target.value, siteId: selected?.siteId ?? undefined },
         });
-      }} className="mt-1 block w-full rounded-lg border bg-background p-2">
+      }} className="mt-1 block w-full  border bg-background p-2">
         {launches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </Select>
     </Label>}
-    {error && <div role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">
+    {error && <div role="alert" className="mt-4  border border-destructive p-3 text-sm">
       <p>{error}</p>
-      <Button variant="outline" type="button" disabled={openingSaving} className="mt-3 min-h-11 rounded-lg border px-4 py-2 font-semibold"
+      <Button variant="outline" type="button" disabled={openingSaving} className="mt-3 min-h-11  border px-4 py-2 font-semibold"
         onClick={() => { void router.invalidate().then(() => { setError(""); setActivationNeedsRefresh(false); }).catch(() =>
           setError("Unable to refresh the saved launch. Reopen this school from Launch before attempting activation again.")); }}>
         Refresh recorded launch status (do not reactivate)
       </Button>
     </div>}
     <MutationFeedback state={mutation} pendingMessage="Saving launch progress…"/>
-    {launch.status === "active" && launch.siteId && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
+    {launch.status === "active" && launch.siteId && <p role="status" className="mt-4  border p-4 text-sm">
       {launch.name} is active. Daily work now lives with the opening handoff, staffing, admissions and academic activity in Site Today.{" "}
       <Link to="/sites/$siteId" params={{ siteId: launch.siteId }} className="font-semibold underline">Open Site Today →</Link>
     </p>}
-    {opened && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
+    {opened && <p role="status" className="mt-4  border p-4 text-sm">
       {opened.name} is active. {opened.siteId
         ? <Link to="/sites/$siteId" params={{ siteId: opened.siteId }} className="underline">
           Open Site Today to review the named operator handoff →
@@ -210,7 +210,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     </p>}
 
     <p className="mt-4 text-sm text-muted-foreground" role="status">You can prepare your website and invite families while CAN reviews opening requirements. Invitations and setup do not activate enrollment or authorize a supervised school day.</p>
-    <section aria-label="Launch preparation destinations" className="mt-5 rounded-xl border bg-background p-4">
+    <section aria-label="Launch preparation destinations" className="mt-5  border bg-background p-4">
       <h3 className="text-sm font-semibold">Continue school preparation</h3>
       <p className="mt-1 text-xs text-muted-foreground">These links are preparation steps, not readiness or authorization decisions. Opening and service authority remain governed by their independent server checks.</p>
       {!hubMode && <nav aria-label="Next school preparation actions" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
@@ -222,7 +222,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         <a href="#invite-families" className="underline">Review invitation progress</a>
       </nav>}
     </section>
-    {next ? <article className="mt-6 rounded-2xl border-2 border-primary/30 p-5" aria-label="Next launch task">
+    {next ? <article className="mt-6  border-2 border-primary/30 p-5" aria-label="Next launch task">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Next up</p>
@@ -240,7 +240,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       {Boolean(next.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">{plural(next.reviewNoteCount ?? 0, "registrar review note")} on record.</p>}
       {next.evidenceReviewCorrectionPending && <p role="status" className="mt-2 text-sm font-semibold">Correction required before this evidence can be reviewed again.</p>}
       {next.pendingEvidenceReview && <p role="status" className="mt-2 text-sm font-semibold">Evidence submitted; awaiting a CAN institutional decision.</p>}
-      {next.latestReviewStatus === "rejected" && next.latestReviewReason && <p className="mt-2 rounded-lg border p-3 text-sm">Correction requested: {next.latestReviewReason}</p>}
+      {next.latestReviewStatus === "rejected" && next.latestReviewReason && <p className="mt-2  border p-3 text-sm">Correction requested: {next.latestReviewReason}</p>}
       
       {next.state === "needs_can" && <p className="mt-3 text-sm">
         CAN owns this work. Your school cannot mark it complete from this screen.
@@ -256,14 +256,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         <LaunchOrientationTask launch={launch} busy={busy} save={saveOrientation} />}
       {next.action === "opening" && next.state === "needs_you" &&
         <LaunchOpeningTask key={launch.id} launch={launch} busy={busy} open={open} />}
-    </article> : <p role="status" className="mt-6 rounded-xl border p-4 text-sm">
+    </article> : <p role="status" className="mt-6  border p-4 text-sm">
       No further task is derived from the saved Launch Journey. Review the canonical record rather than assuming opening is approved.
     </p>}
 
-    <details className="mt-5 rounded-xl border bg-background p-4">
+    <details className="mt-5  border bg-background p-4">
       <summary className="cursor-pointer text-sm font-semibold">Review recorded Journey requirements ({guidance.pendingBlocking.length} opening blockers, {guidance.pending.length} outstanding requirements)</summary>
       <ol className="mt-4 space-y-3">
-        {guidance.tasks.map((task, index) => <li key={task.id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+        {guidance.tasks.map((task, index) => <li key={task.id} className="flex items-start justify-between gap-3  border p-3">
           <div>
             <p className="text-sm font-semibold">{index + 1}. {task.title}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -298,7 +298,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       </ol>
     </details>
 
-    <section className="mt-5 rounded-xl border bg-background p-4" aria-label="Prepare your school community">
+    <section className="mt-5  border bg-background p-4" aria-label="Prepare your school community">
       <h3 className="text-sm font-semibold">Prepare your school community</h3>
       <p className="mt-3 text-sm text-muted-foreground">
         You can prepare these items while opening reviews continue. These tools do not replace opening requirements. A public website is not required for registrar-assisted intake.

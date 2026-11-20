@@ -14,7 +14,7 @@ export function SchoolOwnedCompletion({ task, busy, complete }: {
 }) {
   const [confirmed, setConfirmed] = useState(false);
   if (!task.requirementId || task.state !== "needs_you" || task.requiresRegistrarReview) return null;
-  return <details className="mt-4 rounded-xl border bg-background p-4">
+  return <details className="mt-4  border bg-background p-4">
     <summary className="cursor-pointer text-sm font-semibold">Record this school-owned requirement</summary>
     <p className="mt-3 text-sm text-muted-foreground">
       Use this only after the actual work is complete. This cannot complete CAN or third-party work,
@@ -39,7 +39,7 @@ export function LaunchEvidenceStatement({ task, busy, submit }: {
   const [statement, setStatement] = useState("");
   const [attempted, setAttempted] = useState(false);
   if (!task.requirementId || !["needs_you", "needs_can"].includes(task.state) || task.pendingEvidenceReview || task.action === "admissions" || (task.state === "needs_you" && !task.evidenceReviewRequired)) return null;
-  return <form noValidate className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+  return <form noValidate className="mt-4  border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     setAttempted(true);
     if (statement.trim().length < 10) return;
@@ -65,7 +65,7 @@ export function InstitutionalEvidenceReview({ task, busy, review }: {
   const [decision, setDecision] = useState<"accepted" | "rejected">("rejected");
   const [attempted, setAttempted] = useState(false);
   if (!task.requirementId || !task.pendingEvidenceReview || task.state === "complete") return null;
-  return <form noValidate className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+  return <form noValidate className="mt-4  border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     setAttempted(true);
     if (!reason.trim() || (decision === "rejected" && reason.trim().length < 5)) return;
@@ -73,7 +73,7 @@ export function InstitutionalEvidenceReview({ task, busy, review }: {
   }}>
     <p className="text-sm font-semibold">CAN institutional evidence review</p>
     <p className="mt-2 text-xs text-muted-foreground">Approval completes this requirement, but does not independently authorize opening.</p>
-    {task.latestEvidenceStatement && <blockquote className="mt-3 whitespace-pre-wrap rounded-lg border p-3 text-sm">{task.latestEvidenceStatement}</blockquote>}
+    {task.latestEvidenceStatement && <blockquote className="mt-3 whitespace-pre-wrap  border p-3 text-sm">{task.latestEvidenceStatement}</blockquote>}
     {task.latestEvidenceStatementAt && <p className="mt-2 text-xs text-muted-foreground">Submitted: {task.latestEvidenceStatementAt}</p>}
     <Field label="Decision" className="mt-3">
       <Select value={decision} onChange={event => setDecision(event.target.value as "accepted" | "rejected")}>
