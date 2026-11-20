@@ -76,6 +76,24 @@ describe("V6.1 Prepare operational integration boundaries", () => {
     expect(editor).toContain("createStudioGradeScale");
   });
 
+  it("enforces exact-Site class selection within embedded Prepare", () => {
+    const classes = read("src/components/learning/NativeClassManager.tsx");
+    expect(classes).toContain("prepareOnly && (!preferredSiteId || siteId!==preferredSiteId)");
+    expect(classes).toContain("disabled={prepareOnly}");
+    expect(classes).toContain("!prepareOnly||site.id===preferredSiteId");
+    expect(classes).toContain("operatorSites.isError||prepareOnly");
+    expect(classes).not.toContain("distinct cohort");
+  });
+
+  it("preserves one V6.1 navigation guard for embedded school-year editing", () => {
+    const parent = read("src/components/launch-studio/PrepareOperationsV61.tsx");
+    const form = read("src/components/operations/SchoolYearCreateForm.tsx");
+    expect(parent).toContain("useLaunchUnsavedChanges(yearFormDirty");
+    expect(parent).toContain("onDirtyChange={setYearFormDirty}");
+    expect(form).toContain("useUnsavedChangesGuard(touched && !embedded)");
+    expect(form).toContain("cancel={!embedded && <Link");
+  });
+
   it("keeps Prepare Class creation draft-only, not an enrollment shortcut", () => {
     const operations = read("src/components/launch-studio/PrepareOperationsV61.tsx");
     const classes = read("src/components/learning/NativeClassManager.tsx");
