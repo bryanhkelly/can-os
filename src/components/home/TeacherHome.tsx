@@ -2,17 +2,16 @@ import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, ClipboardList, CalendarDays, MessageCircle, School, Users } from "lucide-react";
+import { BookOpen, ClipboardList, CalendarDays, MessageCircle, School, Users } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { TeacherLearningParticipationPanel } from "@/components/teacher/TeacherLearningParticipationPanel";
+import { TeacherNextActionPanel } from "@/components/teacher/TeacherNextActionPanel";
 import { TeacherLearningFollowUpsPanel } from "@/components/learning/TeacherLearningFollowUpsPanel";
 import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePanel";
 import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
 import { TeacherDaySchedule } from "@/components/teacher/TeacherDaySchedule";
 import { StatCard, EmptyState } from "@/components/workspace";
-import { Button } from "@/components/ui/button";
-import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
@@ -98,30 +97,8 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
      <StatCard asChild label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length}><a href="#grade-follow-ups" /></StatCard>
     </div>
 
-    <DashboardPanel title="What needs you next" className="mt-7">
-      {data.ungradedCount>0 ? <div className="mt-3">
-        <p className="font-semibold">{data.ungradedCount} submitted work item{data.ungradedCount===1?"":"s"} to review</p>
-        <p className="mt-1 text-sm text-muted-foreground">Start with a submission from your current assigned sections.</p>
-        <Button asChild size="lg" className="mt-3">
-          {nextUngraded
-            ? <Link to="/teacher/gradebook" search={{section:nextUngraded.sectionId,assessment:nextUngraded.assessmentId,student:nextUngraded.studentProfileId}}>
-                Grade next submission <ArrowUpRight aria-hidden="true" className="size-4"/>
-              </Link>
-            : <Link to="/teacher/gradebook">
-                Open grading queue <ArrowUpRight aria-hidden="true" className="size-4"/>
-              </Link>}
-        </Button>
-      </div> : data.missingWorkCount>0 ? <div className="mt-3">
-        <p className="font-semibold">{data.missingWorkCount} missing-work follow-up{data.missingWorkCount===1?"":"s"}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Review missing work and follow up with students through the existing teacher workflow.</p>
-        <Button asChild size="lg" className="mt-3">
-          <Link to="/teacher/missing-work">Review missing work <ArrowUpRight aria-hidden="true" className="size-4"/></Link>
-        </Button>
-      </div> : <div className="mt-3">
-        <p className="text-sm text-muted-foreground">No grading or missing-work items in the current snapshot. Review your schedule and prepare your next class.</p>
-        <Link to="/classes" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Open my classes →</Link>
-      </div>}
-    </DashboardPanel>
+    <TeacherNextActionPanel ungradedCount={data.ungradedCount} missingWorkCount={data.missingWorkCount}
+      nextUngraded={nextUngraded} />
 
     <section className="mt-10">
      <p className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">My sections</p>
