@@ -83,8 +83,7 @@ export function UserFlowMap({ title, description, stages, transitions, legend, c
     </ol>
     {transitions && transitions.length > 0 && <section aria-label="Transitions, branches and exception paths" className="border border-border bg-card">
       <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Transitions and decision branches</h3>
-      
-        <Table scrollLabel="Workflow transitions" aria-label="Workflow transitions" className="w-full min-w-[36rem] text-left text-xs"><TableCaption className="sr-only">Workflow transitions</TableCaption>
+      <Table scrollLabel="Workflow transitions" aria-label="Workflow transitions" className="w-full min-w-[36rem] text-left text-xs"><TableCaption className="sr-only">Workflow transitions</TableCaption>
           <TableHeader className="bg-muted/30 text-muted-foreground"><TableRow>
             <TableHead scope="col" className="p-3 font-semibold">From</TableHead>
             <TableHead scope="col" className="p-3 font-semibold">Trigger / outcome</TableHead>
