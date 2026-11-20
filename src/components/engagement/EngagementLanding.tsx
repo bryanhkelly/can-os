@@ -32,7 +32,7 @@ function VerifiedLaunchAction({ journey }: { journey: EngagementJourney }) {
 
 export function EngagementLandingIndex() {
   const search = useLocation({ select: loc => loc.searchStr });
-  return <PageFrame width="wide" className="mx-auto max-w-screen-2xl px-5 pb-20 pt-14 sm:px-8 lg:pt-20">
+  return <PageFrame width="wide" className="mx-auto max-w-screen-2xl px-[var(--page-gutter)] pb-20 pt-14 lg:pt-20">
     <p className="text-xs font-semibold uppercase tracking-wider text-primary">A clearer beginning with CAN</p>
     <PageTitle className="mt-5 max-w-4xl font-serif text-5xl leading-tight sm:text-7xl">Every meaningful beginning starts with a possibility.</PageTitle>
     <p className="mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
@@ -73,7 +73,7 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
   const Icon = accents[journey.category];
   return <PageFrame width="wide">
     <section className="bg-foreground text-background">
-      <div className="mx-auto grid max-w-screen-2xl gap-8 px-5 py-16 sm:px-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(15rem,.65fr)] lg:py-24">
+      <div className="mx-auto grid max-w-screen-2xl gap-8 px-[var(--page-gutter)] py-16 lg:grid-cols-[minmax(0,1.35fr)_minmax(15rem,.65fr)] lg:py-24">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-foreground/80">{journey.eyebrow}</p>
           <PageTitle className="mt-6 max-w-4xl font-serif text-5xl leading-tight sm:text-7xl">{journey.headline}</PageTitle>
@@ -100,7 +100,7 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
         </div>
       </div>
     </section>
-    <section className="mx-auto max-w-screen-2xl px-5 py-14 sm:px-8 lg:py-20">
+    <section className="mx-auto max-w-screen-2xl px-[var(--page-gutter)] py-14 lg:py-20">
       <div className="grid gap-9 lg:grid-cols-[.75fr_1.25fr]">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">How to begin</p>
@@ -116,7 +116,7 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
       </div>
     </section>
     <section className="border-y bg-muted/40">
-      <div className="mx-auto grid max-w-screen-2xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-2">
+      <div className="mx-auto grid max-w-screen-2xl gap-8 px-[var(--page-gutter)] py-14 lg:grid-cols-2">
         <div><h2 className="font-serif text-4xl">Understand before you decide.</h2>
           <p className="mt-4 max-w-lg text-sm leading-7 text-muted-foreground">Explore the model, responsibilities, and the questions worth answering before taking action.</p></div>
         <nav aria-label="Further CAN information" className="grid gap-2">
@@ -125,7 +125,7 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
         </nav>
       </div>
     </section>
-    <div className="mx-auto grid max-w-screen-2xl gap-5 px-5 py-14 sm:px-8 lg:grid-cols-2">
+    <div className="mx-auto grid max-w-screen-2xl gap-5 px-[var(--page-gutter)] py-14 lg:grid-cols-2">
       <VerifiedLaunchAction journey={journey}/>
       <section className="border border-border bg-card p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">No commitment</p>
