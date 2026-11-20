@@ -35,7 +35,6 @@ export const Route = createFileRoute("/groups_/$groupId")({
 });
 
 type Data = Awaited<ReturnType<typeof loadGroupDetail>>;
-type Workspace = NonNullable<Data["workspace"]>;
 
 function GroupDetailPage() {
   const outcome = Route.useLoaderData();
