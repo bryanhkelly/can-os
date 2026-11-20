@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { Bell, ChevronDown, Menu, MessageCircle, Search, UserRound } from "lucide-react";
+import { Bell, ChevronDown, Menu, MessageCircle, Search } from "lucide-react";
+import { WorkspaceAccountTrigger } from "./WorkspaceAccountMenu";
 import { Button } from "@/components/ui/button";
 import { WorkspaceNotice } from "@/components/workspace";
 import { formatWorkspaceRole, getWorkspaceScopeLabel } from "./workspace-scope";
@@ -81,10 +82,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
         </Button>
       </>}
       {authenticated
-        ? <Button variant="ghost" size="icon" aria-label="Account menu" aria-haspopup="dialog" aria-expanded={accountOpen}
-          title={member ? `${member.firstName} ${member.lastName}` : undefined}
-          aria-description={member ? `Signed in as ${member.firstName} ${member.lastName}` : undefined}
-          onClick={onOpenAccount} className=" border bg-muted"><UserRound aria-hidden="true" /></Button>
+        ? <WorkspaceAccountTrigger member={member} accountOpen={accountOpen} onOpenAccount={onOpenAccount} />
         : sessionAvailable && <Button asChild variant="outline" size="lg"><Link to="/access" search={{returnTo}}>Sign in</Link></Button>}
     </div>
   </header>
