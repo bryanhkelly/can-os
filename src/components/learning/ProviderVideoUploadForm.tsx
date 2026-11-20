@@ -93,7 +93,7 @@ export function ProviderVideoUploadForm({
         error={validationAttempted&&!courseVersionId?"Choose an assigned published Course.":undefined}>
         <Select value={courseVersionId} required
           onChange={event=>{reset();setCourseVersionId(event.target.value);}}
-          className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+          className="min-h-11">
           <option value="">Choose an authorized Course version</option>
           {versions.map(item=><option value={item.id} key={item.id}>{item.label}</option>)}
         </Select>
