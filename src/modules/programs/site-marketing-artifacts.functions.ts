@@ -219,7 +219,11 @@ export const listSiteMarketingPackageReleases=createServerFn({method:"GET"})
           .map(o=>({id:o.id,format:z.enum(marketingFormatIds).parse(o.format),templateVersion:o.templateVersion,
             checksum:o.checksum,
             withdrawnAt:o.withdrawnAt?.toISOString()??null})),
-        complete:outputs.every(Boolean),
+        // Refuse a malformed historical release whose repeated format
+        // resolves the same child twice. A complete Package always contains
+        // one distinct artifact for each selected format.
+        complete:formats.length>0 && new Set(formats).size===formats.length &&
+          outputs.length===formats.length && outputs.every(Boolean),
       };
     });
   });
