@@ -18,7 +18,7 @@ describe("Launch Studio current persisted workflows", () => {
   it("reads actual saved Site evidence rather than claiming progress by page visit", () => {
     const route = read("src/routes/launch.site.tsx");
     const frame = read("src/components/launch-studio/LaunchSiteFrameV61.tsx");
-    expect(route).toContain("nextLaunchAction(site.id, overview)");
+    expect(route).toContain("nextLaunchAction(site.id, overview, site.lifecycleStatus)");
     expect(route).toContain("Promise.allSettled");
     expect(route).toContain("site.lifecycleStatus");
     expect(frame).toContain("{statusLabel ??");
