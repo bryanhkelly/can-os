@@ -5,6 +5,7 @@ import { WorkspaceNotice } from "./notice";
 import { QueryState } from "./query-state";
 import { StatCard } from "./stat-card";
 import { StatusBadge, WorkspacePanel } from "./workspace-panel";
+import { WorkspaceActionLink } from "./workspace-action-link";
 
 const meta = { title: "Foundations/Workspace primitives" } satisfies Meta;
 export default meta;
@@ -63,4 +64,15 @@ export const AttentionNotice: Story = {
 
 export const SuccessConfirmation: Story = {
   render: () => <div className="bg-background p-6"><WorkspaceNotice tone="success">Application received. Independent guardian verification is still required.</WorkspaceNotice></div>,
+};
+
+export const AuthorizedActionLink: Story = {
+  render: () => <div className="max-w-2xl bg-background p-6">
+    <WorkspaceActionLink
+      title="Review learning requirements"
+      description="Open the existing independently authorized workspace. This link does not grant approval."
+      href="#review-requirements"
+      actionLabel="Review requirements"
+    />
+  </div>,
 };
