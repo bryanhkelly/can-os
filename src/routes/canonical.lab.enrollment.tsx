@@ -105,7 +105,7 @@ function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
         <p className="mt-2 text-sm text-muted-foreground">Only published training versions can be presented as candidates. A public registration launch also requires an approved deployment, capacity policy and registration command.</p>
         <Label htmlFor="training" className="mt-5 block text-sm font-semibold">Published training</Label>
         <Select id="training" value={selected} onChange={event => setSelected(event.target.value)}
-          className="mt-2 min-h-11 w-full max-w-xl border border-border bg-background px-3 text-sm">
+          className="mt-2 min-h-11 max-w-xl">
           <option value="">Choose a published training</option>
           {published.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
