@@ -173,7 +173,8 @@ const adapter = {
       status: canonicalEnrollmentSites.status,
     }).from(canonicalEnrollmentSites).where(eq(canonicalEnrollmentSites.id, cls.siteId)).limit(1);
     if (!site) return { kind: "suppress", reason: "Site_unavailable" };
-    const enrollmentRequired = record.kind !== "invitation_issued";
+    const cancellation=record.kind==="enrollment_cancelled";
+    const enrollmentRequired=record.kind!=="invitation_issued"&&!cancellation;
     const [enrollment] = enrollmentRequired ? await db.select()
       .from(canonicalClassEnrollments)
       .where(and(eq(canonicalClassEnrollments.id, record.sourceId),
@@ -181,6 +182,15 @@ const adapter = {
         eq(canonicalClassEnrollments.status, "active"))).limit(1) : [];
     if (enrollmentRequired && !enrollment)
       return { kind: "suppress", reason: "Class_enrollment_no_longer_active" };
+    const [cancelledEnrollment]=cancellation?await db.select()
+      .from(canonicalClassEnrollments)
+      .where(and(eq(canonicalClassEnrollments.id,record.sourceId),
+        eq(canonicalClassEnrollments.classId,cls.id),
+        inArray(canonicalClassEnrollments.status,["withdrawn","cancelled"])))
+      .limit(1):[];
+    if(cancellation&&!cancelledEnrollment)
+      return {kind:"suppress",reason:"Class_enrollment_exit_not_current"};
+
     let invitation: typeof canonicalClassEnrollmentInvitations.$inferSelect | null = null;
     if (record.kind === "invitation_issued") {
       const [current] = await db.select().from(canonicalClassEnrollmentInvitations)
@@ -203,10 +213,11 @@ const adapter = {
          (terms.opensAt&&terms.opensAt>now)||(terms.closesAt&&terms.closesAt<=now))
         return {kind:"suppress",reason:"Class_invitation_offering_no_longer_open"};
     }
-    if (record.kind !== "session_changed" &&
+    if (record.kind !== "session_changed" && !cancellation &&
         (cls.state !== "active" || site.status !== "active"))
       return { kind: "suppress", reason: "Class_or_Site_no_longer_open" };
-    const email = await verifiedRecipient(record.recipientPersonId, enrollment ?? null, now);
+    const email = await verifiedRecipient(record.recipientPersonId,
+      enrollment??cancelledEnrollment??null,now);
     if (!email) return { kind: "suppress", reason: "verified_recipient_contact_unavailable" };
     const sender = process.env.CAN_NOTIFICATIONS_FROM_EMAIL ?? process.env.CAN_ACCESS_FROM_EMAIL;
     const organizerEmail = sender?.includes("<")
@@ -217,7 +228,32 @@ const adapter = {
     const view = "Sign in to CAN OS and open My Classes for the authoritative schedule, lessons and meeting access.";
     const assets: NonNullable<Mail["attachments"]> = [];
     let subject: string, text: string;
-    if (record.kind === "invitation_issued") {
+    if(cancellation){
+      const upcoming=await db.select({
+        id:canonicalClassSessions.id,classId:canonicalClassSessions.classId,
+        startsAt:canonicalDeliverySessions.startsAt,endsAt:canonicalDeliverySessions.endsAt,
+        state:facilitatedClassroomPlans.state,
+      }).from(canonicalClassSessions)
+        .innerJoin(canonicalDeliverySessions,
+          eq(canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
+        .innerJoin(facilitatedClassroomPlans,
+          eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
+        .where(and(eq(canonicalClassSessions.classId,cls.id),
+          eq(facilitatedClassroomPlans.state,"scheduled"),
+          gt(canonicalDeliverySessions.startsAt,now)))
+        .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+      if(upcoming.length>100)
+        return {kind:"fail",reason:"Class_cancellation_schedule_exceeds_limit"};
+      if(upcoming.length)assets.push(attachment("cancelled-class-sessions.ics",
+        upcoming.map(row=>({...calendarEvent(row,label,email,organizerEmail),sequence:1})),
+        "CANCEL"));
+      subject="Class enrollment ended: "+label;
+      text=greeting+"Your participation in "+label+" at "+site.name+
+        " has ended. "+(upcoming.length
+          ?"Future scheduled Sessions are cancelled in the attached calendar update."
+          :"You have no future scheduled Sessions.")+
+        "\n\n"+view;
+    } else if (record.kind === "invitation_issued") {
       subject = "Class invitation: " + label;
       text = greeting + "You are invited to join " + label + " at " + site.name +
         ". This invitation expires " + localTime(invitation!.expiresAt, site.timezone) +
