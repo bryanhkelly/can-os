@@ -1,80 +1,81 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { emptySiteLocalContent } from "@/domain/site-local-content";
-import {
-  previewSyntheticSiteContent, previewSyntheticSiteName,
-} from "@/domain/site-preview-presentation";
+import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
 import { renderPrivateWebsitePreviewHtml } from "@/domain/private-website-preview";
-import { renderSharedSitePreview } from "@/domain/site-preview-sharing";
+import { projectShareableSitePreview, renderSharedSitePreview } from "@/domain/site-preview-sharing";
+import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import {
   defaultSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks,
 } from "@/domain/site-content-channels";
 
-const siteId = "d8082b23-b28c-454d-a144-6860ef19d9ea";
+const siteId="d8082b23-b28c-454d-a144-6860ef19d9ea";
+const name="Barton Demo School";
 const read=(path:string)=>readFileSync(path,"utf8");
 
-describe("Barton demonstration website presentation", () => {
-  it("uses normal Site identity in the preview but does not rewrite the real Site or Brand", () => {
-    expect(previewSyntheticSiteName("Barton Demo School", true)).toBe("Barton School");
-    expect(previewSyntheticSiteName("Barton Demo School", false)).toBe("Barton Demo School");
-    expect(previewSyntheticSiteName("Demo", true)).toBe("Demo");
-    const original={...emptySiteLocalContent,
-      heroHeadline:"Barton Demo School welcomes you",
-      localDescription:"At Barton Demo School, our community is growing.",
-      schoolVision:"Our vision for Barton Demo School",
-    };
-    const preview=previewSyntheticSiteContent(original,"Barton School",["Barton Demo School"]);
-    expect(preview.localDescription).toBe("At Barton School, our community is growing.");
-    expect(preview.heroHeadline).toBe("Barton School welcomes you");
-    expect(preview.schoolVision).toBe("Our vision for Barton School");
-    expect(original.localDescription).toContain("Barton Demo School");
-    expect(preview.branding).toBe(original.branding);
-  });
-
-  it("puts the only synthetic/preview designation in the top banner", () => {
-    const html=renderPrivateWebsitePreviewHtml(
-      '<html><head><title>Barton School</title></head><body><main><h1>Barton School</h1></main></body></html>',
-      siteId,["/"],true,"site",true);
-    expect(html).toContain("Demonstration website preview");
-    expect(html).toContain("Images may be illustrative");
-    expect(html).toContain("Forms disabled");
-    expect(html.match(/Demonstration website preview/g)).toHaveLength(1);
-    expect(html).not.toContain("Barton Demo School");
-  });
-
-  it("keeps the synthetic indicator in a shared link banner, not the Site identity", () => {
-    const token="A".repeat(43);
-    const source='<html><head><title>Barton School</title></head><body><h1>Barton School</h1></body></html>';
-    const html=renderSharedSitePreview(source,siteId,token,["/"],true);
-    expect(html).toContain("Demonstration website preview");
-    expect(html).toContain("Barton School");
-    expect(html).not.toContain("Barton Demo School");
-    expect(html).toContain("Forms are disabled");
-    expect(html).toContain('name="robots" content="noindex,nofollow"');
-  });
-
-  it("keeps production and preview access restrictions separate", () => {
-    const preview=read("src/domain/private-website-preview.ts");
-    const source=read("src/routes/launch.site-preview.ts");
-    const share=read("src/modules/sites/site-preview-sharing.functions.ts");
-    expect(preview).toContain('"Cache-Control": "private, no-store"');
-    expect(preview).toContain('"X-Robots-Tag": "noindex, nofollow"');
-    expect(source).toContain("websitePreviewEditorialBlocks(baseContentBlocks)");
-    expect(source).toContain("previewSyntheticSiteName(sourceDisplayName,synthetic)");
-    expect(share).toContain("previewSyntheticSiteName(brand.resolved.displayName, synthetic)");
-    expect(share).toContain("classifySiteLocalContent(websiteContent)");
-  });
-
-  it("hides private planning and network-status projections, keeping editorial intent separate", () => {
-    const blocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
-      mode:"private",siteSetup:{name:"Barton Demo School",organizationName:"Barton Demo School",
-        timezone:"America/Los_Angeles"},
-      networkStatusKnown:true,networkAffiliations:[],
-      preferences:{delivery:"physical",interestIds:["summer"]},
+describe("Website previews respect the saved Site identity and exclude setup administration",()=>{
+  it("displays the complete saved Site and Organization names, including Demo, verbatim",()=>{
+    const page=projectShareableSitePreview({
+      siteName:name,organizationName:name,
+      content:createSchoolWebsiteStarterContent(name),
     });
+    const html=renderPublicSiteHtml(page,{path:"/",localPreview:true});
+    expect(page.site.name).toBe(name);
+    expect(page.site.organizationName).toBe(name);
+    expect(html).toContain(name);
+    expect(html).toContain("At Barton Demo School");
+    expect(html).not.toContain("How your learning Site is taking shape");
+    expect(html).not.toContain("Scheduling reference");
+    const wrapped=renderPrivateWebsitePreviewHtml(html,siteId,["/"],true,"site",true);
+    expect(wrapped).toContain("Demonstration website preview");
+    expect(wrapped).toContain(name);
+  });
+
+  it("preserves names in shared preview links as well",()=>{
+    const page=projectShareableSitePreview({
+      siteName:name,organizationName:name,
+      content:createSchoolWebsiteStarterContent(name),
+    });
+    const html=renderPublicSiteHtml(page,{path:"/",localPreview:true});
+    const wrapped=renderSharedSitePreview(html,siteId,"A".repeat(43),["/"],true);
+    expect(wrapped).toContain(name);
+    expect(wrapped).toContain("Demonstration website preview");
+    expect(wrapped).toContain('content="noindex,nofollow"');
+  });
+
+  it("removes private setup and network cards from website presentation only",()=>{
+    const blocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
+      mode:"private",
+      siteSetup:{name,organizationName:name,timezone:"America/Los_Angeles"},
+      networkStatusKnown:true,
+      networkAffiliations:[],
+      preferences:{delivery:"both",interestIds:["summer"]},
+    });
+    expect(blocks.some(block=>block.channel==="site.setup")).toBe(true);
+    expect(blocks.some(block=>block.channel==="site.network")).toBe(true);
     const editorial=websitePreviewEditorialBlocks(blocks);
-    expect(editorial.some(item=>["site.setup","site.network","learning.interests"].includes(item.channel)))
-      .toBe(false);
-    expect(blocks.some(item=>item.channel==="site.setup")).toBe(true);
+    for(const block of editorial)
+      expect(["site.setup","site.network","learning.interests"]).not.toContain(block.channel);
+    const html=renderPublicSiteHtml({
+      host:"example.can-os.com",site:{name,organizationName:name},
+      localContent:createSchoolWebsiteStarterContent(name),
+      offerings:[],contentBlocks:editorial,
+    },{localPreview:true});
+    for(const item of ["How your learning Site is taking shape","Private setup facts",
+      "Saved Site","Scheduling reference","Planning intent","Independent Site"])
+      expect(html).not.toContain(item);
+    expect(html).toContain(name);
+  });
+
+  it("applies the same exclusion in both launch and Website & Brand previews",()=>{
+    const launch=read("src/routes/launch.site-preview.ts");
+    const studio=read("src/modules/sites/site-website-preview.server.ts");
+    const sharing=read("src/modules/sites/site-preview-sharing.functions.ts");
+    expect(launch).toContain("websitePreviewEditorialBlocks(baseContentBlocks)");
+    expect(studio).toContain("websitePreviewEditorialBlocks(baseContentBlocks)");
+    expect(launch).toContain("savedBrand?.resolved.displayName??site.name");
+    expect(sharing).toContain("siteName: brand.resolved.displayName");
+    expect(sharing).toContain('organizationName: organization?.name ?? "Proposed learning community"');
+    expect(launch).not.toContain("previewSyntheticSiteName");
+    expect(sharing).not.toContain("previewSyntheticSiteContent");
   });
 });
