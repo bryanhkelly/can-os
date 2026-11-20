@@ -54,6 +54,7 @@ const guardedFiles = [
   "src/components/calendar/CalendarRecordContextPanel.tsx",
   "src/components/learning/ClassPublishedResourcesList.tsx",
   "src/components/learning/ClassSupplementContent.tsx",
+  "src/components/operations/FullFlowOperationalRecord.tsx",
   "src/components/operations/ExtendedSeasonReadinessRequests.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
@@ -115,6 +116,7 @@ const owners = [
   ["src/components/operations/OperationsHealthSummary.tsx", ["commandCenterData.issues.map("]],
   ["src/components/learning/NativeClassManager.tsx", ["const methodOptions:", "const creditOptions:", "function toggle<T extends string>", 'aria-label="Approved Offering hierarchy"']],
   ["src/components/operations/OperationsWorkspace.tsx", [
+    'aria-label="FullFlow operational record"',
     '<section aria-label="School improvement and planning"',
     '<section aria-label="Operations exception summary"',
   ]],
