@@ -205,9 +205,15 @@ export const savePlatformProgramDraft = createServerFn({ method: "POST" })
         status: "active",
       }).returning())[0];
       if (!item) throw new Error("Program item could not be created");
+      // This editor changes copy, not jurisdiction, grade range or operational
+      // guidance. Preserve every previously versioned structured field.
       const [version] = await tx.insert(blueprintReferenceItemVersions).values({
         itemId: item.id, versionNo: data.expectedVersion + 1,
         title: data.title, summary: data.summary, description: data.description,
+        gradeRange: latest?.gradeRange ?? {},
+        scheduleSuggestion: latest?.scheduleSuggestion ?? {},
+        configurationGuidance: latest?.configurationGuidance ?? {},
+        metadata: latest?.metadata ?? {},
         lifecycle: "draft", publishedAt: null,
       }).returning({ id: blueprintReferenceItemVersions.id });
       if (!version) throw new Error("Program draft could not be created");
