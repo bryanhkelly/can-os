@@ -108,10 +108,10 @@ describe("Classroom Connect Phase 2 learner activities", () => {
     const pairing = source("src/components/learning/FacilitatedLearnerPairing.tsx");
     const companion = source("src/routes/classroom.companion.tsx");
     expect(native).toContain("<ClassroomCompanionRoom");
-    expect(native).toContain('to="/classroom/companion" search={{courseAttemptId}}');
-    expect(companion).toContain("getRecentClassroomFeedback");
-    expect(companion).toContain("ClassroomGovernedLearnerSurveys");
-    expect(pairing).toContain('queryKey:["native-class-companion",courseAttemptId]');
+    expect(native).toContain("<ClassroomFeedbackPanel courseAttemptId={courseAttemptId}/>");
+    expect(companion).toContain("ClassroomFeedbackPanel");
+    expect(source("src/components/learning/ClassroomFeedbackPanel.tsx")).toContain("ClassroomGovernedLearnerSurveys");
+    expect(pairing).toContain("useLearnerClassroomRooms(courseAttemptId)");
     expect(pairing).toContain("void refresh().catch(()=>setObservationUnavailable(true))");
   });
   it("rehearses a specific approved adoption without a fabricated learner", () => {
