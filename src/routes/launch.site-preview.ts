@@ -24,7 +24,7 @@ import { linkPrivateSitePreviewPages } from "@/domain/site-private-preview-navig
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
-import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "@/modules/sites/site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
@@ -181,11 +181,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         const proposedPrograms=projectPlannedSiteProgramsForPreview(
           parsed.success?parsed.data:null,baseContentBlocks);
         page.contentBlocks=[
-          // Website previews must look like websites, not the private Launch
-          // Studio setup/status dashboard. These facts remain private and
-          // available in their owning administrative screens.
-          ...baseContentBlocks.filter(block=>
-            !["learning.interests","site.setup","site.network"].includes(block.channel)),
+          ...websitePreviewEditorialBlocks(baseContentBlocks),
           ...proposedPrograms,
         ];
         const availablePages=availablePublicSitePaths(page);
