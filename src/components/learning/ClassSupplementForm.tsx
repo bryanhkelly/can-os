@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { resolveClassVideo } from "@/domain/class-video";
 import { ClassVideoUploadForm } from "@/components/learning/ClassVideoUploadForm";
 import { Button } from "@/components/ui/button";
+import { ActionFooter, WorkspacePanel } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -51,11 +52,8 @@ export function ClassSupplementForm({
     // Recognized video URLs are videos, even if the resource was initially a generic link.
     if (resolveClassVideo(next) && kind !== "video") onKindChange("video");
   }
-  return <section className="mb-5 space-y-4  border p-4" aria-label="Add class resource">
-    <div>
-      <h3 className="text-sm font-semibold">Add class or lesson resource</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Embed YouTube or Vimeo, upload a private video to CAN, or share another learning resource. Publisher lessons stay unchanged.</p>
-    </div>
+  return <WorkspacePanel title="Add class or lesson resource" className="mb-5" description="Embed YouTube or Vimeo, upload a private video to CAN, or share another learning resource. Publisher lessons stay unchanged.">
+    <div className="space-y-4">
     <Field label="Resource type" className="text-sm">
       <Select aria-label="Resource type" value={kind} onChange={event => { onKindChange(event.target.value as ClassSupplementKind); setAttempted(false); }}>
         <option value="link">Link or website</option>
@@ -93,7 +91,10 @@ export function ClassSupplementForm({
           {lessons.map(lesson => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
         </Select>
       </Field>}
-      <Button type="submit" disabled={busy} className="justify-self-start">Add resource</Button>
+      <ActionFooter layout="inline" className="mt-0">
+        <Button type="submit" disabled={busy} loading={busy} loadingLabel="Adding resource...">Add resource</Button>
+      </ActionFooter>
     </form>}
-  </section>;
+    </div>
+  </WorkspacePanel>;
 }
