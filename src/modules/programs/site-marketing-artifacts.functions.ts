@@ -15,7 +15,7 @@ import { renderSiteMarketingArtifact } from "@/domain/site-artifact-renderer";
 import { assertSiteBrandMediaRights } from "@/domain/site-brand";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { readSavedBrandVersion } from "@/modules/sites/site-brand.functions";
+import { readSavedBrandVersion } from "@/modules/sites/site-brand.server";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid=z.string().uuid();
