@@ -105,7 +105,7 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       and safeguarding approvals are independent checks.
     </p>
     <Button variant="outline" type="button" disabled={refreshing||mutation.pending||mutation.refreshFailed} onClick={()=>void refresh()}
-      className="mt-3 min-h-11  border px-3 py-2 text-sm disabled:opacity-50">
+      className="mt-3 min-h-11">
       {busy?"Updating…":"Refresh agreement and readiness"}
     </Button>
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Updating agreement and readiness…"/>
@@ -155,7 +155,7 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       </form>}
       {(status.authorization.status==="denied"||status.authorization.status==="revoked")&&
         <Button variant="outline" type="button" disabled={busy} onClick={()=>void request()}
-          className="mt-3  border px-3 py-2 text-xs">Request new agreement version</Button>}
+          className="mt-3">Request new agreement version</Button>}
     </div>:
     <div className="mt-3">
       <p className="text-sm font-semibold">Request service scope</p>
