@@ -36,6 +36,9 @@ function clearCanStorageKeys(storage:Storage,preserve:ReadonlySet<string>=new Se
 }
 /** Broadcast a local account handoff to every tab. Events carry no account ID or secret. */
 export function clearLearnerBrowserState(broadcast=true):void {
+ // Stop mounted players before clearing storage, or pagehide may recreate
+ // private bookmarks after sign-out cleanup.
+ try{window.dispatchEvent(new Event("can:clear-learning-video"));}catch{}
  try{clearCanStorageKeys(window.sessionStorage);}catch{}
  // Preserve kiosk preference and the latest cross-tab revocation marker only.
  try{
