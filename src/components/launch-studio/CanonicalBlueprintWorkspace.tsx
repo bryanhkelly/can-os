@@ -6,6 +6,8 @@ import { Checkbox } from "@/components/ui/choice";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/workspace";
 import { BlueprintReviewHistoryPanel } from "./BlueprintReviewHistoryPanel";
+import { BlueprintComponentPicker } from "./BlueprintComponentPicker";
+import { readableBlueprintKey as readable } from "@/domain/blueprint-display";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   createCanonicalBlueprintConfiguration,
@@ -32,10 +34,6 @@ type Review = Awaited<ReturnType<typeof getBlueprintReview>>;
 type LocalExperienceDraft = BlueprintConfigurationDetail["localExperiences"][number] & {
   source: "proposed_local_experience";
 };
-
-function readable(value: string): string {
-  return value.replaceAll("_", " ");
-}
 
 type SolutionDraftFields = {
   name: string;
@@ -534,33 +532,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
               </Select>
             </Label>
           </div>
-          <fieldset className="border p-4" disabled={editingDisabled}>
-            <legend className="px-2 font-semibold">Blueprint components</legend>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
-              {selectedTemplate.components.map(component =>
-                <Label key={component.id} className="flex items-center gap-3 text-sm">
-                  <Checkbox checked={selectedComponents.includes(component.id)}
-                    disabled={component.requirementMode === "required" || editingDisabled}
-                    onChange={event => setSelectedComponents(current =>
-                      event.target.checked
-                        ? [...current, component.id]
-                        : current.filter(id => id !== component.id)
-                    )}/>
-                  <span className="min-w-0">
-                    <span className="block font-medium">{readable(component.key)}
-                      {component.requirementMode === "required" ? " · required" :
-                        component.requirementMode === "conditional" ? " · conditional" : ""}
-                    </span>
-                    {component.description && <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                      {component.description}
-                    </span>}
-                    {component.requiresIndependentReview && <span className="mt-1 block text-xs text-muted-foreground">
-                      Independent verification remains separate from planning
-                    </span>}
-                  </span>
-                </Label>)}
-            </div>
-          </fieldset>
+          <BlueprintComponentPicker
+            components={selectedTemplate.components}
+            selected={selectedComponents} disabled={editingDisabled}
+            onToggle={(componentId,checked)=>setSelectedComponents(current=>
+              checked?[...current,componentId]:current.filter(id=>id!==componentId))}/>
           {enableReferences && referenceCatalog.length > 0 && selectedTemplate.components
             .filter(component => selectedComponents.includes(component.id))
             .map(component => {
