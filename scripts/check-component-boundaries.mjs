@@ -47,6 +47,7 @@ const guardedFiles = [
   "src/components/student/StudentSchoolLifePanel.tsx",
   "src/components/student/StudentContinueLearningPanel.tsx",
   "src/components/student/StudentTodayAtGlance.tsx",
+  "src/components/learning/ClassTeacherGuidePanel.tsx",
   "src/components/operations/ExtendedSeasonReadinessRequests.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
@@ -86,6 +87,7 @@ for (const file of files) {
 }
 
 const owners = [
+  ["src/routes/classes.tsx", ['<h3 className="font-semibold">Worked solutions</h3>', "Teacher guide not published"]],
   ["src/routes/class.tsx", ["function OfferingCard(", "function ApprovedClassCard(",
     "function InvitationCard(", "function EnrolledClassCard("]],
   ["src/routes/calendar.tsx", ["const groupPeople = new Map", "visibleInvitePeople.map(",
