@@ -7,12 +7,13 @@ const meta = {
   title: "Workflows/Launch Studio/V6.1 internal steps",
   component: GuidedSetupShell,
   parameters: { layout: "padded" },
+  args: { title: "Site Information", steps: [], children: null },
 } satisfies Meta<typeof GuidedSetupShell>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 function Example({ variant }: { variant: "two" | "four" }) {
-  const items = variant === "four" ? [
+  const items: Array<readonly [string, string, string]> = variant === "four" ? [
     ["hosting", "Hosting & Organization", "Confirm your local host"],
     ["environment", "Learning Environment", "Choose how learning happens"],
     ["network", "Network Affiliation", "Optional partnership"],
