@@ -246,6 +246,21 @@ the same patterns. No new feature-specific Button, form footer or panel
 abstraction was introduced. Each workflow retains its original command,
 authorization boundaries, eligibility, validation and state ownership.
 
+**Step navigation adoption:** `ActionFooter layout="step"` owns the
+border, spacing, and back-versus-save alignment for Launch Studio's Site
+Profile, Site Information, Programs & Audiences, and Marketing Package wizard.
+The feature supplies actual Back, Save & Exit and Continue commands, preserving
+its own validation, approval and publication gates. `LaunchDraftButton` uses
+the native shared `Button.loading` treatment instead of maintaining a second
+pending label implementation.
+
+**Additional form migrations:** Teacher Class requests, learning-goal sharing,
+guardian relationship verification and the physical classroom directory all
+compose `ActionFooter`. Room-to-Class assignment uses the canonical `Field`
+and `Select` association rather than a custom-styled select inside a label.
+The cross-feature source tests lock these reuse contracts, and the scoped
+duplicate-form-action lint error covers the newly migrated modules.
+
 `can-os-design/no-duplicate-form-actions` reports a local `div` or
 `footer` directly wrapping a submit `Button` inside a form. It runs
 as an adoption warning across production JSX, and is an **error** for the
