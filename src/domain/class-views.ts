@@ -4,7 +4,7 @@ export const classViews = ["learn", "teach", "manage"] as const;
 export type ClassView = typeof classViews[number];
 export const classTabs = {
   learn: ["lessons", "assignments", "discussions", "progress", "sessions"] as const,
-  teach: ["overview", "lessons", "sessions", "classroom", "roster"] as const,
+  teach: ["overview", "lessons", "discussions", "sessions", "classroom", "roster"] as const,
   manage: ["overview", "offering", "roster", "sessions", "reports", "completion"] as const,
 };
 export type ClassTab = (typeof classTabs)[ClassView][number];
