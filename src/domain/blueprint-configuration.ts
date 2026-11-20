@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-type JsonValue = null | string | number | boolean | JsonValue[] | { [key: string]: JsonValue };
+import type { JsonValue } from "@/domain/json-types";
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
   z.null(),
   z.string(),
