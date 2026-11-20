@@ -49,7 +49,7 @@ function CanonicalEvidenceSession({courseAttemptId}:{courseAttemptId:string}) {
           separate from estimated browser activity.
         </p>
       </div>
-      <Button variant="outline" type="button" className="border px-3 py-2 text-sm font-medium"
+      <Button variant="outline" type="button"
         aria-expanded={open} onClick={()=>{
           setOpen(value=>!value);
           if(!open)void refresh();
