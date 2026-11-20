@@ -16,7 +16,7 @@ function validCaptionTrack(track:ApprovedClassCaptionTrack){
   }catch{return false;}
 }
 type VideoEvents = Pick<VideoHTMLAttributes<HTMLVideoElement>,
-  "onLoadedMetadata" | "onRateChange" | "onPlay" | "onPause" | "onEnded" | "onError">;
+  "onLoadedMetadata" | "onRateChange" | "onPlay" | "onPause" | "onEnded" | "onError" | "onTimeUpdate" | "onSeeked">;
 
 /**
  * Single validated media renderer for learner-led, academic and facilitated
