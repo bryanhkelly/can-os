@@ -18,10 +18,10 @@ export const Route = createFileRoute("/canonical/blueprints")({
 function CanonicalBlueprintPage() {
   const outcome = Route.useLoaderData();
   const { siteId } = Route.useSearch();
-  if (!outcome.ok) return <CanonicalBlueprintLoadError title="Canonical Blueprint Studio" message={outcome.message} />;
+  if (!outcome.ok) return <CanonicalBlueprintLoadError title="Solution planning" message={outcome.message} />;
 
   const { role, siteIds, referencesEnabled } = outcome.data;
-  // A staff member assigned to exactly one canonical Site opens its Studio
+  // A staff member assigned to exactly one canonical Site opens Solution planning
   // immediately. Explicit URLs never fall back to a different Site.
   const selectedSiteId = siteId ?? (siteIds.length === 1 ? siteIds[0] : undefined);
   if (role === "blueprint_reviewer") {
@@ -61,8 +61,8 @@ function CanonicalBlueprintPage() {
   }
   return <WorkspaceShell
     eyebrow="CAN OS v3.0.1"
-    title="Plan your learning Site"
-    subtitle="Plan a school or a community learning center. Your Organization and Site come from your canonical authenticated membership.">
+    title="Configure published Solutions"
+    subtitle="CAN administers published Blueprint definitions. Your authorized Site configures local Solution plans; publication and enrollment are separate.">
     {siteIds.length > 1 && <div className="mt-4 text-sm"><Link to="/canonical/blueprints" search={{}} className="underline">
       Choose a different Site
     </Link></div>}
