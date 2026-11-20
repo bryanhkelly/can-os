@@ -24,6 +24,7 @@ import { replaceVisibleOfferingIntents, selectSavedSolutionPlans } from "@/domai
 import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
+import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 
 type Workspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 type Template = Workspace["templates"][number];
@@ -36,13 +37,30 @@ function readable(value: string): string {
   return value.replaceAll("_", " ");
 }
 
+type SolutionDraftFields = {
+  name: string;
+  templateId: string;
+  editorialIdentity: string;
+  religiousAffiliationCode: string;
+  selectedComponents: readonly string[];
+  selectedReferences: Readonly<Record<string, string[]>>;
+  offeringAdoptions: readonly BlueprintOfferingIntent[];
+  localExperiences: readonly LocalExperienceDraft[];
+};
+
+/** Only local editor inputs belong to the dirty snapshot. Published CAN-owned
+ * Blueprint fields and independently approved readiness are never writable here. */
+function solutionDraftSnapshot(fields: SolutionDraftFields): string {
+  return JSON.stringify(fields);
+}
+
 /**
  * Canonical Blueprint preparation. A draft is Organization-owned and anchored
  * to a Site; freezing it requests review, not permission to operate.
  */
 export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   initialBlueprintVersionId, initialConfigurationId, initialDelivery = "onsite",
-  embedded = false, onWorkspaceChanged,
+  embedded = false, onWorkspaceChanged, onUnsavedChange,
 }: {
   siteId: string;
   enableReferences?: boolean;
@@ -51,6 +69,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   initialDelivery?: "onsite" | "remote" | "hybrid";
   embedded?: boolean;
   onWorkspaceChanged?: (workspace: Workspace) => void;
+  onUnsavedChange?: (unsaved: boolean) => void;
 }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
@@ -77,6 +96,24 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [reconciliationRequired, setReconciliationRequired] = useState(false);
+  const [savedDraftSnapshot, setSavedDraftSnapshot] = useState(() =>
+    solutionDraftSnapshot({
+      name: "", templateId: "", editorialIdentity: "community_belonging",
+      religiousAffiliationCode: "", selectedComponents: [], selectedReferences: {},
+      offeringAdoptions: [], localExperiences: [],
+    }));
+  const currentDraftSnapshot = solutionDraftSnapshot({
+    name, templateId, editorialIdentity, religiousAffiliationCode,
+    selectedComponents, selectedReferences, offeringAdoptions, localExperiences,
+  });
+  const unsaved = currentDraftSnapshot !== savedDraftSnapshot;
+  useLaunchUnsavedChanges(
+    () => unsaved || busy || reconciliationRequired,
+    "Leave Solution planning? Unsaved changes will be lost.",
+  );
+  useEffect(() => {
+    onUnsavedChange?.(unsaved || busy || reconciliationRequired);
+  }, [onUnsavedChange, unsaved, busy, reconciliationRequired]);
 
   async function reload() {
     const next = await readCanonicalBlueprintWorkspace({ data: { siteId } });
@@ -150,6 +187,16 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     setReview(null);
     setOperationId("");
     setExecutedDeployments(null);
+    setName("");
+    setEditorialIdentity("community_belonging");
+    setReligiousAffiliationCode("");
+    setSavedDraftSnapshot(solutionDraftSnapshot({
+      name: "", templateId: template.blueprintVersionId,
+      editorialIdentity: "community_belonging", religiousAffiliationCode: "",
+      selectedComponents: template.components.filter(component =>
+        component.requirementMode === "required").map(component => component.id),
+      selectedReferences: {}, offeringAdoptions: [], localExperiences: [],
+    }));
     setMessage(null);
   }
 
@@ -205,6 +252,19 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         ])
       ));
       setTemplateId(result.blueprintVersionId);
+      setSavedDraftSnapshot(solutionDraftSnapshot({
+        name: result.name,
+        templateId: result.blueprintVersionId,
+        editorialIdentity: result.identity.editorialIdentity,
+        religiousAffiliationCode: result.identity.religiousAffiliationCode ?? "",
+        selectedComponents: result.components.filter(component =>
+          component.selectionStatus === "selected").map(component => component.componentId),
+        selectedReferences: Object.fromEntries(result.components.map(component =>
+          [component.componentId, component.referenceItemVersionIds])),
+        offeringAdoptions: result.offeringAdoptions,
+        localExperiences: result.localExperiences.map(item =>
+          ({ ...item, source: "proposed_local_experience" as const })),
+      }));
       setMessage(null);
       return true;
     } catch (caught) {
@@ -625,6 +685,13 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 setOfferingAdoptions([]);
                 setLocalExperiences([]);
                 setName("");
+                setSavedDraftSnapshot(solutionDraftSnapshot({
+                  name: "", templateId: original?.blueprintVersionId ?? "",
+                  editorialIdentity: "community_belonging", religiousAffiliationCode: "",
+                  selectedComponents: original?.components.filter(component =>
+                    component.requirementMode === "required").map(component => component.id) ?? [],
+                  selectedReferences: {}, offeringAdoptions: [], localExperiences: [],
+                }));
                 setMessage(null);
               }}>Start a new Solution plan</Button>}
           </div>
