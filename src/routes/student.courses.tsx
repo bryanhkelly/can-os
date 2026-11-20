@@ -117,7 +117,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
 /** Same V6.1 class actions in every student context; no parallel navigation path. */
 function StudentClassActions({sectionId}:{sectionId:string}) {
  return <nav aria-label="Class learning actions" className="mt-5 flex flex-wrap gap-3">
-  <Button asChild><Link to="/classes" search={{section:sectionId,tab:"lessons"}}>Open classroom</Link></Button>
+  <Button asChild><Link to="/class" search={{section:sectionId,tab:"lessons"}}>Open classroom</Link></Button>
   <Button asChild variant="outline"><Link to="/student/assignments" search={{section:sectionId}}>Classwork</Link></Button>
  </nav>;
 }
@@ -131,7 +131,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
  
  const connections=course?<WorkspacePanel title="Class connections">
    <nav aria-label="Class connections" className="grid gap-4 text-sm">
-    <Link to="/classes" search={{section:course.id}} className="underline">Class lessons, files and announcements</Link>
+    <Link to="/class" search={{section:course.id}} className="underline">Class lessons, files and announcements</Link>
     <Link to="/student/assignments" search={{section:course.id}} className="underline">View class assignments</Link>
     <Link to="/student/discussions" search={{section:course.id}} className="underline">Class discussion</Link>
     <Link to="/calendar" search={{section:course.id}} className="underline">Class schedule</Link>
@@ -168,7 +168,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
    </div>:<>
     <DetailNavigation label="Class detail">
      <SectionTab current={tab==="overview"} link={{to:"/student/courses",search:{section:course.id,tab:"overview"}}}>Overview</SectionTab>
-     <SectionTab current={false} link={{to:"/classes",search:{section:course.id,tab:"lessons"}}}>Classroom</SectionTab>
+     <SectionTab current={false} link={{to:"/class",search:{section:course.id,tab:"lessons"}}}>Classroom</SectionTab>
      {(["classwork","grades"] as const).map(value=><SectionTab key={value} current={tab===value} link={{to:"/student/courses",search:{section:course.id,tab:value}}}>{value==="classwork"?"Classwork":"Grades & feedback"}</SectionTab>)}
     </DetailNavigation>
     {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>
