@@ -2,6 +2,7 @@ import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import {
   catalogSites,
   geographicAreas,
@@ -49,7 +50,7 @@ export async function getAvailableOfferings(
   }
   const databaseRole = isCanPlanning ? null : programCatalogDatabaseRole(context);
 
-  return db.transaction(async (tx) => {
+  return withBlueprintDatabase(context, () => db.transaction(async (tx) => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     let geographicAreaId: string | null;
     if (input.subject.kind === "site") {
@@ -147,5 +148,5 @@ export async function getAvailableOfferings(
     }));
 
     return projectAvailableOfferings(productRows, availablePolicies);
-  });
+  }));
 }
