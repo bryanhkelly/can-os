@@ -120,7 +120,8 @@
     "verify:person:runtime-main": "node scripts/acceptance/check-main-one-person-runtime.mjs",
     "db:check:main:native-release": "node scripts/acceptance/check-main-native-course-release.mjs",
     "verify:governance:main-consolidation": "node scripts/acceptance/check-main-governance-leaf-consolidation.mjs",
-    "check:component-boundaries": "node scripts/check-component-boundaries.mjs"
+    "check:component-boundaries": "node scripts/check-component-boundaries.mjs",
+    "architecture:inventory": "node scripts/report-component-architecture.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
