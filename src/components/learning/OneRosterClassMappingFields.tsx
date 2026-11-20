@@ -25,7 +25,7 @@ export function OneRosterClassMappingFields({
     <p className="text-sm font-medium">Match all {rows.length} external classes to the existing classes below.</p>
     {rows.map(row => <Label key={row.sourcedId} className="block text-sm">
       {row.title?.trim() || row.sourcedId} ({row.sourcedId})
-      <Select value={mappings[row.sourcedId] ?? ""} className="mt-1 block w-full  border bg-background p-2"
+      <Select value={mappings[row.sourcedId] ?? ""} className="mt-1"
         onChange={event => onMappingChange(row.sourcedId, event.target.value)}>
         <option value="">Select CAN class</option>
         {sections.map(section => <option key={section.id} value={section.id}>{section.code} · {section.title}</option>)}
