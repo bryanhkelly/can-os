@@ -225,7 +225,9 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   }
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
+    // An embedded Site A workspace must never create a draft at Site B.
     if(!selected||busy||feedback.refreshFailed||
+      (prepareOnly && (!preferredSiteId || siteId!==preferredSiteId)) ||
       (!prepareOnly&&createWithOffering&&(methods.length===0||creditModes.length===0)))return;
     setBusy(true);setError("");setNotice("");setCreatedClassId(null);
     try{
@@ -401,11 +403,12 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <Label className="block text-sm font-semibold" htmlFor="publisher-rollout-site">Receiving Site</Label>
             {operatorSites.isError&&<p role="alert" className="text-xs">Authorized Site directory unavailable. Do not prepare a Class.</p>}
             <Select id="publisher-rollout-site" value={rolloutSiteId}
-              disabled={operatorSites.isPending||operatorSites.isError}
+              disabled={operatorSites.isPending||operatorSites.isError||prepareOnly}
               onChange={event=>{setRolloutSiteId(event.target.value);setChoice("");setSiteId("");}}
               className="min-h-11">
               <option value="">Select an authorized physical or virtual Site</option>
-              {rolloutSiteOptions.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+              {rolloutSiteOptions.filter(site=>!prepareOnly||site.id===preferredSiteId)
+                .map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
             </Select>
             <p className="text-xs text-muted-foreground">
               Readiness uses a separate exact Offering, Course version and Site authorization query.
@@ -436,7 +439,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                   </p>
                   {existingAtSite>0&&<p className="mt-1 text-xs text-muted-foreground">
                     At least {existingAtSite} existing Class(es) for this Course at the selected Site.
-                    Preparing another is appropriate only for a distinct cohort or delivery.
+                    Prepare another only for a genuinely separate Class or delivery schedule.
                   </p>}
                 </div>
                 <Button type="button" variant="outline" disabled={status!=="ready"||exactRolloutOptions.isError}
@@ -538,11 +541,13 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               </Select>
             </div>
             <div><Label className="block text-sm font-semibold" htmlFor="native-class-site">Site</Label>
-              <Select id="native-class-site" value={siteId} required
+              <Select id="native-class-site" value={siteId} required disabled={prepareOnly}
                 onChange={e=>setSiteId(e.target.value)}
                 className="mt-2 min-h-11">
                 <option value="">Select an approved physical or virtual Site</option>
-                {(selected?.siteOptions??[]).filter(site=>site.allowedDeliveryModes.some(mode=>mode===deliveryMode))
+                {(selected?.siteOptions??[]).filter(site=>
+                    (!prepareOnly||site.id===preferredSiteId) &&
+                    site.allowedDeliveryModes.some(mode=>mode===deliveryMode))
                   .map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
               </Select>
             </div>
@@ -561,7 +566,9 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               onChange={setTermsDraft} siteTimeZone={selectedSiteTimeZone} />}
 
           </div>}
-          <Button disabled={busy||feedback.refreshFailed||!selected||!siteId||(!prepareOnly&&createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
+          <Button disabled={busy||feedback.refreshFailed||!selected||!siteId||
+            (prepareOnly && (!preferredSiteId||siteId!==preferredSiteId))||
+            (!prepareOnly&&createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
             {busy?"Working…":"Create draft Class"}
           </Button>
         </form>
