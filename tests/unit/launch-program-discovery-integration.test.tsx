@@ -20,7 +20,7 @@ vi.mock("@/components/operations/LaunchWizardPage", () => ({
 vi.mock("@/components/operations/LaunchAcademicSetupWorkspace", () => ({
   LaunchAcademicSetupWorkspace: () => <div>Existing Program academics</div>,
 }));
-vi.mock("@/routes/admin", () => ({ ScopedAdminConsole: () => null }));
+vi.mock("@/components/operations/ScopedAdminConsole", () => ({ ScopedAdminConsole: () => null }));
 vi.mock("@/components/operations/SchoolOpeningEvidencePanel", () => ({
   SchoolOpeningEvidencePanel: () => null,
 }));
