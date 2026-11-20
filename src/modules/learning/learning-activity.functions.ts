@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { AuthorizationError } from "@/domain/command-context";
@@ -149,9 +149,38 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
             supplement.url &&
             (await import("@/domain/class-video")).resolveClassVideo(supplement.url)?.kind === "file");
         }
+        // Publisher-pack materials are bound through current adoption and
+        // entitlement, rather than the teacher-owned class overlay table.
+        let authorizedPublisherPack = false;
+        if (!publisherResource && !authorizedSupplement) {
+          const [packResource] = await tx.select({
+            url: s.curriculumResources.url,
+            kind: s.curriculumResources.kind,
+          }).from(s.curriculumAdoptions)
+            .innerJoin(s.curriculumEntitlements, and(
+              eq(s.curriculumEntitlements.packId, s.curriculumAdoptions.packId),
+              eq(s.curriculumEntitlements.organizationId, s.curriculumAdoptions.organizationId),
+              eq(s.curriculumEntitlements.status, "active"),
+            ))
+            .innerJoin(s.curriculumResourceBindings,
+              eq(s.curriculumResourceBindings.packVersionId, s.curriculumAdoptions.packVersionId))
+            .innerJoin(s.curriculumResources,
+              eq(s.curriculumResources.id, s.curriculumResourceBindings.resourceId))
+            .where(and(
+              eq(s.curriculumAdoptions.programId, section.programId),
+              eq(s.curriculumAdoptions.status, "active"),
+              eq(s.curriculumResourceBindings.resourceId, resourceId),
+              or(eq(s.curriculumResourceBindings.courseTemplateVersionId, section.versionId),
+                 isNull(s.curriculumResourceBindings.courseTemplateVersionId)),
+              or(eq(s.curriculumResourceBindings.lessonId, lesson.id),
+                 isNull(s.curriculumResourceBindings.lessonId)),
+            )).limit(1);
+          authorizedPublisherPack = Boolean(packResource?.url &&
+            (await import("@/domain/class-video")).resolveClassVideo(packResource.url)?.kind === "file");
+        }
         if (data.interaction.kind.startsWith("video_")
-          ? !publishedVideo && !authorizedSupplement
-          : !publisherResource && !authorizedSupplement) {
+          ? !publishedVideo && !authorizedSupplement && !authorizedPublisherPack
+          : !publisherResource && !authorizedSupplement && !authorizedPublisherPack) {
           throw new AuthorizationError("published lesson video or resource");
         }
       }
