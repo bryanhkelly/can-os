@@ -10,10 +10,11 @@ export function ClassroomConnectionStatus({
   useEffect(() => {
     if (rooms.isSuccess && rooms.data.rooms.length) setHadRoom(true);
   }, [rooms.isSuccess, rooms.data]);
+  const connectedCount = rooms.isSuccess ? rooms.data.rooms.length : 0;
   const state = rooms.isPending ? "Connecting" :
     rooms.isError ? "Access unavailable" :
     rooms.isFetching ? "Rechecking connection" :
-    rooms.data.rooms.length ? "Connected" :
+    connectedCount ? "Connected" :
     hadRoom ? "Room no longer active" : "Not connected";
   return <div className="border border-border bg-card p-3 text-sm" role="status"
     aria-label="Classroom connection status" aria-live="polite">
