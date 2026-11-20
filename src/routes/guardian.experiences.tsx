@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getMySchoolProfile } from "@/modules/operations/school-profile.functions";
 import { SchoolProfile, schoolRecordTabs, type SchoolRecordTab } from "@/components/operations/SchoolProfile";
