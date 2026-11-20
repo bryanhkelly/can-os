@@ -105,6 +105,7 @@ export const rsvpCanonicalGroupSession = createServerFn({ method: "POST" })
         sessionId: s.studyGroupSessions.id, startsAt: s.studyGroupSessions.startsAt,
         id: s.studyGroups.id, groupId: s.studyGroups.id, siteId: s.studyGroups.siteId,
         programId: s.studyGroups.programId, sectionId: s.studyGroups.sectionId,
+        metadata:s.studyGroups.metadata,
       }).from(s.studyGroupSessions)
         .innerJoin(s.studyGroups, eq(s.studyGroups.id, s.studyGroupSessions.groupId))
         .where(and(eq(s.studyGroupSessions.id, data.sessionId),
