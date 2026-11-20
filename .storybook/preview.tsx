@@ -40,7 +40,7 @@ const preview: Preview = {
       matchers: { color: /(background|color)$/i, date: /Date$/i },
     },
     a11y: { test: "error" },
-    chromatic: { viewports: [390, 1440] },
+    chromatic: { viewports: [390, 768, 1024, 1440] },
     options: {
       storySort: {
         order: ["V6.1 foundations", "V6.1 templates", "Foundations", "Workflows", "Personas", "Branding"],
