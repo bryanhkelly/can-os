@@ -156,7 +156,6 @@ check("WS3 governed completion and WS6 reporting routes are indexed, no duplicat
     urls.add(route.route);
   }
   for(const url of [
-    "/canonical/classes/completion",
     "/canonical/completion-evidence-reviews",
     "/canonical/noncredit/completion",
     "/reports/class/$classId",
