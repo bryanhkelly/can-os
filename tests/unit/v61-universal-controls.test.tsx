@@ -3,11 +3,38 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox, Radio } from "@/components/ui/choice";
 import { Modal } from "@/components/ui/modal";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { EmptyState, WorkspaceNotice, PageNavigation } from "@/components/workspace";
 
 describe("V6.1 universal action and surface contracts", () => {
+
+  it("shares the V6.1 focus and disabled-state contract across native primitives", () => {
+    const controls = [
+      renderToStaticMarkup(<Button type="button">Continue</Button>),
+      renderToStaticMarkup(<Input aria-label="Name"/>),
+      renderToStaticMarkup(<Select aria-label="Program"><option>High school</option></Select>),
+      renderToStaticMarkup(<Textarea aria-label="Notes"/>),
+      renderToStaticMarkup(<Checkbox aria-label="Acknowledged"/>),
+      renderToStaticMarkup(<Radio aria-label="Choice" name="choice"/>),
+    ];
+    for (const markup of controls) {
+      expect(markup).toContain("focus-visible:ring-2");
+      expect(markup).toContain("focus-visible:ring-ring");
+      expect(markup).toContain("focus-visible:ring-offset-background");
+      expect(markup).toContain("disabled:opacity-50");
+      expect(markup).not.toMatch(/rounded-(?:full|lg|xl|2xl|3xl)/);
+    }
+    for (const markup of controls.slice(1, 4)) {
+      expect(markup).toContain("border-input");
+      expect(markup).toContain("aria-invalid:border-destructive");
+      expect(markup).toContain("disabled:cursor-not-allowed");
+    }
+  });
+
   it("prevents repeat submits and announces pending native actions", () => {
     const html = renderToStaticMarkup(<Button loading loadingLabel="Saving…" type="submit">Save</Button>);
     expect(html).toContain('type="submit"');
