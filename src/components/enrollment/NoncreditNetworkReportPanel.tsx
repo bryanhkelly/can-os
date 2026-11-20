@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {useQuery} from "@tanstack/react-query";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
 
@@ -38,60 +39,60 @@ export function NoncreditNetworkReportPanel(){
             <dd className="mt-2 font-serif text-3xl tabular-nums">{value.toLocaleString()}</dd>
           </div>)}
       </dl>
-      <div className="mt-5 overflow-x-auto border border-border">
-        <table className="w-full text-left text-sm">
-          <thead><tr className="border-b border-border bg-muted/30">
-            <th scope="col" className="p-3">Site</th><th scope="col" className="p-3">Registered</th>
-            <th scope="col" className="p-3">Attended</th><th scope="col" className="p-3">Completed</th>
-          </tr></thead>
-          <tbody>{data!.sites.map(site=><tr key={site.siteId} className="border-b border-border">
-            <th scope="row" className="p-3 font-medium">{site.siteName}</th>
-            <td className="p-3 tabular-nums">{site.registrations}</td>
-            <td className="p-3 tabular-nums">{site.verifiedAttendees}</td>
-            <td className="p-3 tabular-nums">{site.completed}</td>
-          </tr>)}</tbody>
-        </table>
+      <div className="mt-5 border border-border">
+        <Table scrollLabel="Site participation totals" aria-label="Site participation totals" className="text-left"><TableCaption className="sr-only">Site participation totals</TableCaption>
+          <TableHeader><TableRow className="border-b border-border bg-muted/30">
+            <TableHead scope="col" className="p-3">Site</TableHead><TableHead scope="col" className="p-3">Registered</TableHead>
+            <TableHead scope="col" className="p-3">Attended</TableHead><TableHead scope="col" className="p-3">Completed</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>{data!.sites.map(site=><TableRow key={site.siteId} className="border-b border-border">
+            <TableRowHead className="p-3 font-medium">{site.siteName}</TableRowHead>
+            <TableCell className="p-3 tabular-nums">{site.registrations}</TableCell>
+            <TableCell className="p-3 tabular-nums">{site.verifiedAttendees}</TableCell>
+            <TableCell className="p-3 tabular-nums">{site.completed}</TableCell>
+          </TableRow>)}</TableBody>
+        </Table>
       </div>
       {data!.affiliations.length>0&&<section className="mt-6">
         <h3 className="text-sm font-semibold">Organizations credited for participation</h3>
         <p className="mt-2 text-xs text-muted-foreground">Local affiliation is self-reported unless separately verified. Site and affiliation totals represent the same registrations, not additional people served.</p>
-        <div className="mt-3 overflow-x-auto border border-border">
-          <table className="w-full text-left text-sm">
-            <thead><tr className="border-b border-border bg-muted/30">
-              <th scope="col" className="p-3">Organization</th>
-              <th scope="col" className="p-3">Reporting unit at registration</th>
-              <th scope="col" className="p-3">Basis</th>
-              <th scope="col" className="p-3">Registrations</th>
-              <th scope="col" className="p-3">Completed</th>
-            </tr></thead>
-            <tbody>{data!.affiliations.map(row=>
-              <tr key={[row.organizationId,row.networkMembershipId??"provider",row.reportingUnitId??"none",row.basis].join(":")} className="border-b border-border">
-                <th scope="row" className="p-3 font-medium">{row.organizationName}</th>
-                <td className="p-3">{row.reportingUnitName??"Provider Site"}</td>
-                <td className="p-3">{row.basis==="self_reported"?"Self-reported local":"Provider default"}</td>
-                <td className="p-3 tabular-nums">{row.registrations}</td>
-                <td className="p-3 tabular-nums">{row.completed}</td>
-              </tr>)}</tbody>
-          </table>
+        <div className="mt-3 border border-border">
+          <Table scrollLabel="Participation by affiliated organization" aria-label="Participation by affiliated organization" className="text-left"><TableCaption className="sr-only">Participation by affiliated organization</TableCaption>
+            <TableHeader><TableRow className="border-b border-border bg-muted/30">
+              <TableHead scope="col" className="p-3">Organization</TableHead>
+              <TableHead scope="col" className="p-3">Reporting unit at registration</TableHead>
+              <TableHead scope="col" className="p-3">Basis</TableHead>
+              <TableHead scope="col" className="p-3">Registrations</TableHead>
+              <TableHead scope="col" className="p-3">Completed</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>{data!.affiliations.map(row=>
+              <TableRow key={[row.organizationId,row.networkMembershipId??"provider",row.reportingUnitId??"none",row.basis].join(":")} className="border-b border-border">
+                <TableRowHead className="p-3 font-medium">{row.organizationName}</TableRowHead>
+                <TableCell className="p-3">{row.reportingUnitName??"Provider Site"}</TableCell>
+                <TableCell className="p-3">{row.basis==="self_reported"?"Self-reported local":"Provider default"}</TableCell>
+                <TableCell className="p-3 tabular-nums">{row.registrations}</TableCell>
+                <TableCell className="p-3 tabular-nums">{row.completed}</TableCell>
+              </TableRow>)}</TableBody>
+          </Table>
         </div>
       </section>}
       {data!.networkUnits.length>0&&<section className="mt-6">
         <h3 className="text-sm font-semibold">Network reporting units</h3>
         <p className="mt-2 text-xs text-muted-foreground">Each participant is counted once per level in the snapshotted network path. Do not sum totals from different levels.</p>
-        <div className="mt-3 overflow-x-auto border border-border">
-          <table className="w-full text-left text-sm">
-            <thead><tr className="border-b border-border bg-muted/30">
-              <th scope="col" className="p-3">Unit</th>
-              <th scope="col" className="p-3">Registered</th>
-              <th scope="col" className="p-3">Completed</th>
-            </tr></thead>
-            <tbody>{data!.networkUnits.map(row=>
-              <tr key={row.unitId} className="border-b border-border">
-                <th scope="row" className="p-3 font-medium">{row.unitName}</th>
-                <td className="p-3 tabular-nums">{row.registrations}</td>
-                <td className="p-3 tabular-nums">{row.completed}</td>
-              </tr>)}</tbody>
-          </table>
+        <div className="mt-3 border border-border">
+          <Table scrollLabel="Network reporting units" aria-label="Network reporting units" className="text-left"><TableCaption className="sr-only">Network reporting units</TableCaption>
+            <TableHeader><TableRow className="border-b border-border bg-muted/30">
+              <TableHead scope="col" className="p-3">Unit</TableHead>
+              <TableHead scope="col" className="p-3">Registered</TableHead>
+              <TableHead scope="col" className="p-3">Completed</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>{data!.networkUnits.map(row=>
+              <TableRow key={row.unitId} className="border-b border-border">
+                <TableRowHead className="p-3 font-medium">{row.unitName}</TableRowHead>
+                <TableCell className="p-3 tabular-nums">{row.registrations}</TableCell>
+                <TableCell className="p-3 tabular-nums">{row.completed}</TableCell>
+              </TableRow>)}</TableBody>
+          </Table>
         </div>
       </section>}
       <p className="mt-3 text-xs leading-6 text-muted-foreground">{report.data?.notice}</p>
