@@ -5,6 +5,7 @@ import {
   previewSyntheticSiteContent, previewSyntheticSiteName,
 } from "@/domain/site-preview-presentation";
 import { renderPrivateWebsitePreviewHtml } from "@/domain/private-website-preview";
+import { renderSharedSitePreview } from "@/domain/site-preview-sharing";
 import {
   defaultSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks,
 } from "@/domain/site-content-channels";
@@ -39,6 +40,17 @@ describe("Barton demonstration website presentation", () => {
     expect(html).toContain("Forms disabled");
     expect(html.match(/Demonstration website preview/g)).toHaveLength(1);
     expect(html).not.toContain("Barton Demo School");
+  });
+
+  it("keeps the synthetic indicator in a shared link banner, not the Site identity", () => {
+    const token="A".repeat(43);
+    const source='<html><head><title>Barton School</title></head><body><h1>Barton School</h1></body></html>';
+    const html=renderSharedSitePreview(source,siteId,token,["/"],true);
+    expect(html).toContain("Demonstration website preview");
+    expect(html).toContain("Barton School");
+    expect(html).not.toContain("Barton Demo School");
+    expect(html).toContain("Forms are disabled");
+    expect(html).toContain('name="robots" content="noindex,nofollow"');
   });
 
   it("keeps production and preview access restrictions separate", () => {
