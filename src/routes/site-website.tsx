@@ -1,14 +1,12 @@
+import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
+import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
 import { type SiteBrandConfiguration } from "@/domain/site-brand";
-import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
 import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
-import { WebsiteCopyField } from "@/components/launch-studio/WebsiteCopyField";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
 import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
-import { siteBrandDirections, brandRecommendedLayout } from "@/domain/site-brand-direction";
+import { brandRecommendedLayout } from "@/domain/site-brand-direction";
 import { type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
-import { SiteContentChannelEditor } from "@/components/launch-studio/SiteContentChannelEditor";
 import { WebsiteInformationChecklist, WebsiteSourceMappingPanel, WebsiteDesignChecklist } from "@/components/sites/WebsiteReadinessPanels";
 import { WebsitePreviewPanel } from "@/components/sites/WebsitePreviewPanel";
 import { privateWebsitePreviewUrl } from "@/domain/private-website-preview";
@@ -25,14 +23,13 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import {
-  prepareWebsiteEditorContent, restoreOriginalWebsiteField, websiteStarterFieldIds, siteLocalImageMaxBytes,
-  siteLocalImagePublicationGaps, type SiteLocalContent, type SiteLocalTextField,
+  prepareWebsiteEditorContent, siteLocalImageMaxBytes,
+  siteLocalImagePublicationGaps, type SiteLocalContent,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { prepareSchoolWebsite, getPartnerWebsitePreviewView, previewChurchWebsiteDraft, saveSiteWebsiteAndBrand, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
-import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {siteProgramSelectionSchema} from "@/lib/route-search";
 import { z } from "zod";
@@ -236,20 +233,6 @@ async function prepareWebsiteArtwork(file: File): Promise<string> {
     URL.revokeObjectURL(sourceUrl);
   }
 }
-
-const churchFields: ReadonlyArray<{ key: SiteLocalTextField; label: string; help: string; multi: boolean }> = [
-  { key: "heroHeadline", label: "Homepage headline", help: "The first words families see. Your Site name still appears in the website header.", multi: true },
-  { key: "welcomeMessage", label: "Welcome to families", help: "Introduce the kind of community you hope to build.", multi: true },
-  { key: "churchHistory", label: "Tell us about your church", help: "When did your church begin? Share its history and important milestones.", multi: true },
-  { key: "communityOutreach", label: "Your community", help: "What relationships, partnerships or hopes connect your Site with the people around it? Avoid describing unconfirmed activities.", multi: true },
-  { key: "schoolVision", label: "Your vision", help: "What do you hope students will become? You can personalize the prepared wording.", multi: true },
-  { key: "leadershipWelcome", label: "A welcome from your host or Site leader", help: "Optional words approved by your church leader for families.", multi: true },
-  { key: "localTraditions", label: "Local traditions and experiences", help: "Share real local traditions, service projects and community experiences.", multi: true },
-  { key: "localDescription", label: "Your Site story", help: "What makes your Site's purpose and community special? Avoid promises about unapproved academic services.", multi: true },
-  { key: "denomination", label: "Denominational affiliation", help: "Describe your church's identity. Do not claim an endorsement that has not been granted.", multi: false },
-  { key: "statementOfFaith", label: "Statement of faith", help: "Your church's own theological statement, not CAN's academic policies.", multi: true },
-  { key: "spiritualFormation", label: "Spiritual formation", help: "Prayer, worship, discipleship, chapel or religious observances provided locally.", multi: true },
-];
 
 function LocalWebsiteCopyEditor({
   data, step, onStepChange, allowPublication,
@@ -469,19 +452,6 @@ function LocalWebsiteCopyEditor({
     } finally { setPreparingArtwork(false); }
   }
 
-  // Stable, numbered sequence in the editor and preview. Templates decide
-  // presentation, but the administrator never orders or drags sections.
-  const primaryFields = websiteStarterFieldIds.map(key =>
-    churchFields.find(field => field.key === key)!);
-  const additionalStoryFields = churchFields.filter(field =>
-    ["churchHistory", "leadershipWelcome", "localTraditions", "denomination", "statementOfFaith", "spiritualFormation"].includes(field.key));
-  const textField = (field: typeof churchFields[number]) =>
-    <WebsiteCopyField key={field.key} field={field} content={content}
-      candidate={data.siteStoryCopyCandidates.find(item=>item.field===field.key)}
-      disabled={busy||!data.canEdit}
-      onChange={value=>setContent(old=>({...old,[field.key]:value}))}
-      onRestore={()=>setContent(old=>restoreOriginalWebsiteField(old,field.key))}/>;
-
   return <section aria-label="Website content setup">
     {data.demonstration && !data.editingContent && <WorkspaceNotice tone="attention" className="mt-3">
       <p className="font-semibold">Fictional sample prepared for this demo Site</p>
@@ -517,59 +487,15 @@ function LocalWebsiteCopyEditor({
     {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website changes..."/>
     <div className="space-y-5">
-      {step === 0 && <section aria-label="Brand Identity" className="space-y-5">
-        <div>
-          <h3 className="font-serif text-2xl font-semibold">What should families feel about your Site?</h3>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">Choose an editorial direction. Your saved Site Information can guide a suggestion, but this choice never verifies programs, staff or academic outcomes.</p>
-          {data.siteStoryRevision
-            ? <p className="mt-2 text-xs text-muted-foreground">Saved Site Information: {new Date(data.siteStoryRevision).toLocaleDateString()}</p>
-            : <p className="mt-2 text-xs text-muted-foreground">No optional purpose answers saved in Site Information. You can still choose a direction.</p>}
-        </div>
-        <Field label="Public-facing Site name"
-          description="This display name is saved with the Brand version. Changing your Site Profile name later will not alter older flyers or released website pages.">
-          <Input type="text" maxLength={120} value={brandDisplayName}
-            disabled={busy||!data.canEdit}
-            onChange={event=>setBrandDisplayName(event.target.value)}
-            placeholder="Your learning community name" className="min-h-11 w-full"/>
-        </Field>
-        <div className="border bg-muted/20 p-3 text-sm">
-          <p className="font-semibold">
-            {data.currentBrandRevision>0
-              ? `Current saved Site Brand: v${data.currentBrandRevision}`
-              : "Site Brand not saved yet"}
-          </p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Brand changes create immutable saved versions. Previously generated materials
-            retain their original identity until you explicitly update and regenerate them.
-          </p>
-        </div>
-        <fieldset disabled={busy || !data.canEdit}>
-          <legend className="text-sm font-semibold">Choose your brand direction</legend>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {siteBrandDirections.map(direction=>{
-              const selected=brandDirection===direction.id;
-              return <Button key={direction.id} type="button" variant="outline" aria-pressed={selected}
-                onClick={()=>setContent(old=>({...old,branding:{...old.branding,brandDirectionId:direction.id}}))}
-                className={`h-auto min-h-32 w-full flex-col items-start whitespace-normal border p-5 text-left ${selected?"border-primary ring-2 ring-primary/40":""}`}>
-                <span className="w-full text-sm font-bold">{direction.name}</span>
-                <span className="mt-1 text-xs text-muted-foreground">{direction.character}</span>
-                <span className="mt-2 text-xs leading-5 text-muted-foreground">{direction.description}</span>
-                {(selected || brandRecommendation===direction.id) && <span className="mt-3 text-xs font-semibold text-primary">
-                  {selected?"Selected":""}{selected && brandRecommendation===direction.id?" · ":""}
-                  {brandRecommendation===direction.id?"Suggested from Site Information":""}
-                </span>}
-              </Button>;
-            })}
-          </div>
-        </fieldset>
-        <p className="text-xs text-muted-foreground">{brandRecommendation
-          ?"A keyword suggestion from your saved Story is not a required choice or verified institutional claim."
-          :"No recommendation appears without matching Story evidence."}</p>
-        <p className="text-xs text-muted-foreground">
-          Saving creates an immutable Site Brand version only when identity properties change.
-          The website wireframe and content are saved separately.
-        </p>
-      </section>}
+      {step===0&&<WebsiteBrandIdentityStep
+        displayName={brandDisplayName}
+        storyRevision={data.siteStoryRevision}
+        currentRevision={data.currentBrandRevision}
+        canEdit={data.canEdit} busy={busy}
+        direction={brandDirection} recommendation={brandRecommendation}
+        onDisplayNameChange={setBrandDisplayName}
+        onDirectionChange={id=>setContent(old=>({...old,
+          branding:{...old.branding,brandDirectionId:id}}))}/>}
       {step === 1 && <div className="space-y-5">
         <h3 className="font-serif text-2xl font-semibold">Choose your wireframe</h3>
         <p className="text-sm text-muted-foreground">Compare seven structures in grayscale. Colors, typography and imagery come next.</p>
@@ -591,77 +517,10 @@ function LocalWebsiteCopyEditor({
         <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps Site copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
       </div>}
 
-      {step === 3 && <div className="space-y-5">
-        <div>
-          <h3 className="font-serif text-2xl">Build your website from what you have already shared.</h3>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Your Site Information provides the foundation, including the origin story,
-            community needs, values, learner experiences and future vision.
-            New websites start with source-based copy; existing saved edits are never overwritten automatically.
-          </p>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Prepared words are suggestions, not verified promises about programs, services, leaders or opening status.
-            Review them before sharing. Approved academic and admissions facts still come from CAN OS.
-          </p>
-        </div>
-        <p className="text-xs italic leading-5 text-muted-foreground">
-          We use your saved Purpose &amp; Story answers to prepare website copy and potential outreach
-          materials. You control what appears publicly. Review names, permissions, personal details
-          and factual claims before sharing. Nothing goes live automatically.
-        </p>
-        {data.siteStoryCopyCandidates.length>0 && <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
-          <span className="text-sm">
-            {data.siteStoryCopyCandidates.length} source-based drafts available from Site Information.
-          </span>
-          <Button type="button" variant="outline" disabled={busy || !data.canEdit}
-            onClick={()=>setContent(old=>prepareWebsiteCopyFromSiteInformation(old,data.siteStoryCopyCandidates))}>
-            Use Site Information in unchanged starter fields
-          </Button>
-        </div>}
-        {data.siteStorySourceChoices && <div className="border bg-muted/20 p-4 text-sm" role="note">
-          <p className="font-semibold">Suggestions from Site Information</p>
-          <p className="mt-2 text-muted-foreground">
-            Values: {data.siteStorySourceChoices.values.join(", ") || "not selected"}.
-            Priorities: {data.siteStorySourceChoices.motivations.join(", ") || "not selected"}.
-            Suggestions also draw on your written origin, community need and future vision.
-            All proposed wording remains editable and reviewable.
-          </p>
-          <Link to="/launch/site" search={{siteId:data.siteId,module:"site-information"}}
-            className="mt-3 inline-block font-semibold text-primary underline">Review Site Information</Link>
-        </div>}
-        {primaryFields.map(textField)}
-        <details className="border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Review source-attributed church story suggestions (optional)</summary>
-          <div className="mt-4"><ChurchSourceSuggestionReview currentRevision={data.currentRevision}/></div>
-        </details>
-        <details className="border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">More optional church details</summary>
-          <div className="mt-4 space-y-5">{additionalStoryFields.map(textField)}</div>
-        </details>
-        <details className="border p-4" id="website-content-layout">
-          <summary className="cursor-pointer text-sm font-semibold">
-            Arrange Programs, Courses, Classes and website sections
-          </summary>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            These are the same Site-owned content blocks configured in Launch.
-            Each section reads its approved source when available. Saving a layout
-            changes only the private design; publishing the layout is a separate
-            authorized action and never approves a Program or opens enrollment.
-          </p>
-          {data.canPublish
-            ? <div className="mt-4"><SiteContentChannelEditor
-                key={data.siteId + ":" + data.contentChannelConfig.revision}
-                siteId={data.siteId}
-                initialConfig={data.contentChannelConfig}
-                canPublish={allowPublication && data.canPublish}
-                onSaved={() => { void router.invalidate(); }} onDirtyChange={setContentBlocksDirty} />
-              </div>
-            : <WorkspaceNotice tone="attention" className="mt-4">
-                Your verified Site grant allows previewing but not editing website
-                sections. Ask a Site Administrator for local website publishing access.
-              </WorkspaceNotice>}
-        </details>
-      </div>}
+      {step===3&&<WebsiteSiteContentStep data={data} content={content}
+        setContent={setContent} busy={busy} allowPublication={allowPublication}
+        onContentBlocksSaved={()=>{void router.invalidate();}}
+        onContentBlocksDirty={setContentBlocksDirty}/>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
         setContent={setContent} onSelectArtwork={selectArtwork}/>}
