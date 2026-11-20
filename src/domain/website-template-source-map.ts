@@ -72,7 +72,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"vision",title:"Vision feature",description:"A prominent vision statement with editorial accent, section label and supporting paragraph.",
     appearsWhen:"The Site has a nonempty website vision field.",
     elements:[
-      template("Eyebrow and H2","The renderer supplies the label 'Our vision' and the fixed display heading; the template changes their placement."),
+      template("Eyebrow and H2","Actual fixed label: 'Our vision'. Actual fixed H2: 'Helping students discover who they are and what they can become.' The chosen template changes its placement, not its source."),
       authored("Body paragraph","schoolVision","Uses the Site's saved editable vision copy, possibly initially suggested from Establish → Site Information → Purpose & Story."),
       template("Decorative monogram or index","The selected layout provides its own visual marker."),
     ],
@@ -81,7 +81,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"story",title:"Community story",description:"Introduction to the Site's identity, purpose and community, with a link to About.",
     appearsWhen:"Local website copy exists and the About page is available.",
     elements:[
-      template("Section eyebrow and heading","Fixed community label and template heading; the heading varies slightly with school-oriented content."),
+      template("Section eyebrow and heading","Actual fixed eyebrow: 'Our community'. H2 is 'A community where every student has room to grow.' when the Site has a vision and school content; otherwise the renderer uses the experience-profile story title."),
       authored("Story paragraph","localDescription","Uses Site story first; if blank, falls back to schoolVision, churchHistory or leadershipWelcome, in that order."),
       field("Initial source suggestions","Site Information → Purpose & Story","Optional suggested copy uses saved community needs, founding story, motivation, values and future vision. The final saved website draft is authoritative.","Establish → Site Information → Purpose & Story; then Website & Brand → Your Content","site-story"),
       derived("About link","Only shown when /about is an eligible website page."),
@@ -91,7 +91,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"explore",title:"Explore the experience",description:"A navigation grid directing families to the published, eligible pages of the Site.",
     appearsWhen:"At least two eligible linked destinations exist.",
     elements:[
-      template("Eyebrow, H2 and introductory text","Fixed labels such as 'Explore the experience' and the parent-facing introduction."),
+      template("Eyebrow, H2 and introductory text","Actual eyebrow: 'Explore the experience'. H2: 'Find what matters to your family' for school-focused Sites or 'Find your next learning experience' otherwise. Introduction and navigation copy are renderer-owned."),
       derived("Link tiles, descriptions and order","Compiled from available Programs, Courses, Classes, Academics, Student Life, Admissions and School Day pages. Missing/unapproved pages are not linked."),
       template("Tile numbers and arrows","Illustrative numbering and navigation symbols are layout elements."),
     ],
@@ -100,7 +100,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"academics",title:"Academic pathways",description:"Cards describing publicly authorized academic Programs.",
     appearsWhen:"Approved academic Program data is available and this placement is not replaced by an eligible learning.academics content channel. Fictional gallery samples are not real Programs.",
     elements:[
-      template("Section label and H2","Renderer-owned academic pathway heading and supporting introduction."),
+      template("Section label and H2","Actual eyebrow: 'Learning pathways'. H2: 'Serious learning. A more personal path.' The supporting paragraph varies with the current academic and preview context."),
       approved("Program card names, summaries and delivery","Approved Site academic Program versions","Includes only approved public descriptions and permissible delivery information; cards do not inherit broad Establish-stage intent."),
       derived("Program inquiry and application actions","Application status comes from verified application permissions; an approved Program is not necessarily open for admission."),
       sourceLayout("Section placement or replacement","An eligible learning.academics block can supply Site-configured section headings and card layouts instead of this automatic block."),
@@ -110,7 +110,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"enrichment",title:"Student life / enrichment",description:"Cards for independently published enrichment activities and community programs.",
     appearsWhen:"Published enrichment records exist, an eligible channel supplies the section, or the sample template is illustrating a layout.",
     elements:[
-      template("Eyebrow and section heading","Renderer supplies student-experience wording where no Site content channel replaces it."),
+      template("Eyebrow and section heading","Default eyebrow: 'Life beyond lessons'. Default H2: 'Enrichment and student experiences'. Synthetic gallery copy may instead say 'A place to explore what makes you, you.' A Site channel can replace this section."),
       approved("Activity cards, dates, season and fees","Approved enrichment catalog and public Offering data","Reads current authorized records, fees, capacity status and registration windows; no synthetic event is published from a template."),
       sourceLayout("Edited section title, description and layout","Site-configured learning.enrichment channels can replace the renderer's default panel."),
       derived("Availability messages","Comes from the published Offering's live registration terms, not manually entered template text."),
@@ -120,7 +120,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"closing",title:"Closing invitation",description:"Final editorial encouragement and next step.",
     appearsWhen:"There is applicable sample/design copy or approved academic Program content.",
     elements:[
-      template("Eyebrow, H2 and supporting text","Fixed copy that varies by illustrative/sample mode and presence of approved academic records."),
+      template("Eyebrow, H2 and supporting text","Renderer-owned label 'The possibilities ahead' and H2 'Every student has a story worth discovering.' in illustrative contexts; approved academic content uses 'Find your next step' and 'Find the learning opportunity that fits your family.'"),
       derived("Next-step button","Links to an eligible school/program page. Templates do not manufacture an admission or enrollment release."),
     ],
   },
@@ -128,7 +128,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"contact",title:"Contact information",description:"Reviewed contact details and location for families.",
     appearsWhen:"At least one independently reviewed Site contact or address field is permitted for public display.",
     elements:[
-      template("Section eyebrow and H2","Renderer-owned headings for contact information."),
+      template("Section eyebrow and H2","Default eyebrow: 'School information' (school-focused) or 'Contact information'. Default H2: 'Connect with our school' or 'Connect with our learning community'."),
       approved("Contact name, email, phone or office","Site contact · public identity review","Private Site Profile contact fields are not automatically exposed. Only explicitly reviewed public contact projections are eligible."),
       approved("Physical location","Site address · public identity review","A saved planning address alone does not establish visit availability or operating permission."),
       template("Location note","A published address is not proof the Site is open for visits."),
@@ -220,7 +220,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"about-story",title:"About / Site story",description:"Editorial Site introduction, local story and eligible people/media.",
     appearsWhen:"The About page is eligible from saved Site copy or independently verified public information.",
     elements:[
-      template("Page eyebrow, H1 and introductory paragraph","Renderer-owned About-page copy; some sample wording is intentionally fictional."),
+      template("Page eyebrow, H1 and introductory paragraph","Default eyebrow: 'Our community'. School-focused H1: 'A school shaped by purpose and the people around it.' Non-school experiences use their own source-controlled story title. Introductory text is renderer-owned."),
       authored("Site story and vision","localDescription / churchHistory / schoolVision","Published Site-owned copy, optionally first suggested from Purpose & Story."),
       approved("People, leader photos and portraits","Reviewed Site parent information and approved Site media","A Site's private staff and contact roster are never copied into a public page by the template."),
     ],
@@ -229,7 +229,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"academics-page",title:"Academics / Program details",description:"Eligible academic pathways, delivery models and academic-related content sections.",
     appearsWhen:"The Academics page is eligible based on the reviewed academic catalog or sample layout.",
     elements:[
-      template("Page eyebrow, H1 and introduction","Fixed renderer wording adapted to the academic-content profile."),
+      template("Page eyebrow, H1 and introduction","Default eyebrow: 'Learning'. H1: 'Serious learning. A more personal path.' Intro text is template/renderer wording, with illustrative variants."),
       approved("Academic cards, grades and delivery","Approved academic Programs and published schedules","Each Program's independently approved details, not Site intent, establish claims."),
       sourceLayout("Supplementary academic sections","Eligible /academics website content blocks use their own headings and layout."),
       derived("Inquiry and application links","Shown only when reviewed and permitted by the current academic enrollment workflow."),
@@ -239,7 +239,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"programs-page",title:"Programs / Published directory",description:"Program listings and any Site-authored introductory content blocks.",
     appearsWhen:"A public Program page is eligible or a private gallery illustrates the structure.",
     elements:[
-      template("Page eyebrow, H1 and introduction","Fixed 'Community programs' framing; separate from a Program's authored description."),
+      template("Page eyebrow, H1 and introduction","Default eyebrow: 'Community programs'. H1: 'Programs for every stage of learning'. The introductory sentence is fixed, not taken from an unpublished Program."),
       sourceLayout("Custom section headings and layout","Site-owned /programs channel blocks may override the automatic directory layout."),
       approved("Program titles, descriptions and statuses","Published public Program directory","Cards come from independently authorized public records."),
       derived("Registration buttons","Only an approved publication and enrollment release can yield an actionable registration link."),
@@ -249,7 +249,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"courses-page",title:"Courses / Published directory",description:"Public independent Course listings and availability.",
     appearsWhen:"A Course listing is eligible or the private template gallery shows an illustrative page.",
     elements:[
-      template("Page eyebrow, H1 and introduction","Fixed 'Independent learning' copy."),
+      template("Page eyebrow, H1 and introduction","Default eyebrow: 'Independent learning'. H1: 'Courses to explore'. The introductory sentence is fixed."),
       sourceLayout("Custom section headings and layout","Site-owned /courses content blocks."),
       approved("Course cards and descriptions","Published Course records and noncredit enrollment releases","Only public-approved Courses with the required release are listed as registerable."),
       derived("Registration and waitlist actions","Authorized exact Course/Offering release, rechecked on enrollment."),
@@ -259,7 +259,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"classes-page",title:"Classes / Sessions directory",description:"Scheduled or facilitated Classes backed by published Courses.",
     appearsWhen:"Public Class discovery is authorized, or a template gallery demonstrates page layout.",
     elements:[
-      template("Page eyebrow, H1 and introduction","Fixed 'Learn together' and Class directory intro wording."),
+      template("Page eyebrow, H1 and introduction","Default eyebrow: 'Learn together'. H1: 'Classes and scheduled Sessions'. The introductory text comes from the renderer, not an unapproved Class."),
       sourceLayout("Custom section headings and layout","Site-owned /classes content blocks."),
       approved("Class cards and start times","Active published canonical Classes and course adoption","Only eligible public Classes, Sessions and permitted schedules appear."),
       derived("Join or enroll action","Canonical enrollment eligibility, not the presence of a Class card."),
@@ -269,7 +269,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"student-life-page",title:"Student life / Activities",description:"Experiences beyond academic lessons.",
     appearsWhen:"Eligible enrichment offerings, published activities or an illustrative template is available.",
     elements:[
-      template("Page heading and introductory copy","Renderer-authored student-life text."),
+      template("Page heading and introductory copy","Default eyebrow: 'Beyond the classroom'. H1: 'Student life', or 'Find your people. Follow your curiosity.' in an illustrative template."),
       approved("Activities, seasons, fees and places","Reviewed enrichment catalog and Site media","Activity data is source-owned; illustrative photo slots are not evidence of a real event."),
       sourceLayout("Site-owned student-life sections","Additional approved /student-life content blocks."),
     ],
@@ -278,7 +278,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"school-day-page",title:"School day / Delivery",description:"Descriptions of reviewed schedule and attendance arrangements.",
     appearsWhen:"A reviewed academic learning model is available or a private sample is being shown.",
     elements:[
-      template("Page heading and introduction","Renderer-authored explanation, not a verified operating schedule."),
+      template("Page heading and introduction","Default eyebrow: 'Learning together'. H1: 'What a day of learning looks like', or a clearly illustrative alternative. This is not a timetable."),
       approved("Timetables and delivery details","Independently reviewed Program schedule and attendance information","Saved Site timezone and planning intent are not substituted for a published timetable."),
     ],
   }],
@@ -286,7 +286,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"admissions-page",title:"Admissions / Family next steps",description:"Published admissions eligibility and application paths.",
     appearsWhen:"Approved school admissions content is eligible; samples illustrate layout only.",
     elements:[
-      template("Page heading and introduction","Fixed family-facing introduction."),
+      template("Page heading and introduction","Default eyebrow: 'For families'. H1: 'The right school changes what feels possible'. Introduction is renderer-owned."),
       approved("Admissions steps and eligibility","Reviewed admissions policies and active Program authorizations","Applications cannot be generated from an unapproved Program."),
       derived("Application action","Shown only when independently approved and currently open."),
     ],
@@ -295,7 +295,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"tuition-page",title:"Tuition / Financial support",description:"Publicly reviewed tuition and assistance details.",
     appearsWhen:"Approved tuition or financial-aid statements exist or an illustrative layout is requested.",
     elements:[
-      template("Page heading and explanatory text","Fixed introductory copy."),
+      template("Page heading and explanatory text","Default eyebrow: 'Planning your education'. H1: 'Plan with confidence'. Supporting copy remains renderer-owned until verified tuition text is available."),
       approved("Tuition, assistance and fees","Verified tuition/financial-aid projections","Private fee assumptions and possible ESA funding are not presented as official prices."),
     ],
   }],
@@ -303,7 +303,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"families-page",title:"Family services",description:"Current eligible Site support resources and family information.",
     appearsWhen:"Reviewed service information or an illustrative template is available.",
     elements:[
-      template("Page heading and introductory copy","Renderer-authored family partnership text."),
+      template("Page heading and introductory copy","Default eyebrow: 'Supporting families'. H1: 'Partners in your child’s education'. Introductory text is fixed."),
       approved("Services and support cards","Reviewed public family-service records","Only records authorized for family-facing publication are used."),
     ],
   }],
@@ -311,7 +311,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"faq-page",title:"Questions and answers",description:"Answers drawn from eligible admissions, programs and pricing sources.",
     appearsWhen:"Verified public information exists for the FAQ or the sample gallery illustrates the page.",
     elements:[
-      template("Section heading and framing","Fixed 'Common questions' introduction."),
+      template("Section heading and framing","Default eyebrow: 'Common questions'. H1: 'The questions that matter most.' Introductory text is renderer-owned."),
       approved("Answers about school services","Reviewed academic, tuition and admissions data","Only public-approved statements are used, not private draft assumptions."),
     ],
   }],
@@ -319,7 +319,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     key:"contact-page",title:"Contact / Request information",description:"The Site's permitted public contact details and inquiry navigation.",
     appearsWhen:"Reviewed public contact records or illustrative content make this page eligible.",
     elements:[
-      template("Page heading and introduction","Renderer-authored 'Get in touch' framing."),
+      template("Page heading and introduction","Default eyebrow: 'Get in touch'. H1: 'Start a conversation about your child's education'. The intro text is fixed."),
       approved("Address, office and contact fields","Independently reviewed public Site contact/address projections","Site Profile alone is private and does not automatically publish personal contact information."),
       derived("Inquiry links and forms","Current allowed contact route and Site/program inquiry policy. A preview never submits a live application."),
     ],
