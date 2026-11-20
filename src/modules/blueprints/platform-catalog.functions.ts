@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts, organizations, auditEvents } from "@/db/schema";
@@ -292,7 +292,7 @@ export const savePlatformBlueprintDraft = createServerFn({ method: "POST" })
         lifecycle: "draft", publishedAt: null,
       }).returning({ id: blueprintVersions.id });
       if (!version) throw new Error("Blueprint draft could not be created");
-      await tx.insert(blueprintComponents).values(data.components.map(component => ({
+      const createdComponents = await tx.insert(blueprintComponents).values(data.components.map(component => ({
         blueprintVersionId: version.id,
         componentKey: component.key,
         componentKind: component.kind,
@@ -301,7 +301,51 @@ export const savePlatformBlueprintDraft = createServerFn({ method: "POST" })
           ...(componentSpecByKey.get(component.key) ?? {}),
           description: component.description,
         },
-      })));
+      }))).returning({ id: blueprintComponents.id, key: blueprintComponents.componentKey });
+      if (latest) {
+        // Copy version-pinned safety/facility requirements and inter-component
+        // dependencies by stable component key. A removed required component
+        // must NOT silently erase its safety or operational dependencies.
+        const createdByKey = new Map(createdComponents.map(component => [component.key, component.id]));
+        const requirements = await tx.execute(sql`
+          SELECT c.component_key AS "componentKey",r.capability_code AS "capabilityCode",
+            r.minimum_spaces AS "minimumSpaces",r.rationale
+          FROM public.blueprint_facility_requirements r
+          JOIN public.blueprint_components c ON c.id=r.blueprint_component_id
+          WHERE c.blueprint_version_id=${latest.id}::uuid
+        `);
+        for (const requirement of requirements.rows) {
+          const componentId = createdByKey.get(String(requirement.componentKey));
+          if (!componentId) throw new Error("Cannot remove a component with facility requirements.");
+          await tx.execute(sql`
+            INSERT INTO public.blueprint_facility_requirements
+              (blueprint_component_id,capability_code,minimum_spaces,rationale)
+            VALUES (${componentId}::uuid,${String(requirement.capabilityCode)},
+              ${Number(requirement.minimumSpaces)},${String(requirement.rationale)})
+          `);
+        }
+        const dependencies = await tx.execute(sql`
+          SELECT c.component_key AS "componentKey",
+            required.component_key AS "dependsOnKey",
+            d.dependency_kind AS "dependencyKind"
+          FROM public.blueprint_component_dependencies d
+          JOIN public.blueprint_components c ON c.id=d.component_id
+          JOIN public.blueprint_components required ON required.id=d.depends_on_component_id
+          WHERE d.blueprint_version_id=${latest.id}::uuid
+        `);
+        for (const dependency of dependencies.rows) {
+          const componentId = createdByKey.get(String(dependency.componentKey));
+          const targetId = createdByKey.get(String(dependency.dependsOnKey));
+          if (!componentId || !targetId)
+            throw new Error("Cannot remove a component with Blueprint dependencies.");
+          await tx.execute(sql`
+            INSERT INTO public.blueprint_component_dependencies
+              (blueprint_version_id,component_id,depends_on_component_id,dependency_kind)
+            VALUES (${version.id}::uuid,${componentId}::uuid,
+              ${targetId}::uuid,${String(dependency.dependencyKind)})
+          `);
+        }
+      }
       await writeAudit(tx, actor, {
         action: "platform.catalog.version.created", entityType: auditResource.blueprint,
         entityId: version.id, scope: { organizationId: publisher },
