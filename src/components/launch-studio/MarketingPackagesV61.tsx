@@ -57,6 +57,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
   const [showArchived,setShowArchived]=useState(false);
   const [busy,setBusy]=useState(false);
   const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
+  const [discardDialogOpen,setDiscardDialogOpen]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
@@ -183,9 +184,13 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
       setNotice(record?"Package saved.":"No package created.");
     });
   }
-  async function leaveWizard() {
-    if(dirty&&!window.confirm("Discard unsaved changes and return to your packages?"))return;
+  function discardWizard() {
+    setDiscardDialogOpen(false);
     setRecord(null);setView("library");setError("");setNotice("");
+  }
+  function leaveWizard() {
+    if (dirty) { setDiscardDialogOpen(true); return; }
+    discardWizard();
   }
   async function duplicate(selected:PackageRecord) {
     await run(async()=>{
@@ -351,14 +356,14 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
           </Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          {purposeOptions.map(option=><button key={option.id} type="button"
+          {purposeOptions.map(option=><Button key={option.id} type="button" variant="outline"
             disabled={busy||brandReadiness!=="available"}
-            className="border bg-card p-5 text-left hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-auto min-h-32 w-full flex-col items-start justify-start whitespace-normal p-5 text-left hover:border-primary"
             onClick={()=>{start();setTitle(option.label);setContent(starter(option.id));}}>
             <Megaphone className="mb-3 size-5 text-primary" aria-hidden="true"/>
             <strong className="block text-sm">{option.label}</strong>
             <span className="mt-2 block text-xs leading-5 text-muted-foreground">{option.description}</span>
-          </button>)}
+          </Button>)}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
           <h2 className="text-lg font-semibold">Saved packages ({visible.length})</h2>
@@ -730,6 +735,10 @@ export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit
           <Button disabled={busy||record.status==="archived"} onClick={()=>open(record,true)}>Edit package</Button>
         </ActionFooter>
       </>}
+      <ActionDialog open={discardDialogOpen} title="Discard unsaved package changes?"
+        description="Your unsaved edits will be lost. Previously saved Package content and generated releases will remain unchanged."
+        confirmLabel="Discard changes" destructive pending={busy}
+        onClose={()=>setDiscardDialogOpen(false)} onConfirm={discardWizard} />
       <ActionDialog open={Boolean(deleteCandidate)} title="Delete Marketing Package"
         description="Delete unused drafts only. Packages with generated materials must be archived so their released files remain available. This cannot be undone."
         confirmLabel="Delete package" destructive pending={busy}
