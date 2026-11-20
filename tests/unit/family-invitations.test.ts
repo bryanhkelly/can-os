@@ -93,8 +93,8 @@ describe("family invitation recipient review", () => {
       confirmed:true as const,purpose:"interest" as const,
     };
     expect(familyInvitationSendInput.safeParse(valid).success).toBe(true);
-    expect(familyInvitationSendInput.safeParse({...valid,subject:"Welcome\\nBcc: outside@example.test"}).success).toBe(false);
-    expect(familyInvitationSendInput.safeParse({...valid,subject:"Welcome\\rBcc: outside@example.test"}).success).toBe(false);
+    expect(familyInvitationSendInput.safeParse({...valid,subject:"Welcome\nBcc: outside@example.test"}).success).toBe(false);
+    expect(familyInvitationSendInput.safeParse({...valid,subject:"Welcome\rBcc: outside@example.test"}).success).toBe(false);
   });
 });
 
