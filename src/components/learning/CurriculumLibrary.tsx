@@ -98,10 +98,9 @@ function CurriculumCard({ pack, programId, selected }: { pack: Pack; programId: 
             {pack.adoption.status === "active" ? "Another release is selected. Any upgrade requires review." : `Previous selection is ${pack.adoption.status}; review is required.`}
           </p>
         )}
-        <Link to="/operations/curriculum-marketplace" search={{ programId }} hash={`curriculum-pack-${pack.versionId}`}
-          className="mt-auto inline-flex justify-center  border px-4 py-2 text-sm font-semibold">
+        <Button asChild variant="outline" className="mt-auto"><Link to="/operations/curriculum-marketplace" search={{ programId }} hash={`curriculum-pack-${pack.versionId}`}>
           {selected ? "View curriculum" : "Review curriculum"}
-        </Link>
+        </Link></Button>
       </div>
     </article>
   );
