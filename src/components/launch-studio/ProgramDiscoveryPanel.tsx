@@ -137,7 +137,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
       </p>
       {visible.length === 0 && <EmptyState className="mt-3" kind={offerings.length ? "matches" : "records"}
         title={offerings.length ? "No matching Offerings" : "No published Offerings available"}
-        description="Try another search, availability filter, or delivery model." />
+        description="Try another search, availability filter, or delivery model." />}
       {visible.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-2" aria-live="polite">
         {visible.map(item => {
           const { offering, availability } = item;
