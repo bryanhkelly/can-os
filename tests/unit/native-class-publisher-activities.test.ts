@@ -26,7 +26,7 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(survey).toContain("eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id)");
     expect(survey).toContain("eq(canonicalClassEnrollments.learnerPersonId,context.actorPersonId)");
     expect(survey).toContain("noncreditIsolation");
-    expect(schema).toContain('educationV30.table("class_survey_campaigns"');
+    expect(schema).toContain('pgTable("class_survey_campaigns"');
     expect(ddl).toContain("campaign_id uuid PRIMARY KEY");
     expect(ddl).toContain("class_survey_campaign_class_idx");
     expect(ddl).toContain("canonical_class_survey_campaign_guard_trg");
