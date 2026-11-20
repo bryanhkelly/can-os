@@ -28,7 +28,7 @@ describe("Teacher Today schedule", () => {
     expect(html).toContain("Cancelled");
     expect(html).toContain("9:00 AM");
     expect(html).toContain("date=2026-10-30&amp;event=event-1");
-    expect(html).toContain("/classes?section=english");
+    expect(html).toContain("/class");
   });
 
   it("opens due work in its exact Section gradebook", () => {
