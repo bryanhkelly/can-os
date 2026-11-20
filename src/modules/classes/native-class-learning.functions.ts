@@ -10,7 +10,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
-import { resolveAuthorizedLearningPerson } from "@/modules/identity/authorized-learning-person.server";
+import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
