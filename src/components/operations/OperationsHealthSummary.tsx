@@ -1,6 +1,5 @@
-import { Link } from "@tanstack/react-router";
-import { ArrowUpRight } from "lucide-react";
 import type { getLiveOperationsCommandCenter } from "@/modules/operations/command-center.functions";
+import { OperationsIssueList } from "./OperationsIssueList";
 
 type OperationsHealth = Awaited<ReturnType<typeof getLiveOperationsCommandCenter>>;
 
@@ -29,12 +28,7 @@ export function OperationsHealthSummary({ commandCenterData }: {
         <p className="mt-2 text-sm text-muted-foreground">{commandCenterData.summary.sections} active sections in scope. Individual readiness is not inferred from this count.</p>
       </div>
     </div>
-    {commandCenterData.issues.length>0&&<div className="mt-5 divide-y  border bg-card">
-      {commandCenterData.issues.map(issue=><article key={issue.kind+issue.sectionId} className="flex flex-wrap items-start justify-between gap-4 p-5">
-        <div><h3 className="font-semibold">{issue.title}</h3><p className="mt-1 text-sm text-muted-foreground">{issue.description}</p></div>
-        <Link to="/launch/school/$programId" params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}} className="inline-flex min-h-11 items-center gap-2  border px-4 py-2 text-sm font-semibold">Review workflow <ArrowUpRight className="size-4"/></Link>
-      </article>)}
-    </div>}
+    <OperationsIssueList issues={commandCenterData.issues} variant="summary" />
   </section>}
   {commandCenterData&&<section className="mt-7  border border-border/70 bg-card p-6 shadow-sm">
     <h2 className="font-serif text-2xl">Live school operations</h2>
@@ -44,14 +38,7 @@ export function OperationsHealthSummary({ commandCenterData }: {
     <span>{commandCenterData.summary.underCapacity} capacity gaps</span>
     <span>{commandCenterData.summary.waitlisted} open section waitlist entries</span>
     </div>
-    <div className="mt-4 space-y-2">
-    {commandCenterData.issues.map(issue=><div key={issue.kind+issue.sectionId} className=" border p-3 text-sm">
-       <strong>{issue.title}</strong><p className="text-muted-foreground">{issue.description}</p>
-       <Link className="mt-2 inline-block underline" to="/launch/school/$programId"
-        params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}}>Review lifecycle →</Link>
-     </div>)}
-    {!commandCenterData.issues.length&&<p className="text-sm">No instructional staffing, capacity or section waitlist exceptions detected.</p>}
-    </div>
+    <OperationsIssueList issues={commandCenterData.issues} variant="detail" />
    </section>}
   </>;
 }
