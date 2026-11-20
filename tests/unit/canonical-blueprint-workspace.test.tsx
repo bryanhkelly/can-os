@@ -2,6 +2,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { CanonicalBlueprintWorkspace } from "@/components/launch-studio/CanonicalBlueprintWorkspace";
 
+vi.mock("@tanstack/react-router", () => ({
+  useBlocker: vi.fn(),
+}));
+
 vi.mock("@/modules/blueprints/blueprint-studio.functions", () => ({
   readCanonicalBlueprintWorkspace: vi.fn(),
   readCanonicalBlueprintConfiguration: vi.fn(),
