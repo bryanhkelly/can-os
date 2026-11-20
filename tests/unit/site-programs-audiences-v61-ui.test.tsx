@@ -69,7 +69,9 @@ describe("V6.1 Programs & Audiences route and screen", () => {
     expect(route).toContain('module: "website-brand"');
     expect(route).toContain('module: "site-information"');
     expect(server).toContain('assertSiteSetupScope(actor, site, "program.launch.start")');
-    expect(server).toContain("getBlueprintReferenceCatalog(actor, { siteId: data.siteId })");
+    expect(server).toContain("readPublishedBlueprintReferences(tx)");
+    expect(server).not.toContain("getBlueprintReferenceCatalog(actor");
+    expect(server).toContain('assertSiteSetupScope(actor, site, "program.launch.start")');
     // Unchanged published references are private planning intent. Saving other
     // Site vision fields must not fail when a separate catalog role is offline.
     expect(server).toContain("const previouslySelected = new Set(");
