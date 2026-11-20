@@ -52,3 +52,6 @@ The following was subsequently applied to Neon `main`:
 **Capacity remains constrained:** The free Neon project has 10 of 10 branches and one existing old snapshot. Requests for a new validation branch and a fresh snapshot returned limits exceeded. Do not delete or overwrite recovery branches or snapshots without a deliberate retention approval.
 
 **Caution:** The manual scoped Site policy is now present; the operator-run `provision-public-site-catalog-rls.sql` intentionally fails if re-executed against an existing policy. Review the installed policy rather than attempting to apply the creation script a second time.
+
+
+**Independent direct-client denial probe:** After adding the scoped policy, transaction-local `SET LOCAL ROLE authenticated` and `SET LOCAL ROLE anonymous` followed by `SELECT count(*) FROM public.sites` both returned PostgreSQL `42501 permission denied for table sites`, confirming neither direct client role acquired Site read access. A positive restricted-operator probe is pending role and Organization-purpose provisioning; it has not been simulated or claimed.
