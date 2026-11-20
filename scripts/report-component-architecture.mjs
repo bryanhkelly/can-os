@@ -7,7 +7,8 @@
  * No DB connection, build output, generated routes, or network is required.
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, posix } from "node:path";
+import { sourceDependencySpecifiers, sharedUiImportViolation } from "./lib/v61-component-dependencies.mjs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import ts from "typescript";
@@ -29,6 +30,8 @@ walk(sourceRoot);
 const records = [];
 const fingerprints = new Map();
 const boundaryCandidates = [];
+const crossFeatureCandidates = [];
+const sharedLayerCandidates = [];
 function family(path) {
   if (path.startsWith("src/routes/")) return "routes";
   if (path.startsWith("src/components/ui/")) return "ui";
@@ -46,18 +49,29 @@ for (const file of files) {
     path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   let jsx = 0;
   let methods = 0;
-  const imports = [];
-  for (const node of syntax.statements) {
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier))
-      imports.push(node.moduleSpecifier.text);
-  }
+  const imports = sourceDependencySpecifiers(syntax, ts);
   const sourceFamily = family(path);
+  const sourceFeature = path.match(/^src\/components\/([^/]+)\//)?.[1];
   for (const value of imports) {
-    if (sourceFamily === "components" || sourceFamily === "workspace" ||
-        sourceFamily === "workflow" || sourceFamily === "ui") {
-      if (/^@\/(?:routes|db|workers)\//.test(value))
+    const target = value.startsWith("@/")
+      ? "src/" + value.slice(2)
+      : value.startsWith(".")
+        ? posix.normalize(posix.join(posix.dirname(path), value))
+        : null;
+    if (!target) continue;
+    if (path.startsWith("src/components/")) {
+      if (/^src\/(?:routes|db|workers|server)(?:\/|$)/.test(target))
         boundaryCandidates.push({ file: path, dependency: value });
+      const targetFeature = target.match(/^src\/components\/([^/]+)\//)?.[1];
+      if (sourceFeature && targetFeature && sourceFeature !== targetFeature &&
+        !["ui", "workspace", "workflow"].includes(targetFeature)) {
+        crossFeatureCandidates.push({
+          file: path, dependency: value, from: sourceFeature, to: targetFeature,
+        });
+      }
     }
+    const violation = sharedUiImportViolation(path, value);
+    if (violation) sharedLayerCandidates.push({file: path, dependency: value, violation});
   }
   function candidate(name, body) {
     if (!body || body.getWidth(syntax) < 180) return;
@@ -105,5 +119,9 @@ console.log(JSON.stringify({
   largestUiModules: largeUiFiles,
   exactFunctionBodyCandidates: duplicateFunctions,
   componentDependencyCandidates: boundaryCandidates,
-  note: "Candidates require domain review. Never merge differently authorized workflows merely because their JSX or helper bodies look similar.",
+  crossFeatureComponentCandidates: crossFeatureCandidates,
+  sharedLayerViolations: sharedLayerCandidates,
+  heavilyCoupledModules: records.filter(item => item.imports >= 25)
+    .sort((a, b) => b.imports - a.imports).slice(0, 40),
+  note: "Repo-wide observational audit, not a release gate. Cross-feature imports and identical bodies are review candidates, not evidence of interchangeable domain or authorization rules.",
 }, null, 2));
