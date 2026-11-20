@@ -15,6 +15,7 @@ import {
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { getBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const siteIdSchema = z.string().uuid();
@@ -59,6 +60,17 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
   }).strict().parse(value))
   .handler(async ({ data }) => {
     const actor = await authorizedRegistrar("program.launch.start");
+    // These are Site planning references, not academic Program creation.
+    // Validate against the same active, published reference catalog offered in
+    // Establish. Never accept an arbitrary client-provided Product/Offering ID.
+    const selectedPrograms = data.intent.programCodes ?? [];
+    if (selectedPrograms.length) {
+      const catalog = await getBlueprintReferenceCatalog(actor, { siteId: data.siteId });
+      const available = new Set(catalog.filter(item => item.kind === "program_model")
+        .map(item => item.code));
+      if (!selectedPrograms.every(code => available.has(code)))
+        throw new AuthorizationError("selected published Program references");
+    }
     return db.transaction(async tx => {
       const [site] = await tx.select().from(sites)
         .where(eq(sites.id, data.siteId)).for("update").limit(1);
