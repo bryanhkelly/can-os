@@ -25,7 +25,7 @@ export function StudentNextStepsPanel({
     >
       {nextSteps.nextLessonId ? (
         <Link
-          to="/classes"
+          to="/class"
           search={{ ...search, tab: "lessons", lesson: nextSteps.nextLessonId }}
           className="text-sm underline"
         >
