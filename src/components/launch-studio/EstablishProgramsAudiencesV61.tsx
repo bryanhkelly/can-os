@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { GuidedSetupShell } from "@/components/workflow";
-import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
@@ -70,20 +69,6 @@ const guidance = [
 
 export function ProgramsAudiencesV61Guidance({ step }: { step: InternalStep }) {
   return <LaunchGuidancePanels guidance={guidance[step]} />;
-}
-
-function ChoiceCard({ id, label, detail, icon, checked, disabled, onChange }: {
-  id: string; label: string; detail: string; icon?: string;
-  checked: boolean; disabled: boolean; onChange: (checked: boolean) => void;
-}) {
-  return <label className={"relative flex min-w-0 cursor-pointer flex-col gap-2 border bg-card p-4 text-sm focus-within:ring-2 focus-within:ring-ring " +
-    (checked ? "border-primary bg-accent" : "border-border hover:border-primary/60")}>
-    <Checkbox value={id} checked={checked} disabled={disabled}
-      onChange={event => onChange(event.target.checked)} className="absolute right-4 top-4" />
-    {icon && <span aria-hidden="true" className="text-2xl leading-none text-primary">{icon}</span>}
-    <span className="mt-1 pr-6 font-semibold">{label}</span>
-    <span className="text-xs leading-5 text-muted-foreground">{detail}</span>
-  </label>;
 }
 
 function SummaryRow({ label, value, onEdit }: {
@@ -244,7 +229,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       description={step === 0
         ? "Choose the Programs and learning ideas you hope to offer. Delivery details come later."
         : "Choose intended audiences and check your choices below. There is no separate review step."}
-      steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : 1)}>
+      steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : 1)} navigationDisabled={disabled}>
       <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : "Your Audiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
@@ -261,8 +246,8 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             <Button type="button" size="sm" variant="outline" onClick={() => setCatalogReload(n => n + 1)}>Retry Program catalog</Button>
           </div>}
           {programCatalog && <div className="grid gap-3 sm:grid-cols-2">
-            {programs.map(item => <ChoiceCard key={item.code}
-              id={item.code} label={item.title} detail={item.summary}
+            {programs.map(item => <SelectionCard key={item.code} kind="checkbox" layout="vertical"
+              value={item.code} title={item.title} detail={item.summary}
               checked={draft.programCodes?.includes(item.code) ?? false}
               disabled={disabled} onChange={checked => toggleProgram(item.code, checked)} />)}
           </div>}
@@ -289,9 +274,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               You can also describe broad learning interests without selecting a published Program.
             </p>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {interests.map(choice => <ChoiceCard key={choice.id} {...choice}
+              {interests.map(choice => <SelectionCard key={choice.id} kind="checkbox" layout="vertical"
+                value={choice.id} title={choice.label} detail={choice.detail} icon={choice.icon}
                 checked={draft.interestIds.includes(choice.id)}
-                disabled={disabled} onChange={value => toggleInterest(choice.id, value)} />)}
+                disabled={disabled} onChange={checked => toggleInterest(choice.id, checked)} />)}
             </div>
           </div>
         </fieldset>
@@ -303,16 +289,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               <fieldset key={group.title} className="min-w-0 border p-3">
                 <legend className="px-2 text-sm font-semibold">{group.title}</legend>
                 <div className="space-y-2">
-                  {group.options.map(choice => <label key={choice.id}
-                    className={"flex min-h-16 cursor-pointer items-start gap-3 border p-3 " +
-                      (draft.timingIds.includes(choice.id) ? "border-primary bg-accent" : "border-border bg-card")}>
-                    <Checkbox checked={draft.timingIds.includes(choice.id)} disabled={disabled}
-                      onChange={event => toggleTiming(choice.id, event.target.checked)} />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{choice.label}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">{choice.detail}</span>
-                    </span>
-                  </label>)}
+                  {group.options.map(choice => <SelectionCard key={choice.id} kind="checkbox"
+                    value={choice.id} title={choice.label} detail={choice.detail} compact className="min-h-16"
+                    checked={draft.timingIds.includes(choice.id)} disabled={disabled}
+                    onChange={checked => toggleTiming(choice.id, checked)} />)}
                 </div>
               </fieldset>)}
           </div>
@@ -339,16 +319,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
           <p className="text-xs text-muted-foreground">Select any learner groups you may welcome.</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            {audienceChoices.map(choice => <label key={choice.id}
-              className={"flex min-h-24 cursor-pointer items-start gap-3 border p-4 " +
-                (draft.audienceIds.includes(choice.id) ? "border-primary bg-accent" : "border-border bg-card")}>
-              <Checkbox checked={draft.audienceIds.includes(choice.id)} disabled={disabled}
-                onChange={event => toggleAudience(choice.id, event.target.checked)} />
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">{choice.label}</span>
-                <span className="mt-1 block text-xs text-muted-foreground">{choice.detail}</span>
-              </span>
-            </label>)}
+            {audienceChoices.map(choice => <SelectionCard key={choice.id} kind="checkbox"
+              value={choice.id} title={choice.label} detail={choice.detail} className="min-h-24"
+              checked={draft.audienceIds.includes(choice.id)} disabled={disabled}
+              onChange={checked => toggleAudience(choice.id, checked)} />)}
           </div>
         </fieldset>
         <WorkspaceNotice><strong>Audience is not enrollment eligibility.</strong> Age restrictions, guardian consent and safeguarding are determined by authorized offerings, not these selections.</WorkspaceNotice>
