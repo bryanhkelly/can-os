@@ -28,6 +28,17 @@ export function NativeClassroomCompanion({courseAttemptId}:{
       </Link>
     </header>
     <FacilitatedLearnerPairing courseAttemptId={courseAttemptId}/>
+    <div className="border border-border bg-card p-4">
+      <h3 className="text-sm font-semibold">Session feedback and surveys</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Rate a recently paired session or open any survey you were personally invited to.
+        Both use the existing Classroom Connect evidence services.
+      </p>
+      <Link to="/classroom/companion" search={{courseAttemptId}}
+        className="mt-2 inline-block text-sm font-semibold underline">
+        Open session feedback and surveys
+      </Link>
+    </div>
     {rooms.isError&&<p role="alert" className="text-sm">
       Room activities are unavailable. Confirm your current Class Enrollment.
     </p>}
