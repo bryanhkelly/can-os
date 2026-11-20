@@ -72,6 +72,7 @@ export const routeNavigation = {
   "/launch": publicPage,
   "/launch/site": page("/launch/site", admins),
   "/launch/site-preview": endpoint,
+  "/site-preview-share": hidden("Unlisted revocable Site website preview; never a navigation destination", []),
   "/landing": publicPage,
   "/landing/$journeyId": publicPage,
   "/next/$journeyId": publicPage,
