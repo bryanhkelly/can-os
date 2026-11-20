@@ -6,8 +6,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "assets:prepare": "node scripts/prepare-template-images.mjs",
-    "prebuild": "npm run check:build-source-syntax && npm run check:class-architecture && npm run check:route-identifiers && npm run assets:prepare",
-    "prebuild:cloudflare": "npm run check:build-source-syntax && npm run check:class-architecture && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
+    "prebuild": "npm run check:build-source-syntax && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && npm run assets:prepare",
+    "prebuild:cloudflare": "npm run check:build-source-syntax && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
     "postbuild": "npm run typecheck",
     "postbuild:cloudflare": "npm run typecheck",
     "prebuild-storybook": "npm run assets:prepare",
@@ -119,7 +119,8 @@
     "verify:identity:main-core-fks": "node scripts/acceptance/check-main-core-identity-fks.mjs",
     "verify:person:runtime-main": "node scripts/acceptance/check-main-one-person-runtime.mjs",
     "db:check:main:native-release": "node scripts/acceptance/check-main-native-course-release.mjs",
-    "verify:governance:main-consolidation": "node scripts/acceptance/check-main-governance-leaf-consolidation.mjs"
+    "verify:governance:main-consolidation": "node scripts/acceptance/check-main-governance-leaf-consolidation.mjs",
+    "check:component-boundaries": "node scripts/check-component-boundaries.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
