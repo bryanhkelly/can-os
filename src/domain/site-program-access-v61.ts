@@ -13,10 +13,28 @@ export const noSchoolYearAvailability: SchoolYearAvailability = {
  * publisher owns the Program category; neither a Site name nor a learner's
  * grade range determines whether a Program is a school.
  */
+/** The published catalog currently records school-year operating models
+ * across several categories, including "alternative" and "extension".
+ * Category alone is NOT an academic authorization signal, and a grade
+ * range alone would misclassify after-school and summer youth activities.
+ * Keep these existing canonical reference codes together until the
+ * reference publisher adds an explicit operating-model marker.
+ */
+const schoolYearProgramCodes = new Set([
+  "can.program.middle_school_6_8",
+  "can.program.high_school_9_12",
+  "can.program.combined_6_12",
+  "can.program.high_school_extension",
+  "can.program.homeschool_cohort",
+  "can.program.hybrid_academy",
+  "can.program.k8_extension",
+]);
+
 export function isSchoolYearAcademyReference(
-  item: Pick<BlueprintReferenceCatalogItem, "kind" | "category">,
+  item: Pick<BlueprintReferenceCatalogItem, "kind" | "category" | "code">,
 ): boolean {
-  return item.kind === "program_model" && item.category === "core";
+  return item.kind === "program_model" &&
+    (item.category === "core" || schoolYearProgramCodes.has(item.code));
 }
 
 export function schoolYearBandForInterest(id: string): SchoolYearGradeBand | null {
