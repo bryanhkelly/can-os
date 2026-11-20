@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  getNativeValorDraftPractice, submitNativeValorDraftPractice,
-} from "@/modules/classes/native-class-draft-practice.functions";
+  getNativeValorPracticeCheck, submitNativeValorPracticeCheck,
+} from "@/modules/classes/native-valor-practice-check.functions";
 
 /** Private, unscored practice using synthetic Valor draft assessment prompts.
  * Never claims to administer or publish the canonical assessment version.
@@ -13,8 +13,8 @@ import {
 export function NativeValorDraftPracticePanel({classEnrollmentId}:{classEnrollmentId:string}) {
   const client=useQueryClient();
   const query=useQuery({
-    queryKey:["native-valor-draft-practice",classEnrollmentId],
-    queryFn:()=>getNativeValorDraftPractice({data:{classEnrollmentId}}),
+    queryKey:["native-valor-practice-check",classEnrollmentId],
+    queryFn:()=>getNativeValorPracticeCheck({data:{classEnrollmentId}}),
     retry:false,
   });
   const [answers,setAnswers]=useState<Record<string,string>>({});
@@ -26,21 +26,21 @@ export function NativeValorDraftPracticePanel({classEnrollmentId}:{classEnrollme
     Checking for synthetic practice questions…
   </p>;
   if(query.isError)return null; // No disclosure of another Site's draft catalog.
-  if(!data?.available || !data.assessmentVersionId || !data.questions.length)return null;
+  if(!data?.available || !data.questions.length)return null;
   const complete=data.questions.every(item=>(answers[item.id]??"").trim().length>=3);
   async function submit() {
-    if(busy||!data?.available||!data.assessmentVersionId||!complete)return;
+    if(busy||!data?.available||!complete)return;
     setBusy(true);setError("");setNotice("");
     try {
-      await submitNativeValorDraftPractice({data:{
-        classEnrollmentId,assessmentVersionId:data.assessmentVersionId,
-        answers:data.questions.map(item=>({
-          itemVersionId:item.id,response:(answers[item.id]??"").trim(),
+      await submitNativeValorPracticeCheck({data:{
+        classEnrollmentId,
+        responses:data.questions.map(item=>({
+          questionId:item.id,text:(answers[item.id]??"").trim(),
         })),
       }});
       setNotice("Practice answers saved privately. This is not a graded assessment or official credit.");
       setAnswers({});
-      await client.invalidateQueries({queryKey:["native-valor-draft-practice",classEnrollmentId]});
+      await client.invalidateQueries({queryKey:["native-valor-practice-check",classEnrollmentId]});
     }catch(failure){
       setError(normalizeClientError(failure,"Unable to save this practice attempt.").message);
     }finally{setBusy(false);}
