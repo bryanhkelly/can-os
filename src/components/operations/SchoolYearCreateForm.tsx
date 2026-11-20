@@ -118,7 +118,7 @@ export function SchoolYearCreateForm({ data, selection, embedded = false,
           </Field>
           {!siteScales.length && <WorkspaceNotice className="sm:col-span-2">This school needs a grading scale. Create the standard scale, then continue with its school year.</WorkspaceNotice>}
           <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
-            <Field label="New grading scale name"><Input value={newScaleName} onChange={e => setNewScaleName(e.target.value)} /></Field>
+            <Field label="New grading scale name"><Input value={newScaleName} onChange={e => edit(setNewScaleName)(e.target.value)} /></Field>
             <Button type="button" variant="outline" disabled={!site?.organizationId || !newScaleName.trim()}
               onClick={() => void mutation.run(() => createStudioGradeScale({ data: { organizationId: site!.organizationId, name: newScaleName } }), {
                 successMessage: "Grading scale created.",
