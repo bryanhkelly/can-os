@@ -36,6 +36,14 @@ export default tseslint.config(
     files: ["src/components/{ui,workspace,workflow}/**/*.tsx", "src/routes/guardian.apply.tsx"],
     rules: { "can-os-design/no-hardcoded-colors": "error" },
   },
+  // All production pages and feature components must use semantic V6.1
+  // colors, not arbitrary Tailwind palette shades. Stories and tests remain
+  // diagnostic rather than production UI.
+  {
+    files: ["src/**/*.tsx"],
+    ignores: ["src/**/*.stories.tsx", "src/**/*.test.tsx", "src/**/*.spec.tsx"],
+    rules: { "can-os-design/no-hardcoded-colors": "error" },
+  },
   // Layout and type contract (docs/design-system-v6-1.md): pages align to the shell grid
   // through the shared primitives, and type sizes/letter-spacing come from tokens.
   {
