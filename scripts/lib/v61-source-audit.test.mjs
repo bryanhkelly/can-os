@@ -56,6 +56,14 @@ test("full-card checkbox/radio labels are deliberate accessible wrappers, not mi
   assert.equal(result.syntaxErrors.length, 0);
 });
 
+test("native dialogs outside UI primitives must use the shared Modal", () => {
+  const source = 'export const Page = () => <dialog open>Details</dialog>;';
+  const feature = analyzeSource(source, "/demo/src/components/learning/Details.tsx");
+  const primitive = analyzeSource(source, "/demo/src/components/ui/modal.tsx");
+  assert.deepEqual(feature.native.map(node => node.tag), ["dialog"]);
+  assert.equal(primitive.native.length, 0);
+});
+
 test("routes and reachable components are discovered, without route manifests", () => temp(({ root, write }) => {
   write("src/routes/home.tsx", 'import { Widget } from "@/components/cards"; export const Page = () => <Widget/>;');
   write("src/routes/old.tsx", 'export const Page = () => <button className="rounded-xl">Legacy</button>;');
