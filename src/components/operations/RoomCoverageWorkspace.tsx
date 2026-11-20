@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRoomCoverageWorkspaceFn, createRoomAtSiteFn, saveRoomCoverageFn } from "@/modules/operations/room-coverage.functions";
@@ -162,17 +163,17 @@ function RoomCoverageForm({ model, schedule, changed }: {
       </Field>
     </div>
     <fieldset disabled={busy} className="flex flex-wrap gap-3"><legend className="mb-2 text-sm font-semibold">Coverage weekdays</legend>
-      {days.map((day, value) => <label key={day} className="flex items-center gap-2 text-sm"><Checkbox checked={weekdays.includes(value)}
-        onChange={event => setWeekdays(current => event.target.checked ? [...current, value].sort() : current.filter(item => item !== value))}/>{day}</label>)}
+      {days.map((day, value) => <Label key={day} className="flex items-center gap-2 text-sm"><Checkbox checked={weekdays.includes(value)}
+        onChange={event => setWeekdays(current => event.target.checked ? [...current, value].sort() : current.filter(item => item !== value))}/>{day}</Label>)}
       {attempted&&!weekdays.length&&<FieldError className="w-full">Select at least one coverage weekday.</FieldError>}
     </fieldset>
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-semibold">Classes whose onsite students use this room</legend>
       <p className="text-sm text-muted-foreground">Different simultaneous courses may share this room. Enrollment stays in the original classes; occupancy counts each student once.</p>
       {!model.classes.length && <p role="status" className="text-sm">No onsite classes exist yet. Save the room assignment now, then link classes after academic setup.</p>}
-      {model.classes.map(section => <label key={section.id} className="flex items-center gap-2 text-sm">
+      {model.classes.map(section => <Label key={section.id} className="flex items-center gap-2 text-sm">
         <Checkbox checked={sectionIds.includes(section.id)} onChange={event => setSectionIds(current =>
           event.target.checked ? [...current, section.id] : current.filter(id => id !== section.id))}/>{section.title} · {section.programName}
-      </label>)}
+      </Label>)}
     </fieldset>
     <Button type="submit" disabled={busy}>{feedback.pending ? "Saving coverage..." : "Save room coverage"}</Button>
     <MutationFeedback state={feedback} className="mt-3" pendingMessage="Saving room coverage..."/>

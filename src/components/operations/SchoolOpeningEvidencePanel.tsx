@@ -42,7 +42,7 @@ function SchoolOpeningEvidenceWorkspace({programId}:{programId:string}) {
     setNotice(message);
     setModel(await getChurchSchoolOpeningFn({data:{programId}}));
   }
-  return <section className="mt-7 rounded-xl border bg-card p-5" aria-label="School opening evidence">
+  return <section className="mt-7  border bg-card p-5" aria-label="School opening evidence">
     <h2 className="font-serif text-2xl">Evidence for school opening</h2>
     <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
       The church submits each required document. A different CAN officer independently reviews it,
@@ -50,7 +50,7 @@ function SchoolOpeningEvidenceWorkspace({programId}:{programId:string}) {
       it never erases earlier evidence or its review history.
     </p>
     {model&&<p className="mt-3 text-sm">Configuration v{model.version} · <strong>{model.status}</strong></p>}
-    {notice&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">{notice}</p>}
+    {notice&&<p role="status" className="mt-3  border p-3 text-sm">{notice}</p>}
     <QueryState loading={loading?"Loading current evidence and version history…":undefined}
       error={error||undefined} onRetry={()=>void load().catch(()=>{})} retrying={loading}>
       {model&&<div className="mt-4 space-y-4">{model.evidenceItems.map(item=>

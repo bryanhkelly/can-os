@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import {useEffect,useState} from "react";
 import {
   listPublicSchoolDayReviews,approveSchoolDayPublicSummary,
@@ -33,7 +34,7 @@ export function PublicSchoolDayReviewPanel({siteId,programId}:{
     }catch{setMessage("Approval could not be saved. Refresh to review current calendar periods.")}
     finally{setPending("")}
   }
-  return <section aria-label="Public school day review" className="rounded-xl border bg-card p-5">
+  return <section aria-label="Public school day review" className=" border bg-card p-5">
     <h2 className="font-serif text-xl">School-day timetable for families</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Review current, approved school-year periods. This does not certify opening,
@@ -43,7 +44,7 @@ export function PublicSchoolDayReviewPanel({siteId,programId}:{
     {!loaded?<p role="status" className="mt-2 text-sm">Loading schedules…</p>:<>
       {schedules.length===0&&<p className="mt-2 text-sm">No active Program schedule is ready for review.</p>}
       <div className="mt-4 space-y-3">
-        {schedules.map(schedule=><div key={schedule.id} className="rounded-lg border p-3 text-sm">
+        {schedules.map(schedule=><div key={schedule.id} className=" border p-3 text-sm">
           <h3 className="font-semibold">{schedule.name}</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             {schedule.currentApproval?"Reviewed current schedule":"Not currently approved for public presentation"}
@@ -54,11 +55,11 @@ export function PublicSchoolDayReviewPanel({siteId,programId}:{
               {" "}· {period.type}
             </p>)}
           </div>
-          <button type="button" disabled={Boolean(pending)||!schedule.active||!schedule.periods.length}
+          <Button variant="outline" type="button" disabled={Boolean(pending)||!schedule.active||!schedule.periods.length}
             onClick={()=>void approve(schedule)}
-            className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold">
+            className="mt-3  border px-3 py-2 text-xs font-semibold">
             {pending===schedule.id?"Saving…":"Review and approve this timetable"}
-          </button>
+          </Button>
         </div>)}
       </div>
       {message&&<p className="mt-2 text-sm" role="status">{message}</p>}

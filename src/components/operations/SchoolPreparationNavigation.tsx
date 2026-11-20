@@ -7,10 +7,10 @@ export function SchoolPreparationNavigation({schools,selected,onSelect}:{
  schools:School[];selected:School|null;onSelect:(school:School)=>void;
 }){
  if(!schools.length)return null;
- return <section id="school-preparation-selection" aria-label="Your school preparation" className="mt-4 scroll-mt-6 rounded-xl border bg-card p-5">
+ return <section id="school-preparation-selection" aria-label="Your school preparation" className="mt-4 scroll-mt-6  border bg-card p-5">
   <Label className="block text-sm font-semibold">School you are preparing
    <Select value={selected?.id??""} onChange={event=>{const school=schools.find(item=>item.id===event.target.value);if(school)onSelect(school);}}
-    className="mt-2 w-full rounded border bg-background p-3 font-normal">
+    className="mt-2 w-full  border bg-background p-3 font-normal">
     <option value="">Choose your school</option>{schools.map(school=><option key={school.id} value={school.id}>{school.name} · {school.siteName}</option>)}
    </Select>
   </Label>

@@ -18,7 +18,7 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
   const [capacity, setCapacity] = useState("");
   const [createAttempted, setCreateAttempted] = useState(false);
   const busy = feedback.pending || feedback.refreshFailed;
-  return <section id="physical-classrooms" aria-label="Physical classrooms" className="mt-6 rounded-xl border p-5">
+  return <section id="physical-classrooms" aria-label="Physical classrooms" className="mt-6  border p-5">
     <h2 className="font-serif text-2xl">Physical classrooms</h2>
     <p className="mt-2 text-sm">Create the actual rooms at this Site once, then select them for
       scheduled classes in school-day room and adult coverage planning. Rooms are shared by
@@ -32,7 +32,7 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
     </div>}
     {rooms.data && <>
       {rooms.data.rooms.length ? <ul className="mt-4 space-y-2 text-sm">
-        {rooms.data.rooms.map(room => <li key={room.id+":"+room.revision} className="rounded-lg border p-3">
+        {rooms.data.rooms.map(room => <li key={room.id+":"+room.revision} className=" border p-3">
           <strong>{room.name}</strong> · occupancy limit {room.capacity}
           {room.retiredAt ? <p className="mt-1">Retired - unavailable for new assignments or room-plan approvals. Historical records are retained.</p>
             : rooms.data.canManage ? <RoomEditor room={room} busy={busy}
@@ -108,7 +108,7 @@ function SectionRoomLocation({ section, rooms, busy, save }: {
   }}>
     <Label>{section.title} ({section.code}) physical room
       <Select value={roomId} disabled={busy} onChange={event => setRoomId(event.target.value)}
-        className="mt-1 block w-full rounded border bg-background p-2">
+        className="mt-1 block w-full  border bg-background p-2">
         <option value="">Not assigned</option>
         {retiredDefault && <option value={retiredDefault.id} disabled>{retiredDefault.name} (retired - replace or clear)</option>}
         {activeRooms.map(room => <option key={room.id} value={room.id}>{room.name} · capacity {room.capacity}</option>)}
