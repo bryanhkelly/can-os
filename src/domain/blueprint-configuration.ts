@@ -109,6 +109,14 @@ export const blueprintLocalExperienceProposalSchema = z.object({
   configuration: jsonObjectSchema.default({}),
 }).strict();
 
+/** One definition of locally proposed experience kinds, sourced from the
+ * canonical validated schema rather than a second hard-coded UI list. */
+export function isBlueprintLocalExperienceKind(
+  value: string,
+): value is z.infer<typeof blueprintLocalExperienceProposalSchema>["kind"] {
+  return blueprintLocalExperienceProposalSchema.shape.kind.options.some(kind => kind === value);
+}
+
 export const blueprintConfigurationVersionInputSchema = z.object({
   config: jsonObjectSchema.default({}),
   identity: blueprintConfigurationIdentitySchema,
