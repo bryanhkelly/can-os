@@ -69,7 +69,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
   initialDelivery?: "onsite" | "remote" | "hybrid";
   embedded?: boolean;
   onWorkspaceChanged?: (workspace: Workspace) => void;
-  onUnsavedChange?: (unsaved: boolean) => void;
+  onUnsavedChange?: (state: {
+    unsaved: boolean; busy: boolean; reconciliationRequired: boolean;
+  }) => void;
 }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
@@ -112,7 +114,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     "Leave Solution planning? Unsaved changes will be lost.",
   );
   useEffect(() => {
-    onUnsavedChange?.(unsaved || busy || reconciliationRequired);
+    onUnsavedChange?.({ unsaved, busy, reconciliationRequired });
   }, [onUnsavedChange, unsaved, busy, reconciliationRequired]);
 
   async function reload() {
