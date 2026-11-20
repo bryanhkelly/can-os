@@ -44,7 +44,7 @@ import { getTeacherClassRequestOptions } from "@/modules/programs/section-creati
 import { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, MutationFeedback, RosterList } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, WorkspaceLinkNavigation, DetailNavigation, SectionTab, StatusBadge, MutationFeedback, RosterList } from "@/components/workspace";
 import { safeLoader, type LoadOutcome } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -329,14 +329,14 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
         <summary className="cursor-pointer text-xs font-semibold">Learning progress details</summary>
         <StudentNextStepsPanel nextSteps={nextSteps} search={search}/>
       </details>}
-      <WorkspacePanel title="Class connections"><nav className="grid gap-4 text-sm" aria-label="Class connections">
+      <WorkspacePanel title="Class connections"><WorkspaceLinkNavigation label="Class connections" surface="plain" className="grid gap-4">
       {classwork}
       {data.role === "student" && <Link to="/student/courses" search={{section:data.section.id,tab:"grades"}} className="underline">Grades and released feedback</Link>}
       {data.role === "student" && <Link to="/student/courses" search={{section:data.section.id,view:"catalog"}} className="underline">Registration and change deadlines</Link>}
       {data.role !== "guardian" && <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"} search={{ section: data.section.id }} className="underline">Class discussions</Link>}
       {data.role !== "guardian" && <Link to="/calendar" search={{ section: data.section.id }} className="underline">Class calendar</Link>}
       {data.role === "guardian" && <Link to="/guardian/report-cards" search={{ student: search.student }} className="underline">Published report cards</Link>}
-    </nav></WorkspacePanel>
+    </WorkspaceLinkNavigation></WorkspacePanel>
       <WorkspacePanel title="Need support?" description="Review the transcript, save your lesson notes, or ask your class a question.">
         {data.role !== "guardian" ? <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"}
           search={{section:data.section.id,lesson:lesson?.id}} className="inline-flex w-full justify-center border px-3 py-2 text-xs font-semibold">Open discussion →</Link> :
