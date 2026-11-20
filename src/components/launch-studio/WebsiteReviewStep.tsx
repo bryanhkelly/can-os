@@ -34,7 +34,7 @@ export function WebsiteReviewStep({
     </div>
     <div className="flex flex-wrap items-center gap-3">
       <Button type="button" disabled={previewPending} onClick={onPreview}
-        className="min-h-11 border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        size="lg">
         {previewPending?"Generating secure preview...":"Preview unsaved changes"}
       </Button>
       <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
@@ -110,7 +110,7 @@ export function WebsiteReviewStep({
           {allowPublication&&data.canPublish&&version.status==="published"&&
             version.revision<data.currentRevision&&
             <Button type="button" variant="outline" disabled={busy||revisionConflict}
-              onClick={()=>onRestore(version.revision)} className="border px-3 py-1 text-xs">
+              onClick={()=>onRestore(version.revision)} size="sm">
               Restore as new revision
             </Button>}
         </li>)}
