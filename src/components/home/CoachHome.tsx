@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { Link } from "@tanstack/react-router";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
@@ -111,8 +115,8 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
       actions={<><Link to="/support">Referrals, plans & services →</Link><Link to="/profiles">My profile →</Link></>}>
         <div id="support-caseload">
         {loading && <p className="mt-8 text-sm" role="status">Loading caseload…</p>}
-        {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-        {!loading&&!error&&selected&&!chosen&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This student is unavailable in your current caseload.</p>}
+        {error && <p className="mt-8  border p-4 text-sm" role="alert">{error}</p>}
+        {!loading&&!error&&selected&&!chosen&&<p role="alert" className="mt-5  border p-4 text-sm">This student is unavailable in your current caseload.</p>}
         {!loading && !error && students.length === 0 && (
           <p className="mt-8 text-sm">No students currently need coach attention at your sites.</p>
         )}
@@ -121,14 +125,14 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
             <section>
               <div className="space-y-3">
                 {students.map((student) => (
-                  <button
+                  <Button type="submit" variant="ghost"
                     key={student.studentProfileId}
                     onClick={() => {
                       selectStudent(student.studentProfileId);
                       setMessage("");
                       setFormError("");
                     }}
-                    className={`w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${
+                    className={`w-full  border bg-card p-5 text-left hover:border-foreground/40 ${
                       selected === student.studentProfileId ? "border-foreground" : "border-border"
                     }`}
                   >
@@ -140,21 +144,21 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs">
                       {student.openReferrals > 0 && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">
+                        <span className=" bg-stone-warm px-2 py-1">
                           {student.openReferrals} open referral{student.openReferrals === 1 ? "" : "s"}
                           {student.latestReferralStage ? ` · ${student.latestReferralStage.replaceAll("_", " ")}` : ""}
                         </span>
                       )}
                       {student.hasOpenPlan && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">Support plan</span>
+                        <span className=" bg-stone-warm px-2 py-1">Support plan</span>
                       )}
                       {student.openInsights > 0 && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">
+                        <span className=" bg-stone-warm px-2 py-1">
                           {student.openInsights} insight{student.openInsights === 1 ? "" : "s"}
                         </span>
                       )}
                       {student.openActions > 0 && (
-                        <span className="rounded-full bg-stone-warm px-2 py-1">
+                        <span className=" bg-stone-warm px-2 py-1">
                           {student.openActions} open action{student.openActions === 1 ? "" : "s"}
                         </span>
                       )}
@@ -162,11 +166,11 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
                     <p className="mt-3 text-xs text-muted-foreground">
                       Last activity {new Date(student.lastActivityAt).toLocaleString()}
                     </p>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </section>
-            <section className="h-fit rounded-xl border bg-card p-5">
+            <section className="h-fit  border bg-card p-5">
               {!chosen && <p className="text-sm text-muted-foreground">Select a student to see their timeline and log outreach.</p>}
               {chosen && (
                 <>
@@ -181,7 +185,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
                   )}
                   <ol className="mt-3 space-y-3">
                     {timeline.map((entry) => (
-                      <li key={`${entry.kind}-${entry.id}`} className="rounded-lg border border-border p-3 text-sm">
+                      <li key={`${entry.kind}-${entry.id}`} className=" border border-border p-3 text-sm">
                         <div className="flex flex-wrap justify-between gap-2">
                           <p className="font-semibold">{entry.title}</p>
                           {entry.kind==="referral"&&<Link to="/support" search={{referral:entry.id}} className="text-xs underline">Open referral</Link>}
@@ -209,37 +213,37 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
                     ))}
                   </ol>
                   <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Log outreach</h3>
-                  <label className="mt-3 block text-sm font-semibold">
+                  <Label className="mt-3 block text-sm font-semibold">
                     Note
-                    <textarea
+                    <Textarea
                       value={note}
                       onChange={(event) => setNote(event.target.value)}
                       rows={4}
                       placeholder="Who did you contact, what was discussed, and what happens next?"
-                      className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
+                      className="mt-2 w-full  border border-border bg-background p-3 text-sm"
                     />
-                  </label>
-                  <label className="mt-3 block text-sm font-semibold">
+                  </Label>
+                  <Label className="mt-3 block text-sm font-semibold">
                     Outcome
-                    <select
+                    <Select
                       value={outcome}
                       onChange={(event) => setOutcome(event.target.value as typeof outcome)}
-                      className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
+                      className="mt-2 w-full  border border-border bg-background p-3 text-sm"
                     >
                       {outcomes.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
-                    </select>
-                  </label>
-                  {formError && <p className="mt-3 rounded-lg border border-red-300 p-3 text-sm" role="alert">{formError}</p>}
-                  {message && <p className="mt-3 rounded-lg border border-emerald-300 p-3 text-sm" role="status">{message}</p>}
-                  <button
+                    </Select>
+                  </Label>
+                  {formError && <p className="mt-3  border border-danger/40 p-3 text-sm" role="alert">{formError}</p>}
+                  {message && <p className="mt-3  border border-success/40 p-3 text-sm" role="status">{message}</p>}
+                  <Button type="submit" variant="ghost"
                     disabled={busy || note.trim().length < 3}
                     onClick={submitOutreach}
-                    className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40"
+                    className="mt-4 w-full  bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40"
                   >
                     Log outreach
-                  </button>
+                  </Button>
                 </>
               )}
             </section>

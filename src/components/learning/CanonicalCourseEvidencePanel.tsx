@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { getCanonicalCourseEvidence } from "@/modules/learning/canonical-course-evidence.functions";
 
@@ -48,11 +49,11 @@ function CanonicalEvidenceSession({courseAttemptId}:{courseAttemptId:string}) {
           separate from estimated browser activity.
         </p>
       </div>
-      <button type="button" className="border px-3 py-2 text-sm font-medium"
+      <Button variant="outline" type="button" className="border px-3 py-2 text-sm font-medium"
         aria-expanded={open} onClick={()=>{
           setOpen(value=>!value);
           if(!open)void refresh();
-        }}>{open?"Hide details":"View evidence"}</button>
+        }}>{open?"Hide details":"View evidence"}</Button>
     </div>
     {open&&<div className="mt-4 space-y-4">
       {loading&&<p role="status" className="text-sm">Loading course evidence...</p>}

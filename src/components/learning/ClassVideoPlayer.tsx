@@ -127,12 +127,12 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
   return <section aria-label={`Video: ${title}`} className={presentation === "classroom" ? "classroom-player" : "space-y-3"} data-learning-content>
     {presentation === "standard" && <h3 className="font-semibold">{title}</h3>}
     <div className={presentation === "classroom" ? "classroom-player-screen" : undefined}>
-    {!source && (loadUrl || video) && <button type="button" disabled={pending}
+    {!source && (loadUrl || video) && <Button variant="outline" type="button" disabled={pending}
       data-learning-resource-id={resourceId} onClick={() => void open()}
       className="flex aspect-video min-h-48 w-full flex-col items-center justify-center gap-4 border bg-muted p-6 text-sm font-semibold hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50">
       <Play aria-hidden="true" className="size-12 text-primary"/>
       <span>{pending ? "Loading video..." : "Play video"}</span>
-    </button>}
+    </Button>}
     {!source && !loadUrl && !video && <ClassVideoPlaceholder title="Recording unavailable" headingLevel={presentation === "classroom" ? 2 : 3}
       message={url
         ? sourceLink
@@ -141,8 +141,8 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
         : "No video recording has been attached."}/>}
     {source && video && <ClassroomMediaSurface key={source+":"+playbackRevision}
       video={video} title={title} videoRef={attachPlayer}
-      iframeClassName="aspect-video w-full rounded border"
-      videoClassName="aspect-video w-full rounded bg-black"
+      iframeClassName="aspect-video w-full  border"
+      videoClassName="aspect-video w-full  bg-black"
       onLoadedMetadata={event => setReady(Number.isFinite(event.currentTarget.duration))}
       onRateChange={event => setSpeed(event.currentTarget.playbackRate)}
       onPlay={() => { if (resourceId) onPlaybackEvent?.("video_played", resourceId); }}
@@ -164,7 +164,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       aria-label={`Open ${presentation === "classroom" ? "video" : title} at source: ${title}`}
       className={presentation === "classroom" ? "block border-t px-4 py-2 text-3xs text-muted-foreground underline" : "block text-xs underline"}>Open {presentation === "classroom" ? "video" : title} at source</a>}
     {error && <div role="alert" className="text-sm"><p>{error}</p>
-      <button type="button" disabled={pending} onClick={() => { setPlaybackRevision(value => value + 1); setSource(null); void open(); }}
-        className="mt-2 underline">Retry playback</button></div>}
+      <Button variant="ghost" type="button" disabled={pending} onClick={() => { setPlaybackRevision(value => value + 1); setSource(null); void open(); }}
+        className="mt-2 underline">Retry playback</Button></div>}
   </section>;
 }

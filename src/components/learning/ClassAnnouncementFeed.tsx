@@ -19,6 +19,6 @@ export function ClassAnnouncementFeed({ announcements, timezone }: {
         <p className="whitespace-pre-wrap text-sm leading-7">{item.body}</p>
       </WorkspacePanel>)}
     {!announcements.length &&
-      <p className="rounded-xl border p-5 text-sm text-muted-foreground">No class announcements yet.</p>}
+      <p className=" border p-5 text-sm text-muted-foreground">No class announcements yet.</p>}
   </>;
 }
