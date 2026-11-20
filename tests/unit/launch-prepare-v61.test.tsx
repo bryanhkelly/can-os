@@ -20,6 +20,15 @@ vi.mock("@tanstack/react-router", () => ({
   },
 }));
 
+// The integration components make authenticated reads and require QueryClient.
+// Render their stable placement here; service-level behavior is tested in its
+// owning modules and the scoped Prepare Operations contract tests.
+vi.mock("@/components/launch-studio/PrepareOperationsV61", () => ({
+  PrepareFacilitiesV61: ({siteId}:{siteId:string}) => <section>Live Facilities {siteId}</section>,
+  PrepareTeamV61: ({siteId}:{siteId:string}) => <section>Live Team {siteId}</section>,
+  PrepareSchedulesV61: ({siteId}:{siteId:string}) => <section>Live Schedules {siteId}</section>,
+}));
+
 vi.mock("@/modules/programs/program-discovery.functions", () => ({
   discoverLaunchSitePrograms: vi.fn(),
 }));
@@ -83,6 +92,21 @@ describe("V6.1 Prepare to Open", () => {
       expect(html, module.id).not.toContain("Continue: " + module.title);
       expect(html, module.id).not.toContain(" of 7");
       expect(html, module.id).toContain("Launch Studio / Prepare");
+    }
+  });
+
+  it("renders operational Facilities, Team and Schedules in the Prepare center", () => {
+    const ids = [
+      ["facilities-resources", "Live Facilities"],
+      ["invite-team", "Live Team"],
+      ["schedules-capacity", "Live Schedules"],
+    ] as const;
+    for (const [module, heading] of ids) {
+      const html = renderToStaticMarkup(
+        <LaunchPrepareV61 siteId={siteId} module={module} />);
+      expect(html).toContain(heading);
+      expect(html).toContain(siteId);
+      expect(html).not.toContain('aria-label="Prepare module navigation"');
     }
   });
 
