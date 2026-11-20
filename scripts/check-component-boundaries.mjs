@@ -32,6 +32,7 @@ const guardedFiles = [
   "src/components/admissions/PublicInterestRecordCard.tsx",
   "src/components/admissions/PublicInterestTimeline.tsx",
   "src/components/launch-studio/MarketingPackageLibraryList.tsx",
+  "src/components/learning/NativeApprovedOfferingsPanel.tsx",
   "src/components/launch-studio/LaunchGuidancePanels.tsx",
   "src/components/home/GuardianEnrollmentNextSteps.tsx",
   "src/components/home/GuardianGradeQuestions.tsx",
@@ -84,7 +85,7 @@ const owners = [
   ["src/components/enrollment/GuardianApplicationForm.tsx", ['<Label htmlFor={`${id}-transfer`}', '<Label htmlFor={`${id}-household`}']],
   ["src/components/home/GuardianHome.tsx", ['<section aria-label="Enrollment next steps"', '<section aria-label="School responses to your grade questions"']],
   ["src/components/operations/OperationsHealthSummary.tsx", ["commandCenterData.issues.map("]],
-  ["src/components/learning/NativeClassManager.tsx", ["const methodOptions:", "const creditOptions:", "function toggle<T extends string>"]],
+  ["src/components/learning/NativeClassManager.tsx", ["const methodOptions:", "const creditOptions:", "function toggle<T extends string>", 'aria-label="Approved Offering hierarchy"']],
   ["src/components/operations/OperationsWorkspace.tsx", [
     '<section aria-label="School improvement and planning"',
     '<section aria-label="Operations exception summary"',
