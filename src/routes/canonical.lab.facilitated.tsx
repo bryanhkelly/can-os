@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { WorkspaceShell, StatusBadge, ActionDialog, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
@@ -92,7 +93,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
         No new school enrollment or classroom Section is created.
       </p>
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="min-w-72 flex-1 text-sm font-medium">
+        <Label className="min-w-72 flex-1 text-sm font-medium">
           Deployment and course
           <Select className="mt-2"
             value={selected} onChange={event=>setSelected(event.target.value)}>
@@ -103,7 +104,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
               {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
             </option>)}
           </Select>
-        </label>
+        </Label>
         <Button disabled={busy||!available} type="button" onClick={()=>void run(async()=>{
           if(!available)return;
           const created=await startFacilitatedLearningRoom({data:{
@@ -132,7 +133,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
         pairing, attendance, learner work or course completion.
       </p>
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="min-w-72 flex-1 text-sm font-medium">
+        <Label className="min-w-72 flex-1 text-sm font-medium">
           Approved Site course
           <Select className="mt-2"
             value={rehearsalChoice}
@@ -144,7 +145,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
               {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
             </option>)}
           </Select>
-        </label>
+        </Label>
         <Button type="button" variant="outline" disabled={!rehearsal}
           onClick={()=>{if(rehearsal)setRehearsalScope({
             deploymentId:rehearsal.deploymentId,adoptionId:rehearsal.adoptionId,

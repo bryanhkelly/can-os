@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Radio } from "@/components/ui/choice";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
@@ -82,13 +86,13 @@ function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
       <h2 className="mt-2 font-serif text-2xl">Who is learning?</h2>
       <p className="mt-2 text-sm text-muted-foreground">A single entry point adapts the questions and authorization to the person enrolling. Enrollment is not submitted from this internal preview.</p>
       <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        {audienceOptions.map(option => <button type="button" key={option.id}
+        {audienceOptions.map(option => <Button variant="ghost" type="button" key={option.id}
           aria-pressed={audience === option.id} onClick={() => setAudience(option.id)}
           className={"border p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary " +
             (audience === option.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40")}>
           <span className="block text-base font-semibold">{option.title}</span>
           <span className="mt-2 block text-sm leading-6 text-muted-foreground">{option.description}</span>
-        </button>)}
+        </Button>)}
       </div>
     </section>
     {audience === "guardian" ? <section className="mt-5 border border-border bg-card p-5">
@@ -99,12 +103,12 @@ function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
       <section className="mt-5 border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">Select an offering</h2>
         <p className="mt-2 text-sm text-muted-foreground">Only published training versions can be presented as candidates. A public registration launch also requires an approved deployment, capacity policy and registration command.</p>
-        <label htmlFor="training" className="mt-5 block text-sm font-semibold">Published training</label>
-        <select id="training" value={selected} onChange={event => setSelected(event.target.value)}
+        <Label htmlFor="training" className="mt-5 block text-sm font-semibold">Published training</Label>
+        <Select id="training" value={selected} onChange={event => setSelected(event.target.value)}
           className="mt-2 min-h-11 w-full max-w-xl border border-border bg-background px-3 text-sm">
           <option value="">Choose a published training</option>
           {published.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-        </select>
+        </Select>
         {current && <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
           <div className="border border-border p-3"><span className="block text-muted-foreground">Training</span><strong>{current.title}</strong></div>
           <div className="border border-border p-3"><span className="block text-muted-foreground">Instruction</span><strong>{current.requiredMinutes} minutes</strong></div>
@@ -122,8 +126,8 @@ function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
       <section className="mt-5 border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">{audience === "group" ? "Group delivery" : "Participation preference"}</h2>
         <div className="mt-4 flex flex-wrap gap-5 text-sm">
-          <label className="flex items-center gap-2"><input type="radio" name="delivery" checked={delivery === "individual"} onChange={() => setDelivery("individual")}/>Learn on my own device</label>
-          <label className="flex items-center gap-2"><input type="radio" name="delivery" checked={delivery === "facilitated"} onChange={() => setDelivery("facilitated")}/>Join a facilitated group</label>
+          <Label className="flex items-center gap-2"><Radio name="delivery" checked={delivery === "individual"} onChange={() => setDelivery("individual")}/>Learn on my own device</Label>
+          <Label className="flex items-center gap-2"><Radio name="delivery" checked={delivery === "facilitated"} onChange={() => setDelivery("facilitated")}/>Join a facilitated group</Label>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{delivery === "facilitated"
           ? "A facilitator can host a shared-screen session, but each participant must have their own identity and participation record. Group creation does not impersonate learners."

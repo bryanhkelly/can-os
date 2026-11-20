@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
 import { DirectoryTable } from "@/components/workspace";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -77,11 +79,11 @@ function NoncreditLabContent({ attempts, trainings }: {
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="text-base font-semibold">Write safety</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">These controls execute real audited commands against the configured database. Only use disposable or intentionally synthetic pilot records. The learner must submit their knowledge check in their own authorized learning experience before a provider can finalize it.</p>
-      <label className="mt-4 flex items-start gap-3 text-sm">
-        <input type="checkbox" className="mt-1 size-4 accent-primary" checked={acknowledged}
+      <Label className="mt-4 flex items-start gap-3 text-sm">
+        <Checkbox className="mt-1 size-4 accent-primary" checked={acknowledged}
           onChange={event => setAcknowledged(event.target.checked)}/>
         <span>I understand these actions persist to the connected database.</span>
-      </label>
+      </Label>
       {feedback && <p role={feedback.tone === "danger" ? "alert" : "status"}
         className={"mt-4 border px-4 py-3 text-sm " +
           (feedback.tone === "danger" ? "border-destructive text-destructive" : "border-success text-foreground")}>
