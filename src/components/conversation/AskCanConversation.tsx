@@ -128,26 +128,26 @@ export function AskCanConversation() {
       {loading && <p role="status" className="text-sm text-muted-foreground">Loading your conversations...</p>}
       {threads.length > 0 && <div className="mt-5 flex flex-wrap gap-2" aria-label="Conversation history">
         {threads.slice(-8).reverse().map(thread => (
-          <button key={thread.id} type="button" disabled={busy || loading} aria-pressed={conversationId === thread.id} onClick={() => void openThread(thread.id)}
-            className={"rounded-full border px-3 py-1 text-xs " +
+          <Button variant="ghost" key={thread.id} type="button" disabled={busy || loading} aria-pressed={conversationId === thread.id} onClick={() => void openThread(thread.id)}
+            className={" border px-3 py-1 text-xs " +
               (conversationId === thread.id ? "bg-muted" : "hover:bg-muted")}>
             {new Date(thread.lastActiveAt).toLocaleString()}
-          </button>
+          </Button>
         ))}
-        <button type="button" disabled={busy || loading} className="rounded-full border px-3 py-1 text-xs"
+        <Button variant="outline" type="button" disabled={busy || loading} className=" border px-3 py-1 text-xs"
           onClick={() => { ++selection.current; setConversationId(undefined); setMessages([]); setError(""); }}>
           New conversation
-        </button>
+        </Button>
       </div>}
       {error && (
-        <p role="alert" className="mt-6 rounded-lg border border-amber-500 p-3 text-sm text-amber-600">
+        <p role="alert" className="mt-6  border border-warning/40 p-3 text-sm text-warning">
           {error}
         </p>
       )}
 
       <section aria-label="Conversation" aria-live="polite" aria-busy={busy || loading} className="mt-8 grid gap-4">
         {!loading && messages.length === 0 && (
-          <div className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+          <div className=" border bg-card p-5 text-sm text-muted-foreground">
             <p>Try:</p>
             <ul className="mt-2 list-disc pl-5">
               <li>What work needs my attention?</li>
@@ -160,7 +160,7 @@ export function AskCanConversation() {
         {messages.map((message) => (
           <article
             key={message.id}
-            className={`max-w-2xl rounded-xl border p-4 whitespace-pre-line ${
+            className={`max-w-2xl  border p-4 whitespace-pre-line ${
               message.role === "user"
                 ? "justify-self-end bg-muted"
                 : "justify-self-start bg-card"
@@ -173,7 +173,7 @@ export function AskCanConversation() {
                 {message.evidenceRefs.map((ref) => (
                   <span
                     key={`${ref.type}-${ref.id}`}
-                    className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
+                    className=" border px-2 py-0.5 text-xs text-muted-foreground"
                   >
                     {ref.label}
                   </span>
@@ -182,25 +182,25 @@ export function AskCanConversation() {
             )}
 
             {message.actionPreview && (
-              <div className="mt-3 rounded-lg border p-3">
+              <div className="mt-3  border p-3">
                 <p className="text-sm font-semibold">{message.actionPreview.summary}</p>
                 <div className="mt-3 flex gap-2">
-                  <button
+                  <Button variant="default"
                     type="button"
                     disabled={busy}
                     onClick={() => decide(message.actionPreview!.runId, true)}
-                    className="rounded-full bg-primary px-4 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
+                    className=" bg-primary px-4 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
                   >
                     Confirm
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="outline"
                     type="button"
                     disabled={busy}
                     onClick={() => decide(message.actionPreview!.runId, false)}
-                    className="rounded-full border px-4 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                    className=" border px-4 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
                   >
                     Not now
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

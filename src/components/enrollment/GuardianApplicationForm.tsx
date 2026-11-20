@@ -263,11 +263,11 @@ export function GuardianApplicationForm({ programs, households, students = [], t
             </option>)}
           </Select>
           <LaunchFieldHelp label="Why isn't my child listed?">Only students linked to your verified household appear here. If an existing child is missing, ask admissions for help instead of creating another record.</LaunchFieldHelp>
-          {transferRequests.length>0&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">
+          {transferRequests.length>0&&<p role="status" className="mt-2  border p-3 text-sm">
             Transferring an existing student? Select that student above instead of creating a new student identity. After selecting the student, link the original transfer request below.
           </p>}
         </div>
-        {availableTransfers.length>0&&studentProfileId&&<div className="space-y-3 rounded-xl border p-4 sm:col-span-2">
+        {availableTransfers.length>0&&studentProfileId&&<div className="space-y-3  border p-4 sm:col-span-2">
           <Label htmlFor={`${id}-transfer`}>Connecting a move from another school?</Label>
           <Select id={`${id}-transfer`} value={originTransferActionId}
             onChange={event=>{setOriginTransferActionId(event.target.value);setConfirmedDestination(false);setAuthorizedDestinationRecords(false);}}>

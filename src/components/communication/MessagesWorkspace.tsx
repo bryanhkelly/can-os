@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowUpRight, MessageSquare, Search, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,16 +37,16 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
   const isLoadingThread = Boolean(selectedId) && loadingThread;
   return <MasterDetailWorkspace title="Conversations"
     description="Stay connected with your school community."
-    toolbar={<CreateAction><button type="button" disabled={busy} onClick={onCompose}>New message</button></CreateAction>}
+    toolbar={<CreateAction><Button variant="ghost" type="button" disabled={busy} onClick={onCompose}>New message</Button></CreateAction>}
     className="mt-6"
     mobileMode={selectedId && mobileListFor !== selectedId ? "detail" : "list"}
     list={<>
       <div className="border-b p-4">
-        <label className="relative block">
+        <Label className="relative block">
           <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
           <Input aria-label="Search conversations" placeholder="Search conversations..." value={query}
             onChange={event => setQuery(event.target.value)} className="pl-9" />
-        </label>
+        </Label>
         <p className="mt-3 text-xs text-muted-foreground">{visible.length} {visible.length === 1 ? "conversation" : "conversations"}</p>
       </div>
       <QueryState loading={loading ? "Loading messages..." : undefined}
@@ -53,7 +54,7 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
           {query ? "No conversations match your search." : "No conversations yet. Start a new message to connect."}
         </p>}>
         <nav aria-label="Conversations" className="max-h-[36rem] overflow-y-auto">
-          {visible.map(thread => <button key={thread.id} type="button" aria-current={thread.id === selectedId ? "true" : undefined}
+          {visible.map(thread => <Button variant="ghost" key={thread.id} type="button" aria-current={thread.id === selectedId ? "true" : undefined}
             disabled={busy} onClick={() => { onSelect(thread.id); setMobileListFor(null); }}
             className={`block w-full min-w-0 border-b border-l-2 p-4 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50 ${
               thread.id === selectedId ? "border-l-primary bg-accent/60" : "border-l-transparent"
@@ -68,7 +69,7 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
                 </time>
               </div>
             </div>
-          </button>)}
+          </Button>)}
         </nav>
       </QueryState>
     </>}

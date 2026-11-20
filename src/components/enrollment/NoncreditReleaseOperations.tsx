@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {Link} from "@tanstack/react-router";
 import {useQuery,useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
@@ -96,7 +98,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
     {query.isPending&&<p role="status" className="mt-4 text-sm">Loading authorized course operations…</p>}
     {query.isError&&<p role="alert" className="mt-4 text-sm">
       Cohort records are unavailable. Check current provider scope and the cohort schema migration.
-      <button type="button" className="ml-2 underline" onClick={()=>void query.refetch()}>Retry</button>
+      <Button variant="ghost" type="button" className="ml-2 underline" onClick={()=>void query.refetch()}>Retry</Button>
     </p>}
     {message&&<p role="status" className="mt-4 border border-border p-3 text-sm">{message}</p>}
     {query.data&&<>
@@ -175,7 +177,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           <div className="flex items-center gap-3">
             {query.data.deliveryMode==="facilitated"&&!session.linked&&
               session.state==="scheduled"&&Date.parse(session.startsAt)>Date.now()&&
-              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs font-medium">
+              <Label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs font-medium">
                 <Checkbox checked={selectedPlanIds.includes(session.planId)}
                   disabled={busy!==null||(!selectedPlanIds.includes(session.planId)&&selectedPlanIds.length>=4)}
                   onChange={event=>setSelectedPlanIds(current=>
@@ -183,7 +185,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
                       ?current.includes(session.planId)||current.length>=4?current:[...current,session.planId]
                       :current.filter(id=>id!==session.planId))}/>
                 Select
-              </label>}
+              </Label>}
             <div><p className="text-sm font-medium">{new Date(session.startsAt).toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">Ends {new Date(session.endsAt).toLocaleString()} · {session.state}</p>
             {session.linked&&<p className="mt-1 text-xs text-muted-foreground">
@@ -213,16 +215,16 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
                 {["withdrawn","cancelled"].includes(person.status)&&!person.seatReleased&&
                   person.completionOutcome!=="completed"&&
                   <div className="mt-2">
-                    <button type="button" className="text-xs text-primary underline"
+                    <Button variant="ghost" type="button" className="text-xs text-primary underline"
                       onClick={()=>{setSeatTarget(person.registrationId);setSeatReason("");}}>
                       Review capacity release
-                    </button>
+                    </Button>
                     {seatTarget===person.registrationId&&<div className="mt-2 space-y-2 border border-border p-2">
-                      <label className="block text-xs font-medium">Reason for releasing the seat
-                        <textarea value={seatReason} maxLength={500} onChange={event=>setSeatReason(event.target.value)}
+                      <Label className="block text-xs font-medium">Reason for releasing the seat
+                        <Textarea value={seatReason} maxLength={500} onChange={event=>setSeatReason(event.target.value)}
                           className="mt-2 w-full min-w-48 border border-border bg-background p-2" rows={2}
                           placeholder="Describe verified withdrawal and seat-release reason"/>
-                      </label>
+                      </Label>
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" disabled={busy!==null||seatReason.trim().length<15}
                           onClick={()=>void releaseSeat(person.registrationId)}>Confirm release</Button>

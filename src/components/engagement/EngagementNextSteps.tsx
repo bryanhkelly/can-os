@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Radio } from "@/components/ui/choice";
 import { PageFrame, PageTitle } from "@/components/workspace";
 import { useState } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
@@ -32,13 +34,13 @@ export function EngagementNextSteps({ journey }: { journey: EngagementJourney })
         <fieldset className="mt-8">
           <legend className="font-serif text-2xl">What would be most helpful?</legend>
           <div className="mt-5 grid gap-3">
-            {journey.next.choices.map(item=><label key={item.id}
+            {journey.next.choices.map(item=><Label key={item.id}
               className={`flex cursor-pointer items-start gap-4 border p-5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary ${selection === item.id ? "border-primary bg-accent/40" : "border-border bg-card hover:border-primary"}`}>
-              <input type="radio" name="next-step" value={item.id} checked={selection===item.id}
+              <Radio name="next-step" value={item.id} checked={selection===item.id}
                 onChange={() => setSelection(item.id)} className="mt-1 size-5 shrink-0 accent-primary"/>
               <span><strong className="block text-sm font-semibold">{item.title}</strong>
                 <span className="mt-1 block text-xs leading-6 text-muted-foreground">{item.description}</span></span>
-            </label>)}
+            </Label>)}
           </div>
         </fieldset>
         {choice && <div className="mt-6 border-t pt-6">

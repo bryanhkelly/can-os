@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { Check, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ export function ContactLookup({ contacts, value, onChange, disabled }: {
   const matches = contacts.filter(contact =>
     contact.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   return <section aria-label="Contact lookup" className="grid gap-2">
-    <label htmlFor="message-contact-search" className="text-sm font-semibold">Find a contact</label>
+    <Label htmlFor="message-contact-search" className="text-sm font-semibold">Find a contact</Label>
     <div className="relative">
       <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
       <Input id="message-contact-search" type="search" value={query} disabled={disabled}

@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import {useQuery} from "@tanstack/react-query";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
 
@@ -20,7 +21,7 @@ export function NoncreditNetworkReportPanel(){
     {report.isPending&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
     {report.isError&&<p role="alert" className="mt-4 text-sm">
       Reporting is unavailable or its bounded dataset needs partitioning.
-      <button type="button" className="ml-2 text-primary underline" onClick={()=>void report.refetch()}>Retry</button>
+      <Button variant="ghost" type="button" className="ml-2 text-primary underline" onClick={()=>void report.refetch()}>Retry</Button>
     </p>}
     {totals&&<>
       <dl className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3">
