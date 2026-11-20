@@ -4,16 +4,18 @@ import { Globe2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
+import type { LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { LaunchSiteNavigation } from "./LaunchSiteNavigationV61";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
 import { LaunchNavigationGuardProvider } from "./LaunchNavigationGuardProvider";
 
-export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previewAvailable = true, children }: {
+export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previewAvailable = true, completion = {}, children }: {
   site: { id: string; name: string };
   active?: string;
   previewHref?: string;
   statusLabel?: string;
   previewAvailable?: boolean;
+  completion?: LaunchModuleCompletion;
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
@@ -27,7 +29,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
   });
   const expanded = stageChoice.active === active ? stageChoice.stage : activeStage;
   const renderSidebar = (instance: "desktop" | "drawer") => (
-    <LaunchSiteNavigation site={site} active={active} statusLabel={statusLabel}
+    <LaunchSiteNavigation site={site} active={active} statusLabel={statusLabel} completion={completion}
       expanded={expanded} instance={instance} stagePanelBaseId={stagePanelBaseId}
       onToggleStage={stage => setStageChoice({
         active, stage: expanded === stage ? "" : stage,
