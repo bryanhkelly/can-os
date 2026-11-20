@@ -28,7 +28,10 @@ export function readPendingClassroomResponse(storage: Pick<Storage, "getItem" | 
       storage.removeItem(key); return null;
     }
     return item as PendingClassroomResponse;
-  } catch { return null; }
+  } catch {
+    try { storage.removeItem(key); } catch { /* storage unavailable */ }
+    return null;
+  }
 }
 export function writePendingClassroomResponse(storage: Pick<Storage,"setItem">,
   key: string, data: PendingClassroomResponse) {
