@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sharedUiImportViolation } from "./v61-component-dependencies.mjs";
+import ts from "typescript";
+import { sharedUiImportViolation, sourceDependencySpecifiers } from "./v61-component-dependencies.mjs";
 
 test("V6.1 primitives can only depend on other primitives and utilities", () => {
   const file = "src/components/ui/field.tsx";
@@ -28,4 +29,28 @@ test("V6.1 patterns compose peers and primitives without importing business feat
 test("V6.1 dependency guard does not constrain domain-specific component composition", () => {
   assert.equal(sharedUiImportViolation("src/components/learning/ClassEditor.tsx", "@/components/workspace/workspace-panel"), null);
   assert.equal(sharedUiImportViolation("src/routes/class.tsx", "@/components/learning/ClassEditor"), null);
+});
+
+test("V6.1 primitives cannot acquire domain policy, feature hooks, or platform commands", () => {
+  const file = "src/components/ui/field.tsx";
+  assert.match(sharedUiImportViolation(file, "@/domain/site-timezone"), /must not depend on domain/);
+  assert.match(sharedUiImportViolation(file, "../../platform/mutation"), /must not depend on domain/);
+  assert.match(sharedUiImportViolation(file, "@/hooks/useLaunchModelPresets"), /must not depend on domain/);
+  assert.equal(sharedUiImportViolation("src/components/workspace/SiteTimezoneField.tsx", "@/domain/site-timezone"), null);
+});
+
+test("architecture inventory catches static, exported, type-only, and lazy dependencies", () => {
+  const parsed = ts.createSourceFile("example.ts", `
+    import { Button } from "@/components/ui/button";
+    export { Bad } from "@/routes/bad";
+    export * from "@/modules/learning/read.server";
+    type T = import("@/modules/learning/read.server").Thing;
+    const lazy = import("../learning/Feature");
+    const required = require("@/db/client");
+    const computed = import(variableName);
+  `, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  assert.deepEqual(new Set(sourceDependencySpecifiers(parsed, ts)), new Set([
+    "@/components/ui/button", "@/routes/bad", "@/modules/learning/read.server",
+    "../learning/Feature", "@/db/client",
+  ]));
 });
