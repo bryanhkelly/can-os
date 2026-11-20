@@ -607,15 +607,6 @@
       "writeBoundary": "Each existing Class command separately checks actor, Site, Course adoption, session and independent review requirements"
     },
     {
-      "file": "src/routes/classes.tsx",
-      "route": "/classes",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Section-backed academic route awaiting full migration to canonical Class; not a native Class directory or approved final architecture",
-      "writeBoundary": "preserve assigned-teacher private-video upload authorization, 500 MiB verification and deployment gate; own notes bind actor/section/published version/lesson with revision conflicts and transactional audit/outbox excluding note text; assigned teachers create idempotent canonical calendar occurrences/events or edit links on directly managed events with calendar capabilities; no live migration performed",
-      "readBoundary": "current class scope and active enrollment/teaching/guardian relationship; preserve same-program/site/version private-video verification; note reads require own actor and current delivered lesson and never expose notes to guardians; meeting scope matches canonical event/occurrence; guardian DTO excludes meeting links; discussion links select an already authorized canonical thread"
-    },
-    {
       "file": "src/routes/classroom.$sessionId.presentation.tsx",
       "route": "/classroom/$sessionId/presentation",
       "owner": "learning",
