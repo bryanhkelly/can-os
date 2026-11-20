@@ -36,6 +36,7 @@ vi.mock("react", async original => ({
 
 type Props = {
   children?: ReactNode; disabled?: boolean; onClick?: () => void;
+  "aria-label"?: string;
   state?: { pending: boolean; refreshFailed: boolean; retryRefresh: () => Promise<unknown> };
 };
 function nodes(node: ReactNode): ReactElement<Props>[] {
