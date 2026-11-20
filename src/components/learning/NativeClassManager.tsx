@@ -35,9 +35,10 @@ function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:st
 }
 
 export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation,
-  embedded=false,prepareOnly=false}: {
+  embedded=false,prepareOnly=false,onDraftCreated}: {
   preferredSiteId?: string; preferredOfferingVersionId?:string;
   navigation?: ReactNode; embedded?: boolean; prepareOnly?: boolean;
+  onDraftCreated?:()=>Promise<unknown>;
 }) {
   const client=useQueryClient();
   const feedback=useMutationFeedback(refresh);
@@ -261,6 +262,10 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         setCreatedClassId(outcome.value.classId);
         setChoice("");setTitle("");setSiteId("");setClassCapacity("");
         setRecipeCourseId(null);
+        // Refresh the existing Class physical-space read, never write a shadow
+        // record when a draft is created. A failed refresh cannot replay save.
+        try { await onDraftCreated?.(); }
+        catch { setNotice("Draft Class saved. Refresh Class room planning to continue."); }
       }
     }finally{setBusy(false)}
   }
