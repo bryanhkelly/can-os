@@ -66,7 +66,7 @@ describe("V6.1 Prepare to Open", () => {
       <p>Prepared content</p>
     </LaunchSiteFrame>);
     expect(html).toContain("overflow-y-auto overscroll-contain");
-    expect(html).toContain("lg:h-dvh");
+    expect(html).toContain("xl:h-dvh");
     expect(html).toContain("aria-expanded=\"true\"");
     expect(html).toContain("aria-controls=");
     expect(html).toContain("funding-enrollment");
