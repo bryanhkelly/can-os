@@ -195,7 +195,7 @@ export const getNativeClassTeacherAssessments=createServerFn({method:"GET"})
  .handler(async({data})=>{
    setResponseHeader("Cache-Control","private, no-store");
    return db.transaction(async tx=>{
-     const cls=await authorizedTeacher(tx,data.classId);
+     const {cls}=await authorizedTeacher(tx,data.classId);
      const result=await tx.execute(sql`
        SELECT av.assessment_key, av.lifecycle AS version_lifecycle,
               fv.lifecycle AS form_lifecycle, aa.status AS administration_status
