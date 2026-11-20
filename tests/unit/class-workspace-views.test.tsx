@@ -29,6 +29,14 @@ describe("canonical Class navigation", () => {
     expect(teacherDirectory).not.toContain('teacher.isSynthetic ? teacher.name :');
   });
 
+  it("keeps student continue-learning links on the canonical Class directory", () => {
+    const panel = source("src/components/student/StudentContinueLearningPanel.tsx");
+    expect(panel).toContain('to="/class"');
+    expect(panel).not.toContain('to="/classes"');
+    expect(panel).not.toContain('section:resume.sectionId');
+    expect(panel).not.toContain('tab:"lessons"');
+  });
+
   it("keeps learner and operator commands behind the Class authority service", () => {
     const workspace = source("src/modules/classes/native-class-workspace.functions.ts");
     expect(workspace).toContain("getCanonicalCommandContext");
