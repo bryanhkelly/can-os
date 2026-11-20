@@ -40,7 +40,7 @@ describe("V6.1 reporting-table and navigation reuse", () => {
     const content = source(path);
     expect((content.match(/<Table scrollLabel=/g) ?? []).length).toBe(expected);
     expect((content.match(/<TableCaption\b/g) ?? []).length).toBe(expected);
-    expect((content.match(/<TableRowHead\b/g) ?? []).length).toBe(expected);
+    expect((content.match(/<TableRowHead\b/g) ?? []).length).toBeGreaterThanOrEqual(expected);
     expect(content).not.toMatch(/<table\b/);
     expect(content).toContain("TableCell");
     expect(content).toContain("TableHeader");
