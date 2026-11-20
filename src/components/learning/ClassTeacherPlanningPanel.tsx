@@ -1,3 +1,4 @@
+import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { EmptyState, RecordFacts, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
@@ -72,13 +73,13 @@ export function ClassTeacherPlanningPanel({ data, lessons, search }: {
                     </div>
                   : <p className="text-sm text-muted-foreground">Publisher instruction is not available yet.</p>}
               </div>
-              {assigned.length > 0 && <nav aria-label={`Released assessments for ${item.title}`}
-                className="flex flex-wrap gap-2">
+              {assigned.length > 0 && <WorkspaceLinkNavigation label={`Released assessments for ${item.title}`}
+                surface="plain" className="gap-2">
                 {assigned.map(work => <Button asChild key={work.id} variant="outline" size="sm">
                   <Link to="/teacher/gradebook"
                     search={{ section: data.section.id, assessment: work.id }}>{work.title}</Link>
                 </Button>)}
-              </nav>}
+              </WorkspaceLinkNavigation>}
             </li>;
           })}</ol>
         : <EmptyState title="No published lessons in this unit."
