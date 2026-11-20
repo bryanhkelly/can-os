@@ -17,6 +17,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
 }) {
   const [drawer, setDrawer] = useState(false);
   const stagePanelBaseId = useId();
+  const navigationDrawerId = useId();
   const activeStage = siteLaunchModules.find(item => item.id === active)?.stage ?? "Establish";
   // Derive active-stage expansion immediately on navigation. A prior manual
   // collapse only applies while its corresponding module remains active.
@@ -73,7 +74,8 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
     <div className="min-w-0">
       <header aria-label="Launch Studio top bar" className="can-shell-bar sticky top-0 z-30 flex min-h-[var(--topbar-height)] flex-wrap items-center justify-between gap-3 border-b bg-card px-[var(--page-gutter)] py-2">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" className="xl:hidden" onClick={()=>setDrawer(true)} aria-label="Open launch menu">
+          <Button variant="outline" size="sm" className="xl:hidden" onClick={()=>setDrawer(true)} aria-label="Open launch menu"
+            aria-haspopup="dialog" aria-expanded={drawer} aria-controls={navigationDrawerId}>
             <Menu className="size-4" />
           </Button>
           <strong className="text-sm">Launch Studio</strong>
@@ -89,7 +91,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
 
         </div>
       </header>
-      <Modal open={drawer} onClose={() => setDrawer(false)}
+      <Modal id={navigationDrawerId} open={drawer} onClose={() => setDrawer(false)}
         label="Launch Studio navigation" className="m-0 ml-0 h-dvh w-[min(85vw,20rem)] max-h-dvh max-w-none overflow-hidden">
         <div className="flex h-full min-h-0 flex-col bg-card">
           <div className="flex justify-end border-b p-2">
