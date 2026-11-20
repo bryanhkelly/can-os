@@ -37,7 +37,7 @@ describe("family interest record presentation", () => {
       canSendApplicationInvitation:false} as PublicInterestRecord;
     const html=renderToStaticMarkup(<PublicInterestRecordCard row={row} busy={false}
       onInvite={() => {}} onStatusChange={() => {}}/>);
-    expect(html).not.toContain(">Invite to apply</button>");
+    expect(html).not.toContain("Invite to apply");
     expect(html).not.toContain(">Mark contacted</button>");
   });
   it("keeps inquiry contact and guardianship verification separate", () => {
