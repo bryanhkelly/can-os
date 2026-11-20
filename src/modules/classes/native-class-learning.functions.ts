@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -11,6 +11,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
@@ -55,6 +56,7 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         unitOrder:courseUnits.sequenceNo,
         lessonId:courseLessons.id,lessonTitle:courseLessons.title,
         lessonOrder:courseLessons.lessonOrder,
+        content:courseLessons.content,
         progressStatus:learnerLessonProgress.status,
         observedAt:learnerLessonProgress.observedAt,
       }).from(courseLessons)
@@ -83,12 +85,101 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         .innerJoin(canonicalClassOutcomes,eq(canonicalClassOutcomes.id,canonicalClassAwards.classOutcomeId))
         .where(eq(canonicalClassOutcomes.classEnrollmentId,enrollment.id))
         .orderBy(asc(canonicalClassAwards.issuedAt)).limit(100);
+      const safeLessons=lessons.map(lesson=>{
+        const content=lesson.content&&typeof lesson.content==="object" &&
+          !Array.isArray(lesson.content)
+          ?lesson.content as Record<string,unknown>:{};
+        const videoResources=Array.isArray(content.videoResources)
+          ?content.videoResources.flatMap(item=>{
+            if(!item||typeof item!=="object"||Array.isArray(item))return [];
+            const video=item as Record<string,unknown>;
+            if(typeof video.url!=="string" || !/^https:\/\/(www\\.)?(youtube\\.com\/watch|youtu\\.be\/|vimeo\\.com\/)/.test(video.url))
+              return [];
+            return [{url:video.url,title:typeof video.title==="string"?video.title:"Supplemental video",
+              reviewStatus:typeof video.reviewStatus==="string"?video.reviewStatus:"unreviewed"}];
+          }).slice(0,5):[];
+        return {
+          unitId:lesson.unitId,unitTitle:lesson.unitTitle,unitOrder:lesson.unitOrder,
+          lessonId:lesson.lessonId,lessonTitle:lesson.lessonTitle,lessonOrder:lesson.lessonOrder,
+          progressStatus:lesson.progressStatus,observedAt:lesson.observedAt,
+          lessonBody:typeof content.body==="string"?content.body:"",
+          restoredDemo:content.source==="valor-v61-rehydration",
+          videoResources,
+        };
+      });
       return {
         classId:scope.classId,classEnrollmentId:scope.classEnrollmentId,
         courseAttemptId:scope.courseAttemptId,classTitle:instance!.title,
         courseVersionId:scope.courseVersionId,
         enrollmentStatus:enrollment.status,creditMode:enrollment.creditMode,
-        lessons,outcomes,awards,
+        lessons:safeLessons,outcomes,awards,
       };
+    });
+  });
+
+/** Explicit lesson milestone. Uses the same canonical Course Attempt and
+ * native learner authorization as playback. This is not a grade or credit. */
+export const markNativeClassLessonComplete=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>z.object({
+    classEnrollmentId:z.string().uuid(),lessonId:z.string().uuid(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getInstructionalLearnerContext(getRequest());
+    if(!actor.actorPersonId ||
+       !(actor.role==="student"&&actor.capabilities.has("student:read")||
+         actor.role==="learner"&&actor.capabilities.has("learning.participate")))
+      throw new AuthorizationError("own learning milestone capability");
+    return db.transaction(async tx=>{
+      const [enrollment]=await tx.select().from(canonicalClassEnrollments)
+        .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
+          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
+          eq(canonicalClassEnrollments.status,"active"))).for("update").limit(1);
+      if(!enrollment?.courseAttemptId)
+        throw new AuthorizationError("own active Class Course Attempt");
+      const [cls]=await tx.select().from(canonicalClasses)
+        .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
+      if(!cls||cls.state!=="active")throw new AuthorizationError("current Class");
+      if(actor.role==="student"&&
+         (actor.grantSiteId!==cls.siteId||
+          !actor.scope.organizationIds?.includes(cls.operatingOrganizationId)))
+        throw new AuthorizationError("own CAN student Site");
+      const access=await authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId);
+      if(access.source!=="class"||access.courseVersionId!==cls.courseVersionId)
+        throw new AuthorizationError("own Class Course Attempt");
+      const [lesson]=await tx.select({id:courseLessons.id})
+        .from(courseLessons).where(and(eq(courseLessons.id,data.lessonId),
+          eq(courseLessons.courseVersionId,cls.courseVersionId))).limit(1);
+      if(!lesson)throw new AuthorizationError("lesson in this Course");
+      const existing=await tx.execute(sql`
+        SELECT id,status FROM public.learner_lesson_progress
+        WHERE course_attempt_id=${access.courseAttemptId}::uuid
+          AND lesson_id=${data.lessonId}::uuid FOR UPDATE
+      `);
+      const already=existing.rows[0] as {id:string;status:string}|undefined;
+      if(already?.status==="completed"||already?.status==="waived")
+        return {recorded:true,alreadyCompleted:true};
+      if(already){
+        await tx.execute(sql`
+          UPDATE public.learner_lesson_progress
+          SET status='completed',observed_at=now()
+          WHERE id=${already.id}::uuid AND status IN ('not_started','in_progress')
+        `);
+      }else{
+        await tx.execute(sql`
+          INSERT INTO public.learner_lesson_progress
+            (course_attempt_id,course_version_id,lesson_id,status)
+          VALUES (${access.courseAttemptId}::uuid,${cls.courseVersionId}::uuid,
+            ${data.lessonId}::uuid,'completed')
+          ON CONFLICT (course_attempt_id,lesson_id) DO NOTHING
+        `);
+      }
+      await writeCanonicalAudit(tx,{
+        actorPersonId:actor.actorPersonId,owningOrganizationId:cls.operatingOrganizationId,
+        eventCode:"class.lesson.milestone_completed",entityKind:"course_lesson",
+        entityId:data.lessonId,payload:{classId:cls.id,courseAttemptId:access.courseAttemptId,
+          masteryOrCredit:false},
+      });
+      return {recorded:true,alreadyCompleted:false};
     });
   });
