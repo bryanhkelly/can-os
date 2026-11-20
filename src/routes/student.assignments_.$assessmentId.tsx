@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { saveAssignmentWork, submitAssignmentWork } from "@/modules/student-experience/submit-assignment-work";
 import { AssignmentAttemptHistory } from "@/components/student/AssignmentAttemptHistory";
 import { useEffect, useRef, useState } from "react";
@@ -314,27 +315,27 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
      {content.formatNote && <p className="mt-4 border-l-2 border-border bg-muted px-4 py-3 text-sm text-muted-foreground"><strong className="text-foreground">Format:</strong> {content.formatNote}</p>}
     </WorkspacePanel> : null}
     {criteria.length > 0 && <WorkspacePanel title="Grading rubric">
-    <div className="overflow-x-auto">
-    <table className="w-full min-w-[38rem] border-collapse text-sm">
-      <thead>
-       <tr className="border-b border-border text-left text-xs uppercase tracking-eyebrow text-muted-foreground">
-        <th scope="col" className="py-2 pr-3 font-semibold">Criteria</th>
-        <th scope="col" className="py-2 pr-3 font-semibold">What strong work demonstrates</th>
-        <th scope="col" className="py-2 text-right font-semibold">Points</th>
-       </tr>
-      </thead>
-      <tbody>
-       {criteria.map(criterion => <tr key={criterion.id} className="border-b border-border/60">
-        <td className="py-3 pr-3 font-semibold">{criterion.label}</td>
-        <td className="py-3 pr-3 text-muted-foreground">{criterion.description ?? "—"}</td>
-        <td className="py-3 text-right whitespace-nowrap">{criterion.maxPoints}</td>
-       </tr>)}
-       <tr className="bg-muted">
-        <td colSpan={2} className="py-3 pr-3 font-semibold">Total</td>
-        <td className="py-3 text-right font-semibold">{criteriaTotal}</td>
-       </tr>
-      </tbody>
-    </table>
+    <div className="min-w-0">
+    <Table scrollLabel="Grading rubric criteria and points" aria-label="Grading rubric criteria and points" className="w-full min-w-[38rem] border-collapse text-sm"><TableCaption className="sr-only">Grading rubric criteria and points</TableCaption>
+      <TableHeader>
+       <TableRow className="border-b border-border text-left text-xs uppercase tracking-eyebrow text-muted-foreground">
+        <TableHead scope="col" className="py-2 pr-3 font-semibold">Criteria</TableHead>
+        <TableHead scope="col" className="py-2 pr-3 font-semibold">What strong work demonstrates</TableHead>
+        <TableHead scope="col" className="py-2 text-right font-semibold">Points</TableHead>
+       </TableRow>
+      </TableHeader>
+      <TableBody>
+       {criteria.map(criterion => <TableRow key={criterion.id} className="border-b border-border/60">
+        <TableRowHead className="py-3 pr-3 font-semibold">{criterion.label}</TableRowHead>
+        <TableCell className="py-3 pr-3 text-muted-foreground">{criterion.description ?? "—"}</TableCell>
+        <TableCell className="py-3 text-right whitespace-nowrap">{criterion.maxPoints}</TableCell>
+       </TableRow>)}
+       <TableRow className="bg-muted">
+        <TableCell colSpan={2} className="py-3 pr-3 font-semibold">Total</TableCell>
+        <TableCell className="py-3 text-right font-semibold">{criteriaTotal}</TableCell>
+       </TableRow>
+      </TableBody>
+    </Table>
     </div>
     </WorkspacePanel>}
     {!criteria.length && assignment.metadata.rubric && <WorkspacePanel title="Grading rubric">
