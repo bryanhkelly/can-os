@@ -22,6 +22,7 @@ export const sitePreviewShareSchema = z.object({
   revokedAt: iso.nullable(),
   sourceRevision: z.number().int().nonnegative(),
   brandVersionId:z.string().uuid().optional(),
+  synthetic:z.boolean().optional(),
   pages: snapshotPages,
 }).strict();
 export type SitePreviewShare = z.infer<typeof sitePreviewShareSchema>;
@@ -67,6 +68,7 @@ export function activePreviewShare(
 export function renderSharedSitePreview(
   storedHtml: string, siteId: string, token: string,
   availablePages: readonly string[],
+  synthetic = false,
 ): string {
   const known = new Set(availablePages.filter(isPublicSitePagePath));
   const rewritten = storedHtml.replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, "")
@@ -78,8 +80,8 @@ export function renderSharedSitePreview(
       return `${prefix}href="/site-preview-share?${params.toString().replaceAll("&", "&amp;")}"`;
     });
   const banner = `<aside class="can-share-preview" role="status">
-    <strong>Proposed learning community · Website preview</strong>
-    <span>Not published or independently approved. No accreditation or enrollment is implied.</span>
+    <strong>${synthetic ? "Demonstration website preview" : "Proposed learning community · Website preview"}</strong>
+    <span>Not published or independently approved. Images may be illustrative. Forms are disabled. No accreditation or enrollment is implied.</span>
   </aside>`;
   const style = `<style>
   .can-share-preview{z-index:99;position:relative;display:flex;flex-wrap:wrap;align-items:center;
