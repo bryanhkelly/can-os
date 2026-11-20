@@ -181,7 +181,7 @@ export function MarketingPackageWizardV61({
           <Button variant="outline" disabled={busy} onClick={()=>onBack()}>
             <ArrowLeft aria-hidden="true"/> {step===0?"Cancel":"Back"}
           </Button>
-          {record&&<Button variant="outline" disabled={busy} onClick={()=>onSaveExit()}>Save &amp; Exit</Button>}
+          {hasSavedPackage&&<Button variant="outline" disabled={busy} onClick={()=>onSaveExit()}>Save &amp; Exit</Button>}
           <Button disabled={busy} onClick={()=>onNext()}>
             {busy?"Saving…":step===3?"Save package":"Save & Continue"}
             {step===3?<Check aria-hidden="true"/>:<ArrowRight aria-hidden="true"/>}
