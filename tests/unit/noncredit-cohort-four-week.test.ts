@@ -135,11 +135,33 @@ describe("shared four-session operator and server boundaries",()=>{
     expect(scope).toContain("plan.courseVersionId!==release.courseVersionId");
     expect(scope).toContain("plan.siteId!==release.siteId");
   });
+  it("lets facilitators plan Classes before enrollment without broadening live-room access",()=>{
+    const host=read("src/routes/canonical.lab.facilitated.tsx");
+    const rehearsal=read("src/modules/learning/classroom-rehearsal.functions.ts");
+    const live=read("src/modules/learning/facilitated-learning.functions.ts");
+    const schedule=read("src/modules/learning/classroom-schedule-operations.server.ts");
+    // Independent approved published Course/Offering adoption is the source
+    // for future Class scheduling, even when no learner has registered.
+    expect(host).toContain("<ClassroomSchedulePanel choices={visibleRehearsalChoices}");
+    expect(host).toContain("const visibleRehearsalChoices=rehearsalOptions?.choices.filter");
+    expect(host).toContain("choice.siteId===preferredSiteId");
+    expect(rehearsal).toContain("export const getClassroomRehearsalChoices");
+    expect(rehearsal).toContain('eq(deploymentOfferingAdoptions.approvalStatus,"approved")');
+    expect(rehearsal).not.toContain("learnerCourseAttempts");
+    // Room start stays separately gated by active learner attempts.
+    expect(live).toContain(".from(learnerCourseAttempts)");
+    expect(live).toContain('eq(learnerCourseAttempts.status,"active")');
+    expect(host).toContain("const available=visibleChoices.find(choice=>selected===");
+    // Calendar writes independently recheck the exact Site and adopted Course.
+    expect(schedule).toContain("await authorizedHostDeployment(tx,host,deploymentId,siteId)");
+    expect(schedule).toContain("registered deployment Site for scheduling");
+    expect(schedule).toContain("current approved published classroom Course");
+  });
   it("shows editable local-time dates and deliberate selected meeting attachment in V6.1",()=>{
     const host=read("src/routes/canonical.lab.facilitated.tsx");
     const planner=read("src/components/learning/ClassroomSchedulePanel.tsx");
     const operator=read("src/components/enrollment/NoncreditReleaseOperations.tsx");
-    expect(host).toContain("<ClassroomSchedulePanel choices={data.choices}");
+    expect(host).toContain("<ClassroomSchedulePanel choices={visibleRehearsalChoices}");
     expect(planner).toContain('import { Input } from "@/components/ui/input"');
     expect(planner).toContain('import { Select } from "@/components/ui/select"');
     expect(planner).toContain('fillSessionDates("twice-weekly")');
