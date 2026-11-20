@@ -61,7 +61,7 @@ export function NativeApprovedOfferingsPanel({
           <Input id="authorized-course-search" value={searchDraft}
             onChange={event=>onSearchDraftChange(event.target.value)} maxLength={100}
             placeholder="Course name, code, Program or Deployment"
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+            className="mt-1 min-h-11"/>
         </Label>
         <Button type="submit" variant="outline">Search</Button>
         {search&&<Button type="button" variant="outline"
