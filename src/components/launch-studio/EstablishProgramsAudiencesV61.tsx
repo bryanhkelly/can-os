@@ -12,6 +12,8 @@ import {
 import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
+import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
+  noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { chooseStartingIdeaV61, selectedStartingIdeaV61 } from "@/domain/site-program-intent-focus-v61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
@@ -26,6 +28,7 @@ export type ProgramsAudiencesV61Initial = {
   revision: string;
   intent: SiteProgramsAudiencesV61;
   saved: boolean;
+  schoolYearAvailability?: SchoolYearAvailability;
 };
 
 const interests = [
@@ -100,6 +103,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
 }) {
   const router = useRouter();
   const [step, setStep] = useState<InternalStep>(0);
+  const schoolYearAvailability = initial.schoolYearAvailability ?? noSchoolYearAvailability;
   const [draft, setDraft] = useState<SiteProgramsAudiencesV61>(() => ({
     interestIds: [...initial.intent.interestIds],
     timingIds: [...initial.intent.timingIds],
@@ -240,16 +244,37 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             facilities and other requirements, when you choose a Solution in Prepare.
           </p>
           <h3 className="text-sm font-semibold">Published Program ideas</h3>
+          {(!schoolYearAvailability["grades-6-8"] || !schoolYearAvailability["grades-9-12"]) &&
+            <WorkspaceNotice tone="attention">
+              Grades 6–12 school-year academy choices are disabled until this Site has
+              independently verified school-opening authorization. After-school, summer,
+              Saturday, adult learning and other community Programs remain available for
+              private planning. A published Program or an existing demo Class does not
+              authorize enrollment.
+            </WorkspaceNotice>}
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
           {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
             <p>{catalogError}</p>
             <Button type="button" size="sm" variant="outline" onClick={() => setCatalogReload(n => n + 1)}>Retry Program catalog</Button>
           </div>}
           {programCatalog && <div className="grid gap-3 sm:grid-cols-2">
-            {programs.map(item => <SelectionCard key={item.code} kind="checkbox" layout="vertical"
-              value={item.code} title={item.title} detail={item.summary}
-              checked={draft.programCodes?.includes(item.code) ?? false}
-              disabled={disabled} onChange={checked => toggleProgram(item.code, checked)} />)}
+            {programs.map(item => {
+              const schoolYearBlocked = !academyReferenceMayBeSelected(item,schoolYearAvailability);
+              const selected = draft.programCodes?.includes(item.code) ?? false;
+              return <div key={item.code} className="min-w-0 space-y-1">
+                <SelectionCard kind="checkbox" layout="vertical"
+                  value={item.code} title={item.title}
+                  detail={<>{item.summary}{schoolYearBlocked && <span className="mt-2 block font-medium">
+                    School-year authorization required · not currently selectable
+                  </span>}</>}
+                  checked={selected} disabled={disabled || schoolYearBlocked}
+                  onChange={checked => toggleProgram(item.code, checked)} />
+                {schoolYearBlocked && selected && <Button type="button" size="sm"
+                    variant="outline" disabled={disabled} onClick={() => toggleProgram(item.code,false)}>
+                    Remove previously selected school-year Program
+                  </Button>}
+              </div>;
+            })}
           </div>}
           {programCatalog && programs.length === 0 && <p className="text-sm text-muted-foreground">No published Program references are available to plan.</p>}
           {unavailablePrograms.length > 0 && <WorkspaceNotice tone="attention">
@@ -274,10 +299,23 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               You can also describe broad learning interests without selecting a published Program.
             </p>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {interests.map(choice => <SelectionCard key={choice.id} kind="checkbox" layout="vertical"
-                value={choice.id} title={choice.label} detail={choice.detail} icon={choice.icon}
-                checked={draft.interestIds.includes(choice.id)}
-                disabled={disabled} onChange={checked => toggleInterest(choice.id, checked)} />)}
+              {interests.map(choice => {
+                const schoolYearBlocked = !schoolYearInterestMayBeSelected(choice.id,schoolYearAvailability);
+                const selected = draft.interestIds.includes(choice.id);
+                return <div key={choice.id} className="min-w-0 space-y-1">
+                  <SelectionCard kind="checkbox" layout="vertical"
+                    value={choice.id} title={choice.label}
+                    detail={<>{choice.detail}{schoolYearBlocked && <span className="mt-2 block font-medium">
+                      School-year authorization required · unavailable for this Site
+                    </span>}</>} icon={choice.icon}
+                    checked={selected} disabled={disabled || schoolYearBlocked}
+                    onChange={checked => toggleInterest(choice.id, checked)} />
+                  {schoolYearBlocked && selected && <Button type="button" size="sm"
+                      variant="outline" disabled={disabled} onClick={() => toggleInterest(choice.id,false)}>
+                      Remove previously selected interest
+                    </Button>}
+                </div>;
+              })}
             </div>
           </div>
         </fieldset>
@@ -306,9 +344,11 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               onChange={event => setDraft(current => chooseStartingIdeaV61(current,event.target.value))}>
               <option value="">I'll decide later</option>
               {chosenPrograms.map(item =>
-                <option key={item.code} value={"program:"+item.code}>{item.title}</option>)}
+                <option key={item.code} value={"program:"+item.code}
+                  disabled={!academyReferenceMayBeSelected(item,schoolYearAvailability)}>{item.title}</option>)}
               {options.map(item =>
-                <option key={item.id} value={"interest:"+item.id}>{item.label}</option>)}
+                <option key={item.id} value={"interest:"+item.id}
+                  disabled={!schoolYearInterestMayBeSelected(item.id,schoolYearAvailability)}>{item.label}</option>)}
             </Select>
           </Field>
         </section>
