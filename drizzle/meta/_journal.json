@@ -673,6 +673,13 @@
       "when": 1795133000000,
       "tag": "0095_course_registration_class_placement",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1795134000000,
+      "tag": "0096_class_enrollment_calendar_cancellation",
+      "breakpoints": true
     }
   ]
 }
