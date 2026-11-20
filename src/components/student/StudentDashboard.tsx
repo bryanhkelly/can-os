@@ -5,10 +5,11 @@ import { deriveStudentSuccessPriorities } from "@/domain/student-success";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components/workspace/dashboard-layout";
-import { DashboardProgress, DashboardMediaTile } from "@/components/workspace/dashboard-widgets";
+import { DashboardProgress } from "@/components/workspace/dashboard-widgets";
 import { StudentDashboardRail } from "./StudentDashboardRail";
 import { StudentUpcomingAssignments } from "./StudentUpcomingAssignments";
 import { StudentReleasedGradesPanel } from "./StudentReleasedGradesPanel";
+import { StudentSchoolLifePanel } from "./StudentSchoolLifePanel";
 import { formatCalendarDateTime } from "@/components/calendar/calendar-presentation";
 import type { DashboardAssignment, StudentDashboardData } from "./student-dashboard-data";
 import { StudentAssignmentLink } from "./StudentAssignmentLink";
@@ -115,16 +116,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
           sections={liveData.sections} />rdPanel>
         <StudentReleasedGradesPanel state={data?.grades} />
       </div>
-      <DashboardPanel id="school-life" title="School Life"
-        action={<Link to="/student/my-school" className={textLink}>View all →</Link>}>
-        {data && !data.community.ok ? <p role="alert" className="text-xs">School updates could not be loaded. <Link to="/student/my-school" className="underline">Open School Life to retry.</Link></p>
-          : upcomingEvents.length ? <div className="student-life-grid">{upcomingEvents.slice(0,3).map(event =>
-            <DashboardMediaTile key={event.id} title={event.title} subtitle={format(event.startsAt,event.timezone)}
-              className="student-life-tile"
-              href={`/calendar?date=${dateKeyInTimezone(event.startsAt,event.timezone)}&event=${encodeURIComponent(event.id)}`} />)}</div>
-            : <div className="space-y-3"><p role="status" className="text-xs text-muted-foreground">No upcoming school events are published.</p>
-              <Link to="/student/my-school" className={textLink}>School &amp; community →</Link></div>}
-      </DashboardPanel>
+      <StudentSchoolLifePanel events={upcomingEvents}
+        unavailable={Boolean(data && !data.community.ok)} />
     </>}
     rail={<StudentDashboardRail localDate={localDate} timezone={timezone}
       todayEvents={todayEvents} communityState={data?.community} />}
