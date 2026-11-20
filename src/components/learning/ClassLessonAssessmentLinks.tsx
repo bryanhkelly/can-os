@@ -15,8 +15,10 @@ export function ClassLessonAssessmentLinks({
   sectionId: string;
 }) {
   if (!items.length) return null;
-  return <section className="mt-6 space-y-3  border p-4" aria-label="Assignments for this lesson">
-          <h3 className="text-sm font-semibold">Assignments for this lesson</h3>
+  const title = items.some(item => item.unitId && !item.curriculumLessonId)
+    ? "Assignments for this lesson or unit" : "Assignments for this lesson";
+  return <section className="mt-6 space-y-3  border p-4" aria-label={title}>
+          <h3 className="text-sm font-semibold">{title}</h3>
           <ul className="divide-y">{items.map(work => <li key={work.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
             <div>
               <p className="font-medium text-sm">{work.title}</p>
