@@ -8,6 +8,7 @@ describe("Launch Studio preview and atomic release share preflight",()=>{
     const page=source("src/components/launch-studio/MarketingPackagesV61.tsx");
     const preview=source("src/components/launch-studio/MarketingMaterialPreviewV61.tsx");
     expect(page).toContain("title={title}");
+    expect(page).toContain('siteId={siteId} title={record.title}');
     expect(preview).toContain("siteId,title,brandVersionId,format,content");
     expect(preview).toContain("previewSiteMarketingArtifact({data:{siteId,title,brandVersionId,format,content}})");
     expect(preview).toContain("[siteId,title,brandVersionId,format,content,retry]");
