@@ -21,6 +21,10 @@ const nativeOwners = [
   "src/routes/class_.$classId.tsx",
   "src/routes/class.tsx",
   "src/components/learning/NativeClassManager.tsx",
+  "src/components/learning/native-class/OfferingCard.tsx",
+  "src/components/learning/native-class/ApprovedClassCard.tsx",
+  "src/components/learning/native-class/InvitationCard.tsx",
+  "src/components/learning/native-class/EnrolledClassCard.tsx",
   "src/components/learning/NativeClassHomeNavigation.tsx",
   "src/components/learning/PublisherCourseActivityEditor.tsx",
   "src/components/learning/ProviderInstructionHome.tsx",
@@ -106,6 +110,29 @@ for (const [component,requiredCommand] of [
     console.error("Native Class architecture: missing promoted content component "+component);
     errors++;
   }
+}
+
+// The route composes independently testable learner actions. Do not move
+// enrollment, invitation, transfer, or withdrawal commands back into /class.
+const learnerCards = [
+  "OfferingCard", "ApprovedClassCard", "InvitationCard", "EnrolledClassCard",
+];
+for (const name of learnerCards) {
+  const card=readFileSync(resolve(root, "src/components/learning/native-class/"+name+".tsx"), "utf8");
+  if (!productionClasses.includes('import { '+name+' } from "@/components/learning/native-class/'+name+'";') ||
+      !productionClasses.includes("<"+name) ||
+      productionClasses.includes("function "+name+"(") ||
+      !card.includes("export function "+name+"(")) {
+    console.error("Native Class architecture: learner action card must stay in reusable component "+name);
+    errors++;
+  }
+}
+if (productionClasses.includes("enrollCurrentPersonInClass") ||
+    productionClasses.includes("transferMyNativeClassEnrollment") ||
+    productionClasses.includes("withdrawMyNativeClassEnrollment") ||
+    productionClasses.includes("declineNativeClassInvitation")) {
+  console.error("Native Class architecture: learner mutation commands must not be duplicated in the route");
+  errors++;
 }
 
 if (errors > 0) process.exitCode = 1;
