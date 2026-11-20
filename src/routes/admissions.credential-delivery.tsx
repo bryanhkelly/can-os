@@ -48,8 +48,8 @@ function CredentialDeliveryPage(){
     <Label className="block text-sm font-medium">Credential type<Select className="mt-1 block w-full  border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as "transcript"|"diploma");setCredentialId("");setHistory([]);setReleases([]);setRecipients([])}}><option value="transcript">Official transcript</option><option value="diploma">Diploma</option></Select></Label>
     <Field label="Issued credential ID"><Input value={credentialId} onChange={event=>{setCredentialId(event.target.value);setHistory([]);setReleases([])}}/></Field>
     <div className="flex flex-wrap gap-2">
-     <Button type="submit" variant="outline" disabled={busy} className=" border px-3 py-2" onClick={()=>void run(async()=>{const result=await renderAcademicCredential({data:{kind,credentialId}});downloadBase64(result.base64,result.filename,"application/pdf");setMessage("Document generated for download.")})}>Download official PDF</Button>
-     <Button type="submit" variant="outline" disabled={busy} className=" border px-3 py-2" onClick={()=>void run(async()=>{setHistory(await listAcademicCredentialDeliveries({data:{kind,credentialId}}))})}>Refresh delivery history</Button>
+     <Button type="submit" variant="outline" disabled={busy}  onClick={()=>void run(async()=>{const result=await renderAcademicCredential({data:{kind,credentialId}});downloadBase64(result.base64,result.filename,"application/pdf");setMessage("Document generated for download.")})}>Download official PDF</Button>
+     <Button type="submit" variant="outline" disabled={busy}  onClick={()=>void run(async()=>{setHistory(await listAcademicCredentialDeliveries({data:{kind,credentialId}}))})}>Refresh delivery history</Button>
     </div>
    </section>
    <section className="space-y-3  border p-4">
@@ -59,7 +59,7 @@ function CredentialDeliveryPage(){
     <Field label="Completed transfer action ID"><Input value={transferActionId} onChange={event=>setTransferActionId(event.target.value)}/></Field>
     <Field label="Signed transfer consent ID"><Input value={consentId} onChange={event=>setConsentId(event.target.value)}/></Field>
     <Label className="flex gap-2 text-sm"><Checkbox checked={releaseAcknowledged} onChange={e=>setReleaseAcknowledged(e.target.checked)}/>I reviewed the completed transfer, signed consent, guardian authority and verified recipient. This grants guardian access, not delivery to an outside institution.</Label>
-    <Button type="submit" variant="outline" disabled={busy||!releaseAcknowledged||kind!=="transcript"||!selectedRecipient||!transferActionId||!consentId} className=" border px-3 py-2" onClick={()=>void mutation.run(async()=>{
+    <Button type="submit" variant="outline" disabled={busy||!releaseAcknowledged||kind!=="transcript"||!selectedRecipient||!transferActionId||!consentId}  onClick={()=>void mutation.run(async()=>{
      const [recipientPersonId,recipientEmail]=selectedRecipient.split("|");
      await authorizeAcademicCredentialRelease({data:{
       kind:"transcript",credentialId,recipientPersonId,recipientEmail,
@@ -74,27 +74,27 @@ function CredentialDeliveryPage(){
    <section className="space-y-3  border p-4">
     <h2 className="font-semibold">Verified recipient candidates</h2>
     <p className="text-sm">Only the credential student and academically authorized guardians with verified accounts are shown. Identity verification alone is not permission to release a record.</p>
-    <Button type="submit" variant="outline" disabled={busy} className=" border px-3 py-2" onClick={()=>void run(async()=>{setRecipients(await listVerifiedCredentialRecipients({data:{kind,credentialId}}))})}>Find eligible identities</Button>
+    <Button type="submit" variant="outline" disabled={busy}  onClick={()=>void run(async()=>{setRecipients(await listVerifiedCredentialRecipients({data:{kind,credentialId}}))})}>Find eligible identities</Button>
     {recipients.map(row=><p key={row.personId+row.email} className=" border p-3 text-sm">{row.firstName} {row.lastName} · {row.email}</p>)}
     {!recipients.length&&<p className="text-sm text-muted-foreground">No recipient candidates loaded.</p>}
    </section>
    <section className="space-y-3  border p-4">
     <h2 className="font-semibold">Release authorization status</h2>
     <p className="text-sm">Only CAN registrars may revoke existing authorizations. School-to-school delivery remains blocked; guardian-access authorizations are reviewed and revoked here.</p>
-    <Button type="submit" variant="outline" disabled={busy} className=" border px-3 py-2" onClick={()=>void run(async()=>{setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}))})}>Refresh release authorizations</Button>
+    <Button type="submit" variant="outline" disabled={busy}  onClick={()=>void run(async()=>{setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}))})}>Refresh release authorizations</Button>
     {releases.map(row=>{
      const status=row.revokedAt?"Revoked":new Date(row.expiresAt)<=new Date()?"Expired":"Authorized";
      return <article key={row.id} className=" border p-3 text-sm">
       <strong>{row.recipientEmail}</strong>
       <p>Purpose: {row.releasePurpose}</p>
       <p>Status: {status} · Authorized: {new Date(row.authorizedAt).toLocaleString()} · Expires: {new Date(row.expiresAt).toLocaleString()}</p>
-      <Button type="submit" variant="outline" disabled={busy} className="mt-2  border px-3 py-2" onClick={()=>void run(async()=>{
+      <Button type="submit" variant="outline" disabled={busy} className="mt-2" onClick={()=>void run(async()=>{
        const rows=await listAcademicCredentialReleaseAccessHistory({data:{authorizationId:row.id}});
        setAccessHistory(previous=>({...previous,[row.id]:rows}));
       })}>Review PDF disclosures</Button>
       {accessHistory[row.id]?.length===0&&<p>No successfully prepared PDF disclosures recorded.</p>}
       {accessHistory[row.id]?.map(entry=><p key={entry.id}>PDF prepared: {new Date(entry.occurredAt).toLocaleString()} · Recipient ID: {entry.actorPersonId}</p>)}
-      {status==="Authorized"&&<Button type="submit" variant="outline" disabled={busy} className="mt-2  border px-3 py-2" onClick={()=>void mutation.run(
+      {status==="Authorized"&&<Button type="submit" variant="outline" disabled={busy} className="mt-2" onClick={()=>void mutation.run(
        ()=>revokeAcademicCredentialRelease({data:{authorizationId:row.id}}),
        {successMessage:"Release revoked.",commandErrorMessage:"Unable to revoke access.",
         refresh:async()=>setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}))}
