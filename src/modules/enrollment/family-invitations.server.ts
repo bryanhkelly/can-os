@@ -10,6 +10,7 @@ import {
   domainEvents,
   programs,
   sites,
+  siteMarketingPackages,
   publicAdmissionsInterests,
   publicFamilyStartRequests,
 } from "@/db/schema";
@@ -179,7 +180,9 @@ export async function sendFamilyInvitationBatch(
 
     if (existing) {
       const metadata = familyInvitationBatchMetadataSchema.parse(existing.metadata);
-      if (existing.subject !== data.subject || !familyInvitationRetryMatches(
+      const sameSource=JSON.stringify(metadata.marketingSource??null)===
+        JSON.stringify(data.marketingSource??null);
+      if (!sameSource || existing.subject !== data.subject || !familyInvitationRetryMatches(
         metadata, data.subject, data.introduction, parsed.contacts.map(contactProjection), data.purpose,
       )) {
         throw new Error("This invitation request was already used with different content");
@@ -190,6 +193,25 @@ export async function sendFamilyInvitationBatch(
         recipientCount: metadata.recipients.length,
         skippedExisting: 0,
       };
+    }
+
+    if(data.marketingSource){
+      if(data.purpose!=="interest")throw new DomainError("FORBIDDEN",
+        "Marketing Package attribution is only valid for preopening interest outreach.");
+      const [packageRecord]=await tx.select({
+        id:siteMarketingPackages.id,
+        revision:siteMarketingPackages.revision,
+        status:siteMarketingPackages.status,
+      }).from(siteMarketingPackages).where(and(
+        eq(siteMarketingPackages.id,data.marketingSource.packageId),
+        eq(siteMarketingPackages.siteId,destination.siteId),
+      )).limit(1);
+      if(!packageRecord || packageRecord.status!=="draft")
+        throw new DomainError("UNAVAILABLE",
+          "The source Marketing Package is unavailable for this Site.");
+      if(packageRecord.revision!==data.marketingSource.packageRevision)
+        throw new DomainError("CONFLICT",
+          "The source Marketing Package changed. Reload the invitation before sending.");
     }
 
     const previousBatches = await tx.select({ metadata: communicationThreads.metadata })
@@ -229,6 +251,7 @@ export async function sendFamilyInvitationBatch(
       destination: data.purpose === "interest" ? "preopening_interest" : "private_platform",
       siteId: destination.siteId,
       introduction: data.introduction,
+      ...(data.marketingSource?{marketingSource:data.marketingSource}:{}),
       status: "queued",
       recipients: contacts.map(contact => ({
         ...contactProjection(contact),
@@ -496,6 +519,7 @@ export async function listFamilyInvitationWorkspace(
         programName,
         subject: batch.subject,
         introduction: batch.metadata.introduction,
+        marketingSource:batch.metadata.marketingSource??null,
         createdAt: batch.createdAt.toISOString(),
         status: batch.metadata.status,
         purpose: batch.metadata.destination === "preopening_interest" ? "interest" as const : "application" as const,

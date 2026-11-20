@@ -63,7 +63,8 @@ export const Route = createFileRoute("/admissions/invite-families")({
       throw new DomainError("VALIDATION_FAILED",
         "Review the saved Package for protected claims or missing email details before sending.");
     const packageStarter=selectedPackage
-      ? {headline:originalHeadline.slice(0,120),message:originalMessage}
+      ? {headline:originalHeadline.slice(0,120),message:originalMessage,
+      packageId:selectedPackage.id,packageRevision:selectedPackage.revision}
       : null;
     const suggestions = deps.siteId && deps.purpose === "interest" && !packageStarter
       ? await readSiteMarketingSuggestionsV61({ data: { siteId: deps.siteId } }).catch(() => null)
@@ -77,7 +78,7 @@ export const Route = createFileRoute("/admissions/invite-families")({
 
 type Data = Awaited<ReturnType<typeof listFamilyInvitations>> & {
   suggestions: Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>> | null;
-  packageStarter:{headline:string;message:string}|null;
+  packageStarter:{headline:string;message:string;packageId:string;packageRevision:number}|null;
 };
 type Selection = z.infer<typeof searchSchema>;
 
@@ -125,6 +126,10 @@ function FamilyInvitationsWorkspace({data,selection}:{data:Data;selection:Select
       const result = await sendFamilyInvitations({data:{
         requestId, programId:selectedProgramId, rawContacts:contacts,
         subject, introduction, purpose:selection.purpose, confirmed:true,
+        ...(isInterest&&data.packageStarter?{marketingSource:{
+          packageId:data.packageStarter.packageId,
+          packageRevision:data.packageStarter.packageRevision,
+        }}:{}),
       }});
       setRequestId(crypto.randomUUID());
       setContacts("");
@@ -161,7 +166,7 @@ function FamilyInvitationsWorkspace({data,selection}:{data:Data;selection:Select
     <MutationFeedback state={mutation} pendingMessage="Queuing invitations..."/>
     {isInterest&&<p className="mt-4 text-sm text-muted-foreground">
       {data.packageStarter
-        ? "The editable subject and introduction below came from the selected saved Marketing Package. Review every claim and identify consenting adults before sending."
+        ? "This invitation is based on the selected saved Marketing Package. Any edits to the subject or introduction are frozen in the send record, along with the source Package revision. Review claims and consenting recipients before sending."
         : starter
           ? "The editable introduction below is suggested from your saved Site Story and intended audiences. Review it and identify consenting adults before sending."
           : "A safe starter message is provided. Review the details and identify consenting adults before sending."}

@@ -11,6 +11,14 @@ export function isFamilyInvitationExpired(createdAt: Date, now = new Date()): bo
   return now.getTime() >= createdAt.getTime() + FAMILY_INVITATION_LINK_LIFETIME_MS;
 }
 
+/** Optional provenance to a reviewed working Marketing Package. Sent subject
+ * and introduction are always snapshotted independently in the batch record. */
+export const familyInvitationMarketingSourceSchema=z.object({
+  packageId:z.string().uuid(),
+  packageRevision:z.number().int().positive(),
+}).strict();
+export type FamilyInvitationMarketingSource=z.infer<typeof familyInvitationMarketingSourceSchema>;
+
 export const familyInvitationSendInput = z.object({
   requestId: z.string().uuid(),
   programId: z.string().uuid(),
@@ -19,6 +27,7 @@ export const familyInvitationSendInput = z.object({
     .refine(value=>!/[\r\n]/.test(value),"Use a single-line email subject."),
   introduction: z.string().trim().min(1).max(2_000),
   confirmed: z.literal(true),
+  marketingSource: familyInvitationMarketingSourceSchema.optional(),
   /** Interest outreach does not grant application access before school approval. */
   purpose: z.enum(["interest", "application"]).default("application"),
 }).strict();
@@ -46,6 +55,8 @@ export type FamilyInvitationBatchMetadata = {
   destination?: "private_platform" | "preopening_interest";
   siteId?: string;
   introduction: string;
+  /** Source attribution; actual sent text remains frozen in subject/introduction. */
+  marketingSource?: FamilyInvitationMarketingSource;
   status: "queued" | "retrying" | "complete";
   recipients: FamilyInvitationRecipient[];
 };
@@ -70,6 +81,7 @@ export const familyInvitationBatchMetadataSchema: z.ZodType<FamilyInvitationBatc
   destination: z.enum(["private_platform", "preopening_interest"]).optional(),
   siteId: z.string().uuid().optional(),
   introduction: z.string().min(1).max(2_000),
+  marketingSource:familyInvitationMarketingSourceSchema.optional(),
   status: z.enum(["queued", "retrying", "complete"]),
   recipients: z.array(recipientSchema).min(1).max(FAMILY_INVITATION_MAX_RECIPIENTS),
 }).strict().refine(value=>!value.destination||Boolean(value.siteId),
