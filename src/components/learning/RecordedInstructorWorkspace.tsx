@@ -301,6 +301,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
             key={`${courseAttemptId}:${instruction.selection.trackVersionId}:${presentation.assetVersionId}`}
             title={`${currentLesson.title} recording`}
             resourceId={presentation.assetVersionId}
+            resumeKey={courseAttemptId}
             onPlaybackEvent={(kind, resourceId) => observe(kind, currentLesson.id, resourceId)}
              onVideoEngagement={durationMs => observeNativeVideo(currentLesson.id, durationMs)}
             loadUrl={async () => (await getRecordedInstructionAssetDownload({ data: {
