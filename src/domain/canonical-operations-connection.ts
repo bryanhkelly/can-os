@@ -16,6 +16,7 @@ export function canonicalOperationsUrlValid(
     return ["postgresql:", "postgres:"].includes(ops.protocol) &&
       ops.protocol === primary.protocol &&
       ops.username === "can_os_canonical_ops_app" &&
+      primary.username !== ops.username &&
       ops.password.length > 0 &&
       ops.hostname.length > 0 &&
       neonEndpoint(ops.hostname) === neonEndpoint(primary.hostname) &&
