@@ -10,6 +10,8 @@ import {readdir, readFile} from "node:fs/promises";
 import {join, relative, resolve, extname} from "node:path";
 import ts from "typescript";
 import { duplicateImportBindings } from "../lib/import-binding-conflicts.mjs";
+import { sourceDependencySpecifiers } from "../lib/v61-component-dependencies.mjs";
+import { unresolvedLocalSourceModule } from "../lib/source-module-resolution.mjs";
 
 const root=resolve(process.cwd());
 // Only runtime and build-tool source blocks a production build. Test suites
@@ -52,6 +54,16 @@ for(const filename of files){
   }
   // Parser diagnostics alone do not catch two imports declaring the same
   // local name. Report this deterministic binding collision before building.
+  // Check local module targets before bundling, including re-exports and
+  // type-only/lazy imports. A syntax-valid missing dependency must not
+  // masquerade as a TanStack generated-route failure.
+  for(const specifier of sourceDependencySpecifiers(parsed, ts)){
+    const missing=unresolvedLocalSourceModule(root, filename, specifier);
+    if(missing){
+      console.error(relative(root,filename)+": Missing local import "+specifier+" (resolved to "+missing+")");
+      errors++;
+    }
+  }
   for(const conflict of duplicateImportBindings(parsed)){
     const {line,character}=parsed.getLineAndCharacterOfPosition(conflict.start);
     console.error(relative(root,filename)+":"+(line+1)+":"+(character+1)+
