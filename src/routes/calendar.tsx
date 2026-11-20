@@ -1,6 +1,6 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { z } from "zod";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,22 +30,10 @@ import { CalendarMonthGrid } from "@/components/calendar/CalendarMonthGrid";
 import { CalendarEventFactsPanels } from "@/components/calendar/CalendarEventFactsPanels";
 import { CalendarRecordContextPanel } from "@/components/calendar/CalendarRecordContextPanel";
 import { formatTime, formatEventDate, typeLabel } from "@/components/calendar/calendar-presentation";
-import { getWorkspaceSession } from "@/modules/identity/workspace-session.functions";
 import { accessReturnToFromLocation } from "@/domain/access-navigation";
 import { normalizeClientError } from "@/lib/client-error";
 
 export const Route = createFileRoute("/calendar")({
-  // Check the live server session, not a cached client role or calendar result.
-  // An expired login is not evidence that a calendar event is unavailable.
-  loader: async ({ location }) => {
-    const session = await getWorkspaceSession();
-    if (session.error) throw new Error("Unable to verify the calendar session.");
-    if (!session.session?.authenticated) {
-      throw redirect({ to: "/access", search: {
-        returnTo: accessReturnToFromLocation(location),
-      }, replace: true });
-    }
-  },
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:CalendarView;q?:string}=>({
     date:typeof search.date==="string"&&z.string().date().safeParse(search.date).success?search.date:undefined,
     event:typeof search.event==="string"?search.event:undefined,
