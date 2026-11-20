@@ -26,8 +26,7 @@ const groups = [
     links: [
       { title: "Solution planning", detail: "Configure CAN-published packages for an authorized Site", path: "/canonical/blueprints" },
       { title: "Blueprint reviews", detail: "Independent approval and review", path: "/canonical/blueprint-reviews" },
-      { title: "Content studio", detail: "Academic content and instructional tracks", path: "/canonical/content" },
-      { title: "Content reviews", detail: "Independent instructional content review", path: "/canonical/content-reviews" },
+      { title: "Classes and content", detail: "Manage authorized Classes and their instructional content", path: "/class" },
     ],
   },
   {
