@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import {useEffect,useState} from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
@@ -40,7 +41,7 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
     }catch{setStatus("Unable to approve staff. Refresh to check current consent and publication revision.")}
     finally{setSaving(false)}
   }
-  return <section aria-label="Public staff review" className="rounded-xl border bg-card p-5">
+  return <section aria-label="Public staff review" className=" border bg-card p-5">
     <h2 className="font-serif text-xl">People families will meet</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Only people with active Site roles and their own current public biography consent appear.
@@ -49,9 +50,9 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
     {!data?<p role="status" className="mt-2 text-sm">{status||"Loading consented staff…"}</p>:
     <form noValidate onSubmit={approve} className="mt-4 space-y-3">
       {data.candidates.length===0&&<p className="text-sm">No staff biographies are consented for this Site.</p>}
-      {data.candidates.map(person=><label key={person.personId}
-        className="flex gap-3 rounded-lg border p-3 text-sm">
-        <input type="checkbox" disabled={saving} checked={selected.includes(person.personId)}
+      {data.candidates.map(person=><Label key={person.personId}
+        className="flex gap-3  border p-3 text-sm">
+        <Checkbox disabled={saving} checked={selected.includes(person.personId)}
           onChange={event=>{
             setReviewed(false);
             setSelected(previous=>event.target.checked
@@ -62,7 +63,7 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
           <span className="mt-1 block text-muted-foreground">{person.biography}</span>
           <span className="mt-1 block text-xs">Consent valid through {person.expiresOn}</span>
         </span>
-      </label>)}
+      </Label>)}
       <Field label="Institutional review reason" className="text-xs" required
         error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining this staff review.":undefined}>
         <Textarea value={reason} onChange={event=>setReason(event.target.value)} minLength={10} maxLength={500}/>
