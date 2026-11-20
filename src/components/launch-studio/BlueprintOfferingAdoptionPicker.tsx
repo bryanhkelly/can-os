@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ export type BlueprintOfferingIntent = {
 
 type Props = {
   siteId: string;
+  initialDelivery?: "onsite" | "remote" | "hybrid";
   components: readonly { id: string; key: string }[];
   selected: readonly BlueprintOfferingIntent[];
   onChange: (next: BlueprintOfferingIntent[]) => void;
@@ -26,30 +27,41 @@ type Props = {
  * It never creates a Deployment, activates a program, or overrides program fit.
  */
 export function BlueprintOfferingAdoptionPicker({
-  siteId, components, selected, onChange, disabled = false,
+  siteId, initialDelivery = "onsite", components, selected, onChange, disabled = false,
 }: Props) {
-  const [deliveryContext, setDeliveryContext] = useState<"onsite" | "remote" | "hybrid">("onsite");
+  const [deliveryContext, setDeliveryContext] =
+    useState<"onsite" | "remote" | "hybrid">(initialDelivery);
+  const requestVersion = useRef(0);
   const [offerings, setOfferings] = useState<AvailableOffering[] | null>(null);
   const [targetComponentId, setTargetComponentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    requestVersion.current += 1;
+    setDeliveryContext(initialDelivery);
     setOfferings(null);
     setTargetComponentId("");
-  }, [siteId]);
+    setError(null);
+    setLoading(false);
+    return () => { requestVersion.current += 1; };
+  }, [siteId, initialDelivery]);
 
   async function discover() {
+    const version = ++requestVersion.current;
     setLoading(true);
     setError(null);
     try {
-      setOfferings(await discoverCanonicalBlueprintOfferings({
+      const result = await discoverCanonicalBlueprintOfferings({
         data: { subject: { kind: "site", siteId }, deliveryContext },
-      }));
+      });
+      if (requestVersion.current === version) setOfferings(result);
     } catch (caught) {
-      setError(normalizeClientError(caught, "Published Offerings could not be loaded.").message);
+      if (requestVersion.current === version) {
+        setError(normalizeClientError(caught, "Published Offerings could not be loaded.").message);
+      }
     } finally {
-      setLoading(false);
+      if (requestVersion.current === version) setLoading(false);
     }
   }
 
@@ -66,8 +78,12 @@ export function BlueprintOfferingAdoptionPicker({
         <Select id="blueprint-offering-delivery" className="mt-2" value={deliveryContext}
           onChange={event => {
             const next = event.currentTarget.value as typeof deliveryContext;
+            requestVersion.current += 1;
             setDeliveryContext(next);
             setOfferings(null);
+            setLoading(false);
+            setError(null);
+            setTargetComponentId("");
           }}>
           <option value="onsite">On site</option>
           <option value="remote">Remote</option>
