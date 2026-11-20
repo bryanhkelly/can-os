@@ -5,6 +5,7 @@ import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { launchSiteLifecycleLabel, nextLaunchAction } from "@/domain/launch-overview-v61";
 import { launchModuleCompletionV61 } from "@/domain/launch-module-completion-v61";
+import { signOutOfWorkspace } from "@/components/shell/workspace-sign-out";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
@@ -142,17 +143,17 @@ function SiteLaunchPage() {
       <EstablishSiteProfileUnified key={`${site.id}:${site.updatedAt}`}
         site={site} organizations={organizations}
         onBackToOverview={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
-        onSaveAndExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
+        onSaveAndExit={signOutOfWorkspace}
         onContinueToSiteInformation={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })} />
     </WorkspaceShell> : selected?.id === "site-information" && siteInformation ? <SiteInformationBody
       site={site} initial={siteInformation} organizations={organizations}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-profile" } })}
-      onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
+      onExit={signOutOfWorkspace}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "programs-audiences" } })} />
     : selected?.id === "programs-audiences" && programsAudiences ? <ProgramsAudiencesBody
       siteId={site.id} initial={programsAudiences}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })}
-      onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
+      onExit={signOutOfWorkspace}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
