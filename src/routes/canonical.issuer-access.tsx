@@ -117,7 +117,7 @@ function CredentialIssuerAccess(){
           <Textarea required minLength={25} maxLength={1200} value={evidence}
             onChange={e=>setEvidence(e.target.value)}
             placeholder="Reference your organization’s independently reviewed authorization and credential policy."
-            className="mt-2 min-h-28 w-full border border-border bg-background p-3 text-sm"/>
+            className="mt-2 min-h-28"/>
         </Label>
         <Button type="submit" disabled={busy||my.isPending||my.isError||
           my.data?.status==="approved"||my.data?.status==="pending"||
@@ -147,7 +147,7 @@ function CredentialIssuerAccess(){
         <Label className="block text-sm font-semibold">Independent verification evidence
           <Textarea minLength={25} maxLength={1200} value={reviewEvidence}
             onChange={e=>setReviewEvidence(e.target.value)}
-            className="mt-2 min-h-28 w-full border border-border bg-background p-3 text-sm"
+            className="mt-2 min-h-28"
             placeholder="Record the institutional authority and policy evidence reviewed."/>
         </Label>
         <Label className="block text-sm font-semibold">Approval expiration (UTC)
@@ -183,7 +183,7 @@ function CredentialIssuerAccess(){
         <Label className="block text-sm font-semibold">Reason for revocation
           <Textarea required minLength={25} maxLength={1200} value={revokeReason}
             onChange={e=>setRevokeReason(e.target.value)}
-            className="mt-2 min-h-24 w-full border border-border bg-background p-3 text-sm"/>
+            className="mt-2 min-h-24"/>
         </Label>
         <Button variant="outline" type="submit"
           disabled={!revokeId||revokeReason.trim().length<25||busy}>Revoke selected issuer</Button>
