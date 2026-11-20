@@ -232,7 +232,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
                 </FormItem>
               )} />
               <div className="sm:col-span-2">
-                <Button variant="default" className=" border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy}>
+                <Button variant="default" size="lg" type="submit" disabled={busy}>
                   {busy ? "Inviting…" : "Invite staff member"}
                 </Button>
               </div>
