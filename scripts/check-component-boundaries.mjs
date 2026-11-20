@@ -12,6 +12,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { sharedUiImportViolation } from "./lib/v61-component-dependencies.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const guardedDirectories = [
@@ -101,6 +102,8 @@ for (const file of files) {
   for (const node of program.statements) {
     if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) continue;
     const importPath = node.moduleSpecifier.text;
+    const dependencyProblem = sharedUiImportViolation(file, importPath);
+    if (dependencyProblem) failures.push(file + ": " + dependencyProblem);
     if (importPath.startsWith("@/routes/") || importPath.startsWith("@/db/") ||
         importPath.startsWith("@/workers/")) {
       failures.push(file + ": shared UI must not import route, database, or worker code: " + importPath);
