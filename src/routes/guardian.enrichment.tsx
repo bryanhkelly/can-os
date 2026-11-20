@@ -6,7 +6,7 @@ import { z } from "zod";
 import { enrichmentConsentContext } from "@/domain/enrichment-consent";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { WorkspaceShell } from "@/components/workspace";
+import { ActionFooter, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -141,11 +141,11 @@ function EnrichmentFamilyView({ data, seasonId }: {
           <Input value={lastName} maxLength={80} onChange={e => setLastName(e.target.value)}/>
         </Field>
         <Field label="Grade (optional)" className="text-sm"><Input value={gradeLevel} maxLength={20} onChange={e => setGradeLevel(e.target.value)}/></Field>
-        <div className="sm:col-span-3">
-          <Button type="submit" variant="outline" disabled={busy}>
+        <ActionFooter layout="inline" className="mt-0 sm:col-span-3">
+          <Button type="submit" variant="outline" disabled={busy} loading={busy} loadingLabel="Adding child...">
             Add child
           </Button>
-        </div>
+        </ActionFooter>
       </form>}
     </section>
     <section className="mt-8" aria-label="Your enrichment registrations">
