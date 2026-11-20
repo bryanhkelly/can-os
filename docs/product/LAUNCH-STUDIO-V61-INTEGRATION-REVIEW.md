@@ -126,3 +126,53 @@ Establish / Programs & Audiences stores declared Site intent, **not** a concrete
 This is intentional fail-closed behavior but it means a brand-new Site with only broad intent cannot yet send invitations or create Program-linked events. Do **not** fabricate a Program, select an unrelated Site's Program, insert mock contacts, or create a second Site-level CRM to paper over the gap. Any fully pre-Program Site inquiry/event capability must be designed against the canonical public Site/Person/Event model at the later database-design phase, without equating Program intent to a Solution or opening enrollment.
 
 The shared family invitation validator also rejects multi-line subjects, including CR/LF header injection, and package handoff checks original claims before limiting a subject to the provider's email bound. Event creation retains one idempotency key during uncertain retries; when an existing invitation-only event is recovered without its one-time RSVP token, the user is directed to the authorized explicit link rotation command instead of silently revoking shared links.
+
+
+## V6.1 Launch Studio design-system realignment (November 19, 2026)
+
+This pass repaired the missing object-property separators in the Prepare /
+Funding & Admissions module, then applied the repository-approved V6.1
+primitives and application patterns across the current Launch Studio route,
+Website & Brand, Introduce Marketing Packages, Prepare, and Open handoffs.
+
+- Shared `GuidedSetupShell` step navigation composes canonical `Button`
+  instead of standalone native controls. Browser-visible steps remain local to
+  their module, not duplicated in the Launch sidebar; visits do not imply saved
+  or completed requirements.
+- The global Launch sidebar activates at `xl` to preserve usable working
+  width beside the context rail, and nested navigation links have 44px touch
+  targets. The mobile menu retains the shared focus-managed `Modal`.
+- Marketing Packages uses the same `Button` geometry as other V6.1 choices
+  and an `ActionDialog` to confirm discarding unsaved changes.
+- Website & Brand uses `ActionDialog` for reloading conflicted work and
+  restoring historical revisions. Demo warnings, conflict recovery and
+  unavailable storage now use semantic `WorkspaceNotice`, not local amber
+  palettes.
+- Programs & Audiences reuses `ActionFooter` and exposes an explicit
+  reload-and-reconcile action after uncertain persistence.
+- Catalog's existing governed planning links now compose shared
+  `Button asChild` actions. Preview sharing uses semantic success colors.
+- Strict ESLint scoped to the V6.1 Launch screens and embedded canonical
+  planning components enforces shared form controls and semantic color
+  utilities. It intentionally permits wrapping `<label>` for accessible
+  full-card checkbox/radio selection, without permitting native form fields.
+- `tests/unit/launch-v61-design-system.test.ts` adds TSX syntax, raw-control,
+  geometry, semantic-color and key workflow checks across the Launch surfaces.
+  `LaunchV61StepNavigation.stories.tsx` adds two- and four-step interactive
+  examples. The Prepare story and shared Button route expectation were
+  corrected to their current source contracts.
+
+**Inspection only:** A source-level scan found no raw `button`, `input`,
+`select` or `textarea` elements, unsupported rounded card utilities,
+or hard-coded numeric Tailwind alert colors in the audited current Launch
+components and direct website editor. This is not evidence of a successful
+TypeScript compilation, running unit tests, rendered screenshots or accessibility
+acceptance.
+
+**Still required:** Execute `npm run typecheck`, `npm run build`, focused
+and full unit tests, `npm run lint`, design-system inventory checks, Storybook
+and authenticated Playwright journeys at 390/768/1024/1440px and 200% zoom.
+Resolve PR #348's merge conflicts only after current-code integration and
+database review. Preserve pending migrations and independent publication,
+opening, safeguarding and enrollment gates. No change to `main` is part
+of this design pass.
