@@ -34,7 +34,12 @@ export async function getCanonicalBlueprintWorkspace(
   rawInput: unknown,
 ) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
+  // This workspace exposes local configuration drafts and planning operations.
+  // It is not CAN's publisher authoring Studio. The legacy blueprint_author
+  // SQL role may write Site configuration versions, never Blueprint definitions.
+  // Read-only publisher discovery must use its separately scoped catalog service.
   assertCapability(context, "blueprint.read");
+  assertCapability(context, "blueprint.configure");
   const { siteId } = blueprintWorkspaceInputSchema.parse(rawInput);
   if (!context.scope.siteIds?.includes(siteId)) {
     throw new AuthorizationError("Blueprint workspace Site scope");
