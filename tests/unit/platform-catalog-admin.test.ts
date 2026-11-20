@@ -30,6 +30,9 @@ describe("platform-owned Program Catalog and Solution Blueprint authority", () =
       ...value, components: [value.components[0]],
       publisherOrganizationId: id,
     }).success).toBe(false);
+    expect(savePlatformBlueprintSchema.safeParse({
+      ...value, components: [value.components[0]], offeringCode: "CLC-DIGITAL-01",
+    }).success).toBe(true);
   });
 
   it("validates constrained Program drafts and exact version decisions", () => {
