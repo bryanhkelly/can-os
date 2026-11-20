@@ -116,7 +116,7 @@ function TeacherMarketplacePage() {
               ? teacher.eligibleSectionIds.includes(selection)
               : eligibleSections.length > 0;
             return <article key={teacher.personId} className="space-y-2  border p-3">
-            <p className="font-semibold">{teacher.name}{teacher.isSynthetic && <span className="text-xs font-normal text-muted-foreground"> · Sample profile</span>}</p>
+            <p className="font-semibold">{teacher.isSynthetic ? teacher.name : <Link to="/profiles" search={{person:teacher.personId}} className="underline underline-offset-2">{teacher.name}</Link>}{teacher.isSynthetic && <span className="text-xs font-normal text-muted-foreground"> · Sample profile</span>}</p>
             <p className="text-sm text-muted-foreground">{teacher.modality.replaceAll("_", " ")} · Offered capacity: {teacher.indicativeSeatCapacity} seats</p>
             {teacher.isSynthetic && <p className="text-xs text-muted-foreground">
               Sample profiles are preview data and cannot be engaged as instructors.
