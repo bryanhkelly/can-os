@@ -229,7 +229,7 @@ export function NativeClassSessionsPanel({
                 Revocation reason (audited)
               </Label>
               <Textarea id={"revoke-"+session.id} rows={2} minLength={15} maxLength={500}
-                className="w-full border border-border bg-background p-2 text-sm"
+                
                 value={revocationReason}
                 onChange={event=>setRevocationReason(event.target.value)}/>
               <div className="flex gap-2">
@@ -269,7 +269,7 @@ export function NativeClassSessionsPanel({
                   <Label className="text-xs font-semibold">
                     New date and time ({siteTimeZone})
                     <Input type="datetime-local" value={changeLocalStart} required
-                      className="mt-1 min-h-11 w-full border border-border bg-background px-2"
+                      className="mt-1 min-h-11"
                       onChange={e=>{setChangeLocalStart(e.target.value);
                         setChangeRequestId(crypto.randomUUID());}}/>
                   </Label>
@@ -277,7 +277,7 @@ export function NativeClassSessionsPanel({
                     Length (minutes)
                     <Input type="number" min={15} max={480} step={15}
                       value={changeDuration}
-                      className="mt-1 min-h-11 w-full border border-border bg-background px-2"
+                      className="mt-1 min-h-11"
                       onChange={e=>{setChangeDuration(Number(e.target.value));
                         setChangeRequestId(crypto.randomUUID());}}/>
                   </Label>
@@ -285,7 +285,7 @@ export function NativeClassSessionsPanel({
                 <Label className="block text-xs font-semibold">
                   Reason (audited, at least 15 characters)
                   <Textarea value={changeReason} rows={2} maxLength={500}
-                    className="mt-1 w-full border border-border bg-background p-2"
+                    className="mt-1"
                     onChange={e=>{setChangeReason(e.target.value);
                       setChangeRequestId(crypto.randomUUID());}}/>
                 </Label>
@@ -380,14 +380,14 @@ export function NativeClassSessionsPanel({
         </Label>
           <Input id="native-series-start" type="datetime-local" required value={first}
             onChange={e=>{setFirst(e.target.value);resetSchedule();}}
-            className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+            className="mt-2 min-h-11"/>
         </div>
         <div><Label htmlFor="native-series-duration" className="block text-sm font-semibold">
           Duration (minutes)
         </Label>
           <Input id="native-series-duration" type="number" required min={15} max={480}
             value={minutes} onChange={e=>{setMinutes(Number(e.target.value));resetSchedule();}}
-            className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+            className="mt-2 min-h-11"/>
         </div>
       </div>:<div className="space-y-3">
         {customRows.map((row,index)=><div key={row.id}
@@ -398,7 +398,7 @@ export function NativeClassSessionsPanel({
             </Label>
             <Input id={"class-custom-"+row.id} type="datetime-local" required
               value={row.localStart} onChange={e=>changeRow(row.id,{localStart:e.target.value})}
-              className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+              className="mt-1 min-h-11"/>
           </div>
           <div>
             <Label className="text-sm font-semibold" htmlFor={"class-minutes-"+row.id}>
@@ -406,7 +406,7 @@ export function NativeClassSessionsPanel({
             </Label>
             <Input id={"class-minutes-"+row.id} type="number" min={15} max={480} required
               value={row.minutes} onChange={e=>changeRow(row.id,{minutes:Number(e.target.value)})}
-              className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+              className="mt-1 min-h-11"/>
           </div>
           <Button size="sm" variant="outline" type="button" disabled={customRows.length<=1||busy}
             onClick={()=>{setCustomRows(rows=>rows.filter(item=>item.id!==row.id));resetSchedule();}}>
