@@ -15,6 +15,7 @@ export const canonicalClasses = pgTable("classes", {
   physicalSpaceId: uuid("physical_space_id"),
   /** Existing approved canonical Class staff assignment, not a new staff grant. */
   primaryFacilitatorAssignmentId: uuid("primary_facilitator_assignment_id"),
+  physicalPlanningRevision: integer("physical_planning_revision").notNull().default(1),
   title: text("title").notNull(),
   capacity:integer("capacity"),
   deliveryMode: text("delivery_mode").$type<"self_paced"|"scheduled"|"facilitated"|"hybrid">().notNull(),
