@@ -113,7 +113,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
       <div className="student-feature-grid student-feature-lower">
         <StudentUpcomingAssignments assignments={assignments}
           error={assignmentsError} at={at} timezone={timezone}
-          sections={liveData.sections} />rdPanel>
+          sections={liveData.sections} />
         <StudentReleasedGradesPanel state={data?.grades} />
       </div>
       <StudentSchoolLifePanel events={upcomingEvents}
