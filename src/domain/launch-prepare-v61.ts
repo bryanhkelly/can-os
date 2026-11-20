@@ -60,6 +60,14 @@ export function orderSolutionsByVision<T extends {
   return [...recipes].sort((left, right) => score(right) - score(left));
 }
 
+/** Reuse the same pinned-version filter throughout Prepare and the local plan editor.
+ * Site scoping remains server-owned; these candidates are already authorized. */
+export function selectSavedSolutionPlans<T extends { blueprintVersionId: string }>(
+  plans: readonly T[], blueprintVersionId: string,
+): T[] {
+  return plans.filter(plan => plan.blueprintVersionId === blueprintVersionId);
+}
+
 /** A hidden/out-of-filter recipe must never remain in the visible detail pane. */
 export function resolveVisibleSolutionRecipe<T extends { blueprintVersionId: string }>(
   visible: readonly T[], selectedId: string | null,
