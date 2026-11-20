@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import { auditEvents as sharedAuditEvents } from "@/db/schema";
 import { writeBlueprintTransition } from "./blueprint-journal.server";
 import {
@@ -83,7 +84,7 @@ export async function getBlueprintReview(
   const { configurationVersionId } = blueprintReviewReadInputSchema.parse(rawInput);
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
     if (isCanPlanning) {
@@ -128,7 +129,7 @@ export async function getBlueprintReview(
           decision: latestByComponent.get(item.componentId) ?? "not_reviewed",
         })),
     };
-  });
+  }));
 }
 
 /**
@@ -145,7 +146,7 @@ export async function getBlueprintReviewHistory(
   const { configurationVersionId, page } = blueprintReviewHistoryInputSchema.parse(rawInput);
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
     if (isCanPlanning) {
@@ -180,7 +181,7 @@ export async function getBlueprintReviewHistory(
             ? row.conditions.rationale : null,
       })),
     };
-  });
+  }));
 }
 
 /**
@@ -197,7 +198,7 @@ export async function decideBlueprintReview(
   const actorPersonId = context.actorPersonId;
 
   const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, input.configurationVersionId);
     await tx.select({ id: blueprintConfigurations.id })
@@ -341,5 +342,5 @@ export async function decideBlueprintReview(
       decision: input.decision,
       created: true,
     };
-  });
+  }));
 }
