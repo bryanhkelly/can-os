@@ -3,11 +3,12 @@ import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassEnrollments, canonicalClassSessions,
   canonicalDeliverySessions, facilitatedClassroomPlans, learnerCourseAttempts,
-  participationAttributions,
+  participationAttributions,canonicalPersons,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { selectCourseClass } from "@/domain/course-class-registration";
 import { assertNativeClassSeatAvailable } from "@/domain/native-class-lifecycle";
+import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { emitCanonicalDomainEvent, writeCanonicalAudit } from "@/platform/canonical-mutation.server";
@@ -93,6 +94,26 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
     cls.courseVersionId!==args.release.courseVersionId||
     cls.operatingOrganizationId!==args.release.registeringOrganizationId)
     throw new AuthorizationError("Class does not belong to the registered Course and Site");
+  // Native Class self-enrollment requires independently verified adulthood.
+  // A Course sign-up attestation, email verification, or non-student role alone
+  // cannot bypass the existing native Class learner identity policy.
+  const [person]=await tx.select({birthDate:canonicalPersons.birthDate})
+    .from(canonicalPersons).where(eq(canonicalPersons.id,args.personId)).limit(1);
+  if(!verifiedAdultOn(person?.birthDate,new Date()))
+    throw new AuthorizationError("verified adult identity before Class registration");
+  if(cls.deliveryMode!=="self_paced"){
+    const [scheduled]=await tx.select({id:canonicalClassSessions.id})
+      .from(canonicalClassSessions)
+      .innerJoin(facilitatedClassroomPlans,
+        eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
+      .innerJoin(canonicalDeliverySessions,
+        eq(canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
+      .where(and(eq(canonicalClassSessions.classId,cls.id),
+        eq(facilitatedClassroomPlans.state,"scheduled"),
+        gt(canonicalDeliverySessions.startsAt,new Date())))
+      .limit(1);
+    if(!scheduled)throw new AuthorizationError("current scheduled Class Sessions");
+  }
   const [attempt]=await tx.select().from(learnerCourseAttempts).where(and(
     eq(learnerCourseAttempts.id,args.attemptId),
     eq(learnerCourseAttempts.noncreditRegistrationId,args.registrationId),
