@@ -184,11 +184,11 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   {commandCenterData===null&&<QueryState error="Staffing and capacity exceptions could not be loaded; operational health cannot be verified." onRetry={retrySupplementaryReads}/>}
   {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
   {mutation.refreshError&&<Button variant="outline" type="button" disabled={mutation.isSubmitting}
-   onClick={()=>void retryActionRefresh()} className="mt-2  border px-3 py-2 text-sm disabled:opacity-50">
+   onClick={()=>void retryActionRefresh()} className="mt-2">
    Retry action refresh
   </Button>}
   {exitMutation.refreshError&&<Button variant="outline" type="button" disabled={exitMutation.isSubmitting}
-   onClick={()=>void retryExitRefresh()} className="mt-2  border px-3 py-2 text-sm disabled:opacity-50">
+   onClick={()=>void retryExitRefresh()} className="mt-2">
    Retry institutional change refresh
   </Button>}
   <AttentionQueue items={attentionItems.filter(item=>item.priority!=="critical")}/>
@@ -290,24 +290,24 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    value={dueDrafts[i.id]??localDue(i.dueAt)}
    onChange={event=>setDueDrafts(prev=>({...prev,[i.id]:event.target.value}))}/>
  </Label>
- <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50"
+ <Button variant="outline" type="button" size="sm"
    disabled={commandsBlocked||dueDrafts[i.id]===undefined}
    onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</Button>
- <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"in_progress")}>Start</Button>
- <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"waiting")}>Waiting</Button>
+ <Button variant="outline" type="button" size="sm" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"in_progress")}>Start</Button>
+ <Button variant="outline" type="button" size="sm" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"waiting")}>Waiting</Button>
  {i.type==="guardian_health_information_review"?
   <Link to="/operations/health-review" search={{action:i.id}}
     className=" border px-3 py-1 text-xs font-semibold">Review confidential family update</Link>:
   i.type==="transfer_academic_records_handoff"?
   <Link to="/operations/transfer-records" className=" border px-3 py-1 text-xs font-semibold">Complete verified records transfer →</Link>:
   (i.enrollmentChangeKind==="transfer"||i.enrollmentChangeKind==="withdrawal")?
-  <Button variant="outline" type="button" className=" border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
+  <Button variant="outline" type="button" size="sm"
     disabled={commandsBlocked} onClick={()=>{if(i.enrollmentChangeKind==="withdrawal"||i.enrollmentChangeKind==="transfer")void completeEnrollmentExit(i.id,i.enrollmentChangeKind);}}>
     Complete official {i.enrollmentChangeKind==="withdrawal"?"withdrawal":"transfer"} &amp; end school enrollment
   </Button>:
   i.type==="onsite_coverage_gap"&&i.siteId?
   <Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-xs underline">Assigned director resolves in Site Today →</Link>:
-  <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"resolved")}>Resolve</Button>}
+  <Button variant="outline" type="button" size="sm" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"resolved")}>Resolve</Button>}
  </>}</div></article>)}
   {!data.items.length&&<EmptyState title="No actions currently require attention."/>}
   </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3  border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
