@@ -6,7 +6,7 @@ import ts from "typescript";
 // Automatically inspect every application route and component. Do not maintain
 // route names, JSX snippets, or expected component counts as migration gates.
 // Existing debt is reported; changed files may never add more debt.
-const nativeTags = new Set(["button", "input", "label", "select", "textarea"]);
+const nativeTags = new Set(["button", "input", "label", "select", "textarea", "dialog"]);
 const radiusPattern = /(?:^|\s)(?:[\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=\s|$)/g;
 const ignoredFile = /\.(?:test|spec|stories)\.tsx$/;
 
