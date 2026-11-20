@@ -4,7 +4,7 @@ import { beginClassVideoUpload, finishClassVideoUpload } from "@/modules/learnin
 import { createPrivateUploadTask } from "@/platform/storage/private-upload";
 import { classVideoFileSchema, videoUploadPolicy } from "@/domain/class-video";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
-import { ActionFooter, MutationFeedback } from "@/components/workspace";
+import { ActionFooter, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
@@ -59,7 +59,7 @@ export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: 
     <h3 className="text-sm font-semibold">Upload a video</h3>
     <p className="text-xs text-muted-foreground">Private MP4 or WebM, up to 500 MB. Use browser-compatible codecs.
       Only authorized class viewers can request playback. Publisher content stays unchanged.</p>
-    {!enabled && <p role="status" className="text-sm">Video uploads are not enabled on this deployment. You can still add a video link.</p>}
+    {!enabled && <WorkspaceNotice tone="attention">Video uploads are not enabled on this deployment. You can still add a video link.</WorkspaceNotice>}
     <MutationFeedback state={feedback} pendingMessage="Uploading and verifying video. Keep this page open..."/>
     <fieldset disabled={!enabled || busy || attempted} className="grid gap-3">
       <Field label="Video title" required error={validationAttempted&&title.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
