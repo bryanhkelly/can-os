@@ -393,7 +393,7 @@ export function RecordedLessonCompletionAction({ allowed, completed, waived, pen
 
 export function RecordedOfficialCourseLinks({ sectionId }: { sectionId: string }) {
   return <WorkspaceLinkNavigation label="Official course records">
-    <Link to="/classes" search={{ section: sectionId, tab: "lessons" }} className="underline">Official class lessons</Link>
+    <Link to="/class"  className="underline">Official class lessons</Link>
     <Link to="/student/assignments" search={{ section: sectionId }} className="underline">Assignments and feedback</Link>
     <Link to="/student/courses" search={{ section: sectionId, tab: "grades" }} className="underline">Grades</Link>
   </WorkspaceLinkNavigation>;
