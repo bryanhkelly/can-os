@@ -163,6 +163,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const search = { section: data.section.id, student: data.role === "guardian" ? data.studentPersonId ?? undefined : undefined };
+  const nativeVideoResumeKey = data.role === "student" && data.studentPersonId
+    ? `${data.studentPersonId}:${data.section.id}:${data.section.versionId}` : undefined;
   const supplements = data.supplements ?? [];
   const teacherGuides = data.role === "teacher" ? data.teacherGuides : null;
   const assessmentEvidence = data.assessmentEvidence ?? [];
@@ -240,6 +242,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   }
   function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
     return <ClassSupplementContent item={item} presentation={presentation}
+      resumeKey={nativeVideoResumeKey}
       {...nativeVideoCallbacks(item.url)}
       programId={data.section.programId} sectionId={data.section.id}
       disabled={busy || downloading}
@@ -296,7 +299,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       <Link to="/student/assignments" search={{ section: data.section.id }} className="underline">Class assignments and feedback</Link>;
   const recorded = mainVideoResource?.url ? <ClassVideoPlayer key={mainVideoResource.id} title={mainVideoResource.title}
     url={mainVideoResource.url} resourceId={mainVideoResource.id} declaredVideo={false} presentation="classroom"
-    {...nativeVideoCallbacks(mainVideoResource.url)}/> :
+    resumeKey={nativeVideoResumeKey} {...nativeVideoCallbacks(mainVideoResource.url)}/> :
     mainVideoSupplement ? supplementContent(mainVideoSupplement, "classroom") : <ClassVideoPlaceholder
       title={lesson ? "No lesson recording yet" : "No class recording yet"}
       message={lesson ? "Your teacher has not attached a recorded video. Use the published reading and activities below." :
