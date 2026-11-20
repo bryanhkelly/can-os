@@ -161,9 +161,9 @@ export function NativeClassSessionsPanel({
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Verified classroom prerequisites">
         <p className="border border-border p-3 text-sm">
-          <strong>Eligible Class enrollments:</strong> {workspace.rosterCount}
+          <strong>Current Class roster count:</strong> {workspace.rosterCount}
           <span className="block text-xs text-muted-foreground">
-            {workspace.rosterCount>0 ? "A current roster exists; each learner remains independently authorized at pairing."
+            {workspace.rosterCount>0 ? "A roster exists; active registration, Site assignment and Class access are independently checked before pairing."
               : "No enrolled learner is listed. Verify registration before inviting participants."}
           </span>
         </p>
