@@ -36,17 +36,29 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [editorUnsaved, setEditorUnsaved] = useState(false);
+  const [editorState, setEditorState] = useState({
+    unsaved: false, busy: false, reconciliationRequired: false,
+  });
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const [pendingSwitch, setPendingSwitch] = useState<(() => void) | null>(null);
 
   function requestSwitch(action: () => void) {
-    if (editorUnsaved) setPendingSwitch(() => action);
+    setSwitchError(null);
+    if (editorState.busy) {
+      setSwitchError("A Solution save or review action is still running. Complete it before switching plans.");
+      return;
+    }
+    if (editorState.reconciliationRequired) {
+      setSwitchError("The last write could not be reconciled. Reload the catalog before switching plans.");
+      return;
+    }
+    if (editorState.unsaved) setPendingSwitch(() => action);
     else action();
   }
   function closeEditor() {
     setConfiguringVersionId(null);
     setResumeConfigurationId(null);
-    setEditorUnsaved(false);
+    setEditorState({ unsaved: false, busy: false, reconciliationRequired: false });
   }
 
   useEffect(() => {
@@ -56,7 +68,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
     setSelectedId(null);
     setConfiguringVersionId(null);
     setResumeConfigurationId(null);
-    setEditorUnsaved(false);
+    setEditorState({ unsaved: false, busy: false, reconciliationRequired: false });
     setPendingSwitch(null);
     setError(null);
     setQuery("");
@@ -81,6 +93,13 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
 
   return <WorkspacePanel title="Available Solutions"
     description="Browse CAN-published Solutions and configure your Site plan. Definitions are maintained separately by CAN app administrators.">
+    {switchError && <div role="alert" className="mt-3 border border-border bg-muted p-3 text-sm">
+      <p>{switchError}</p>
+      {editorState.reconciliationRequired && <Button type="button" variant="outline"
+        size="sm" className="mt-2" onClick={() => setReload(value => value + 1)}>
+        Reload catalog
+      </Button>}
+    </div>
     {loading && <p role="status" className="text-sm">Loading published Solutions…</p>}
     {error && <div role="alert" className="border border-destructive/30 bg-card p-4 text-sm">
       <p className="font-semibold">Unable to load Solutions</p>
@@ -171,7 +190,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                 <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the governed Solution and Site qualification workflows. This preview does not infer missing requirements.</p>
                 {workspace.canConfigure ? <div className="space-y-3">
                   <Button type="button" onClick={() => requestSwitch(() => {
-                    setEditorUnsaved(false);
+                    setEditorState({ unsaved: false, busy: false, reconciliationRequired: false });
                     setResumeConfigurationId(null);
                     setConfiguringVersionId(selected.blueprintVersionId);
                   })}>
@@ -184,7 +203,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                         {savedForSelected.map(configuration => <Button key={configuration.configurationId}
                             type="button" variant="outline" size="sm"
                             onClick={() => requestSwitch(() => {
-                              setEditorUnsaved(false);
+                              setEditorState({ unsaved: false, busy: false, reconciliationRequired: false });
                               setResumeConfigurationId(configuration.configurationId);
                               setConfiguringVersionId(selected.blueprintVersionId);
                             })}>
@@ -212,7 +231,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
         initialDelivery={preferredCatalogDelivery(delivery)}
         onWorkspaceChanged={updated => setWorkspace(current =>
           current?.siteId === updated.siteId ? updated : current)}
-        onUnsavedChange={setEditorUnsaved}
+        onUnsavedChange={setEditorState}
         embedded enableReferences />
     </>}
     <p className="mt-6 border-t pt-4 text-xs leading-5 text-muted-foreground">
