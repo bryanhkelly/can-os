@@ -76,7 +76,7 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
     <h3 className="font-semibold">Ask the school about this grade</h3>
     <p className="mt-1 text-xs text-muted-foreground">Your question creates a school follow-up. It does not change the grade.</p>
     <Button variant="outline" type="button" onClick={() => void refresh()} disabled={mutation.pending || loading}
-      className="mt-3  border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+      className="mt-3">
       {loading ? "Checking…" : "Refresh school response"}
     </Button>
     {loading ? <p className="mt-3 text-sm" role="status">Checking school response…</p> :
