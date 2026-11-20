@@ -10,6 +10,7 @@ import { WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } 
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
 import { LaunchSitePublicationPanel } from "./LaunchSitePublicationPanel";
 import { LaunchReadinessPanelV61 } from "./LaunchReadinessPanelV61";
+import { PrepareFacilitiesV61, PrepareSchedulesV61, PrepareTeamV61 } from "./PrepareOperationsV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 
 const prepareModuleIcons: Record<PrepareStageModuleIdV61, LucideIcon> = {
@@ -221,7 +222,10 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
         </WorkspaceNotice>
       </>}
       {module === "publish-site" && <LaunchSitePublicationPanel key={siteId} siteId={siteId} />}
-      {module !== "program-catalog" && module !== "publish-site" && <WorkspacePanel title="What to prepare"
+      {module === "facilities-resources" && <PrepareFacilitiesV61 key={siteId} siteId={siteId} />}
+      {module === "invite-team" && <PrepareTeamV61 key={siteId} siteId={siteId} />}
+      {module === "schedules-capacity" && <PrepareSchedulesV61 key={siteId} siteId={siteId} />}
+      {(module === "funding-enrollment" || module === "opening-compliance") && <WorkspacePanel title="What to prepare"
         description="Use requirements from the chosen Solution and applicable jurisdiction, rather than a generic checklist.">
         <div className="flex gap-3">
           <ClipboardCheck aria-hidden="true" className="mt-1 size-5 shrink-0 text-primary" />
