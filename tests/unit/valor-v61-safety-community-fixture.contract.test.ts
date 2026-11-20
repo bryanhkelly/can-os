@@ -47,7 +47,7 @@ describe("Valor canonical, private synthetic community fixtures",()=>{
     expect(trips).toContain("'proposed'");
     expect(trips).toContain("'invited',NULL");
     expect(trips).not.toMatch(/INSERT\s+INTO\s+public\.(consent_records|field_trip_attendance|field_trip_chaperones)/i);
-    expect(safety).toContain("'noRealIncident',true");
+    expect(safety).toContain('"noRealIncident":true');
     expect(safety).toContain("'closed'");
     expect(safety).not.toMatch(/INSERT\s+INTO\s+public\.(safeguarding_concerns|safeguarding_external_reports|medication_administrations|medication_authorizations|incident_notifications)/i);
   });
