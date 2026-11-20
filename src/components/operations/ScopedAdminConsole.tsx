@@ -39,9 +39,18 @@ type Site = Awaited<ReturnType<typeof listScopedSites>>["sites"][number];
 type Account = Awaited<ReturnType<typeof listAccessAccounts>>["accounts"][number];
 type Person = Awaited<ReturnType<typeof listPeople>>["people"][number];
 
-const authMessage = "Sign in with an authorized registrar account to manage access.";
+const authMessage = "Sign in with an authorized Site administrator or registrar to manage access.";
 
-export function ScopedAdminConsole({selection, mode="access", hubMode=false, includeRoomCoverage=true, onChanged}: {onChanged?:()=>Promise<unknown>;hubMode?:boolean;includeRoomCoverage?:boolean;selection: {siteId?: string; inviteRole?: string}; mode?: "access"|"invite"|"people"}) {
+export function ScopedAdminConsole({selection, mode="access", hubMode=false,
+  includeRoomCoverage=true, lockedSiteId, onChanged}: {
+  onChanged?:()=>Promise<unknown>;
+  hubMode?:boolean;
+  includeRoomCoverage?:boolean;
+  /** In Launch Studio, do not offer a different Site in this form or staff list. */
+  lockedSiteId?:string;
+  selection: {siteId?: string; inviteRole?: string};
+  mode?: "access"|"invite"|"people";
+}) {
   const [sites, setSites] = useState<Site[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -62,9 +71,13 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, inc
         if (!active) return;
         setSites(siteResult.sites);
         const defaults = launchStaffInvitationDefaults(siteResult.sites, selection);
-        form.setValue("siteId", defaults.siteId);
+        form.setValue("siteId", lockedSiteId ?? defaults.siteId);
         form.setValue("role", defaults.role);
-        if (defaults.unavailable) setError("The requested school is outside your available Sites. Choose a permitted school before inviting anyone.");
+        if (lockedSiteId && !siteResult.sites.some(site => site.id === lockedSiteId)) {
+          setError("The requested Site is outside your current invitation authority.");
+        } else if (defaults.unavailable) {
+          setError("The requested school is outside your available Sites. Choose a permitted school before inviting anyone.");
+        }
         setAccounts(accountResult.accounts);
         setPeople(peopleResult.people);
         setLoading(false);
@@ -94,6 +107,11 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, inc
   }
 
   async function submitInvite(values: z.output<typeof inviteSchema>) {
+    if (lockedSiteId && (values.siteId !== lockedSiteId ||
+        !sites.some(site => site.id === lockedSiteId))) {
+      setError("This invitation must remain within your current Site.");
+      return;
+    }
     setBusy(true);
     setError("");
     setNotice("");
@@ -115,7 +133,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, inc
           ? `Invitation submitted to the email provider for ${values.email}. Their exact-site role stays inactive until they accept the secure link.`
           : `Invitation recorded for ${values.email}, but email delivery was not confirmed. Retry the same invitation; no duplicate grant will be created.`);
       const defaults = launchStaffInvitationDefaults(sites, selection);
-      form.reset({...inviteDefaults,siteId:defaults.siteId,role:defaults.role});
+      form.reset({...inviteDefaults,siteId:lockedSiteId ?? defaults.siteId,role:defaults.role});
       await refresh();
       void onChanged?.().catch(()=>setError("Changes were saved, but the Hub summary could not refresh. Reopen the Hub before retrying."));
     } catch {
@@ -204,16 +222,18 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, inc
                 <FormItem className="sm:col-span-2">
                   <FormLabel className="text-sm font-semibold">Exact Site (required)</FormLabel>
                   <FormControl>
-                    <Select className={fieldClass} required {...field}>
+                    <Select className={fieldClass} required disabled={busy || Boolean(lockedSiteId)} {...field}>
                       <option value="">Select a permitted school</option>
-                      {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+                      {sites.filter(site => !lockedSiteId || site.id === lockedSiteId)
+                        .map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
                     </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <div className="sm:col-span-2">
-                <Button variant="default" size="lg" type="submit" disabled={busy}>
+                <Button variant="default" size="lg" type="submit"
+                  disabled={busy || Boolean(lockedSiteId && !sites.some(site => site.id === lockedSiteId))}>
                   {busy ? "Inviting…" : "Invite staff member"}
                 </Button>
               </div>
@@ -224,7 +244,9 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, inc
         {mode==="access"&&<section id="access-accounts" className="mt-8"><h2 className="font-serif text-2xl font-semibold">Staff access and readiness</h2>
           <p className="mt-1 text-sm text-muted-foreground">Acceptance and qualification are separate facts. Onsite directors, facilitators and staff submit screening and safeguarding-training evidence through their Profile; an independent reviewer must approve both.</p>
           <DirectoryTable label="Staff access" caption="Account grants in your authorized organizational scope."
-            rows={accounts.flatMap(account=>account.grants.map(grant=>({account,grant})))}
+            rows={accounts.flatMap(account=>account.grants
+              .filter(grant=>!lockedSiteId || grant.siteId===lockedSiteId)
+              .map(grant=>({account,grant})))}
             rowKey={row=>row.grant.grantId}
             empty={<p className="p-4 text-sm text-muted-foreground">No access accounts found in your organization scope.</p>}
             columns={[
