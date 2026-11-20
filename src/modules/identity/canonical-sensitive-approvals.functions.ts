@@ -200,7 +200,8 @@ export const listActiveCredentialIssuerApprovals=createServerFn({method:"GET"})
       organizationId:accountPersonGrants.organizationId,
       siteId:accountPersonGrants.siteId,
     }).from(approvals).innerJoin(accountPersonGrants,
-      eq(accountPersonGrants.id,approvals.accountPersonGrantId))
+      and(eq(accountPersonGrants.id,approvals.accountPersonGrantId),
+        eq(accountPersonGrants.accountId,approvals.requestedByCanAccountId)))
       .where(eq(approvals.status,"approved")).limit(101);
   });
 
@@ -219,7 +220,8 @@ export const listPendingCredentialIssuerApprovals=createServerFn({method:"GET"})
       siteId:accountPersonGrants.siteId,
       role:accountPersonGrants.role,
     }).from(approvals).innerJoin(accountPersonGrants,
-      eq(accountPersonGrants.id,approvals.accountPersonGrantId))
+      and(eq(accountPersonGrants.id,approvals.accountPersonGrantId),
+        eq(accountPersonGrants.accountId,approvals.requestedByCanAccountId)))
       .where(eq(approvals.status,"pending")).limit(101);
   });
 
