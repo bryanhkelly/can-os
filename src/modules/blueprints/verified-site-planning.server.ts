@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, sites } from "@/db/schema";
 import { isCanonicalSiteDiscoverable } from "@/domain/canonical-site-availability";
