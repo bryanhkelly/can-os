@@ -1,9 +1,7 @@
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
 import { Textarea } from "@/components/ui/textarea";
 import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
@@ -127,21 +125,15 @@ export function MarketingPackageWizardV61({
                 const selected=content.formats.includes(option.id);
                 return <div key={option.id} className={"flex min-w-0 flex-wrap items-start gap-2 border p-3 "+
                   (selected?"border-primary/60 bg-accent/25":"border-border bg-card")}>
-                  <Checkbox id={"marketing-format-"+option.id} className="mt-1"
-                    checked={selected}
-                    onChange={event=>{
-                      onPatch({formats:event.target.checked
+                  <SelectionCard kind="checkbox" compact value={option.id} title={option.label}
+                    detail={option.description} checked={selected} disabled={busy}
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 hover:bg-transparent"
+                    onChange={checked=>{
+                      onPatch({formats:checked
                         ? [...new Set([...content.formats,option.id])]
                         : content.formats.filter(id=>id!==option.id)});
-                      if(event.target.checked)onPreviewFormatChange(option.id);
+                      if(checked)onPreviewFormatChange(option.id);
                     }}/>
-                  <Label htmlFor={"marketing-format-"+option.id}
-                    className="min-w-0 flex-1 cursor-pointer text-sm">
-                    <strong className="block">{option.label}</strong>
-                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                      {option.description}
-                    </span>
-                  </Label>
                   <Button type="button" size="sm" variant="outline" disabled={!selected}
                     aria-pressed={activePreviewFormat===option.id}
                     onClick={()=>onPreviewFormatChange(option.id)}>Preview</Button>
