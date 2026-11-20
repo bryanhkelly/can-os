@@ -21,8 +21,7 @@ describe("canonical School Blueprint configuration", () => {
     );
     expect(markup).toContain("Configure your Solution");
     expect(markup).toContain("CAN defines and publishes the Blueprint");
-    expect(markup).toContain("Choose a published recipe");
-    expect(markup).toContain("Review and approval are separate from operating authorization");
+    expect(markup).toContain("Independent approval and enrollment authorization are separate");
     expect(markup).toContain("Loading Blueprint workspace");
     expect(markup).not.toContain("Start enrollment");
     expect(markup).not.toContain("Activate program");
