@@ -3,9 +3,10 @@ import { Slot } from "@radix-ui/react-slot";
 import { LoaderCircle } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { focusRingClasses } from "./control-styles";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  cn("inline-flex shrink-0 items-center justify-center gap-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0", focusRingClasses),
   {
     variants: {
       variant: {
