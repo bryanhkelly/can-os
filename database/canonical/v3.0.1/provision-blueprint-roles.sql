@@ -161,7 +161,7 @@ SELECT format(
 -- The independent reviewer reads only original author provenance.
 -- Public audit RLS additionally checks purpose and Organization.
 SELECT format(
- 'GRANT SELECT (actor_person_id,action,resource_id) ON public.audit_events TO %I',
+ 'GRANT SELECT (actor_person_id,action,resource_type,resource_id) ON public.audit_events TO %I',
  :'reviewer_role')
 \gexec
 
