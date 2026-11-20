@@ -1,5 +1,6 @@
 import { isValidElement, type EffectCallback, type ReactElement, type ReactNode, type SetStateAction } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Button } from "@/components/ui/button";
 import { GuardianPickupPanel } from "@/components/operations/GuardianPickupPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
 import { MutationFeedback } from "@/components/workspace";
@@ -64,7 +65,7 @@ describe.each([
     return nodes(panel());
   }
   function button(label: string) {
-    const result = render().find(node => node.type === "button" && node.props.children === label);
+    const result = render().find(node => node.type === Button && node.props.children === label);
     if (!result) throw new Error(`Missing pickup control: ${label}`);
     return result;
   }
@@ -97,7 +98,7 @@ describe.each([
     state.read.mockRejectedValueOnce(new Error("Refresh unavailable"));
     button(second).props.onClick?.(); await settled();
     expect(feedback().refreshFailed).toBe(true);
-    expect(render().some(node => node.type === "button" &&
+    expect(render().some(node => node.type === Button &&
       [first, second].includes(String(node.props.children)) && !node.props.disabled)).toBe(false);
     await feedback().retryRefresh();
     expect(feedback().refreshFailed).toBe(false);
