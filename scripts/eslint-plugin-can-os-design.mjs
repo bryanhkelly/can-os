@@ -223,9 +223,52 @@ const noNativeFeatureControls = {
   },
 };
 
+/**
+ * Pages should compose the V6.1 ActionFooter/FormActions instead of
+ * reproducing submit-button rows. This is intentionally narrow: only a
+ * direct submit Button inside a div/footer that is itself inside a form.
+ * Unrelated filter bars, navigation, and non-submit actions remain valid.
+ */
+const noDuplicateFormActions = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "Compose form submit rows with ActionFooter or FormActions" },
+    schema: [],
+    messages: {
+      reuse: "Use V6.1 <ActionFooter> or <FormActions> instead of a custom <{{name}}> around a submit Button.",
+    },
+  },
+  create(context) {
+    function containsDirectSubmitButton(element) {
+      return element.children.some(child => {
+        if (child.type !== "JSXElement" || jsxName(child.openingElement.name) !== "Button") return false;
+        return child.openingElement.attributes.some(attr =>
+          attr.type === "JSXAttribute" && attr.name.name === "type" &&
+          attr.value?.type === "Literal" && attr.value.value === "submit"
+        );
+      });
+    }
+    return {
+      JSXOpeningElement(node) {
+        const tag = jsxName(node.name);
+        if (tag !== "div" && tag !== "footer") return;
+        const element = node.parent;
+        if (element?.type !== "JSXElement" || !containsDirectSubmitButton(element)) return;
+        for (let ancestor = element.parent; ancestor; ancestor = ancestor.parent) {
+          if (ancestor.type === "JSXElement" && jsxName(ancestor.openingElement.name) === "form") {
+            context.report({ node, messageId: "reuse", data: { name: tag } });
+            return;
+          }
+        }
+      },
+    };
+  },
+};
+
 export default {
   rules: {
     "no-native-feature-controls": noNativeFeatureControls,
+    "no-duplicate-form-actions": noDuplicateFormActions,
     "no-hardcoded-colors": noHardcodedColors,
     "no-arbitrary-type-values": noArbitraryTypeValues,
     "no-raw-page-structure": noRawPageStructure,
