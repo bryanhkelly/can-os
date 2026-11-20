@@ -2,13 +2,24 @@ import { and, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { db } from "@/db/client";
 import * as s from "@/db/schema";
+import { canonicalClasses, canonicalClassEnrollments, canonicalClassStaffAssignments } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { authorizeClass } from "@/modules/learning/class-access.server";
 
 type Actor = Awaited<ReturnType<typeof requireActor>>;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-export type GroupScope = { id: string; siteId: string | null; programId: string | null; sectionId: string | null };
+export type GroupScope = { id: string; siteId: string | null; programId: string | null; sectionId: string | null; metadata?: unknown };
+
+export function canonicalGroupClassId(group: GroupScope): string | null {
+  const meta=group.metadata;
+  if(!meta||typeof meta!=="object"||Array.isArray(meta))return null;
+  const value=(meta as Record<string,unknown>).canonicalClassId;
+  if(value===undefined||value===null)return null;
+  if(typeof value!=="string"||!/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(value))
+    throw new AuthorizationError("valid canonical Class group binding");
+  return value;
+}
 
 export function assertGroupScope(actor: Actor, group: GroupScope) {
   if (!group.siteId || !actorSiteIds(actor).includes(group.siteId) ||
@@ -20,6 +31,23 @@ export function assertGroupScope(actor: Actor, group: GroupScope) {
 /** Active enrollment in the group's school/program and, for course groups, section. */
 export async function eligibleStudent(tx: Pick<Tx, "select">, studentPersonId: string, group: GroupScope, grantedPrograms: string[]) {
   if (!group.siteId) throw new AuthorizationError("group site");
+  const nativeClassId=canonicalGroupClassId(group);
+  if(nativeClassId){
+    const [native]=await tx.select({studentProfileId:s.studentProfiles.id})
+      .from(canonicalClassEnrollments)
+      .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
+      .innerJoin(s.studentProfiles,eq(s.studentProfiles.personId,canonicalClassEnrollments.learnerPersonId))
+      .innerJoin(s.sites,eq(s.sites.id,canonicalClasses.siteId))
+      .where(and(eq(canonicalClasses.id,nativeClassId),
+        eq(canonicalClasses.siteId,group.siteId),
+        eq(canonicalClasses.operatingOrganizationId,s.sites.organizationId),
+        eq(canonicalClasses.state,"active"),
+        eq(canonicalClassEnrollments.learnerPersonId,studentPersonId),
+        eq(canonicalClassEnrollments.status,"active")))
+      .limit(1);
+    if(!native)throw new AuthorizationError("current canonical Class member");
+    return native.studentProfileId;
+  }
   const [membership] = await tx.select({ studentProfileId: s.studentProfiles.id })
     .from(s.studentProfiles)
     .innerJoin(s.enrollments, eq(s.enrollments.studentProfileId, s.studentProfiles.id))
@@ -70,6 +98,22 @@ export async function facilitatedGroup(tx: Tx, actor: Actor, groupId: string) {
       eq(s.studyGroups.facilitatorPersonId, actor.actorPersonId)))
     .for("update").limit(1);
   if (!group) throw new AuthorizationError("active facilitated group");
+  const nativeClassId=canonicalGroupClassId(group);
+  if(nativeClassId){
+    assertGroupScope(actor,group);
+    const [authorized]=await tx.select({id:canonicalClassStaffAssignments.id})
+      .from(canonicalClassStaffAssignments)
+      .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassStaffAssignments.classId))
+      .where(and(eq(canonicalClassStaffAssignments.classId,nativeClassId),
+        eq(canonicalClassStaffAssignments.personId,actor.actorPersonId),
+        eq(canonicalClassStaffAssignments.roleCode,"teacher"),
+        eq(canonicalClassStaffAssignments.state,"approved"),
+        eq(canonicalClasses.siteId,group.siteId),
+        eq(canonicalClasses.state,"active")))
+      .limit(1);
+    if(!authorized)throw new AuthorizationError("current canonical Class teacher");
+    return group;
+  }
   if (group.sectionId) {
     // Exact delegated Section authority is sufficient for a course group,
     // but a bare assignment is not: validate active qualification, academic
