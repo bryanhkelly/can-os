@@ -50,7 +50,7 @@ export function NativeApprovedOfferingsPanel({
           <Link to="/class" search={{view:"activities"}} className="underline">Learning activities</Link>
         </div>
       </div>
-      {loaded&&offeringGroups.length===0&&<p className="mt-4 text-sm text-muted-foreground">
+      {loaded&&groups.length===0&&<p className="mt-4 text-sm text-muted-foreground">
         {search
           ?"No matching approved Courses are visible for this search. Clear the search to inspect the current operator catalog."
           :"No approved published Course adoption is visible for the current operator scope. Publisher approval and local adoption are separate."}
@@ -69,7 +69,7 @@ export function NativeApprovedOfferingsPanel({
       </form>
       <p className="mt-2 text-xs text-muted-foreground">Authorized Course results are paginated. Program component counts reflect the loaded page, not the full Offering.</p>
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {offeringGroups.map(group=><article key={group.id} className="border border-border p-4">
+        {groups.map(group=><article key={group.id} className="border border-border p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {group.first.offeringKind==="program"?"Program Offering":group.first.offeringKind==="course"?"Course Offering":"Published Offering"} · v{group.first.offeringVersionNo}
           </p>
