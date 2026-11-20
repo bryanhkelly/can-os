@@ -235,6 +235,26 @@ thin shell session-context import in `DashboardHome` is explicitly
 documented as a narrow exception rather than allowing arbitrary shell
 dependencies. The pure dependency tests are included in `test:design-audit`.
 
+**Cross-feature form pattern adoption (November 2026):** Existing
+`WorkspacePanel`, `ActionFooter`, `Field`, `Button` and `EmptyState`
+components now compose the reviewed forms for Class video uploads and resource
+links, admissions inquiries and family invitations, guardian enrollment form
+signing and registrar decisions, interest-event creation, school setup and
+extended-season drafts. Launch Studio Site Profile, learning-environment
+preparation, Program Discovery and native Offering adoption review also use
+the same patterns. No new feature-specific Button, form footer or panel
+abstraction was introduced. Each workflow retains its original command,
+authorization boundaries, eligibility, validation and state ownership.
+
+`can-os-design/no-duplicate-form-actions` reports a local `div` or
+`footer` directly wrapping a submit `Button` inside a form. It runs
+as an adoption warning across production JSX, and is an **error** for the
+migrated feature modules. A header toolbar, filter row, non-submit
+action or composition using `ActionFooter`/`FormActions` is not prohibited.
+The narrow detection intentionally does not claim to recognize every
+possible duplicated UI; cross-feature rendering tests and browser review
+remain complementary checks.
+
 **Dependency direction:** `ui` does not import features; shared
 `workspace` and `workflow` patterns compose `ui`; feature-specific
 components compose those layers. Server authorization, identity, evidence,
