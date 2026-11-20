@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
+import { getClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
 import {
   getClassroomHostActivity, releaseClassroomActivity, closeClassroomActivity,
 } from "@/modules/learning/classroom-evidence.functions";
@@ -30,6 +31,11 @@ export function ClassroomFacilitatorConsole({
     queryKey: ["classroom-host-activities", facilitatedSessionId],
     queryFn: () => getClassroomHostActivity({ data: { facilitatedSessionId } }),
     staleTime: 0, refetchInterval: 8000, retry: false,
+  });
+  const projector=useQuery({
+    queryKey:["classroom-projector-control",facilitatedSessionId],
+    queryFn:()=>getClassroomProjectorCommand({data:{facilitatedSessionId}}),
+    staleTime:0,refetchInterval:8000,retry:false,
   });
   const feedback = useMutationFeedback(() => room.refetch({throwOnError:true}));
   const busy = feedback.pending || feedback.refreshFailed;
@@ -85,11 +91,22 @@ export function ClassroomFacilitatorConsole({
         <p><strong>Room:</strong> {room.isError?"Access not verified":room.isPending?"Checking…":currentState}</p>
         <p><strong>Latest check:</strong> {room.isError?"Failed":room.isFetching?"Refreshing…":
           room.dataUpdatedAt?new Date(room.dataUpdatedAt).toLocaleTimeString():"Not yet checked"}</p>
+        <p><strong>Projector commands:</strong> {projector.isError?"Unavailable":
+          projector.isPending?"Checking…":
+          projector.data.roomState!=="live"?"Stopped ("+projector.data.roomState+")":
+          projector.data.latest?"Last request: "+projector.data.latest.commandKind:
+          "No commands yet"}</p>
         <p><strong>Activity:</strong> {room.isSuccess?
           room.data.releases.filter(release=>!release.closed).length+" open, "+
           room.data.releases.reduce((count,release)=>count+release.responseEvents,0)+" response events":
           "Unavailable"}</p>
       </div>
+      {projector.isError&&<p role="alert" className="mt-2 text-sm text-destructive">
+        The latest projector command could not be verified. This is not a playback confirmation.
+      </p>}
+      {projector.isSuccess&&projector.data.roomState==="blocked"&&<p role="alert" className="mt-2 text-sm text-destructive">
+        Projector authorization is blocked. Recheck audience enrollment and recording rights.
+      </p>}
       {room.isError&&<p role="alert" className="mt-2 text-sm text-destructive">
         Current facilitator or room access cannot be verified. Do not rely on previous counts or command states.
       </p>}
@@ -102,7 +119,7 @@ export function ClassroomFacilitatorConsole({
       </p>
       <Button type="button" size="sm" variant="outline" className="mt-3"
         disabled={room.isFetching}
-        onClick={()=>void room.refetch()}>Recheck classroom health</Button>
+        onClick={()=>{void room.refetch();void projector.refetch();}}>Recheck classroom health</Button>
     </section>
     {room.isSuccess && room.data?.partial && <p role="status" className="text-xs text-muted-foreground">
       This room exceeded the bounded live summary. The counts shown are partial.
