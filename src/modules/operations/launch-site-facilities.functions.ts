@@ -102,15 +102,19 @@ export const saveLaunchSiteSpaceV61=createServerFn({method:"POST"})
           ne(siteSpaces.id,room.id),
           sql`lower(btrim(${siteSpaces.name}))=lower(${data.name})`)).limit(1);
       if(duplicate)throw new DomainError("CONFLICT","A room with that name already exists");
-      if(data.maxOccupancy!==null){
-        const [overCapacity]=await tx.select({id:canonicalClasses.id})
-          .from(canonicalClasses).where(and(
-            eq(canonicalClasses.physicalSpaceId,room.id),
-            gt(canonicalClasses.capacity,data.maxOccupancy),
-          )).limit(1);
-        if(overCapacity)
-          throw new DomainError("CONFLICT","A planned Class exceeds this room capacity. Reassign or reduce the Class first.");
-      }
+      // A room already selected by a Class cannot have its documented
+      // occupancy erased, nor reduced below that Class's planned seats.
+      // A null Class capacity is still a planning gap, not a verified limit.
+      const [capacityConflict]=await tx.select({id:canonicalClasses.id})
+        .from(canonicalClasses).where(and(
+          eq(canonicalClasses.physicalSpaceId,room.id),
+          data.maxOccupancy===null
+            ? undefined
+            : gt(canonicalClasses.capacity,data.maxOccupancy),
+        )).limit(1);
+      if(capacityConflict)
+        throw new DomainError("CONFLICT",
+          "One or more planned Classes use this room. Keep a sufficient occupancy limit or reassign those Classes first.");
       const merged=mergeSitePlanningResourcesV61(room.resources,data.resources);
       const same=room.name===data.name&&room.maxOccupancy===data.maxOccupancy&&
         JSON.stringify(parseSitePlanningResourcesV61(room.resources))===JSON.stringify(data.resources);
