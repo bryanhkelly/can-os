@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassEnrollments, canonicalClassSessions,
   canonicalDeliverySessions, facilitatedClassroomPlans, learnerCourseAttempts,
+  participationAttributions,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { selectCourseClass } from "@/domain/course-class-registration";
@@ -132,6 +133,28 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
     consentSha256:args.release.consentSha256,consentedAt:args.now,
   }).returning({id:canonicalClassEnrollments.id});
   if(!placed)throw new Error("Class Placement creation failed");
+  // Both immutable attribution views must refer to the same learner, Course,
+  // released Site and reviewed network choice. Class reporting must not
+  // fabricate a different affiliate from an optional form field.
+  const sourceAttributions=await tx.select().from(participationAttributions)
+    .where(eq(participationAttributions.noncreditRegistrationId,args.registrationId))
+    .limit(2);
+  if(sourceAttributions.length!==1)throw new AuthorizationError("one original Course attribution");
+  const origin=sourceAttributions[0]!;
+  if(origin.deliverySiteId!==cls.siteId||origin.reportingSiteId!==cls.siteId)
+    throw new AuthorizationError("Course and Class delivery attribution mismatch");
+  await tx.insert(participationAttributions).values({
+    classEnrollmentId:placed.id,releaseId:args.release.id,
+    deliverySiteId:origin.deliverySiteId,reportingSiteId:origin.reportingSiteId,
+    creditedOrganizationId:origin.creditedOrganizationId,
+    networkMembershipId:origin.networkMembershipId,
+    attributionBasis:origin.attributionBasis,
+    relationshipSnapshot:{
+      source:"course_registration_class_placement",
+      registrationId:args.registrationId,
+      originalAttributionId:origin.id,
+    },
+  });
   const [linked]=await tx.update(learnerCourseAttempts).set({classEnrollmentId:placed.id})
     .where(and(eq(learnerCourseAttempts.id,args.attemptId),
       eq(learnerCourseAttempts.noncreditRegistrationId,args.registrationId),
