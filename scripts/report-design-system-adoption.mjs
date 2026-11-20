@@ -24,6 +24,9 @@ const canonicalTags = new Set([
   "StudentDashboardRail", "StudentUpcomingAssignments",
   "StudentReleasedGradesPanel", "StudentSchoolLifePanel",
   "StudentContinueLearningPanel", "StudentTodayAtGlance",
+  "ClassTeacherGuidePanel", "ClassLessonDiscussions", "ClassLessonAssessmentLinks",
+  "ClassPublishedResourcesList", "ClassSupplementContent",
+  "CalendarEventFactsPanels", "CalendarRecordContextPanel",
   "ExtendedSeasonDraftForm", "ExtendedSeasonReadinessRequests",
 ]);
 const files = [];
