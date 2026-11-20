@@ -5,12 +5,14 @@ import { StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/works
 import { listLaunches } from "@/modules/programs/launch.functions";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import { readLaunchSitePublication } from "@/modules/sites/launch-site-publication.functions";
+import { getNoncreditEnrollmentPublisher } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
 
 /** Existing authorities own every status. This is a read-only cross-workflow
  * projection, not a new readiness checklist, approval or enrollment toggle. */
 type Launches = Awaited<ReturnType<typeof listLaunches>>["launches"];
 type Solutions = Awaited<ReturnType<typeof readCanonicalBlueprintWorkspace>>;
 type Publication = Awaited<ReturnType<typeof readLaunchSitePublication>>;
+type NoncreditPublisher = Awaited<ReturnType<typeof getNoncreditEnrollmentPublisher>>;
 type ReadState<T> = { state: "loading" } | { state: "unavailable" } | { state: "ready"; value: T };
 
 export function LaunchReadinessPanelV61({ siteId, context }: {
@@ -20,17 +22,20 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
   const [programs, setPrograms] = useState<ReadState<Launches>>({state:"loading"});
   const [solutions, setSolutions] = useState<ReadState<Solutions>>({state:"loading"});
   const [publication, setPublication] = useState<ReadState<Publication>>({state:"loading"});
+  const [noncredit, setNoncredit] = useState<ReadState<NoncreditPublisher>>({state:"loading"});
 
   useEffect(() => {
     let active = true;
     setPrograms({state:"loading"});
     setSolutions({state:"loading"});
     setPublication({state:"loading"});
+    if (context === "open") setNoncredit({state:"loading"});
     void Promise.allSettled([
       listLaunches({data:{includeActive:true,siteId}}),
       readCanonicalBlueprintWorkspace({data:{siteId}}),
       readLaunchSitePublication({data:{siteId}}),
-    ]).then(([launches,plans,website]) => {
+      context === "open" ? getNoncreditEnrollmentPublisher() : Promise.resolve(null),
+    ]).then(([launches,plans,website,releases]) => {
       if(!active)return;
       setPrograms(launches.status === "fulfilled"
         ? {state:"ready",value:launches.value.launches.filter(item=>item.siteId===siteId)}
@@ -39,11 +44,13 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
         ? {state:"ready",value:plans.value} : {state:"unavailable"});
       setPublication(website.status === "fulfilled"
         ? {state:"ready",value:website.value} : {state:"unavailable"});
+      if (context === "open") setNoncredit(releases.status==="fulfilled" && releases.value
+        ? {state:"ready",value:releases.value} : {state:"unavailable"});
     });
     return ()=>{active=false;};
-  },[siteId,reload]);
+  },[siteId,reload,context]);
 
-  const pending = [programs,solutions,publication].some(item=>item.state==="loading");
+  const pending = [programs,solutions,publication,...(context==="open"?[noncredit]:[])].some(item=>item.state==="loading");
   return <WorkspacePanel title={context==="open" ? "Saved readiness and receiving Programs" : "Readiness from existing workspaces"}
     description="Each status comes from its owning workflow. A saved plan, completed requirement, website or Program status never grants Offering-level enrollment authorization.">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -156,6 +163,57 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
             ? "Publication recorded; reachability unverified" : "Not published"}</StatusBadge>
         </div>}
       </section>
+      {context==="open" && <section className="border bg-background p-4"
+        aria-label="Independently authorized noncredit enrollment releases">
+        <h3 className="text-sm font-semibold">Noncredit Offering enrollment</h3>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          The existing publisher service alone determines candidate availability and issued
+          enrollment releases. A candidate is not an active registration.
+        </p>
+        {noncredit.state==="loading" && <p role="status" className="mt-2 text-sm">
+          Checking authorized noncredit Offering records…
+        </p>}
+        {noncredit.state==="unavailable" && <WorkspaceNotice tone="attention" className="mt-3">
+          Current noncredit enrollment authority could not be verified for this account.
+          This does not mean an Offering is approved or unavailable.
+        </WorkspaceNotice>}
+        {noncredit.state==="ready" && (() => {
+          const candidates=noncredit.value.candidates.filter(item=>
+            [...item.siteOptions,...item.digitalSiteOptions].some(site=>site.id===siteId));
+          const releases=noncredit.value.published.filter(item=>item.siteId===siteId);
+          return <div className="mt-3 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              {candidates.length} publisher candidates · {releases.length} recorded enrollment releases
+            </p>
+            {releases.length>0 && <ul className="space-y-2">
+              {releases.map(item=><li key={item.id}
+                className="flex flex-wrap items-center justify-between gap-3 border p-3">
+                <p className="min-w-0 text-sm font-medium">{item.title}</p>
+                <StatusBadge tone="neutral">Recorded status: {item.status}</StatusBadge>
+              </li>)}
+            </ul>}
+            {candidates.length>0 && <ul className="space-y-2">
+              {candidates.map(item=><li key={[item.deploymentId,item.adoptionId,
+                item.trainingVersionId,item.courseVersionId].join(":")} className="border p-3">
+                <p className="text-sm font-medium">{item.trainingTitle}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Authorized provider candidate. Final enrollment publication still requires
+                  the receiving service to validate current release, capacity and consent.
+                </p>
+              </li>)}
+            </ul>}
+            {!releases.length && !candidates.length && <p className="text-sm text-muted-foreground">
+              No noncredit publisher candidates or issued enrollment releases for this Site.
+              Other academic and Class enrollment systems are independent.
+            </p>}
+            <Button asChild variant="outline" size="sm">
+              <Link to="/programs/noncredit/enrollment" search={{publicSiteId:siteId}}>
+                Manage independently authorized noncredit enrollment
+              </Link>
+            </Button>
+          </div>;
+        })()}
+      </section>}
     </div>
     <p className="mt-4 text-xs leading-5 text-muted-foreground">
       {context==="open"
