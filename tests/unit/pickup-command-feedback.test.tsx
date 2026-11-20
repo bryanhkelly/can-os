@@ -110,3 +110,41 @@ describe.each([
     expect(state.second.mock.calls[0][0].data.mutationId).not.toBe(state.second.mock.calls[1][0].data.mutationId);
   });
 });
+
+it("never presents an out-of-order pickup roster from a previous school date", async () => {
+  let resolveFirst!: (value: unknown) => void;
+  const firstDay = new Promise<unknown>(resolve => { resolveFirst = resolve; });
+  state.read.mockImplementation(({ data }: { data: { date: string } }) =>
+    data.date === "2030-01-01"
+      ? firstDay
+      : Promise.resolve({
+          students: [{ ...student, studentName: "Next Date Student" }],
+          canRecordPickupObservations: true, note: "Second date",
+        }));
+
+  function renderDate(date: string) {
+    state.cursor = 0;
+    state.effects = [];
+    const elements = nodes(OnsitePickupPanel({ date }));
+    return { elements, effects: [...state.effects] };
+  }
+
+  const older = renderDate("2030-01-01");
+  const cleanups = older.effects.map(effect => effect());
+  const newer = renderDate("2030-01-02");
+  cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); });
+  newer.effects.forEach(effect => effect());
+
+  await vi.waitFor(() => expect(renderDate("2030-01-02").elements
+    .some(element => element.props["aria-label"] === "Pickup for Next Date Student")).toBe(true));
+
+  resolveFirst({
+    students: [{ ...student, studentName: "Previous Date Student" }],
+    canRecordPickupObservations: true, note: "First date",
+  });
+  // Let the delayed request settle; it must not replace the verified roster.
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const current = renderDate("2030-01-02").elements;
+  expect(current.some(element => element.props["aria-label"] === "Pickup for Next Date Student")).toBe(true);
+  expect(current.some(element => element.props["aria-label"] === "Pickup for Previous Date Student")).toBe(false);
+});
