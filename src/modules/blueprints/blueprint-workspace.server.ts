@@ -13,6 +13,8 @@ import {
   educationOperations,
   educationOperationSites,
   educationOperationOrganizationRoles,
+  offerings,
+  offeringVersions,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -154,6 +156,30 @@ export async function getCanonicalBlueprintWorkspace(
         .map(version => version.blueprintVersionId),
     );
     const templates = selectBlueprintWorkspaceRecipes(recipes, savedRecipeVersionIds);
+    const linkedCodes = [...new Set(templates.flatMap(template => {
+      const spec = template.spec;
+      if (!spec || typeof spec !== "object" || Array.isArray(spec)) return [];
+      const code = (spec as Record<string, unknown>).offeringCode;
+      return typeof code === "string" && code.trim() ? [code] : [];
+    }))];
+    const linkedPublishedProducts = linkedCodes.length
+      ? await tx.select({
+          code: offerings.code,
+          title: offerings.title,
+          offeringVersionId: offeringVersions.id,
+          versionNo: offeringVersions.versionNo,
+        }).from(offerings)
+          .innerJoin(offeringVersions, eq(offeringVersions.offeringId, offerings.id))
+          .where(and(
+            inArray(offerings.code, linkedCodes),
+            eq(offerings.status, "active"),
+            eq(offeringVersions.lifecycle, "published"),
+          )).orderBy(desc(offeringVersions.versionNo))
+      : [];
+    const linkedByCode = new Map<string, (typeof linkedPublishedProducts)[number]>();
+    for (const product of linkedPublishedProducts) {
+      if (!linkedByCode.has(product.code)) linkedByCode.set(product.code, product);
+    }
     const components = templates.length
       ? await tx.select({
           id: blueprintComponents.id,
@@ -184,6 +210,10 @@ export async function getCanonicalBlueprintWorkspace(
           ...template,
           programCode: typeof metadata.programCode === "string" ? metadata.programCode : null,
           offeringCode: typeof metadata.offeringCode === "string" ? metadata.offeringCode : null,
+          // Planning-only. A published product is NOT a Site availability
+          // decision, qualified adoption or permission to enroll learners.
+          linkedPublishedOffering: typeof metadata.offeringCode === "string"
+            ? linkedByCode.get(metadata.offeringCode) ?? null : null,
           components: components
             .filter(component => component.blueprintVersionId === template.blueprintVersionId)
             .map(({ id, key, kind, requirementMode, componentSpec }) => ({
