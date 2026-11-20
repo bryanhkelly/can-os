@@ -109,23 +109,23 @@ function SiteResourceNeedForm({assessmentId}:{assessmentId:string}){
       <Label className="block">Resource code
         <Input required minLength={2} maxLength={64} pattern="[a-z][a-z0-9_]*" value={code}
           onChange={e=>setCode(e.target.value)} placeholder="e.g. learner_laptops"
-          className="mt-1 w-full border border-border bg-background p-2"/></Label>
+          className="mt-1"/></Label>
       <Label className="block">Resource description
         <Input required minLength={5} maxLength={500} value={description}
           onChange={e=>setDescription(e.target.value)} placeholder="Laptops for participating learners"
-          className="mt-1 w-full border border-border bg-background p-2"/></Label>
+          className="mt-1"/></Label>
       <Label className="block">Measurement unit
         <Input required value={unit} maxLength={40} onChange={e=>setUnit(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></Label>
+          className="mt-1"/></Label>
       <div className="grid grid-cols-2 gap-2">
         <Label>Required<Input type="number" min="0" max="1000000" step="any" required value={required} onChange={e=>setRequired(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></Label>
+          className="mt-1"/></Label>
         <Label>Available<Input type="number" min="0" max="1000000" step="any" required value={available} onChange={e=>setAvailable(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></Label>
+          className="mt-1"/></Label>
       </div>
       <Label className="block">Estimated cost per additional unit (USD, optional)
         <Input type="number" min="0" max="10000000" step=".01" value={cost} onChange={e=>setCost(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2"/></Label>
+          className="mt-1"/></Label>
       <Button size="sm" type="submit" disabled={busy}>{busy?"Recording…":"Record self-reported need"}</Button>
     </form>}
   </div>;
