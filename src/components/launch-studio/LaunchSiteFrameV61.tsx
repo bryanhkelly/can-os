@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { siteLaunchModules } from "./LaunchStudioOverviewV61";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
+import { LaunchNavigationGuardProvider } from "./LaunchNavigationGuardProvider";
 
 const stages = ["Establish", "Introduce", "Prepare", "Open"] as const;
 
@@ -71,7 +72,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
       </div>
     </div>
   );
-  return <div className="min-h-screen bg-background text-foreground xl:grid xl:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]">
+  return <LaunchNavigationGuardProvider><div className="min-h-screen bg-background text-foreground xl:grid xl:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]">
     <aside className="hidden min-h-0 border-r bg-card xl:sticky xl:top-0 xl:block xl:h-dvh">{renderSidebar("desktop")}</aside>
     <div className="min-w-0">
       <header aria-label="Launch Studio top bar" className="can-shell-bar sticky top-0 z-30 flex min-h-[var(--topbar-height)] flex-wrap items-center justify-between gap-3 border-b bg-card px-[var(--page-gutter)] py-2">
@@ -107,5 +108,5 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
       </Modal>
       <div>{children}</div>
     </div>
-  </div>;
+  </div></LaunchNavigationGuardProvider>;
 }
