@@ -4,6 +4,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
+import { requireCurriculumDeliveryAccess } from "./curriculum-delivery-access.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { sessionIdleCutoff } from "@/domain/access-tokens";
 import {
@@ -57,6 +58,7 @@ export const startLearningActivitySession = createServerFn({ method: "POST" })
           !readClassContent(section.curriculum)) {
         throw new AuthorizationError("published enrolled class");
       }
+      await requireCurriculumDeliveryAccess(tx, section);
       const [created] = await tx.insert(s.learningActivitySessions).values({
         accessSessionId: actor.sessionId,
         studentProfileId,
@@ -109,6 +111,7 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
       if (!studentProfileId || !section.siteId || section.contentStatus !== "published") {
         throw new AuthorizationError("published enrolled class");
       }
+      await requireCurriculumDeliveryAccess(tx, section);
       const content = readClassContent(section.curriculum);
       if (!content) throw new AuthorizationError("published lesson content");
       const lesson = content.modules.flatMap(module => module.lessons)
