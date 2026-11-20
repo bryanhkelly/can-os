@@ -335,3 +335,39 @@ negative tests, revocation, transactional ownership checks, and audit/event
 persistence. A first-party application service authorization is *not*
 evidence that restricted-role RLS was exercised. Do not conflate the
 normal Site planning path with approval/deployment role provisioning.
+
+
+## 2026-11-19 · Establish-to-Prepare Catalog and published COGIC package integration
+
+- **Single authorization:** `exploreBlueprintReferenceCatalog` now uses the
+  verified CAN Site planning context. A founder's existing authenticated Site
+  administrator grant can browse published Program references in Establish
+  and published Solutions in Prepare without a second canonical operator role.
+- **Save-time integrity:** Adding a new Program reference inside
+  `saveSiteProgramsAudiencesV61` now calls the same published-reference query
+  inside the already authorized, revision-locked Site transaction. It does not
+  open a nested catalog transaction or use an unrelated DB role. Previously
+  saved/retired reference codes remain removable without requiring catalog
+  availability.
+- **Published operating details:** Site-facing Solution cards and editors now
+  render whitelisted CAN-authored `componentSpec.description` text and explicit
+  independent-review requirements. Raw unpublished/internal component specs
+  are not exposed.
+- **Published Solution product:** The existing `Blueprint.spec.offeringCode`
+  is resolved to the latest active/published Offering version **owned by the
+  same publisher Organization**. The linked product can be added as a
+  version-pinned private proposal without requiring a current geographic
+  availability decision. The existing availability-policy picker and all
+  execution/review/enrollment gates remain independent.
+- **COGIC pilot data observed:** Two active published pilot Blueprint versions
+  and their twelve component definitions are present on Neon main. No
+  published qualification fit policies or associated policy requirements were
+  observed. Consequently the application must not infer Site readiness,
+  regulatory eligibility or enrollability from the published product link.
+- **Verification:** Source contracts (20/20 inspected assertions) and focused
+  regression tests were authored and committed, but the new tests have not
+  been executed in a functioning CI/build environment. GitHub Actions and
+  the Netlify preview currently report failures without a successful build
+  acceptance. Authenticated browser and RLS/role tests remain necessary.
+- **Scope:** Feature branch only. No production writes, new schema, approval
+  grants, website release or enrollment activation.
