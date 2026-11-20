@@ -1,3 +1,4 @@
+import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { Link } from "@tanstack/react-router";
 import type { FirstClassroom } from "@/domain/first-classroom";
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
@@ -32,8 +33,8 @@ export function TeacherFirstWeekCard({ id, title, studentCount, classroom }: {
           : <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
               {classroom.blockers.map(item => <li key={item.key}>{item.message}</li>)}
             </ul>}
-      <nav aria-label={`Teaching actions for ${title}`}
-        className="flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-3 text-sm">
+      <WorkspaceLinkNavigation label={`Teaching actions for ${title}`}
+        surface="plain" className="gap-x-4 gap-y-2 border-t border-border pt-3">
         {classroom?.firstWeek.lesson && <Link to="/classes"
           search={{ section: id, tab: "lessons", lesson: classroom.firstWeek.lesson.id }}
           className="font-medium underline underline-offset-4">Open first lesson</Link>}
@@ -47,7 +48,7 @@ export function TeacherFirstWeekCard({ id, title, studentCount, classroom }: {
           className="font-medium underline underline-offset-4">Gradebook</Link>
         <Link to="/classes" search={{ section: id, tab: "people" }}
           className="font-medium underline underline-offset-4">Review roster</Link>
-      </nav>
+      </WorkspaceLinkNavigation>
     </div>
   </DashboardPanel>;
 }
