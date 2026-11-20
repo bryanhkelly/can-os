@@ -77,7 +77,7 @@ function TeacherMissingWorkResolution({actionId}:{actionId:string}) {
       Resolution note
       <Textarea value={note} maxLength={1000} rows={3} disabled={busy}
         onChange={event=>setNote(event.target.value)}
-        className="mt-2 w-full  border bg-background p-3 text-sm"
+        className="mt-2"
         placeholder="Document the follow-up outcome"/>
     </Label>
     <Button variant="default" type="button" disabled={busy||note.trim().length<5}
