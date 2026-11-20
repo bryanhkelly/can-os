@@ -31,7 +31,9 @@ export function RoomCoverageWorkspace({ siteId, view = "all" }: {
   const [roomAttempted, setRoomAttempted] = useState(false);
   const busy = feedback.pending || feedback.refreshFailed;
   const model = query.data;
-  return <section aria-label="All-day room coverage" className="mt-6 border border-border bg-card p-5">
+  return <section aria-label={view === "rooms" ? "Site physical rooms" :
+    view === "schedules" ? "Existing school Program room coverage" : "All-day room coverage"}
+    className="mt-6 border border-border bg-card p-5">
     <h2 className="font-serif text-2xl">{view === "rooms"
       ? "Physical rooms & occupancy capacity"
       : view === "schedules" ? "Facilitator coverage & room schedules"
