@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EmptyState, FilterBar, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, EmptyState, FilterBar, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
@@ -36,6 +36,18 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [editorUnsaved, setEditorUnsaved] = useState(false);
+  const [pendingSwitch, setPendingSwitch] = useState<(() => void) | null>(null);
+
+  function requestSwitch(action: () => void) {
+    if (editorUnsaved) setPendingSwitch(() => action);
+    else action();
+  }
+  function closeEditor() {
+    setConfiguringVersionId(null);
+    setResumeConfigurationId(null);
+    setEditorUnsaved(false);
+  }
 
   useEffect(() => {
     let active = true;
@@ -44,6 +56,8 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
     setSelectedId(null);
     setConfiguringVersionId(null);
     setResumeConfigurationId(null);
+    setEditorUnsaved(false);
+    setPendingSwitch(null);
     setError(null);
     setQuery("");
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
@@ -83,7 +97,11 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
       {templates.length === 0 ? <EmptyState title="No published Solutions"
         description="A Solution must be published and available to this Site before it can be configured." className="mt-4" /> : <>
         <FilterBar label="Published Solutions" query={query}
-          onQueryChange={value => { setQuery(value); setSelectedId(null); setConfiguringVersionId(null); setResumeConfigurationId(null); }}
+          onQueryChange={value => requestSwitch(() => {
+            setQuery(value);
+            setSelectedId(null);
+            closeEditor();
+          })}
           searchLabel="Search published Solutions"
           searchPlaceholder="Search titles or components" className="mt-5" />
         <p role="status" className="mt-3 text-xs text-muted-foreground">
@@ -104,11 +122,10 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                 const matchesProgram = !!template.programCode &&
                   !!intent?.programCodes?.includes(template.programCode);
                 return <Button key={template.blueprintVersionId} type="button"
-                  variant="ghost" onClick={() => {
+                  variant="ghost" onClick={() => requestSwitch(() => {
                     setSelectedId(template.blueprintVersionId);
-                    setConfiguringVersionId(null);
-                    setResumeConfigurationId(null);
-                  }}
+                    closeEditor();
+                  })}
                   aria-pressed={active}
                   className={"h-auto min-h-20 w-full justify-start whitespace-normal border p-4 text-left hover:bg-muted " +
                     (active ? "border-primary bg-accent" : "bg-background")}>
@@ -153,10 +170,11 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                 </div>
                 <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the governed Solution and Site qualification workflows. This preview does not infer missing requirements.</p>
                 {workspace.canConfigure ? <div className="space-y-3">
-                  <Button type="button" onClick={() => {
+                  <Button type="button" onClick={() => requestSwitch(() => {
+                    setEditorUnsaved(false);
                     setResumeConfigurationId(null);
                     setConfiguringVersionId(selected.blueprintVersionId);
-                  }}>
+                  })}>
                     Start a Solution plan <ArrowRight aria-hidden="true" className="size-4" />
                   </Button>
                   {savedForSelected.length > 0 &&
@@ -165,10 +183,11 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
                       <div className="mt-2 flex flex-wrap gap-2">
                         {savedForSelected.map(configuration => <Button key={configuration.configurationId}
                             type="button" variant="outline" size="sm"
-                            onClick={() => {
+                            onClick={() => requestSwitch(() => {
+                              setEditorUnsaved(false);
                               setResumeConfigurationId(configuration.configurationId);
                               setConfiguringVersionId(selected.blueprintVersionId);
-                            }}>
+                            })}>
                             {configuration.name} · {configuration.lifecycle === "frozen" ? "In review" : "Draft"}
                           </Button>)}
                       </div>
@@ -183,7 +202,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
     </>}
     {configuringVersionId && workspace?.canConfigure && <>
       <div className="mt-6 border-t pt-5">
-        <Button type="button" variant="outline" onClick={() => setConfiguringVersionId(null)}>
+        <Button type="button" variant="outline" onClick={() => requestSwitch(closeEditor)}>
           Return to Solution details
         </Button>
       </div>
@@ -193,6 +212,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
         initialDelivery={preferredCatalogDelivery(delivery)}
         onWorkspaceChanged={updated => setWorkspace(current =>
           current?.siteId === updated.siteId ? updated : current)}
+        onUnsavedChange={setEditorUnsaved}
         embedded enableReferences />
     </>}
     <p className="mt-6 border-t pt-4 text-xs leading-5 text-muted-foreground">
@@ -200,5 +220,15 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
       published learning products while configuring the Site plan. Adoption, class
       publication, and enrollment each require separate authorization.
     </p>
+    <ActionDialog open={Boolean(pendingSwitch)}
+      title="Discard unsaved Solution changes?"
+      description="Your edits to the selected Site plan have not been saved. Discarding them will not alter any saved revisions or published CAN Solutions."
+      confirmLabel="Discard changes" destructive
+      onClose={() => setPendingSwitch(null)}
+      onConfirm={() => {
+        const action = pendingSwitch;
+        setPendingSwitch(null);
+        if (action) action();
+      }} />
   </WorkspacePanel>;
 }
