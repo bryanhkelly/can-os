@@ -1,3 +1,4 @@
+import { canonicalJson } from "@/lib/canonical-json";
 import { siteBrandVersions, siteArtifactReleases, siteLocalContentVersions } from "@/db/schema";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -32,12 +33,7 @@ const saveInput = revisionInput.extend({
 });
 const archiveInput = revisionInput.extend({ archived: z.boolean() });
 
-function canonicalJson(value:unknown):string {
-  return JSON.stringify(value,(_key,entry:unknown)=>
-    entry && typeof entry==="object" && !Array.isArray(entry)
-      ? Object.fromEntries(Object.entries(entry).sort(([a],[b])=>a.localeCompare(b)))
-      : entry);
-}
+
 
 function toView(row: typeof siteMarketingPackages.$inferSelect) {
   return {
