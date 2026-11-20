@@ -4,7 +4,7 @@ import { beginClassVideoUpload, finishClassVideoUpload } from "@/modules/learnin
 import { createPrivateUploadTask } from "@/platform/storage/private-upload";
 import { classVideoFileSchema, videoUploadPolicy } from "@/domain/class-video";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
-import { MutationFeedback } from "@/components/workspace";
+import { ActionFooter, MutationFeedback } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
@@ -79,12 +79,12 @@ export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: 
         <Checkbox checked={rights} onChange={event => setRights(event.target.checked)}/>
       </Field>
     </fieldset>
-    <div className="flex gap-3">
-      <Button type="submit" disabled={!enabled || busy}>
+    <ActionFooter layout="inline" className="mt-0">
+      <Button type="submit" disabled={!enabled || busy} loading={feedback.pending} loadingLabel="Uploading video...">
         {attempted ? "Retry video upload" : "Upload video"}
       </Button>
       {attempted && <Button type="button" variant="outline" disabled={busy}
         onClick={() => { task.current = null; setAttempted(false); }}>Choose another file</Button>}
-    </div>
+    </ActionFooter>
   </form>;
 }
