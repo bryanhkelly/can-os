@@ -397,7 +397,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         releaseNavigation();
         window.location.reload();
       }}>Reload Site and review saved choices</Button>
-    </>
+    </>}
     <footer aria-label="Programs & Audiences actions">
       <ActionFooter layout="step">
       <Button variant="outline" disabled={busy} onClick={() => step === 0 ? onBackToSiteInformation() : selectStep(0)}>
