@@ -7,7 +7,7 @@
  */
 import { ArrowRight, BookOpen, Building2, ClipboardCheck, Globe, Info, Megaphone, Rocket, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { prepareStageModulesV61 } from "@/domain/launch-prepare-v61";
+export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { WorkspaceShell, WorkspacePanel, WorkspaceNotice, StatusBadge, type StatusTone } from "@/components/workspace";
 
 export type LaunchOverviewProps = {
@@ -19,18 +19,6 @@ export type LaunchOverviewProps = {
   /** Server-resolved route to permanent Site Workspace. */
   workspaceUrl: string;
 };
-
-export const siteLaunchModules = [
-  { stage: "Establish", id: "site-profile", title: "Site Profile" },
-  { stage: "Establish", id: "site-information", title: "Site Information" },
-  { stage: "Establish", id: "programs-audiences", title: "Programs & Audiences" },
-  { stage: "Establish", id: "website-brand", title: "Website & Brand" },
-  { stage: "Introduce", id: "promote", title: "Promote" },
-  { stage: "Introduce", id: "recruit", title: "Recruit Families / Learners" },
-  { stage: "Introduce", id: "interest-events", title: "Interest Events" },
-  ...prepareStageModulesV61.map(module => ({ stage: "Prepare" as const, id: module.id, title: module.title })),
-  { stage: "Open", id: "open", title: "Open" },
-] as const;
 
 const stages = [
   { id: "Establish", icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
