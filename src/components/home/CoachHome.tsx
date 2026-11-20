@@ -6,6 +6,8 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { Link } from "@tanstack/react-router";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { CoachCaseloadList } from "@/components/support/CoachCaseloadList";
+import { CoachStudentTimeline } from "@/components/support/CoachStudentTimeline";
 import { Users, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -122,54 +124,8 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
         )}
         {!loading && !error && students.length > 0 && (
           <div className="mt-8 grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-            <section>
-              <div className="space-y-3">
-                {students.map((student) => (
-                  <Button type="submit" variant="ghost"
-                    key={student.studentProfileId}
-                    onClick={() => {
-                      selectStudent(student.studentProfileId);
-                      setMessage("");
-                      setFormError("");
-                    }}
-                    className={`w-full  border bg-card p-5 text-left hover:border-foreground/40 ${
-                      selected === student.studentProfileId ? "border-foreground" : "border-border"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h2 className="text-base font-semibold">{student.name}</h2>
-                      <span className="text-xs text-muted-foreground">
-                        {student.gradeLevel ? `Grade ${student.gradeLevel}` : "Grade —"}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      {student.openReferrals > 0 && (
-                        <span className=" bg-stone-warm px-2 py-1">
-                          {student.openReferrals} open referral{student.openReferrals === 1 ? "" : "s"}
-                          {student.latestReferralStage ? ` · ${student.latestReferralStage.replaceAll("_", " ")}` : ""}
-                        </span>
-                      )}
-                      {student.hasOpenPlan && (
-                        <span className=" bg-stone-warm px-2 py-1">Support plan</span>
-                      )}
-                      {student.openInsights > 0 && (
-                        <span className=" bg-stone-warm px-2 py-1">
-                          {student.openInsights} insight{student.openInsights === 1 ? "" : "s"}
-                        </span>
-                      )}
-                      {student.openActions > 0 && (
-                        <span className=" bg-stone-warm px-2 py-1">
-                          {student.openActions} open action{student.openActions === 1 ? "" : "s"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Last activity {new Date(student.lastActivityAt).toLocaleString()}
-                    </p>
-                  </Button>
-                ))}
-              </div>
-            </section>
+            <CoachCaseloadList students={students} selected={selected}
+              onSelect={id=>{selectStudent(id);setMessage("");setFormError("");}} />
             <section className="h-fit  border bg-card p-5">
               {!chosen && <p className="text-sm text-muted-foreground">Select a student to see their timeline and log outreach.</p>}
               {chosen && (
@@ -177,41 +133,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
                   <h2 className="font-serif text-2xl">{chosen.name}</h2>
                   <Link to="/staff/students/$personId" params={{personId:chosen.personId}} className="mt-3 inline-block text-sm underline">Open student profile</Link>
                   <p className="mt-3 text-xs text-muted-foreground">School-support records only. Do not enter clinical or private counseling notes.</p>
-                  <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Timeline</h3>
-                  {historyError&&<p role="alert" className="mt-3 text-sm">{historyError}</p>}
-                  {timelineLoading && <p className="mt-3 text-sm" role="status">Loading history…</p>}
-                  {!timelineLoading && !historyError && timeline.length === 0 && (
-                    <p className="mt-3 text-sm text-muted-foreground">No recorded history yet.</p>
-                  )}
-                  <ol className="mt-3 space-y-3">
-                    {timeline.map((entry) => (
-                      <li key={`${entry.kind}-${entry.id}`} className=" border border-border p-3 text-sm">
-                        <div className="flex flex-wrap justify-between gap-2">
-                          <p className="font-semibold">{entry.title}</p>
-                          {entry.kind==="referral"&&<Link to="/support" search={{referral:entry.id}} className="text-xs underline">Open referral</Link>}
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(entry.occurredAt).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
-                          {entry.kind.replaceAll("_", " ")}
-                          {entry.outcome ? ` · ${entry.outcome.replaceAll("_", " ")}` : ""}
-                          {` · ${entry.status.replaceAll("_", " ")}`}
-                        </p>
-                        {entry.detail && <p className="mt-2 text-sm text-muted-foreground">{entry.detail}</p>}
-                        {entry.stageHistory && entry.stageHistory.length > 0 && (
-                          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                            {entry.stageHistory.map((stage, index) => (
-                              <li key={index}>
-                                {stage.stage.replaceAll("_", " ")} · {new Date(stage.occurredAt).toLocaleDateString()}
-                                {stage.note ? ` — ${stage.note}` : ""}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
+                  <CoachStudentTimeline entries={timeline} loading={timelineLoading} error={historyError}/>
                   <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Log outreach</h3>
                   <Label className="mt-3 block text-sm font-semibold">
                     Note
