@@ -16,7 +16,7 @@ export function TeacherFirstWeekCard({ id, title, studentCount, classroom }: {
   return <DashboardPanel title={title}
     description={studentCount === null ? "Student roster temporarily unavailable"
       : `${studentCount} enrolled ${studentCount === 1 ? "student" : "students"}`}
-    action={<Link to="/classes" search={{ section: id }} className="font-semibold underline underline-offset-4">
+    action={<Link to="/class" search={{ section: id }} className="font-semibold underline underline-offset-4">
       Open class
     </Link>}>
     <div className="space-y-3">
@@ -35,7 +35,7 @@ export function TeacherFirstWeekCard({ id, title, studentCount, classroom }: {
             </ul>}
       <WorkspaceLinkNavigation label={`Teaching actions for ${title}`}
         surface="plain" className="gap-x-4 gap-y-2 border-t border-border pt-3">
-        {classroom?.firstWeek.lesson && <Link to="/classes"
+        {classroom?.firstWeek.lesson && <Link to="/class"
           search={{ section: id, tab: "lessons", lesson: classroom.firstWeek.lesson.id }}
           className="font-medium underline underline-offset-4">Open first lesson</Link>}
         {classroom?.firstWeek.assessment
@@ -46,7 +46,7 @@ export function TeacherFirstWeekCard({ id, title, studentCount, classroom }: {
               className="font-medium underline underline-offset-4">Create first assessment</Link>}
         <Link to="/teacher/gradebook" search={{ section: id }}
           className="font-medium underline underline-offset-4">Gradebook</Link>
-        <Link to="/classes" search={{ section: id, tab: "people" }}
+        <Link to="/class" search={{ section: id, tab: "people" }}
           className="font-medium underline underline-offset-4">Review roster</Link>
       </WorkspaceLinkNavigation>
     </div>
