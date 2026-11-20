@@ -150,6 +150,12 @@ SELECT format('GRANT USAGE ON SEQUENCE %s TO %I',
  :'reviewer_role')
 \gexec
 
+-- The journal-only RLS purpose predicate is not callable by clients.
+SELECT format(
+ 'GRANT EXECUTE ON FUNCTION public.has_restricted_blueprint_purpose(uuid,text) TO %I,%I',
+ :'author_role',:'reviewer_role')
+\gexec
+
 -- Public audit and outbox are the single authoritative journals.
 -- No direct INSERT privilege is given to these tables. The function
 -- validates the restricted role, approved purpose binding, action and
