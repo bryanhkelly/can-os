@@ -53,7 +53,7 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
    Boolean(item.revisionFeedbackText)))));
  return <WorkspaceShell width="wide" eyebrow="Student learning" title="Your assignments"
   subtitle="Read instructions, open an assignment to work on it, and follow through on feedback."
-  breadcrumbs={<><Link to="/home" className="underline">Student Today</Link><span>/</span><Link to="/classes" search={section ? { section } : {}} className="underline">{section ? "Class" : "My classes"}</Link><span>/</span><span>Assignments</span></>}
+  breadcrumbs={<><Link to="/home" className="underline">Student Today</Link><span>/</span><Link to="/class" search={section ? { section } : {}} className="underline">{section ? "Class" : "My classes"}</Link><span>/</span><span>Assignments</span></>}
   actions={<Button asChild variant="outline" size="sm"><Link to="/calendar-export">Export deadlines (.ics)</Link></Button>}>
   {!connected && <WorkspaceNotice tone="attention" className="mt-5">School records are currently unavailable.</WorkspaceNotice>}
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
