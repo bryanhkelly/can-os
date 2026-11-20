@@ -24,6 +24,8 @@ import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
 import { ClassCreationRequestForm } from "@/components/learning/ClassCreationRequestForm";
 import { ClassTeacherPlanningPanel } from "@/components/learning/ClassTeacherPlanningPanel";
 import { ClassTeacherGuidePanel } from "@/components/learning/ClassTeacherGuidePanel";
+import { ClassLessonDiscussions } from "@/components/learning/ClassLessonDiscussions";
+import { ClassLessonAssessmentLinks } from "@/components/learning/ClassLessonAssessmentLinks";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
@@ -390,17 +392,9 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
           <div className="whitespace-pre-wrap text-sm leading-8">{lesson.transcript}</div>
         </section> : <p role="status" className="text-sm text-muted-foreground">No transcript has been published for this lesson.</p>}
           notes={data.role !== "guardian" ? <PrivateLessonNotes key={lesson.id} sectionId={data.section.id} versionId={data.section.versionId} lessonId={lesson.id}/> : undefined}
-          discussion={data.role !== "guardian" ? <section className="space-y-4" aria-label="Lesson discussions">
-            <p className="text-sm text-muted-foreground">Discuss this lesson with your class. Posts use the school’s shared discussion threads and teacher moderation.</p>
-            {!lessonDiscussions.length && <p role="status" className="text-sm">No discussion has been opened for this lesson.</p>}
-            <ul className="divide-y">{lessonDiscussions.map(thread => <li key={thread.id} className="py-3">
-              <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"} search={{ section: data.section.id, thread: thread.id }}
-                className="font-semibold underline">{thread.title}</Link>
-              <p className="mt-1 text-xs text-muted-foreground">{thread.locked ? "Locked · read only" : "Open for class responses"}{thread.lessonId === null ? " · Class-wide discussion" : ""}</p>
-            </li>)}
-          </ul>
-            {data.role === "teacher" && <Link to="/teacher/discussions" search={{ section: data.section.id, lesson: lesson.id }} className="text-sm underline">Start a discussion from this lesson</Link>}
-          </section> : undefined}/>
+          discussion={data.role !== "guardian" ? <ClassLessonDiscussions
+            threads={lessonDiscussions} role={data.role} sectionId={data.section.id}
+            lessonId={lesson.id} /> : undefined}/>
         {data.role === "teacher" && <ClassSupplementForm key={lesson.id} title={resourceTitle} url={resourceUrl}
           kind={resourceKind} lessonId={lesson.id} lessons={lessons} busy={busy} fixedLesson
           sectionId={data.section.id} uploadsEnabled={data.videoUploadsEnabled}
@@ -413,24 +407,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
             } });
             setResourceTitle(""); setResourceUrl("");
           }, "Teacher resource attached to this lesson.")} />}
-        {relatedWork.length > 0 && <section className="mt-6 space-y-3  border p-4" aria-label="Assignments for this lesson">
-          <h3 className="text-sm font-semibold">Assignments for this lesson</h3>
-          <ul className="divide-y">{relatedWork.map(work => <li key={work.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div>
-              <p className="font-medium text-sm">{work.title}</p>
-              {data.role !== "teacher" && <p className="text-xs text-muted-foreground">
-                {work.status === "graded" && work.score !== null ? `Graded: ${work.score} / ${work.pointsPossible ?? "—"}` :
-                work.status === "submitted" ? "Submitted · awaiting teacher feedback" :
-                work.status === "returned" ? "Returned for revision" :
-                work.status === "draft" ? "Response in progress" : "Not submitted"}
-              </p>}
-            </div>
-            {data.role === "teacher" ?
-              <Link to="/teacher/gradebook" search={{section:data.section.id,assessment:work.id}} className="text-sm underline">Review in gradebook</Link> :
-              data.role === "student" ?
-              <Link to="/student/assignments" search={{section:data.section.id,assessment:work.id}} className="text-sm underline">Open assignment</Link> : null}
-          </li>)}</ul>
-        </section>}
+        <ClassLessonAssessmentLinks items={relatedWork}
+          role={data.role} sectionId={data.section.id} />
         {data.role === "teacher" && <section className="mt-6  border p-4" aria-label="Assign from this lesson">
           <h3 className="text-sm font-semibold">Assign work from this lesson</h3>
           <p className="mt-1 text-xs text-muted-foreground">Create teacher-owned work linked to this published lesson. Publisher content remains unchanged.</p>
