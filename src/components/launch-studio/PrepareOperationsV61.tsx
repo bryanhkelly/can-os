@@ -2,12 +2,12 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { SchoolYearCreateForm } from "@/components/operations/SchoolYearCreateForm";
 import { getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
-import { ActionDialog, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   cleanSiteEnvironmentV61, siteEnvironmentV61Schema,
   type SiteEnvironmentV61,
@@ -123,9 +123,8 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
         </WorkspaceNotice>}
         {revision && <form className="mt-4 grid gap-4 sm:grid-cols-2"
           onSubmit={event => {event.preventDefault(); void saveEnvironment();}}>
-          <Label className="block text-sm font-semibold">
-            Delivery model
-            <Select className="mt-2 min-h-11 w-full" value={environment.delivery}
+          <Field label="Delivery model">
+            <Select className="min-h-11 w-full" value={environment.delivery}
               disabled={saving || reconciliationRequired}
               onChange={event => setEnvironment(current => ({
                 ...current,
@@ -138,10 +137,9 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
               <option value="digital">Online</option>
               <option value="both">Blended / hybrid</option>
             </Select>
-          </Label>
-          {environment.delivery !== "digital" && <Label className="block text-sm font-semibold">
-            Physical space arrangement
-            <Select className="mt-2 min-h-11 w-full"
+          </Field>
+          {environment.delivery !== "digital" && <Field label="Physical space arrangement">
+            <Select className="min-h-11 w-full"
               disabled={saving || reconciliationRequired}
               value={environment.physicalSpaceArrangement}
               onChange={event => setEnvironment(current => ({
@@ -153,15 +151,13 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
               <option value="shared_hosted">Shared or hosted</option>
               <option value="planned">Still being arranged</option>
             </Select>
-          </Label>}
-          <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-            <Button type="submit" disabled={saving || reconciliationRequired || !dirty}>
-              {saving ? "Saving…" : "Save learning environment"}
-            </Button>
+          </Field>}
+          <ActionFooter layout="inline" className="mt-0 sm:col-span-2">
+            <Button type="submit" disabled={saving || reconciliationRequired || !dirty} loading={saving} loadingLabel="Saving learning environment...">Save learning environment</Button>
             <span className="text-xs text-muted-foreground">
               {dirty ? "Unsaved changes" : "No unsaved changes"}
             </span>
-          </div>
+          </ActionFooter>
         </form>}
       </>}
       <div className="mt-4">
