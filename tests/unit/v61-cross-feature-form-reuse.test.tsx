@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { ActionFooter } from "@/components/workspace/action-footer";
 import { Button } from "@/components/ui/button";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -8,6 +8,27 @@ import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
 import { ExtendedSeasonDraftForm } from "@/components/operations/ExtendedSeasonDraftForm";
 
 describe("V6.1 cross-feature form composition", () => {
+  it("requires shared submit actions across all named feature forms", () => {
+    const formPaths: URL[] = [];
+    function scan(directory: URL) {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const url = new URL(entry.name + (entry.isDirectory() ? "/" : ""), directory);
+        if (entry.isDirectory()) scan(url);
+        else if (entry.isFile() && entry.name.endsWith("Form.tsx")) formPaths.push(url);
+      }
+    }
+    scan(new URL("../../src/components/", import.meta.url));
+    expect(formPaths.length).toBeGreaterThan(10);
+    for (const file of formPaths) {
+      const source = readFileSync(file, "utf8");
+      if (!source.includes("<form") || !source.includes('type="submit"')) continue;
+      expect(
+        source.includes("<ActionFooter") || source.includes("<FormActions"),
+        `Missing V6.1 submit pattern in ${file.pathname}`,
+      ).toBe(true);
+    }
+  });
+
   it("renders the shared step footer with appropriate spacing and labeled workflow actions", () => {
     const html = renderToStaticMarkup(<ActionFooter layout="step">
       <Button type="button" variant="outline">Previous step</Button>
