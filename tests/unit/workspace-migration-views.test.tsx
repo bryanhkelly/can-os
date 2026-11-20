@@ -89,7 +89,7 @@ describe("enrolled learning workspace", () => {
     expect(html).not.toContain("Available Chemistry");
     expect(html).not.toContain("Request class");
     expect(html).toContain('href="/student/courses?view=catalog"');
-    expect(html).toContain('href="/classes?section=english&amp;tab=lessons"');
+    expect(html).toContain('href="/class"');
   });
   it("retains real registration controls only in the catalog", () => {
     state.search = { view: "catalog" };
@@ -292,7 +292,7 @@ describe("family and student profiles", () => {
   it("keeps profile tabs URL-backed and renders zero finalized grades", () => {
     const html = renderToStaticMarkup(<Student360View profile={profile} tab="academics"/>);
     expect(html).toContain('href="/staff/students/student-person?tab=academics" aria-current="page"');
-    expect(html).toContain('href="/classes?section=english" class="underline underline-offset-4">English</a>');
+    expect(html).toContain('href="/class" class="underline underline-offset-4">English</a>');
     expect(html).toContain('href="/profiles?person=teacher-person" class="underline underline-offset-2">Avery Sample</a>');
     expect(html).toContain("Finalized grade: F · 0%");
     expect(html).toContain("Avery Sample");
@@ -334,7 +334,7 @@ describe("family and student profiles", () => {
     expect(html).toContain("Connection 2");
     expect(html).not.toContain("Connection 3");
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(html).toContain('href="/classes?section=section-0"');
+    expect(html).toContain('href="/class"');
   });
   it("shows all authorized connections only on their own tab", () => {
     const html = renderToStaticMarkup(<PersonProfile profile={personProfile} tab="connections"/>);
