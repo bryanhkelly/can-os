@@ -23,15 +23,21 @@ import {
 } from "@/modules/learning/facilitated-learning.functions";
 
 export const Route = createFileRoute("/canonical/lab/facilitated")({
+  validateSearch: (raw:Record<string,unknown>):{siteId?:string} => ({
+    siteId:typeof raw.siteId==="string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw.siteId)
+      ? raw.siteId : undefined,
+  }),
   loader: () => safeLoader(() => getFacilitatedHostWorkspace())(),
   component: FacilitatedLearningLabPage,
 });
 
 function FacilitatedLearningLabPage() {
   const result = Route.useLoaderData();
+  const {siteId:preferredSiteId}=Route.useSearch();
   if (!result.ok) return <CanonicalBlueprintLoadError
     title="Facilitated learning" message={result.message}/>;
-  return <FacilitatedLabContent data={result.data}/>;
+  return <FacilitatedLabContent data={result.data} preferredSiteId={preferredSiteId}/>;
 }
 
 type Workspace = Awaited<ReturnType<typeof getFacilitatedHostWorkspace>>;
@@ -39,7 +45,9 @@ function effectiveRoomState(room: Workspace["rooms"][number], nowMs: number) {
   return room.state === "live" && Date.parse(room.expiresAt) <= nowMs
     ? "expired" : room.state;
 }
-function FacilitatedLabContent({data}:{data:Workspace}) {
+function FacilitatedLabContent({data,preferredSiteId}:{
+  data:Workspace; preferredSiteId?:string;
+}) {
   const router=useRouter();
   const [clockMs, setClockMs] = useState(() => Date.now());
   useEffect(() => {
@@ -60,7 +68,9 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     }).catch(()=>{if(live)setRehearsalFailed(true);});
     return ()=>{live=false;};
   },[]);
-  const rehearsal = rehearsalOptions?.choices.find(choice=>
+  const visibleRehearsalChoices=rehearsalOptions?.choices.filter(choice=>
+    !preferredSiteId || choice.siteId===preferredSiteId) ?? [];
+  const rehearsal = visibleRehearsalChoices.find(choice=>
     rehearsalChoice===choice.deploymentId+":"+choice.adoptionId+":"+
     choice.courseVersionId+":"+choice.siteId);
   const [selected,setSelected]=useState("");
@@ -72,7 +82,11 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
   const [code,setCode]=useState<{
     roomId:string;code:string;expiresAt:string;
   }|null>(null);
-  const available=data.choices.find(choice=>selected===
+  const visibleChoices=data.choices.filter(choice=>
+    !preferredSiteId || choice.siteId===preferredSiteId);
+  const visibleRooms=data.rooms.filter(room=>
+    !preferredSiteId || room.siteId===preferredSiteId);
+  const available=visibleChoices.find(choice=>selected===
     choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId);
   async function run(action:()=>Promise<void>,successMessage="Room action saved.") {
     if(busy)return;
@@ -86,6 +100,15 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
   return <WorkspaceShell width="wide" eyebrow="Canonical · Learning operations"
     title="Facilitated learning" subtitle="One facilitator controls the room, while each enrolled learner may pair their own device. Pairing is not attendance or academic credit.">
     <CapabilityLabNav current="facilitated"/>
+    {preferredSiteId&&<p className="mt-3 text-xs text-muted-foreground">
+      Site-scoped classroom view. Only Courses, rooms and meetings for the
+      requested Site are displayed; all scheduling and playback commands still
+      require independent facilitator authorization.
+    </p>}
+    {preferredSiteId&&visibleChoices.length===0&&<WorkspaceNotice tone="attention" className="mt-3">
+      No approved Course delivery is currently authorized for this Site and facilitator.
+      Confirm the appointment, Course and deployment before scheduling Classes.
+    </WorkspaceNotice>}
     <section className="mt-6 border border-border bg-card p-5" aria-label="Start a shared-screen learning room">
       <h2 className="font-serif text-xl font-semibold">Start a room</h2>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -98,7 +121,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           <Select className="mt-2"
             value={selected} onChange={event=>setSelected(event.target.value)}>
             <option value="">Choose an authorized course</option>
-            {data.choices.map(choice=><option
+            {visibleChoices.map(choice=><option
               key={choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId}
               value={choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId}>
               {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
@@ -139,7 +162,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
             value={rehearsalChoice}
             onChange={e=>{setRehearsalChoice(e.target.value);setRehearsalScope(null);}}>
             <option value="">Choose a course to rehearse</option>
-            {rehearsalOptions?.choices.map(choice=><option
+            {visibleRehearsalChoices.map(choice=><option
               key={choice.deploymentId+":"+choice.adoptionId+":"+choice.courseVersionId+":"+choice.siteId}
               value={choice.deploymentId+":"+choice.adoptionId+":"+choice.courseVersionId+":"+choice.siteId}>
               {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
@@ -161,7 +184,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       {rehearsalScope&&<ClassroomRehearsalPlayer
         scope={rehearsalScope} onClose={()=>setRehearsalScope(null)}/>}
     </section>
-    <ClassroomSchedulePanel choices={data.choices}
+    <ClassroomSchedulePanel choices={visibleChoices}
       onRoomStarted={value=>{
         setCode({roomId:value.roomId,code:value.pairingCode,expiresAt:value.pairingExpiresAt});
         setExpandedRoomId(value.roomId);
@@ -172,7 +195,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     <MutationFeedback state={feedback} pendingMessage="Updating the room…" className="mt-4"/>
     {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
     {code && Date.parse(code.expiresAt) > clockMs &&
-      data.rooms.some(room => room.id === code.roomId &&
+      visibleRooms.some(room => room.id === code.roomId &&
         effectiveRoomState(room, clockMs) === "live") &&
       <section className="mt-5 border border-border bg-card p-5" aria-label="Current device pairing code">
       <p className="text-sm font-semibold">Share this code or QR with authorized learners</p>
@@ -191,13 +214,13 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     <section className="mt-7" aria-label="Facilitated rooms">
       <h2 className="font-serif text-xl font-semibold">Your rooms</h2>
       <div className="mt-3 grid gap-4">
-        {data.rooms.map(room => {
+        {visibleRooms.map(room => {
           const roomState = effectiveRoomState(room, clockMs);
           return <article key={room.id} className="border border-border bg-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-semibold">
-                {data.choices.find(choice=>
+                {visibleChoices.find(choice=>
                   choice.deploymentId===room.deploymentId&&
                   choice.courseVersionId===room.courseVersionId)?.courseTitle??"Course room"}
               </h3>
@@ -262,7 +285,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           </div>
         </article>;
         })}
-        {!data.rooms.length&&<p className="border border-border p-5 text-sm text-muted-foreground">
+        {!visibleRooms.length&&<p className="border border-border p-5 text-sm text-muted-foreground">
           No facilitated learning rooms have been started under your current Site permissions.
         </p>}
       </div>
