@@ -19,7 +19,7 @@ describe("Guardian application controlled fields", () => {
       onLastNameChange={() => {}} onGradeChange={() => {}}/>);
     expect(html).toContain("Student legal first name");
     expect(html).toContain("Guardian household");
-    expect(html).toContain("readOnly");
+    expect(html.toLowerCase()).toContain("readonly");
     expect(html).toContain("value=\"Avery\"");
   });
 
