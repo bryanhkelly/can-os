@@ -181,7 +181,11 @@ export const Route=createFileRoute("/launch/site-preview")({
         const proposedPrograms=projectPlannedSiteProgramsForPreview(
           parsed.success?parsed.data:null,baseContentBlocks);
         page.contentBlocks=[
-          ...baseContentBlocks.filter(block=>block.channel!=="learning.interests"),
+          // Website previews must look like websites, not the private Launch
+          // Studio setup/status dashboard. These facts remain private and
+          // available in their owning administrative screens.
+          ...baseContentBlocks.filter(block=>
+            !["learning.interests","site.setup","site.network"].includes(block.channel)),
           ...proposedPrograms,
         ];
         const availablePages=availablePublicSitePaths(page);
