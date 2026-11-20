@@ -27,7 +27,7 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
     setSolutions({state:"loading"});
     setPublication({state:"loading"});
     void Promise.allSettled([
-      listLaunches({data:{includeActive:true}}),
+      listLaunches({data:{includeActive:true,siteId}}),
       readCanonicalBlueprintWorkspace({data:{siteId}}),
       readLaunchSitePublication({data:{siteId}}),
     ]).then(([launches,plans,website]) => {
