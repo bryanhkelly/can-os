@@ -72,10 +72,33 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
                     {model ? model.title + " · v" + model.versionNo + " · " : ""}
                     Saved revision {plan.revision}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {model?.components.filter(item => item.requirementMode === "required").length ?? 0}
-                    {" "}required model components. Their selection does not verify Site readiness.
-                  </p>
+                  {model ? <>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {model.components.filter(item => item.requirementMode === "required").length}
+                      {" "}required components in the published Solution. These are not verified Site readiness.
+                    </p>
+                    <details className="mt-2 text-xs">
+                      <summary className="cursor-pointer font-medium text-primary">
+                        View published Solution requirements
+                      </summary>
+                      <ul className="mt-2 space-y-2">
+                        {model.components.map(component => <li key={component.id}
+                          className="border-l-2 border-border pl-3">
+                          <span className="font-medium capitalize">
+                            {component.key.replaceAll("_", " ")}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {" · "}{component.requirementMode}
+                          </span>
+                          {component.description && <p className="mt-1 leading-5 text-muted-foreground">
+                            {component.description}
+                          </p>}
+                        </li>)}
+                      </ul>
+                    </details>
+                  </> : <p className="mt-1 text-xs text-muted-foreground">
+                    This saved Solution version is not available for preview. Review the plan for details.
+                  </p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge tone="neutral">{plan.lifecycle==="frozen"?"Submitted for review":"Private planning draft"}</StatusBadge>
