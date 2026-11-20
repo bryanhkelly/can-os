@@ -13,7 +13,11 @@ vi.mock("react", async importOriginal => {
   const actual = await importOriginal<typeof import("react")>();
   return { ...actual, useState: (initial: unknown) => {
     const [value, setValue] = actual.useState(initial);
-    return [initial === null ? state.model : value, setValue];
+    // The panel now keeps server results tagged with their program/date so a
+    // previous planning context is never rendered for another site selection.
+    return [initial === null && state.model
+      ? { programId: state.model.programId, date: state.model.date, value: state.model }
+      : value, setValue];
   } };
 });
 
