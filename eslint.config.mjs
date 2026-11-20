@@ -84,7 +84,23 @@ export default tseslint.config(
       "src/**/*.test.{tsx,jsx}",
       "src/**/*.spec.{tsx,jsx}",
     ],
-    rules: { "can-os-design/no-native-feature-controls": "error" },
+    rules: {
+      "can-os-design/no-native-feature-controls": "error",
+      // Existing unmatched form layouts remain visible as warnings while
+      // consolidated flows are protected with a stricter scoped rule below.
+      "can-os-design/no-duplicate-form-actions": "warn",
+    },
+  },
+  {
+    files: [
+      "src/components/learning/{ClassVideoUploadForm,ClassSupplementForm}.tsx",
+      "src/components/operations/{ExtendedSeasonDraftForm,LaunchConfigurationForm}.tsx",
+      "src/components/admissions/{FamilyInvitationForm,AdmissionsInquiryForm}.tsx",
+      "src/components/enrollment/EnrollmentForm.tsx",
+      "src/routes/operations.interest-events.tsx",
+      "src/components/launch-studio/{EstablishSiteProfileUnified,PrepareOperationsV61,NativeOfferingAdoptionReviewPanel,ProgramDiscoveryPanel}.tsx",
+    ],
+    rules: { "can-os-design/no-duplicate-form-actions": "error" },
   },
   ...storybook.configs["flat/recommended"],
 );
