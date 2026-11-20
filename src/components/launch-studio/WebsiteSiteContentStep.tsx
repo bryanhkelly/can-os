@@ -5,6 +5,7 @@ import { WorkspaceNotice } from "@/components/workspace";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import { WebsiteCopyField, type WebsiteCopyFieldSpec } from "./WebsiteCopyField";
 import { SiteContentChannelEditor } from "./SiteContentChannelEditor";
+import { WebsiteTemplateSourceGuide } from "./WebsiteTemplateSourceGuide";
 import {
   restoreOriginalWebsiteField, websiteStarterFieldIds,
   type SiteLocalContent, type SiteLocalTextField,
@@ -67,6 +68,16 @@ export function WebsiteSiteContentStep({
       potential outreach materials. Review names, permissions, personal details
       and factual claims before sharing. Nothing goes live automatically.
     </p>
+    <details className="border border-border p-3" aria-label="Website section source reference">
+      <summary className="cursor-pointer text-sm font-semibold">
+        See every homepage section, heading, element and source
+      </summary>
+      <p className="mt-2 text-xs text-muted-foreground">
+        The exact saved Site and Brand names are displayed. This reference distinguishes
+        your editable copy from CAN's fixed template text and governed public records.
+      </p>
+      <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/" />
+    </details>
     {data.siteStoryCopyCandidates.length>0&&
       <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
         <span className="text-sm">
