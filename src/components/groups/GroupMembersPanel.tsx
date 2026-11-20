@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field";
 import { WorkspacePanel } from "@/components/workspace";
+import { GroupMembershipRequestRow } from "./GroupReviewRows";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { decideCanonicalGroupMembership, inviteCanonicalGroupMembers, listCanonicalGroupInvitees } from "@/modules/study-groups/canonical-membership.functions";
 import type { GroupPanelRecord, GroupPanelAvailability, GroupPanelRun } from "./group-panel-contracts";
@@ -42,25 +43,12 @@ export function GroupMembersPanel({ group, availability, busy, run }: {
     <div className="space-y-4">
       <div>
         <h3 className="text-sm font-semibold">Pending requests</h3>
-        {group.pendingMembers.map(member => <div key={member.id}
-          className="mt-2 flex flex-wrap items-center justify-between gap-3 border p-3">
-          <div>
-            <p className="text-sm font-medium">{member.studentName}</p>
-            <p className="text-xs text-muted-foreground">
-              {member.guardianReady ? "Guardian permission recorded" : "Awaiting guardian permission"}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled}
-              onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
-                groupId: group.id, studentPersonId: member.studentPersonId, approve: false,
-              } }), "Membership declined.")}>Decline</Button>
-            <Button variant="default" size="sm" type="button" disabled={busy || !availability.membershipEnabled || !member.guardianReady}
-              onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
-                groupId: group.id, studentPersonId: member.studentPersonId, approve: true,
-              } }), "Membership approved.")}>Approve</Button>
-          </div>
-        </div>)}
+        {group.pendingMembers.map(member => <GroupMembershipRequestRow
+          key={member.id} groupId={group.id} member={member}
+          busy={busy} membershipEnabled={availability.membershipEnabled}
+          onDecision={(groupId,studentPersonId,approve)=>
+            run(()=>decideCanonicalGroupMembership({data:{groupId,studentPersonId,approve}}),
+              approve?"Membership approved.":"Membership declined.")}/>)}
         {group.pendingMembers.length === 0 &&
           <p className="mt-2 text-xs text-muted-foreground">No pending memberships.</p>}
       </div>
