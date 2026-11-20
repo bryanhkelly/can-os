@@ -1,4 +1,3 @@
-import { saveSiteBrandVersion } from "@/modules/sites/site-brand.functions";
 import { type SiteBrandConfiguration } from "@/domain/site-brand";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -32,7 +31,7 @@ import {
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { prepareSchoolWebsite, getPartnerWebsitePreviewView, previewChurchWebsiteDraft, saveChurchWebsiteDraft, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
+import { prepareSchoolWebsite, getPartnerWebsitePreviewView, previewChurchWebsiteDraft, saveSiteWebsiteAndBrand, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {siteProgramSelectionSchema} from "@/lib/route-search";
@@ -340,16 +339,9 @@ function LocalWebsiteCopyEditor({
     setShareMessage("");
   }
 
-  async function saveDraft(mode: "stay" | "exit" = "stay") {
-    if (busy || !data.canEdit || !data.draftStorageReady || revisionConflict) return;
-    if (contentBlocksDirty) {
-      setError("Save your website section layout using 'Save private blocks' before saving or exiting.");
-      return;
-    }
-    setError("");
-    const submitted = content;
+  function brandConfig(submitted:SiteLocalContent):SiteBrandConfiguration{
     const branding=submitted.branding;
-    const configuration:SiteBrandConfiguration={
+    return {
       directionId:branding.brandDirectionId??null,
       paletteId:branding.paletteId??"signature",
       typographyId:branding.typographyId??"editorial",
@@ -359,34 +351,41 @@ function LocalWebsiteCopyEditor({
       logoAssetId:brandConfigRef.current?.logoAssetId??null,
       heroAssetId:brandConfigRef.current?.heroAssetId??null,
     };
-    const outcome = await mutation.run(async()=>{
-      // Authoritative Brand save happens first. This may create a new immutable
-      // Brand version, but NEVER updates an existing released artifact.
-      const brandResult=await saveSiteBrandVersion({data:{
-        siteId:data.siteId,expectedBrandVersionId:brandPointerRef.current,
-        configuration,
-        logoImage:branding.logoImage??null,heroImage:branding.heroImage,
-      }});
-      brandPointerRef.current=brandResult.brandVersionId;
-      brandConfigRef.current=brandResult.configuration;
-      setSavedBrandName(brandResult.configuration.displayName);
-      // Website content is a separate revision and stores only layout/copy.
-      // A failure here is reported; the already-saved Brand is not rolled back.
-      return saveChurchWebsiteDraft({data:{
-        content:submitted,siteId:data.siteId,expectedRevision:editor.revision,
-      }});
-    },{successMessage:"Site Brand and private website draft saved. Publication and enrollment are unchanged.",
-      commandErrorMessage:"The Site Brand or website draft could not be saved. Reload before retrying."});
-    if (outcome.status === "saved" || outcome.status === "refresh-failed") {
-      markSaved(submitted, outcome.value.revision);
-      if (mode === "exit" && outcome.status === "saved") {
+  }
+  function acceptSavedBrand(brand:{
+    brandVersionId:string;configuration:SiteBrandConfiguration;
+  }){
+    brandPointerRef.current=brand.brandVersionId;
+    brandConfigRef.current=brand.configuration;
+    setSavedBrandName(brand.configuration.displayName);
+  }
+
+  async function saveDraft(mode: "stay" | "exit" = "stay") {
+    if(busy||!data.canEdit||!data.draftStorageReady||revisionConflict)return;
+    if(contentBlocksDirty){
+      setError("Save your website section layout using 'Save private blocks' before saving or exiting.");
+      return;
+    }
+    setError("");
+    const submitted=content;
+    const outcome=await mutation.run(()=>saveSiteWebsiteAndBrand({data:{
+      siteId:data.siteId,operation:"draft",expectedRevision:editor.revision,
+      expectedBrandVersionId:brandPointerRef.current,
+      brand:brandConfig(submitted),content:submitted,
+    }}),{
+      successMessage:"Site Brand and website draft saved together. Publication and enrollment remain unchanged.",
+      commandErrorMessage:"The Site Brand and website could not be saved. No partial changes were committed.",
+    });
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+      acceptSavedBrand(outcome.value.brand);
+      markSaved(submitted,outcome.value.website.revision);
+      if(mode==="exit"&&outcome.status==="saved"){
         releaseNavigation();
         await router.navigate({to:"/launch/site",search:{siteId:data.siteId}});
       }
-    } else if (outcome.status === "failed" &&
-      normalizeClientError(outcome.error).code === "CONFLICT") {
-      // Keep all typed content; a newer server revision needs explicit review.
-      await router.invalidate().catch(() => undefined);
+    }else if(outcome.status==="failed"&&
+      normalizeClientError(outcome.error).code==="CONFLICT"){
+      await router.invalidate().catch(()=>undefined);
     }
   }
   async function previewCurrentDraft() {
@@ -402,26 +401,29 @@ function LocalWebsiteCopyEditor({
   }
 
   async function submit() {
-    if (busy) return;
+    if(busy||!data.canPublish||revisionConflict)return;
     setError("");
-    if (artworkGaps.length) {
-      setError("Complete the artwork description, usage rights and child-privacy confirmations before approving website copy.");
+    if(artworkGaps.length){
+      setError("Confirm artwork descriptions, usage rights and child privacy before reviewing website copy.");
       return;
     }
-    if (revisionConflict) return;
-    const submitted = content;
-    const outcome = await mutation.run(() => publishChurchWebsiteContent({
-        data: { content: submitted, expectedRevision: editor.revision,siteId:data.siteId },
-      }), { successMessage: result => result.status === "review_required"
-        ? "Protected institutional language was held for CAN review. Previously published church content remains unchanged."
-        : "Reviewed church-owned website copy saved. Official Site publication remains a separate Prepare decision. If this Site is already public, approved copy may update its live website.",
-      commandErrorMessage: "Could not save church content." });
-    if (outcome.status === "saved" || outcome.status === "refresh-failed")
-      markSaved(submitted, outcome.value.revision);
-    else if (outcome.status === "failed" &&
-      normalizeClientError(outcome.error).code === "CONFLICT") {
-      // Surface the current revision without discarding what this editor typed.
-      await router.invalidate().catch(() => undefined);
+    const submitted=content;
+    const outcome=await mutation.run(()=>saveSiteWebsiteAndBrand({data:{
+      siteId:data.siteId,operation:"save",expectedRevision:editor.revision,
+      expectedBrandVersionId:brandPointerRef.current,
+      brand:brandConfig(submitted),content:submitted,
+    }}),{
+      successMessage:result=>result.website.status==="review_required"
+        ?"Protected institutional copy has been held for CAN review. Site Brand and submitted copy were saved together."
+        :"Reviewed Site-owned copy and Site Brand saved together. Publish or republish separately in Prepare.",
+      commandErrorMessage:"Site Brand and website copy were not saved. No partial changes were committed.",
+    });
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+      acceptSavedBrand(outcome.value.brand);
+      markSaved(submitted,outcome.value.website.revision);
+    }else if(outcome.status==="failed"&&
+      normalizeClientError(outcome.error).code==="CONFLICT"){
+      await router.invalidate().catch(()=>undefined);
     }
   }
 
@@ -439,7 +441,13 @@ function LocalWebsiteCopyEditor({
       // only after the mutation succeeded so a failed restore never discards
       // unsaved copy, even when the route refresh was unable to complete.
       const restored = outcome.value.restoredContent;
-      if (restored) markSaved(prepareWebsiteEditorContent(restored, data.siteName), outcome.value.revision, true);
+      if(restored){
+        const restoredCopy=prepareWebsiteEditorContent(restored,data.siteName);
+        // Website history does not own Site branding. Restoring copy must
+        // preserve the current canonical identity and media selection.
+        markSaved({...restoredCopy,branding:{...content.branding,
+          templateId:restoredCopy.branding.templateId}},outcome.value.revision,true);
+      }
     } else if (outcome.status === "failed" &&
       normalizeClientError(outcome.error).code === "CONFLICT") {
       await router.invalidate().catch(() => undefined);
