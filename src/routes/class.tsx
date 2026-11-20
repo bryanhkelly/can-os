@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useState, type ReactNode } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { NativeClassHomeNavigation } from "@/components/learning/NativeClassHomeNavigation";
 import { OfferingCard } from "@/components/learning/native-class/OfferingCard";
 import { ApprovedClassCard } from "@/components/learning/native-class/ApprovedClassCard";
