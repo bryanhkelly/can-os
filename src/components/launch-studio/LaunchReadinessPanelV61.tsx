@@ -6,6 +6,8 @@ import { listLaunches } from "@/modules/programs/launch.functions";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import { readLaunchSitePublication } from "@/modules/sites/launch-site-publication.functions";
 import { getNoncreditEnrollmentPublisher } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
+import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
+import { projectProgramOfferingJourneys } from "@/domain/program-offering-journey-v61";
 
 /** Existing authorities own every status. This is a read-only cross-workflow
  * projection, not a new readiness checklist, approval or enrollment toggle. */
@@ -13,6 +15,7 @@ type Launches = Awaited<ReturnType<typeof listLaunches>>["launches"];
 type Solutions = Awaited<ReturnType<typeof readCanonicalBlueprintWorkspace>>;
 type Publication = Awaited<ReturnType<typeof readLaunchSitePublication>>;
 type NoncreditPublisher = Awaited<ReturnType<typeof getNoncreditEnrollmentPublisher>>;
+type SavedProgramIntent = Awaited<ReturnType<typeof readSiteProgramsAudiencesV61>>;
 type ReadState<T> = { state: "loading" } | { state: "unavailable" } | { state: "ready"; value: T };
 
 export function LaunchReadinessPanelV61({ siteId, context }: {
@@ -20,6 +23,7 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
 }) {
   const [reload, setReload] = useState(0);
   const [programs, setPrograms] = useState<ReadState<Launches>>({state:"loading"});
+  const [savedIntent, setSavedIntent] = useState<ReadState<SavedProgramIntent>>({state:"loading"});
   const [solutions, setSolutions] = useState<ReadState<Solutions>>({state:"loading"});
   const [publication, setPublication] = useState<ReadState<Publication>>({state:"loading"});
   const [noncredit, setNoncredit] = useState<ReadState<NoncreditPublisher>>({state:"loading"});
@@ -27,11 +31,18 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
   useEffect(() => {
     let active = true;
     setPrograms({state:"loading"});
+    setSavedIntent({state:"loading"});
     setSolutions({state:"loading"});
     setPublication({state:"loading"});
     if (context === "open") setNoncredit({state:"loading"});
     // Each authority resolves independently. A slow or unavailable enrollment
     // reader must never delay already authorized Program and Solution evidence.
+    void readSiteProgramsAudiencesV61({data:{siteId}})
+      .then(result => {
+        if(active)setSavedIntent(result.siteId===siteId
+          ? {state:"ready",value:result} : {state:"unavailable"});
+      })
+      .catch(() => {if(active)setSavedIntent({state:"unavailable"});});
     void listLaunches({data:{includeActive:true,siteId}})
       .then(result => {
         if(active)setPrograms({state:"ready",value:result.launches.filter(item=>item.siteId===siteId)});
@@ -54,7 +65,18 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
     return ()=>{active=false;};
   },[siteId,reload,context]);
 
-  const pending = [programs,solutions,publication,...(context==="open"?[noncredit]:[])].some(item=>item.state==="loading");
+  const pending = [programs,savedIntent,solutions,publication,...(context==="open"?[noncredit]:[])].some(item=>item.state==="loading");
+  const pilotJourneys = solutions.state==="ready" && savedIntent.state==="ready"
+    ? projectProgramOfferingJourneys({
+        programCodes:savedIntent.value.intent.programCodes ?? [],
+        templates:solutions.value.templates,
+        plans:solutions.value.configurations,
+        siteId,
+        ...(context==="open" && noncredit.state==="ready"
+          ? {candidates:noncredit.value.candidates,releases:noncredit.value.published}
+          : {}),
+      })
+    : null;
   return <WorkspacePanel title={context==="open" ? "Saved readiness and receiving Programs" : "Readiness from existing workspaces"}
     description="Each status comes from its owning workflow. A saved plan, completed requirement, website or Program status never grants Offering-level enrollment authorization.">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -65,6 +87,82 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
         onClick={()=>setReload(value=>value+1)}>Refresh readiness</Button>
     </div>
     <div className="mt-4 grid gap-4">
+      <section className="border bg-background p-4" aria-label="Program to Offering delivery journey">
+        <h3 className="text-sm font-semibold">Program → Solution → Course delivery</h3>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          Site-specific training journeys from the existing published Program catalog,
+          saved Blueprint configurations and independently authorized noncredit publisher.
+          A Course registration and the Classes a learner attends are separate actions.
+        </p>
+        {(savedIntent.state==="loading" || solutions.state==="loading") &&
+          <p role="status" className="mt-3 text-sm">Reading your saved Programs and published Solutions…</p>}
+        {(savedIntent.state==="unavailable" || solutions.state==="unavailable") &&
+          <WorkspaceNotice tone="attention" className="mt-3">
+            Your saved Program-to-Solution journey could not be verified for this Site.
+            No pilot status is inferred from unavailable records.
+          </WorkspaceNotice>}
+        {pilotJourneys?.length===0 && <p className="mt-3 text-sm">
+          No Program references are selected for this Site.{" "}
+          <Link to="/launch/site" search={{siteId,module:"programs-audiences"}}
+            className="font-semibold text-primary underline">Select a Program in Establish</Link> first.
+        </p>}
+        {pilotJourneys && pilotJourneys.length>0 && <ul className="mt-4 space-y-3">
+          {pilotJourneys.map(journey=><li key={journey.programCode}
+            className="border border-border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold">
+                {journey.solution?.title ?? journey.programCode.replaceAll("_"," ").replaceAll("."," ")}
+              </h4>
+              <StatusBadge tone={journey.offeringPublished?"neutral":"attention"}>
+                {journey.offeringPublished?"Published learning product":"Learning product not published"}
+              </StatusBadge>
+            </div>
+            <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div><dt className="text-xs text-muted-foreground">Program</dt>
+                <dd className="text-sm font-medium">Selected in Establish</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Solution</dt>
+                <dd className="text-sm font-medium">{journey.solution
+                  ? "Published recipe v"+journey.solution.versionNo : "No published matching Solution"}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Site operating plan</dt>
+                <dd className="text-sm font-medium">{journey.savedPlan
+                  ? (journey.savedPlan.lifecycle==="frozen"?"Submitted for review":"Saved private plan")
+                  : "Not configured for this Site"}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Noncredit enrollment</dt>
+                <dd className="text-sm font-medium">
+                  {context==="prepare"||noncredit.state!=="ready"
+                    ? "Provider authorization not verified here"
+                    : (journey.publisherCandidateCount??0)>0
+                      ? "Publisher-eligible at this Site"
+                      : "No authorized Course release candidate"}
+                </dd></div>
+            </dl>
+            {journey.facilitatedFourSessions && <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              This Solution calls for four dated Classes. Schedule and attach them to
+              the authorized Course registration, then record independent attendance.
+              The four dates may be consecutive or separated by holidays.
+            </p>}
+            {context==="open"&&noncredit.state==="ready"&&<p className="mt-3 text-xs text-muted-foreground">
+              {journey.releasedCount??0} recorded enrollment releases
+              {" · "}{journey.openRegistrationCount??0} within a current published registration window.
+              Registration does not prove attendance, assessment or completion.
+            </p>}
+            <div className="mt-3 flex flex-wrap gap-4 text-xs">
+              <Link to="/launch/site" search={{siteId,module:"program-catalog",
+                ...(journey.savedPlan ? {solutionPlanId:journey.savedPlan.configurationId} : {})}}
+                className="font-semibold text-primary underline">
+                {journey.savedPlan?"Continue Site Solution":"Configure Solution"}
+              </Link>
+              {journey.facilitatedFourSessions&&<Link to="/canonical/lab/facilitated"
+                className="font-semibold text-primary underline">Manage dated Classes</Link>}
+              {journey.solution?.offeringCode && <Link to="/programs/noncredit/enrollment"
+                search={{publicSiteId:siteId,offeringCode:journey.solution.offeringCode}}
+                className="font-semibold text-primary underline">
+                Review this Offering's enrollment
+              </Link>}
+            </div>
+          </li>)}
+        </ul>}
+      </section>
       <section className="border bg-background p-4" aria-label="Solution planning state">
         <h3 className="text-sm font-semibold">Solution plans</h3>
         {solutions.state==="loading" && <p role="status" className="mt-2 text-sm">Loading Solution plans…</p>}
