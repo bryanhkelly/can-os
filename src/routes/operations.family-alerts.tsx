@@ -5,7 +5,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CreateAction, WorkspaceShell, secondaryActionClassName } from "@/components/workspace";
+import { ActionFooter, CreateAction, WorkspaceShell, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -102,9 +102,11 @@ export function Publisher({data,mode="history"}:{data:Data;mode?:"history"|"comp
      placeholder="Include the effective date, affected school activities, safety instructions and how to contact the school." />
    </Field>
    <p className="text-xs text-muted-foreground">Verified families receive an in-app notice and queued email. Only verified SMS opt-ins receive a text, which tells families to sign in. Quiet hours may delay delivery. This is not an emergency dispatch system, a calendar mutation or authorization to close the school.</p>
-  <Button type="submit" disabled={busy}>
-    {busy?"Publishing…":"Publish to currently enrolled families"}
-  </Button>
+  <ActionFooter layout="form">
+    <Button type="submit" disabled={busy} loading={busy} loadingLabel="Publishing notice...">
+      Publish to currently enrolled families
+    </Button>
+  </ActionFooter>
   </form>}
   {mode==="history"&&<section className="mt-8 space-y-3">
    <h2 className="text-lg font-semibold">Recent published notices</h2>
