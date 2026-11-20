@@ -109,7 +109,7 @@ describe("Site website share preview safety", () => {
       && block.description.includes("weekdays"))).toBe(true);
     expect(planned.every(block =>
       block.items.length === 3 &&
-      block.items.every(item => item.label === "Proposed · not enrolling" && !item.link)
+      block.items.every(item => item.label === "Learning interest" && !item.link)
     )).toBe(true);
     const page = projectShareableSitePreview({
       siteName: "Proposed Learning Community",
