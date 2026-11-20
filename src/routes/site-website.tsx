@@ -8,6 +8,7 @@ import { brandRecommendedLayout } from "@/domain/site-brand-direction";
 import { type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
 import { privateWebsitePreviewUrl } from "@/domain/private-website-preview";
+import { signOutOfWorkspace } from "@/components/shell/workspace-sign-out";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
@@ -363,7 +364,11 @@ function LocalWebsiteCopyEditor({
       markSaved(submitted,outcome.value.website.revision);
       if(mode==="exit"&&outcome.status==="saved"){
         releaseNavigation();
-        await router.navigate({to:"/launch/site",search:{siteId:data.siteId}});
+        try { await signOutOfWorkspace(); }
+        catch(failure) {
+          setError(mutationErrorMessage(failure,
+            "Website saved, but sign-out failed. Use the Account menu to sign out."));
+        }
       }
     }else if(outcome.status==="failed"&&
       normalizeClientError(outcome.error).code==="CONFLICT"){
@@ -557,7 +562,7 @@ function LocalWebsiteCopyEditor({
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" type="button"
             disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
-            onClick={()=>void saveDraft("exit")}>Save & Exit</Button>
+            onClick={()=>void saveDraft("exit")}>Save & Sign Out</Button>
           {step < 4 ? <Button type="button"
             onClick={()=>onStepChange(Math.min(4,step+1))}>Continue</Button>
             : <Button type="button" disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
