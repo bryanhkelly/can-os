@@ -130,10 +130,11 @@ export const markNativeClassLessonComplete=createServerFn({method:"POST"})
        !(actor.role==="student"&&actor.capabilities.has("student:read")||
          actor.role==="learner"&&actor.capabilities.has("learning.participate")))
       throw new AuthorizationError("own learning milestone capability");
+    const learnerPersonId=actor.actorPersonId;
     return db.transaction(async tx=>{
       const [enrollment]=await tx.select().from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
-          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
+          eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
           eq(canonicalClassEnrollments.status,"active"))).for("update").limit(1);
       if(!enrollment?.courseAttemptId)
         throw new AuthorizationError("own active Class Course Attempt");
