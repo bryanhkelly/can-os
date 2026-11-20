@@ -20,9 +20,11 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const {actor}=await resolveAuthorizedLearningPerson(
-      getRequest(),"learning.participate",
-    );
+    const actor=await getInstructionalLearnerContext(getRequest());
+    if(!actor.actorPersonId ||
+      !(actor.role==="learner"&&actor.capabilities.has("learning.participate") ||
+        actor.role==="student"&&actor.capabilities.has("student:read")))
+      throw new AuthorizationError("authenticated Course learner");
     return db.transaction(async tx=>{
       const [enrollment]=await tx.select().from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
@@ -32,6 +34,10 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
       const [instance]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
       if(!instance)throw new AuthorizationError("own Class");
+      if(actor.role==="student" && (!instance.siteId ||
+        actor.grantSiteId!==instance.siteId ||
+        !actor.scope.organizationIds?.includes(instance.operatingOrganizationId)))
+        throw new AuthorizationError("own current CAN student Site");
       // Use the same native Course Attempt gate as recorded instructors,
       // playback, practice and other learner services. This also rejects
       // suspended adoption or revoked Site authority, not only wrong Person.
