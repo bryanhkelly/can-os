@@ -17,7 +17,11 @@ type Model = Awaited<ReturnType<typeof getRoomCoverageWorkspaceFn>>;
 type Schedule = Model["schedules"][number];
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
+/** One authorized room registry and schedule service, reused across Prepare. */
+export function RoomCoverageWorkspace({ siteId, view = "all" }: {
+  siteId?: string;
+  view?: "all" | "rooms" | "schedules";
+}) {
   const query = useQuery({ queryKey: ["room-coverage", siteId ?? "own"],
     queryFn: () => getRoomCoverageWorkspaceFn({ data: siteId ? { siteId } : {} }), retry: false });
   const feedback = useMutationFeedback(() => query.refetch({ throwOnError: true }));
@@ -28,7 +32,10 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
   const busy = feedback.pending || feedback.refreshFailed;
   const model = query.data;
   return <section aria-label="All-day room coverage" className="mt-6 border border-border bg-card p-5">
-    <h2 className="font-serif text-2xl">{model?.canManage ? "All-day room coverage" : "My assigned room coverage"}</h2>
+    <h2 className="font-serif text-2xl">{view === "rooms"
+      ? "Physical rooms & occupancy capacity"
+      : view === "schedules" ? "Facilitator coverage & room schedules"
+      : model?.canManage ? "All-day room coverage" : "My assigned room coverage"}</h2>
     <p className="mt-2 text-sm">One onsite facilitator supervises a physical room while its students take
       different virtual courses. Course teaching assignments remain separate.</p>
     <p className="mt-2 text-sm text-muted-foreground">A saved assignment is a plan, not verified arrival,
@@ -45,6 +52,19 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
     </div>}
     {model && <>
       <p className="mt-3 text-sm">School timezone: {model.timezone}</p>
+      {view === "rooms" && <div className="mt-4 space-y-2">
+        <h3 className="font-semibold">Recorded rooms ({model.rooms.length})</h3>
+        {!model.rooms.length && <p className="text-sm text-muted-foreground">
+          No rooms are recorded yet. Add a room and its occupancy limit below.
+        </p>}
+        {model.rooms.map(room => <div key={room.id}
+          className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
+          <span className="font-medium">{room.name}</span>
+          <span className="text-muted-foreground">Capacity: {room.capacity}
+            {room.retiredAt ? " · retired" : ""}</span>
+        </div>)}
+      </div>}
+      {view !== "rooms" && <>
       {!model.schedules.length && <p role="status" className="mt-3 border border-border bg-muted/30 p-4 text-sm">
          {model.canManage
            ? "No room coverage assignments recorded. Assign an accepted facilitator, backup, room and linked classes before opening the onsite day."
@@ -71,7 +91,9 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
           <RoomCoverageForm model={model} schedule={schedule} changed={() => query.refetch({ throwOnError: true })}/>
         </details>}
       </li>)}</ul>
+      </>}
       {model.canManage && <>
+        {view !== "schedules" && <>
         <h3 className="mt-5 font-semibold">Create a physical room</h3>
         <form noValidate className="mt-3 grid gap-3 sm:grid-cols-3" onSubmit={event => {
           event.preventDefault();
@@ -96,9 +118,12 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
         </form>
         <MutationFeedback state={feedback} className="mt-3" pendingMessage="Saving physical room..."/>
         {feedback.refreshFailed && <Button onClick={() => void feedback.retryRefresh()} disabled={feedback.pending}>Refresh saved rooms</Button>}
+        </>}
+        {view !== "rooms" && <>
         <h3 className="mt-5 font-semibold">Assign all-day room coverage</h3>
         {!model.staff.length && <p role="status" className="mt-2 text-sm">Invite a room facilitator and have them accept before assigning coverage.</p>}
         <RoomCoverageForm key={"new:" + model.schedules.length} model={model} changed={() => query.refetch({ throwOnError: true })}/>
+        </>}
       </>}
     </>}
   </section>;
