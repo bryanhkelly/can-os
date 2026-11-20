@@ -109,7 +109,9 @@ async function draftQuestions(tx:Tx,courseVersionId:string,deploymentId:string,o
 async function history(tx:Tx,courseAttemptId:string,assessmentVersionId:string){
   const rows=await tx.execute(sql`
     SELECT fp.id,fp.recorded_at,
-      (r.response -> 'responses') AS responses
+      (r.response -> 'responses') AS responses,
+      r.response->>'teacherFeedback' AS feedback,
+      (r.response->>'demoScore')::numeric AS practice_score
     FROM public.formative_practice_attempts fp
     JOIN education_v30_secure.formative_practice_responses r
       ON r.practice_attempt_id=fp.id
@@ -120,6 +122,8 @@ async function history(tx:Tx,courseAttemptId:string,assessmentVersionId:string){
   `);
   return rows.rows.map(row=>({
     id:String(row.id),recordedAt:new Date(String(row.recorded_at)).toISOString(),
+    teacherFeedback:typeof row.feedback==="string"?row.feedback:null,
+    practiceScore:row.practice_score===null?null:Number(row.practice_score),
     responses:Array.isArray(row.responses)
       ?row.responses.map((entry:unknown)=>{
         const r=entry&&typeof entry==="object"&&!Array.isArray(entry)
