@@ -248,7 +248,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                     Publishing requires independently approved safeguarding, screened staff, emergency response,
                      authorized child release and session coverage. An attestation cannot replace approvals.
                   </p>
-                  <Button variant="outline" type="button" className="mt-2  border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  <Button variant="outline" type="button" className="mt-2"
                     disabled={!canPublish || !isProgramActive || !scheduled.length || busy}
                     onClick={() => {
                       setPublishSeasonId(active ? "" : season.id);
@@ -340,7 +340,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                     </Field>
                     <div className="sm:col-span-2">
                       <Button variant="outline" type="submit" disabled={busy || !canPublish}
-                        className=" border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                        >
                         {busy ? "Publishing…" : "Publish enrollment to families"}
                       </Button>
                     </div>
@@ -394,7 +394,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                           </div>}
                       </details>}
                     {season.status === "draft" && <Button variant="outline" type="button"
-                      className="mt-2  border px-3 py-2 text-xs font-semibold"
+                      className="mt-2"
                       onClick={() => {
                         setScheduleSeasonId(active ? "" : season.id);
                         setScheduleFrom(season.startsOn);
@@ -449,7 +449,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                       </Label>
                       <div className="sm:col-span-2">
                         <Button variant="outline" type="submit" disabled={busy}
-                          className=" border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                          >
                           {busy ? "Scheduling…" : "Save draft sessions"}
                         </Button>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -496,7 +496,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                           </option>)}
                         </Select>
                       </Label>
-                      <Button variant="outline" type="button" className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      <Button variant="outline" type="button" 
                         disabled={busy || !operatorId || tasks.length === extendedLearningReadinessTasks.length}
                         onClick={() => assignReadiness(season.id, season.programId ?? "")}>
                         {tasks.length ? "Complete missing requests" : "Assign readiness requests"}
