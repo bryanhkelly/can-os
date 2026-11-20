@@ -58,6 +58,7 @@ export const Route = createFileRoute("/admissions/invite-families")({
     // Check the FULL saved content before shortening a headline to the
     // invitation service's 120-character email subject bound.
     if(selectedPackage && (originalHeadline.length<3 || !originalMessage ||
+      !/^[^<>\r\n]+$/.test(originalHeadline) ||
       containsProtectedInstitutionalClaim(originalHeadline+" "+originalMessage)))
       throw new DomainError("VALIDATION_FAILED",
         "Review the saved Package for protected claims or missing email details before sending.");
