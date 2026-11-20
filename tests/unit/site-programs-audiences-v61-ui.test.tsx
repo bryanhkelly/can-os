@@ -70,6 +70,14 @@ describe("V6.1 Programs & Audiences route and screen", () => {
     expect(route).toContain('module: "site-information"');
     expect(server).toContain('assertSiteSetupScope(actor, site, "program.launch.start")');
     expect(server).toContain("getBlueprintReferenceCatalog(actor, { siteId: data.siteId })");
+    // Unchanged published references are private planning intent. Saving other
+    // Site vision fields must not fail when a separate catalog role is offline.
+    expect(server).toContain("const previouslySelected = new Set(");
+    expect(server).toContain("const addedCodes = ");
+    expect(server).toContain("if (addedCodes.length)");
+    expect(server).not.toContain("if (selectedPrograms.length)");
+    expect(server.indexOf("const addedCodes")).toBeGreaterThan(
+      server.indexOf("site.updatedAt.toISOString() !== data.expectedRevision"));
     expect(ui).toContain("exploreBlueprintReferenceCatalog");
     expect(ui).toContain("Programs under consideration");
     expect(ui).toContain("programCodes");
