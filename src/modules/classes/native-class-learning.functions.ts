@@ -93,7 +93,7 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
           ?content.videoResources.flatMap(item=>{
             if(!item||typeof item!=="object"||Array.isArray(item))return [];
             const video=item as Record<string,unknown>;
-            if(typeof video.url!=="string" || !/^https:\/\/(www\\.)?(youtube\\.com\/watch|youtu\\.be\/|vimeo\\.com\/)/.test(video.url))
+            if(typeof video.url!=="string" || !/^https:\/\/(?:www\.)?(?:youtube\.com\/watch|youtu\.be\/|vimeo\.com\/)/.test(video.url))
               return [];
             return [{url:video.url,title:typeof video.title==="string"?video.title:"Supplemental video",
               reviewStatus:typeof video.reviewStatus==="string"?video.reviewStatus:"unreviewed"}];
