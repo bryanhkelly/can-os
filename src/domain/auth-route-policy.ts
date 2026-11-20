@@ -7,7 +7,9 @@ import { safeAccessReturnTo } from "@/domain/access-navigation";
  */
 const publicRoots = new Set([
   "/access", "/landing", "/site/new", "/explore",
-  "/interest-event", "/family/interest",
+  "/interest-event", "/family/interest", "/family/join",
+  "/church/apply", "/learn/enroll", "/site-preview-share",
+  "/published-site", "/enrichment",
 ]);
 
 export function isPublicCanPath(pathname: string): boolean {
@@ -16,7 +18,8 @@ export function isPublicCanPath(pathname: string): boolean {
   // These two routes intentionally have public nested pages.
   return path.startsWith("/access/") ||
     path.startsWith("/landing/") || path.startsWith("/next/") ||
-    path.startsWith("/explore/");
+    path.startsWith("/explore/") || path.startsWith("/enrichment/") ||
+    path.startsWith("/published-site/");
 }
 
 export function signInReturnUrl(value: unknown): string {
