@@ -84,7 +84,7 @@ describe("V6.1 universal action and surface contracts", () => {
       label="Launch Studio navigation" onClose={() => undefined}>Menu</Modal>);
     expect(html).toContain('id="launch-navigation-drawer"');
     expect(html).toContain('aria-label="Launch Studio navigation"');
-    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
+    expect(html).not.toMatch(/\brounded(?:-[\w-]+)?\b/);
   });
 
   it("keeps empty, error and pagination surfaces rectangular", () => {
