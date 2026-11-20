@@ -18,9 +18,17 @@ type NoncreditPublisher = Awaited<ReturnType<typeof getNoncreditEnrollmentPublis
 type SavedProgramIntent = Awaited<ReturnType<typeof readSiteProgramsAudiencesV61>>;
 type ReadState<T> = { state: "loading" } | { state: "unavailable" } | { state: "ready"; value: T };
 
-export function LaunchReadinessPanelV61({ siteId, context }: {
+type LaunchReadinessPanelV61Props = {
   siteId: string; context: "prepare" | "open";
-}) {
+};
+
+/** New Site or stage means a new evidence-reader session, not cached
+ * permissions, previews, or statuses from the previous Site. */
+export function LaunchReadinessPanelV61(props: LaunchReadinessPanelV61Props) {
+  return <LaunchReadinessPanelScoped key={props.siteId+":"+props.context} {...props}/>;
+}
+
+function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61Props) {
   const [reload, setReload] = useState(0);
   const [programs, setPrograms] = useState<ReadState<Launches>>({state:"loading"});
   const [savedIntent, setSavedIntent] = useState<ReadState<SavedProgramIntent>>({state:"loading"});
@@ -55,7 +63,8 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
       })
       .catch(() => {if(active)setSolutions({state:"unavailable"});});
     void readLaunchSitePublication({data:{siteId}})
-      .then(result => {if(active)setPublication({state:"ready",value:result});})
+      .then(result => {if(active)setPublication(result.siteId===siteId
+        ? {state:"ready",value:result} : {state:"unavailable"});})
       .catch(() => {if(active)setPublication({state:"unavailable"});});
     if(context==="open") {
       void getNoncreditEnrollmentPublisher()
