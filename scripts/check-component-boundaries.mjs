@@ -131,6 +131,7 @@ const owners = [
     '<ul className="mt-4 divide-y">{periodItems.map',
     '<ul className="mt-4 divide-y">{visibleItems.map',
     'viewDates.map(day=><section', 'cells.map((cell, index)',
+    '<Modal open={composerOpen}', '<CalendarInviteesPicker',
   ]],
   ["src/routes/site-website.tsx", ["function WebsiteInformationChecklist(",
     "function WebsiteSourceMappingPanel(", "function WebsiteDesignChecklist(",
