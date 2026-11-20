@@ -102,12 +102,13 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
     const clientSubmissionId=retryIds.current[key]??crypto.randomUUID();
     retryIds.current[key]=clientSubmissionId;
     pendingAnswers.current[key]=answer;
+    setError("");setNotice("");
     const storageKey=classroomPendingKey(courseAttemptId,facilitatedSessionId,key);
     const clientInstanceId=instance.current||accessClientInstance();
     if(!writePendingClassroomResponse(window.sessionStorage,storageKey,{
       clientSubmissionId,clientInstanceId,answer,savedAt:Date.now(),
     }))setNotice("Your browser cannot retain an interrupted answer after reload. Keep this tab open.");
-    setBusy(key);setError("");setNotice("");
+    setBusy(key);
     try{
       await submitClassroomResponse({data:{
         facilitatedSessionId,courseAttemptId,activityReleaseId:activity.id,
