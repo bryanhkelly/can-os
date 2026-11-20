@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ export function SelectionCard({
   const vertical = layout === "vertical";
   const controlProps = {
     value, name, checked, disabled,
-    onChange: (event: React.ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.checked),
+    onChange: (event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.checked),
     className: cn(vertical ? "absolute right-4 top-4" : "mt-0.5"),
   };
   return <label className={cn(
