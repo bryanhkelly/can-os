@@ -93,7 +93,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       setMessage(normalizeClientError(cause,"Could not release the withdrawn seat.").message);
     }finally{setBusy(null);}
   }
-  return <section className="mt-5 border border-border bg-card p-5" aria-label="Cohort management">
+  return <section className="mt-5 border border-border bg-card p-5" aria-label="Course registration management">
     <h2 className="font-serif text-2xl">Course registration and participants</h2>
     {query.isPending&&<p role="status" className="mt-4 text-sm">Loading authorized course operations…</p>}
     {query.isError&&<p role="alert" className="mt-4 text-sm">
