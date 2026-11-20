@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { BookOpen, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { getCurriculumMarketplace } from "@/modules/learning/curriculum-marketplace.functions";
 
 type Marketplace = Awaited<ReturnType<typeof getCurriculumMarketplace>>;
@@ -22,10 +23,9 @@ export function CurriculumLibrary({ marketplaces }: { marketplaces: readonly Mar
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{market.program.name}</p>
                 <h2 className="mt-1 font-serif text-2xl">Your curriculum</h2>
               </div>
-              <Link to="/operations/curriculum-marketplace" search={{ programId: market.program.id }}
-                hash="curriculum-packs" className=" border px-4 py-2 text-sm font-medium">
+              <Button asChild variant="outline"><Link to="/operations/curriculum-marketplace" search={{ programId: market.program.id }} hash="curriculum-packs">
                 Browse curriculum
-              </Link>
+              </Link></Button>
             </div>
             {selected.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
@@ -36,10 +36,9 @@ export function CurriculumLibrary({ marketplaces }: { marketplaces: readonly Mar
                 <BookOpen aria-hidden="true" className="size-8 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">You haven't selected a curriculum</h3>
                 <p className="text-sm text-muted-foreground">Browse published curriculum and review a release for {market.program.name}.</p>
-                <Link to="/operations/curriculum-marketplace" search={{ programId: market.program.id }}
-                  hash="curriculum-packs" className=" bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+                <Button asChild><Link to="/operations/curriculum-marketplace" search={{ programId: market.program.id }} hash="curriculum-packs">
                   Choose curriculum
-                </Link>
+                </Link></Button>
               </div>
             )}
             {market.packs.length === 0 && (
