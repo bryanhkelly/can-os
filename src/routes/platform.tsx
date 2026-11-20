@@ -11,6 +11,7 @@ import { ActionFooter, DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
 import { NativePublisherReleaseReadinessPanel } from "@/components/learning/NativePublisherReleaseReadinessPanel";
+import { PlatformCatalogManager } from "@/components/platform/PlatformCatalogManager";
 
 export const Route = createFileRoute("/platform")({
   loader: () => safeLoader(() => readPlatformAdminOverview())(),
@@ -62,14 +63,15 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
+    <PlatformCatalogManager/>
     <NativePublisherReleaseReadinessPanel records={summary.publisherReleaseReadiness}
       limited={summary.publisherReleasesLimited}/>
     <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady} cases={summary.reviewCases}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        This verified platform role does not grant Site-specific Class authority,
-        Blueprint approval, or access to individual learner records.
+        Platform-wide planning authoring does not grant Site-specific Class authority,
+        institutional Blueprint approval, or access to individual learner records.
         Privileged platform mutations require separate audited server commands.
       </p>
     </section>
