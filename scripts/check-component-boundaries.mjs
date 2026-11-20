@@ -57,6 +57,7 @@ const guardedFiles = [
   "src/components/learning/ClassSupplementContent.tsx",
   "src/components/operations/FullFlowOperationalRecord.tsx",
   "src/components/operations/ExtendedSeasonReadinessRequests.tsx",
+  "src/components/learning/NativeClassScheduleForm.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
 ];
@@ -109,6 +110,7 @@ for (const file of files) {
 }
 
 const owners = [
+  ["src/components/learning/NativeClassSessionsPanel.tsx", ['form onSubmit={e=>void createMeetings(e)}', 'name={"native-schedule-"+workspace.classId}']],
   ["src/routes/groups_.$groupId.tsx", [
     "function GroupOverviewPanel(", "function GroupDetailsPanel(",
     "function ResourcesPanel(", "function StudentMembershipPanel(",
