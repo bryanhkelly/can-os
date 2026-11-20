@@ -29,6 +29,8 @@ const guardedFiles = [
   "src/components/learning/ClassParticipationAcknowledgments.tsx",
   "src/components/learning/ClassOfferingTermsFields.tsx",
   "src/components/launch-studio/LaunchGuidancePanels.tsx",
+  "src/components/home/GuardianEnrollmentNextSteps.tsx",
+  "src/components/home/GuardianGradeQuestions.tsx",
 ];
 const failures = [];
 const files = [];
@@ -73,6 +75,7 @@ const owners = [
   ["src/routes/site-website.tsx", ["function WebsiteInformationChecklist(",
     "function WebsiteSourceMappingPanel(", "function WebsiteDesignChecklist(",
     "function WebsitePreviewPanel("]],
+  ["src/components/home/GuardianHome.tsx", ['<section aria-label="Enrollment next steps"', '<section aria-label="School responses to your grade questions"']],
   ["src/components/operations/OperationsHealthSummary.tsx", ["commandCenterData.issues.map("]],
   ["src/components/learning/NativeClassManager.tsx", ["const methodOptions:", "const creditOptions:", "function toggle<T extends string>"]],
   ["src/components/operations/OperationsWorkspace.tsx", [
