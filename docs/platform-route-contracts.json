@@ -346,24 +346,6 @@
       "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
     },
     {
-      "file": "src/routes/canonical.classes.tsx",
-      "route": "/canonical/classes",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Former /canonical Class UI staging page redirects to production /class?view=manage; no independent Class implementation",
-      "readBoundary": "Redirect only; the native /class manager separately checks current operator and Site scope",
-      "writeBoundary": "None on this route; all mutations require separately authorized native Class commands"
-    },
-    {
-      "file": "src/routes/canonical.classes_.completion.tsx",
-      "route": "/canonical/classes/completion",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Former /canonical staging page redirects Class completion reviews to /class/:classId?view=manage&tab=completion",
-      "readBoundary": "Route validation and redirect only; /class must authorize exact Class, staff, Site and review purpose",
-      "writeBoundary": "No writes at the staging route; governed completion commands remain separately authenticated"
-    },
-    {
       "file": "src/routes/canonical.completion-evidence-reviews.tsx",
       "route": "/canonical/completion-evidence-reviews",
       "owner": "learning",
@@ -371,42 +353,6 @@
       "roleJourney": "Independent staff reviewer requests/approves canonical completion source evidence at verified provider scope",
       "readBoundary": "Current canonical independently scoped reviewer and exact provider/Site/source authorization; no network-only access",
       "writeBoundary": "Versioned source-bound review requests and decisions behind restricted WS3 review gating"
-    },
-    {
-      "file": "src/routes/canonical.content.tsx",
-      "route": "/canonical/content",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Staged creator URL redirects to /class?view=content; provider content home retains existing exact-appointment checks",
-      "readBoundary": "Redirect only; promoted component reads current authorized provider appointment via the existing source service",
-      "writeBoundary": "No writes in the staging route; original author/reviewer commands remain separately authorized, audited and independently reviewed"
-    },
-    {
-      "file": "src/routes/canonical.content_.$trackVersionId.tsx",
-      "route": "/canonical/content_/$trackVersionId",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Staged content edit URL redirects to /class?view=content&trackVersionId=:id; current Course/asset checks remain with original services",
-      "readBoundary": "Redirect only; promoted component reads current authorized provider appointment via the existing source service",
-      "writeBoundary": "No writes in the staging route; original author/reviewer commands remain separately authorized, audited and independently reviewed"
-    },
-    {
-      "file": "src/routes/canonical.content-reviews.tsx",
-      "route": "/canonical/content-reviews",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Staged review URL redirects to /class?view=reviews; independent reviewers retain their existing authority boundary",
-      "readBoundary": "Redirect only; promoted component reads current authorized provider appointment via the existing source service",
-      "writeBoundary": "No writes in the staging route; original author/reviewer commands remain separately authorized, audited and independently reviewed"
-    },
-    {
-      "file": "src/routes/canonical.course-activities.tsx",
-      "route": "/canonical/course-activities",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Staged publisher Course activity editor now redirects bookmarked URLs to /class?view=activities",
-      "readBoundary": "Redirect only; promoted publisher editor rechecks current organization, owner and Course publisher scope on each read",
-      "writeBoundary": "No writes at /canonical; assessment and survey authoring uses existing purpose-bound commands and independent review"
     },
     {
       "file": "src/routes/canonical.issuer-access.tsx",
@@ -1397,15 +1343,6 @@
       "roleJourney": "Site Admin/Registrar accesses provider-private reports and the authorized Class drilldown",
       "readBoundary": "Each report revalidates current Organization/Site and provider data rights; network membership alone denies",
       "writeBoundary": "None; no public network publication or funding claims"
-    },
-    {
-      "file": "src/routes/reports.classes_.$classId.tsx",
-      "route": "/reports/classes/$classId",
-      "owner": "reporting",
-      "verification": "pending",
-      "roleJourney": "Legacy bookmarked Class evidence URL redirects to native /class/:classId?view=manage&tab=reports",
-      "readBoundary": "Redirect only; native Class Reports tab renders the shared WS6 report panel with source-scoped authorization",
-      "writeBoundary": "None on redirect; report UI is read-only"
     },
     {
       "file": "src/routes/safeguarding.tsx",
