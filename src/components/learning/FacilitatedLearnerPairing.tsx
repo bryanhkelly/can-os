@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLearnerClassroomRooms, useRefreshLearnerClassroomRooms } from "@/components/learning/useLearnerClassroomRooms";
+import { useLearnerClassroomRooms } from "@/components/learning/useLearnerClassroomRooms";
 import { pairWithFacilitatedRoom, leaveFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ import { QueryState, WorkspaceNotice } from "@/components/workspace";
  */
 export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:string}) {
   const rooms=useLearnerClassroomRooms(courseAttemptId);
-  const refreshRooms=useRefreshLearnerClassroomRooms();
   const [code,setCode] = useState("");
   const [pending,setPending] = useState(false);
   const [message,setMessage] = useState("");
@@ -35,7 +34,6 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
       setMessageTone("success");
       setMessage("Your device is paired with the facilitator's room.");
       void refresh().catch(()=>setObservationUnavailable(true));
-      void refreshRooms(courseAttemptId).catch(()=>setObservationUnavailable(true));
     } catch {
       setMessageTone("danger");
       setMessage("Unable to pair. Check the code, room expiry, or current course registration.");
@@ -49,7 +47,6 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
       setMessageTone("success");
       setMessage("You left the facilitator's room.");
       void refresh().catch(()=>setObservationUnavailable(true));
-      void refreshRooms(courseAttemptId).catch(()=>setObservationUnavailable(true));
     } catch {
       setMessageTone("danger");
       setMessage("Unable to leave the room. Try again.");
