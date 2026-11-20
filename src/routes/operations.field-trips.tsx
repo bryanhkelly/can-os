@@ -6,7 +6,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { formatTimestamp } from "@/modules/calendar/timezone";
 import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 import { DomainError } from "@/domain/errors";
-import { CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, secondaryActionClassName } from "@/components/workspace";
+import { ActionFooter, CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, secondaryActionClassName } from "@/components/workspace";
 import {SiteProgramFields} from "@/components/workspace/site-program-fields";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {LocalDateTimeField} from "@/components/workspace/local-datetime-field";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import {
   approveCanonicalFieldTrip, inviteCanonicalFieldTripStudent,
   listFieldTripOperations, proposeCanonicalFieldTrip,
@@ -99,40 +99,37 @@ export function FieldTripOperationsView({ data, mode="directory", tripId }: { da
           <SiteProgramFields sites={data.sites} programs={data.programs} siteId={siteId} programId={programId}
             siteRequired programPlaceholder="All enrolled programs at this school" disabled={busy}
             onChange={(site,program)=>{setSiteId(site);setProgramId(program);}}/>
-          <Label className="text-sm">Trip title
+          <Field label="Trip title" required>
             <Input required minLength={3} maxLength={150} value={title}
-              onChange={event => setTitle(event.target.value)}
-              className="mt-1 block w-full  border bg-background p-2" />
-          </Label>
-          <Label className="text-sm">Destination
+              onChange={event => setTitle(event.target.value)} />
+          </Field>
+          <Field label="Destination" required>
             <Input required minLength={3} maxLength={240} value={destination}
-              onChange={event => setDestination(event.target.value)}
-              className="mt-1 block w-full  border bg-background p-2" />
-          </Label>
+              onChange={event => setDestination(event.target.value)} />
+          </Field>
           <LocalDateTimeField label="Departure" timezone={selectedSite?.timezone} value={departsAt} onChange={setDepartsAt} required disabled={busy}/>
           <LocalDateTimeField label="Return" timezone={selectedSite?.timezone} value={returnsAt} onChange={setReturnsAt} required disabled={busy}/>
           <LocalDateTimeField label="Permission deadline" timezone={selectedSite?.timezone} value={permissionDueAt} onChange={setPermissionDueAt} required disabled={busy}/>
-          <Label className="text-sm">Trip fee (USD)
+          <Field label="Trip fee (USD)" required>
             <Input required type="number" min={0} max={10000} step="0.01" value={fee}
-              onChange={event => setFee(event.target.value)}
-              className="mt-1 block w-full  border bg-background p-2" />
-          </Label>
-          <Label className="text-sm">Permission statement version
+              onChange={event => setFee(event.target.value)} />
+          </Field>
+          <Field label="Permission statement version" required>
             <Input required maxLength={80} value={permissionVersion}
-              onChange={event => setPermissionVersion(event.target.value)}
-              className="mt-1 block w-full  border bg-background p-2" />
-          </Label>
-          <Label className="text-sm sm:col-span-2">School-approved guardian permission statement
+              onChange={event => setPermissionVersion(event.target.value)} />
+          </Field>
+          <Field label="School-approved guardian permission statement" className="sm:col-span-2" required>
             <Textarea required minLength={40} maxLength={5000} rows={6}
               value={permissionText}
               onChange={event => setPermissionText(event.target.value)}
-              className="mt-1 block w-full  border bg-background p-3 text-sm"
               placeholder="Paste the school-approved permission and acknowledgement statement here." />
-          </Label>
-          <Button type="submit" disabled={busy || !siteId || !data.programs.some(p => p.siteId === siteId)}
-            className="w-fit">
-            Propose trip
-          </Button>
+          </Field>
+          <ActionFooter layout="inline" className="mt-0 sm:col-span-2">
+            <Button type="submit" disabled={busy || !siteId || !data.programs.some(p => p.siteId === siteId)}
+              loading={busy} loadingLabel="Proposing field trip...">
+              Propose trip
+            </Button>
+          </ActionFooter>
         </form>
       </section>}
       {mode==="directory"&&<DirectoryTable label="Field trips" caption="Trips in your authorized school and program scope."
@@ -188,14 +185,13 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
         )}>Approve trip</Button>}
     {trip.status === "approved" && trip.hasPublishedPermission &&
       <div className="mt-5 flex flex-wrap items-end gap-3">
-        <Label className="min-w-56 flex-1 text-sm">Invite an enrolled student
-          <Select value={candidate} onChange={event => onCandidateChange(event.target.value)}
-            className="mt-1 block w-full  border bg-background p-2">
+        <Field className="min-w-56 flex-1" label="Invite an enrolled student">
+          <Select value={candidate} onChange={event => onCandidateChange(event.target.value)}>
             <option value="">Select a student</option>
             {remaining.map(student =>
               <option key={student.id} value={student.id}>{student.name}</option>)}
           </Select>
-        </Label>
+        </Field>
         <Button type="button" disabled={busy || !candidate}
           variant="outline"
           onClick={() => void run(async () => {
