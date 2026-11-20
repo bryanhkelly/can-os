@@ -21,6 +21,7 @@ import { assertCapability, AuthorizationError, type CommandContext } from "@/dom
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole, blueprintReadDatabaseRole } from "@/domain/blueprint-database-role";
 import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
+import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "./verified-site-planning.server";
 
 type ReviewInput = ReturnType<typeof decideBlueprintReviewInputSchema.parse>;
 
@@ -80,10 +81,15 @@ export async function getBlueprintReview(
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.read");
   const { configurationVersionId } = blueprintReviewReadInputSchema.parse(rawInput);
-  const databaseRole = blueprintReadDatabaseRole(context);
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
   return db.transaction(async tx => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
+    if (isCanPlanning) {
+      const siteId = requireBlueprintSiteScope(context, version.config);
+      await assertVerifiedCanPlanningSite(tx, context, siteId, version.owningOrganizationId);
+    }
     const [latestReview] = await tx.select({
       id: configurationReviews.id,
       decision: configurationReviews.decision,
@@ -137,10 +143,15 @@ export async function getBlueprintReviewHistory(
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.read");
   const { configurationVersionId, page } = blueprintReviewHistoryInputSchema.parse(rawInput);
-  const databaseRole = blueprintReadDatabaseRole(context);
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
   return db.transaction(async tx => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
+    if (isCanPlanning) {
+      const siteId = requireBlueprintSiteScope(context, version.config);
+      await assertVerifiedCanPlanningSite(tx, context, siteId, version.owningOrganizationId);
+    }
     requireBlueprintSiteScope(context, version.config);
     const rows = await tx.select({
       id: configurationReviews.id,
