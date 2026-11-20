@@ -184,7 +184,8 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
         if (data.interaction.kind.startsWith("video_")
           ? !publishedVideo && !authorizedSupplement && !authorizedPublisherPack
           : !publisherResource && !authorizedSupplement && !authorizedPublisherPack) {
-          throw new AuthorizationError("published lesson video or resource");
+          throw new AuthorizationError(data.interaction.kind === "resource_opened"
+            ? "published lesson resource" : "published lesson video");
         }
       }
       const [learningSession] = await tx.select().from(s.learningActivitySessions)
