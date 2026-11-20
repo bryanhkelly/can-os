@@ -195,7 +195,7 @@ export function PrepareTeamV61({ siteId }: { siteId: string }) {
     </WorkspacePanel>
     <Suspense fallback={<p role="status" className="border p-4 text-sm">Loading Site staff workspace…</p>}>
       <ScopedAdminConsole key={siteId + ":" + view}
-        selection={{ siteId }} mode={view} hubMode includeRoomCoverage={false}/>
+        selection={{ siteId }} lockedSiteId={siteId} mode={view} hubMode includeRoomCoverage={false}/>
     </Suspense>
     <WorkspaceNotice tone="info">
       Invitations remain inactive until accepted. Screening, training,
