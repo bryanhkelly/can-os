@@ -10,6 +10,7 @@ import {
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import type { JsonObject } from "@/domain/json-types";
 import { getIdentityContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
 import {
@@ -283,9 +284,9 @@ export const savePlatformBlueprintDraft = createServerFn({ method: "POST" })
         typeof component.componentSpec === "object" && !Array.isArray(component.componentSpec)
           ? component.componentSpec : {},
       ]));
-      const spec = { ...formerSpec, programCode: data.programCode,
-        ...(data.offeringCode ? { offeringCode: data.offeringCode } : {}) };
-      if (!data.offeringCode) delete spec.offeringCode;
+      const spec: JsonObject = { ...formerSpec, programCode: data.programCode };
+      if (data.offeringCode) spec.offeringCode = data.offeringCode;
+      else delete spec.offeringCode;
       const [version] = await tx.insert(blueprintVersions).values({
         blueprintId: item.id, versionNo: data.expectedVersion + 1,
         targetKind: data.targetKind, spec,
