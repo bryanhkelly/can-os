@@ -44,7 +44,7 @@
     "/guardian/students",
     "/guardian/attendance",
     "/guardian/admission-offers",
-    "/classes",
+    "/class",
     "/sites",
     "/calendar",
     "/messages",
@@ -70,7 +70,7 @@
     },
     {
       "persona": "teacher",
-      "destination": "/classes"
+      "destination": "/class"
     },
     {
       "persona": "registrar",
