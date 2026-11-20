@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
-import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   cleanSiteEnvironmentV61, cleanSiteHostingV61,
   siteEnvironmentV61Schema, siteHostingV61Schema, siteStoryV61Schema,
@@ -68,16 +67,6 @@ export function SiteInformationV61Guidance({ step }: { step: Step }) {
   return <LaunchGuidancePanels guidance={siteInformationV61Guidance[step]} />;
 }
 
-function SingleChoice({ name, selected, title, detail, onSelect }: {
-  name: string; selected: boolean; title: string; detail: string; onSelect: () => void;
-}) {
-  return <label className={"flex min-h-20 cursor-pointer items-start gap-3 border p-4 text-sm " +
-    (selected ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted/30")}>
-    <Radio name={name} checked={selected} onChange={onSelect} className="mt-0.5" />
-    <span><strong className="block">{title}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{detail}</span></span>
-  </label>;
-}
-
 const motivations = [
   ["access", "Expand access to educational opportunities"],
   ["belonging", "Build a supportive, welcoming community"],
@@ -114,12 +103,10 @@ function MultiChoice({ title, hint, options, selected, onChange, max }: {
     <legend className="text-sm font-semibold">{title}</legend>
     <p className="text-xs leading-5 text-muted-foreground">{hint}</p>
     <div className="grid gap-2 sm:grid-cols-2">
-      {options.map(([id, label]) => <label key={id} className="flex min-h-11 items-center gap-2 border bg-card p-3 text-xs">
-        <Checkbox checked={selected.includes(id)}
-          disabled={max !== undefined && selected.length >= max && !selected.includes(id)}
-          onChange={event => onChange(event.target.checked ? [...selected, id] : selected.filter(value => value !== id))} />
-        <span>{label}</span>
-      </label>)}
+      {options.map(([id, label]) => <SelectionCard key={id} kind="checkbox" compact
+        value={id} title={label} checked={selected.includes(id)}
+        disabled={max !== undefined && selected.length >= max && !selected.includes(id)}
+        onChange={checked => onChange(checked ? [...selected, id] : selected.filter(value => value !== id))} />)}
     </div>
     {max !== undefined && <p className="text-xs text-muted-foreground">{selected.length} of {max} selected</p>}
   </fieldset>;
@@ -325,12 +312,12 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who hosts your learning space or activities?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
-            <SingleChoice name="site-host" selected={host.hostingMode === "same"} title="Your organization"
-              detail="Your organization hosts its own activities" onSelect={() => setHost(current => ({ ...current, hostingMode: "same" }))} />
-            <SingleChoice name="site-host" selected={host.hostingMode === "different"} title="Another organization"
-              detail="A separate organization hosts us" onSelect={() => setHost(current => ({ ...current, hostingMode: "different" }))} />
-            <SingleChoice name="site-host" selected={host.hostingMode === "undecided"} title="Not decided yet"
-              detail="We are still exploring options" onSelect={() => setHost(current => ({ ...current, hostingMode: "undecided" }))} />
+            <SelectionCard kind="radio" name="site-host" checked={host.hostingMode === "same"} title="Your organization"
+              detail="Your organization hosts its own activities" onChange={() => setHost(current => ({ ...current, hostingMode: "same" }))} />
+            <SelectionCard kind="radio" name="site-host" checked={host.hostingMode === "different"} title="Another organization"
+              detail="A separate organization hosts us" onChange={() => setHost(current => ({ ...current, hostingMode: "different" }))} />
+            <SelectionCard kind="radio" name="site-host" checked={host.hostingMode === "undecided"} title="Not decided yet"
+              detail="We are still exploring options" onChange={() => setHost(current => ({ ...current, hostingMode: "undecided" }))} />
           </div>
         </fieldset>
         {host.hostingMode === "different" && <div className="grid gap-4 sm:grid-cols-2">
@@ -354,12 +341,12 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">How will learners participate?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
-            <SingleChoice name="site-delivery" title="In person" detail="At a physical learning location"
-              selected={environment.delivery === "physical"} onSelect={() => setEnvironment(current => ({ ...current, delivery: "physical" }))} />
-            <SingleChoice name="site-delivery" title="Online" detail="Participate remotely"
-              selected={environment.delivery === "digital"} onSelect={() => setEnvironment(current => ({ ...current, delivery: "digital" }))} />
-            <SingleChoice name="site-delivery" title="Both" detail="In-person and online learning"
-              selected={environment.delivery === "both"} onSelect={() => setEnvironment(current => ({ ...current, delivery: "both" }))} />
+            <SelectionCard kind="radio" name="site-delivery" title="In person" detail="At a physical learning location"
+              checked={environment.delivery === "physical"} onChange={() => setEnvironment(current => ({ ...current, delivery: "physical" }))} />
+            <SelectionCard kind="radio" name="site-delivery" title="Online" detail="Participate remotely"
+              checked={environment.delivery === "digital"} onChange={() => setEnvironment(current => ({ ...current, delivery: "digital" }))} />
+            <SelectionCard kind="radio" name="site-delivery" title="Both" detail="In-person and online learning"
+              checked={environment.delivery === "both"} onChange={() => setEnvironment(current => ({ ...current, delivery: "both" }))} />
           </div>
         </fieldset>
         {environment.delivery && environment.delivery !== "digital" && <Field label="Physical space arrangement" required>
@@ -379,10 +366,10 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       <div className="space-y-5">
         <fieldset className="space-y-3"><legend className="text-sm font-semibold">Would you like to explore network affiliation?</legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            <SingleChoice name="site-network" title="Not at this time" detail="Continue independently"
-              selected={networkChoice === "independent"} onSelect={() => setNetworkChoice("independent")} />
-            <SingleChoice name="site-network" title="Explore or request affiliation" detail="Review eligible networks and request approval"
-              selected={networkChoice === "request"} onSelect={() => setNetworkChoice("request")} />
+            <SelectionCard kind="radio" name="site-network" title="Not at this time" detail="Continue independently"
+              checked={networkChoice === "independent"} onChange={() => setNetworkChoice("independent")} />
+            <SelectionCard kind="radio" name="site-network" title="Explore or request affiliation" detail="Review eligible networks and request approval"
+              checked={networkChoice === "request"} onChange={() => setNetworkChoice("request")} />
           </div>
         </fieldset>
         {networkChoice === "request" && <SiteAffiliationPanel siteId={siteId} />}
