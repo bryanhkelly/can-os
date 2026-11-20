@@ -103,6 +103,7 @@ export const listPlatformCatalogDefinitions = createServerFn({ method: "GET" })
         lifecycle: blueprintReferenceItemVersions.lifecycle,
         title: blueprintReferenceItemVersions.title,
         summary: blueprintReferenceItemVersions.summary,
+        description: blueprintReferenceItemVersions.description,
       }).from(blueprintReferenceItems)
         .innerJoin(blueprintReferenceItemVersions,
           eq(blueprintReferenceItems.id, blueprintReferenceItemVersions.itemId))
@@ -182,9 +183,12 @@ export const savePlatformBlueprintDraft = createServerFn({ method: "POST" })
       const publisher = await platformPublisher(tx);
       const [program] = await tx.select({ id: blueprintReferenceItems.id })
         .from(blueprintReferenceItems)
+        .innerJoin(blueprintReferenceItemVersions,
+          eq(blueprintReferenceItemVersions.itemId, blueprintReferenceItems.id))
         .where(and(eq(blueprintReferenceItems.code, data.programCode),
           eq(blueprintReferenceItems.referenceKind, "program_model"),
-          eq(blueprintReferenceItems.status, "active"))).limit(1);
+          eq(blueprintReferenceItems.status, "active"),
+          eq(blueprintReferenceItemVersions.lifecycle, "published"))).limit(1);
       if (!program) throw new Error("Create a published Program reference before its Blueprint.");
       const [existing] = await tx.select().from(blueprints)
         .where(and(eq(blueprints.publisherOrganizationId, publisher),
@@ -236,22 +240,28 @@ async function draftVersion(tx: Tx, kind: CatalogKind, id: string) {
   if (kind === "program") {
     const [version] = await tx.select({ id: blueprintReferenceItemVersions.id,
       lifecycle: blueprintReferenceItemVersions.lifecycle,
+      itemId: blueprintReferenceItemVersions.itemId,
+      versionNo: blueprintReferenceItemVersions.versionNo,
     }).from(blueprintReferenceItemVersions)
       .innerJoin(blueprintReferenceItems,
         eq(blueprintReferenceItems.id, blueprintReferenceItemVersions.itemId))
       .where(and(eq(blueprintReferenceItemVersions.id, id),
         eq(blueprintReferenceItems.referenceKind, "program_model"),
         eq(blueprintReferenceItems.status, "active"))).limit(1);
+    if (!version || (await latestProgram(tx, version.itemId))?.id !== id) return undefined;
     return version;
   }
   const publisher = await platformPublisher(tx);
   const [version] = await tx.select({ id: blueprintVersions.id,
     lifecycle: blueprintVersions.lifecycle,
+    blueprintId: blueprintVersions.blueprintId,
+    versionNo: blueprintVersions.versionNo,
   }).from(blueprintVersions)
     .innerJoin(blueprints, eq(blueprints.id, blueprintVersions.blueprintId))
     .where(and(eq(blueprintVersions.id, id),
       eq(blueprints.publisherOrganizationId, publisher),
       eq(blueprints.status, "active"))).limit(1);
+  if (!version || (await latestBlueprint(tx, version.blueprintId))?.id !== id) return undefined;
   return version;
 }
 
