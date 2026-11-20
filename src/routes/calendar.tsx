@@ -26,6 +26,7 @@ import { Modal } from "@/components/ui/modal";
 import { countCalendarInvitees } from "@/domain/calendar-invitees";
 import { CalendarInviteesPicker } from "@/components/calendar/CalendarInviteesPicker";
 import { CalendarAgendaList } from "@/components/calendar/CalendarAgendaList";
+import { CalendarEventFactsPanels } from "@/components/calendar/CalendarEventFactsPanels";
 import { WEEKDAY_ABBREVIATIONS } from "@/domain/weekdays";
 import { formatTime, formatEventDate, typeLabel, chipClass } from "@/components/calendar/calendar-presentation";
 
@@ -473,39 +474,7 @@ function CalendarPage() {
       </WorkspacePanel>}
     >
       <div className="mt-6 grid gap-5">
-        <WorkspacePanel title="Event details" description="Schedule and description for this calendar event." className=" shadow-none">
-          <dl className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</dt>
-              <dd className="mt-1 text-sm">{formatEventDate(selectedEvent.startsAt, selectedEvent.timezone)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</dt>
-              <dd className="mt-1 text-sm">{eventTime} <span className="text-muted-foreground">{selectedEvent.timezone}</span></dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</dt>
-              <dd className="mt-1 text-sm">{typeLabel(selectedEvent)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</dt>
-              <dd className="mt-1 text-sm">{selectedEvent.cancelled ? "Cancelled" : "On calendar"}</dd>
-            </div>
-            {!!selectedEvent.teachers?.length && <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {selectedEvent.teachers.length > 1 ? "Teachers" : "Teacher"}
-              </dt>
-              <dd className="mt-1 text-sm">{selectedEvent.teachers.map((teacher, index) => <span key={teacher.personId}>
-                {index > 0 && ", "}<Link to="/profiles" search={{ person: teacher.personId }} className="underline underline-offset-2">{teacher.name}</Link>
-              </span>)}</dd>
-            </div>}
-          </dl>
-        </WorkspacePanel>
-        <WorkspacePanel title="Description" className=" shadow-none">
-          <p className="whitespace-pre-wrap text-sm leading-6">
-            {selectedEvent.description || "No additional description has been provided."}
-          </p>
-        </WorkspacePanel>
+        <CalendarEventFactsPanels event={selectedEvent} eventTime={eventTime}/>
         {selectedEvent.manageable&&<WorkspacePanel title="Manage event" className=" shadow-none">
           {manageMode?.id!==selectedEvent.id&&confirmCancelId!==selectedEvent.id&&<div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"edit")} className="">Edit details</Button>
