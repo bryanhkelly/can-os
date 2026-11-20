@@ -149,13 +149,13 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     setMessage(null);
   }
 
-  async function openConfiguration(configurationId: string, available: Workspace | null = workspace) {
+  async function openConfiguration(configurationId: string, available: Workspace | null = workspace): Promise<boolean> {
     if (embedded && initialBlueprintVersionId &&
         !available?.configurations.some(configuration =>
           configuration.configurationId === configurationId &&
           configuration.blueprintVersionId === initialBlueprintVersionId)) {
       setError("This saved plan is unavailable for the selected Site and Solution version.");
-      return;
+      return false;
     }
     setBusy(true);
     setRevisingFrozen(false);
@@ -202,8 +202,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       ));
       setTemplateId(result.blueprintVersionId);
       setMessage(null);
+      return true;
     } catch (caught) {
-      setError(normalizeClientError(caught, "This Blueprint configuration is unavailable.").message);
+      setError(normalizeClientError(caught, "This Solution plan could not be reopened.").message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -259,10 +261,12 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         } });
         const current = await reload();
         onWorkspaceChanged?.(current);
-        await openConfiguration(detail.configurationId, current);
-        setMessage(saved.revision > detail.revision
-          ? "A new Blueprint configuration revision was saved."
-          : "The Blueprint configuration is already up to date.");
+        const opened = await openConfiguration(detail.configurationId, current);
+        setMessage(!opened
+          ? "Changes were saved, but the latest plan could not be reopened. Reload before editing."
+          : saved.revision > detail.revision
+            ? "A new Solution plan revision was saved."
+            : "The Solution plan is already up to date.");
       } else {
         const configurationId = crypto.randomUUID();
         await createCanonicalBlueprintConfiguration({ data: {
@@ -276,8 +280,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         } });
         const current = await reload();
         onWorkspaceChanged?.(current);
-        await openConfiguration(configurationId, current);
-        setMessage("Solution plan created.");
+        const opened = await openConfiguration(configurationId, current);
+        setMessage(opened ? "Solution plan created." :
+          "Solution plan created, but reopening failed. Reload to review the saved plan.");
       }
     } catch (caught) {
       setError(normalizeClientError(caught, "The Blueprint configuration could not be saved.").message);
@@ -306,8 +311,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       });
       const current = await reload();
       onWorkspaceChanged?.(current);
-      await openConfiguration(detail.configurationId, current);
-      setMessage("Current Solution plan submitted for independent review. No Program or enrollment is authorized.");
+      const opened = await openConfiguration(detail.configurationId, current);
+      setMessage(opened
+        ? "Current Solution plan submitted for independent review. No Program or enrollment is authorized."
+        : "Solution plan submitted, but review status could not be refreshed. Reload before taking another action.");
     } catch (caught) {
       setError(normalizeClientError(caught, "Blueprint submission failed.").message);
     } finally {
