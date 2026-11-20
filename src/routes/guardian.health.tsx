@@ -3,7 +3,7 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { QueryState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { ActionFooter, QueryState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -161,9 +161,11 @@ function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:(
    <Field label="Emergency contact phone" className="text-sm font-medium"><Input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} maxLength={40}/></Field>
    <Field label="Relationship to child" className="text-sm font-medium"><Input value={relationship} onChange={e=>setRelationship(e.target.value)} maxLength={80}/></Field>
    </div>
-  <Button type="submit" disabled={busy||submitted}>
-    {busy?"Submitting…":submitted?"Awaiting school review":"Submit for school review"}
-  </Button>
+  <ActionFooter layout="form">
+    <Button type="submit" disabled={busy||submitted} loading={busy} loadingLabel="Submitting health update...">
+      {submitted?"Awaiting school review":"Submit for school review"}
+    </Button>
+  </ActionFooter>
   </>}
   {child.approvedEmergencyContact?.phone&&<p className="text-sm"><strong>Current school-approved contact:</strong> {child.approvedEmergencyContact.name} · {child.approvedEmergencyContact.phone} · {child.approvedEmergencyContact.relationship}</p>}
   <MutationFeedback state={mutation} pendingMessage="Submitting for school review..."/>
