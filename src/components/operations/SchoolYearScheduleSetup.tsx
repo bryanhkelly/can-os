@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { addStudioSchedule } from "@/modules/academic-time/school-year-studio.functions";
 import { defaultScheduleDayPattern, scheduleDayPattern } from "@/domain/schedule-day-pattern";
+import { WEEKDAY_ABBREVIATIONS } from "@/domain/weekdays";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
@@ -41,7 +42,7 @@ export function SchoolYearScheduleSetup({ schoolYearId, programId, startsOn, end
         <Input minLength={2} maxLength={100} value={name} onChange={event => setName(event.target.value)} />
       </Field>
       <fieldset><legend>Instructional weekdays</legend><div className="mt-2 flex flex-wrap gap-3">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => <Label key={day} className="flex items-center gap-2">
+        {WEEKDAY_ABBREVIATIONS.map((day, index) => <Label key={day} className="flex items-center gap-2">
           <Checkbox checked={pattern.weekdays.includes(index)} onChange={event => setPattern(current => ({ ...current,
             weekdays: event.target.checked ? [...current.weekdays, index].sort() : current.weekdays.filter(value => value !== index),
           }))}/>{day}
