@@ -12,9 +12,10 @@ export interface GuidedSetupStep {
 
 /** Shared V6.1 internal-step presentation. A passive progress list does not
  * imply steps are saved or let callers bypass their validation. */
-export function GuidedSetupProgress({ steps, onStepChange, label = "Setup progress" }: {
+export function GuidedSetupProgress({ steps, onStepChange, navigationDisabled = false, label = "Setup progress" }: {
   steps: readonly GuidedSetupStep[];
   onStepChange?: (id: string) => void;
+  navigationDisabled?: boolean;
   label?: string;
 }) {
   return <ol aria-label={label} className={cn("grid gap-2 border-b bg-muted/25 p-4",
@@ -42,6 +43,7 @@ export function GuidedSetupProgress({ steps, onStepChange, label = "Setup progre
           {onStepChange ? <Button type="button" variant="ghost"
             className={cn(itemClass, "h-full w-full shrink justify-start whitespace-normal hover:border-primary/40")}
             aria-current={step.status === "current" ? "step" : undefined}
+            disabled={navigationDisabled}
             onClick={() => onStepChange(step.id)}>{item}</Button> :
             <div className={itemClass} aria-current={step.status === "current" ? "step" : undefined}>{item}</div>}
         </li>;
@@ -49,13 +51,15 @@ export function GuidedSetupProgress({ steps, onStepChange, label = "Setup progre
     </ol>;
 }
 
-export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange }: {
+export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange, navigationDisabled = false }: {
   title: string;
   description?: string;
   steps: readonly GuidedSetupStep[];
   aside?: ReactNode;
   /** Optional local step navigation; does not imply saved or complete. */
   onStepChange?: (id: string) => void;
+  /** Lock internal navigation while an owning workflow commits or reconciles a save. */
+  navigationDisabled?: boolean;
   children: ReactNode;
 }) {
   const titleId = useId();
@@ -64,7 +68,7 @@ export function GuidedSetupShell({ title, description, steps, aside, children, o
       <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
       {description && <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
     </header>
-    <GuidedSetupProgress steps={steps} onStepChange={onStepChange} />
+    <GuidedSetupProgress steps={steps} onStepChange={onStepChange} navigationDisabled={navigationDisabled} />
     <div className={cn("grid gap-6 p-5 sm:p-6", aside && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0">{children}</div>
       {aside && <aside aria-label="Setup guidance" className="min-w-0 lg:border-l lg:pl-6">{aside}</aside>}
