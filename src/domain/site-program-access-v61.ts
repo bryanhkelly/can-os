@@ -40,8 +40,8 @@ export function academyReferenceMayBeSelected(
   allowed: SchoolYearAvailability,
 ): boolean {
   if (!isSchoolYearAcademyReference(item)) return true;
-  const min = item.academicGradeRange?.min && gradeNumber(item.academicGradeRange.min);
-  const max = item.academicGradeRange?.max && gradeNumber(item.academicGradeRange.max);
+  const min = item.academicGradeRange ? gradeNumber(item.academicGradeRange.min) : null;
+  const max = item.academicGradeRange ? gradeNumber(item.academicGradeRange.max) : null;
   if (min == null || max == null || min > max) return false;
   if (min <= 8 && max >= 6 && !allowed["grades-6-8"]) return false;
   if (min <= 12 && max >= 9 && !allowed["grades-9-12"]) return false;
