@@ -178,6 +178,45 @@ Class enrollment service. The existing learner enrollment-history feed is a
 list of source participation records, not an audit trail of every transition;
 do not present it as event history without a distinct authorized source.
 
+### Canonical native controls and reuse contract (November 2026)
+
+**The design system already owns the native elements.** Do not introduce another
+Button/Input/Select/Label implementation in a feature. Native HTML is an
+implementation detail of `src/components/ui/`, not a competing option for
+feature pages. Every Site, Launch Studio, classroom, guardian, facilitator,
+admissions and operations surface follows the same ownership rules.
+
+| Native behavior | Canonical V6.1 owner | Feature use |
+| --- | --- | --- |
+| Action or link-styled action | `ui/button.tsx` (`Button`) | Use `Button` and `Button asChild` for a real link. Only one primary action per view. |
+| Text, email, number, date, file inputs | `ui/input.tsx` (`Input`) | Wrap in `Field` for labels, descriptions, required and error presentation. |
+| Select menu / multiline text | `ui/select.tsx`, `ui/textarea.tsx` | Compose with `Field` rather than per-feature styles. |
+| Checkbox or radio | `ui/choice.tsx` | Use `Checkbox` / `Radio`; preserve an accessible label and fieldset where appropriate. |
+| Label, validation, managed forms | `ui/label.tsx`, `ui/field.tsx`, `ui/form.tsx` | Reuse `Label`, `Field` and the existing React Hook Form adapter; do not clone markup per module. |
+| Dialog and tabular data | `ui/modal.tsx`, `ui/table.tsx` | Compose the shared primitives; use `WorkspacePanel`, `ActionDialog`, `DirectoryTable` as the higher-level patterns. |
+
+**Style ownership:** `src/components/ui/control-styles.ts` is the single
+source of shared focus-ring, disabled-control, validation and field-surface
+classes. The controls still own their meaningful differences, such as textarea
+resizing, check/radio appearance, button loading and select sizing.
+Changes to these shared behaviors propagate to all existing consumers.
+
+**Enforcement:** `can-os-design/no-native-feature-controls` applies to every
+production JSX route and feature, including newly added files. It permits only
+static hidden form inputs and a native wrapping `label` whose sole interactive
+descendant is a canonical `Checkbox` or `Radio`. The actual primitive
+implementation files are exempt. The rule does not ban semantic native
+`form`, `fieldset`, `legend`, `video` or other elements that are not
+duplicate form controls. Its unit tests verify both exceptions and regressions.
+`npm run lint` and the source-level V6.1 audit are independent enforcement
+routes. Storybook is the interactive catalog; browser and visual QA remain
+separate release gates.
+
+**Dependency direction:** `ui` does not import features; shared
+`workspace` and `workflow` patterns compose `ui`; feature-specific
+components compose those layers. Server authorization, identity, evidence,
+approval decisions and mutations never belong in primitive controls.
+
 **Reuse before invention:** For any new feature surface, look for an existing pattern
 before creating a new table, filter row, status display, stepper, form layout or header.
 Extend a shared pattern only when the behavior is genuinely reusable across multiple
