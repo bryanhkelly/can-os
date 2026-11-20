@@ -13,6 +13,7 @@ import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline
 import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
+import { NativeClassActivationStatus } from "@/components/learning/NativeClassActivationStatus";
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
@@ -437,6 +438,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           <p className="mt-3 text-sm text-muted-foreground">
             One Course version, one Class identity, one enrollment model. Official grades and awards remain individual, authorized outcomes.
           </p>
+          <div className="mt-5"><NativeClassActivationStatus classId={workspace.classId}/></div>
         </>}
         {workspace.tab==="offering"&&<>
           <h2 className="font-serif text-2xl">Class Offering</h2>
