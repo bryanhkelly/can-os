@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, WorkspaceNotice } from "@/components/workspace";
 import { createTeacherLearningFollowUp } from "@/modules/learning/teacher-learning-followup.functions";
 import { followUpApproachLabels, type TeacherLearningFollowUpInput } from "@/domain/teacher-learning-followup";
 
@@ -68,12 +68,12 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
           <option value={1}>1 day</option><option value={3}>3 days</option><option value={7}>7 days</option>
         </Select>
       </Field>
-      {!created && <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={busy}>
-          {busy ? "Saving…" : "Create follow-up Action"}
+      {!created && <ActionFooter layout="inline" className="mt-0">
+        <Button type="submit" disabled={busy} loading={busy} loadingLabel="Saving follow-up...">
+          Create follow-up Action
         </Button>
         <Button type="button" variant="ghost" onClick={() => setExpanded(false)} disabled={busy}>Cancel</Button>
-      </div>}
+      </ActionFooter>
       {notice && <WorkspaceNotice tone={created ? "success" : "danger"}>{notice}</WorkspaceNotice>}
       {actionId && <Link to="/actions/$actionId" params={{ actionId }} className="font-semibold underline">Open follow-up Action</Link>}
     </form>}
