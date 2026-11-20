@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {buildClassAssessmentEvidence,summarizeClassAssessmentEvidence} from "@/domain/class-assessment-evidence";
+import {buildClassAssessmentEvidence,summarizeClassAssessmentEvidence,visibleClassAssessments,assessmentsForPublishedLesson} from "@/domain/class-assessment-evidence";
 
 const items=[
  {id:"formative",title:"Unit 1 practice",status:"published" as const,pointsPossible:"20.00",
@@ -57,5 +57,36 @@ describe("class assessment evidence (not course credit or mastery)",()=>{
     {id:"x",title:"x",status:"published",pointsPossible:"not-a-number",metadata:{unitId:"../other-school"}},
   ],[{assessmentId:"x",attemptNumber:1,status:"returned",score:"not-a-score"}]);
   expect(evidence[0]).toMatchObject({unitId:null,pointsPossible:null,score:null});
+ });
+});
+
+
+describe("shared classroom-to-assignment integration", () => {
+ it("applies scheduled-release visibility for learners and guardians, but not teachers", () => {
+  const now=new Date("2026-11-19T12:00:00Z");
+  const assessments=[
+   {id:"available",status:"published",availableAt:new Date("2026-11-18T12:00:00Z")},
+   {id:"future",status:"published",availableAt:new Date("2026-12-01T12:00:00Z")},
+   {id:"closed",status:"closed",availableAt:new Date("2026-11-18T12:00:00Z")},
+   {id:"draft",status:"draft",availableAt:null},
+  ];
+  const ids=(role:"student"|"guardian"|"teacher")=>visibleClassAssessments(assessments,role,now).map(row=>row.id);
+  expect(ids("student")).toEqual(["available","closed"]);
+  expect(ids("guardian")).toEqual(["available","closed"]);
+  expect(ids("teacher")).toEqual(["available","future","closed","draft"]);
+ });
+ it("shows existing unit-scoped demo homework in its unit's lessons without rewriting publisher records", () => {
+  const rows=buildClassAssessmentEvidence([
+   {id:"unit1",title:"Unit 1 checkpoint",status:"published",pointsPossible:"10",metadata:{unitId:"algebra1-u01"}},
+   {id:"unit2",title:"Unit 2 checkpoint",status:"published",pointsPossible:"10",metadata:{unitId:"algebra1-u02"}},
+   {id:"specific",title:"Day 2 assignment",status:"published",pointsPossible:"10",metadata:{curriculumLessonId:"u01-d02",unitId:"algebra1-u02"}},
+   {id:"general",title:"Coursewide assignment",status:"published",pointsPossible:"10",metadata:{}},
+   {id:"stale",title:"Old course",status:"published",pointsPossible:"10",metadata:{unitId:"algebra1-u01",publisherCourseVersionId:"old"}},
+   {id:"private",title:"Draft",status:"draft",pointsPossible:"10",metadata:{unitId:"algebra1-u01"}},
+  ],[],"current");
+  expect(assessmentsForPublishedLesson(rows,"u01-d02","u01").map(row=>row.id)).toEqual(["unit1","specific"]);
+  expect(assessmentsForPublishedLesson(rows,"u01-d03","u01").map(row=>row.id)).toEqual(["unit1"]);
+  expect(assessmentsForPublishedLesson(rows,"u02-d01","u02").map(row=>row.id)).toEqual(["unit2"]);
+  expect(assessmentsForPublishedLesson(rows,"u01-d02").map(row=>row.id)).toEqual(["specific"]);
  });
 });
