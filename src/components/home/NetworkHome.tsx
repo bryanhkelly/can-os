@@ -89,7 +89,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
           {(entry.status === "pending" || entry.status === "approved") && <>
             <Label className="mt-3 block text-sm font-medium">Decision reason
               <Textarea rows={2} minLength={4} maxLength={1000}
-                className="mt-1 w-full  border bg-background p-2"
+                className="mt-1"
                 placeholder="Reason for this network decision"
                 value={reasons[entry.id] ?? ""}
                 onChange={event => setReasons(old => ({ ...old, [entry.id]: event.target.value }))}/>
@@ -97,13 +97,13 @@ function NetworkSites({ data }: { data: NetworkData }) {
             <div className="mt-2 flex gap-2">
               {entry.status === "pending" ? <>
                 <Button type="submit" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
-                  className=" border px-3 py-2 text-sm disabled:opacity-50"
+                  
                   onClick={() => void decide(entry.id, "approve")}>Approve</Button>
                 <Button type="submit" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
-                  className=" border px-3 py-2 text-sm disabled:opacity-50"
+                  
                   onClick={() => void decide(entry.id, "reject")}>Reject</Button>
               </> : <Button type="submit" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
-                className=" border px-3 py-2 text-sm disabled:opacity-50"
+                
                 onClick={() => void decide(entry.id, "revoke")}>Revoke affiliation</Button>}
             </div>
           </>}
