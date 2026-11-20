@@ -110,8 +110,8 @@ describe("Launch readiness read-only presentation components", () => {
     expect(html).toContain("Safeguarding");
     expect(html).toContain("Publication recorded; reachability unverified");
     expect(html).toContain("academy.example");
-    expect(html).toContain("1 publisher candidates");
-    expect(html).toContain("1 recorded enrollment releases");
+    expect(html).toContain("1 publisher candidate");
+    expect(html).toContain("1 recorded enrollment release");
     expect(html).toContain("Final enrollment publication still requires");
   });
 });
