@@ -51,18 +51,18 @@ function DevicesContent({data}:{data:Workspace}){
      await createSiteDeviceRegistration({data:{label,deviceCategory:category,ownership,managed}});
      setLabel("");
     });}}>
-     <Label className="block text-sm">Device label<Input required minLength={2} maxLength={100} className="mt-1 block w-full border border-border bg-background p-2"
+     <Label className="block text-sm">Device label<Input required minLength={2} maxLength={100} className="mt-1"
        value={label} onChange={event=>setLabel(event.target.value)} placeholder="Room A Chromebook 01"/></Label>
-     <Label className="block text-sm">Category<Select className="mt-1 block w-full border border-border bg-background p-2"
+     <Label className="block text-sm">Category<Select className="mt-1"
        value={category} onChange={e=>setCategory(e.target.value as typeof category)}>
       {["desktop","laptop","tablet","phone","chromebook","other"].map(s=><option key={s} value={s}>{s}</option>)}
      </Select></Label>
-     <Label className="block text-sm">Ownership<Select className="mt-1 block w-full border border-border bg-background p-2"
+     <Label className="block text-sm">Ownership<Select className="mt-1"
       value={ownership} onChange={e=>setOwnership(e.target.value as typeof ownership)}>
       {["site","organization","loaned","personal"].map(s=><option key={s} value={s}>{s}</option>)}
      </Select></Label>
      <Label className="flex items-center gap-2 text-sm"><Checkbox checked={managed} onChange={e=>setManaged(e.target.checked)}/>Managed by the Site</Label>
-     <Button variant="outline" disabled={working} type="submit" className="min-h-10 border border-border px-4 py-2 font-medium disabled:opacity-50">Add device</Button>
+     <Button variant="outline" disabled={working} type="submit" >Add device</Button>
     </form>
    </section>
    <section className="border border-border bg-card p-5" aria-label="Site policy">
@@ -70,8 +70,8 @@ function DevicesContent({data}:{data:Workspace}){
     <div className="mt-4 space-y-4">
      <Label className="flex items-center gap-2 text-sm"><Checkbox checked={sharedRequired} onChange={e=>setSharedRequired(e.target.checked)}/>Shared-device mode recommended for site computers</Label>
      <Label className="flex items-center gap-2 text-sm"><Checkbox checked={managedAssessment} onChange={e=>setManagedAssessment(e.target.checked)}/>Require managed devices for restricted assessments (policy record only)</Label>
-     <Label className="block text-sm">Target kiosk idle lock (minutes)<Input type="number" min={1} max={30} value={idle} onChange={e=>setIdle(Number(e.target.value))} className="mt-1 block w-24 border border-border bg-background p-2"/></Label>
-     <Button variant="outline" type="button" disabled={working} className="min-h-10 border border-border px-4 py-2 font-medium disabled:opacity-50"
+     <Label className="block text-sm">Target kiosk idle lock (minutes)<Input type="number" min={1} max={30} value={idle} onChange={e=>setIdle(Number(e.target.value))} className="mt-1 w-24"/></Label>
+     <Button variant="outline" type="button" disabled={working} 
       onClick={()=>void run(()=>updateSiteDevicePolicy({data:{
        sharedDeviceRequired:sharedRequired,managedDeviceRequiredForAssessments:managedAssessment,kioskIdleMinutes:idle}}))}>Save policy</Button>
     </div>
@@ -89,7 +89,7 @@ function DevicesContent({data}:{data:Workspace}){
        {id:"ownership",title:"Ownership",render:device=>device.ownership},
        {id:"managed",title:"Managed",render:device=>device.managed?"Yes":"No"},
        {id:"status",title:"Status",render:device=>data.writeAllowed?<Select disabled={working} value={device.status}
-         className="border border-border bg-background px-2 py-1"
+         className="min-w-0"
          onChange={e=>void run(()=>changeSiteDeviceStatus({data:{id:device.id,status:e.target.value as typeof device.status}}))}>
          {["active","repair","retired","lost"].map(s=><option key={s} value={s}>{s}</option>)}
        </Select>:device.status},
