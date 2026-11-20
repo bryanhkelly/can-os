@@ -71,6 +71,20 @@ DO $$ BEGIN
       ADD CONSTRAINT classes_physical_space_requires_site_ck
       CHECK (physical_space_id IS NULL OR site_id IS NOT NULL);
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+      WHERE conrelid='public.classes'::regclass
+        AND conname='classes_facilitator_requires_space_ck') THEN
+    ALTER TABLE public.classes
+      ADD CONSTRAINT classes_facilitator_requires_space_ck
+      CHECK (primary_facilitator_assignment_id IS NULL OR physical_space_id IS NOT NULL);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+      WHERE conrelid='public.classes'::regclass
+        AND conname='classes_physical_planning_revision_ck') THEN
+    ALTER TABLE public.classes
+      ADD CONSTRAINT classes_physical_planning_revision_ck
+      CHECK (physical_planning_revision > 0);
+  END IF;
 END $$;
 
 CREATE INDEX IF NOT EXISTS classes_physical_space_idx
