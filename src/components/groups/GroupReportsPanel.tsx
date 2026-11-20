@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { WorkspacePanel } from "@/components/workspace";
 import { resolveCanonicalGroupReport } from "@/modules/study-groups/canonical-moderation.functions";
-import type { GroupPanelRecord, GroupPanelRole, GroupPanelAvailability, GroupPanelRun, GroupPanelMutation } from "./group-panel-contracts";
+import type { GroupPanelRecord, GroupPanelAvailability, GroupPanelRun } from "./group-panel-contracts";
 
 /** Moderation actions are subject to the authenticated server policy. */
 export function GroupReportsPanel({ group, availability, busy, run }: {
