@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { FamilyInvitationForm } from "@/components/admissions/FamilyInvitationForm";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
 import { ExtendedSeasonDraftForm } from "@/components/operations/ExtendedSeasonDraftForm";
+import { NativeClassScheduleForm } from "@/components/learning/NativeClassScheduleForm";
 
 describe("V6.1 cross-feature form composition", () => {
   it("requires shared submit actions across all named feature forms", () => {
@@ -71,6 +72,23 @@ describe("V6.1 cross-feature form composition", () => {
     expect(source).toContain('loading={mutation.pending}');
     expect(source).toContain('loadingLabel="Saving draft..."');
     expect(source).not.toContain('mutation.pending ? "Saving draft..." : buttonLabel');
+  });
+
+  it("connects Class schedule labels, control identities and the shared submit footer", () => {
+    const html = renderToStaticMarkup(<NativeClassScheduleForm
+      classId="class-1" siteTimeZone="America/Los_Angeles"
+      mode="single" first="2026-11-24T15:30" minutes={60}
+      customRows={[]} busy={false} scheduled={false}
+      onModeChange={() => undefined} onFirstChange={() => undefined}
+      onMinutesChange={() => undefined} onRowChange={() => undefined}
+      onRemoveRow={() => undefined} onAddRow={() => undefined}
+      onSubmit={() => undefined}/>);
+    expect(html).toContain('data-action-footer="inline"');
+    expect(html).toContain('for="native-series-start"');
+    expect(html).toContain('id="native-series-start"');
+    expect(html).toContain('for="native-series-duration"');
+    expect(html).toContain('id="native-series-duration"');
+    expect(html).toContain("Schedule one Session");
   });
 
   it("uses the canonical panel and form actions for eligible family invitations", () => {
