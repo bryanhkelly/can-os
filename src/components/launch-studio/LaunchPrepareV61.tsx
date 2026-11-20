@@ -146,9 +146,10 @@ function PrepareModuleHandoffs({ siteId, handoffs }: { siteId: string; handoffs:
   </WorkspacePanel>;
 }
 
-export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnavailable = false }: {
+export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPlanId, intentUnavailable = false }: {
   module: PrepareModuleIdV61;
   siteId: string;
+  solutionPlanId?: string;
   intent?: SiteProgramsAudiencesV61 | null;
   delivery?: "physical" | "digital" | "both" | null;
   intentUnavailable?: boolean;
@@ -212,7 +213,8 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
             </div>)}
           </div>
         </WorkspacePanel>
-        <SolutionCatalogV61 key={siteId} siteId={siteId} intent={intent} delivery={delivery} />
+        <SolutionCatalogV61 key={siteId} siteId={siteId} intent={intent} delivery={delivery}
+          initialPlanId={solutionPlanId} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
           CAN administers the published Solution definition. Site operators configure their own plan with the existing governed commands.
           Discovery and planning never grant Site qualification, publication or enrollment authority.
