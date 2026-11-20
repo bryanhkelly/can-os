@@ -138,14 +138,29 @@ const intentTitles: Record<SiteProgramsAudiencesV61["interestIds"][number], stri
   senior: "Older Adults",
 };
 
-function PrepareModuleHandoffs({ siteId, handoffs }: { siteId: string; handoffs: readonly Handoff[] }) {
+function PrepareModuleHandoffs({ siteId, handoffs, secondary = false }: {
+  siteId: string; handoffs: readonly Handoff[]; secondary?: boolean;
+}) {
+  if (!handoffs.length) return null;
+  const links = <div className="grid gap-3">
+    {handoffs.map(item => <WorkspaceActionLink key={item.title}
+      title={item.title} description={item.detail}
+      href={item.href(siteId)} actionLabel={item.title} />)}
+  </div>;
+  // Once an operation is embedded, its external route becomes an optional
+  // advanced handoff rather than a competing primary action.
+  if (secondary) return <details className="border bg-card p-4">
+    <summary className="min-h-11 cursor-pointer text-sm font-semibold text-primary">
+      Advanced operations and complete records
+    </summary>
+    <p className="my-3 text-xs text-muted-foreground">
+      These actions open the existing authorized workspaces for advanced work.
+    </p>
+    {links}
+  </details>;
   return <WorkspacePanel title="Continue in the authorized workspace"
     description="These actions use the existing business records, permissions and verification gates.">
-    <div className="grid gap-3">
-      {handoffs.map(item => <WorkspaceActionLink key={item.title}
-        title={item.title} description={item.detail}
-        href={item.href(siteId)} actionLabel={item.title} />)}
-    </div>
+    {links}
   </WorkspacePanel>;
 }
 
@@ -238,7 +253,9 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
         </div>
       </WorkspacePanel>}
       <LaunchReadinessPanelV61 key={siteId + ":" + module} siteId={siteId} context="prepare" />
-      <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}/>
+      <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}
+        secondary={module === "facilities-resources" || module === "invite-team" ||
+          module === "schedules-capacity"} />
       <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
         A shared preview is not Site publication. Publishing the Site is not approval to operate, publish an Offering, or enroll learners.
       </WorkspaceNotice>
