@@ -213,6 +213,8 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
       let registrationId:string;
       let attemptId:string;
       let alreadyEnrolled=false;
+      let previouslyAssignedClassId:string|null=null;
+      let previouslyAssignedEnrollmentId:string|null=null;
       if(prior){
         const [claim]=await tx.select({releaseId:noncreditSelfEnrollmentClaims.releaseId,
           canonicalAccountId:noncreditSelfEnrollmentClaims.canonicalAccountId})
@@ -222,12 +224,29 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         if(!claim||claim.releaseId!==release.id||claim.canonicalAccountId!==native.accountId ||
            !["active","registered","completed"].includes(prior.status))
           throw new AuthorizationError("Existing enrollment requires provider review");
-        const [attempt]=await tx.select({id:learnerCourseAttempts.id})
+        const [attempt]=await tx.select({id:learnerCourseAttempts.id,classEnrollmentId:learnerCourseAttempts.classEnrollmentId})
           .from(learnerCourseAttempts).where(and(
             eq(learnerCourseAttempts.noncreditRegistrationId,prior.id),
             eq(learnerCourseAttempts.courseVersionId,release.courseVersionId),
           )).limit(1);
         if(!attempt)throw new AuthorizationError("Existing course attempt requires review");
+        if(attempt.classEnrollmentId){
+          const [priorClass]=await tx.select({
+            classId:canonicalClassEnrollments.classId,
+            learnerPersonId:canonicalClassEnrollments.learnerPersonId,
+            courseAttemptId:canonicalClassEnrollments.courseAttemptId,
+            status:canonicalClassEnrollments.status,
+          }).from(canonicalClassEnrollments)
+            .where(eq(canonicalClassEnrollments.id,attempt.classEnrollmentId))
+            .limit(1);
+          if(!priorClass||priorClass.learnerPersonId!==native.personId||
+             priorClass.courseAttemptId!==attempt.id||priorClass.status!=="active")
+            throw new AuthorizationError("existing Class placement requires review");
+          if(data.classId&&data.classId!==priorClass.classId)
+            throw new AuthorizationError("changing your Class requires an approved transfer");
+          previouslyAssignedClassId=priorClass.classId;
+          previouslyAssignedEnrollmentId=attempt.classEnrollmentId;
+        }
         registrationId=prior.id;attemptId=attempt.id;alreadyEnrolled=true;
       }else{
         if(!invited&&(release.seatsRemaining<=0||release.hasWaitingQueue))
@@ -326,7 +345,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         tx,native.accountId,native.personId,release.registeringOrganizationId,
       );
       const cookie=await issueNativeLearnerSession(tx,native.accountId,grantId,now);
-      return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie,classId:placement?.classId??null,classEnrollmentId:placement?.classEnrollmentId??null};
+      return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie,classId:placement?.classId??previouslyAssignedClassId,classEnrollmentId:placement?.classEnrollmentId??previouslyAssignedEnrollmentId};
     });
     appendResponseHeader("Set-Cookie",outcome.cookie);
     return {registrationId:outcome.registrationId,
