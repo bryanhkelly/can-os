@@ -40,11 +40,12 @@ function readable(value: string): string {
  * to a Site; freezing it requests review, not permission to operate.
  */
 export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
-  initialBlueprintVersionId, embedded = false,
+  initialBlueprintVersionId, initialConfigurationId, embedded = false,
 }: {
   siteId: string;
   enableReferences?: boolean;
   initialBlueprintVersionId?: string;
+  initialConfigurationId?: string;
   embedded?: boolean;
 }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -95,8 +96,17 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         if (initialBlueprintVersionId) {
           const initial = result.templates.find(template =>
             template.blueprintVersionId === initialBlueprintVersionId);
-          if (initial) chooseTemplate(initial);
-          else setError("The selected published Solution is no longer available for this Site.");
+          if (!initial) {
+            setError("The selected published Solution is no longer available for this Site.");
+          } else if (initialConfigurationId) {
+            const saved = result.configurations.some(configuration =>
+              configuration.configurationId === initialConfigurationId &&
+              configuration.blueprintVersionId === initialBlueprintVersionId);
+            if (saved) void openConfiguration(initialConfigurationId, result);
+            else setError("The requested Solution plan is not available for this Site and version.");
+          } else {
+            chooseTemplate(initial);
+          }
         }
       })
       .catch(caught => {
@@ -104,7 +114,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [siteId, initialBlueprintVersionId]);
+  }, [siteId, initialBlueprintVersionId, initialConfigurationId]);
 
   useEffect(() => {
     if (!enableReferences) {
@@ -137,12 +147,12 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     setMessage(null);
   }
 
-  async function openConfiguration(configurationId: string) {
+  async function openConfiguration(configurationId: string, available: Workspace | null = workspace) {
     if (embedded && initialBlueprintVersionId &&
-        !workspace?.configurations.some(configuration =>
+        !available?.configurations.some(configuration =>
           configuration.configurationId === configurationId &&
           configuration.blueprintVersionId === initialBlueprintVersionId)) {
-      setError("This saved plan belongs to a different published Solution.");
+      setError("This saved plan is unavailable for the selected Site and Solution version.");
       return;
     }
     setBusy(true);
@@ -151,6 +161,16 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     setError(null);
     try {
       const result = await readCanonicalBlueprintConfiguration({ data: { configurationId } });
+      // The server independently validates current Site scope. Refuse any stale
+      // cross-Solution result before populating the editor as an extra UI safeguard.
+      if (embedded && initialBlueprintVersionId &&
+          result.blueprintVersionId !== initialBlueprintVersionId) {
+        throw new Error("This saved plan belongs to another Solution version.");
+      }
+      if (!result.config || typeof result.config !== "object" ||
+          Array.isArray(result.config) || result.config.siteId !== siteId) {
+        throw new Error("The saved Solution plan no longer belongs to this Site.");
+      }
       setDetail(result);
       setReview(null);
       setExecutedDeployments(null);
@@ -235,7 +255,8 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
           expectedRevision: detail.revision,
           version,
         } });
-        await openConfiguration(detail.configurationId);
+        const current = await reload();
+        await openConfiguration(detail.configurationId, current);
         setMessage(saved.revision > detail.revision
           ? "A new Blueprint configuration revision was saved."
           : "The Blueprint configuration is already up to date.");
@@ -250,10 +271,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
           name: name.trim(),
           version,
         } });
-        await openConfiguration(configurationId);
-        setMessage("Blueprint configuration created.");
+        const current = await reload();
+        await openConfiguration(configurationId, current);
+        setMessage("Solution plan created.");
       }
-      await reload();
     } catch (caught) {
       setError(normalizeClientError(caught, "The Blueprint configuration could not be saved.").message);
     } finally {
@@ -279,9 +300,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       await submitCanonicalBlueprintConfiguration({
         data: { configurationId: detail.configurationId, expectedRevision: saved.revision },
       });
-      await openConfiguration(detail.configurationId);
-      await reload();
-      setMessage("Current Blueprint changes saved and submitted for independent review. No program has been authorized.");
+      const current = await reload();
+      await openConfiguration(detail.configurationId, current);
+      setMessage("Current Solution plan submitted for independent review. No Program or enrollment is authorized.");
     } catch (caught) {
       setError(normalizeClientError(caught, "Blueprint submission failed.").message);
     } finally {
@@ -549,7 +570,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 setReview(null);
                 setOperationId("");
                 setExecutedDeployments(null);
-                setTemplateId("");
+                setTemplateId(embedded ? initialBlueprintVersionId ?? "" : "");
                 setEditorialIdentity("community_belonging");
                 setReligiousAffiliationCode("");
                 setSelectedComponents([]);
@@ -558,7 +579,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 setLocalExperiences([]);
                 setName("");
                 setMessage(null);
-              }}>Start a new configuration</Button>}
+              }}>Start a new Solution plan</Button>}
           </div>
           {detail && <div className="text-sm text-muted-foreground">
             <p>Revision {detail.revision} · {detail.lifecycle === "frozen"
