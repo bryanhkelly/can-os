@@ -574,7 +574,12 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 setReview(null);
                 setOperationId("");
                 setExecutedDeployments(null);
-                setTemplateId(embedded ? initialBlueprintVersionId ?? "" : "");
+                const original = embedded && initialBlueprintVersionId
+                  ? workspace.templates.find(template =>
+                      template.blueprintVersionId === initialBlueprintVersionId)
+                  : undefined;
+                if (original) chooseTemplate(original);
+                else setTemplateId("");
                 setEditorialIdentity("community_belonging");
                 setReligiousAffiliationCode("");
                 setSelectedComponents([]);
