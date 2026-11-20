@@ -1,8 +1,7 @@
 import { and, desc, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeBlueprintTransition } from "./blueprint-journal.server";
 import {
-  domainEvents,
-  auditEvents,
   blueprintComponentApprovalDecisions,
   blueprintConfigurationComponents,
   blueprintConfigurationOfferingIntents,
@@ -369,7 +368,7 @@ export async function executeBlueprintConfiguration(
       });
     }
 
-    await tx.insert(auditEvents).values({
+    await writeBlueprintTransition(tx, context, {
       actorPersonId,
       owningOrganizationId: configurationVersion.owningOrganizationId,
       eventCode: "blueprint.configuration.executed",
@@ -381,8 +380,7 @@ export async function executeBlueprintConfiguration(
         deploymentIds,
         requestId: context.requestId ?? null,
       },
-    });
-    await tx.insert(domainEvents).values({
+    }, {
       eventType: "BlueprintConfigurationExecuted",
       aggregateType: "BlueprintExecutionBatch",
       aggregateId: batch.id,
