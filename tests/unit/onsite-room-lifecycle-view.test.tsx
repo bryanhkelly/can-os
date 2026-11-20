@@ -30,6 +30,22 @@ beforeEach(() => {
       assignedPrimaryPersonId: null, staff: [], current: null }],
   };
 });
+describe("room planning scope isolation", () => {
+  it("never displays another program's staffing and rooms during a program change", () => {
+    const html = renderToStaticMarkup(
+      <OnsiteRoomPlanningPanel programId="different-program" initialDate="2030-01-01"/>);
+    expect(html).not.toContain("Science");
+    expect(html).not.toContain("Library");
+    expect(html).toContain("Room and adult coverage planning");
+  });
+  it("never displays the previous date's staff during a school-day change", () => {
+    const html = renderToStaticMarkup(
+      <OnsiteRoomPlanningPanel programId="program" initialDate="2030-01-02"/>);
+    expect(html).not.toContain("Science");
+    expect(html).not.toContain("Library");
+  });
+});
+
 describe("retired classrooms in daily planning", () => {
   it("shows a real empty selection rather than visually selecting a different active room", () => {
     const html = renderToStaticMarkup(<OnsiteRoomPlanningPanel programId="program" initialDate="2030-01-01"/>);
