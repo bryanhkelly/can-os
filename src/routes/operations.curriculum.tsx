@@ -14,7 +14,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { CreateAction, EmptyState, secondaryActionClassName } from "@/components/workspace";
+import { ActionFooter, CreateAction, EmptyState, secondaryActionClassName } from "@/components/workspace";
 
 export const loadCurriculum=(programId?:string)=>safeLoader(async()=>{
   const programs=await getCurriculumAdopterPrograms();
@@ -101,7 +101,9 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
     <Field label="Subject" required error={courseAttempted&&subject.trim().length<2?"Enter a subject with at least 2 characters.":undefined}>
      <Input minLength={2} maxLength={100} value={subject} onChange={event=>{requestId.current=null;setSubject(event.target.value);}}/>
     </Field>
-    <Button type="submit" variant="outline" disabled={busy}>Create course</Button>
+    <ActionFooter layout="form">
+      <Button type="submit" variant="outline" disabled={busy} loading={busy} loadingLabel="Creating course...">Create course</Button>
+    </ActionFooter>
   </form>}
   {mode!=="create"&&(courseId?studio.courses.filter(course=>course.id===courseId):studio.courses).map(course=><section key={course.id} className="border-t py-5">
     <h2 className="text-xl font-semibold">{course.code} · {course.title}</h2><p className="text-sm">{course.subject}</p>
