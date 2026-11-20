@@ -20,6 +20,18 @@ import { programCatalogDatabaseRole } from "@/domain/program-catalog-database-ro
 import { DomainError } from "@/domain/errors";
 import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "@/modules/blueprints/verified-site-planning.server";
 
+
+type BlueprintCatalogTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Reuse one published-reference query for both Establish browsing and
+ * save-time validation. The caller owns Site authorization and transaction.
+ * This helper cannot issue a second role, grant, or nested DB transaction. */
+export async function readPublishedBlueprintReferences(
+  tx: BlueprintCatalogTx,
+): Promise<BlueprintReferenceCatalogItem[]> {
+    return readPublishedBlueprintReferences(tx);
+}
+
 /** Catalog discovery is scoped to a real Site and a purpose-bound DB role. */
 export async function getBlueprintReferenceCatalog(
   context: CommandContext,
