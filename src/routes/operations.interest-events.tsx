@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { CreateAction, DirectoryPagination, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
+import { ActionFooter, CreateAction, DirectoryPagination, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, WorkspacePanel, secondaryActionClassName } from "@/components/workspace";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -172,8 +172,8 @@ export function InterestEventsWorkspace({
       <Link to="/operations/interest-events" search={{siteId:selection.siteId,programId:selection.programId}} className={secondaryActionClassName}>{mode==="create"?"Cancel":"All events"}</Link>}
   />} main={<>
     <MutationFeedback state={mutation} pendingMessage="Saving event..." />
-    {mode==="create"&&<form noValidate onSubmit={event => void submit(event)} className="mt-6 space-y-4">
-      <h2 className="font-semibold">Create an interest event</h2>
+    {mode==="create"&&<WorkspacePanel title="Create an interest event" className="mt-6">
+    <form noValidate onSubmit={event => void submit(event)} className="space-y-4">
       {titleSource && titleSource!=="none" && <p className="text-sm text-muted-foreground">
         {titleSource==="saved-package"
           ? "The event title and description were started from your saved Marketing Package."
@@ -233,10 +233,11 @@ export function InterestEventsWorkspace({
           <option value="public">Public RSVP (requires the current published Site and Program)</option>
         </Select>
       </Field>
-      <Button type="submit" disabled={busy || !timezone}>
-        Create event
-      </Button>
-    </form>}
+      <ActionFooter layout="form">
+        <Button type="submit" disabled={busy || !timezone} loading={busy} loadingLabel="Creating event...">Create event</Button>
+      </ActionFooter>
+    </form>
+    </WorkspacePanel>}
     {mode==="create"&&createdEventId&&<div className="space-y-3 border-t pt-4">
       <Link to="/operations/interest-events/$eventId" params={{eventId:createdEventId}}
           search={{siteId:siteForProgram(createdProgramId),programId:createdProgramId}}
