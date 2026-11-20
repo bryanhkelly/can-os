@@ -18,6 +18,20 @@ const isNonTestAppTsx = file => !/\.(?:stories|test|spec)\.tsx$/.test(file);
 const allUi = discoverTsx(src).filter(isNonTestAppTsx).map(relativeName);
 const missing = allUi.filter(file => !reviewed.has(file));
 
+// Being included in the source graph is not the same as passing V6.1.
+// Alert on discovered-but-unmigrated files as well as missing components.
+const unresolvedSource = inventory.inspected.flatMap(file => {
+  const rawControls = file.native.filter(item => item.tag !== "label");
+  if (!rawControls.length && !file.corners.length && !file.syntaxErrors.length) return [];
+  return [{
+    path: file.path,
+    rawControlCount: rawControls.length,
+    nativeLabelCount: file.native.filter(item => item.tag === "label").length,
+    roundedUtilityCount: file.corners.length,
+    syntaxErrorCount: file.syntaxErrors.length,
+  }];
+});
+
 function walk(folder, found = []) {
   if (!existsSync(folder)) return found;
   for (const entry of readdirSync(folder, { withFileTypes: true })) {
@@ -45,16 +59,40 @@ const report = {
   extraUi: inventory.totals.extraUiFiles,
   inspectedTsx: reviewed.size,
   omittedTsx: missing,
+  sourceDebt: { count: unresolvedSource.length, files: unresolvedSource },
   independentlyReviewedRequired: {
     note: "These render public HTML or Storybook content outside the application TSX audit; inspect their actual output independently.",
     serverPresentation,
     externalStorybook,
     css: ["src/styles.css"],
   },
-  limitation: "Coverage is not visual, accessibility, typecheck or application-journey acceptance.",
+  limitations: [
+    "Source coverage is not visual, accessibility, typecheck or authenticated journey acceptance.",
+    "Public-site HTML is Site-branded and requires separate rendered-output review.",
+    "Storybook canvases and global CSS must be reviewed independently.",
+  ],
 };
 console.log(JSON.stringify(report, null, 2));
 if (missing.length) {
-  console.error("V6.1 coverage gate: application components/routes missing from source inventory.");
+  console.error("V6.1 COMPONENT OMITTED: " + missing.join(", "));
+  process.exitCode = 1;
+}
+if (unresolvedSource.length) {
+  console.error("V6.1 SOURCE NOT ALIGNED: " + unresolvedSource.length +
+    " files retain legacy controls, geometry or syntax. See sourceDebt.");
+}
+const independent = [
+  ...serverPresentation, ...externalStorybook,
+  ...report.independentlyReviewedRequired.css,
+];
+if (independent.length) {
+  console.error("V6.1 COMPONENT OUTSIDE REACT AUDIT: " + independent.length +
+    " independently rendered/configured surfaces need visual review. " +
+    "See independentlyReviewedRequired.");
+}
+// Strict mode refuses full certification until source debt and independently
+// rendered surfaces are explicitly reviewed, rather than silently omitted.
+if (process.argv.includes("--strict") && (unresolvedSource.length || independent.length)) {
+  console.error("V6.1 strict coverage cannot certify every page/component.");
   process.exitCode = 1;
 }
