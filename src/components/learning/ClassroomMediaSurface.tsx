@@ -39,7 +39,11 @@ export function ClassroomMediaSurface({
     return <iframe key={video.src} title={title} src={video.src}
       className={iframeClassName}
       allow="fullscreen; picture-in-picture; encrypted-media"
-      allowFullScreen referrerPolicy="no-referrer"/>;
+      // YouTube requires an HTTP Referer for embedded playback (error 153).
+      // Send only the app origin, never a student's private lesson URL.
+      // Vimeo retains the stricter no-referrer policy.
+      allowFullScreen referrerPolicy={video.src.startsWith("https://www.youtube-nocookie.com/embed/")
+        ? "strict-origin-when-cross-origin" : "no-referrer"}/>;
   }
   return <video key={video.src} ref={videoRef} src={video.src}
     playsInline controls preload="metadata" aria-label={title}
