@@ -18,6 +18,7 @@ import {
 } from "@/domain/command-context";
 import { programCatalogDatabaseRole } from "@/domain/program-catalog-database-role";
 import { DomainError } from "@/domain/errors";
+import { assertVerifiedCanPlanningSite, isVerifiedCanSitePlanning } from "@/modules/blueprints/verified-site-planning.server";
 
 /** Catalog discovery is scoped to a real Site and a purpose-bound DB role. */
 export async function getBlueprintReferenceCatalog(
@@ -30,10 +31,11 @@ export async function getBlueprintReferenceCatalog(
   if (!context.scope.siteIds?.includes(siteId)) {
     throw new AuthorizationError("Blueprint catalog Site scope");
   }
-  const databaseRole = programCatalogDatabaseRole(context);
+  const isCanPlanning = isVerifiedCanSitePlanning(context);
+  const databaseRole = isCanPlanning ? null : programCatalogDatabaseRole(context);
 
   return db.transaction(async tx => {
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [site] = await tx.select({
       id: catalogSites.id,
       status: catalogSites.status,
@@ -41,6 +43,7 @@ export async function getBlueprintReferenceCatalog(
     if (!isCanonicalSiteDiscoverable(site?.status)) {
       throw new DomainError("UNAVAILABLE", "This Site is unavailable for Blueprint planning.");
     }
+    if (isCanPlanning) await assertVerifiedCanPlanningSite(tx, context, siteId);
 
     const rows = await tx.select({
       itemId: blueprintReferenceItems.id,
