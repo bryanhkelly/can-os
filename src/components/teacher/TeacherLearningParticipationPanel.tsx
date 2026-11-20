@@ -34,6 +34,10 @@ export function TeacherLearningParticipationPanel({
               <p className="mt-1 text-xs text-muted-foreground">{student.observedEvents7d} recorded interactions in 7 days
                 · latest {student.latestObservedAt ? new Date(student.latestObservedAt).toLocaleString() : "not recorded"}
                 · up to {Math.round(student.estimatedActiveMs7d / 60_000)} min estimated active time</p>
+              {student.nativeVideoObservations7d > 0 && <p className="mt-1 text-xs text-muted-foreground">
+                Native video: {student.nativeVideoStarts7d} observed starts and {student.nativeVideoObservations7d} player events.
+                These are browser observations, not proof of viewing or completion.
+              </p>}
               {student.latestEventId && <TeacherLearningFollowUpForm
                 sectionId={student.sectionId} studentProfileId={student.studentProfileId}
                 learningEventId={student.latestEventId} onCreated={onCreated} />}
