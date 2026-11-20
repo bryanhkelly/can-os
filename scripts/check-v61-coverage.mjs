@@ -56,14 +56,14 @@ const serverPresentation = walk(src)
 // still be verified with the rendered page and BrandTheme where applicable.
 const sharedCss = readFileSync(join(src, "styles.css"), "utf8");
 const sharedThemeTokens = {
-  fontSans: /--font-sans:\\s*"DM Sans"/.test(sharedCss),
-  fontSerif: /--font-serif:\\s*"Instrument Serif"/.test(sharedCss),
-  squareGeometry: /--radius:\\s*0(?:px|rem)?\\s*;/.test(sharedCss),
-  semanticSuccess: /--color-success:\\s*var\\(--success\\)/.test(sharedCss),
-  semanticWarning: /--color-warning:\\s*var\\(--warning\\)/.test(sharedCss),
-  semanticDanger: /--color-danger:\\s*var\\(--danger\\)/.test(sharedCss),
-  shellWidth: /--sidebar-width:\\s*[^;]+;/.test(sharedCss),
-  shellHeight: /--topbar-height:\\s*[^;]+;/.test(sharedCss),
+  fontSans: /--font-sans:\s*"DM Sans"/.test(sharedCss),
+  fontSerif: /--font-serif:\s*"Instrument Serif"/.test(sharedCss),
+  squareGeometry: /--radius:\s*0(?:px|rem)?\s*;/.test(sharedCss),
+  semanticSuccess: /--color-success:\s*var\(--success\)/.test(sharedCss),
+  semanticWarning: /--color-warning:\s*var\(--warning\)/.test(sharedCss),
+  semanticDanger: /--color-danger:\s*var\(--danger\)/.test(sharedCss),
+  shellWidth: /--sidebar-width:\s*[^;]+;/.test(sharedCss),
+  shellHeight: /--topbar-height:\s*[^;]+;/.test(sharedCss),
 };
 const missingThemeTokens = Object.entries(sharedThemeTokens)
   .filter(([, found]) => !found).map(([token]) => token);
