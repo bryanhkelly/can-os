@@ -17,7 +17,7 @@ import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { readSiteSchoolYearAvailability } from "./site-school-year-availability.server";
-import { newlyRestrictedSiteIntent } from "@/domain/site-program-access-v61";
+import { isSchoolYearAcademyReference, newlyRestrictedSiteIntent } from "@/domain/site-program-access-v61";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const siteIdSchema = z.string().uuid();
@@ -41,6 +41,8 @@ export const readSiteProgramsAudiencesV61 = createServerFn({ method: "GET" })
     const [site] = await tx.select().from(sites).where(eq(sites.id, data.siteId)).limit(1);
     assertSiteSetupScope(actor, site, "program.read");
     const schoolYearAvailability = await readSiteSchoolYearAvailability(tx,site.id);
+    const schoolYearAcademyPrograms = (await readPublishedBlueprintReferences(tx))
+      .filter(isSchoolYearAcademyReference);
     const raw = site.metadata.launchPreferences;
     // A damaged persisted Site record must be corrected, not shown as a blank form.
     const intent = normalizeSiteProgramsAudiencesV61(raw);
@@ -51,6 +53,7 @@ export const readSiteProgramsAudiencesV61 = createServerFn({ method: "GET" })
       intent,
       delivery: preferences?.delivery ?? null,
       schoolYearAvailability,
+      schoolYearAcademyPrograms,
       saved: !!preferences && (preferences.planningVersion === 2 ||
         preferences.interestIds.length > 0),
     };
