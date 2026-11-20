@@ -267,7 +267,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
    </div>)}
    <Button type="button" variant="outline" disabled={content.resources.length>=500} 
     onClick={()=>setContent({...content,resources:[...content.resources,{id:crypto.randomUUID(),title:"New resource",url:"https://"}]})}>Add resource link</Button>
-   <div><Button type="button" variant="outline" onClick={()=>void save()} className=" border px-4 py-2 text-sm">Save draft</Button>
+   <div><Button type="button" variant="outline" onClick={()=>void save()} >Save draft</Button>
     {dirty&&<span className="ml-3 text-sm">Unsaved changes</span>}</div>
   </fieldset>
   <fieldset disabled={busy}><PublisherTeacherGuideEditor courseCode={courseCode} content={content}
