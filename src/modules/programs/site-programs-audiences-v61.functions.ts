@@ -16,6 +16,8 @@ import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
+import { readSiteSchoolYearAvailability } from "./site-school-year-availability.server";
+import { newlyRestrictedSiteIntent } from "@/domain/site-program-access-v61";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const siteIdSchema = z.string().uuid();
@@ -35,8 +37,10 @@ export const readSiteProgramsAudiencesV61 = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await authorizedRegistrar("program.read");
-    const [site] = await db.select().from(sites).where(eq(sites.id, data.siteId)).limit(1);
+    return db.transaction(async tx => {
+    const [site] = await tx.select().from(sites).where(eq(sites.id, data.siteId)).limit(1);
     assertSiteSetupScope(actor, site, "program.read");
+    const schoolYearAvailability = await readSiteSchoolYearAvailability(tx,site.id);
     const raw = site.metadata.launchPreferences;
     // A damaged persisted Site record must be corrected, not shown as a blank form.
     const intent = normalizeSiteProgramsAudiencesV61(raw);
@@ -46,9 +50,11 @@ export const readSiteProgramsAudiencesV61 = createServerFn({ method: "GET" })
       revision: site.updatedAt.toISOString(),
       intent,
       delivery: preferences?.delivery ?? null,
+      schoolYearAvailability,
       saved: !!preferences && (preferences.planningVersion === 2 ||
         preferences.interestIds.length > 0),
     };
+    });
   });
 
 /** Canonical, revision-checked Site metadata update under one row lock. */
@@ -70,22 +76,29 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
       if (site.updatedAt.toISOString() !== data.expectedRevision)
         throw new Error("This Site changed since you opened Programs & Audiences. Reload and review before saving.");
       const old = site.metadata.launchPreferences;
-      const previouslySelected = new Set(
-        normalizeSiteProgramsAudiencesV61(old).programCodes ?? [],
-      );
+      const previousIntent = normalizeSiteProgramsAudiencesV61(old);
+      const schoolYearAvailability = await readSiteSchoolYearAvailability(tx,site.id);
+      const previouslySelected = new Set(previousIntent.programCodes ?? []);
       const addedCodes = (data.intent.programCodes ?? []).filter(code =>
         !previouslySelected.has(code));
+      let catalog: Awaited<ReturnType<typeof readPublishedBlueprintReferences>> = [];
       if (addedCodes.length) {
         // Exact Site authority was established on this locked Site row above.
         // Validate new Program intent within the *same* transaction as the
         // metadata save; no second, separately provisioned catalog role or
         // nested connection is necessary.
-        const catalog = await readPublishedBlueprintReferences(tx);
+        catalog = await readPublishedBlueprintReferences(tx);
         const available = new Set(catalog.filter(item => item.kind === "program_model")
           .map(item => item.code));
         if (!addedCodes.every(code => available.has(code)))
           throw new AuthorizationError("selected published Program references");
       }
+      const newlyRestricted = newlyRestrictedSiteIntent(
+        data.intent,previousIntent,catalog,schoolYearAvailability);
+      if (newlyRestricted.length) throw new AuthorizationError(
+        "School-year Programs require independently authorized academic operations: " +
+        newlyRestricted.join(", "),
+      );
       const rawEnvironment = site.metadata.siteEnvironmentV61;
       const environment = siteEnvironmentV61Schema.safeParse(rawEnvironment);
       if (rawEnvironment != null && !environment.success)
