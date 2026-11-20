@@ -6,7 +6,7 @@ import { discoverLaunchSitePrograms, getLaunchSiteClassScope } from "@/modules/p
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { EmptyState, FilterBar, StatusBadge } from "@/components/workspace";
+import { ActionFooter, EmptyState, FilterBar, StatusBadge } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 
 const deliveryOptions = [
@@ -100,9 +100,8 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
       they are not a verified match for facilities, staff, funding, jurisdiction or enrollment.
     </p>
     <form className="mt-5 flex flex-wrap items-end gap-3" onSubmit={handleSubmit}>
-      <Label className="min-w-52 flex-1 text-sm font-medium" htmlFor="program-delivery-context">
-        Delivery model
-        <Select id="program-delivery-context" className="mt-2" value={deliveryContext}
+      <Field label="Delivery model" className="min-w-52 flex-1">
+        <Select id="program-delivery-context" value={deliveryContext}
           disabled={loading} onChange={event => {
             const selected = deliveryOptions.find(option => option.value === event.currentTarget.value);
             if (selected) {
@@ -117,10 +116,10 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
           }}>
           {deliveryOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </Select>
-      </Label>
-      <Button type="submit" disabled={loading}>
-        {loading ? "Checking availability..." : "Browse available Offerings"}
-      </Button>
+      </Field>
+      <ActionFooter layout="inline" className="mt-0 self-end">
+        <Button type="submit" disabled={loading} loading={loading} loadingLabel="Checking availability...">Browse available Offerings</Button>
+      </ActionFooter>
     </form>
     {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
     {offerings && <>
