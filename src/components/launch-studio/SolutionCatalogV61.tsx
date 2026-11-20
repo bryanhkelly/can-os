@@ -85,6 +85,8 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
           searchPlaceholder="Search titles or components" className="mt-5" />
         <p role="status" className="mt-3 text-xs text-muted-foreground">
           {visible.length} matching published Solutions.
+          {delivery && ` Saved Site delivery preference: ${delivery === "physical" ? "On site" :
+            delivery === "digital" ? "Online" : "Hybrid or blended"} (planning only).`}
           {(intent?.interestIds.length || intent?.programCodes?.length)
             ? " Exact saved Program matches appear first. These are planning suggestions, not Site authorization."
             : ""}
