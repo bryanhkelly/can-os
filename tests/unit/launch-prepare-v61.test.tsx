@@ -192,16 +192,18 @@ describe("V6.1 Prepare to Open", () => {
     const prepare = read("src/components/launch-studio/LaunchPrepareV61.tsx");
     const catalog = read("src/components/launch-studio/SolutionCatalogV61.tsx");
     const readiness = read("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
+    const solutionView = read("src/components/launch-studio/SolutionPlansReadinessV61.tsx");
     expect(route).toContain("solutionPlanId: z.string().uuid().optional()");
     expect(route).toContain('selected.id === "program-catalog" ? search.solutionPlanId : undefined');
     expect(prepare).toContain("initialPlanId={solutionPlanId}");
     expect(catalog).toContain("resolveSavedSolutionPlan(");
     expect(catalog).toContain("setResumeConfigurationId(saved.plan.configurationId)");
-    expect(readiness).toContain("solutionPlanId:plan.configurationId");
-    expect(readiness).toContain("View published Solution requirements");
-    expect(readiness).toContain("These are not verified Site readiness.");
-    expect(readiness).toContain("Continue plan");
-    expect(readiness).toContain("Review plan");
+    expect(readiness).toContain("SolutionPlansReadinessV61");
+    expect(solutionView).toContain("solutionPlanId:plan.configurationId");
+    expect(solutionView).toContain("View published Solution requirements");
+    expect(solutionView).toContain("These are not verified Site readiness.");
+    expect(solutionView).toContain("Continue plan");
+    expect(solutionView).toContain("Review plan");
   });
 
   it("preserves invisible proposed Offering intents when editing a visible Program component", () => {
