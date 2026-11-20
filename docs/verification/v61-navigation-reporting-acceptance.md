@@ -24,6 +24,9 @@ Complex gradebook matrices, private grade-editing flows, and specialized active 
 - `tests/unit/design-system-rules.test.ts` covers the `no-native-feature-tables` lint rule.
 - `src/components/workspace/report-table.stories.tsx` provides desktop (1440px), tablet (768px), mobile (390px), and dark-mode compositions. Its mobile interaction asserts that the actual table can be horizontally scrolled and focused; cursor interactions exercise first, middle and terminal pages.
 - `src/components/workspace/directory-table.stories.tsx` already covers sorting, paging, loading, empty, retry and dark states.
+- `.github/workflows/platform-code-verification.yml` includes a separate `storybook-v61` job on PRs to `main`. It builds Storybook, installs Chromium, captures real browser images across 390/768/1440px in both light/dark, executes the Storybook behavioral/a11y test suite, and uploads the screenshot/report artifact even when the job fails.
+- `scripts/capture-v61-navigation-reporting.mjs` discovers the built story IDs from `storybook-static/index.json` instead of guessing URLs, verifies keyboard-focusable scrolling, row/column headers, responsive overflow, theme application and terminal cursor disablement. Its output is in `artifacts/v61-navigation-reporting/`. Its artifact is **automated evidence**, not a human-reviewed approval of every CAN OS route.
+
 - `src/components/shell/ShellAlignment.stories.tsx` already covers app-shell geometry and active navigation.
 
 Raw native `<table>` in migrated reporting modules is an ESLint **error**; elsewhere it is a warning until the particular table's interactive behavior is evaluated. Shared destination navigation is protected by source regression tests.
@@ -40,6 +43,7 @@ npm run typecheck
 npm run lint
 npm run build
 npm run test:storybook
+node scripts/capture-v61-navigation-reporting.mjs # after npm run build-storybook and Playwright install
 npm run test:visual
 npm run design:routes
 npm run design:coverage
