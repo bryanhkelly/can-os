@@ -68,6 +68,7 @@ export async function getCanonicalBlueprintWorkspace(
         title: blueprints.title,
         blueprintVersionId: blueprintVersions.id,
         versionNo: blueprintVersions.versionNo,
+        spec: blueprintVersions.spec,
       }).from(blueprints)
         .innerJoin(blueprintVersions, eq(blueprintVersions.blueprintId, blueprints.id))
         .where(and(
@@ -158,12 +159,20 @@ export async function getCanonicalBlueprintWorkspace(
       canExecute: context.capabilities.has("blueprint.execute"),
       affiliations,
       operations: [...new Map(operations.map(operation => [operation.id, operation])).values()],
-      templates: templates.map(template => ({
-        ...template,
-        components: components
-          .filter(component => component.blueprintVersionId === template.blueprintVersionId)
-          .map(({ id, key, kind, requirementMode }) => ({ id, key, kind, requirementMode })),
-      })),
+      templates: templates.map(({ spec, ...template }) => {
+        // Only expose the published, non-sensitive planning association.
+        // Do not return unreviewed internal Blueprint spec to Site clients.
+        const metadata: Record<string, unknown> = spec && typeof spec === "object"
+          && !Array.isArray(spec) ? spec as Record<string, unknown> : {};
+        return {
+          ...template,
+          programCode: typeof metadata.programCode === "string" ? metadata.programCode : null,
+          offeringCode: typeof metadata.offeringCode === "string" ? metadata.offeringCode : null,
+          components: components
+            .filter(component => component.blueprintVersionId === template.blueprintVersionId)
+            .map(({ id, key, kind, requirementMode }) => ({ id, key, kind, requirementMode })),
+        };
+      }),
       configurations: configurations.flatMap(configuration => {
         const version = latestByConfiguration.get(configuration.id);
         if (!version || !version.config || typeof version.config !== "object"
