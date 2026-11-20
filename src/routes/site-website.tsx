@@ -168,7 +168,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Choose your editorial direction":index===1?"Choose a structure":
           index===2?"Colors, fonts and rights-cleared media":index===3?"Edit website content":"Review private draft",
-        status:step===index?"current":step>index?"complete":"upcoming",
+        status:step===index?"current":"upcoming",
       })) : [
         { id: "address", title: "Site address", description: "Prepare a private website address", status: "current" },
       ]}
