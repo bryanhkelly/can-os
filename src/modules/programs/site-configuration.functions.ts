@@ -10,7 +10,7 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSiteSetupScope, assertSiteLocationProgramScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
 import { resolveSiteGeographicAreaId } from "./site-geographic-area.server";
-import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations, schoolYears, calendarEvents } from "@/db/schema";
+import { sites, programs, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | {[key:string]:JsonValue};
@@ -87,34 +87,8 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         updatedAt:nextRevision,
       }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
       if(!changed)throw new Error("Unable to save Site configuration");
-      // Every location revision can change locality requirements or eligibility.
-      // Keep prior legal decisions untouched; flag them for independent review.
-      for(const program of [] as typeof attached){
-        const [prior]=await tx.select({id:actions.id,status:actions.status,metadata:actions.metadata})
-          .from(actions).where(and(
-            eq(actions.type,"site_location_change_review"),
-            eq(actions.subjectType,"program"),eq(actions.subjectId,program.id),
-            eq(actions.siteId,site.id),
-          )).limit(1);
-        const metadata={...(prior?.metadata??{}),reviewState:"needs_independent_review",
-          siteAddressRevision:changed.updatedAt.toISOString(),changeReason:data.changeReason??null,
-          requestedByPersonId:actor.actorPersonId};
-        if(prior){
-          await tx.update(actions).set({
-            status:"open",resolvedAt:null,resolutionNote:null,metadata,
-            updatedAt:new Date(),
-          }).where(eq(actions.id,prior.id));
-        }else{
-          await tx.insert(actions).values({
-            type:"site_location_change_review",status:"open",priority:"high",
-            title:"Review updated school physical location",
-            description:"School location changed. Recheck jurisdiction, locality, published claims, and opening approval against authoritative records. This task does not grant authorization.",
-            subjectType:"program",subjectId:program.id,
-            organizationId:site.organizationId,siteId:site.id,programId:program.id,
-            metadata,
-          });
-        }
-      }
+      // Unapproved Site location edits are saved as normal, audited draft revisions.
+      // Any already approved or published operation was denied above.
       await writeAudit(tx,actor,{
         action:"site.location.update",entityType:"site",entityId:site.id,
         scope:{organizationId:site.organizationId,siteId:site.id},
