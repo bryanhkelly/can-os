@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/choice";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { DirectoryTable, WorkspaceShell } from "@/components/workspace";
@@ -157,10 +158,10 @@ function SurveyDraftForm({ organizationId, drafts, limit, surveyPublicationEnabl
                   <option value="single_choice">Single choice</option>
                   <option value="multiple_choice">Multiple choice</option>
                 </Select></div>
-              <label className="flex items-center gap-3 pt-6 text-sm font-medium">
-                <input type="checkbox" checked={question.required}
+              <Label className="flex items-center gap-3 pt-6 text-sm font-medium">
+                <Checkbox checked={question.required}
                   onChange={e => edit(index, {required:e.target.checked})}
-                  className="size-4 accent-primary"/>Required answer</label>
+                  className="size-4 accent-primary"/>Required answer</Label>
             </div>
             {numeric && <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="space-y-2"><Label htmlFor={"min-"+index}>Minimum rating</Label>

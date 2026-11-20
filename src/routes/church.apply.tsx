@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
@@ -41,7 +44,7 @@ export const Route = createFileRoute("/church/apply")({
   component: ChurchApplicationPage,
 });
 
-const field = "mt-1 block w-full rounded-lg border bg-background p-3 text-sm";
+const field = "mt-1 block w-full  border bg-background p-3 text-sm";
 function ChurchApplicationPage() {
   const [form, setForm] = useState({
     churchName: "", siteName: "", timezone: DEFAULT_SITE_TIMEZONE,
@@ -86,29 +89,29 @@ function ChurchApplicationPage() {
       <h1 className="mt-2 font-serif text-4xl">Bring a school to your church</h1>
       <p className="mt-3 text-muted-foreground">Tell us about your church and your proposed school location. CAN will independently verify that you are authorized to represent the church before issuing access.</p>
     </div>
-    {submitted ? <ChurchApplicationConfirmation {...submitted}/> : <form noValidate onSubmit={submit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2">
+    {submitted ? <ChurchApplicationConfirmation {...submitted}/> : <form noValidate onSubmit={submit} className="grid gap-4  border bg-card p-6 sm:grid-cols-2">
       {([
         ["churchName","Church name"],["siteName","Proposed school site name"],
         ["firstName","Your first name"],["lastName","Your last name"],
         ["leaderTitle","Your role at the church"],["contactEmail","Your work email"],
-      ] as const).map(([key,label]) => <label key={key} className="text-sm font-semibold"><span id={`church-${key}-label`}>{label}</span>
-        <input id={`church-${key}`} required type={key==="contactEmail"?"email":"text"} maxLength={churchApplicationLimits[key]}
+      ] as const).map(([key,label]) => <Label key={key} className="text-sm font-semibold"><span id={`church-${key}-label`}>{label}</span>
+        <Input id={`church-${key}`} required type={key==="contactEmail"?"email":"text"} maxLength={churchApplicationLimits[key]}
           aria-invalid={Boolean(fieldErrors[key])} aria-describedby={fieldErrors[key]?`church-${key}-error`:undefined}
           aria-labelledby={`church-${key}-label`}
           className={field} value={form[key]} onChange={event=>change(key,event.target.value)} />
         {fieldErrors[key]&&<span id={`church-${key}-error`} className="mt-1 block text-sm text-destructive">{fieldErrors[key]?.[0]}</span>}
-      </label>)}
+      </Label>)}
       <SiteTimezoneField value={form.timezone} onChange={value=>change("timezone",value)} />
-      <label className="text-sm font-semibold"><span id="church-website-label">Church website (optional)</span>
-        <input id="church-churchWebsite" type="url" placeholder="https://…" maxLength={churchApplicationLimits.churchWebsite} className={field}
+      <Label className="text-sm font-semibold"><span id="church-website-label">Church website (optional)</span>
+        <Input id="church-churchWebsite" type="url" placeholder="https://…" maxLength={churchApplicationLimits.churchWebsite} className={field}
           aria-invalid={Boolean(fieldErrors.churchWebsite)} aria-describedby={fieldErrors.churchWebsite?"church-website-error":undefined}
           aria-labelledby="church-website-label"
           value={form.churchWebsite} onChange={event=>change("churchWebsite",event.target.value)}/>
         {fieldErrors.churchWebsite&&<span id="church-website-error" className="mt-1 block text-sm text-destructive">{fieldErrors.churchWebsite[0]}</span>}
-      </label>
+      </Label>
       <p className="text-xs text-muted-foreground sm:col-span-2">CAN will verify church authorization outside this form. Email ownership is also checked by a one-time sign-in link after approval.</p>
       {error&&<p role="alert" className="text-sm text-destructive sm:col-span-2">{error}</p>}
-      <button type="submit" disabled={busy} className="rounded-lg bg-foreground px-4 py-3 font-semibold text-background disabled:opacity-50 sm:col-span-2">{busy?"Sending…":"Request church onboarding"}</button>
+      <Button variant="ghost" type="submit" disabled={busy} className=" bg-foreground px-4 py-3 font-semibold text-background disabled:opacity-50 sm:col-span-2">{busy?"Sending…":"Request church onboarding"}</Button>
     </form>}
   </main>;
 }
