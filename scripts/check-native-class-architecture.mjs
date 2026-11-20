@@ -43,7 +43,7 @@ if (existsSync(resolve(root, "src/routes/classes.tsx"))) {
   errors++;
 }
 const canonicalDirectory = readFileSync(resolve(root, "src/routes/class.tsx"), "utf8");
-if (/LegacySectionClassPage|SectionClassEntry|import\\(["']\\.\\/classes["']\\)/.test(canonicalDirectory)) {
+if (/LegacySectionClassPage|SectionClassEntry|import\(["']\.\/classes["']\)/.test(canonicalDirectory)) {
   console.error("Native Class architecture: canonical directory must not embed retired classroom code");
   errors++;
 }
