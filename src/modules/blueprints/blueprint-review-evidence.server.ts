@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import { evidenceDocuments, evidenceDocumentVersions } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
@@ -25,7 +26,7 @@ export async function listBlueprintReviewEvidence(
   }
 
   const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const versions = await tx.select({
     id: evidenceDocumentVersions.id,
@@ -51,5 +52,5 @@ export async function listBlueprintReviewEvidence(
     seen.add(item.documentId);
     return true;
   }).map(({ id, title, kind }) => ({ id, title, kind }));
-  });
+  }));
 }
