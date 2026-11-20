@@ -217,7 +217,7 @@ export const getNativeClassTeacherDraftPractice=createServerFn({method:"GET"})
        WHERE ce.class_id=${cls.id}::uuid
          AND ca.status='active' AND ca.section_id IS NULL
          AND fp.course_version_id=${cls.courseVersionId}::uuid
-         AND pr.response @> '{"synthetic":true,"practiceOnly":true}'::jsonb
+         AND pr.response->>'mode'='valor_draft_assessment_practice'
          AND p.metadata @> '{"synthetic":true}'::jsonb
        ORDER BY fp.recorded_at DESC,fp.id DESC
        LIMIT 51
