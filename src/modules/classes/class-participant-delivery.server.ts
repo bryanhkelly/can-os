@@ -7,6 +7,7 @@ import {
   canonicalClasses, canonicalClassEnrollments, canonicalClassEnrollmentInvitations,
   canonicalClassSessions, canonicalDeliverySessions, facilitatedClassroomPlans,
   canonicalEnrollmentSites, canonicalAccounts, canonicalAccountGrants,
+  canonicalClassOfferingVersions,
   guardianAuthorities, learnerProfiles,
 } from "@/db/canonical-v301";
 import {
@@ -190,6 +191,17 @@ const adapter = {
           invitation.learnerPersonId !== record.recipientPersonId ||
           invitation.expiresAt <= now)
         return { kind: "suppress", reason: "Class_invitation_expired_or_closed" };
+      const [terms] = await db.select({
+        state: canonicalClassOfferingVersions.state,
+        methods: canonicalClassOfferingVersions.enrollmentMethods,
+        opensAt: canonicalClassOfferingVersions.opensAt,
+        closesAt: canonicalClassOfferingVersions.closesAt,
+      }).from(canonicalClassOfferingVersions)
+        .where(and(eq(canonicalClassOfferingVersions.id, invitation.classOfferingVersionId),
+          eq(canonicalClassOfferingVersions.classId, cls.id))).limit(1);
+      if(!terms||terms.state!=="published"||!terms.methods.includes("invitation")||
+         (terms.opensAt&&terms.opensAt>now)||(terms.closesAt&&terms.closesAt<=now))
+        return {kind:"suppress",reason:"Class_invitation_offering_no_longer_open"};
     }
     if (record.kind !== "session_changed" &&
         (cls.state !== "active" || site.status !== "active"))
