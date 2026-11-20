@@ -1,6 +1,7 @@
 import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { and, isNull, sql } from "drizzle-orm";
 import { educationV30 } from "./core";
+import { accountPersonGrants } from "@/db/schema/access";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 
@@ -33,7 +34,8 @@ export const canonicalAccountGrants = educationV30.table("canonical_account_gran
 export const canonicalSensitiveCapabilityApprovals = pgTable("canonical_sensitive_capability_approvals", {
     id: id(),
     /** Current authoritative CAN grant. Not a native v3 account grant. */
-    accountPersonGrantId: uuid("account_person_grant_id").notNull(),
+    accountPersonGrantId: uuid("account_person_grant_id").notNull()
+      .references(() => accountPersonGrants.id, { onDelete: "restrict" }),
     capabilityCode: text("capability_code").$type<"credential.issue">().notNull(),
     requestedByCanAccountId: uuid("requested_by_can_account_id").notNull(),
     requestEvidenceReference: text("request_evidence_reference").notNull(),
