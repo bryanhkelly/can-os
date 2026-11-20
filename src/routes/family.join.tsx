@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { useEffect,useState } from "react";
@@ -71,8 +72,8 @@ function FamilyJoinPage(){
    <p className="text-sm text-muted-foreground">After verification, you can begin
      your student's application. School staff independently verify legal guardian authority
      before child records, consents or offers can be accessed.</p>
-   <button disabled={!ready||!token||busy} type="button" onClick={()=>void verify()}
-     className="rounded-lg bg-foreground px-5 py-3 font-semibold text-background disabled:opacity-50">
-     {busy?"Verifying…":"Verify email and continue"}</button>
+   <Button variant="ghost" disabled={!ready||!token||busy} type="button" onClick={()=>void verify()}
+     className=" bg-foreground px-5 py-3 font-semibold text-background disabled:opacity-50">
+     {busy?"Verifying…":"Verify email and continue"}</Button>
  </main>;
 }

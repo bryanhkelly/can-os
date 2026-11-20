@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { safeLoader } from "@/lib/safe-loader";
@@ -20,11 +21,11 @@ function EnrichmentReview() {
     subtitle="For verified CAN network reviewers. All approvals are restricted, audited and tied to one Season.">
     <div className="mt-5 space-y-3">
       {!result.data.length && <p className="text-sm">No extended-learning seasons are awaiting operating review.</p>}
-      {result.data.map(season => <div className="rounded-lg border bg-card p-3" key={season.seasonId}>
-        <button type="button" className="text-left text-sm font-semibold underline"
+      {result.data.map(season => <div className=" border bg-card p-3" key={season.seasonId}>
+        <Button variant="ghost" type="button" className="text-left text-sm font-semibold underline"
           onClick={() => setSelected(old => old === season.seasonId ? "" : season.seasonId)}>
           {season.offeringName} · {season.seasonName} · {season.status}
-        </button>
+        </Button>
         {selected === season.seasonId && <ExtendedSeasonEvidencePanel seasonId={season.seasonId}/>}
       </div>)}
     </div>

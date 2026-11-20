@@ -60,7 +60,7 @@ function EnrichmentOfferingDetailPage() {
           description="Choose an option during registration.">
           <ul className="space-y-2">
             {offering.packages.map(item => <li key={item.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+              className="flex flex-wrap items-center justify-between gap-2  border p-3 text-sm">
               <span>{item.title}</span>
               <span className="flex items-center gap-3">
                 <span className="font-semibold">{currency.format(item.priceCents / 100)}</span>
@@ -90,7 +90,7 @@ function EnrichmentOfferingDetailPage() {
           <li>Submit the registration; the school confirms placement or waitlist.</li>
         </ol>
         {offering.registrationOpen && <Link to="/guardian/enrichment" search={{ seasonId }}
-          className="mt-4 inline-block rounded-lg border px-3 py-2 text-sm font-semibold">
+          className="mt-4 inline-block  border px-3 py-2 text-sm font-semibold">
           Continue to registration
         </Link>}
       </WorkspacePanel>} />

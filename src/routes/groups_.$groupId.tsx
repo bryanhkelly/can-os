@@ -160,7 +160,7 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
         <MutationFeedback state={mutation} pendingMessage="Saving group change..." />
         <div className="border border-border bg-card" role="tablist" aria-label="Study group sections">
           <div className="flex min-w-0 overflow-x-auto">
-            {tabs.map((tab, index) => <button key={tab.id} id={`group-tab-${tab.id}`} type="button" role="tab"
+            {tabs.map((tab, index) => <Button variant="ghost" key={tab.id} id={`group-tab-${tab.id}`} type="button" role="tab"
               aria-selected={activeTab === tab.id} aria-controls={`group-panel-${tab.id}`}
               tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)}
               onKeyDown={event => handleTabKeyDown(event, index)}
@@ -169,7 +169,7 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
                 : "inline-flex min-h-12 shrink-0 items-center gap-2 border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground hover:text-foreground"}>
               {tab.label}
               {"count" in tab && <span className="bg-muted px-2 py-0.5 text-xs tabular-nums">{tab.count}</span>}
-            </button>)}
+            </Button>)}
           </div>
         </div>
         <section id="group-panel-overview" role="tabpanel" aria-labelledby="group-tab-overview" tabIndex={0}
