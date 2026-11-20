@@ -138,7 +138,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
         </div>
         {createdUrl && <div className="border p-4">
           <p className="flex items-center gap-2 text-sm font-semibold">
-            <Check className="size-4 text-primary" /> View-only link created
+            <Check className="size-4 text-success" aria-hidden="true" /> View-only link created
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Copy this link now. The token cannot be retrieved again after you close this window.
