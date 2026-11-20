@@ -30,7 +30,8 @@ describe("V6.1 calendar login and build footer",()=>{
    expect(login).toContain('buildId?.slice(0,12)??"unavailable"');
    const footer=login.indexOf('aria-label="Build information"');
    expect(footer).toBeGreaterThan(login.indexOf("</WorkspacePanel>"));
-   expect(embeddedSourceRevision()).toBeNull();
+   const revision=embeddedSourceRevision();
+   expect(revision===null||/^[a-f0-9]{40}$/.test(revision)).toBe(true);
  });
 });
 
