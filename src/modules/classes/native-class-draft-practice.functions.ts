@@ -57,7 +57,7 @@ async function exactValorLearner(tx: Tx, actor: Actor, classEnrollmentId: string
   if (!cls || cls.state !== "active" || cls.siteId !== VALOR_SITE ||
       cls.operatingOrganizationId !== "f1000000-0000-4000-8000-000000000002")
     throw new AuthorizationError("synthetic Valor Class");
-  const [synthetic] = await tx.execute(sql`
+  const syntheticRows = await tx.execute(sql`
     SELECT EXISTS(
       SELECT 1 FROM public.sites s JOIN public.people p
         ON p.id=${actor.actorPersonId}::uuid
@@ -65,8 +65,8 @@ async function exactValorLearner(tx: Tx, actor: Actor, classEnrollmentId: string
         AND s.metadata @> '{"synthetic":true}'::jsonb
         AND p.metadata @> '{"synthetic":true}'::jsonb
     ) AS allowed
-  `).then(result => result.rows);
-  if (synthetic?.allowed !== true) throw new AuthorizationError("synthetic demo only");
+  `);
+  if (syntheticRows.rows[0]?.allowed !== true) throw new AuthorizationError("synthetic demo only");
   if (actor.role === "student" && (!actor.scope.siteIds?.includes(VALOR_SITE) ||
       !actor.scope.organizationIds?.includes(cls.operatingOrganizationId)))
     throw new AuthorizationError("own synthetic Valor Site");
