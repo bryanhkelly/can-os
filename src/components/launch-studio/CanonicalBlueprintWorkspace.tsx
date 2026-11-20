@@ -258,8 +258,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       const version = versionInput(selectedTemplate, detail ?? undefined);
       if (detail) {
         attemptedWrite = true;
-        attemptedWrite = true;
-      const saved = await saveCanonicalBlueprintConfiguration({ data: {
+        const saved = await saveCanonicalBlueprintConfiguration({ data: {
           configurationId: detail.configurationId,
           versionId: crypto.randomUUID(),
           expectedRevision: detail.revision,
@@ -316,6 +315,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       // Submit what the author actually sees. A previously saved draft may not
       // include edits made since it was opened. Save first using optimistic
       // revision control; the service reuses an identical draft revision.
+      attemptedWrite = true;
       const saved = await saveCanonicalBlueprintConfiguration({ data: {
         configurationId: detail.configurationId,
         versionId: crypto.randomUUID(),
