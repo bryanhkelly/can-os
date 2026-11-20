@@ -15,7 +15,8 @@ export function isPublicCanPath(pathname: string): boolean {
   if(publicRoots.has(path))return true;
   // These two routes intentionally have public nested pages.
   return path.startsWith("/access/") ||
-    path.startsWith("/landing/") || path.startsWith("/explore/");
+    path.startsWith("/landing/") || path.startsWith("/next/") ||
+    path.startsWith("/explore/");
 }
 
 export function signInReturnUrl(value: unknown): string {
