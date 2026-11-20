@@ -153,8 +153,71 @@ const noRepeatedPrimary = {
   },
 };
 
+
+/**
+ * V6.1 owns the native HTML control once in src/components/ui. Feature JSX
+ * composes the canonical primitives instead of restyling native controls.
+ * Hidden form fields and accessible choice-card labels are deliberate HTML
+ * exceptions; the same exceptions are used by v61-source-audit.mjs.
+ */
+const nativeControlTags = new Set(["button", "input", "select", "textarea", "label"]);
+const choiceControlTags = new Set(["Checkbox", "Radio"]);
+const nestedControlTags = new Set([
+  ...nativeControlTags, "Button", "Input", "Select", "Textarea", "Checkbox", "Radio",
+]);
+const jsxName = node => node?.type === "JSXIdentifier" ? node.name : null;
+
+function isHiddenFormInput(opening) {
+  return opening.attributes?.some(attr =>
+    attr.type === "JSXAttribute" && attr.name?.name === "type" &&
+    attr.value?.type === "Literal" && attr.value.value === "hidden"
+  );
+}
+
+function isChoiceCardLabel(opening) {
+  const element = opening.parent;
+  if (element?.type !== "JSXElement") return false;
+  const controls = [];
+  function inspect(node) {
+    if (node.type === "JSXElement") {
+      const tag = jsxName(node.openingElement.name);
+      if (nestedControlTags.has(tag)) controls.push(tag);
+      for (const child of node.children) inspect(child);
+    } else if (node.type === "JSXFragment") {
+      for (const child of node.children) inspect(child);
+    }
+  }
+  for (const child of element.children) inspect(child);
+  return controls.length === 1 && choiceControlTags.has(controls[0]);
+}
+
+const noNativeFeatureControls = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Implement native interactive controls in src/components/ui; reuse V6.1 primitives in every application feature",
+    },
+    schema: [],
+    messages: {
+      primitive: "Use the canonical V6.1 primitive instead of native <{{name}}> in feature JSX. Native HTML belongs in src/components/ui.",
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        const tag = jsxName(node.name);
+        if (!nativeControlTags.has(tag)) return;
+        if (tag === "input" && isHiddenFormInput(node)) return;
+        if (tag === "label" && isChoiceCardLabel(node)) return;
+        context.report({ node, messageId: "primitive", data: { name: tag } });
+      },
+    };
+  },
+};
+
 export default {
   rules: {
+    "no-native-feature-controls": noNativeFeatureControls,
     "no-hardcoded-colors": noHardcodedColors,
     "no-arbitrary-type-values": noArbitraryTypeValues,
     "no-raw-page-structure": noRawPageStructure,
