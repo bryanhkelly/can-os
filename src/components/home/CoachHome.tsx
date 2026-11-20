@@ -119,7 +119,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
               chosen={chosen} timeline={timeline} timelineLoading={timelineLoading}
               historyError={historyError} note={note} outcome={outcome} busy={busy}
               formError={formError} message={message} onNoteChange={setNote}
-              onOutcomeChange={setOutcome} onSubmit={submitOutreach} />  </section>
+              onOutcomeChange={setOutcome} onSubmit={submitOutreach} />
           </div>
         )}
         </div>
