@@ -1,5 +1,6 @@
+import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { WorkspaceLinkNavigation } from "./workspace-link-navigation";
 import { DirectoryWindowPagination } from "./directory-window-pagination";
@@ -71,12 +72,41 @@ export const Tablet: Story = {
 };
 export const Mobile: Story = {
   parameters: { chromatic: { viewports: [390] } },
-  render: () => <ReportingExample />,
-  play: async ({ canvasElement }) => checkSemantics(canvasElement),
+  render: () => <div className="max-w-[390px]"><ReportingExample /></div>,
+  play: async ({ canvasElement }) => {
+    await checkSemantics(canvasElement);
+    const region = within(canvasElement).getByRole("region", { name: "Site participation totals" });
+    await expect(region.scrollWidth).toBeGreaterThan(region.clientWidth);
+    region.focus();
+    await expect(region).toHaveFocus();
+  },
 };
 export const Dark: Story = {
   globals: { theme: "dark" },
   parameters: { chromatic: { viewports: [390, 1440] } },
   render: () => <ReportingExample />,
   play: async ({ canvasElement }) => checkSemantics(canvasElement),
+};
+
+function CursorPageExample() {
+  const [page, setPage] = React.useState(0);
+  return <div className="bg-background p-6 text-foreground">
+    <DirectoryWindowPagination label="Blueprint review history" pageIndex={page} hasMore={page < 2}
+      previousLabel="Newer" nextLabel="Older" onPageChange={setPage}/>
+  </div>;
+}
+
+export const CursorPagingInteractions: Story = {
+  render: () => <CursorPageExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "Newer" })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: "Older" }));
+    await expect(canvas.getByText("Page 2")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Older" }));
+    await expect(canvas.getByText("Page 3")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Older" })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: "Newer" }));
+    await expect(canvas.getByText("Page 2")).toBeVisible();
+  },
 };
