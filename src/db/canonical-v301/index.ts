@@ -31,6 +31,7 @@ export * from "./classroom-assisted-activity";
 
 export * from "./community-benefits";
 export * from "./classes";
+export * from "./launch-facilities";
 export * from "./class-enrollment-intents";
 
 export * from "./network-attribution";
