@@ -73,12 +73,13 @@ export function ValorStudentClassHome({classes,navigation}:{
                 Open Class
               </Link>
             </Button>:item.canJoin?<>
-              <Checkbox checked={!!acknowledged[item.classId]}
-                onCheckedChange={value=>setAcknowledged(old=>({
-                  ...old,[item.classId]:value===true
-                }))}>
-                I understand this is synthetic, noncredit test participation.
-              </Checkbox>
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox checked={!!acknowledged[item.classId]}
+                  onChange={event=>setAcknowledged(old=>({
+                    ...old,[item.classId]:event.target.checked
+                  }))}/>
+                <span>I understand this is synthetic, noncredit test participation.</span>
+              </label>
               <Button disabled={!acknowledged[item.classId]||!!busy}
                 onClick={()=>void enroll(item.classId)}>
                 {busy===item.classId?"Enrolling…":pending?"Start this Class":"Enroll in Class"}
