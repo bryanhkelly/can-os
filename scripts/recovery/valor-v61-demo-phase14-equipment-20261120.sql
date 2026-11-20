@@ -53,7 +53,7 @@ BEGIN
     WHERE id=md5('valor-v61:equipment:return-demo')::uuid)
  THEN
    INSERT INTO public.equipment_custody_events
-     (id,asset_id,from_organization_id,to_site_id,occurred_at,actor_person_id,event_kind,event_order)
+     (id,asset_id,from_organization_id,to_site_id,occurred_at,actor_person_id,event_kind)
    VALUES(md5('valor-v61:equipment:return-demo')::uuid,a2,vorg,vsite,
      '2026-11-06T20:00:00Z',alex,'returned');
  END IF;
