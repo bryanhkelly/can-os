@@ -85,7 +85,6 @@ const owners = [
     "function SessionsPanel(", "function DiscussionPanel(",
     "function MembersPanel(", "function ReportsPanel(",
   ]],
-  ["src/routes/classes.tsx", ['<h3 className="font-semibold">Worked solutions</h3>', "Teacher guide not published", 'aria-label="Lesson discussions"', 'aria-label="Assignments for this lesson"', '<ul className="space-y-3">{items.map(item => <li key={item.id}']],
   ["src/routes/class.tsx", ["function OfferingCard(", "function ApprovedClassCard(",
     "function InvitationCard(", "function EnrolledClassCard("]],
   ["src/routes/calendar.tsx", ['<WorkspacePanel title="Event details" description="Schedule and description for this calendar event."', 'rail={<WorkspacePanel title="Record context"', "const groupPeople = new Map", "visibleInvitePeople.map(",
