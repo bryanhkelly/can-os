@@ -65,7 +65,9 @@ BEGIN
         AND ce.credit_mode='not_applicable'
         AND cls.state='active'
         AND r.status IN ('registered','active')
-        AND cls.operating_organization_id=r.registering_organization_id
+        -- The Course registering Organization and the authorized Class
+        -- operator can be different at the same approved host Site.
+        -- Application admission rechecks active operator/Site grants.
         AND cls.site_id=release.site_id
         AND cls.deployment_id=r.deployment_id
         AND cls.adoption_id=r.adoption_id
