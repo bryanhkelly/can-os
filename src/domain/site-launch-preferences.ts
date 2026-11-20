@@ -30,7 +30,15 @@ export const siteLaunchPreferencesSchema = z.object({
   audienceIds: z.array(z.enum(sitePlanningAudienceIds)).max(4)
     .refine(distinct, "Duplicate audiences are not allowed").optional(),
   startingFocus: z.enum(sitePlanningInterestIds).nullable().optional(),
+  // Canonical published Program reference codes (not adopted Solutions).
+  // Older Site records omit this field and remain readable.
+  programCodes: z.array(z.string().trim().min(3).max(128)).max(30)
+    .refine(distinct, "Choose each Program once").optional(),
+  startingProgramCode: z.string().trim().min(3).max(128).nullable().optional(),
 }).strict().superRefine((value, ctx) => {
+  if (value.startingProgramCode && !value.programCodes?.includes(value.startingProgramCode))
+    ctx.addIssue({ code: "custom", path: ["startingProgramCode"],
+      message: "Starting Program must be selected." });
   if (value.startingFocus && !value.interestIds.includes(value.startingFocus))
     ctx.addIssue({ code: "custom", path: ["startingFocus"],
       message: "Starting focus must be a selected learning interest." });
@@ -46,7 +54,13 @@ export const siteProgramsAudiencesV61Schema = z.object({
   audienceIds: z.array(z.enum(sitePlanningAudienceIds)).max(4)
     .refine(distinct, "Choose each audience once"),
   startingFocus: z.enum(sitePlanningInterestIds).nullable(),
+  programCodes: z.array(z.string().trim().min(3).max(128)).max(30)
+    .refine(distinct, "Choose each Program once").optional(),
+  startingProgramCode: z.string().trim().min(3).max(128).nullable().optional(),
 }).strict().superRefine((value, ctx) => {
+  if (value.startingProgramCode && !value.programCodes?.includes(value.startingProgramCode))
+    ctx.addIssue({ code: "custom", path: ["startingProgramCode"],
+      message: "Choose a selected Program for your starting focus." });
   if (value.startingFocus && !value.interestIds.includes(value.startingFocus))
     ctx.addIssue({ code: "custom", path: ["startingFocus"],
       message: "Choose a selected learning interest for your starting focus." });
@@ -76,6 +90,9 @@ export function readSiteProgramsAudiencesV61(raw: unknown): SiteProgramsAudience
     ])],
     audienceIds: source.audienceIds ?? [],
     startingFocus: source.startingFocus ?? null,
+    ...(source.programCodes ? { programCodes: source.programCodes } : {}),
+    ...(source.startingProgramCode !== undefined
+      ? { startingProgramCode: source.startingProgramCode } : {}),
   });
 }
 
@@ -96,5 +113,8 @@ export function applySiteProgramsAudiencesV61(
     timingIds: plan.timingIds,
     audienceIds: plan.audienceIds,
     startingFocus: plan.startingFocus,
+    ...(plan.programCodes !== undefined ? { programCodes: plan.programCodes } : {}),
+    ...(plan.startingProgramCode !== undefined
+      ? { startingProgramCode: plan.startingProgramCode } : {}),
   });
 }
