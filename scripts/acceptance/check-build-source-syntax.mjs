@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Fail early on malformed TS/TSX/JS/JSX before TanStack Router runs route
- * generation. Otherwise routeTree.gen is never created and the bundler reports
- * a misleading unresolved import.
+ * Fail early on malformed TS/TSX/JS/JSX and unresolved local module imports
+ * before TanStack Router runs route generation. Otherwise routeTree.gen may
+ * never be created and bundler errors obscure the original source defect.
  *
  * Pure local file parsing: no database, network, generated assets or deploy.
  */
@@ -52,8 +52,6 @@ for(const filename of files){
       " TS"+diagnostic.code+" "+message);
     errors++;
   }
-  // Parser diagnostics alone do not catch two imports declaring the same
-  // local name. Report this deterministic binding collision before building.
   // Check local module targets before bundling, including re-exports and
   // type-only/lazy imports. A syntax-valid missing dependency must not
   // masquerade as a TanStack generated-route failure.
@@ -64,6 +62,7 @@ for(const filename of files){
       errors++;
     }
   }
+  // Parser diagnostics also miss two imports with the same local binding.
   for(const conflict of duplicateImportBindings(parsed)){
     const {line,character}=parsed.getLineAndCharacterOfPosition(conflict.start);
     console.error(relative(root,filename)+":"+(line+1)+":"+(character+1)+
@@ -72,10 +71,10 @@ for(const filename of files){
   }
 }
 if(errors){
-  console.error("Source syntax gate blocked build: "+errors+
-    " syntax/import errors across "+files.length+" files. Fix the first error, then retry.");
+  console.error("Source syntax/import gate blocked build: "+errors+
+    " syntax, duplicate-binding, or missing-import errors across "+files.length+" files. Fix the first error, then retry.");
   process.exitCode=1;
 }else{
-  console.log("Source syntax gate: "+files.length+
-    " TypeScript/JavaScript files parsed without syntax errors.");
+  console.log("Source syntax/import gate: "+files.length+
+    " TypeScript/JavaScript files parsed with valid local imports.");
 }
