@@ -205,9 +205,9 @@ Changes to these shared behaviors propagate to all existing consumers.
 production JSX route and feature, including newly added files. It permits only
 static hidden form inputs and a native wrapping `label` whose sole interactive
 descendant is a canonical `Checkbox` or `Radio`. The actual primitive
-implementation files are exempt. The rule does not ban semantic native
-`form`, `fieldset`, `legend`, `video` or other elements that are not
-duplicate form controls. Its unit tests verify both exceptions and regressions.
+implementation files are exempt. Native `dialog` is owned by the shared
+`Modal` primitive. The rule does not ban semantic native `form`, `fieldset`,
+`legend`, `video` or other elements that are not duplicate form controls. Its unit tests verify both exceptions and regressions.
 `npm run lint` and the source-level V6.1 audit are independent enforcement
 routes. Storybook is the interactive catalog; browser and visual QA remain
 separate release gates.
