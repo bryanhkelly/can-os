@@ -18,7 +18,7 @@ import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionDialog, ActionFooter, PageHeader, type StatusTone } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, StatusBadge, ActionDialog, ActionFooter, PageHeader, PageFrame, type StatusTone } from "@/components/workspace";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -110,9 +110,9 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   if (studio) return <LaunchSiteFrame
     site={{id:data.siteId,name:data.siteName}} active="website-brand"
     previewHref={privateWebsitePreviewUrl(data.siteId)}>
-    <div className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-7">
+    <PageFrame width="wide" className="launch-studio-page">
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
-        <main className="min-w-0">
+        <div className="min-w-0">
           <PageHeader eyebrow="Establish / Website & Brand"
             title={data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
               "Tell Your Story","Review & Finish"][step]:"Prepare your private website address"}
@@ -133,7 +133,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
               : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/>}
           </div>
           <div className="mt-5 border-t pt-4 text-sm">{returnToLaunch??<Link to="/home" className="font-semibold text-primary">Exit to workspace</Link>}</div>
-        </main>
+        </div>
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Website and Brand guidance">
           <section className="bg-foreground p-5 text-background">
             <h2 className="font-serif text-xl font-semibold">What you can do</h2>
@@ -159,7 +159,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
           </section>
         </aside>
       </div>
-    </div>
+    </PageFrame>
   </LaunchSiteFrame>;
   return <WorkspaceShell
     eyebrow="Website & Brand Studio"
