@@ -257,17 +257,20 @@ operator navigation. Code inspection only; not a successful build.
 - Added or updated regression tests for the above contracts. The tests have
   **not** been executed in an authenticated test environment.
 
-### Important P0 integration blockers still open
+### Remaining integration and acceptance gates
 
-1. **Fresh-Site provisioning.** `provisionVerifiedSchoolSignup` creates
-   public Site/Organization/person/grant records but does not create an active
-   canonical `site_organization_roles` operator relationship or the
-   purpose-scoped PostgreSQL roles used by Blueprint and catalog readers.
-   Those readers require both. The current SQL scripts deliberately require
-   DBA review and manual provisioning. Do not grant broad SQL privileges
-   automatically or bypass forced RLS merely to make a newly created Site
-   appear ready. An independently approved, idempotent provisioning process
-   and real test-Site acceptance are needed.
+1. **First-party Site planning, corrected in source.** A verified CAN Site
+   administrator or registrar now enters the private Solution catalog and
+   configuration workflow using their existing CAN Site grant. The application
+   rechecks the canonical public Site's ownership and lifecycle inside each
+   planning transaction. No second operator relationship, native staff
+   correspondence, or per-Organization SQL role is needed for first-party
+   *planning*. The old scoped PostgreSQL role path remains for separately
+   provisioned native or delegated operators and independent review.
+   The actual `DATABASE_URL` role and its enforced RLS posture still require
+   deployment verification: the new CAN application path uses the same
+   server-side database connection and Site authorization pattern as Establish
+   rather than the native `SET LOCAL ROLE` planning transaction.
 2. **CAN app-admin Blueprint authoring.** Current UI supports Site-owned
    configuration against published recipes; it does not implement an
    independently authorized CAN-admin create/review/version/publish workflow
@@ -291,3 +294,44 @@ operator navigation. Code inspection only; not a successful build.
 **Release decision:** Implementation improved, but not accepted as a fully
 provisioned, enrollable launch. Do not merge to `main` or alter production
 schema on the strength of source-only checks.
+
+
+## 2026-11-19 · Verified CAN Site grant is sufficient for private Solution planning
+
+The previous fresh-Site authorization requirement was incorrect. In the
+Launch Studio owner workflow, the authoritative verified CAN Site grant must
+be enough to start private Solution planning. This branch now implements it
+using the existing shared `public.sites` identity rather than manufacturing
+native operator links or issuing a second staff account.
+
+- `getBlueprintPlanningContext` authenticates the current verified CAN session,
+  Person, Site Admin/Registrar grant, owning Organization, and verified email.
+  It explicitly rejects demo delegation and grants only `blueprint.read`,
+  `blueprint.configure`, and `program.launch.start`. A private server-side
+  WeakSet marks this context; browser-supplied properties cannot opt in.
+- Workspace, published reference catalog, published-Offering lookup, and
+  configuration create/read/save/submit now verify the exact public Site
+  and owning Organization and use this first-party CAN planning context.
+  Saved versions cannot be transferred across Sites. Delegated native
+  operators retain the existing purpose-bound PostgreSQL role path.
+- Read-only review status/history for a Site's own plan uses the same verified
+  Site owner. Independent `blueprint.review` decisions, Blueprint execution,
+  actual Offering adoption, publishing, enrollment, and activation have *not*
+  been granted by this change.
+- Verified-email signup now binds an otherwise unbound CAN account to its one
+  Person in the same transaction and explicitly creates an active Organization
+  with a `planning` Site. This is not opening or accreditation authorization.
+- Catalog error messaging no longer tells verified new Site owners to request
+  manual operator provisioning.
+- Regression tests cover CAN login, demo/unverified denials, exact Site and
+  Organization scope, closed Site denials, immutable Person binding, and
+  approval separation. The tests have been committed but not executed.
+
+**Security/runtime acceptance:** Existing Neon main metadata reports
+`neondb_owner` as `rolbypassrls=true`. The actual application database
+credential was not inspected. Before merging, verify this first-party
+planning path against the configured application role, with cross-tenant
+negative tests, revocation, transactional ownership checks, and audit/event
+persistence. A first-party application service authorization is *not*
+evidence that restricted-role RLS was exercised. Do not conflate the
+normal Site planning path with approval/deployment role provisioning.
