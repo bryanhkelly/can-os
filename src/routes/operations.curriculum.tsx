@@ -14,7 +14,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { ActionFooter, CreateAction, EmptyState, secondaryActionClassName } from "@/components/workspace";
+import { ActionFooter, CreateAction, DetailNavigation, EmptyState, SectionTab, secondaryActionClassName } from "@/components/workspace";
 
 export const loadCurriculum=(programId?:string)=>safeLoader(async()=>{
   const programs=await getCurriculumAdopterPrograms();
@@ -61,12 +61,11 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
    <Link to="/class" search={{view:"activities"}} className={secondaryActionClassName}>Course activities</Link>
   </div>:undefined}>
   <div className="space-y-8 pt-6">
-  {data.programs.length>1&&<nav aria-label="Curriculum program scope" className="flex flex-wrap gap-3">
-   <Link to="/operations/curriculum" search={{}} aria-current={data.marketplaces.length>1?"page":undefined}
-    className=" border px-3 py-2 text-sm">All programs</Link>
+  {data.programs.length>1&&<DetailNavigation label="Curriculum program scope" variant="record">
+   <SectionTab current={data.marketplaces.length>1} link={{to:"/operations/curriculum",search:{}}}>All programs</SectionTab>
    {data.programs.map(program=>
-   <Link key={program.id} to="/operations/curriculum" search={{programId:program.id}} aria-current={data.marketplaces.length===1&&data.marketplaces[0]?.program.id===program.id?"page":undefined}
-    className=" border px-3 py-2 text-sm">{program.name}</Link>)}</nav>}
+   <SectionTab key={program.id} current={data.marketplaces.length===1&&data.marketplaces[0]?.program.id===program.id}
+     link={{to:"/operations/curriculum",search:{programId:program.id}}}>{program.name}</SectionTab>)}</DetailNavigation>
   {!data.programs.length&&<p role="status">No curriculum access grants are available in this membership. An administrator must assign institutional curriculum authority.</p>}
   {mode==="library"&&data.marketplaces.length>1&&data.marketplaces.some(market=>market.canPublish)&&
    <p className="text-sm text-muted-foreground">Select a program to create courses or manage publishing.</p>}
