@@ -1,6 +1,7 @@
 import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import {
   blueprintComponents,
   blueprintConfigurationVersions,
@@ -56,7 +57,7 @@ export async function getCanonicalBlueprintWorkspace(
 
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintDatabaseRole(context, "blueprint_author");
-  return db.transaction(async tx => {
+  return withBlueprintDatabase(context, () => db.transaction(async tx => {
     if (databaseRole) await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [site] = await tx.select({ id: catalogSites.id, status: catalogSites.status })
       .from(catalogSites).where(eq(catalogSites.id, siteId)).limit(1);
@@ -256,5 +257,5 @@ export async function getCanonicalBlueprintWorkspace(
         }];
       }),
     };
-  });
+  }));
 }
