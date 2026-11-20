@@ -33,13 +33,13 @@ export function FormActions({ submitLabel, pendingLabel, pending, disabled, canc
   pendingLabel: string;
   pending: boolean;
   disabled?: boolean;
-  cancel: ReactElement;
+  cancel?: ReactElement | null | false;
 }) {
   return <ActionFooter layout="form">
     <Button type="submit" size="lg" loading={pending} loadingLabel={pendingLabel} disabled={pending || disabled}>{submitLabel}</Button>
-    <Slot className={cn(buttonVariants({ variant: "ghost", size: "lg" }), pending && "pointer-events-none opacity-50")}
+    {cancel && <Slot className={cn(buttonVariants({ variant: "ghost", size: "lg" }), pending && "pointer-events-none opacity-50")}
       aria-disabled={pending || undefined} tabIndex={pending ? -1 : undefined}
-      onClickCapture={event => { if (pending) { event.preventDefault(); event.stopPropagation(); } }}>{cancel}</Slot>
+      onClickCapture={event => { if (pending) { event.preventDefault(); event.stopPropagation(); } }}>{cancel}</Slot>}
   </ActionFooter>;
 }
 
