@@ -30,7 +30,7 @@ describe("Valor canonical, private synthetic community fixtures",()=>{
     const fixture=recovery("valor-v61-full-demo-phase11-class-discussions-20261120.sql");
     expect(fixture).toContain("'class',v_class_id");
     expect(fixture).toContain("'notPublic',true");
-    expect(fixture).toContain("'notActuallySent'");
+    expect(fixture).toContain('"notActuallySent":true');
     expect(discussion).toContain("authorizeCanonicalCourseAttempt");
     expect(discussion).toContain("communicationParticipants.participantId");
     expect(discussion).toContain("assertCurrentCanonicalClassThread(actor,thread)");
