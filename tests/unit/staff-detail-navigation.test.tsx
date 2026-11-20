@@ -132,7 +132,7 @@ describe("read-only staff Action detail",()=>{
       type:"academic_intervention",sectionId:"english",canReviewClass:true,canManageOperations:false,
       workspaceHome:"/home",dueAt:null,resolvedAt:null,resolutionNote:null}};
     const html=render(Action);
-    expect(html).toContain('href="/classes?section=english"');
+    expect(html).toContain('href="/class"');
     expect(html).toContain('href="/teacher/gradebook?section=english"');
     expect(html).toContain('href="/calendar?section=english"');
     expect(html).not.toContain("Open owning operations workflow");
@@ -183,7 +183,7 @@ describe("read-only staff Action detail",()=>{
     const html=render(MissingWork);
     expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay&amp;student=student-profile"');
     expect(html).toContain('href="/staff/students/student-person"');
-    expect(html).toContain('href="/classes?section=english" class="underline">English</a>');
+    expect(html).toContain('href="/class" class="underline">English</a>');
     expect(html).not.toContain('/staff/students/student-profile');
     expect(html).toContain('href="/actions/owned-action"');
     expect(html).toContain("Open follow-up");
@@ -228,7 +228,7 @@ describe("read-only staff Action detail",()=>{
     expect(html).toContain("Resolve this follow-up");
     expect(html).toContain("Resolution note");
     expect(html).toContain("Resolve follow-up");
-    expect(html).toContain('href="/classes?section=english"');
+    expect(html).toContain('href="/class"');
     expect(html).not.toContain("Open owning operations workflow");
     state.data={ok:true,data:{...record,status:"resolved"}};
     expect(render(Action)).not.toContain("Resolve this follow-up");
