@@ -4,7 +4,8 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
-import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
+import { LaunchSiteFacilitiesWorkspaceV61 } from "./LaunchSiteFacilitiesWorkspaceV61";
+import { LaunchClassFacilitiesWorkspaceV61 } from "./LaunchClassFacilitiesWorkspaceV61";
 import { SchoolYearCreateForm } from "@/components/operations/SchoolYearCreateForm";
 import { getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
 import { ActionDialog, ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
@@ -182,7 +183,7 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
           setReload(value => value + 1);
         }} />
     </WorkspacePanel>
-    <RoomCoverageWorkspace key={siteId} siteId={siteId} view="rooms" />
+    <LaunchSiteFacilitiesWorkspaceV61 key={siteId} siteId={siteId} />
     <WorkspaceNotice tone="info">
       Room occupancy is self-reported planning capacity. Approved building use,
       accessibility, connectivity, special equipment, and jurisdiction-specific
@@ -305,51 +306,33 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
 
 /** Room schedules and Class drafts reuse canonical operational owners.
  * Prepare hides Class activation/Offering publishing; Open is independent. */
+/** Canonical Class records own their Site Space and approved staff planning.
+ * No legacy Section/room_coverage_schedule is mounted in Launch Studio. */
 export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
-  // Do not request older Program coverage until the operator explicitly
-  // chooses it. Canonical Classes are the default Prepare experience.
-  const [showExistingProgramCoverage, setShowExistingProgramCoverage] = useState(false);
-  const [showAcademicYears, setShowAcademicYears] = useState(false);
+  const [showAcademicYears,setShowAcademicYears]=useState(false);
   return <div className="space-y-5">
     <Suspense fallback={<p role="status" className="border p-4 text-sm">
-      Loading approved Class and capacity planning…
+      Loading authorized Class preparation…
     </p>}>
       <NativeClassManager key={siteId} preferredSiteId={siteId} embedded prepareOnly />
     </Suspense>
-    <details className="border bg-card p-4" onToggle={event => {
-      if (event.currentTarget.open) setShowAcademicYears(true);
+    <LaunchClassFacilitiesWorkspaceV61 key={siteId} siteId={siteId} />
+    <details className="border bg-card p-4" onToggle={event=>{
+      if(event.currentTarget.open)setShowAcademicYears(true);
     }}>
       <summary className="min-h-11 cursor-pointer text-sm font-semibold text-primary">
         Academic years & calendars for school programs
       </summary>
       <p className="my-3 text-sm text-muted-foreground">
-        For school-year-based delivery, define academic years, terms and
-        instructional days. This is not a prerequisite for a short noncredit
-        training or a four-session workshop.
+        School-year calendars are optional for short training and
+        flexible, four-session programs.
       </p>
-      {showAcademicYears && <PrepareSchoolYearsV61 key={siteId} siteId={siteId} />}
+      {showAcademicYears&&<PrepareSchoolYearsV61 key={siteId} siteId={siteId}/>}
     </details>
-    <WorkspacePanel title="Existing school Program room coverage"
-      description="Optional for Sites already using the older school Program room-coverage service. This is not the canonical Class Session scheduler.">
-      <details className="mt-3" onToggle={event => {
-        if (event.currentTarget.open) setShowExistingProgramCoverage(true);
-      }}>
-        <summary className="min-h-11 cursor-pointer text-sm font-semibold text-primary">
-          Manage existing Program room coverage
-        </summary>
-        {showExistingProgramCoverage &&
-          <RoomCoverageWorkspace key={siteId} siteId={siteId} view="schedules"/>}
-      </details>
-      <p className="mt-3 text-xs text-muted-foreground">
-        These schedules link existing school Program class records, not canonical
-        Class drafts. Canonical Class Sessions are scheduled from their own Class
-        record until their in-place Prepare integration is implemented.
-      </p>
-    </WorkspacePanel>
     <WorkspaceNotice tone="info">
-      Class drafts and room coverage are preparation records. Dates, staff
-      qualifications, live presence, admission capacity, activation, and
-      enrollment publication retain their separate authorizations.
+      A Class room link does not itself establish presence, room safety, instructor
+      verification, or authorization to publish enrollment. Class Sessions
+      continue to follow their canonical scheduled-delivery workflow.
     </WorkspaceNotice>
   </div>;
 }
