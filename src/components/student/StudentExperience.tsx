@@ -41,7 +41,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
      <StatusBadge tone={classroom.ready?"success":"attention"}>{classroom.ready?"Ready to start":"Setup in progress"}</StatusBadge>
      <p className="mt-2 text-xs text-muted-foreground">{classroom.ready?"Lesson and submission work are available.":"Your school still needs to complete this class setup."}</p>
      {classroom.ready?<div className="mt-3 space-y-2 text-sm">
-      <p>1. <Link to="/class" search={{section:classroom.sectionId,tab:"lessons",lesson:classroom.firstWeek.lesson!.id}} className="underline focus-visible:outline-2">Study “{classroom.firstWeek.lesson!.title}”</Link></p>
+      <p>1. <Link to="/class"  className="underline focus-visible:outline-2">Study “{classroom.firstWeek.lesson!.title}”</Link></p>
       <p>2. <StudentAssignmentLink assessmentId={classroom.firstWeek.assessment!.id} sectionId={classroom.sectionId} className="underline focus-visible:outline-2">Complete “{classroom.firstWeek.assessment!.title}”</StudentAssignmentLink></p>
      </div>:<ul className="mt-3 list-inside list-disc space-y-1 text-xs">{classroom.blockers.map(item=><li key={item.key}>{item.message}</li>)}</ul>}
     </article>;
@@ -60,7 +60,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
    <Button asChild variant="outline" size="sm"><Link to="/calendar">Calendar</Link></Button>
   </nav>
   {liveData.sections.length>0&&<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
-   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/class" search={{section:section.sectionId,tab:"lessons"}} className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
+   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/class"  className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
     <h3 className="font-semibold">{section.sectionTitle}</h3><span className="mt-3 inline-block text-sm underline">Open class</span>
    </Link>)}</div>
   </WorkspacePanel>}
