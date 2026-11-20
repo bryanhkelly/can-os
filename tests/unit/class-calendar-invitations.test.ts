@@ -32,6 +32,23 @@ describe("Class ICS invitations", () => {
     expect(() => renderCalendarInvitation([event, event], "REQUEST")).toThrow();
     expect(() => renderCalendarInvitation([{...event, uid: "bad\r\nMETHOD:CANCEL"}], "REQUEST")).toThrow();
   });
+  it("preserves an unknown end time and publishes one-time downloads",()=>{
+    const ics=renderCalendarInvitation([{
+      uid:event.uid,summary:"Open house",startsAt:event.startsAt,
+    }],"PUBLISH");
+    expect(ics).toContain("METHOD:PUBLISH");
+    expect(ics).not.toContain("DTEND:");
+  });
+  it("attaches recipient/organizer identities without header injection",()=>{
+    const ics=renderCalendarInvitation([{
+      ...event,attendeeEmail:"learner@example.org",organizerEmail:"info@can-os.example",
+    }],"REQUEST");
+    expect(ics).toContain("ORGANIZER:mailto:info@can-os.example");
+    expect(ics).toContain("ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:learner@example.org");
+    expect(()=>renderCalendarInvitation([{
+      ...event,attendeeEmail:"learner@example.org\r\nMETHOD:CANCEL",
+    }],"REQUEST")).toThrow();
+  });
   it("folds multi-byte Unicode without exceeding 75 UTF-8 octets", () => {
     const line = foldCalendarLine("SUMMARY:" + "🌱".repeat(70));
     expect(line.split("\r\n").every(part => new TextEncoder().encode(part).length <= 75)).toBe(true);
