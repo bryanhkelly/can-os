@@ -191,6 +191,7 @@ function SiteLaunchPage() {
       width="wide"><a href={base} className="inline-flex min-h-11 items-center text-primary underline">
         Back to Site overview</a>
     </WorkspaceShell> : <LaunchStudioOverview
+      completion={launchModuleCompletionV61(site,overview)}
       site={{ ...site, statusLabel, statusTone: "neutral" }}
       mode="returning"
       nextAction={overview ? nextLaunchAction(site.id, overview, site.lifecycleStatus) : {
