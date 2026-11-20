@@ -52,3 +52,36 @@ jobs:
             echo "- Connected Site/Program acceptance remains separate and requires isolated Neon credentials."
             echo "- No production authorization or compliance certification is implied."
           } >> "${GITHUB_STEP_SUMMARY}"
+
+  storybook-v61:
+    name: V6.1 browser behavior and responsive component evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact feature revision
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build Storybook with V6.1 tokens
+        run: npm run build-storybook
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture V6.1 navigation and reporting at mobile/tablet/desktop
+        run: node scripts/capture-v61-navigation-reporting.mjs
+      - name: Exercise Storybook behavior and accessibility
+        run: npm run test:storybook
+      - name: Retain authentic browser evidence even when acceptance fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v61-navigation-reporting-browser-${{ github.run_id }}
+          path: |
+            artifacts/v61-navigation-reporting/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 21
