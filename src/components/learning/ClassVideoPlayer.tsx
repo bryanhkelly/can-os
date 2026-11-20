@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveClassVideo, safeClassVideoSourceLink } from "@/domain/class-video";
-import { ClassroomMediaSurface } from "@/components/learning/ClassroomMediaSurface";
+import { ClassroomMediaSurface, type ApprovedClassCaptionTrack } from "@/components/learning/ClassroomMediaSurface";
 import { normalizeClientError } from "@/lib/client-error";
 import { Play, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ type ClassVideoPlayerProps = {
   resourceId?: string;
   declaredVideo?: boolean;
   presentation?: "standard" | "classroom";
+  captionTracks?: readonly ApprovedClassCaptionTrack[];
   /** Observations only. External embeds do not prove playback or watch time. */
   onPlaybackEvent?: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) => void;
   /** Observational watch-heartbeat from focused, genuinely advancing native playback; never attendance. */
@@ -47,7 +48,7 @@ export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
   return <ClassVideoPlayerSession key={sourceIdentity} {...props}/>;
 }
 
-function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard", onPlaybackEvent, onVideoEngagement, resumeKey, onPlaybackError }: ClassVideoPlayerProps) {
+function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard", onPlaybackEvent, onVideoEngagement, resumeKey, onPlaybackError, captionTracks = [] }: ClassVideoPlayerProps) {
   // Do not fetch third-party media or private signed URLs during SSR or on
   // initial navigation. Even preload="metadata" initiates a network request.
   // All formats, including direct MP4/WebM, require a deliberate Play action.
@@ -187,7 +188,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
           : "This video source is unavailable or unsafe. Ask your school to replace the link."
         : "No video recording has been attached."}/>}
     {source && video && <ClassroomMediaSurface key={source+":"+playbackRevision}
-      video={video} title={title} videoRef={attachPlayer}
+      video={video} title={title} videoRef={attachPlayer} captionTracks={captionTracks}
       iframeClassName="aspect-video w-full  border"
       videoClassName="aspect-video w-full  bg-black"
       onLoadedMetadata={event => setReady(Number.isFinite(event.currentTarget.duration))}
