@@ -24,6 +24,7 @@ import { listSiteMarketingPackagesV61, readSiteMarketingSuggestionsV61 } from "@
 const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
   programId: z.string().uuid().optional(),
+  solutionPlanId: z.string().uuid().optional(),
   module: z.enum(siteLaunchModules.map(item=>item.id) as [string, ...string[]]).optional(),
 });
 
@@ -157,6 +158,7 @@ function SiteLaunchPage() {
     </WorkspaceShell>
     : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61 key={site.id}
       module={selected.id} siteId={site.id}
+      solutionPlanId={selected.id === "program-catalog" ? search.solutionPlanId : undefined}
       intent={prepareIntent?.kind === "ready" ? prepareIntent.intent : null}
       delivery={prepareIntent?.kind === "ready" ? prepareIntent.delivery : null}
       intentUnavailable={prepareIntent?.kind === "unavailable"} />
