@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { EmptyState, WorkspaceNotice, PageNavigation } from "@/components/workspace";
 
@@ -76,6 +77,14 @@ describe("V6.1 universal action and surface contracts", () => {
     expect(html).toContain('aria-invalid="true"');
     expect(html).toContain(`aria-describedby="existing-help ${id}-description ${id}-error"`);
     expect(html).toContain('role="alert"');
+  });
+
+  it("exposes a stable dialog id for an accessible mobile navigation control", () => {
+    const html = renderToStaticMarkup(<Modal id="launch-navigation-drawer" open={false}
+      label="Launch Studio navigation" onClose={() => undefined}>Menu</Modal>);
+    expect(html).toContain('id="launch-navigation-drawer"');
+    expect(html).toContain('aria-label="Launch Studio navigation"');
+    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
   });
 
   it("keeps empty, error and pagination surfaces rectangular", () => {
