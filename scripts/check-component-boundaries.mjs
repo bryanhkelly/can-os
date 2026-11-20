@@ -38,6 +38,7 @@ const guardedFiles = [
   "src/components/home/GuardianEnrollmentNextSteps.tsx",
   "src/components/home/GuardianGradeQuestions.tsx",
   "src/components/home/GuardianChildSummaryCard.tsx",
+  "src/components/support/CoachOutreachPanel.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
 ];
@@ -89,6 +90,7 @@ const owners = [
   ["src/components/enrollment/NoncreditReleaseOperations.tsx", ['rows={query.data.roster}', '<h3 className="mt-7 text-base font-semibold">Participant roster</h3>']],
   ["src/components/enrollment/GuardianApplicationForm.tsx", ['<Label htmlFor={`${id}-transfer`}', '<Label htmlFor={`${id}-household`}']],
   ["src/components/home/CoachHome.tsx", ["students.map((student) => (", '<h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Timeline</h3>']],
+  ["src/components/home/CoachHome.tsx", ['<section className="h-fit  border bg-card p-5"', 'onClick={submitOutreach}']],
   ["src/components/home/GuardianHome.tsx", ['<section aria-label="Enrollment next steps"', '<section aria-label="School responses to your grade questions"', "visibleChildren.map(child => <article"]],
   ["src/components/operations/OperationsHealthSummary.tsx", ["commandCenterData.issues.map("]],
   ["src/components/learning/NativeClassManager.tsx", ["const methodOptions:", "const creditOptions:", "function toggle<T extends string>", 'aria-label="Approved Offering hierarchy"']],
