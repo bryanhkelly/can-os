@@ -7,7 +7,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { assertSiteSetupScope, assertSiteLocationProgramScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
+import { assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
 import { resolveSiteGeographicAreaId } from "./site-geographic-area.server";
 import { sites, programs, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations } from "@/db/schema";
@@ -55,7 +55,9 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       const attached=await tx.select({id:programs.id,status:programs.status}).from(programs)
         .where(eq(programs.siteId,site.id));
       const attachedIds=attached.map(item=>item.id);
-      assertSiteLocationProgramScope(actor,attachedIds);
+      // The verified Site-level registrar may revise this Site's draft
+      // location, even when draft Programs exist without individual Program
+      // grants. Independent operational approvals are still checked below.
       const [approvedConfigurations,publishedPrograms,approvedServices]=await Promise.all([
         attachedIds.length?tx.select({id:schoolConfigurationVersions.id})
           .from(schoolConfigurationVersions)
@@ -204,13 +206,15 @@ export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
       const attached=await tx.select({id:programs.id,status:programs.status})
         .from(programs).where(eq(programs.siteId,site.id));
       const programIds=attached.map(program=>program.id);
-      assertSiteLocationProgramScope(actor,programIds);
+      // Site-wide draft identity belongs to the verified Site registrar.
+      // Requiring separate grants for every planning Program would incorrectly
+      // block basic edits before operations are independently approved.
       // A published Site address is not itself approval to operate.
       // Unapproved draft Site identity remains editable; operationally
       // ready/active Programs and independent authorization still lock it.
       if(attached.some(program=>
           program.status==="active" || program.status==="ready"))
-        throw new Error("An active, ready or publicly published Site requires CAN-coordinated identity amendment.");
+        throw new Error("An operating or approved Program requires a coordinated Site identity amendment.");
       if(programIds.length) {
         const [approved,published,authorized]=await Promise.all([
           tx.select({id:schoolConfigurationVersions.id}).from(schoolConfigurationVersions)
