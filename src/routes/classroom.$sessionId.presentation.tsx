@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { PageFrame, PageHeader } from "@/components/workspace";
 import { ClassroomProjectorPlayer } from "@/components/learning/ClassroomProjectorPlayer";
 import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
 import { ClassroomPublicPromptControls } from "@/components/learning/ClassroomPublicPromptControls";
@@ -52,25 +53,15 @@ function ClassroomPresentation() {
   });
   const live = state.isSuccess && state.data?.roomState === "live";
 
-  return <main className="min-h-screen bg-background px-4 py-6 md:px-10"
+  return <PageFrame width="wide" className="min-h-screen bg-background"
     aria-label="Shared-screen classroom presentation">
-    <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
-      <div>
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          CAN OS · Classroom Connect
-        </p>
-        <h1 className="font-serif text-3xl font-semibold">
-          Facilitated classroom
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Watch together. Answer on your own device.
-        </p>
-      </div>
-      <Button type="button" variant="outline" onClick={() =>
+    <PageHeader eyebrow="Classroom Connect"
+      title="Facilitated classroom"
+      subtitle="Watch together. Answer on your own device."
+      actions={<Button type="button" variant="outline" onClick={() =>
         void document.documentElement.requestFullscreen?.()}>
         Full screen
-      </Button>
-    </header>
+      </Button>} />
     {state.isPending && <p role="status" className="mt-6">
       Verifying current facilitator and room authority…
     </p>}
@@ -128,5 +119,5 @@ function ClassroomPresentation() {
         </p>
       </aside>
     </div>}
-  </main>;
+  </PageFrame>;
 }
