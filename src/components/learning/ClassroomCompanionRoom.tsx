@@ -82,6 +82,9 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
         retryIds.current[activity.id]=stored.clientSubmissionId;
         pendingAnswers.current[activity.id]=stored.answer;
         recovered[activity.id]=stored.answer;
+      } else if(stored) {
+        // A new tab/session identity cannot reuse the original retry token.
+        clearPendingClassroomResponse(window.sessionStorage,key);
       }
     }
     if(Object.keys(recovered).length)setAnswers(previous=>({...previous,...recovered}));
