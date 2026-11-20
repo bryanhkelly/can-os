@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccountNoncreditPrincipals } from "@/db/schema";
 import {
-  canonicalAccounts,
+  canonicalAccounts,canonicalClasses,canonicalClassEnrollments,
   facilitatedLearningParticipants, learnerCourseAttempts, noncreditRegistrations,
   noncreditCompletionDecisions,
   noncreditSelfEnrollmentClaims,
@@ -75,7 +75,7 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
       })!=="withdraw")
         throw new AuthorizationError("only unfinished active training can be withdrawn");
       const now=new Date();
-      const attempts=await tx.select({id:learnerCourseAttempts.id})
+      const attempts=await tx.select({id:learnerCourseAttempts.id,classEnrollmentId:learnerCourseAttempts.classEnrollmentId})
         .from(learnerCourseAttempts)
         .where(and(
           eq(learnerCourseAttempts.noncreditRegistrationId,registration.id),
@@ -83,6 +83,28 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
           inArray(learnerCourseAttempts.status,["planned","active"]),
         ));
       const ids=attempts.map(row=>row.id);
+      const linkedClassIds=[...new Set(attempts.flatMap(item=>
+        item.classEnrollmentId?[item.classEnrollmentId]:[]))];
+      if(linkedClassIds.length>1)
+        throw new AuthorizationError("multiple Class placements need manual reconciliation");
+      const linkedClasses=[];
+      for(const classEnrollmentId of linkedClassIds){
+        const [source]=await tx.select({
+          classId:canonicalClassEnrollments.classId,
+        }).from(canonicalClassEnrollments)
+          .where(eq(canonicalClassEnrollments.id,classEnrollmentId)).limit(1);
+        if(!source)throw new AuthorizationError("linked Class enrollment");
+        const [cls]=await tx.select().from(canonicalClasses)
+          .where(eq(canonicalClasses.id,source.classId)).for("update").limit(1);
+        const [enrollment]=await tx.select().from(canonicalClassEnrollments)
+          .where(and(eq(canonicalClassEnrollments.id,classEnrollmentId),
+            eq(canonicalClassEnrollments.learnerPersonId,bridge.canonicalPersonId),
+            eq(canonicalClassEnrollments.status,"active")))
+          .for("update").limit(1);
+        if(!cls||!enrollment||!ids.includes(enrollment.courseAttemptId??""))
+          throw new AuthorizationError("exact active Course Class placement");
+        linkedClasses.push({cls,enrollment});
+      }
       if(ids.length){
         await tx.update(learnerCourseAttempts).set({status:"withdrawn"})
           .where(inArray(learnerCourseAttempts.id,ids));
@@ -94,6 +116,33 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
             eq(facilitatedLearningParticipants.participantPersonId,bridge.canonicalPersonId),
             isNull(facilitatedLearningParticipants.leftAt),
           ));
+      }
+      // Update the same Class placement, not a separate record of progress.
+      // All Course Attempts have been withdrawn before the Class status flips.
+      for(const {cls,enrollment} of linkedClasses){
+        await tx.update(canonicalClassEnrollments).set({status:"withdrawn"})
+          .where(eq(canonicalClassEnrollments.id,enrollment.id));
+        const payload={contractVersion:1,classId:cls.id,
+          classEnrollmentId:enrollment.id,courseAttemptId:enrollment.courseAttemptId,
+          participantPersonId:bridge.canonicalPersonId,
+          operatingOrganizationId:cls.operatingOrganizationId,
+          siteId:cls.siteId,deliverySiteId:cls.siteId,
+          deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
+          offeringVersionId:cls.offeringVersionId,courseVersionId:cls.courseVersionId,
+          classOfferingVersionId:enrollment.classOfferingVersionId,
+          previousStatus:"active",status:"withdrawn",reason:"Course registration withdrawn",
+          capacityReleased:true,courseAttemptIdsWithdrawn:ids,
+          occurredAt:now.toISOString()};
+        await writeCanonicalAudit(tx,{
+          actorPersonId:bridge.canonicalPersonId,
+          owningOrganizationId:cls.operatingOrganizationId,
+          eventCode:"class.enrollment.withdrawn",entityKind:"class_enrollment",
+          entityId:enrollment.id,payload,
+        });
+        await emitCanonicalDomainEvent(tx,{
+          eventType:"ClassEnrollmentWithdrawn",aggregateType:"class_enrollment",
+          aggregateId:enrollment.id,actorPersonId:bridge.canonicalPersonId,payload,
+        });
       }
       await tx.update(noncreditRegistrations).set({status:"withdrawn"})
         .where(eq(noncreditRegistrations.id,registration.id));
