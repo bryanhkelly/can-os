@@ -19,7 +19,7 @@ import {
 import { ExtendedSeasonDraftForm, type ExtendedSeasonDraftValues } from "./ExtendedSeasonDraftForm";
 import type { EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listEnrichmentSessionRoster } from "@/modules/activities/enrichment-roster.functions";
-import { extendedLearningReadinessTasks } from "@/domain/extended-learning-readiness-tasks";
+import { ExtendedSeasonReadinessRequests } from "./ExtendedSeasonReadinessRequests";
 import { ExtendedSeasonEvidencePanel } from "./ExtendedSeasonEvidencePanel";
 
 type Planning = Awaited<ReturnType<typeof listExtendedSeasonPlanning>>;
@@ -461,53 +461,11 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                   </div>
                 );
               })()}
-              {season.status === "draft" && (() => {
-                const tasks = planning.assignments.filter(a => a.seasonId === season.id);
-                const available = planning.operators.filter(p => p.programId === season.programId);
-                const existingOwner = tasks[0]?.ownerPersonId ?? "";
-                const operatorId = readinessOwners[season.id] ?? existingOwner;
-                return (
-                  <details className="mt-3  border p-3">
-                    <summary className="cursor-pointer text-xs font-semibold">Optional evidence requests</summary>
-                    <p className="text-xs font-semibold">
-                      Evidence requests: {tasks.length}/{extendedLearningReadinessTasks.length} recorded
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      These are evidence-gathering assignments only. A completed task does not
-                      demonstrate approval or allow children to register.
-                    </p>
-                    {!!tasks.length && <ul className="mt-2 list-disc pl-5 text-xs">
-                      {tasks.map(task => <li key={task.id}>
-                        {extendedLearningReadinessTasks.find(t => t.key === task.requirementKey)?.title ??
-                          "Unrecognized requirement"} — {task.status === "resolved"
-                            ? "task closed, verification pending" : "evidence requested"}
-                      </li>)}
-                    </ul>}
-                    {season.status === "draft" && <div className="mt-2 flex flex-wrap items-end gap-2">
-                      <Label className="min-w-44 flex-1 text-xs">Receiving site operator
-                        <Select className={inputClass} value={operatorId}
-                          disabled={busy || tasks.length > 0}
-                          onChange={e => setReadinessOwners(current => ({
-                            ...current, [season.id]: e.target.value,
-                          }))}>
-                          <option value="">Choose active site registrar</option>
-                          {available.map(person => <option key={person.personId} value={person.personId}>
-                            {person.firstName} {person.lastName}
-                          </option>)}
-                        </Select>
-                      </Label>
-                      <Button variant="outline" type="button" 
-                        disabled={busy || !operatorId || tasks.length === extendedLearningReadinessTasks.length}
-                        onClick={() => assignReadiness(season.id, season.programId ?? "")}>
-                        {tasks.length ? "Complete missing requests" : "Assign readiness requests"}
-                      </Button>
-                    </div>}
-                    {!available.length && <p className="mt-2 text-xs text-muted-foreground">
-                      No active site registrar/operator is currently eligible for these tasks.
-                    </p>}
-                  </details>
-                );
-              })()}
+              <ExtendedSeasonReadinessRequests season={season}
+                assignments={planning.assignments} operators={planning.operators}
+                owner={readinessOwners[season.id]} busy={busy}
+                onOwnerChange={personId=>setReadinessOwners(current=>({...current,[season.id]:personId}))}
+                onAssign={()=>assignReadiness(season.id,season.programId??"")} />
             </li>
           )}
           {!planning.seasons.some(season => programs.some(p => p.id === season.programId)) &&
