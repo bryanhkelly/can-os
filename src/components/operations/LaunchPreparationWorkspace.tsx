@@ -1,5 +1,4 @@
 import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
-import { useSchoolConfigurationNavigation } from "@/components/launch-studio/SchoolConfigurationContext";
 import { Link } from "@tanstack/react-router";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import { LaunchAcademicYearStep } from "@/components/operations/LaunchAcademicYearStep";
@@ -29,7 +28,6 @@ export function LaunchPreparationWorkspace({ hubMode=false, focus, currentLaunch
   enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
   familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
 }) {
-  const navigation=useSchoolConfigurationNavigation();
   const scopedInvitationTimes=currentLaunch&&familyInvitations
     ? familyInvitations.batches.filter(batch=>batch.programId===currentLaunch.id&&batch.siteId===currentLaunch.siteId)
       .map(batch=>new Date(batch.createdAt).getTime()).filter(Number.isFinite).sort((a,b)=>a-b)
