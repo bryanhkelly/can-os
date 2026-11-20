@@ -19,6 +19,7 @@ const guardedDirectories = [
   "src/components/workspace",
   "src/components/workflow",
   "src/components/calendar",
+  "src/components/groups",
   "src/components/sites",
   "src/components/learning/native-class",
 ];
@@ -62,6 +63,19 @@ const guardedFiles = [
 const failures = [];
 const files = [];
 
+/** A build-independent syntax gate for extracted shared UI and its owners.
+ * TypeScript's parser catches malformed JSX and incomplete refactor edits,
+ * even when CI runners or cloud deployments are unavailable.
+ */
+function checkParseDiagnostics(file, source, program) {
+  for (const diagnostic of program.parseDiagnostics) {
+    const position = diagnostic.start ?? 0;
+    const { line, character } = program.getLineAndCharacterOfPosition(position);
+    const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, " ");
+    failures.push(`${file}:${line + 1}:${character + 1}: syntax ${diagnostic.code}: ${message}`);
+  }
+}
+
 function collect(directory) {
   for (const entry of readdirSync(resolve(root, directory), { withFileTypes: true })) {
     const name = join(directory, entry.name).replaceAll("\\", "/");
@@ -77,6 +91,7 @@ for (const file of files) {
   const source = readFileSync(resolve(root, file), "utf8");
   const program = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  checkParseDiagnostics(file, source, program);
   for (const node of program.statements) {
     if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) continue;
     const importPath = node.moduleSpecifier.text;
@@ -123,6 +138,9 @@ const owners = [
 ];
 for (const [file, banned] of owners) {
   const source = readFileSync(resolve(root, file), "utf8");
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  checkParseDiagnostics(file, source, parsed);
   for (const legacy of banned) {
     if (source.includes(legacy)) failures.push(file + ": duplicate inline UI returned: " + legacy);
   }
