@@ -20,11 +20,12 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
   async function returnFeedback(submissionId:string){
     if(busy)return;
     setBusy(submissionId);setNotice("");setError("");
-    const raw=scores[submissionId]?.trim();
+    const item=queue.data?.items.find(entry=>entry.id===submissionId);
+    const raw=(scores[submissionId]??(item?.practiceScore===null?"":String(item?.practiceScore??""))).trim();
     const practiceScore=raw?Number(raw):null;
     try{
       await returnNativeClassPracticeFeedback({data:{
-        classId,submissionId,feedback:(feedback[submissionId]??"").trim(),practiceScore,
+        classId,submissionId,feedback:(feedback[submissionId]??item?.demoFeedback??"").trim(),practiceScore,
       }});
       setNotice("Practice feedback returned to the learner. No official grade was issued.");
       await client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]});
