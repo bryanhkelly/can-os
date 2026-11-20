@@ -1,10 +1,10 @@
 
 import { useId, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
-import { Building2, Globe2, Menu, X } from "lucide-react";
+import { Globe2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { siteLaunchModules, siteLaunchStagesV61 } from "@/domain/launch-site-navigation-v61";
+import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
+import { LaunchSiteNavigation } from "./LaunchSiteNavigationV61";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
 import { LaunchNavigationGuardProvider } from "./LaunchNavigationGuardProvider";
 
@@ -27,48 +27,12 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
   });
   const expanded = stageChoice.active === active ? stageChoice.stage : activeStage;
   const renderSidebar = (instance: "desktop" | "drawer") => (
-    <div className="flex h-full flex-col bg-card">
-      <div className="can-shell-bar flex h-[var(--topbar-height)] flex-col justify-center border-b px-4">
-        <p className="text-base font-bold">CAN OS</p>
-        <p className="text-3xs font-bold uppercase tracking-eyebrow text-muted-foreground">Christian Academic Network</p>
-      </div>
-      <div className="m-3 border p-3">
-        <p className="text-sm font-semibold">{site.name}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{statusLabel ?? "Site setup"}</p>
-      </div>
-      <nav aria-label="Launch Studio navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-3">
-        <Link to="/launch/site" search={{ siteId: site.id }} onClick={() => setDrawer(false)}
-          className={"block border-b px-3 py-3 text-sm font-semibold " + (!active ? "text-primary" : "")}
-          aria-current={!active ? "page" : undefined}>Overview</Link>
-        {siteLaunchStagesV61.map((stage, index) => (
-          <div key={stage} className="border-b py-1">
-            <Button type="button" variant="ghost" aria-expanded={expanded===stage}
-              aria-controls={`${stagePanelBaseId}-${instance}-${stage}`} onClick={()=>setStageChoice({active, stage: expanded===stage ? "" : stage})}
-              className="flex min-h-11 w-full justify-between px-3 py-3 text-left text-sm font-semibold">
-              <span>{index+1}. {stage}</span><span aria-hidden="true">{expanded===stage ? "−" : "+"}</span>
-            </Button>
-            <div id={`${stagePanelBaseId}-${instance}-${stage}`} hidden={expanded !== stage} className="space-y-1 pb-2 pl-4">
-              {siteLaunchModules.filter(item=>item.stage===stage).map(item=>(
-                <Link key={item.id} to="/launch/site" search={{ siteId: site.id, module: item.id }}
-                  onClick={() => setDrawer(false)}
-                  aria-current={active===item.id ? "page" : undefined}
-                  className={"flex min-h-11 items-center border-l-2 px-3 py-2 text-xs " +
-                    (active===item.id ? "border-primary bg-accent font-bold text-primary" : "border-transparent text-muted-foreground hover:bg-muted")}>
-                  {item.title}
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
-      </nav>
-      <div className="m-3 border p-3">
-        <Button asChild variant="ghost" className="w-full justify-start">
-          <Link to="/sites/$siteId" params={{ siteId: site.id }}>
-            <Building2 className="size-4" /> Site Workspace
-          </Link>
-        </Button>
-      </div>
-    </div>
+    <LaunchSiteNavigation site={site} active={active} statusLabel={statusLabel}
+      expanded={expanded} instance={instance} stagePanelBaseId={stagePanelBaseId}
+      onToggleStage={stage => setStageChoice({
+        active, stage: expanded === stage ? "" : stage,
+      })}
+      onNavigate={() => setDrawer(false)} />
   );
   return <LaunchNavigationGuardProvider><div className="min-h-screen bg-background text-foreground xl:grid xl:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]">
     <aside className="hidden min-h-0 border-r bg-card xl:sticky xl:top-0 xl:block xl:h-dvh">{renderSidebar("desktop")}</aside>
