@@ -16,7 +16,7 @@ import {
   publishExtendedSeasonFn,
   type listExtendedSeasonPlanning,
 } from "@/modules/activities/extended-learning.functions";
-import { programTypeLabels } from "@/domain/program-offerings";
+import { ExtendedSeasonDraftForm, type ExtendedSeasonDraftValues } from "./ExtendedSeasonDraftForm";
 import type { EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listEnrichmentSessionRoster } from "@/modules/activities/enrichment-roster.functions";
 import { extendedLearningReadinessTasks } from "@/domain/extended-learning-readiness-tasks";
@@ -30,13 +30,11 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   siteId?: string;
 }) {
   const router = useRouter();
-  const [programId, setProgramId] = useState("");
-  const [offeringName, setOfferingName] = useState("");
-  const [seasonName, setSeasonName] = useState("");
-  const [activityType, setActivityType] = useState<"club"|"athletics"|"arts"|"service"|"stem"|"faith"|"leadership"|"outings"|"other">("other");
-  const [startsOn, setStartsOn] = useState("");
-  const [endsOn, setEndsOn] = useState("");
-  const [capacity, setCapacity] = useState(24);
+  const [draft,setDraft]=useState<ExtendedSeasonDraftValues>({
+    programId:"", offeringName:"", seasonName:"", activityType:"other",
+    startsOn:"", endsOn:"", capacity:24,
+  });
+  const {programId,offeringName,seasonName,activityType,startsOn,endsOn,capacity}=draft;
   const mutation = useMutationFeedback(() => router.invalidate({ sync: true }));
   const busy = mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
@@ -89,7 +87,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       refreshErrorMessage: "The draft season was saved, but current planning records could not be loaded. Retry the refresh before creating another season.",
     });
     if (outcome.status === "saved" || outcome.status === "refresh-failed") {
-      setOfferingName(""); setSeasonName(""); setDraftAttempted(false);
+      setDraft(current=>({...current,offeringName:"",seasonName:""})); setDraftAttempted(false);
     }
   }
 
@@ -217,54 +215,10 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       </p>
       {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving season changes…"/>
-      <form noValidate onSubmit={createDraft} className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label="Extended-learning program" className="text-xs sm:col-span-2" required
-          error={draftAttempted&&!selected?"Choose an eligible noncredit program.":undefined}>
-          <Select value={programId} onChange={e => setProgramId(e.target.value)}>
-            <option value="">Select a noncredit summer or after-school program</option>
-            {selectable.map(p => <option key={p.id} value={p.id}>{p.name} · {programTypeLabels[p.type]}</option>)}
-          </Select>
-        </Field>
-        <Field label="Offering name" className="text-xs" required
-          error={draftAttempted&&offeringName.trim().length<2?"Enter an offering name with at least 2 characters.":undefined}>
-          <Input value={offeringName} onChange={e => setOfferingName(e.target.value)} placeholder="Robotics lab" minLength={2} maxLength={160} />
-        </Field>
-        <Field label="Season name" className="text-xs" required
-          error={draftAttempted&&seasonName.trim().length<2?"Enter a season name with at least 2 characters.":undefined}>
-          <Input value={seasonName} onChange={e => setSeasonName(e.target.value)} placeholder="Summer 2027 / June" minLength={2} maxLength={120} />
-        </Field>
-        <Field label="Category" className="text-xs">
-          <Select value={activityType} onChange={e => setActivityType(e.target.value as typeof activityType)}>
-            <option value="other">Other enrichment</option>
-            <option value="stem">STEM / robotics</option>
-            <option value="faith">Faith / discipleship</option>
-            <option value="leadership">Leadership</option>
-            <option value="outings">Outings / field trips</option>
-            <option value="club">Club</option>
-            <option value="arts">Arts</option>
-            <option value="athletics">Athletics</option>
-            <option value="service">Service</option>
-          </Select>
-        </Field>
-        <Field label="Seat capacity" className="text-xs" required
-          error={draftAttempted&&(!Number.isInteger(capacity)||capacity<1||capacity>10000)?"Enter a whole number from 1 to 10,000.":undefined}>
-          <Input type="number" min={1} max={10000} value={capacity} onChange={e => setCapacity(Number(e.target.value))} />
-        </Field>
-        <Field label="Start date" className="text-xs" required
-          error={draftAttempted&&!startsOn?"Choose a start date.":undefined}>
-          <Input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} />
-        </Field>
-        <Field label="End date" className="text-xs" required
-          error={draftAttempted&&(!endsOn||endsOn<startsOn)?"Choose an end date on or after the start date.":undefined}>
-          <Input type="date" min={startsOn||undefined} value={endsOn} onChange={e => setEndsOn(e.target.value)} />
-        </Field>
-        <div className="sm:col-span-2">
-          <Button variant="outline" type="submit" disabled={busy} className=" border px-4 py-2 text-sm font-semibold disabled:opacity-50">
-            {busy ? "Saving…" : "Save draft season"}
-          </Button>
-          {!selectable.length && <p className="mt-2 text-xs text-muted-foreground">Create a hosted noncredit summer or after-school Program above first.</p>}
-        </div>
-      </form>
+      <ExtendedSeasonDraftForm value={draft} selectable={selectable}
+        busy={busy} attempted={draftAttempted}
+        onChange={patch=>setDraft(current=>({...current,...patch}))}
+        onSubmit={createDraft} />
       <div className="mt-6">
         <h3 className="text-sm font-semibold">Recorded seasons</h3>
         <ul className="mt-2 space-y-2">
