@@ -11,12 +11,10 @@ import {
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
-import { getCommandContext } from "@/modules/identity/command-context.server";
+import { getIdentityContext } from "@/modules/identity/command-context.server";
 import { assertCurrentCanonicalClassThread } from "@/modules/communication/current-canonical-class-thread.server";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 
-const site="f1000000-0000-4000-8000-000000000003";
-const org="f1000000-0000-4000-8000-000000000002";
 const scope=z.object({classEnrollmentId:z.string().uuid()}).strict();
 const submit=scope.extend({
   threadId:z.string().uuid(),
@@ -32,9 +30,7 @@ type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Learner=Awaited<ReturnType<typeof getInstructionalLearnerContext>>;
 async function requirePrivateDiscussionAccess(tx:Tx,actor:Learner,classEnrollmentId:string){
   if(!actor.actorPersonId||actor.sessionAccountId||
-      actor.role!=="student"||!actor.capabilities.has("student:read")||
-      !actor.scope.siteIds?.includes(site)||
-      !actor.scope.organizationIds?.includes(org))
+      actor.role!=="student"||!actor.capabilities.has("student:read"))
     throw new AuthorizationError("direct CAN student membership");
   const [enrollment]=await tx.select().from(canonicalClassEnrollments).where(and(
     eq(canonicalClassEnrollments.id,classEnrollmentId),
@@ -43,8 +39,10 @@ async function requirePrivateDiscussionAccess(tx:Tx,actor:Learner,classEnrollmen
   if(!enrollment?.courseAttemptId)throw new AuthorizationError("current Class Course Attempt");
   const [cls]=await tx.select().from(canonicalClasses)
     .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
-  if(!cls||cls.siteId!==site||cls.operatingOrganizationId!==org||cls.state!=="active")
-    throw new AuthorizationError("your active Valor Class");
+  if(!cls||!cls.siteId||cls.state!=="active"||
+      !actor.scope.siteIds?.includes(cls.siteId)||
+      !actor.scope.organizationIds?.includes(cls.operatingOrganizationId))
+    throw new AuthorizationError("your current operating Class");
   const access=await authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId);
   if(access.source!=="class"||access.courseVersionId!==cls.courseVersionId)
     throw new AuthorizationError("your Class Course Attempt");
@@ -122,15 +120,15 @@ const teacherReply=teacherClassScope.extend({
 /** Verified direct instructor identity and a current exact-Class staff
  * appointment, never a publisher role or a stale discussion participant. */
 async function currentTeacherThreads(classId:string){
-  const actor=await getCommandContext(getRequest());
-  if(!actor.actorPersonId||actor.sessionAccountId||actor.role!=="teacher"||
-      !actor.scope.siteIds?.includes(site)||
-      !actor.scope.organizationIds?.includes(org))
-    throw new AuthorizationError("current direct Valor teacher");
+  const actor=await getIdentityContext(getRequest());
+  if(!actor.actorPersonId||actor.sessionAccountId||actor.role!=="teacher")
+    throw new AuthorizationError("current direct Class teacher");
   const [cls]=await db.select().from(canonicalClasses)
     .where(eq(canonicalClasses.id,classId)).limit(1);
-  if(!cls||cls.siteId!==site||cls.operatingOrganizationId!==org||cls.state!=="active")
-    throw new AuthorizationError("active Valor teaching Class");
+  if(!cls||!cls.siteId||cls.state!=="active"||
+      !actor.scope.siteIds?.includes(cls.siteId)||
+      !actor.scope.organizationIds?.includes(cls.operatingOrganizationId))
+    throw new AuthorizationError("active assigned teaching Class");
   const rows=await db.select({
     id:communicationThreads.id,subject:communicationThreads.subject,
     contextType:communicationThreads.contextType,
