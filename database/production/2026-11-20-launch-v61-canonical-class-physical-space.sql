@@ -31,6 +31,12 @@ WHERE r.retired_at IS NULL
   )
 ON CONFLICT DO NOTHING;
 
+-- The staff assignment reference must agree with the Class, not merely exist
+-- elsewhere in the operating network. This supporting unique index permits
+-- a composite FK while preserving the existing canonical staff-assignment PK.
+CREATE UNIQUE INDEX IF NOT EXISTS class_staff_assignment_id_class_uq
+  ON public.class_staff_assignments(id,class_id);
+
 -- A Class can select one default physical space for planning. Its actual
 -- dated Sessions, attendance, operating approval and staffing remain governed
 -- by their existing independent records and must be revalidated at operation.
@@ -54,8 +60,8 @@ DO $$ BEGIN
         AND conname='classes_primary_facilitator_assignment_fk') THEN
     ALTER TABLE public.classes
       ADD CONSTRAINT classes_primary_facilitator_assignment_fk
-      FOREIGN KEY (primary_facilitator_assignment_id)
-      REFERENCES public.class_staff_assignments(id)
+      FOREIGN KEY (primary_facilitator_assignment_id,id)
+      REFERENCES public.class_staff_assignments(id,class_id)
       ON UPDATE RESTRICT ON DELETE RESTRICT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint
