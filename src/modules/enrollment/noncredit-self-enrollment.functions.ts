@@ -24,6 +24,7 @@ import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-ad
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
+import { placeCourseRegistrationInClass } from "./course-class-placement.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type VerifiedSelfEnrollmentActor = {
@@ -229,7 +230,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         registrationId=prior.id;attemptId=attempt.id;alreadyEnrolled=true;
       }else{
         if(!invited&&(release.seatsRemaining<=0||release.hasWaitingQueue))
-          throw new AuthorizationError("This cohort is full or serving its waitlist; join the waiting queue");
+          throw new AuthorizationError("This Course is full or serving its waitlist; join the waiting queue");
         // New participant records cannot be invented when capacity is exhausted.
         await tx.insert(learnerProfiles).values({personId:native.personId})
           .onConflictDoNothing();
@@ -313,16 +314,23 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           },
         });
       }
+      // New Course registration is complete only with a real Class placement.
+      // Existing legacy registrations remain readable without inventing a
+      // second Course Attempt or silently assigning a different Class.
+      const placement=alreadyEnrolled?null:await placeCourseRegistrationInClass(tx,{
+        release,personId:native.personId,registrationId,attemptId,
+        selectedClassId:data.classId,now,
+      });
       const grantId=await requireLearnerGrant(
         tx,native.accountId,native.personId,release.registeringOrganizationId,
       );
       const cookie=await issueNativeLearnerSession(tx,native.accountId,grantId,now);
-      return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie};
+      return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie,classId:placement?.classId??null,classEnrollmentId:placement?.classEnrollmentId??null};
     });
     appendResponseHeader("Set-Cookie",outcome.cookie);
     return {registrationId:outcome.registrationId,
       courseAttemptId:outcome.courseAttemptId,
-      alreadyEnrolled:outcome.alreadyEnrolled};
+      alreadyEnrolled:outcome.alreadyEnrolled,classId:outcome.classId,classEnrollmentId:outcome.classEnrollmentId};
   });
 
 /** Public projections disclose only current approved releases and schedules,
