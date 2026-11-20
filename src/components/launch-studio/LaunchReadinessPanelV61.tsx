@@ -30,23 +30,27 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
     setSolutions({state:"loading"});
     setPublication({state:"loading"});
     if (context === "open") setNoncredit({state:"loading"});
-    void Promise.allSettled([
-      listLaunches({data:{includeActive:true,siteId}}),
-      readCanonicalBlueprintWorkspace({data:{siteId}}),
-      readLaunchSitePublication({data:{siteId}}),
-      context === "open" ? getNoncreditEnrollmentPublisher() : Promise.resolve(null),
-    ]).then(([launches,plans,website,releases]) => {
-      if(!active)return;
-      setPrograms(launches.status === "fulfilled"
-        ? {state:"ready",value:launches.value.launches.filter(item=>item.siteId===siteId)}
-        : {state:"unavailable"});
-      setSolutions(plans.status === "fulfilled" && plans.value.siteId === siteId
-        ? {state:"ready",value:plans.value} : {state:"unavailable"});
-      setPublication(website.status === "fulfilled"
-        ? {state:"ready",value:website.value} : {state:"unavailable"});
-      if (context === "open") setNoncredit(releases.status==="fulfilled" && releases.value
-        ? {state:"ready",value:releases.value} : {state:"unavailable"});
-    });
+    // Each authority resolves independently. A slow or unavailable enrollment
+    // reader must never delay already authorized Program and Solution evidence.
+    void listLaunches({data:{includeActive:true,siteId}})
+      .then(result => {
+        if(active)setPrograms({state:"ready",value:result.launches.filter(item=>item.siteId===siteId)});
+      })
+      .catch(() => {if(active)setPrograms({state:"unavailable"});});
+    void readCanonicalBlueprintWorkspace({data:{siteId}})
+      .then(result => {
+        if(active)setSolutions(result.siteId === siteId
+          ? {state:"ready",value:result} : {state:"unavailable"});
+      })
+      .catch(() => {if(active)setSolutions({state:"unavailable"});});
+    void readLaunchSitePublication({data:{siteId}})
+      .then(result => {if(active)setPublication({state:"ready",value:result});})
+      .catch(() => {if(active)setPublication({state:"unavailable"});});
+    if(context==="open") {
+      void getNoncreditEnrollmentPublisher()
+        .then(result => {if(active)setNoncredit({state:"ready",value:result});})
+        .catch(() => {if(active)setNoncredit({state:"unavailable"});});
+    }
     return ()=>{active=false;};
   },[siteId,reload,context]);
 
@@ -57,7 +61,7 @@ export function LaunchReadinessPanelV61({ siteId, context }: {
       <p className="text-xs text-muted-foreground">
         {pending ? "Reading current authorized records…" : "Latest requested Site-scoped records"}
       </p>
-      <Button type="button" size="sm" variant="outline" disabled={pending}
+      <Button type="button" size="sm" variant="outline"
         onClick={()=>setReload(value=>value+1)}>Refresh readiness</Button>
     </div>
     <div className="mt-4 grid gap-4">
