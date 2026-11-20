@@ -93,6 +93,7 @@ export default tseslint.config(
   },
   {
     files: [
+      "src/components/**/*Form.tsx",
       "src/components/learning/{ClassVideoUploadForm,ClassSupplementForm}.tsx",
       "src/components/operations/{ExtendedSeasonDraftForm,LaunchConfigurationForm}.tsx",
       "src/components/admissions/{FamilyInvitationForm,AdmissionsInquiryForm}.tsx",
