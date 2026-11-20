@@ -17,7 +17,7 @@ vi.mock("@tanstack/react-router",()=>({
 }));
 vi.mock("@/components/shell/WorkspaceSession",()=>({useWorkspaceSession:()=>({session:{authenticated:true,role:state.role,activeContext:{siteIds:state.siteIds}}})}));
 vi.mock("@/modules/programs/school-configuration-loader",()=>({loadSchoolConfiguration:state.load}));
-vi.mock("@/routes/admin",()=>({ScopedAdminConsole:({selection}:{selection:{siteId:string}})=><p>Team records for {selection.siteId}</p>}));
+vi.mock("@/components/operations/ScopedAdminConsole",()=>({ScopedAdminConsole:({selection}:{selection:{siteId:string}})=><p>Team records for {selection.siteId}</p>}));
 vi.mock("@/components/operations/LaunchWizardPage",()=>({LaunchWizardPage:()=><p>Program setup form</p>}));
 vi.mock("@/components/operations/LaunchAcademicSetupWorkspace",()=>({LaunchAcademicSetupWorkspace:()=>null}));
 vi.mock("@/components/operations/LaunchPreparationWorkspace",()=>({LaunchPreparationWorkspace:()=>null}));
