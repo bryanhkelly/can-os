@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LaunchSiteAddressFields } from "@/components/operations/LaunchSiteAddressFields";
 import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
-import { StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { saveSiteProfileSequentially, SiteProfileSaveError } from "./site-profile-persistence";
 import {
@@ -253,7 +253,7 @@ export function EstablishSiteProfileUnified({
       {reloadRequired && <Button type="button" variant="outline" onClick={() => window.location.reload()}>
         Reload Site to reconcile changes
       </Button>}
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+      <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
         <Button type="button" variant="outline" disabled={saving || reloadRequired} onClick={onBackToOverview}>
           <ArrowLeft aria-hidden="true" /> Back to Overview
         </Button>
@@ -264,7 +264,7 @@ export function EstablishSiteProfileUnified({
             Save &amp; Continue <ArrowRight aria-hidden="true"/>
           </Button>
         </div>
-      </footer>
+      </ActionFooter>
     </form>
   </section>;
 }
