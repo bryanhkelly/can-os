@@ -42,3 +42,25 @@ tester.run("no-brand-prefixed-labels", plugin.rules["no-brand-prefixed-labels"],
     { code: `const b = <p>CAN OS / Your classroom</p>;`, errors: [{ messageId: "brand" }] },
   ],
 });
+
+tester.run("no-native-feature-controls", plugin.rules["no-native-feature-controls"], {
+  valid: [
+    'const page = <Button type="submit">Save</Button>;',
+    'const field = <Field label="Name"><Input /></Field>;',
+    'const hidden = <input type="hidden" name="returnTo" value="/" />;',
+    'const choice = <label><Checkbox name="consent"/> I agree</label>;',
+    'const choice = <label><Radio name="selection" /> Option A</label>;',
+    'const nested = <label><span><Checkbox name="consent"/></span> I agree</label>;',
+  ],
+  invalid: [
+    { code: 'const page = <button type="button">Save</button>;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <input type="text" />;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <input type={kind} />;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <select><option>Yes</option></select>;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <textarea />;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <label>Feedback</label>;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <label><Input /> Feedback</label>;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <label><Checkbox/><Input/>Choose</label>;', errors: [{ messageId: "primitive" }] },
+    { code: 'const page = <label><input type="checkbox"/>Choose</label>;', errors: [{ messageId: "primitive" }, { messageId: "primitive" }] },
+  ],
+});
