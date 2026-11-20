@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
-import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { EmptyState, QueryState, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { BookOpen, CalendarDays, ClipboardList, School } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import { type listLaunches } from "@/modules/programs/launch.functions";
@@ -12,6 +12,7 @@ import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney
 import { SchoolImprovementPanel } from "@/components/operations/SchoolImprovementPanel";
 import { OperationsHealthSummary } from "@/components/operations/OperationsHealthSummary";
 import { FullFlowOperationalRecord } from "@/components/operations/FullFlowOperationalRecord";
+import { OperationsActionCard } from "@/components/operations/OperationsActionCard";
 import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
 import {useRef,useState} from "react";
 import {Link,useRouter} from "@tanstack/react-router";
@@ -223,49 +224,16 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   {selected.action&&<Link to="/home" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
   {selected.action&&<Link to="/actions/$actionId" params={{actionId:selected.action}} className="ml-4 text-sm underline">View Action details</Link>}
   {selected.action&&!data.items.some(item=>item.id===selected.action)&&<WorkspaceNotice tone="danger">This action is unavailable in the current operations queue.</WorkspaceNotice>}
-  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className=" border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/home" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><StatusBadge tone={i.priority==="critical"?"danger":i.priority==="high"?"attention":"neutral"}>{i.priority}</StatusBadge></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
-  <p className="mt-2 text-xs text-muted-foreground">Status: {i.status?.replaceAll("_"," ") ?? "open"}
-   {i.dueAt&&<> · Due {new Date(i.dueAt).toLocaleDateString()}
-    {new Date(i.dueAt).getTime()<Date.now()&&<strong className="ml-2 text-foreground">Overdue</strong>}</>}
-   {!i.ownerPersonId&&" · Unassigned"}
-  </p>
-  <div className="mt-3 flex flex-wrap gap-3">{i.type==="section_creation_request"?i.programId?
-   <Link to="/launch/school/$programId" params={{programId:i.programId}} className="text-sm underline">Review teacher class request in academic setup →</Link>:
-   <WorkspaceNotice tone="danger">This class request is missing its program. Contact your school administrator.</WorkspaceNotice>:
-   i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><Label className="flex items-center gap-2 text-xs">Assigned to
- <Select aria-label={"Assign "+i.title} className="min-w-0" disabled={commandsBlocked} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
- <option value="" disabled={i.type==="onsite_coverage_gap"&&!!i.eligibleOwnerPersonId}>Unassigned</option>
- {i.type==="onsite_coverage_gap"&&i.ownerPersonId&&i.ownerPersonId!==i.eligibleOwnerPersonId&&
-  <option value={i.ownerPersonId} disabled>Previous assignee — reassign to the current director</option>}
- {data.assignees.filter(person=>person.siteId===i.siteId&&
-   (i.type==="onsite_coverage_gap"?person.role==="site_leader"&&person.id===i.eligibleOwnerPersonId:person.role!=="site_leader")).map(person=><option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.role}</option>)}
- </Select></Label>
- <Label className="flex flex-col gap-1 text-xs">Due date (your local time)
-  <Input type="datetime-local" aria-label={"Deadline for "+i.title}
-   className="min-w-0"
-   disabled={commandsBlocked}
-   value={dueDrafts[i.id]??localDue(i.dueAt)}
-   onChange={event=>setDueDrafts(prev=>({...prev,[i.id]:event.target.value}))}/>
- </Label>
- <Button variant="outline" type="button" size="sm"
-   disabled={commandsBlocked||dueDrafts[i.id]===undefined}
-   onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</Button>
- <Button variant="outline" type="button" size="sm" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"in_progress")}>Start</Button>
- <Button variant="outline" type="button" size="sm" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"waiting")}>Waiting</Button>
- {i.type==="guardian_health_information_review"?
-  <Link to="/operations/health-review" search={{action:i.id}}
-    className=" border px-3 py-1 text-xs font-semibold">Review confidential family update</Link>:
-  i.type==="transfer_academic_records_handoff"?
-  <Link to="/operations/transfer-records" className=" border px-3 py-1 text-xs font-semibold">Complete verified records transfer →</Link>:
-  (i.enrollmentChangeKind==="transfer"||i.enrollmentChangeKind==="withdrawal")?
-  <Button variant="outline" type="button" size="sm"
-    disabled={commandsBlocked} onClick={()=>{if(i.enrollmentChangeKind==="withdrawal"||i.enrollmentChangeKind==="transfer")void completeEnrollmentExit(i.id,i.enrollmentChangeKind);}}>
-    Complete official {i.enrollmentChangeKind==="withdrawal"?"withdrawal":"transfer"} &amp; end school enrollment
-  </Button>:
-  i.type==="onsite_coverage_gap"&&i.siteId?
-  <Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-xs underline">Assigned director resolves in Site Today →</Link>:
-  <Button variant="outline" type="button" size="sm" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"resolved")}>Resolve</Button>}
- </>}</div></article>)}
+  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=>
+    <OperationsActionCard key={i.kind+i.id} i={i}
+      selected={selected} assignees={data.assignees}
+      commandsBlocked={commandsBlocked}
+      dueDraft={dueDrafts[i.id]??localDue(i.dueAt)}
+      hasDueDraft={dueDrafts[i.id]!==undefined}
+      onAssign={assignAction}
+      onDueChange={(id,value)=>setDueDrafts(prev=>({...prev,[id]:value}))}
+      onSaveDue={changeDeadline} onChangeStatus={moveAction}
+      onCompleteEnrollmentExit={completeEnrollmentExit}/>)}
   {!data.items.length&&<EmptyState title="No actions currently require attention."/>}
   </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3  border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
  {dialog&&<ActionDialog open title={dialog.kind==="resolve"?"Resolve action":dialog.kind==="deadline"?"Change action deadline":"Complete official "+dialog.exitKind}
