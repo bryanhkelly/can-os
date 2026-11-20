@@ -55,3 +55,28 @@ The following was subsequently applied to Neon `main`:
 
 
 **Independent direct-client denial probe:** After adding the scoped policy, transaction-local `SET LOCAL ROLE authenticated` and `SET LOCAL ROLE anonymous` followed by `SELECT count(*) FROM public.sites` both returned PostgreSQL `42501 permission denied for table sites`, confirming neither direct client role acquired Site read access. A positive restricted-operator probe is pending role and Organization-purpose provisioning; it has not been simulated or claimed.
+
+## Validation branch: ordered migrations 0086–0094 (2026-11-19 Pacific)
+
+**Prepared branch:** `v61-launch-brand-migration-validation-20261119` (`br-bitter-pine-ar7mjn70`), forked from Neon production `main` (`br-restless-sea-ar9ooo55`) at parent timestamp `2026-11-20T05:35:13Z`.
+
+**Source baseline:** Feature branch commit `8ae02f75508bb40e48c26d8f38295fffdd276b75` for migrations 0086–0093. An independently reviewed additive privacy migration `drizzle/0094_class_participant_delivery_privacy.sql` and journal entry `1795132000000` were subsequently added to the feature branch.
+
+**Important journal correction:** The prior production journal actually stops at migration **0085** (journal ID 87, timestamp `1794990001000`), not 0086. This test therefore applied **0086, 0087, 0088, 0089, 0090, 0091, 0092, 0093, 0094** in that order. Previously manually added 0087/0088 schema objects were skipped idempotently by their source SQL; each migration then received its original journal timestamp and the SHA-256 of its exact source SQL. This matches the SHA-256 method and timestamp format used by the existing Drizzle journal, which were independently verified against applied migration 0085. The validation journal now has 96 rows, through 0094.
+
+### Verified outcomes on the validation branch
+
+- Brand versioning and historical backfill: **3** immutable Site Brand versions from **6** existing content revisions. Both previously published Sites remain published, carry valid pinned Brand/content revisions and retain attributed authors. One Site correctly has a different current Brand from its older published Brand.
+- Immutable Package Release tables, append-only Brand and artifact guards, cross-Site FK constraints and product checks exist.
+- A transaction-local synthetic Marketing Package → Package Release → Artifact Release round trip succeeded, including the exact Release reference; immutability and cross-Site FK negative cases behaved as expected. Its savepoint was rolled back, leaving **zero** fixture rows.
+- A direct UPDATE of an existing Brand version was denied by the immutability trigger (SQLSTATE P0001).
+- Untrusted `authenticated` role sees **zero** Brand/Package release rows under enabled RLS.
+- A distinct issue was discovered in migration 0093: the Class participant-delivery receipts table inherited direct `authenticated` read/write grants with RLS disabled. New migration **0094** enables deny-by-default RLS and revokes those direct privileges from `PUBLIC`, `anonymous` and `authenticated`. After applying 0094, a direct restricted-client SELECT returned permission denied (SQLSTATE 42501). The server-owned table is still available through the trusted owner path, not a new client API.
+- Production-row preservation: Site count **9**, existing content revisions **6**, published Sites **2**; no synthetic test rows persisted. Notification receipt columns and Class participant transport table were installed on the validation branch.
+- All SQL migrations and the additive privacy hardening were actually **committed on the disposable validation branch**, not just rolled back as in the earlier production rehearsal.
+
+### Production status and promotion gate
+
+**Neon main remains unchanged** by validation: its journal still has 87 applied rows through 0085; `site_brand_versions`, `site_marketing_package_releases` and `class_participant_deliveries` do not exist there. Site Brand pointers have not been updated on production.
+
+The Neon project remains at its branch capacity limit (validation now consumes the released slot); the sole existing snapshot is historical, not a current production rollback. Do not delete recovery branches or old snapshots as an automatic workaround. For the production promotion, secure a current rollback strategy first, then recheck live preconditions and apply the exact immutable reviewed migration sequence 0086–0094 using the standard database migrator. If code branch migrations advance again, review the new entries separately before running them. Use verified deployment and application-authorization acceptance afterward. This validation alone does **not** authorize a COGIC pilot Site, publish Course/Offering content, enable enrollment or establish cross-Organization reporting.
