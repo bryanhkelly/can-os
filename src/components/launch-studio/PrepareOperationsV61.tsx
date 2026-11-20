@@ -312,17 +312,25 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
 export function PrepareSchedulesV61({ siteId }: { siteId: string }) {
   return <div className="space-y-5">
     <PrepareSchoolYearsV61 key={siteId} siteId={siteId} />
-    <RoomCoverageWorkspace key={siteId} siteId={siteId} view="schedules"/>
-    <WorkspaceNotice tone="info">
-      Room coverage currently links the Site's existing Section records.
-      Native Class drafts below have separate canonical identities and are not
-      automatically attached to a room schedule.
-    </WorkspaceNotice>
     <Suspense fallback={<p role="status" className="border p-4 text-sm">
       Loading approved Class and capacity planning…
     </p>}>
       <NativeClassManager key={siteId} preferredSiteId={siteId} embedded prepareOnly />
     </Suspense>
+    <WorkspacePanel title="Existing school Program room coverage"
+      description="Optional for Sites already using the older school Program room-coverage service. This is not the canonical Class Session scheduler.">
+      <details className="mt-3">
+        <summary className="min-h-11 cursor-pointer text-sm font-semibold text-primary">
+          Manage existing Program room coverage
+        </summary>
+        <RoomCoverageWorkspace key={siteId} siteId={siteId} view="schedules"/>
+      </details>
+      <p className="mt-3 text-xs text-muted-foreground">
+        These schedules link existing school Program class records, not canonical
+        Class drafts. Canonical Class Sessions are scheduled from their own Class
+        record until their in-place Prepare integration is implemented.
+      </p>
+    </WorkspacePanel>
     <WorkspaceNotice tone="info">
       Class drafts and room coverage are preparation records. Dates, staff
       qualifications, live presence, admission capacity, activation, and
