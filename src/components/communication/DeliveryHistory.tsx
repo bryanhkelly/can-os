@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { RecordedTime, StatusTimeline } from "@/components/workflow";
 import { WorkspaceNotice } from "@/components/workspace/notice";
+import { PageNavigation } from "@/components/workspace/page-navigation";
 import type { getDeliveryHistory } from "@/modules/communication/delivery-history.functions";
 
 type History = Awaited<ReturnType<typeof getDeliveryHistory>>;
@@ -52,10 +53,13 @@ export function DeliveryHistory({ history, cursor, notification, refreshing, onR
           </div>,
         }))}/>}
     </div>
-    <nav aria-label="Delivery history pages" className="mt-4 flex flex-wrap gap-4 text-sm">
-      <Button type="button" size="sm" variant="outline" loading={refreshing} disabled={refreshing} onClick={onRefresh}>{refreshing ? "Refreshing..." : "Refresh delivery status"}</Button>
-      {cursor && <Link to="/notifications" search={{ notification }} className="underline">Latest deliveries</Link>}
-      {history?.nextCursor && <Link to="/notifications" search={{ notification, deliveryCursor: history.nextCursor }} className="underline">Older deliveries</Link>}
-    </nav>
+    <div className="mt-4 flex flex-wrap items-center gap-4">
+      <Button type="button" size="sm" variant="outline" loading={refreshing} disabled={refreshing}
+        onClick={onRefresh}>{refreshing ? "Refreshing..." : "Refresh delivery status"}</Button>
+      {(cursor || history?.nextCursor) && <PageNavigation label="Delivery history pages"
+        previous={cursor ? <Link to="/notifications" search={{ notification }} className="underline">Latest deliveries</Link> : undefined}
+        next={history?.nextCursor ? <Link to="/notifications" search={{ notification, deliveryCursor: history.nextCursor }} className="underline">Older deliveries</Link> : undefined}
+      />}
+    </div>
   </section>;
 }
