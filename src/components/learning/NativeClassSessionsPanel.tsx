@@ -159,6 +159,33 @@ export function NativeClassSessionsPanel({
         Check your classroom setup before opening the room. These are local preparation
         reminders, not stored attendance or compliance evidence.
       </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Verified classroom prerequisites">
+        <p className="border border-border p-3 text-sm">
+          <strong>Eligible Class enrollments:</strong> {workspace.rosterCount}
+          <span className="block text-xs text-muted-foreground">
+            {workspace.rosterCount>0 ? "A current roster exists; each learner remains independently authorized at pairing."
+              : "No enrolled learner is listed. Verify registration before inviting participants."}
+          </span>
+        </p>
+        <p className="border border-border p-3 text-sm">
+          <strong>Current Site and facilitator:</strong> {canSchedule&&workspace.siteId?"Authorized to plan":"Not verified"}
+          <span className="block text-xs text-muted-foreground">
+            Opening a room and playing media separately recheck current Site, staff and content rights.
+          </span>
+        </p>
+        <p className="border border-border p-3 text-sm">
+          <strong>Scheduled Sessions:</strong> {workspace.sessions.filter(session=>session.state==="scheduled"||session.roomState==="live").length}
+          <span className="block text-xs text-muted-foreground">
+            Room start is available only inside the permitted Session window.
+          </span>
+        </p>
+        <p className="border border-border p-3 text-sm">
+          <strong>Video authorization:</strong> Checked at playback
+          <span className="block text-xs text-muted-foreground">
+            This checklist does not authorize media. Use the room's approved recording catalog.
+          </span>
+        </p>
+      </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         {([
           ["media","Approved lesson and captions checked"],
