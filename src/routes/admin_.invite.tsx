@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { adminSearchSchema, ScopedAdminConsole } from "@/routes/admin";
+import { adminSearchSchema } from "@/lib/admin-route-search";
+import { ScopedAdminConsole } from "@/components/operations/ScopedAdminConsole";
 
 export const Route = createFileRoute("/admin_/invite")({
   validateSearch: (search: Record<string, unknown>) => adminSearchSchema.parse(search),
