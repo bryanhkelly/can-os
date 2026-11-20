@@ -60,7 +60,7 @@ function DiscussionsView({ threads }: { threads: Awaited<ReturnType<typeof loadC
 
   return <WorkspaceShell width="standard" eyebrow="Course discussions" title="Course discussions"
     subtitle="Course prompts and replies from your actively enrolled classes and teaching team."
-    breadcrumbs={<Link to="/class" search={{ section }} className="text-sm underline">
+    breadcrumbs={<Link to="/class"  className="text-sm underline">
       Back to {section ? "class" : "my classes"}
     </Link>}>
     <MutationFeedback state={mutation} className="mt-4" pendingMessage="Posting discussion response..." />
