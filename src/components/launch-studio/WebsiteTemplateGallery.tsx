@@ -170,6 +170,10 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
           {styledPreview?"Styled example. Select colors and type separately in Visual Identity.":
             "Grayscale layout preview, not a finished Site website."}
         </p>
+        <a href="#website-template-section-sources"
+          className="mb-3 inline-block text-sm font-semibold text-primary underline underline-offset-4">
+          View this page's headings, elements and data sources
+        </a>
         <TemplatePreviewFrame key={`${value}:${previewPage}:${viewport}:${styledPreview}`}
           html={renderSample(value)} name={`${chosen.name} ${previewLabels[previewPage]}`}
           viewport={viewport} tall grayscale={!styledPreview}/>
