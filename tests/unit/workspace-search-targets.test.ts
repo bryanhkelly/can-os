@@ -47,11 +47,11 @@ describe("workspace search result destinations",()=>{
     const result=await searchWorkspace({data:{query:"English"}});
     expect(result.messages[0]?.to).toBe("/messages?thread=conversation");
     if(role==="student"){
-      expect(result.courses[0]?.to).toBe("/classes?section=english");
+      expect(result.courses[0]?.to).toBe("/class");
       expect(result.assignments[0]?.to).toBe("/student/assignments/essay?section=english");
       expect(result.students).toEqual([]);
     }else if(role==="teacher"){
-      expect(result.courses[0]?.to).toBe("/classes?section=english");
+      expect(result.courses[0]?.to).toBe("/class");
       expect(result.assignments[0]?.to).toBe("/teacher/gradebook?section=english&assessment=essay");
       expect(result.students[0]?.to).toBe("/staff/students/student");
     }else{
