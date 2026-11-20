@@ -57,6 +57,7 @@ describe("Site Brand client/server execution boundary", () => {
       "src/modules/sites/site-family-brand.server.ts",
       "src/modules/sites/site-preview-sharing.functions.ts",
       "src/modules/sites/site-website-preview.functions.ts",
+      "src/modules/enrollment/family-invitations.server.ts",
       "src/modules/programs/site-marketing-artifacts.functions.ts",
       "src/routes/launch.site-preview.ts",
     ]) {
