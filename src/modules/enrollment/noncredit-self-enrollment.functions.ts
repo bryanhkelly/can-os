@@ -9,7 +9,7 @@ import {
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons,
-  canonicalClasses,canonicalClassEnrollments,
+  canonicalClasses,canonicalClassEnrollments,canonicalClassSessions,
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
@@ -501,6 +501,20 @@ async function readMyNoncreditHistoryPage(
     const nextCursor=registrations.length>50&&last
       ?{registeredAt:last.registeredAtCursor,registrationId:last.registrationId}:null;
     const releaseIds=[...new Set(page.map(r=>r.releaseId))];
+    const classIds=[...new Set(page.flatMap(r=>r.classId?[r.classId]:[]))];
+    const classSessions=classIds.length?await db.select({
+      classId:canonicalClassSessions.classId,
+      startsAt:canonicalDeliverySessions.startsAt,
+      endsAt:canonicalDeliverySessions.endsAt,
+    }).from(canonicalClassSessions)
+      .innerJoin(facilitatedClassroomPlans,eq(
+        facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
+      .innerJoin(canonicalDeliverySessions,eq(
+        canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
+      .where(and(
+        inArray(canonicalClassSessions.classId,classIds),
+        inArray(facilitatedClassroomPlans.state,["scheduled","started"]),
+      )).orderBy(canonicalDeliverySessions.startsAt).limit(1001):[];
     const plans=releaseIds.length?await db.select({
       releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
       startsAt:canonicalDeliverySessions.startsAt,
@@ -540,11 +554,13 @@ async function readMyNoncreditHistoryPage(
         referenceId:current.get(r.registrationId)!.id,
         label:"Completion decision: "+current.get(r.registrationId)!.outcome.replaceAll("_"," "),
       }:null,
-      upcomingSessions:plans.filter(p=>p.releaseId===r.releaseId &&
-        p.endsAt.getTime()>Date.now()).slice(0,20).map(p=>({
+      upcomingSessions:(r.classId
+        ?classSessions.filter(p=>p.classId===r.classId)
+        :plans.filter(p=>p.releaseId===r.releaseId))
+        .filter(p=>p.endsAt.getTime()>Date.now()).slice(0,20).map(p=>({
           startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
         })),
-      schedulePartial:plans.length>1000,
+      schedulePartial:r.classId?classSessions.length>1000:plans.length>1000,
     })),nextCursor};
 
 }
