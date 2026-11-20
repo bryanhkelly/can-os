@@ -48,7 +48,7 @@ export function EstablishSiteProfileUnified({
   /** Only a server-authorized identity reader may populate this value. */
   administrator?: { name: string; email: string } | null;
   onBackToOverview: () => void;
-  onSaveAndExit: () => void;
+  onSaveAndExit: () => Promise<void>;
   onContinueToSiteInformation: () => void;
 }) {
   const router = useRouter();
@@ -80,7 +80,7 @@ export function EstablishSiteProfileUnified({
   const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const organization = organizations.find(item => item.id === site.organizationId);
 
-  async function saveAndNavigate(navigate: () => void) {
+  async function saveAndNavigate(navigate: () => void | Promise<void>) {
     if (busy.current || reloadRequired) return;
     setError("");
     if (name.trim().length < 2 || name.trim().length > 160 ||
@@ -127,7 +127,11 @@ export function EstablishSiteProfileUnified({
       // Even with no changes, read the currently authorized Site before handoff.
       await router.invalidate();
       releaseNavigation();
-      navigate();
+      try { await navigate(); }
+      catch (failure) {
+        setError(failure instanceof Error ? failure.message :
+          "Your changes were saved, but sign-out failed. Use the Account menu to sign out.");
+      }
     } catch (cause) {
       setReloadRequired(true);
       setError(mutationsSucceeded
@@ -234,7 +238,7 @@ export function EstablishSiteProfileUnified({
         </Button>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="ghost" disabled={saving || reloadRequired}
-            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Exit</Button>
+            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Sign Out</Button>
           <Button type="submit" loading={saving} loadingLabel="Saving Site…" disabled={reloadRequired}>
             Save &amp; Continue <ArrowRight aria-hidden="true"/>
           </Button>
