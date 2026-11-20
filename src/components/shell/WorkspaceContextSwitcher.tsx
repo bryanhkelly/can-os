@@ -52,7 +52,7 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
     <Label htmlFor="workspace-switcher-search" className="mb-2 block">Search workspaces</Label>
     <Input id="workspace-switcher-search" type="search" autoComplete="off" value={query}
       onChange={event => setQuery(event.target.value)} placeholder="Search people, roles, or schools…"
-      className="mb-5 min-h-11 rounded-none" />
+      className="mb-5 min-h-11 " />
     <div className="space-y-2" aria-busy={changing}>
       {grants.map(grant => {
         const active = grant.id === session.activeGrantId;

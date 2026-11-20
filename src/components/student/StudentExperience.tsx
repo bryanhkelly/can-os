@@ -35,7 +35,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
   {firstWeek.length>0&&<WorkspacePanel title="Your first week" description="Open actual published lessons and assignment work from your enrolled classes. Setup gaps are shown honestly." className="mt-7">
    <div className="grid gap-3 sm:grid-cols-2">{firstWeek.map(classroom=>{
     const title=liveData.sections.find(section=>section.sectionId===classroom.sectionId)?.sectionTitle??"Class";
-    return <article key={classroom.sectionId} className="rounded-lg border p-4">
+    return <article key={classroom.sectionId} className=" border p-4">
      <h3 className="font-semibold">{title}</h3>
      <StatusBadge tone={classroom.ready?"success":"attention"}>{classroom.ready?"Ready to start":"Setup in progress"}</StatusBadge>
      <p className="mt-2 text-xs text-muted-foreground">{classroom.ready?"Lesson and submission work are available.":"Your school still needs to complete this class setup."}</p>
@@ -49,17 +49,17 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
   <details className="mt-6 border bg-card p-4">
   <summary className="cursor-pointer text-sm font-semibold">More learning details and school links</summary>
   <nav aria-label="Student workspace" className="mt-4 flex flex-wrap gap-2 text-sm">
-   <Link to="/student/assignments" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Assignments</Link>
-   <Link to="/student/courses" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Courses</Link>
-   <Link to="/student/support" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Support</Link>
-   <Link to="/groups" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Study groups</Link>
-   <Link to="/student/my-school" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; community</Link>
-   <Link to="/profiles" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">My profile</Link>
-   <Link to="/student/report-card" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Report card</Link>
-   <Link to="/calendar" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Calendar</Link>
+   <Link to="/student/assignments" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Assignments</Link>
+   <Link to="/student/courses" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Courses</Link>
+   <Link to="/student/support" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Support</Link>
+   <Link to="/groups" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Study groups</Link>
+   <Link to="/student/my-school" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; community</Link>
+   <Link to="/profiles" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">My profile</Link>
+   <Link to="/student/report-card" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Report card</Link>
+   <Link to="/calendar" className=" border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Calendar</Link>
   </nav>
   {liveData.sections.length>0&&<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
-   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/classes" search={{section:section.sectionId,tab:"lessons"}} className="rounded-lg border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
+   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/classes" search={{section:section.sectionId,tab:"lessons"}} className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
     <h3 className="font-semibold">{section.sectionTitle}</h3><span className="mt-3 inline-block text-sm underline">Open class</span>
    </Link>)}</div>
   </WorkspacePanel>}
@@ -72,7 +72,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
       formatStatus(item.status??"assigned");
      const tone=item.timeliness==="missing"||item.status==="returned"||item.timeliness==="late"
       ?"attention":item.status==="graded"?"success":"neutral";
-     return <article key={item.assessmentId} className="rounded-xl border bg-background p-4">
+     return <article key={item.assessmentId} className=" border bg-background p-4">
      <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold"><StudentAssignmentLink assessmentId={item.assessmentId} sectionId={item.sectionId} className="hover:underline focus-visible:outline-2">{item.assessmentTitle}</StudentAssignmentLink></h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions."}</p></div><StatusBadge tone={tone}>{status}</StatusBadge></div>
      <p className="mt-3 text-xs text-muted-foreground">{item.dueAt?"Due "+format(item.dueAt,liveData.sections.find(section=>section.sectionId===item.sectionId)?.timezone):"No due date"}</p>
      <StudentAssignmentLink assessmentId={item.assessmentId} sectionId={item.sectionId} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">Open assignment →</StudentAssignmentLink>
@@ -82,7 +82,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
    </WorkspacePanel>
    <div className="space-y-6">
    <WorkspacePanel title="Schedule" description="Events from your enrolled classes and school.">
-    <div className="space-y-3">{liveData.events.map(event=><article key={event.id} className="rounded-xl border bg-background p-4">
+    <div className="space-y-3">{liveData.events.map(event=><article key={event.id} className=" border bg-background p-4">
      <h3 className="font-semibold"><Link to="/calendar" search={{date:dateKeyInTimezone(new Date(event.startsAt).toISOString(),event.timezone),event:event.id}} className="hover:underline focus-visible:outline-2">{event.title}</Link></h3>
      {event.cancelled&&<StatusBadge tone="attention">Cancelled</StatusBadge>}
      <p className="mt-1 text-sm text-muted-foreground">{format(event.startsAt,event.timezone)} · {event.timezone}</p>
@@ -94,7 +94,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
   </div>
   </details>
     <WorkspacePanel title="Other open actions" description="Support or follow-ups outside your assignment list.">
-    <div className="space-y-3">{otherOpenActions.map(action=><article key={action.id} className="rounded-xl border bg-background p-4">
+    <div className="space-y-3">{otherOpenActions.map(action=><article key={action.id} className=" border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
        <h3 className="min-w-0 font-semibold">{action.subjectType==="assessment"&&action.subjectId?<StudentAssignmentLink assessmentId={action.subjectId} className="hover:underline focus-visible:outline-2">{action.title}</StudentAssignmentLink>:<Link to="/student/experiences" search={{action:action.id}} className="hover:underline focus-visible:outline-2">{action.title}</Link>}</h3>
        <StatusBadge tone={action.priority==="urgent"||action.priority==="high"?"attention":"neutral"}>{action.priority==="urgent"?"Urgent":action.priority==="high"?"High priority":"Open"}</StatusBadge>
