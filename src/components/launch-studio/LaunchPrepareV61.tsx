@@ -12,6 +12,9 @@ import { LaunchSitePublicationPanel } from "./LaunchSitePublicationPanel";
 import { LaunchReadinessPanelV61 } from "./LaunchReadinessPanelV61";
 import { PrepareFacilitiesV61, PrepareSchedulesV61, PrepareTeamV61 } from "./PrepareOperationsV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
+import type { SchoolYearAvailability } from "@/domain/site-program-access-v61";
+import { schoolYearInterestMayBeSelected } from "@/domain/site-program-access-v61";
 
 const prepareModuleIcons: Record<PrepareStageModuleIdV61, LucideIcon> = {
   "program-catalog": BookOpen,
@@ -164,12 +167,14 @@ function PrepareModuleHandoffs({ siteId, handoffs, secondary = false }: {
   </WorkspacePanel>;
 }
 
-export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPlanId, intentUnavailable = false }: {
+export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPlanId, schoolYearAvailability, schoolYearAcademyPrograms, intentUnavailable = false }: {
   module: PrepareModuleIdV61;
   siteId: string;
   solutionPlanId?: string;
   intent?: SiteProgramsAudiencesV61 | null;
   delivery?: "physical" | "digital" | "both" | null;
+  schoolYearAvailability?: SchoolYearAvailability;
+  schoolYearAcademyPrograms?: readonly BlueprintReferenceCatalogItem[];
   intentUnavailable?: boolean;
 }) {
   const definition = prepareModulesV61.find(item => item.id === module)!; // Module navigation is owned by LaunchSiteFrame.
@@ -208,7 +213,17 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
           {intent && intent.interestIds.length > 0 ? <>
             <p className="text-xs font-medium text-muted-foreground">What you said you want to offer</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {intent.interestIds.map(id => <span key={id} className="border bg-muted px-3 py-2 text-xs font-medium">{intentTitles[id]}</span>)}
+              {intent.interestIds.map(id => {
+                const blocked = !schoolYearAvailability ||
+                  !schoolYearInterestMayBeSelected(id,schoolYearAvailability);
+                return <span key={id} className={"border bg-muted px-3 py-2 text-xs font-medium " +
+                    (blocked && (id === "grades-6-8" || id === "grades-9-12")
+                      ? "opacity-50" : "")}
+                    title={blocked && (id === "grades-6-8" || id === "grades-9-12")
+                      ? "Previously selected; school-year authorization required" : undefined}>
+                    {intentTitles[id]}
+                  </span>;
+              })}
             </div>
             {intent.startingFocus && <p className="mt-3 text-sm">Starting focus: <strong>{intentTitles[intent.startingFocus]}</strong></p>}
           </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You have not saved any learning interests. You can explore the catalog now and add your vision later.</p>
@@ -232,6 +247,8 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
           </div>
         </WorkspacePanel>
         <SolutionCatalogV61 key={siteId} siteId={siteId} intent={intent} delivery={delivery}
+          schoolYearAvailability={schoolYearAvailability}
+          schoolYearAcademyPrograms={schoolYearAcademyPrograms}
           initialPlanId={solutionPlanId} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
           CAN administers the published Solution definition. Site operators configure their own plan with the existing governed commands.
