@@ -43,6 +43,12 @@ export function StudentContinueLearningPanel({
               {resume.lesson?.estimatedMinutes && <div className="mt-3 flex gap-2"><Clock3 aria-hidden="true" className="size-4 shrink-0" />
                 <p className="text-xs">About {resume.lesson.estimatedMinutes} min · estimated duration</p></div>}
               <Link to="/classes" search={{section:resume.sectionId,tab:"lessons"}} className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">View Course →</Link>
+              {nextWork && <div className="mt-4 space-y-2 border-t border-border pt-3">
+                <p className="text-xs font-semibold">Assignment needing attention</p>
+                <p className="text-xs text-muted-foreground">{nextWork.title}</p>
+                <StudentAssignmentLink assessmentId={nextWork.assessmentId} sectionId={nextWork.sectionId}
+                  className="student-resume-action">Continue assignment →</StudentAssignmentLink>
+              </div>}
             </div>
           </div> : <div className="space-y-3">
             <p role="status" className="text-xs text-muted-foreground">{unavailable
