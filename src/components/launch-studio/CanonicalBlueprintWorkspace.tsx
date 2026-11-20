@@ -20,7 +20,7 @@ import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/bluepr
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
 import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.server";
 import { blueprintEditorialIdentityKeys, includedBlueprintComponentIds } from "@/domain/blueprint-configuration";
-import { selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
+import { replaceVisibleOfferingIntents, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
@@ -41,12 +41,14 @@ function readable(value: string): string {
  * to a Site; freezing it requests review, not permission to operate.
  */
 export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
-  initialBlueprintVersionId, initialConfigurationId, embedded = false, onWorkspaceChanged,
+  initialBlueprintVersionId, initialConfigurationId, initialDelivery = "onsite",
+  embedded = false, onWorkspaceChanged,
 }: {
   siteId: string;
   enableReferences?: boolean;
   initialBlueprintVersionId?: string;
   initialConfigurationId?: string;
+  initialDelivery?: "onsite" | "remote" | "hybrid";
   embedded?: boolean;
   onWorkspaceChanged?: (workspace: Workspace) => void;
 }) {
@@ -369,6 +371,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     }
   }
 
+  const editableProgramComponents = selectedTemplate?.components.filter(component =>
+    component.kind === "program_model" && selectedComponents.includes(component.id)) ?? [];
+  const editableProgramComponentIds = editableProgramComponents.map(component => component.id);
   const readOnlyFrozen = detail?.lifecycle === "frozen" && !revisingFrozen;
   const editingDisabled = busy || readOnlyFrozen || reconciliationRequired;
   // A selected Solution in Prepare must not display another Solution's saved drafts.
@@ -506,18 +511,17 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 </div>
               </fieldset>;
             })}
-          {enableReferences && selectedTemplate.components.some(component =>
-            selectedComponents.includes(component.id) && component.kind === "program_model"
-          ) && <BlueprintOfferingAdoptionPicker
-            siteId={siteId}
-            components={selectedTemplate.components
-              .filter(component => component.kind === "program_model" &&
-                selectedComponents.includes(component.id))}
-            selected={offeringAdoptions.filter(intent =>
-              selectedComponents.includes(intent.componentId))}
-            onChange={setOfferingAdoptions}
-            disabled={editingDisabled}
-          />}
+          {enableReferences && editableProgramComponents.length > 0 &&
+            <BlueprintOfferingAdoptionPicker
+              siteId={siteId}
+              initialDelivery={initialDelivery}
+              components={editableProgramComponents}
+              selected={offeringAdoptions.filter(intent =>
+                editableProgramComponentIds.includes(intent.componentId))}
+              onChange={next => setOfferingAdoptions(previous =>
+                replaceVisibleOfferingIntents(previous, next, editableProgramComponentIds))}
+              disabled={editingDisabled}
+            />}
           {selectedTemplate.components.some(component =>
             selectedComponents.includes(component.id) &&
             ["community", "experience", "club", "activity"].includes(component.kind)
@@ -611,10 +615,12 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                       template.blueprintVersionId === initialBlueprintVersionId)
                   : undefined;
                 if (original) chooseTemplate(original);
-                else setTemplateId("");
+                else {
+                  setTemplateId("");
+                  setSelectedComponents([]);
+                }
                 setEditorialIdentity("community_belonging");
                 setReligiousAffiliationCode("");
-                setSelectedComponents([]);
                 setSelectedReferences({});
                 setOfferingAdoptions([]);
                 setLocalExperiences([]);
