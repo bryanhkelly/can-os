@@ -36,6 +36,8 @@ try {
       has_table_privilege(current_user,
         'education_v30.canonical_account_grants','SELECT') AS can_read_native_grants,
       has_table_privilege(current_user,
+        'public.account_person_grants','SELECT') AS can_read_shared_grants,
+      has_table_privilege(current_user,
         'public.canonical_sensitive_capability_approvals','SELECT') AS can_read_approvals,
       education_v30.v301_can_sensitive_capability(repeat('0',64),'credential.issue') AS unknown_issuer,
       education_v30.v301_can_sensitive_capability(repeat('0',64),'blueprint.review') AS unknown_other_capability
@@ -46,7 +48,7 @@ try {
   assert.equal(row.staff_auth_available,true);
   assert.equal(row.issuer_auth_available,true);
   for(const key of ["can_read_raw_sessions","can_read_identity_links",
-    "can_read_native_grants","can_read_approvals",
+    "can_read_native_grants","can_read_shared_grants","can_read_approvals",
     "unknown_issuer","unknown_other_capability"]){
     assert.equal(row[key],false, `Restricted reader must not allow ${key}`);
   }
@@ -62,6 +64,12 @@ try {
   );
   assert(body.includes("source_session.secret_hash=p_can_session_hash"),
     "Source CAN account must be resolved from the exact hashed session");
+  assert(body.includes("approval.account_person_grant_id=staff.grant_id"),
+    "Issuer authority must use the exact shared CAN Person grant");
+  assert(body.includes("reviewer.person_id<>staff.person_id"),
+    "Reviewer must not be the requesting CAN Person");
+  assert(!body.includes("access_account_canonical_principals"),
+    "Retired Person correspondence must not authorize sensitive capabilities");
   await client.query("ROLLBACK");
   const [restored]=(await client.query("SELECT current_user AS role")).rows;
   assert.equal(restored?.role,"can_os_canonical_auth_app",
