@@ -9,6 +9,9 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/modules/programs/site-programs-audiences-v61.functions", () => ({
   saveSiteProgramsAudiencesV61: vi.fn(),
 }));
+vi.mock("@/modules/blueprints/blueprint-reference-catalog.functions", () => ({
+  exploreBlueprintReferenceCatalog: vi.fn().mockResolvedValue([]),
+}));
 
 import { EstablishProgramsAudiencesV61 } from "@/components/launch-studio/EstablishProgramsAudiencesV61";
 
@@ -66,6 +69,10 @@ describe("V6.1 Programs & Audiences route and screen", () => {
     expect(route).toContain('module: "website-brand"');
     expect(route).toContain('module: "site-information"');
     expect(server).toContain('assertSiteSetupScope(actor, site, "program.launch.start")');
+    expect(server).toContain("getBlueprintReferenceCatalog(actor, { siteId: data.siteId })");
+    expect(ui).toContain("exploreBlueprintReferenceCatalog");
+    expect(ui).toContain("Programs under consideration");
+    expect(ui).toContain("programCodes");
     expect(server).toContain('assertSiteSetupScope(actor, site, "program.read")');
     expect(server).toContain('.for("update")');
     expect(server).toContain("data.expectedRevision");
