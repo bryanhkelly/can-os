@@ -5,7 +5,8 @@
  * navigation via the shared module registry. Render this under a Site-scoped
  * route only after the server has verified active Site access.
  */
-import { ArrowRight, BookOpen, Building2, ClipboardCheck, Globe, Info, Megaphone, Rocket, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, CheckCircle2, ClipboardCheck, Globe, Info, Megaphone, Rocket, Users } from "lucide-react";
+import { completedLaunchStageV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { Button } from "@/components/ui/button";
 export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
@@ -19,6 +20,7 @@ export type LaunchOverviewProps = {
   previewUrl: string | null;
   /** Server-resolved route to permanent Site Workspace. */
   workspaceUrl: string;
+  completion?: LaunchModuleCompletion;
 };
 
 const stagePresentation: Record<SiteLaunchStageV61, {
@@ -38,7 +40,7 @@ const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }))
  * <Button asChild variant="ghost" size="sm"><a href={previewUrl} target="_blank" rel="noopener noreferrer">Preview Website</a></Button>
  * If previewUrl is null, show disabled/unavailable status, never invent an ID.
  */
-export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, workspaceUrl }: LaunchOverviewProps) {
+export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, workspaceUrl, completion = {} }: LaunchOverviewProps) {
   const rail = <div className="space-y-4">
     <WorkspacePanel title="Why this matters">
       <p className="text-sm leading-6 text-muted-foreground">Launch Studio takes your Site from an initial identity to planned programs, community outreach and verified operational readiness.</p>
@@ -67,7 +69,11 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
         <div className="grid gap-3 sm:grid-cols-2">{stages.map((stage, index) => {
           const Icon = stage.icon;
           return <article key={stage.id} className="border bg-card p-5">
-            <div className="flex items-center justify-between"><Icon aria-hidden="true" className="size-5 text-primary"/><span className="text-xs text-muted-foreground">0{index + 1}</span></div>
+            <div className="flex items-center justify-between"><Icon aria-hidden="true" className="size-5 text-primary"/>
+              {completedLaunchStageV61(stage.id,completion)
+                ? <CheckCircle2 aria-label={stage.id+" saved setup complete"} className="size-5 text-success"/>
+                : <span className="text-xs text-muted-foreground">0{index + 1}</span>}
+            </div>
             <h3 className="mt-3 font-semibold">{stage.id}</h3>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">{stage.summary}</p>
           </article>;
