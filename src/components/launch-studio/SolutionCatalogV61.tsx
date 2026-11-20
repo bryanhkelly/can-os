@@ -23,8 +23,10 @@ function readable(code: string): string {
  * Solution/adoption store. The server returns only recipes for an authorized
  * canonical Site and is the sole owner of capability and operator checks.
  */
-export function SolutionCatalogV61({ siteId, intent, delivery }: {
+export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId }: {
   siteId: string;
+  /** Deep-link back to a Site-owned, version-pinned plan from other Prepare steps. */
+  initialPlanId?: string;
   intent?: SiteProgramsAudiencesV61 | null;
   delivery?: "physical" | "digital" | "both" | null;
 }) {
@@ -73,12 +75,31 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
     setError(null);
     setQuery("");
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
-      .then(result => { if (active) setWorkspace(result); })
+      .then(result => {
+        if (!active) return;
+        if (result.siteId !== siteId) {
+          throw new Error("The Solution catalog returned a different Site.");
+        }
+        setWorkspace(result);
+        if (initialPlanId) {
+          const plan = result.configurations.find(item =>
+            item.configurationId === initialPlanId);
+          const selectedVersion = plan && result.templates.find(template =>
+            template.blueprintVersionId === plan.blueprintVersionId);
+          if (!plan || !selectedVersion) {
+            setError("This saved Solution plan is unavailable for the selected Site. Choose an available plan.");
+          } else {
+            setSelectedId(plan.blueprintVersionId);
+            setConfiguringVersionId(plan.blueprintVersionId);
+            setResumeConfigurationId(plan.configurationId);
+          }
+        }
+      })
       .catch(caught => { if (active) setError(normalizeClientError(caught,
         "Published Solutions could not be loaded for this Site.").message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [siteId, reload]);
+  }, [siteId, initialPlanId, reload]);
 
   const templates = workspace?.templates ?? [];
   const filtered = filterPublishedSolutionRecipes(templates, query);
