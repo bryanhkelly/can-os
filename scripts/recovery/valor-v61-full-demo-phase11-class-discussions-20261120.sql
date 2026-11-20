@@ -10,7 +10,7 @@ DECLARE
  j CONSTANT uuid:='f1000000-0000-4000-8000-000000000005';
  r CONSTANT uuid:='f1000000-0000-4000-8000-000000000006';
  rec record;
- class_id uuid;
+ v_class_id uuid;
  thread_id uuid;
 BEGIN
  IF NOT EXISTS(SELECT 1 FROM public.sites WHERE id=vs AND organization_id=vo
@@ -37,22 +37,22 @@ BEGIN
     'SYNTHETIC TEACHER: That comparison can help identify omissions and perspective.')
  ) v(course_code,subject,prompt,teacher_text,jordan_text,reply_text)
  LOOP
-   SELECT c.id INTO class_id
+   SELECT c.id INTO v_class_id
    FROM public.classes c JOIN public.course_versions cv ON cv.id=c.course_version_id
    JOIN public.courses co ON co.id=cv.course_id
    WHERE c.site_id=vs AND c.state='active' AND co.course_code=rec.course_code;
-   IF class_id IS NULL THEN RAISE EXCEPTION 'Missing native Class for %',rec.course_code; END IF;
-   IF NOT EXISTS (SELECT 1 FROM public.class_enrollments e WHERE e.class_id=class_id
+   IF v_class_id IS NULL THEN RAISE EXCEPTION 'Missing native Class for %',rec.course_code; END IF;
+   IF NOT EXISTS (SELECT 1 FROM public.class_enrollments e WHERE e.class_id=v_class_id
       AND e.learner_person_id=j AND e.status='active' AND e.course_attempt_id IS NOT NULL)
-   OR NOT EXISTS (SELECT 1 FROM public.class_staff_assignments st WHERE st.class_id=class_id
+   OR NOT EXISTS (SELECT 1 FROM public.class_staff_assignments st WHERE st.class_id=v_class_id
       AND st.person_id=r AND st.role_code='teacher' AND st.state='approved')
    THEN RAISE EXCEPTION 'Class Person authorization provenance absent for %',rec.course_code; END IF;
    thread_id:=md5('valor-v61:class-discussion:'||rec.course_code)::uuid;
    INSERT INTO public.communication_threads
     (id,subject,context_type,context_id,created_by_person_id,metadata,last_message_at)
-   VALUES(thread_id,rec.subject,'class',class_id,r,
+   VALUES(thread_id,rec.subject,'class',v_class_id,r,
      jsonb_build_object('synthetic',true,'demoOnly',true,'noExternalDelivery',true,
-       'fixture','valor-v61-class-discussions','classId',class_id,
+       'fixture','valor-v61-class-discussions','classId',v_class_id,
        'courseCode',rec.course_code,'kind','class_discussion',
        'participantAuthorization','current_class_membership',
        'notPublic',true),
