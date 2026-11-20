@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { getMyNativeClassCalendar } from "@/modules/classes/native-class-calendar.functions";
+import { classSessionCalendarUid, renderCalendarInvitation } from "@/domain/calendar-invitations";
+import { downloadBlob } from "@/lib/download";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { StatusBadge, MutationFeedback } from "@/components/workspace";
@@ -13,6 +16,29 @@ import { creditName, type EnrolledClass, type Item } from "./types";
 
 export function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onChanged:()=>Promise<void>;destinations:Item[]}){
   const [confirm,setConfirm]=useState(false);
+  const [calendarBusy,setCalendarBusy]=useState(false);
+  const [calendarError,setCalendarError]=useState<string|null>(null);
+  async function downloadCalendar(){
+    if(calendarBusy||item.status!=="active")return;
+    setCalendarBusy(true);setCalendarError(null);
+    try{
+      const snapshot=await getMyNativeClassCalendar({data:{classEnrollmentId:item.classEnrollmentId}});
+      if(!snapshot.sessions.length){
+        setCalendarError("No upcoming Class Sessions are scheduled yet.");
+        return;
+      }
+      const body=renderCalendarInvitation(snapshot.sessions.map(session=>({
+        uid:classSessionCalendarUid(session.id),
+        summary:snapshot.classTitle,
+        description:"Sign in to CAN OS My Classes for meeting access and learning materials.",
+        startsAt:new Date(session.startsAt),endsAt:new Date(session.endsAt),
+      })),"REQUEST");
+      downloadBlob(new Blob([body],{type:"text/calendar;charset=utf-8"}),
+        "can-os-class-schedule.ics");
+    }catch{
+      setCalendarError("The verified Class schedule could not be exported. Please try again.");
+    }finally{setCalendarBusy(false);}
+  }
   const mutation=useMutationFeedback(onChanged);
   const busy=mutation.pending||mutation.refreshFailed;
   const [transferVersion,setTransferVersion]=useState("");
@@ -69,6 +95,14 @@ export function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledCl
         className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
         Open Class
       </Link>}
+    {item.status==="active"&&["scheduled","facilitated","hybrid"].includes(item.deliveryMode)&&
+      <div className="mt-3">
+        <Button type="button" size="sm" variant="outline" disabled={calendarBusy}
+          onClick={()=>void downloadCalendar()}>
+          {calendarBusy?"Preparing calendar…":"Download Class schedule (.ics)"}
+        </Button>
+        {calendarError&&<p role="status" className="mt-2 text-sm text-muted-foreground">{calendarError}</p>}
+      </div>}
     {item.status==="active"&&eligibleDestinations.length>0&&
       <details className="mt-4 border border-border p-3">
         <summary className="cursor-pointer text-sm font-semibold">Transfer to another Class</summary>

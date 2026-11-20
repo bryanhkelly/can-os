@@ -52,6 +52,26 @@ export default {
         });
       }));
     }
+    // Class participant mail uses the same durable claim/lease protocol as the
+    // Node maintenance runner. Duplicate cron invocations cannot claim one receipt.
+    if(env.DATABASE_URL){
+      ctx.waitUntil(withRequestDatabase(
+        async()=>{
+          const {processClassParticipantDeliveries}=await import(
+            "./modules/classes/class-participant-delivery.server"
+          );
+          return processClassParticipantDeliveries();
+        },
+        env.DATABASE_URL,
+      ).then(result=>{
+        if(result.accepted||result.failed||result.suppressed)
+          console.info("CAN Class participant delivery dispatch",result);
+      }).catch(error=>{
+        console.error("CAN Class participant delivery dispatch failed",{
+          type:error instanceof Error?error.name:"unknown",
+        });
+      }));
+    }
     // Independent of photography. A Neon transaction lease prevents more
     // than one actual cleanup per 24 hours on the once-a-minute Worker cron.
     if(env.CAN_SESSION_DEVICE_RETENTION_ENABLED==="1"){
