@@ -20,6 +20,10 @@ const keyFor = (student: Student) => student.programId + ":" + student.studentPr
 export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: string }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const pendingMutationIds = useRef(new Map<string, string>());
+  const requestSequence = useRef(0);
+  // A child selection can change before an earlier response settles.
+  const activeStudentPersonId = useRef(studentPersonId);
+  activeStudentPersonId.current = studentPersonId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -32,27 +36,42 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   const [revocationReasons, setRevocationReasons] = useState<Record<string, string>>({});
   const [holdReasons, setHoldReasons] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (propagateFailure = false) => {
+    const request = ++requestSequence.current;
     setLoading(true);
     setError("");
+    setWorkspace(null); // Never offer previous-child authorizations as current.
     try {
-      setWorkspace(await getGuardianPickupWorkspace({ data: { studentPersonId } }));
+      const next = await getGuardianPickupWorkspace({ data: { studentPersonId } });
+      if (request !== requestSequence.current ||
+          studentPersonId !== activeStudentPersonId.current) {
+        if (propagateFailure) throw new Error("Pickup authority context changed; retry refresh.");
+        return;
+      }
+      setWorkspace(next);
     } catch (cause) {
-      setWorkspace(null);
-      setError(mutationErrorMessage(cause, "Unable to load pickup authority"));
-      throw cause;
+      if (request === requestSequence.current &&
+          studentPersonId === activeStudentPersonId.current) {
+        setWorkspace(null);
+        setError(mutationErrorMessage(cause, "Unable to load pickup authority"));
+      }
+      // An automatic load reports errors in the panel. A post-command refresh
+      // must reject so mutation feedback blocks further custody changes.
+      if (propagateFailure) throw cause;
     } finally {
-      setLoading(false);
+      if (request === requestSequence.current &&
+          studentPersonId === activeStudentPersonId.current) setLoading(false);
     }
   }, [studentPersonId]);
-  const mutation = useMutationFeedback(load);
+  const mutation = useMutationFeedback(() => load(true));
   const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
     setNotice("");
     // Different guardian / child selection must not inherit a pending request.
     pendingMutationIds.current.clear();
-    void load().catch(() => {});
+    void load();
+    return () => { requestSequence.current++; };
   }, [load]);
 
   async function run(key: string, message: string, command: (mutationId: string) => Promise<unknown>) {
