@@ -20,10 +20,15 @@ import { NoncreditPilotOutcomesPanel } from "@/components/learning/NoncreditPilo
 import { NoncreditTrainingReadiness } from "@/components/enrollment/NoncreditTrainingReadiness";
 
 export const Route=createFileRoute("/programs/noncredit/enrollment")({
-  validateSearch:(search:Record<string,unknown>):{publicSiteId?:string}=>({
+  validateSearch:(search:Record<string,unknown>):{publicSiteId?:string;offeringCode?:string}=>({
     publicSiteId:typeof search.publicSiteId==="string"&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.publicSiteId)
       ?search.publicSiteId:undefined,
+    // Navigation hint only; publication still selects a server-authorized
+    // candidate and revalidates all Site, Offering and provider grants.
+    offeringCode:typeof search.offeringCode==="string"&&
+      /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(search.offeringCode)
+      ?search.offeringCode:undefined,
   }),
   component:NoncreditPublicationPage,
 });
@@ -37,7 +42,7 @@ function candidateKey(candidate:Candidate){
 /** Actual provider enrollment release, not the Capability Lab prototype. */
 function NoncreditPublicationPage(){
   const client=useQueryClient();
-  const {publicSiteId}=Route.useSearch();
+  const {publicSiteId,offeringCode}=Route.useSearch();
   const preferredSiteId=publicSiteId??null;
   const query=useQuery({queryKey:["noncredit-publisher-releases"],
     queryFn:()=>getNoncreditEnrollmentPublisher(),retry:false,staleTime:15_000});
@@ -55,9 +60,10 @@ function NoncreditPublicationPage(){
   const [created,setCreated]=useState("");
   const [managedRelease,setManagedRelease]=useState<string|null>(null);
   const candidates=(query.data?.candidates??[]).filter(candidate=>
-    !publicSiteId||(preferredSiteId!==null&&[
+    (!offeringCode||candidate.offeringCode===offeringCode)&&
+    (!publicSiteId||(preferredSiteId!==null&&[
       ...candidate.siteOptions,...candidate.digitalSiteOptions,
-    ].some(site=>site.id===preferredSiteId)));
+    ].some(site=>site.id===preferredSiteId))));
   const selected=candidates.find(item=>candidateKey(item)===choice);
   const valid=selected&&opensAt&&closesAt&&maxParticipants&&additionalSites.length<=49&&consentVersion.trim().length>=3&&
     consentText.trim().length>=25&&siteId&&
@@ -111,6 +117,9 @@ function NoncreditPublicationPage(){
         Only training approved for this exact Site by the signed-in publisher
         can be selected. Publication and enrollment still require current
         Course, Deployment, capacity and registration authority.</p>
+      {offeringCode&&<p className="mt-2 text-xs text-muted-foreground">
+        Filtering authorized results to Offering {offeringCode}. This link does not approve or publish it.
+      </p>}
     </section>}
     {query.isPending&&<p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your provider-scoped training and deployment authority…</p>}
     {query.isError&&<p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
