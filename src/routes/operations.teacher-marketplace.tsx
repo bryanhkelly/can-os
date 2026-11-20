@@ -116,7 +116,7 @@ function TeacherMarketplacePage() {
               ? teacher.eligibleSectionIds.includes(selection)
               : eligibleSections.length > 0;
             return <article key={teacher.personId} className="space-y-2  border p-3">
-            <p className="font-semibold">{teacher.isSynthetic ? teacher.name : <Link to="/profiles" search={{person:teacher.personId}} className="underline underline-offset-2">{teacher.name}</Link>}{teacher.isSynthetic && <span className="text-xs font-normal text-muted-foreground"> · Sample profile</span>}</p>
+            <p className="font-semibold"><Link to="/profiles" search={{person:teacher.personId}} className="underline underline-offset-2">{teacher.name}</Link></p>
             <p className="text-sm text-muted-foreground">{teacher.modality.replaceAll("_", " ")} · Offered capacity: {teacher.indicativeSeatCapacity} seats</p>
             {teacher.isSynthetic && <p className="text-xs text-muted-foreground">
               Sample profiles are preview data and cannot be engaged as instructors.
@@ -152,7 +152,7 @@ function TeacherMarketplacePage() {
         <p className="text-sm">{previews?.teachers.length ?? 0} sample teachers available to preview</p>
         <div className="grid gap-3 md:grid-cols-2">
           {previews?.teachers.filter(teacher=>!search || [teacher.name,...teacher.courses.map(course=>course.title),...teacher.courses.map(course=>course.subject)].some(value=>value.toLowerCase().includes(search))).map(teacher=><article key={teacher.personId} className=" border p-3">
-            <p className="font-semibold">{teacher.name} · Sample profile</p>
+            <p className="font-semibold"><Link to="/profiles" search={{person:teacher.personId}} className="underline underline-offset-2">{teacher.name}</Link></p>
             <p className="text-sm text-muted-foreground">{teacher.courses.length} illustrative course matches</p>
             <p className="text-sm">{[...new Set(teacher.courses.map(course=>course.subject))].join(", ")}</p>
           </article>)}
