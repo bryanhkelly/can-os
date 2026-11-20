@@ -111,6 +111,12 @@ for (const file of files) {
 }
 
 const owners = [
+  ["src/routes/groups.tsx", [
+    "pendingRequests.map(({ group, member }) => (",
+    "openReports.map(({ group, report }) => (",
+  ]],
+  ["src/components/groups/GroupMembersPanel.tsx", ["group.pendingMembers.map(member => <div"]],
+  ["src/components/groups/GroupReportsPanel.tsx", ["group.reports.map(report => <div"]],
   ["src/components/learning/NativeClassSessionsPanel.tsx", ['form onSubmit={e=>void createMeetings(e)}', 'name={"native-schedule-"+workspace.classId}']],
   ["src/routes/groups_.$groupId.tsx", [
     "function GroupOverviewPanel(", "function GroupDetailsPanel(",
