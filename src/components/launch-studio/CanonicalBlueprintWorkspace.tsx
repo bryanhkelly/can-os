@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/workspace";
 import { BlueprintReviewHistoryPanel } from "./BlueprintReviewHistoryPanel";
 import { BlueprintComponentPicker } from "./BlueprintComponentPicker";
+import { BlueprintReferencesPicker } from "./BlueprintReferencesPicker";
 import { readableBlueprintKey as readable } from "@/domain/blueprint-display";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -537,35 +538,15 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
             selected={selectedComponents} disabled={editingDisabled}
             onToggle={(componentId,checked)=>setSelectedComponents(current=>
               checked?[...current,componentId]:current.filter(id=>id!==componentId))}/>
-          {enableReferences && referenceCatalog.length > 0 && selectedTemplate.components
-            .filter(component => selectedComponents.includes(component.id))
-            .map(component => {
-              const available = referenceCatalog.filter(reference =>
-                reference.kind === component.kind
-              );
-              if (!available.length) return null;
-              return <fieldset key={component.id} className="border p-4" disabled={editingDisabled}>
-                <legend className="px-2 font-semibold">
-                  {readable(component.key)} · curated references
-                </legend>
-                <div className="mt-2 grid max-h-52 gap-3 overflow-y-auto sm:grid-cols-2">
-                  {available.map(reference => <Label key={reference.versionId}
-                    className="flex items-start gap-3 text-sm">
-                    <Checkbox className="mt-1"
-                      checked={(selectedReferences[component.id] ?? []).includes(reference.versionId)}
-                      onChange={event => setSelectedReferences(current => {
-                        const before = current[component.id] ?? [];
-                        return { ...current, [component.id]: event.target.checked
-                          ? [...before, reference.versionId]
-                          : before.filter(id => id !== reference.versionId) };
-                      })}/>
-                    <span><strong className="block">{reference.title}</strong>
-                      <span className="text-muted-foreground">{reference.summary}</span>
-                    </span>
-                  </Label>)}
-                </div>
-              </fieldset>;
-            })}
+          <BlueprintReferencesPicker enabled={enableReferences}
+            components={selectedTemplate.components} selected={selectedComponents}
+            catalog={referenceCatalog} selectedReferences={selectedReferences}
+            disabled={editingDisabled}
+            onToggle={(componentId,versionId,checked)=>setSelectedReferences(current=>{
+              const existing=current[componentId]??[];
+              return {...current,[componentId]:checked
+                ? [...existing,versionId]:existing.filter(id=>id!==versionId)};
+            })}/>
           {enableReferences && editableProgramComponents.length > 0 &&
             <BlueprintOfferingAdoptionPicker
               siteId={siteId}
