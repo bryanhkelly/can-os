@@ -50,3 +50,15 @@ Changing these components does not apply a migration or modify a production data
 
 ## Interest Events Site-scoping correction
 The existing Program-linked Interest Events workspace now filters its Program chooser by the exact Site from Launch Studio and never submits a Program belonging to a different selected Site. A dedicated regression test covers multiple authorized Sites and empty Site scope. The server remains authoritative.
+
+## Continued integration: saved-package operational handoffs
+
+- An active, saved interest-invitation Package has a direct, exact-Site handoff to the existing family invitation screen. The subject and introduction are editable; no recipient, consent, or Program authorization is inferred from the Package. The full saved headline and message are screened for protected claims before any email-subject shortening.
+- An active event-invitation Package has the same configured handoff pattern into the existing Program-linked Interest Events creation screen. Both the headline and description are editable starting points; date, timezone, location, registration and authorization still belong to the event service.
+- Invalid, archived or cross-Site package references fail rather than silently substituting a different Site's package or editorial content. Interest Event requests also reject mismatched explicit Program selections.
+- The new Interest Event form retains its server idempotency request key after uncertain delivery failures and rotates it only after an acknowledged create.
+- Brand-before-marketing is enforced at the new-package UI and canonical preopening family invitation queue **and** delivery boundaries. A failed Brand read can be retried in the library; application invitations retain their separate institutional authorization. Emails sent through the existing family service use the current saved Site Brand, while separately generated immutable Marketing Package releases keep their selected Brand version.
+- The Site-first private preview returns to Launch Studio for authorized registrar readers; the separately authorized Website & Brand preview returns to its Review & Finish step.
+- Focused loader tests now exercise package references, multiple Sites, eligibility, protected claims and preservation of family invitation consent boundaries. These tests have been added but cannot be reported as passing until a real test run.
+
+No changes were made to collateral update semantics, schema migrations, live distribution systems or main.
