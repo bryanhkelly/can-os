@@ -312,11 +312,12 @@ disclosure limits, server filtering, reporting scope and the data itself.
 Use `DirectoryTable` for record lists with sorting, permitted actions,
 selection or pagination. Reuse the low-level table family for fixed-column
 reporting and source metadata rather than adding directory affordances.
-The current migrated evidence panels have **seven read-only tables** across
-Noncredit Network, Native Class, Noncredit Pilot and Noncredit Provider reports.
+The current migrated read-only screens have **ten tables** across
+Noncredit Network, Native Class, Noncredit Pilot, Noncredit Provider,
+facilitated-impact reporting, workflow transitions, and student rubric views.
 
 `can-os-design/no-native-feature-tables` warns across production TSX and
-is an error for those four migrated reporting panels. Complex legacy
+is an error for the seven migrated reporting, workflow and rubric components. Complex legacy
 gradebook and assessment grids are not silently converted: retain their
 functional behavior until interaction, keyboard and source-of-truth
 acceptance is available. Storybook reports/table fixtures include mobile,
