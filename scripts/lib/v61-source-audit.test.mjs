@@ -33,6 +33,20 @@ test("AST ignores JSX-like comments and literal text; hidden inputs remain nativ
   assert.equal(result.syntaxErrors.length, 0);
 });
 
+test("full-card checkbox/radio labels are deliberate accessible wrappers, not migration debt", () => {
+  const source = [
+    "export const Options = () => <section>",
+    "  <label><Checkbox name='approval'/> Agree</label>",
+    "  <label><Radio name='level' value='beginner'/> Beginner</label>",
+    "  <label><Input type='text'/> Invalid text-input wrapper</label>",
+    "  <label><Input type='checkbox'/> Canonical Input is not the choice primitive</label>",
+    "</section>;",
+  ].join("\n");
+  const result = analyzeSource(source, "/demo/src/components/feature/Options.tsx");
+  assert.deepEqual(result.native.map(node => node.tag), ["label", "label"]);
+  assert.equal(result.syntaxErrors.length, 0);
+});
+
 test("routes and reachable components are discovered, without route manifests", () => temp(({ root, write }) => {
   write("src/routes/home.tsx", 'import { Widget } from "@/components/cards"; export const Page = () => <Widget/>;');
   write("src/routes/old.tsx", 'export const Page = () => <button className="rounded-xl">Legacy</button>;');
