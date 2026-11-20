@@ -52,5 +52,5 @@ export function StudentUpcomingAssignments({
               ? "No assignments match this filter." : "No published coursework in your current classes."}</p>}
             {visible.length > 5 && <p className="p-3 text-xs text-muted-foreground">Showing 5 of {visible.length}. Open all assignments for the complete list.</p>}
           </div>}
-        </Dashboa;
+        </DashboardPanel>;
 }
