@@ -52,10 +52,10 @@ function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
         setModel(null);
         setError(mutationErrorMessage(cause, "Unable to read evidence"));
       }
-      throw cause;
+      // The loader reports failures through the visible error state.
     } finally { if (request === requestSequence.current) setLoading(false); }
   }, [seasonId]);
-  useEffect(() => { void load().catch(() => {}); return () => { requestSequence.current++; }; }, [load]);
+  useEffect(() => { void load(); return () => { requestSequence.current++; }; }, [load]);
   async function changed() {
     const result = await readExtendedEvidenceFn({ data: { seasonId } });
     setModel(result);
@@ -68,7 +68,7 @@ function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
       Scheduled sessions must also have currently active, assigned onsite staff.
       Expired or superseded evidence blocks new registrations immediately.
     </p>
-    <Button variant="ghost" type="button" className="mt-2 text-xs underline" onClick={() => void load().catch(() => {})} disabled={loading}>
+    <Button variant="ghost" type="button" className="mt-2 text-xs underline" onClick={() => void load()} disabled={loading}>
       {loading ? "Refreshing…" : "Refresh evidence"}
     </Button>
     {error && <p role="alert" className="mt-2 text-xs">{error}</p>}
