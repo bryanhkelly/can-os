@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { siteProgramSelectionSchema } from "@/lib/route-search";
-import { ScopedAdminConsole } from "@/routes/admin";
+import { ScopedAdminConsole } from "@/components/operations/ScopedAdminConsole";
 
 export const Route = createFileRoute("/admin_/people")({
   validateSearch: (search: Record<string, unknown>) => siteProgramSelectionSchema.pick({ siteId: true }).parse(search),
