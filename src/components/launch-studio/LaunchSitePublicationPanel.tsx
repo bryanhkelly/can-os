@@ -48,6 +48,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
     setPublicationSnapshot(null);
     try {
       const result = await readLaunchSitePublication({ data: { siteId } });
+      if (result.siteId !== siteId)
+        throw new Error("The Site publication reader returned an unexpected Site.");
       if (current !== requestId.current || activeSiteId.current !== siteId) {
         if (propagateFailure) throw new Error("Publication context changed. Reload this Site.");
         return;
@@ -107,11 +109,15 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
       setReachability(null);
       await load(true);
     } catch (cause) {
-      if (activeSiteId.current === siteId)
+      if (activeSiteId.current === siteId) {
+        // A rejected transport response might still represent a committed
+        // publication change. Do not expose another write until reconciled.
+        setPublicationSnapshot(null);
         setError(commandAccepted
           ? "The publication decision was saved, but the current Site state could not be verified. Reload and reconcile before any further publication action."
           : normalizeClientError(cause,
             "Publication could not be confirmed. Reload the Site before retrying.").message);
+      }
     } finally { setBusy(false); }
   }
 
@@ -133,10 +139,13 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
         setError("The website copy contains protected claims that require independent review.");
       }
     } catch (cause) {
-      if (activeSiteId.current === siteId)
+      if (activeSiteId.current === siteId) {
+        setPublicationSnapshot(null);
         setError(commandAccepted
           ? "The website copy review was saved, but its current status could not be verified. Reload and reconcile before taking another action."
-          : normalizeClientError(cause, "Website copy review could not be confirmed.").message);
+          : normalizeClientError(cause,
+            "Website copy review could not be confirmed. Reload the Site before retrying.").message);
+      }
     } finally { setBusy(false); }
   }
 
