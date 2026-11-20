@@ -17,7 +17,7 @@ export function EngagementNextSteps({ journey }: { journey: EngagementJourney })
   const destination = choice?.action === "information"
     ? engagementInformationHref(journey, choice)
     : choice ? engagementContactHref(journey, choice, search) : "";
-  return <PageFrame width="wide" className="mx-auto max-w-screen-xl px-5 py-12 sm:px-8 lg:py-20">
+  return <PageFrame width="wide" className="mx-auto max-w-screen-xl px-[var(--page-gutter)] py-12 lg:py-20">
     <a href={engagementLocalHref(`/landing/${journey.id}`, search)}
       className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary hover:underline">
       <ArrowLeft className="size-4"/> Back to {journey.audience.toLowerCase()}
