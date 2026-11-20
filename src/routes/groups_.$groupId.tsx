@@ -2,40 +2,22 @@ import { useEffect, useState, type KeyboardEvent } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
-import { dateTimeInputValue, formatTimestamp } from "@/modules/calendar/timezone";
-import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
-  ActionDialog, EmptyState, LocalDateTimeField, MutationFeedback, PageFrame,
-  PageEyebrow, PageTitle, RecordHeader, RecordLayout, StatusBadge, WorkspaceNotice,
-  WorkspacePanel, secondaryActionClassName, useUnsavedChangesGuard,
+  MutationFeedback, PageFrame, PageEyebrow, PageTitle, RecordHeader,
+  RecordLayout, StatusBadge, WorkspaceNotice, secondaryActionClassName,
 } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
-import { DiscussionComposer } from "@/components/learning/DiscussionComposer";
-import { Checkbox } from "@/components/ui/choice";
-import { Label } from "@/components/ui/label";
-import { Field, FieldError } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { groupSessionSelectionSchema } from "@/lib/route-search";
 import { Users } from "lucide-react";
-import {
-  getCanonicalGroupWorkspace, getStudyGroupAvailability,
-} from "@/modules/study-groups/canonical-workspace.functions";
-import {
-  decideCanonicalGroupMembership, inviteCanonicalGroupMembers,
-  leaveCanonicalGroup, listCanonicalGroupInvitees, requestCanonicalGroupMembership,
-} from "@/modules/study-groups/canonical-membership.functions";
-import {
-  createCanonicalGroupPost, reportCanonicalGroupPost, resolveCanonicalGroupReport,
-} from "@/modules/study-groups/canonical-moderation.functions";
-import {
-  createCanonicalGroupSession, recordCanonicalGroupAttendance,
-  reviseCanonicalGroupSession, rsvpCanonicalGroupSession,
-} from "@/modules/study-groups/canonical-sessions.functions";
+import { getCanonicalGroupWorkspace, getStudyGroupAvailability } from "@/modules/study-groups/canonical-workspace.functions";
 import { groupKindLabel, nextGroupSession } from "@/domain/study-group-display";
 import { GroupOverviewPanel, GroupDetailsPanel, GroupResourcesPanel } from "@/components/groups/GroupInformationPanels";
 import { GroupSessionsPanel } from "@/components/groups/GroupSessionsPanel";
+import { GroupStudentMembershipPanel } from "@/components/groups/GroupStudentMembershipPanel";
+import { GroupDiscussionPanel } from "@/components/groups/GroupDiscussionPanel";
+import { GroupMembersPanel } from "@/components/groups/GroupMembersPanel";
+import { GroupReportsPanel } from "@/components/groups/GroupReportsPanel";
 
 const sessionSearchSchema = groupSessionSelectionSchema.pick({ session: true });
 const loadGroupDetail = async () => {
@@ -54,9 +36,6 @@ export const Route = createFileRoute("/groups_/$groupId")({
 
 type Data = Awaited<ReturnType<typeof loadGroupDetail>>;
 type Workspace = NonNullable<Data["workspace"]>;
-type Group = Workspace["groups"][number];
-type Availability = Data["availability"];
-type Run = (work: () => Promise<unknown>, message: string) => Promise<void>;
 
 function GroupDetailPage() {
   const outcome = Route.useLoaderData();
@@ -180,7 +159,7 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
         </section>
         <section id="group-panel-discussion" role="tabpanel" aria-labelledby="group-tab-discussion" tabIndex={0}
           hidden={activeTab !== "discussion"}>
-          <DiscussionPanel group={group} role={role} availability={availability}
+          <GroupDiscussionPanel group={group} role={role} availability={availability}
             approvedMember={approvedMember} busy={busy} run={run} mutation={mutation} />
         </section>
         <section id="group-panel-resources" role="tabpanel" aria-labelledby="group-tab-resources" tabIndex={0}
@@ -195,225 +174,10 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
       </>}
       rail={<>
         <GroupDetailsPanel group={group} />
-        {role === "student" && <StudentMembershipPanel group={group} availability={availability}
+        {role === "student" && <GroupStudentMembershipPanel group={group} availability={availability}
           hasEnrollmentGuardian={workspace.hasEnrollmentGuardian} busy={busy} run={run} />}
-        {role === "teacher" && <MembersPanel group={group} availability={availability} busy={busy} run={run} />}
-        {role === "teacher" && <ReportsPanel group={group} availability={availability} busy={busy} run={run} />}
+        {role === "teacher" && <GroupMembersPanel group={group} availability={availability} busy={busy} run={run} />}
+        {role === "teacher" && <GroupReportsPanel group={group} availability={availability} busy={busy} run={run} />}
       </>} />
   </PageFrame>;
-}
-
-function StudentMembershipPanel({ group, availability, hasEnrollmentGuardian, busy, run }: {
-  group: Group; availability: Availability;
-  hasEnrollmentGuardian: boolean | null; busy: boolean; run: Run;
-}) {
-  const status = group.membershipStatus;
-  return <WorkspacePanel title="Your membership"
-    description="Participation requires guardian permission and facilitator approval.">
-    <div className="space-y-3">
-      {hasEnrollmentGuardian === false && <WorkspaceNotice tone="danger">
-        A linked guardian is required to request study group membership. Ask your school to verify your guardian relationship.
-      </WorkspaceNotice>}
-      {status === "pending" && <WorkspaceNotice>
-        Participation requires current guardian permission and facilitator approval. Check with your guardian and facilitator about this pending request.
-      </WorkspaceNotice>}
-      {status !== "approved" && status !== "pending" && <WorkspaceNotice>
-        Request membership to access group discussions and sessions.
-      </WorkspaceNotice>}
-      <div className="flex flex-wrap gap-2">
-        {!status || status === "left" || status === "declined"
-          ? <Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled || hasEnrollmentGuardian !== true}
-              onClick={() => void run(() => requestCanonicalGroupMembership({ data: { groupId: group.id } }),
-                "Membership requested. A guardian and the facilitator must approve.")}>Request to join</Button>
-          : <Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled}
-              onClick={() => void run(() => leaveCanonicalGroup({ data: { groupId: group.id } }),
-                status === "pending" ? "Membership request withdrawn." : "You left the study group.")}>
-              {status === "pending" ? "Withdraw request" : "Leave group"}</Button>}
-      </div>
-    </div>
-  </WorkspacePanel>;
-}
-
-function DiscussionPanel({ group, role, availability, approvedMember, busy, run, mutation }: {
-  group: Group; role: Workspace["role"]; availability: Availability;
-  approvedMember: boolean; busy: boolean; run: Run;
-  mutation: ReturnType<typeof useMutationFeedback>;
-}) {
-  const [draft, setDraft] = useState("");
-  const [report, setReport] = useState<{ postId: string; body: string } | null>(null);
-  const [reportReason, setReportReason] = useState("");
-  // This panel remains mounted across tabs; preserve typed messages and
-  // prevent leaving the group before unsent student content is posted.
-  useUnsavedChangesGuard(approvedMember && (draft.trim().length > 0 || (report !== null && reportReason.trim().length > 0)));
-  if (!approvedMember) return <WorkspacePanel title="Group discussion">
-    <WorkspaceNotice>Discussions are visible to approved group members.</WorkspaceNotice>
-  </WorkspacePanel>;
-  return <WorkspacePanel title="Group discussion"
-    description="Posts are visible to approved group members. Report unsafe or inappropriate content for facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly.">
-    <div className="space-y-3">
-      {group.posts.map(post => <div key={post.id} className="border p-3">
-        <p className="text-sm whitespace-pre-wrap">{post.body}</p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {formatTimestamp(post.createdAt, group.timezone)}
-        </p>
-        {role === "student" && <Button variant="ghost" size="sm" type="button"
-          disabled={busy || !availability.contentEnabled}
-          onClick={() => { setReport({ postId: post.id, body: post.body }); setReportReason(""); }}>
-          Report</Button>}
-      </div>)}
-      {group.posts.length === 0 && <p className="text-sm text-muted-foreground">No posts yet.</p>}
-      <DiscussionComposer value={draft} onChange={setDraft} label="New post"
-        placeholder="Share a question or a study tip" maxLength={3000}
-        submitLabel="Post message" pending={mutation.pending} disabled={busy || !availability.contentEnabled}
-        onSubmit={body => void run(async () => {
-          await createCanonicalGroupPost({ data: { groupId: group.id, body } });
-          setDraft(previous => previous === body ? "" : previous);
-        }, "Post shared with your group.")} />
-    </div>
-    {report && <ActionDialog open title="Report study group post"
-      description="Explain why this post needs facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly."
-      confirmLabel="Send report" pending={mutation.pending} pendingLabel="Sending report…"
-      confirmDisabled={busy || !availability.contentEnabled || reportReason.trim().length < 5}
-      onClose={() => { setReport(null); setReportReason(""); }}
-      onConfirm={() => void mutation.run(() => reportCanonicalGroupPost({ data: {
-        groupId: group.id, postId: report.postId, reason: reportReason,
-      } }), {
-        successMessage: "Your report was sent for facilitator review.",
-        commandErrorMessage: "Unable to report this post.",
-      }).then(outcome => {
-        if (outcome.status === "saved" || outcome.status === "refresh-failed") { setReport(null); setReportReason(""); }
-      })}>
-      <blockquote className="border bg-muted p-3 text-sm whitespace-pre-wrap">{report.body}</blockquote>
-      <Field label="Reason for reporting" className="text-sm" required>
-        <Textarea required minLength={5} maxLength={1000} value={reportReason}
-          onChange={event => setReportReason(event.target.value)} />
-      </Field>
-      <MutationFeedback state={mutation} pendingMessage="Sending report..." />
-    </ActionDialog>}
-  </WorkspacePanel>;
-}
-
-function MembersPanel({ group, availability, busy, run }: {
-  group: Group; availability: Availability; busy: boolean; run: Run;
-}) {
-  const [inviting, setInviting] = useState(false);
-  const [selectedInviteeIds, setSelectedInviteeIds] = useState<string[]>([]);
-  const [inviteAttempted, setInviteAttempted] = useState(false);
-  const [inviteeLoad, setInviteeLoad] = useState<{
-    loaded: boolean;
-    invitees: Awaited<ReturnType<typeof listCanonicalGroupInvitees>>;
-    error: string;
-  }>({ loaded: false, invitees: [], error: "" });
-  useEffect(() => {
-    let active = true;
-    if (!inviting) return () => { active = false; };
-    setInviteeLoad({ loaded: false, invitees: [], error: "" });
-    listCanonicalGroupInvitees({ data: { groupId: group.id } })
-      .then(invitees => { if (active) setInviteeLoad({ loaded: true, invitees, error: "" }); })
-      .catch(error => {
-        if (active) setInviteeLoad({
-          loaded: true, invitees: [],
-          error: mutationErrorMessage(error, "Unable to load eligible students."),
-        });
-      });
-    return () => { active = false; };
-  }, [inviting, group.id]);
-  return <WorkspacePanel title="Members and invitations"
-    description="Invited students still need guardian permission and facilitator approval to join."
-    actions={<Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled}
-      onClick={() => { setSelectedInviteeIds([]); setInviteAttempted(false); setInviting(open => !open); }}>
-      {inviting ? "Close invitations" : "Invite students"}</Button>}>
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">Pending requests</h3>
-        {group.pendingMembers.map(member => <div key={member.id}
-          className="mt-2 flex flex-wrap items-center justify-between gap-3 border p-3">
-          <div>
-            <p className="text-sm font-medium">{member.studentName}</p>
-            <p className="text-xs text-muted-foreground">
-              {member.guardianReady ? "Guardian permission recorded" : "Awaiting guardian permission"}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled}
-              onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
-                groupId: group.id, studentPersonId: member.studentPersonId, approve: false,
-              } }), "Membership declined.")}>Decline</Button>
-            <Button variant="default" size="sm" type="button" disabled={busy || !availability.membershipEnabled || !member.guardianReady}
-              onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
-                groupId: group.id, studentPersonId: member.studentPersonId, approve: true,
-              } }), "Membership approved.")}>Approve</Button>
-          </div>
-        </div>)}
-        {group.pendingMembers.length === 0 &&
-          <p className="mt-2 text-xs text-muted-foreground">No pending memberships.</p>}
-      </div>
-      {inviting && <form noValidate className="space-y-3 border p-4" onSubmit={event => {
-        event.preventDefault();
-        setInviteAttempted(true);
-        if (!selectedInviteeIds.length) return;
-        void run(async () => {
-          await inviteCanonicalGroupMembers({ data: {
-            groupId: group.id, studentPersonIds: selectedInviteeIds,
-          } });
-          setSelectedInviteeIds([]); setInviting(false); setInviteAttempted(false);
-        }, "Invitations sent. Students still need guardian permission and facilitator approval to join.");
-      }}>
-        <p className="text-xs text-muted-foreground">
-          Invitations notify students; they must request membership before joining.
-        </p>
-        {!inviteeLoad.loaded && <p role="status" className="text-xs text-muted-foreground">Loading eligible students...</p>}
-        {inviteeLoad.error && <p role="alert" className="text-xs text-destructive">{inviteeLoad.error}</p>}
-        {inviteeLoad.loaded && !inviteeLoad.error && inviteeLoad.invitees.length === 0 &&
-          <p className="text-xs text-muted-foreground">No eligible students are available to invite.</p>}
-        {inviteeLoad.invitees.map(student => <Label key={student.personId} className="flex min-h-10 items-center gap-3 border border-border bg-card px-3 py-2">
-          <Checkbox disabled={busy} checked={selectedInviteeIds.includes(student.personId)}
-            onChange={event => setSelectedInviteeIds(ids => event.target.checked
-              ? [...ids, student.personId]
-              : ids.filter(id => id !== student.personId))} />
-          <span>{student.firstName} {student.lastName}</span>
-        </Label>)}
-        {inviteAttempted && !selectedInviteeIds.length &&
-          <FieldError>Select at least one student to invite.</FieldError>}
-        <Button type="submit" disabled={busy || !inviteeLoad.loaded}>
-          {busy ? "Sending invitations..." : "Send invitations"}
-        </Button>
-      </form>}
-      <div>
-        <h3 className="text-sm font-semibold">Members</h3>
-        <ul className="mt-2 space-y-1">
-          {group.roster.map(student => <li key={student.personId} className="text-sm">{student.studentName}</li>)}
-        </ul>
-        {group.roster.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No approved members yet.</p>}
-      </div>
-    </div>
-  </WorkspacePanel>;
-}
-
-function ReportsPanel({ group, availability, busy, run }: {
-  group: Group; availability: Availability; busy: boolean; run: Run;
-}) {
-  return <WorkspacePanel title="Content reports"
-    description="Open reports for this group's discussion.">
-    <div className="space-y-3">
-      {group.reports.map(report => <div key={report.id} className="border p-3">
-        <p className="text-sm">Reason: {report.reason}</p>
-        <blockquote className="mt-2 border bg-muted p-3 text-sm whitespace-pre-wrap">
-          {report.postBody ?? "The reported post is unavailable."}
-        </blockquote>
-        {report.postHidden && <p className="mt-1 text-xs text-muted-foreground">Post already hidden</p>}
-        <div className="mt-2 flex gap-2">
-          <Button variant="destructive" size="sm" type="button" disabled={busy || !availability.moderationEnabled}
-            onClick={() => void run(() => resolveCanonicalGroupReport({ data: {
-              reportId: report.id, hidePost: true,
-            } }), "Reported post hidden.")}>Hide post</Button>
-          <Button variant="outline" size="sm" type="button" disabled={busy || !availability.moderationEnabled}
-            onClick={() => void run(() => resolveCanonicalGroupReport({ data: {
-              reportId: report.id, hidePost: false,
-            } }), "Report reviewed; content retained.")}>Retain post</Button>
-        </div>
-      </div>)}
-      {group.reports.length === 0 && <p className="text-xs text-muted-foreground">No open content reports.</p>}
-    </div>
-  </WorkspacePanel>;
 }
