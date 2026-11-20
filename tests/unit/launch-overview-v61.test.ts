@@ -71,6 +71,12 @@ describe("Launch Overview source-derived next steps", () => {
     expect(unavailable.description).toContain("could not be verified");
   });
 
+  it("never recommends resuming configuration for a closed Site", () => {
+    const action=nextLaunchAction("closed-site",complete,"closed");
+    expect(action.title).toBe("Review Closed Site");
+    expect(action.href).toBe("/sites/closed-site");
+    expect(action.description).toContain("closed");
+  });
   it("does not treat a missing website draft as publication readiness", () => {
     expect(nextLaunchAction("site",{...complete,websiteDraftAvailable:false}).href)
       .toContain("module=website-brand");
