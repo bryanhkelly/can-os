@@ -265,9 +265,33 @@ const noDuplicateFormActions = {
   },
 };
 
+/**
+ * Real tables should use the canonical Table family for consistent
+ * keyboard-accessible horizontal scrolling, headers and V6.1 geometry.
+ * Complex legacy grids migrate separately after interaction QA.
+ */
+const noNativeFeatureTables = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "Reuse the CAN OS V6.1 Table primitives instead of native feature tables" },
+    schema: [],
+    messages: {
+      table: "Use V6.1 <Table>, <TableHeader>, <TableRow>, <TableHead>, <TableRowHead> and <TableCell> rather than a native feature <table>.",
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        if (jsxName(node.name) === "table") context.report({ node, messageId: "table" });
+      },
+    };
+  },
+};
+
 export default {
   rules: {
     "no-native-feature-controls": noNativeFeatureControls,
+    "no-native-feature-tables": noNativeFeatureTables,
     "no-duplicate-form-actions": noDuplicateFormActions,
     "no-hardcoded-colors": noHardcodedColors,
     "no-arbitrary-type-values": noArbitraryTypeValues,
