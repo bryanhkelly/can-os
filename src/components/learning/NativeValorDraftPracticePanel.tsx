@@ -58,6 +58,24 @@ export function NativeValorDraftPracticePanel({classEnrollmentId}:{classEnrollme
       {data.history.length} practice attempt{data.history.length===1?"":"s"} saved.
       You can try again without changing your earlier answers.
     </p>}
+    {data.history.length>0&&<div className="space-y-3" aria-label="Your saved knowledge-check practice history">
+      {data.history.map((attempt,index)=><details key={attempt.id} className="border border-border p-3">
+        <summary className="cursor-pointer text-sm font-medium">
+          Practice attempt {data.history.length-index} · {new Date(attempt.recordedAt).toLocaleString()}
+        </summary>
+        {attempt.responses.map((answer,i)=><div key={i} className="mt-3 space-y-1 text-sm">
+          <p className="font-medium">{answer.promptText}</p>
+          <p className="whitespace-pre-wrap text-muted-foreground">{answer.response}</p>
+        </div>)}
+        {attempt.teacherFeedback&&<div className="mt-4 border-t border-border pt-3">
+          <p className="text-sm font-semibold">Teacher practice feedback</p>
+          <p className="whitespace-pre-wrap text-sm">{attempt.teacherFeedback}</p>
+          {attempt.practiceScore!==null&&<p className="mt-1 text-sm">
+            Practice score: {attempt.practiceScore} / 10. Not an official grade.
+          </p>}
+        </div>}
+      </details>)}
+    </div>}
     <div className="space-y-4">
       {data.questions.map((question,index)=><label className="block space-y-2" key={question.id}>
         <span className="block text-sm font-semibold">{index+1}. {question.prompt}</span>
