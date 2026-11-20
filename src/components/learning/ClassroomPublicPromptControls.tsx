@@ -44,17 +44,17 @@ export function ClassroomPublicPromptControls({facilitatedSessionId}:{
       available exclusively in the private facilitator console.
     </p>
     <Field label="Question" className="mt-3"><Textarea id="public-question" rows={2} maxLength={1000}
-      className="mt-1 w-full border border-border bg-background p-2 text-sm"
+      className="mt-1"
       value={prompt} onChange={event=>setPrompt(event.target.value)}/></Field>
     <Field label="Answer format" className="mt-3"><Select id="public-answer-kind" value={kind}
       onChange={event=>setKind(event.target.value as typeof kind)}
-      className="mt-1 w-full border border-border bg-background p-2 text-sm">
+      className="mt-1">
       <option value="single_choice">Multiple choice</option>
       <option value="text">Short written response</option>
     </Select></Field>
     {kind==="single_choice"&&<>
       <Field label="Choices, one per line" className="mt-3"><Textarea id="public-answer-options" rows={3} maxLength={1607}
-        className="mt-1 w-full border border-border bg-background p-2 text-sm"
+        className="mt-1"
         value={choices} onChange={event=>setChoices(event.target.value)}/></Field>
     </>}
     <Button className="mt-3" size="sm" disabled={!valid||busy}
