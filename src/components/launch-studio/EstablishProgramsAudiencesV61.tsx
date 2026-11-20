@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { GuidedSetupShell } from "@/components/workflow";
-import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
@@ -298,10 +298,17 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       </div>
     </GuidedSetupShell>
     {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
-    {reloadRequired && <WorkspaceNotice tone="attention">
-      The server may have saved your last request. Keep this page open to review your entries, then reload to reconcile the latest Site version before another save.
-    </WorkspaceNotice>}
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-t pt-5" aria-label="Programs & Audiences actions">
+    {reloadRequired && <>
+      <WorkspaceNotice tone="attention">
+        The server may have saved your last request. Review your entries, then reload to reconcile the latest Site version before another save.
+      </WorkspaceNotice>
+      <Button type="button" variant="outline" onClick={() => {
+        releaseNavigation();
+        window.location.reload();
+      }}>Reload Site and review saved choices</Button>
+    </>
+    <footer aria-label="Programs & Audiences actions">
+      <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
       <Button variant="outline" disabled={busy} onClick={() => step === 0 ? onBackToSiteInformation() : selectStep(0)}>
         <ArrowLeft aria-hidden="true" />{step === 0 ? "Back to Site Information" : "Previous step"}
       </Button>
@@ -313,6 +320,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             Save & Continue <ArrowRight aria-hidden="true" />
           </Button>}
       </div>
+      </ActionFooter>
     </footer>
   </section>;
 }
