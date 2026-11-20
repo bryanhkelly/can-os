@@ -11,6 +11,8 @@ import {
   siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
 import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
+import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
+import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 
 type InternalStep = 0 | 1;
@@ -125,11 +127,18 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     timingIds: [...initial.intent.timingIds],
     audienceIds: [...initial.intent.audienceIds],
     startingFocus: initial.intent.startingFocus,
+    ...(initial.intent.programCodes !== undefined
+      ? { programCodes: [...initial.intent.programCodes] } : {}),
+    ...(initial.intent.startingProgramCode !== undefined
+      ? { startingProgramCode: initial.intent.startingProgramCode } : {}),
   }));
   const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(initial.intent));
   const [busy, setBusy] = useState(false);
   const [reloadRequired, setReloadRequired] = useState(false);
   const [error, setError] = useState("");
+  const [programCatalog, setProgramCatalog] = useState<BlueprintReferenceCatalogItem[] | null>(null);
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogReload, setCatalogReload] = useState(0);
   const revision = useRef(initial.revision);
   const saving = useRef(false);
   const panel = useRef<HTMLDivElement>(null);
@@ -141,6 +150,15 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     if (firstStepRender.current) { firstStepRender.current = false; return; }
     panel.current?.focus();
   }, [step]);
+  useEffect(() => {
+    let current = true;
+    setProgramCatalog(null);
+    setCatalogError("");
+    void exploreBlueprintReferenceCatalog({ data: { siteId } })
+      .then(items => { if (current) setProgramCatalog(items.filter(item => item.kind === "program_model")); })
+      .catch(() => { if (current) setCatalogError("The published Program catalog is unavailable for this Site."); });
+    return () => { current = false; };
+  }, [siteId, catalogReload]);
 
   function selectStep(next: InternalStep) {
     if (saving.current) return;
@@ -156,6 +174,16 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       return { ...current, interestIds,
         startingFocus: current.startingFocus && !interestIds.includes(current.startingFocus)
           ? null : current.startingFocus };
+    });
+  }
+  function toggleProgram(code: string, checked: boolean) {
+    setDraft(current => {
+      const programCodes = checked
+        ? [...new Set([...(current.programCodes ?? []), code])]
+        : (current.programCodes ?? []).filter(item => item !== code);
+      return { ...current, programCodes,
+        startingProgramCode: current.startingProgramCode && !programCodes.includes(current.startingProgramCode)
+          ? null : current.startingProgramCode ?? null };
     });
   }
   function toggleTiming(id: TimingId, checked: boolean) {
@@ -203,6 +231,8 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   }
 
   const options = interests.filter(item => draft.interestIds.includes(item.id));
+  const programs = programCatalog ?? [];
+  const chosenPrograms = programs.filter(item => draft.programCodes?.includes(item.code));
   const disabled = busy || reloadRequired;
   const sections = [
     { id: "interests", title: "Program Interests", description: "What you want to offer",
@@ -226,6 +256,34 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             {interests.map(choice => <ChoiceCard key={choice.id} {...choice} checked={draft.interestIds.includes(choice.id)}
               disabled={disabled} onChange={value => toggleInterest(choice.id, value)} />)}
           </div>
+        </fieldset>
+        <fieldset className="space-y-3 border-t pt-5">
+          <legend className="text-sm font-semibold">Programs under consideration</legend>
+          <p className="text-xs text-muted-foreground">These published Program references are reusable CAN catalog entries. Selecting one expresses interest only. The actual Solution and Offering are configured separately in Prepare.</p>
+          {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
+          {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
+            <p>{catalogError}</p>
+            <Button type="button" size="sm" variant="outline" onClick={() => setCatalogReload(n => n + 1)}>Retry Program catalog</Button>
+          </div>}
+          {programCatalog && <div className="grid gap-3 sm:grid-cols-2">
+            {programs.map(item => <ChoiceCard key={item.code}
+              id={item.code} label={item.title} detail={item.summary}
+              checked={draft.programCodes?.includes(item.code) ?? false}
+              disabled={disabled} onChange={checked => toggleProgram(item.code, checked)} />)}
+          </div>}
+          {programCatalog && programs.length === 0 && <p className="text-sm text-muted-foreground">No published Program references are available to plan.</p>}
+          {programCatalog && (draft.programCodes ?? []).some(code => !programs.some(item => item.code === code)) &&
+            <WorkspaceNotice tone="attention">A previously selected Program is no longer available. Remove the retired selection before saving.</WorkspaceNotice>}
+          {chosenPrograms.length > 0 && <Field label="Which Program would you start with?"
+            description="Optional planning priority. This does not adopt the Solution or authorize enrollment.">
+            <Select value={draft.startingProgramCode ?? ""} disabled={disabled}
+              onChange={event => setDraft(current => ({
+                ...current, startingProgramCode: event.target.value || null,
+              }))}>
+              <option value="">I'll decide later</option>
+              {chosenPrograms.map(item => <option key={item.code} value={item.code}>{item.title}</option>)}
+            </Select>
+          </Field>}
         </fieldset>
         <section aria-labelledby="pa-timing-title" className="space-y-3 border-t pt-5">
           <h3 id="pa-timing-title" className="text-sm font-semibold">When might you offer learning? <span className="font-normal text-muted-foreground">(optional)</span></h3>
@@ -264,7 +322,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </Field>
         </section>
         <WorkspaceNotice>These are private planning interests, not approved Programs, Courses, Classes or enrollments. Adopt real offerings later in <strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
-        <p className="text-xs text-muted-foreground">{draft.interestIds.length} learning interests selected. You can update your plans later in the Site Workspace.</p>
+        <p className="text-xs text-muted-foreground">{draft.interestIds.length} learning interests and {(draft.programCodes ?? []).length} Program references selected. You can update your plans later in the Site Workspace.</p>
       </> : <>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
@@ -286,7 +344,11 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         <section className="space-y-3 border bg-muted/20 p-4" aria-labelledby="pa-summary">
           <h3 id="pa-summary" className="text-sm font-semibold">Your selections so far</h3>
           <p className="text-xs text-muted-foreground">A compact reference within this step, not a separate review screen.</p>
-          <SummaryRow label="Program interests" value={labels(draft.interestIds, interests)} onEdit={() => selectStep(0)} />
+          <SummaryRow label="Learning interests" value={labels(draft.interestIds, interests)} onEdit={() => selectStep(0)} />
+          <SummaryRow label="Proposed Programs" value={
+            (draft.programCodes ?? []).length ? (draft.programCodes ?? [])
+              .map(code => programs.find(item => item.code === code)?.title ?? code).join(" · ") : "Not selected yet"
+          } onEdit={() => selectStep(0)} />
           <SummaryRow label="Days & times"
             value={draft.timingIds.length ? draft.timingIds.map(id => timingLabels[id]).join(" · ") : "Not selected yet"}
             onEdit={() => selectStep(0)} />
