@@ -86,6 +86,7 @@ export default tseslint.config(
     ],
     rules: {
       "can-os-design/no-native-feature-controls": "error",
+      "can-os-design/no-native-feature-tables": "warn",
       // Existing unmatched form layouts remain visible as warnings while
       // consolidated flows are protected with a stricter scoped rule below.
       "can-os-design/no-duplicate-form-actions": "warn",
@@ -107,6 +108,15 @@ export default tseslint.config(
       "src/components/launch-studio/{EstablishSiteProfileUnified,PrepareOperationsV61,NativeOfferingAdoptionReviewPanel,ProgramDiscoveryPanel}.tsx",
     ],
     rules: { "can-os-design/no-duplicate-form-actions": "error" },
+  },
+  {
+    // Report tables already consolidated under the V6.1 primitives.
+    files: [
+      "src/components/enrollment/NoncreditNetworkReportPanel.tsx",
+      "src/components/reports/{NativeClassReportPanel,NoncreditProviderEvidencePanel}.tsx",
+      "src/components/learning/NoncreditPilotOutcomesPanel.tsx",
+    ],
+    rules: { "can-os-design/no-native-feature-tables": "error" },
   },
   ...storybook.configs["flat/recommended"],
 );
