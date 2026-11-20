@@ -126,7 +126,7 @@ for (const persona of ["student", "guardian", "teacher"] as const) {
  */
 const guardianP0Destinations = [
   { route: "/guardian/students", heading: "Academic progress" },
-  { route: "/class", heading: "Your family's classes" },
+  { route: "/class", heading: "My Classes" },
   { route: "/guardian/report-cards", heading: "Report card" },
   { route: "/messages", heading: "Messages" },
   { route: "/notifications", heading: "Notifications" },
@@ -301,7 +301,7 @@ test("student assignment list links back to enrolled classes", async ({ browser 
   if (!secret || !fixture) throw new Error("Missing synthetic student fixture.");
   await withAuthenticatedPage(browser, secret, async ({ page }) => {
     await page.goto("/student/assignments");
-    const classesLink = page.getByRole("link", { name: "My Classes", exact: true });
+    const classesLink = page.getByRole("link", { name: "My classes", exact: true });
     await expect(classesLink).toHaveAttribute("href", "/class");
     await classesLink.click();
     await expect(page).toHaveURL(/\/class(?:\?|$)/);
