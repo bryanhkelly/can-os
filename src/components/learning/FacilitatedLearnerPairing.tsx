@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { pairWithFacilitatedRoom, leaveFacilitatedRoom, getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ type PairingStatus = Awaited<ReturnType<typeof getLearnerFacilitatedRoom>>;
  * Pairing alone never constitutes attendance, watched media or completion.
  */
 export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:string}) {
+  const queryClient=useQueryClient();
   const [code,setCode] = useState("");
   const [status,setStatus] = useState<PairingStatus|null>(null);
   const [pending,setPending] = useState(false);
@@ -50,7 +52,6 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
     try {
       await pairWithFacilitatedRoom({data:{courseAttemptId,pairingCode:code.trim()}});
       setCode("");
-      await refresh();
       setMessageTone("success");
       setMessage("Your device is paired with the facilitator's room.");
     } catch {
@@ -63,7 +64,6 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
     setPending(true);setMessage("");
     try {
       await leaveFacilitatedRoom({data:{courseAttemptId,facilitatedSessionId:roomId}});
-      await refresh();
       setMessageTone("success");
       setMessage("You left the facilitator's room.");
     } catch {
