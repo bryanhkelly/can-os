@@ -4,6 +4,7 @@ import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
 import { Textarea } from "@/components/ui/textarea";
 import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
@@ -37,18 +38,13 @@ export function MarketingPackageWizardV61({
 }){
   return <>
 
-        <nav aria-label="Package steps" className="grid gap-2 sm:grid-cols-4">
-          {steps.map((value,index)=><div key={value}
-            aria-current={index===step?"step":undefined}
-            className={"border px-3 py-3 text-left text-xs font-semibold focus-visible:ring-2 focus-visible:ring-ring "+
-              (index===step?"border-primary bg-accent text-primary":"bg-card text-muted-foreground")}
->
-            <span className="mr-2">{index+1}.</span>{stepLabels[index]}
-          </div>)}
-        </nav>
+        <GuidedSetupProgress label="Package progress" steps={steps.map((id, index) => ({
+          id, title: stepLabels[index], status: index === step ? "current" as const : "upcoming" as const,
+        }))} />
 
         {step===0&&<WorkspacePanel title="What would you like to share?" description="Choose a starting point. Your Site brand will be reused automatically later.">
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
+            <legend className="sr-only">Package purpose</legend>
             {purposeOptions.map(option=><label key={option.id}
               className={"flex cursor-pointer gap-3 border p-4 text-sm "+
                 (content.purpose===option.id?"border-primary bg-accent":"bg-card")}>
@@ -57,7 +53,7 @@ export function MarketingPackageWizardV61({
                   onPatch({...starter(option.id),audiences:content.audiences,formats:content.formats})}/>
               <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
             </label>)}
-          </div>
+          </fieldset>
           <div className="mt-5"><Field label="Package name" required>
             <Input value={title} maxLength={120} onChange={event=>onTitleChange(event.target.value)}/>
           </Field></div>

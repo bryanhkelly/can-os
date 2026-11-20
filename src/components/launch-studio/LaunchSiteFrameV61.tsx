@@ -26,7 +26,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
   const expanded = stageChoice.active === active ? stageChoice.stage : activeStage;
   const renderSidebar = (instance: "desktop" | "drawer") => (
     <div className="flex h-full flex-col bg-card">
-      <div className="border-b px-4 py-5">
+      <div className="can-shell-bar flex h-[var(--topbar-height)] flex-col justify-center border-b px-4">
         <p className="text-base font-bold">CAN OS</p>
         <p className="text-3xs font-bold uppercase tracking-eyebrow text-muted-foreground">Christian Academic Network</p>
       </div>
@@ -71,7 +71,7 @@ export function LaunchSiteFrame({ site, active, previewHref, children }: {
   return <div className="min-h-screen bg-background text-foreground xl:grid xl:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]">
     <aside className="hidden min-h-0 border-r bg-card xl:sticky xl:top-0 xl:block xl:h-dvh">{renderSidebar("desktop")}</aside>
     <div className="min-w-0">
-      <header className="flex min-h-[var(--topbar-height)] flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-2 sm:px-7">
+      <header aria-label="Launch Studio top bar" className="can-shell-bar sticky top-0 z-30 flex min-h-[var(--topbar-height)] flex-wrap items-center justify-between gap-3 border-b bg-card px-[var(--page-gutter)] py-2">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" className="xl:hidden" onClick={()=>setDrawer(true)} aria-label="Open launch menu">
             <Menu className="size-4" />

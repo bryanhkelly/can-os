@@ -10,22 +10,14 @@ export interface GuidedSetupStep {
   status: "complete" | "current" | "upcoming";
 }
 
-export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange }: {
-  title: string;
-  description?: string;
+/** Shared V6.1 internal-step presentation. A passive progress list does not
+ * imply steps are saved or let callers bypass their validation. */
+export function GuidedSetupProgress({ steps, onStepChange, label = "Setup progress" }: {
   steps: readonly GuidedSetupStep[];
-  aside?: ReactNode;
-  /** Optional local step navigation; does not imply saved or complete. */
   onStepChange?: (id: string) => void;
-  children: ReactNode;
+  label?: string;
 }) {
-  const titleId = useId();
-  return <section aria-labelledby={titleId} className="border border-border bg-card shadow-sm">
-    <header className="border-b px-5 py-5 sm:px-6">
-      <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
-      {description && <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
-    </header>
-    <ol aria-label="Setup progress" className={cn("grid gap-2 border-b bg-muted/25 p-4",
+  return <ol aria-label={label} className={cn("grid gap-2 border-b bg-muted/25 p-4",
       steps.length === 2 ? "grid-cols-1 sm:grid-cols-2" :
       steps.length === 3 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" :
       steps.length === 4 ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" :
@@ -54,7 +46,25 @@ export function GuidedSetupShell({ title, description, steps, aside, children, o
             <div className={itemClass} aria-current={step.status === "current" ? "step" : undefined}>{item}</div>}
         </li>;
       })}
-    </ol>
+    </ol>;
+}
+
+export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange }: {
+  title: string;
+  description?: string;
+  steps: readonly GuidedSetupStep[];
+  aside?: ReactNode;
+  /** Optional local step navigation; does not imply saved or complete. */
+  onStepChange?: (id: string) => void;
+  children: ReactNode;
+}) {
+  const titleId = useId();
+  return <section aria-labelledby={titleId} className="border border-border bg-card shadow-sm">
+    <header className="border-b px-5 py-5 sm:px-6">
+      <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
+      {description && <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
+    </header>
+    <GuidedSetupProgress steps={steps} onStepChange={onStepChange} />
     <div className={cn("grid gap-6 p-5 sm:p-6", aside && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0">{children}</div>
       {aside && <aside aria-label="Setup guidance" className="min-w-0 lg:border-l lg:pl-6">{aside}</aside>}

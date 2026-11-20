@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
-import { GuidedSetupShell } from "@/components/workflow/guided-setup-shell";
+import { GuidedSetupProgress, GuidedSetupShell } from "@/components/workflow/guided-setup-shell";
 
 const meta = {
   title: "Workflows/Launch Studio/V6.1 internal steps",
@@ -55,5 +55,21 @@ export const TwoProgramsAudiencesSteps: Story = {
     const audience = canvas.getByRole("button",{name:/Your Audiences/});
     await userEvent.click(audience);
     await expect(audience).toHaveAttribute("aria-current","step");
+  },
+};
+
+/** Progress is informational until the owning module validates the next step. */
+export const PassiveMarketingPackageProgress: Story = {
+  render: () => <GuidedSetupProgress label="Package progress" steps={[
+    { id: "menu", title: "Menu", status: "upcoming" },
+    { id: "audience", title: "Audience", status: "current" },
+    { id: "message", title: "Messages", status: "upcoming" },
+    { id: "assets", title: "Collateral & Assets", status: "upcoming" },
+  ]} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const progress = canvas.getByRole("list", { name: "Package progress" });
+    await expect(progress.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+    await expect(within(progress).queryByRole("button")).not.toBeInTheDocument();
   },
 };

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Check, CircleHelp, Landmark, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, Landmark, ShieldCheck } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,17 +17,16 @@ export function LaunchStudioStepContent({ active, children }: { active: boolean;
 export function LaunchStudioChrome({ children }: { children: ReactNode }) {
   return <div className="launch-studio min-h-screen bg-background">
     <header className="border-b bg-card">
-      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-8">
+      <div className="can-shell-bar flex min-h-[var(--topbar-height)] flex-wrap items-center px-[var(--page-gutter)]">
         <Link to="/launch" className="flex min-h-11 items-center gap-3 text-foreground">
           <span className="flex size-10 items-center justify-center bg-foreground text-background"><Landmark className="size-6" /></span>
           <span className="border-r pr-4 text-xs font-bold">CAN OS<span className="block text-3xs font-medium uppercase tracking-eyebrow">Launch Studio</span></span>
           <span className="font-serif text-2xl">Launch Studio</span>
         </Link>
-        <Button asChild variant="ghost" size="sm"><a href="#launch-help"><CircleHelp className="size-4" /> Help</a></Button>
       </div>
     </header>
     {children}
-    <footer className="mx-auto flex max-w-screen-2xl flex-wrap justify-between gap-3 px-4 py-8 text-xs text-muted-foreground sm:px-8">
+    <footer className="flex flex-wrap justify-between gap-3 px-[var(--page-gutter)] py-8 text-xs text-muted-foreground">
       <span>Launch Studio</span><span>School records stay private. Access and approvals remain server-verified.</span>
     </footer>
   </div>;
