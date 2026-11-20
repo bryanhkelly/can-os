@@ -7,8 +7,8 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 export type ClassroomReturnTo = "academic" | "native" | "training";
 
 function ReturnToClasses({target}:{target:ClassroomReturnTo}){
-  return target==="academic"?<Link to="/classes" className="underline">My classes</Link>:
-    target==="native"?<Link to="/classes" search={{}} className="underline">My classes</Link>:
+  return target==="academic"?<Link to="/class" className="underline">My classes</Link>:
+    target==="native"?<Link to="/class" search={{}} className="underline">My classes</Link>:
     <Link to="/learn/my-activity" className="underline">My classes</Link>;
 }
 
@@ -41,8 +41,8 @@ export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPositio
           {toolsVisible ? <PanelRightClose aria-hidden="true"/> : <PanelRightOpen aria-hidden="true"/>}
           {toolsVisible ? "Hide lesson tools" : "Show lesson tools"}
         </Button>
-        <Button variant="ghost" size="sm" asChild>{returnTo==="academic"?<Link to="/classes"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
-        returnTo==="native"?<Link to="/classes" search={{}}><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
+        <Button variant="ghost" size="sm" asChild>{returnTo==="academic"?<Link to="/class"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
+        returnTo==="native"?<Link to="/class" search={{}}><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
         <Link to="/learn/my-activity"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>}</Button>
       </div>
     </div>
