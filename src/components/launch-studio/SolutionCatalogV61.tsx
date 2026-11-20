@@ -105,10 +105,9 @@ export function SolutionCatalogV61({ siteId, intent, delivery }: {
       <p className="font-semibold">Unable to load Solutions</p>
       <p className="mt-2 text-muted-foreground">{error}</p>
       <p className="mt-2 text-muted-foreground">
-        Published Solution planning requires a current Site operator relationship
-        and CAN-provisioned catalog access. If this is a new Site, those permissions
-        may not be active yet. A transient service error can also prevent loading.
-        Your saved Site vision remains unchanged.
+        Your verified Site administrator grant is sufficient for private Solution
+        planning. If the catalog cannot load, check the service connection and
+        try again. Saved Site plans are not changed by a failed read.
       </p>
       <Button type="button" variant="outline" size="sm" className="mt-3"
         onClick={() => setReload(value => value + 1)}>Retry Program Catalog</Button>
