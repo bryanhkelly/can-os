@@ -26,6 +26,7 @@ import { ClassTeacherPlanningPanel } from "@/components/learning/ClassTeacherPla
 import { ClassTeacherGuidePanel } from "@/components/learning/ClassTeacherGuidePanel";
 import { ClassLessonDiscussions } from "@/components/learning/ClassLessonDiscussions";
 import { ClassLessonAssessmentLinks } from "@/components/learning/ClassLessonAssessmentLinks";
+import { ClassPublishedResourcesList } from "@/components/learning/ClassPublishedResourcesList";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
@@ -219,11 +220,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     } }));
   }
   function resources(items: ClassContent["resources"]) {
-    return <ul className="space-y-3">{items.map(item => <li key={item.id} className=" border p-3 text-sm">
-      {item.url && resolveClassVideo(item.url) ? <ClassVideoPlayer title={item.title} url={item.url} resourceId={item.id} declaredVideo={false}/> :
-        item.url ? <SafeClassExternalLink url={item.url} title={item.title} kind="external" resourceId={item.id}/> :
-        <Button variant="ghost" size="sm" type="button" data-learning-resource-id={item.id} disabled={busy || downloading} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</Button>}
-    </li>)}</ul>;
+    return <ClassPublishedResourcesList items={items}
+      disabled={busy || downloading} onDownload={download} />;
   }
   function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
     if (item.kind === "video" || (item.url && resolveClassVideo(item.url))) {
