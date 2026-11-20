@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { requestCanonicalGroupMembership, leaveCanonicalGroup } from "@/modules/study-groups/canonical-membership.functions";
-import type { GroupPanelRecord, GroupPanelRole, GroupPanelAvailability, GroupPanelRun, GroupPanelMutation } from "./group-panel-contracts";
+import type { GroupPanelRecord, GroupPanelAvailability, GroupPanelRun } from "./group-panel-contracts";
 
 /** Student membership always remains subject to guardian and facilitator approval. */
 export function GroupStudentMembershipPanel({ group, availability, hasEnrollmentGuardian, busy, run }: {
