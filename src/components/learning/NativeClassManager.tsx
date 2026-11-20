@@ -4,6 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
 import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
+import { ClassOfferingTermsFields, initialClassOfferingTermsForm, type ClassOfferingTermsForm } from "@/components/learning/ClassOfferingTermsFields";
 import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
 import { nativeClassOperatorQueryKeys } from "@/domain/native-class-operator-query-keys";
 import { invalidateNativeClassAvailability, nativeClassAvailabilityQueryKeys } from "@/lib/native-class-availability-cache";
@@ -27,24 +28,9 @@ import { getPublisherRolloutTemplate } from "@/modules/programs/publisher-rollou
 import { assessLocalRollout, parsePortableRollout, serializeProgramRollout, type ProgramRolloutRecipe } from "@/domain/network-program-rollout";
 
 
-type Method=ClassOfferingTerms["enrollmentMethods"][number];
-type CreditMode=ClassOfferingTerms["allowedCreditModes"][number];
-const methodOptions: {value:Method;label:string}[]=[
-  {value:"self",label:"Self-enrollment"},{value:"assignment",label:"Assignment"},
-  {value:"invitation",label:"Invitation (verified adults)"},
-  {value:"approval",label:"Approval required (verified adults)"},
-];
-const creditOptions: {value:CreditMode;label:string}[]=[
-  {value:"not_applicable",label:"No academic credit"},
-  {value:"audit",label:"Audit"},
-  // For-credit participation needs institutional eligibility and issuer approval.
-];
 const deliveryOptions=["self_paced","scheduled","facilitated","hybrid"] as const;
 function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:string;courseVersionId:string}){
   return [o.deploymentId,o.adoptionId,o.offeringVersionId,o.courseVersionId].join(":");
-}
-function toggle<T extends string>(list:T[],name:T):T[]{
-  return list.includes(name)?list.filter(v=>v!==name):[...list,name];
 }
 
 export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation}: {preferredSiteId?: string;preferredOfferingVersionId?:string;navigation?:ReactNode}) {
@@ -94,14 +80,12 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   const [siteId,setSiteId]=useState("");
   const [deliveryMode,setDeliveryMode]=useState<(typeof deliveryOptions)[number]>(preferredSiteId?"facilitated":"self_paced");
   const [createWithOffering,setCreateWithOffering]=useState(false);
-  const [visibility,setVisibility]=useState<ClassOfferingTerms["visibility"]>("private");
-  const [methods,setMethods]=useState<Method[]>(["assignment"]);
-  const [creditModes,setCreditModes]=useState<CreditMode[]>(["not_applicable"]);
-  const [opensAt,setOpensAt]=useState("");
-  const [closesAt,setClosesAt]=useState("");
-  const [capacity,setCapacity]=useState("");
-  const [consentVersion,setConsentVersion]=useState("");
-  const [consentText,setConsentText]=useState("");
+  const [termsDraft,setTermsDraft]=useState<ClassOfferingTermsForm>(()=>({
+    ...initialClassOfferingTermsForm,
+    methods:[...initialClassOfferingTermsForm.methods],
+    creditModes:[...initialClassOfferingTermsForm.creditModes],
+  }));
+  const {visibility,methods,creditModes,opensAt,closesAt,capacity,consentVersion,consentText}=termsDraft;
   const [busy,setBusy]=useState(false);
   const [createdClassId,setCreatedClassId]=useState<string|null>(null);
   const [notice,setNotice]=useState("");
@@ -628,63 +612,9 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                 onChange={event=>setCreateWithOffering(event.target.checked)}/>
               Also create a draft Class Offering
             </Label>
-            {createWithOffering&&<div className="mt-4">
-            <h3 className="text-base font-semibold">Class Offering terms</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Availability and admission methods do not change the Course or Class identity.</p>
-            <div className="mt-4">
-              <Label htmlFor="native-class-visibility" className="block text-sm font-semibold">Visibility</Label>
-              <Select id="native-class-visibility" value={visibility}
-                onChange={e=>setVisibility(e.target.value as typeof visibility)}
-                className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
-                <option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option>
-              </Select>
-            </div>
-            <fieldset className="mt-4">
-              <legend className="text-sm font-semibold">Allowed enrollment methods</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">{methodOptions.map(method=><Label key={method.value} className="flex items-center gap-2 text-sm">
-                <Checkbox checked={methods.includes(method.value)}
-                  onChange={()=>setMethods(toggle(methods,method.value))}/> {method.label}
-              </Label>)}</div>
-            </fieldset>
-            <fieldset className="mt-4">
-              <legend className="text-sm font-semibold">Allowed credit participation</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">{creditOptions.map(mode=><Label key={mode.value} className="flex items-center gap-2 text-sm">
-                <Checkbox checked={creditModes.includes(mode.value)}
-                  onChange={()=>setCreditModes(toggle(creditModes,mode.value))}/> {mode.label}
-              </Label>)}</div>
-              <p className="mt-2 text-xs text-muted-foreground">For-credit participation does not award credit without separate institutional approval and an earned outcome.</p>
-            </fieldset>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <div><Label htmlFor="native-class-open" className="block text-sm font-semibold">Opens</Label>
-                <Input id="native-class-open" type="datetime-local" value={opensAt}
-                  onChange={e=>setOpensAt(e.target.value)} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
-              </div>
-              <div><Label htmlFor="native-class-close" className="block text-sm font-semibold">Closes</Label>
-                <Input id="native-class-close" type="datetime-local" value={closesAt}
-                  onChange={e=>setClosesAt(e.target.value)} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
-              </div>
-              <div><Label htmlFor="native-class-capacity" className="block text-sm font-semibold">Capacity</Label>
-                <Input id="native-class-capacity" type="number" min={1} value={capacity} placeholder="Unlimited"
-                  onChange={e=>setCapacity(e.target.value)} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Registration times use the hosting Site time zone:
-              {" "}{selectedSiteTimeZone??"select an authorized Site with a configured time zone"}.
-              Missing or ambiguous daylight-saving times cannot be submitted.
-            </p>
-            {methods.includes("self")&&<div className="mt-4 space-y-3">
-              <p className="text-sm font-semibold">Self-enrollment consent terms</p>
-              <div><Label htmlFor="native-class-consent-version" className="block text-xs font-semibold">Version</Label>
-                <Input id="native-class-consent-version" value={consentVersion} required minLength={3}
-                  onChange={e=>setConsentVersion(e.target.value)} placeholder="participation-v1"
-                  className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/></div>
-              <div><Label htmlFor="native-class-consent-text" className="block text-xs font-semibold">Participation and data-use terms</Label>
-                <Textarea id="native-class-consent-text" value={consentText} required minLength={25} maxLength={10000} rows={4}
-                  onChange={e=>setConsentText(e.target.value)}
-                  className="mt-1 w-full border border-border bg-background p-3 text-sm"/></div>
-            </div>}
-            </div>}
+            {createWithOffering&&<ClassOfferingTermsFields value={termsDraft}
+              onChange={setTermsDraft} siteTimeZone={selectedSiteTimeZone} />}
+
           </div>
           <Button disabled={busy||feedback.refreshFailed||!selected||!siteId||(createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
             {busy?"Working…":"Create draft Class"}
