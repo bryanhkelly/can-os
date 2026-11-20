@@ -93,7 +93,7 @@ function ObjectiveAssessmentPublications(){
         </Label>
         <Select id="assessment-publication-version" value={selected}
           onChange={e=>{setSelected(e.target.value);setConfirmed(false);setError("");setNotice("");}}
-          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          className="mt-2 min-h-11">
           <option value="">Select an assessment draft</option>
           {queue.data.versions.map(x=><option key={x.assessmentVersionId}
             value={x.assessmentVersionId}>{x.title} · {x.questionCount} questions</option>)}
