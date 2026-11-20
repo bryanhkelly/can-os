@@ -107,6 +107,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
         .select({
           id: s.sites.id,
           organizationId: s.sites.organizationId,
+          lifecycleStatus: s.sites.lifecycleStatus,
           name: s.sites.name,
           slug: s.sites.slug,
           timezone: s.sites.timezone,
