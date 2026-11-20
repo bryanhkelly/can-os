@@ -42,3 +42,12 @@ export function typeLabel(item: CalendarFeedItem): string {
 export function chipClass(): string {
   return "border-border bg-muted text-primary";
 }
+
+/** Render an exact instant in the receiving Site or event timezone.
+ * Used by Calendar and learner dashboards; never infer attendance from it.
+ */
+export function formatCalendarDateTime(stamp: Date | string, timezone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium", timeStyle: "short", timeZone: timezone,
+  }).format(new Date(stamp));
+}
