@@ -143,7 +143,7 @@ export const finalizeNativeClassKnowledgeCheck=createServerFn({method:"POST"})
         .where(and(eq(learnerCourseAttempts.id,enrollment.courseAttemptId),
           eq(learnerCourseAttempts.classEnrollmentId,enrollment.id),
           eq(learnerCourseAttempts.status,"active"))).limit(1);
-      if(!course||course.enrollmentId||course.noncreditRegistrationId||
+      if(!course||course.enrollmentId||
          course.sectionId||course.deploymentId!==cls.deploymentId||
          course.courseVersionId!==cls.courseVersionId)
         throw new AuthorizationError("exact native Class Course Attempt");
