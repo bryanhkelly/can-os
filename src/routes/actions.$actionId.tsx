@@ -82,7 +82,7 @@ function TeacherMissingWorkResolution({actionId}:{actionId:string}) {
     </Label>
     <Button variant="default" type="button" disabled={busy||note.trim().length<5}
       onClick={()=>void resolve()}
-      className="mt-3  bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">
+      className="mt-3">
       Resolve follow-up
     </Button>
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Resolving follow-up..."/>
