@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, sites } from "@/db/schema";
-import { isCanonicalSiteDiscoverable } from "@/domain/canonical-site-availability";
+import { isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { accessSessionCookie } from "@/domain/access-tokens";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -94,7 +94,7 @@ export async function assertVerifiedCanPlanningSite(
     organizationId: sites.organizationId,
     lifecycleStatus: sites.lifecycleStatus,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
-  if (!site || !isCanonicalSiteDiscoverable(site.lifecycleStatus) ||
+  if (!site || !isPrivateCanSitePlanningAllowed(site.lifecycleStatus) ||
       site.organizationId !== context.scope.organizationIds[0] ||
       (expectedOrganizationId && site.organizationId !== expectedOrganizationId)) {
     throw new AuthorizationError("current CAN Site owner relationship");
