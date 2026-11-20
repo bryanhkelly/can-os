@@ -174,15 +174,17 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
             <div className="mt-auto pt-5">
               {canonicalSiteId && planEligible ?
                 <div className="grid gap-2">
-                  <Link to="/canonical/blueprints" search={{siteId: canonicalSiteId}}
-                    className="inline-flex min-h-11 items-center justify-center border border-primary bg-primary px-4 py-2 text-center text-sm font-semibold text-primary-foreground">
-                    Plan this Offering
-                  </Link>
-                  {classManagementAllowed ? <Link to="/class" search={{view:"manage",siteId:canonicalSiteId,
-                    offeringVersionId:offering.offeringVersionId}}
-                    className="inline-flex min-h-11 items-center justify-center border px-4 py-2 text-center text-sm font-semibold text-primary">
-                    Check Class configuration
-                  </Link> : <p className="text-xs leading-5 text-muted-foreground">
+                  <Button asChild className="w-full whitespace-normal text-center">
+                    <Link to="/canonical/blueprints" search={{siteId: canonicalSiteId}}>
+                      Plan this Offering
+                    </Link>
+                  </Button>
+                  {classManagementAllowed ? <Button asChild variant="outline" className="w-full whitespace-normal text-center">
+                    <Link to="/class" search={{view:"manage",siteId:canonicalSiteId,
+                      offeringVersionId:offering.offeringVersionId}}>
+                      Check Class configuration
+                    </Link>
+                  </Button> : <p className="text-xs leading-5 text-muted-foreground">
                     Class configuration requires a separate verified Site permission.
                   </p>}
                 </div> : <p className="text-xs text-muted-foreground">
