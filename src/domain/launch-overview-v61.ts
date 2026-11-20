@@ -12,6 +12,10 @@ export type LaunchOverviewEvidence = {
   programs: LaunchOverviewSource<{ saved: boolean }>;
   brand: LaunchOverviewSource<{ saved: boolean }>;
   marketing: LaunchOverviewSource<{ hasPackages: boolean }>;
+  /** Private, authorized Site-owned plans. Not qualification or opening approval. */
+  solutions?: LaunchOverviewSource<{ plans: readonly {
+    configurationId: string; lifecycle: "draft" | "frozen";
+  }[] }>;
   websiteDraftAvailable: boolean;
 };
 
@@ -63,6 +67,30 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
     return { title: "Prepare a Marketing Package",
       description: "Use your saved Site Brand and Story to introduce your learning community.",
       href: route("promote") };
+  }
+  if (evidence.solutions?.state === "unavailable") {
+    return { title: "Review Program Catalog",
+      description: "Saved Solution plans could not be verified. Review them before continuing.",
+      href: route("program-catalog") };
+  }
+  if (evidence.solutions?.state === "ready") {
+    const plans = evidence.solutions.value.plans;
+    if (plans.length === 1) {
+      const plan = plans[0];
+      return {
+        title: plan.lifecycle === "draft" ? "Continue Solution Plan" : "Review Submitted Solution",
+        description: plan.lifecycle === "draft"
+          ? "Resume your saved Solution configuration in Prepare."
+          : "Review your submitted Solution plan and its independent approval status.",
+        href: route("program-catalog") + "&solutionPlanId=" +
+          encodeURIComponent(plan.configurationId),
+      };
+    }
+    if (plans.length > 1) {
+      return { title: "Continue Preparing Solutions",
+        description: "Review your saved plans in Program Catalog and choose which to continue.",
+        href: route("program-catalog") };
+    }
   }
   return { title: "Explore the Program Catalog",
     description: "Select and privately configure a Solution. Readiness and approval remain independent.",
