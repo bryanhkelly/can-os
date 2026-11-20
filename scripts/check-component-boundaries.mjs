@@ -46,6 +46,7 @@ const guardedFiles = [
   "src/components/student/StudentReleasedGradesPanel.tsx",
   "src/components/student/StudentSchoolLifePanel.tsx",
   "src/components/student/StudentContinueLearningPanel.tsx",
+  "src/components/student/StudentTodayAtGlance.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
 ];
@@ -96,7 +97,7 @@ const owners = [
   ["src/components/admissions/PublicInterestInbox.tsx", ['aria-label="Family relationship history"', 'items.map(row => <article']],
   ["src/components/enrollment/NoncreditReleaseOperations.tsx", ['rows={query.data.roster}', '<h3 className="mt-7 text-base font-semibold">Participant roster</h3>']],
   ["src/components/enrollment/GuardianApplicationForm.tsx", ['<Label htmlFor={`${id}-transfer`}', '<Label htmlFor={`${id}-household`}']],
-  ["src/components/student/StudentDashboard.tsx", ['<DashboardPanel id="student-schedule"', '<DashboardPanel title="Announcements"', '<DashboardPanel id="student-assignments"', '<DashboardPanel id="student-grades"', '<DashboardPanel id="school-life"', '<DashboardPanel id="continue-learning"']],
+  ["src/components/student/StudentDashboard.tsx", ['<DashboardPanel id="student-schedule"', '<DashboardPanel title="Announcements"', '<DashboardPanel id="student-assignments"', '<DashboardPanel id="student-grades"', '<DashboardPanel id="school-life"', '<DashboardPanel id="continue-learning"', '<DashboardPanel title="Today at a Glance"']],
   ["src/components/home/TeacherHome.tsx", ['aria-label="Observed learning participation"']],
   ["src/components/operations/ExtendedLearningSeasonPlanner.tsx", ['<form noValidate onSubmit={createDraft}']],
   ["src/components/home/CoachHome.tsx", ["students.map((student) => (", '<h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Timeline</h3>']],
