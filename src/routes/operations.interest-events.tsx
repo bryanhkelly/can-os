@@ -242,6 +242,11 @@ export function InterestEventsWorkspace({
           search={{siteId:siteForProgram(createdProgramId),programId:createdProgramId}}
           className="underline">Open created event</Link>
       {shareLinks[createdEventId]&&<p className="break-all text-sm">Invite-only RSVP link: <a className="underline" href={shareLinks[createdEventId]}>{shareLinks[createdEventId]}</a></p>}
+      {visibility==="invitation_only"&&!shareLinks[createdEventId]&&
+        <p role="status" className="text-sm text-muted-foreground">
+          This event is saved. Open the event and choose Generate invite link if a
+          previous response was interrupted. Generating a new link disables older links.
+        </p>}
     </div>}
     {mode==="directory"&&<DirectoryTable label="Interest events" caption="Events in your authorized school scope."
       rows={visibleEvents} rowKey={event=>event.id}
