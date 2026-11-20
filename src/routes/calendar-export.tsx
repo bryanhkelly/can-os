@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
 import {createFileRoute} from "@tanstack/react-router";
 import {getAssignments} from "@/modules/student-experience/assignments.functions";
@@ -16,5 +17,5 @@ function CalendarExport(){
   const blob=new Blob([renderICS(items,"CAN OS assignment deadlines")],{type:"text/calendar;charset=utf-8"});
   downloadBlob(blob,"can-os-assignments.ics");
  };
- return <WorkspaceShell width="reading" eyebrow="Calendar" title="Calendar export" subtitle="Export your authorized assignment deadlines as an ICS file. This is a one-time import, not an automatically refreshing calendar subscription."><button type="button" onClick={exportCalendar} className="mt-6 rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background">Export deadlines (.ics)</button></WorkspaceShell>;
+ return <WorkspaceShell width="reading" eyebrow="Calendar" title="Calendar export" subtitle="Export your authorized assignment deadlines as an ICS file. This is a one-time import, not an automatically refreshing calendar subscription."><Button variant="ghost" type="button" onClick={exportCalendar} className="mt-6  bg-foreground px-5 py-3 text-sm font-semibold text-background">Export deadlines (.ics)</Button></WorkspaceShell>;
 }
