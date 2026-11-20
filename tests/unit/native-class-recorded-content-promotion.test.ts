@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { getActiveWorkspacePath, workspaceLinks, getWorkspaceHome } from
   "@/components/shell/workspace-navigation.registry";
@@ -16,21 +16,12 @@ describe("recorded instruction is promoted into the single /class experience",()
     expect(source).toContain('redirect({to:"/class",search:{view:"reviews"}})');
   });
 
-  it("keeps old staging bookmarks but no duplicate command handlers",()=>{
-    const paths=[
-      ["src/routes/canonical.content.tsx",'search={{view:"content"}}'],
-      ["src/routes/canonical.content_.$trackVersionId.tsx",'search={{view:"content",trackVersionId}}'],
-      ["src/routes/canonical.content-reviews.tsx",'search={{view:"reviews"}}'],
-    ] as const;
-    for(const [path,target] of paths){
-      const route=read(path);
-      expect(route).toContain('<Navigate to="/class"');
-      expect(route).toContain(target);
-      expect(route).not.toContain("createRecordedInstructionDraft");
-      expect(route).not.toContain("saveRecordedInstructionDraft");
-      expect(route).not.toContain("decideRecordedInstructionReview");
-      expect(route).not.toContain("publishRecordedInstruction");
-    }
+  it("keeps retired recording and review routes absent",()=>{
+    for(const path of [
+      "src/routes/canonical.content.tsx",
+      "src/routes/canonical.content_.$trackVersionId.tsx",
+      "src/routes/canonical.content-reviews.tsx",
+    ]) expect(existsSync(path)).toBe(false);
   });
 
   it("keeps original role and Course appointment checks in the source services",()=>{
