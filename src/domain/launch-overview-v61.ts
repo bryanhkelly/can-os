@@ -84,7 +84,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   if (evidence.solutions?.state === "ready") {
     const plans = evidence.solutions.value.plans;
     if (plans.length === 1) {
-      const plan = plans[0];
+      const plan = plans[0]!;
       return {
         title: plan.lifecycle === "draft" ? "Continue Solution Plan" : "Review Submitted Solution",
         description: plan.lifecycle === "draft"
