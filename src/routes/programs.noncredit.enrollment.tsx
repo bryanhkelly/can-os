@@ -1,3 +1,9 @@
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Radio } from "@/components/ui/choice";
+import { Checkbox } from "@/components/ui/choice";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
@@ -109,7 +115,7 @@ function NoncreditPublicationPage(){
     {query.isPending&&<p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your provider-scoped training and deployment authority…</p>}
     {query.isError&&<p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
       Enrollment management is unavailable for this Site. Sign in with a currently authorized provider or Site role, then retry. No Site identity bridge is required.
-      <button type="button" className="ml-2 font-semibold text-primary underline" onClick={()=>void query.refetch()}>Retry</button>
+      <Button variant="ghost" type="button" className="ml-2 font-semibold text-primary underline" onClick={()=>void query.refetch()}>Retry</Button>
     </p>}
     {query.data&&<div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(15rem,.8fr)]">
       <section className="border border-border bg-card p-5">
@@ -125,8 +131,8 @@ function NoncreditPublicationPage(){
         </p>}
         {candidates.length>0&&<form onSubmit={event=>void submit(event)} className="mt-5 space-y-5">
           <div>
-            <label htmlFor="nc-candidate" className="block text-sm font-semibold">Approved training / deployment</label>
-            <select id="nc-candidate" required value={choice}
+            <Label htmlFor="nc-candidate" className="block text-sm font-semibold">Approved training / deployment</Label>
+            <Select id="nc-candidate" required value={choice}
               onChange={event=>{
                 const value=event.target.value;
                 const candidate=candidates.find(item=>candidateKey(item)===value);
@@ -144,7 +150,7 @@ function NoncreditPublicationPage(){
               {candidates.map(item=><option key={candidateKey(item)} value={candidateKey(item)}>
                 {item.trainingTitle} · {item.deploymentName} · {item.providerName}
               </option>)}
-            </select>
+            </Select>
           </div>
           {selected&&<NoncreditTrainingReadiness key={candidateKey(selected)} selection={{
             deploymentId:selected.deploymentId,
@@ -155,37 +161,37 @@ function NoncreditPublicationPage(){
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">Delivery mode</legend>
             <div className="flex flex-wrap gap-4 text-sm">
-              <label className="flex items-center gap-2"><input type="radio" name="nc-delivery"
+              <Label className="flex items-center gap-2"><Radio name="nc-delivery"
                 checked={deliveryMode==="independent"}
                 disabled={!!publicSiteId&&!!selected&&!selected.digitalSiteOptions.some(s=>s.id===preferredSiteId)}
                 onChange={()=>{setDeliveryMode("independent");setSiteId(publicSiteId&&selected?.digitalSiteOptions.some(s=>s.id===preferredSiteId)?preferredSiteId??"":"");setAdditionalSites([]);}}/>
                 Independent / online
-              </label>
-              <label className="flex items-center gap-2"><input type="radio" name="nc-delivery"
+              </Label>
+              <Label className="flex items-center gap-2"><Radio name="nc-delivery"
                 checked={deliveryMode==="facilitated"}
                 disabled={!!publicSiteId&&!!selected&&!selected.siteOptions.some(s=>s.id===preferredSiteId)}
                 onChange={()=>{setDeliveryMode("facilitated");setSiteId(publicSiteId&&selected?.siteOptions.some(s=>s.id===preferredSiteId)?preferredSiteId??"":"");setAdditionalSites([]);}}/>
                 Facilitated at a Site
-              </label>
+              </Label>
             </div>
           </fieldset>
           {deliveryMode==="independent"&&<div>
-            <label htmlFor="nc-online-site" className="block text-sm font-semibold">Authorized Site for online delivery (required)</label>
-            <select id="nc-online-site" required value={siteId} onChange={event=>setSiteId(event.target.value)}
+            <Label htmlFor="nc-online-site" className="block text-sm font-semibold">Authorized Site for online delivery (required)</Label>
+            <Select id="nc-online-site" required value={siteId} onChange={event=>setSiteId(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose an authorized Site</option>
               {selected?.digitalSiteOptions.filter(site=>!publicSiteId||site.id===preferredSiteId).map(site=>
                 <option key={site.id} value={site.id}>{site.name}</option>)}
-            </select>
+            </Select>
             <p className="mt-2 text-xs text-muted-foreground">An authorized virtual, mobile or physical Site anchors the release and its reporting. Online delivery does not require an in-person facilitator.</p>
           </div>}
           {deliveryMode==="facilitated"&&<div>
-            <label htmlFor="nc-site" className="block text-sm font-semibold">Authorized hosting Site</label>
-            <select id="nc-site" required value={siteId} onChange={event=>{setSiteId(event.target.value);setAdditionalSites([]);}}
+            <Label htmlFor="nc-site" className="block text-sm font-semibold">Authorized hosting Site</Label>
+            <Select id="nc-site" required value={siteId} onChange={event=>{setSiteId(event.target.value);setAdditionalSites([]);}}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose a deployment Site</option>
               {selected?.siteOptions.filter(site=>!publicSiteId||site.id===preferredSiteId).map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-            </select>
+            </Select>
             {!selected?.siteOptions.length&&<p className="mt-2 text-xs text-muted-foreground">
               This deployment has no currently authorized hosting Site in your scope.
             </p>}
@@ -195,41 +201,41 @@ function NoncreditPublicationPage(){
                 <p className="mb-3 text-xs text-muted-foreground">Every selected location gets its own approved registration release, seats and classroom calendar. This does not add new Site permissions.</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {selected.siteOptions.filter(site=>site.id!==siteId).map(site=>
-                    <label key={site.id} className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={additionalSites.includes(site.id)}
+                    <Label key={site.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={additionalSites.includes(site.id)}
                         onChange={event=>setAdditionalSites(current=>
                           event.target.checked?[...current,site.id]:current.filter(id=>id!==site.id))}/>
                       {site.name}
-                    </label>)}
+                    </Label>)}
                 </div>
               </fieldset>}
           </div>}
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-semibold">Registration opens
-              <input type="datetime-local" required value={opensAt} onChange={event=>setOpensAt(event.target.value)}
+            <Label className="block text-sm font-semibold">Registration opens
+              <Input type="datetime-local" required value={opensAt} onChange={event=>setOpensAt(event.target.value)}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-            </label>
-            <label className="block text-sm font-semibold">Registration closes
-              <input type="datetime-local" required value={closesAt} onChange={event=>setClosesAt(event.target.value)}
+            </Label>
+            <Label className="block text-sm font-semibold">Registration closes
+              <Input type="datetime-local" required value={closesAt} onChange={event=>setClosesAt(event.target.value)}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-            </label>
+            </Label>
           </div>
-          <label className="block text-sm font-semibold">Maximum registrations
-            <input type="number" min={1} max={1000000} step={1} required value={maxParticipants}
+          <Label className="block text-sm font-semibold">Maximum registrations
+            <Input type="number" min={1} max={1000000} step={1} required value={maxParticipants}
               onChange={event=>setMaxParticipants(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-          </label>
-          <label className="block text-sm font-semibold">Participation terms version
-            <input type="text" required minLength={3} maxLength={80} value={consentVersion}
+          </Label>
+          <Label className="block text-sm font-semibold">Participation terms version
+            <Input type="text" required minLength={3} maxLength={80} value={consentVersion}
               onChange={event=>setConsentVersion(event.target.value)} placeholder="e.g. training-policy-v1"
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-          </label>
-          <label className="block text-sm font-semibold">Approved terms shown to each participant
-            <textarea required minLength={25} maxLength={4000} rows={7} value={consentText}
+          </Label>
+          <Label className="block text-sm font-semibold">Approved terms shown to each participant
+            <Textarea required minLength={25} maxLength={4000} rows={7} value={consentText}
               onChange={event=>setConsentText(event.target.value)}
               className="mt-2 w-full border border-border bg-background px-3 py-3 text-sm"
               placeholder="Provide the actual approved enrollment, participation and data-use terms for this training. Do not include unapproved claims."/>
-          </label>
+          </Label>
           <p className="text-xs leading-6 text-muted-foreground">
             Publication is immediate when the window is open. You can close a release, but changing
             its terms, delivery, course or capacity requires a new release.
@@ -255,13 +261,13 @@ function NoncreditPublicationPage(){
             <div className="flex flex-wrap gap-3">
               <Link to="/learn/enroll" search={{release:row.id}}
                 className="text-xs font-semibold text-primary underline underline-offset-4">Learner link</Link>
-              <button type="button" className="text-xs font-semibold text-primary underline underline-offset-4"
+              <Button variant="ghost" type="button" className="text-xs font-semibold text-primary underline underline-offset-4"
                 onClick={()=>setManagedRelease(id=>id===row.id?null:row.id)}>
                 {managedRelease===row.id?"Hide roster":"Roster & sessions"}
-              </button>
-              {row.status==="published"&&<button type="button" disabled={busy}
+              </Button>
+              {row.status==="published"&&<Button variant="ghost" type="button" disabled={busy}
                 onClick={()=>void close(row.id)}
-                className="text-xs font-semibold text-destructive underline underline-offset-4">Close registration</button>}
+                className="text-xs font-semibold text-destructive underline underline-offset-4">Close registration</Button>}
             </div>
           </div>)}
           {!query.data.published.length&&<p className="py-4 text-sm text-muted-foreground">Nothing has been published yet.</p>}

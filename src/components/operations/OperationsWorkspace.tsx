@@ -1,3 +1,6 @@
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
@@ -153,59 +156,59 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    <DashboardShortcut title="Calendar" description="Your authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
   </>}
   priority={attentionItems.some(item=>item.priority==="critical") ? <AttentionQueue items={attentionItems.filter(item=>item.priority==="critical")} /> : undefined}
-  actions={<div className="flex flex-wrap gap-2"><Link to="/launch/site" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link><Link to="/operations/family-alerts" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Notify families</Link></div>}>
-  {notice&&<p role="status" className="mb-4 rounded-xl border p-4 text-sm">{notice}</p>}
-  <section aria-label="Operations filters" className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+  actions={<div className="flex flex-wrap gap-2"><Link to="/launch/site" className="inline-flex min-h-11 items-center  bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center  border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link><Link to="/operations/family-alerts" className="inline-flex min-h-11 items-center  border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Notify families</Link></div>}>
+  {notice&&<p role="status" className="mb-4  border p-4 text-sm">{notice}</p>}
+  <section aria-label="Operations filters" className=" border border-border/70 bg-card p-5 shadow-sm">
    <h2 className="text-sm font-semibold">Filter operational records</h2>
    <div className="mt-3 flex flex-wrap gap-4">
-    <label className="min-w-52 flex-1 text-sm">School
-     <select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="mt-2 block min-h-11 w-full rounded-lg border bg-background px-3 py-2">
+    <Label className="min-w-52 flex-1 text-sm">School
+     <Select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="mt-2 block min-h-11 w-full  border bg-background px-3 py-2">
       <option value="">All authorized schools</option>
       {data.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-     </select>
-    </label>
-    <label className="min-w-52 flex-1 text-sm">Program
-     <select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="mt-2 block min-h-11 w-full rounded-lg border bg-background px-3 py-2">
+     </Select>
+    </Label>
+    <Label className="min-w-52 flex-1 text-sm">Program
+     <Select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="mt-2 block min-h-11 w-full  border bg-background px-3 py-2">
       <option value="">All authorized programs</option>
       {data.programs.filter(program=>!selected.siteId||program.siteId===selected.siteId)
        .map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
-     </select>
-    </label>
+     </Select>
+    </Label>
    </div>
   </section>
   {healthData===null
    ? <QueryState error="Operational health details could not load; alignment cannot be verified." onRetry={retrySupplementaryReads}/>
-   : healthData.schemaStatus!=="aligned"&&<p className="mt-4 rounded-xl border p-3 text-sm" role="status">Some operational information may be temporarily unavailable. Contact CAN support if this continues.</p>}
+   : healthData.schemaStatus!=="aligned"&&<p className="mt-4  border p-3 text-sm" role="status">Some operational information may be temporarily unavailable. Contact CAN support if this continues.</p>}
   {commandCenterData===null&&<QueryState error="Staffing and capacity exceptions could not be loaded; operational health cannot be verified." onRetry={retrySupplementaryReads}/>}
   {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
-  {mutation.refreshError&&<button type="button" disabled={mutation.isSubmitting}
-   onClick={()=>void retryActionRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">
+  {mutation.refreshError&&<Button variant="outline" type="button" disabled={mutation.isSubmitting}
+   onClick={()=>void retryActionRefresh()} className="mt-2  border px-3 py-2 text-sm disabled:opacity-50">
    Retry action refresh
-  </button>}
-  {exitMutation.refreshError&&<button type="button" disabled={exitMutation.isSubmitting}
-   onClick={()=>void retryExitRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">
+  </Button>}
+  {exitMutation.refreshError&&<Button variant="outline" type="button" disabled={exitMutation.isSubmitting}
+   onClick={()=>void retryExitRefresh()} className="mt-2  border px-3 py-2 text-sm disabled:opacity-50">
    Retry institutional change refresh
-  </button>}
+  </Button>}
   <AttentionQueue items={attentionItems.filter(item=>item.priority!=="critical")}/>
-  <section aria-label="School improvement and planning" className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+  <section aria-label="School improvement and planning" className="mt-7  border border-border/70 bg-card p-5 shadow-sm">
     <p className="text-xs font-bold uppercase tracking-widest text-primary">Sustain · Review and plan</p>
     <h2 className="mt-2 font-serif text-2xl font-semibold">Keep your school moving forward</h2>
     <p className="mt-2 text-sm text-muted-foreground">Use the existing school records for recurring review. These links are suggested routines, not proof that a review or compliance requirement is complete.</p>
     <div className="mt-4 grid gap-3 md:grid-cols-3">
-      <article className="rounded-xl border p-4">
+      <article className=" border p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Weekly · Operational review</p>
         <h3 className="mt-2 font-semibold">Resolve open issues</h3>
         <p className="mt-2 text-sm text-muted-foreground">Review assigned actions, staffing exceptions and unresolved follow-ups.</p>
         <a href="#operations-actions" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Review action queue →</a>
       </article>
-      <article className="rounded-xl border p-4">
+      <article className=" border p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monthly · School health</p>
         <h3 className="mt-2 font-semibold">Review evidence and insights</h3>
         <p className="mt-2 text-sm text-muted-foreground">Inspect observed signals, accept follow-up actions, or dismiss with a recorded reason.</p>
         <Link to="/operations/insights" search={{siteId:selected.siteId,programId:selected.programId}}
           className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Open insights →</Link>
       </article>
-      <article className="rounded-xl border p-4">
+      <article className=" border p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Term / Annual · Planning</p>
         <h3 className="mt-2 font-semibold">Prepare the next school period</h3>
         <p className="mt-2 text-sm text-muted-foreground">Review saved school years, calendars and academic requirements before configuring new periods.</p>
@@ -220,28 +223,28 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     <h2 className="font-serif text-3xl font-semibold">Operational health</h2>
     <p className="mt-2 text-sm text-muted-foreground">Prioritize verified staffing and capacity exceptions before routine school monitoring. Readiness approvals remain controlled by their owning workflows.</p>
     <div className="mt-5 grid gap-4 md:grid-cols-3">
-      <div className="rounded-2xl border border-destructive/40 bg-card p-5">
+      <div className=" border border-destructive/40 bg-card p-5">
         <h3 className="text-sm font-semibold">Needs intervention</h3>
         <p className="mt-2 text-3xl font-semibold">{commandCenterData.issues.length}</p>
         <p className="mt-2 text-xs text-muted-foreground">Reported staffing and capacity exceptions</p>
       </div>
-      <div className="rounded-2xl border bg-card p-5">
+      <div className=" border bg-card p-5">
         <h3 className="text-sm font-semibold">Watching</h3>
         <p className="mt-2 text-sm text-muted-foreground">Use the existing action workspace and live program details to review emerging concerns. No inferred warning counts.</p>
       </div>
-      <div className="rounded-2xl border bg-muted/30 p-5">
+      <div className=" border bg-muted/30 p-5">
         <h3 className="text-sm font-semibold">Active sections</h3>
         <p className="mt-2 text-sm text-muted-foreground">{commandCenterData.summary.sections} active sections in scope. Individual readiness is not inferred from this count.</p>
       </div>
     </div>
-    {commandCenterData.issues.length>0&&<div className="mt-5 divide-y rounded-2xl border bg-card">
+    {commandCenterData.issues.length>0&&<div className="mt-5 divide-y  border bg-card">
       {commandCenterData.issues.map(issue=><article key={issue.kind+issue.sectionId} className="flex flex-wrap items-start justify-between gap-4 p-5">
         <div><h3 className="font-semibold">{issue.title}</h3><p className="mt-1 text-sm text-muted-foreground">{issue.description}</p></div>
-        <Link to="/launch/school/$programId" params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}} className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold">Review workflow <ArrowUpRight className="size-4"/></Link>
+        <Link to="/launch/school/$programId" params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}} className="inline-flex min-h-11 items-center gap-2  border px-4 py-2 text-sm font-semibold">Review workflow <ArrowUpRight className="size-4"/></Link>
       </article>)}
     </div>}
   </section>}
-  {commandCenterData&&<section className="mt-7 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+  {commandCenterData&&<section className="mt-7  border border-border/70 bg-card p-6 shadow-sm">
     <h2 className="font-serif text-2xl">Live school operations</h2>
     <div className="mt-3 flex flex-wrap gap-4 text-sm">
     <span>{commandCenterData.summary.sections} active sections</span>
@@ -250,7 +253,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     <span>{commandCenterData.summary.waitlisted} open section waitlist entries</span>
     </div>
     <div className="mt-4 space-y-2">
-    {commandCenterData.issues.map(issue=><div key={issue.kind+issue.sectionId} className="rounded border p-3 text-sm">
+    {commandCenterData.issues.map(issue=><div key={issue.kind+issue.sectionId} className=" border p-3 text-sm">
        <strong>{issue.title}</strong><p className="text-muted-foreground">{issue.description}</p>
        <Link className="mt-2 inline-block underline" to="/launch/school/$programId"
         params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}}>Review lifecycle →</Link>
@@ -268,16 +271,16 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
        <GuidedSchoolJourney key={program.id} program={program}
         journey={launchesData.launches.find(launch=>launch.id===program.id)??null}/>)}
     {!dashboardData.programs.some(p=>isGuidedAcademicSchool(p.type))&&
-      <div className="rounded-xl border-2 border-primary/30 p-5">
+      <div className=" border-2 border-primary/30 p-5">
         <p className="font-semibold">Your school is not set up yet.</p>
         <p className="mt-1 text-sm text-muted-foreground">There are no academic school programs in this scope. Launch Mode creates the canonical Program and Launch Journey, then guides the remaining setup; it never authorizes opening by itself.</p>
         <Link to="/launch/site" search={{siteId:undefined,programId:undefined}}
-          className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
+          className="mt-3 inline-flex min-h-11 items-center  bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
           Launch a school →
         </Link>
       </div>}
   </section>}
-  <section className="mt-7 rounded-xl border bg-card p-5" aria-label="FullFlow operational record">
+  <section className="mt-7  border bg-card p-5" aria-label="FullFlow operational record">
    <h2 className="font-serif text-2xl">Connected school operational record</h2>
    <p className="mt-2 text-sm text-muted-foreground">Live records from the same authorized school programs, curriculum releases, enrollments, classrooms, grades and guardian follow-ups. Numbers are not simulated readiness approvals.</p>
   {dashboardData===null ? <QueryState error="The connected school record could not be loaded. Launch and grading status cannot be verified from this screen." onRetry={retrySupplementaryReads}/> : <>
@@ -288,12 +291,12 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
          ["Class placements",dashboardData.totals.placedStudents],
          ["Graded submissions",dashboardData.totals.gradedWork],
          ["Guardian questions open",dashboardData.totals.unresolvedGuardianResponses]]
-       .map(([label,value])=><div key={label} className="rounded-lg border p-3">
+       .map(([label,value])=><div key={label} className=" border p-3">
         <p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p>
        </div>)}
     </div>
     <div className="mt-5 space-y-4">
-    {dashboardData.programs.map(program=><article key={program.id} className="rounded-xl border p-4">
+    {dashboardData.programs.map(program=><article key={program.id} className=" border p-4">
       <div id={`academic-activity-${program.id}`} className="scroll-mt-6" />
       <div className="flex flex-wrap items-center justify-between gap-2">
        <h3 className="font-semibold">{program.name} <span className="text-xs font-normal text-muted-foreground">· {program.status.replaceAll("_"," ")} · {program.type.replaceAll("_"," ")}</span></h3>
@@ -318,19 +321,19 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
        <p className="break-all">Credit issuer: {program.creditIssuingOrganizationId}</p>
       </details>
      </article>)}
-    {!dashboardData.programs.length&&<p className="rounded-lg border p-4 text-sm">No programs match your current school and verified access scope.</p>}
+    {!dashboardData.programs.length&&<p className=" border p-4 text-sm">No programs match your current school and verified access scope.</p>}
     </div>
    </>}
   </section>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
   {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Overdue",data.summary.overdue],["Unassigned",data.summary.unassigned],["Waiting",data.summary.waiting],["Needs response",data.summary.needsResponse]].map(([label,num])=><StatCard key={label} label={label} value={num}/>)}
   </div>
-  <p className="mt-6">{selected.siteId?<Link to="/sites/$siteId" params={{siteId:selected.siteId}} className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">Open this Site Today →</Link>:<Link to="/sites" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">Choose a school →</Link>} <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
+  <p className="mt-6">{selected.siteId?<Link to="/sites/$siteId" params={{siteId:selected.siteId}} className="inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold">Open this Site Today →</Link>:<Link to="/sites" className="inline-flex min-h-11 items-center  border px-4 py-2 text-sm font-semibold">Choose a school →</Link>} <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex  border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex  border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
   <div id="operations-actions" className="mt-8 scroll-mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
   {selected.action&&<Link to="/home" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
   {selected.action&&<Link to="/actions/$actionId" params={{actionId:selected.action}} className="ml-4 text-sm underline">View Action details</Link>}
   {selected.action&&!data.items.some(item=>item.id===selected.action)&&<WorkspaceNotice tone="danger">This action is unavailable in the current operations queue.</WorkspaceNotice>}
-  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/home" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><StatusBadge tone={i.priority==="critical"?"danger":i.priority==="high"?"attention":"neutral"}>{i.priority}</StatusBadge></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
+  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className=" border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/home" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><StatusBadge tone={i.priority==="critical"?"danger":i.priority==="high"?"attention":"neutral"}>{i.priority}</StatusBadge></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
   <p className="mt-2 text-xs text-muted-foreground">Status: {i.status?.replaceAll("_"," ") ?? "open"}
    {i.dueAt&&<> · Due {new Date(i.dueAt).toLocaleDateString()}
     {new Date(i.dueAt).getTime()<Date.now()&&<strong className="ml-2 text-foreground">Overdue</strong>}</>}
@@ -339,42 +342,42 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   <div className="mt-3 flex flex-wrap gap-3">{i.type==="section_creation_request"?i.programId?
    <Link to="/launch/school/$programId" params={{programId:i.programId}} className="text-sm underline">Review teacher class request in academic setup →</Link>:
    <WorkspaceNotice tone="danger">This class request is missing its program. Contact your school administrator.</WorkspaceNotice>:
-   i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><label className="flex items-center gap-2 text-xs">Assigned to
- <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={commandsBlocked} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
+   i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><Label className="flex items-center gap-2 text-xs">Assigned to
+ <Select aria-label={"Assign "+i.title} className=" border bg-background px-2 py-1" disabled={commandsBlocked} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
  <option value="" disabled={i.type==="onsite_coverage_gap"&&!!i.eligibleOwnerPersonId}>Unassigned</option>
  {i.type==="onsite_coverage_gap"&&i.ownerPersonId&&i.ownerPersonId!==i.eligibleOwnerPersonId&&
   <option value={i.ownerPersonId} disabled>Previous assignee — reassign to the current director</option>}
  {data.assignees.filter(person=>person.siteId===i.siteId&&
    (i.type==="onsite_coverage_gap"?person.role==="site_leader"&&person.id===i.eligibleOwnerPersonId:person.role!=="site_leader")).map(person=><option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.role}</option>)}
- </select></label>
- <label className="flex flex-col gap-1 text-xs">Due date (your local time)
-  <input type="datetime-local" aria-label={"Deadline for "+i.title}
-   className="rounded border bg-background px-2 py-1"
+ </Select></Label>
+ <Label className="flex flex-col gap-1 text-xs">Due date (your local time)
+  <Input type="datetime-local" aria-label={"Deadline for "+i.title}
+   className=" border bg-background px-2 py-1"
    disabled={commandsBlocked}
    value={dueDrafts[i.id]??localDue(i.dueAt)}
    onChange={event=>setDueDrafts(prev=>({...prev,[i.id]:event.target.value}))}/>
- </label>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+ </Label>
+ <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50"
    disabled={commandsBlocked||dueDrafts[i.id]===undefined}
-   onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</button>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
+   onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</Button>
+ <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"in_progress")}>Start</Button>
+ <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"waiting")}>Waiting</Button>
  {i.type==="guardian_health_information_review"?
   <Link to="/operations/health-review" search={{action:i.id}}
-    className="rounded border px-3 py-1 text-xs font-semibold">Review confidential family update</Link>:
+    className=" border px-3 py-1 text-xs font-semibold">Review confidential family update</Link>:
   i.type==="transfer_academic_records_handoff"?
-  <Link to="/operations/transfer-records" className="rounded border px-3 py-1 text-xs font-semibold">Complete verified records transfer →</Link>:
+  <Link to="/operations/transfer-records" className=" border px-3 py-1 text-xs font-semibold">Complete verified records transfer →</Link>:
   (i.enrollmentChangeKind==="transfer"||i.enrollmentChangeKind==="withdrawal")?
-  <button type="button" className="rounded border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
+  <Button variant="outline" type="button" className=" border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
     disabled={commandsBlocked} onClick={()=>{if(i.enrollmentChangeKind==="withdrawal"||i.enrollmentChangeKind==="transfer")void completeEnrollmentExit(i.id,i.enrollmentChangeKind);}}>
     Complete official {i.enrollmentChangeKind==="withdrawal"?"withdrawal":"transfer"} &amp; end school enrollment
-  </button>:
+  </Button>:
   i.type==="onsite_coverage_gap"&&i.siteId?
   <Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-xs underline">Assigned director resolves in Site Today →</Link>:
-  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>}
+  <Button variant="outline" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"resolved")}>Resolve</Button>}
  </>}</div></article>)}
   {!data.items.length&&<EmptyState title="No actions currently require attention."/>}
-  </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
+  </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3  border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
  {dialog&&<ActionDialog open title={dialog.kind==="resolve"?"Resolve action":dialog.kind==="deadline"?"Change action deadline":"Complete official "+dialog.exitKind}
   description={<><p>{dialog.title}</p><p className="mt-2">{dialog.kind==="exit"
    ?"Active Program and class memberships end immediately. The student login at this school may also be revoked. Record the institutional decision and academic records handoff."
