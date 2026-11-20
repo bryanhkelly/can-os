@@ -7,8 +7,8 @@
  * No DB connection, build output, generated routes, or network is required.
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve, posix } from "node:path";
-import { sourceDependencySpecifiers, sharedUiImportViolation } from "./lib/v61-component-dependencies.mjs";
+import { join, resolve } from "node:path";
+import { sourceDependencySpecifiers, sharedUiImportViolation, resolveSourceDependency } from "./lib/v61-component-dependencies.mjs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import ts from "typescript";
@@ -53,11 +53,7 @@ for (const file of files) {
   const sourceFamily = family(path);
   const sourceFeature = path.match(/^src\/components\/([^/]+)\//)?.[1];
   for (const value of imports) {
-    const target = value.startsWith("@/")
-      ? "src/" + value.slice(2)
-      : value.startsWith(".")
-        ? posix.normalize(posix.join(posix.dirname(path), value))
-        : null;
+    const target = resolveSourceDependency(path, value);
     if (!target) continue;
     if (path.startsWith("src/components/")) {
       if (/^src\/(?:routes|db|workers|server)(?:\/|$)/.test(target))
