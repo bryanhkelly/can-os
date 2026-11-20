@@ -659,6 +659,13 @@
       "when": 1795131000000,
       "tag": "0093_class_participant_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1795132000000,
+      "tag": "0094_class_participant_delivery_privacy",
+      "breakpoints": true
     }
   ]
 }
