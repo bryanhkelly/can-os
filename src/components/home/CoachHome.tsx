@@ -1,13 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { Link } from "@tanstack/react-router";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { CoachCaseloadList } from "@/components/support/CoachCaseloadList";
-import { CoachStudentTimeline } from "@/components/support/CoachStudentTimeline";
+import { CoachOutreachPanel, type CoachOutreachOutcome } from "@/components/support/CoachOutreachPanel";
 import { Users, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -19,13 +15,6 @@ import {
 type CaseloadStudent = Awaited<ReturnType<typeof getCoachCaseload>>["students"][number];
 type TimelineEntry = Awaited<ReturnType<typeof getCoachStudentHistory>>["timeline"][number];
 
-const outcomes = [
-  { value: "contacted", label: "Contacted" },
-  { value: "meeting_scheduled", label: "Meeting scheduled" },
-  { value: "escalated", label: "Escalated" },
-  { value: "no_response", label: "No response" },
-] as const;
-
 export function CoachPage({studentProfileId,selectStudent,title="Specialist caseload"}:{
   studentProfileId?:string;selectStudent:(id:string)=>void;title?:string;
 }) {
@@ -36,7 +25,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [note, setNote] = useState("");
-  const [outcome, setOutcome] = useState<(typeof outcomes)[number]["value"]>("contacted");
+  const [outcome, setOutcome] = useState<CoachOutreachOutcome>("contacted");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [message, setMessage] = useState("");
@@ -126,49 +115,11 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
           <div className="mt-8 grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
             <CoachCaseloadList students={students} selected={selected}
               onSelect={id=>{selectStudent(id);setMessage("");setFormError("");}} />
-            <section className="h-fit  border bg-card p-5">
-              {!chosen && <p className="text-sm text-muted-foreground">Select a student to see their timeline and log outreach.</p>}
-              {chosen && (
-                <>
-                  <h2 className="font-serif text-2xl">{chosen.name}</h2>
-                  <Link to="/staff/students/$personId" params={{personId:chosen.personId}} className="mt-3 inline-block text-sm underline">Open student profile</Link>
-                  <p className="mt-3 text-xs text-muted-foreground">School-support records only. Do not enter clinical or private counseling notes.</p>
-                  <CoachStudentTimeline entries={timeline} loading={timelineLoading} error={historyError}/>
-                  <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Log outreach</h3>
-                  <Label className="mt-3 block text-sm font-semibold">
-                    Note
-                    <Textarea
-                      value={note}
-                      onChange={(event) => setNote(event.target.value)}
-                      rows={4}
-                      placeholder="Who did you contact, what was discussed, and what happens next?"
-                      className="mt-2 w-full  border border-border bg-background p-3 text-sm"
-                    />
-                  </Label>
-                  <Label className="mt-3 block text-sm font-semibold">
-                    Outcome
-                    <Select
-                      value={outcome}
-                      onChange={(event) => setOutcome(event.target.value as typeof outcome)}
-                      className="mt-2 w-full  border border-border bg-background p-3 text-sm"
-                    >
-                      {outcomes.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </Select>
-                  </Label>
-                  {formError && <p className="mt-3  border border-danger/40 p-3 text-sm" role="alert">{formError}</p>}
-                  {message && <p className="mt-3  border border-success/40 p-3 text-sm" role="status">{message}</p>}
-                  <Button type="submit" variant="ghost"
-                    disabled={busy || note.trim().length < 3}
-                    onClick={submitOutreach}
-                    className="mt-4 w-full  bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40"
-                  >
-                    Log outreach
-                  </Button>
-                </>
-              )}
-            </section>
+            <CoachOutreachPanel
+              chosen={chosen} timeline={timeline} timelineLoading={timelineLoading}
+              historyError={historyError} note={note} outcome={outcome} busy={busy}
+              formError={formError} message={message} onNoteChange={setNote}
+              onOutcomeChange={setOutcome} onSubmit={submitOutreach} />  </section>
           </div>
         )}
         </div>
