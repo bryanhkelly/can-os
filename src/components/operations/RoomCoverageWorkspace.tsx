@@ -36,15 +36,20 @@ export function RoomCoverageWorkspace({ siteId, view = "all" }: {
       ? "Physical rooms & occupancy capacity"
       : view === "schedules" ? "Facilitator coverage & room schedules"
       : model?.canManage ? "All-day room coverage" : "My assigned room coverage"}</h2>
-    <p className="mt-2 text-sm">One onsite facilitator supervises a physical room while its students take
-      different virtual courses. Course teaching assignments remain separate.</p>
-    <p className="mt-2 text-sm text-muted-foreground">A saved assignment is a plan, not verified arrival,
+    {view === "rooms" ? <p className="mt-2 text-sm">
+      Record physical rooms and self-reported occupancy limits for this Site.
+      Accessibility, equipment and building-use verification remain separate.
+    </p> : <p className="mt-2 text-sm">
+      Existing school Program room coverage assigns onsite facilitators while
+      learners attend Courses. Teaching assignments remain separate.
+    </p>}
+    {view !== "rooms" && <p className="mt-2 text-sm text-muted-foreground">A saved assignment is a plan, not verified arrival,
       continuous supervision, safety approval or permission to open. Independently reviewed daily room
       plans, qualified primary and backup adults, occupancy and school-calendar checks still apply.
-      Breaks or absences require an approved coverage handoff; report interruptions rather than assuming coverage continues.</p>
-    <p className="mt-2 text-sm text-muted-foreground">For standalone schools, this is planning only:
+      Breaks or absences require an approved coverage handoff; report interruptions rather than assuming coverage continues.</p>}
+    {view !== "rooms" && <p className="mt-2 text-sm text-muted-foreground">For standalone schools, this is planning only:
       the existing reviewed daily supervision and witnessed-presence workflow supports independently
-      church-hosted CAN programs. Saving a room assignment does not activate that workflow for a standalone school.</p>
+      church-hosted CAN programs. Saving a room assignment does not activate that workflow for a standalone school.</p>}
     {query.isPending && <p role="status" className="mt-3">Loading room coverage...</p>}
     {query.error && <div role="alert" className="mt-3">
       {mutationErrorMessage(query.error, "Room coverage is unavailable.")}
