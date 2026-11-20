@@ -16,37 +16,52 @@ export function OnsiteRoomPlanningPanel({programId, initialDate, onChanged}:{
   programId:string; initialDate?:string; onChanged?:()=>Promise<void>|void;
 }) {
   const [date,setDate]=useState(initialDate??new Date().toISOString().slice(0,10));
-  const [model,setModel]=useState<Model|null>(null);
+  const [modelSnapshot,setModel]=useState<{programId:string;date:string;value:Model}|null>(null);
+  // Never expose qualified staff or rooms from another program or planning day.
+  const model=modelSnapshot?.programId===programId&&modelSnapshot?.date===date
+    ? modelSnapshot.value:null;
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(false);
   // A date/program switch invalidates older requests, including a refresh
   // started after a plan mutation. Never show another day's qualified adults.
   const requestSequence=useRef(0);
+  const activeScope=useRef({programId,date});
   const load=useCallback(async()=>{
+    if(activeScope.current.programId!==programId||activeScope.current.date!==date)return;
     const request=++requestSequence.current;
     setLoading(true);setError("");setModel(null);
     try {
       const result=await getOnsiteRoomPlanningFn({data:{programId,date}});
-      if(request===requestSequence.current)setModel(result);
+      if(request===requestSequence.current&&activeScope.current.programId===programId&&
+        activeScope.current.date===date)setModel({programId,date,value:result});
     } catch(cause) {
-      if(request===requestSequence.current){
+      if(request===requestSequence.current&&activeScope.current.programId===programId&&
+        activeScope.current.date===date){
         setModel(null);
         setError(mutationErrorMessage(cause,"Room planning unavailable"));
       }
     } finally {
-      if(request===requestSequence.current)setLoading(false);
+      if(request===requestSequence.current&&activeScope.current.programId===programId&&
+        activeScope.current.date===date)setLoading(false);
     }
   },[programId,date]);
   const refreshAfterChange=useCallback(async()=>{
+    if(activeScope.current.programId!==programId||activeScope.current.date!==date)
+      throw new Error("Room planning context changed. Refresh the current date before continuing.");
     const request=++requestSequence.current;
     const result=await getOnsiteRoomPlanningFn({data:{programId,date}});
-    if(request!==requestSequence.current)
+    if(request!==requestSequence.current||activeScope.current.programId!==programId||
+       activeScope.current.date!==date)
       throw new Error("Room planning context changed. Refresh the current date before continuing.");
-    setModel(result);
+    setModel({programId,date,value:result});
     await onChanged?.();
   },[programId,date,onChanged]);
   useEffect(()=>{if(initialDate)setDate(initialDate);},[initialDate]);
-  useEffect(()=>{void load();return ()=>{requestSequence.current++;};},[load]);
+  useEffect(()=>{
+    activeScope.current={programId,date};
+    void load();
+    return ()=>{requestSequence.current++;};
+  },[load,programId,date]);
   return <section className="mt-6 border p-4" aria-label="Room and adult coverage planning">
     <h3 className="font-semibold">Room and adult coverage planning</h3>
     <p className="mt-2 text-sm text-muted-foreground">The church records the room, capacity and named adults for a real scheduled block. An independent CAN officer reviews the plan. This is a staff plan, not a legal inspection, permission to open or a record of physical arrival.</p>
