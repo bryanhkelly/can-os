@@ -443,10 +443,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     const component = eligibleLocalCategories.find(item => item.id === localComponentId);
     if (!component || !isBlueprintLocalExperienceKind(component.kind) ||
         localTitle.trim().length < 2) return;
+    const kind = component.kind;
     setLocalExperiences(current => current.length >= 200 ? current : [...current, {
       source: "proposed_local_experience",
       componentId: component.id,
-      kind: component.kind,
+      kind,
       title: localTitle.trim(),
       summary: localSummary.trim(),
       configuration: {},
