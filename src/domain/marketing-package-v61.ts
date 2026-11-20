@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { containsProtectedInstitutionalClaim } from "./site-local-content";
 
 /** Brand-independent source content. No Site theme, media blob or publication claim is stored here. */
 export const marketingPurposeIds = ["site-announcement", "program-interest", "interest-invitation", "event-invitation"] as const;
@@ -20,6 +21,18 @@ export const marketingPackageContentSchema = z.object({
 }).strict();
 export type MarketingPackageContent = z.infer<typeof marketingPackageContentSchema>;
 export type MarketingPurpose = MarketingPackageContent["purpose"];
+/** Shared release/preflight protection. The Package name also becomes
+ * immutable release metadata, so preview must inspect it just like release.
+ * Site Story and Program intent are suggestions, not approved public claims.
+ */
+export function marketingPackageClaimsRequireReview(
+  title:string,content:MarketingPackageContent,
+):boolean{
+  return containsProtectedInstitutionalClaim(
+    [title,content.headline,content.message,content.callToAction].join(" "),
+  );
+}
+
 export type MarketingFormat = MarketingPackageContent["formats"][number];
 
 export const marketingPurposeOptions: ReadonlyArray<{id: MarketingPurpose; label: string; description: string}> = [
