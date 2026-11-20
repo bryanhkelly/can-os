@@ -377,7 +377,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
               setChoice("");setSiteId("");}}
             placeholder="Paste versioned publisher rollout instructions from an approved partner"
-            className="mt-1 w-full border border-border bg-background p-3 font-mono text-xs"/>
+            className="mt-1 font-mono text-xs"/>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled={!selected}
               onClick={()=>void exportLaunchRecipe()}>Copy Offering rollout</Button>
@@ -396,7 +396,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <Select id="publisher-rollout-site" value={rolloutSiteId}
               disabled={operatorSites.isPending||operatorSites.isError}
               onChange={event=>{setRolloutSiteId(event.target.value);setChoice("");setSiteId("");}}
-              className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="min-h-11">
               <option value="">Select an authorized physical or virtual Site</option>
               {rolloutSiteOptions.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
             </Select>
@@ -467,7 +467,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                 }
               }else setSiteId("");
             }}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11">
               <option value="">Select an authorized Course</option>
               {visibleOptions.map(row=><option key={optionKey(row)} value={optionKey(row)}>
                 {row.offeringTitle} · {row.courseTitle} (v{row.courseVersionNo}) · {row.deploymentName}
@@ -498,7 +498,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <Input id="native-class-title" required minLength={3} maxLength={200} value={title}
               disabled={selected?.localClassPolicy.classTitle==="locked"}
               onChange={e=>setTitle(e.target.value)} placeholder="AI Literacy · January 2027"
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+              className="mt-2 min-h-11"/>
           </div>
           <div>
             <Label className="block text-sm font-semibold" htmlFor="native-class-overall-capacity">
@@ -508,7 +508,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               max={selected?.localClassPolicy.maxClassCapacity??undefined}
               value={classCapacity} placeholder="Unlimited"
               onChange={event=>setClassCapacity(event.target.value)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+              className="mt-2 min-h-11"/>
             <p className="mt-2 text-xs text-muted-foreground">
               {selected?.localClassPolicy.maxClassCapacity!==null&&selected&&
                 "Publisher maximum: "+selected.localClassPolicy.maxClassCapacity+". An unlimited Class is not permitted. "}
@@ -525,7 +525,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                     site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)))
                   setSiteId(selectAuthorizedClassSite(selected?.siteOptions??[],preferredSiteId,mode));
               }}
-                className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+                className="mt-2 min-h-11">
                 {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))
                   .map(mode=><option key={mode} value={mode}>{mode.replace("_"," ")}</option>)}
               </Select>
@@ -533,7 +533,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <div><Label className="block text-sm font-semibold" htmlFor="native-class-site">Site</Label>
               <Select id="native-class-site" value={siteId} required
                 onChange={e=>setSiteId(e.target.value)}
-                className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+                className="mt-2 min-h-11">
                 <option value="">Select an approved physical or virtual Site</option>
                 {(selected?.siteOptions??[]).filter(site=>site.allowedDeliveryModes.some(mode=>mode===deliveryMode))
                   .map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
