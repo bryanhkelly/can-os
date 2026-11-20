@@ -4,9 +4,11 @@ import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical-v301";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { currentClassAuthority } from "./native-class-authority.server";
+import { getIdentityContext } from "@/modules/identity/command-context.server";
 
 const input=z.object({classId:z.string().uuid()}).strict();
 const asRecord=(value:unknown):Record<string,unknown>=>
@@ -29,6 +31,17 @@ async function authorizedTeacher(tx:Tx,classId:string){
       actor.scope.organizationIds?.length!==1)
      throw new AuthorizationError("exact CAN academic teacher membership");
   assertCapability(actor,"teacher:read");
+  // This teacher review surface requires an actual direct CAN teacher
+  // login. An otherwise valid native provider or room bearer cannot stand
+  // in for an assigned academic teacher's personal account.
+  const can=await getIdentityContext(getRequest());
+  if(can.role!=="teacher" || can.sessionAccountId ||
+      !can.actorPersonId || can.actorPersonId!==actor.actorPersonId ||
+      can.grantSiteId!==actor.scope.siteIds[0] ||
+      can.scope.organizationIds?.length!==1 ||
+      can.scope.organizationIds[0]!==actor.scope.organizationIds[0] ||
+      !can.capabilities.has("teacher:read"))
+    throw new AuthorizationError("current direct CAN teacher Session");
   const [cls]=await tx.select().from(canonicalClasses)
        .where(eq(canonicalClasses.id,classId)).limit(1);
      const now=new Date();
@@ -146,5 +159,82 @@ export const getNativeClassTeacherAssessments=createServerFn({method:"GET"})
          item.form_lifecycle==="published" &&
          item.administration_status==="open",
      })),partial:rows.length>50};
+   });
+ });
+
+const returnInput=input.extend({
+  submissionId:z.string().uuid(),
+  feedback:z.string().trim().min(10).max(2000),
+}).strict();
+
+/** Synthetic classroom revision request: preserve the learner's response
+ * verbatim, update only an already-submitted canonical row, and audit the
+ * instruction. This is NOT a grading_decision, official score or credential.
+ * Production grading remains guarded by independent verified capability. */
+export const returnNativeClassHomeworkForRevision=createServerFn({method:"POST"})
+ .validator((raw:unknown)=>returnInput.parse(raw))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   return db.transaction(async tx=>{
+     const cls=await authorizedTeacher(tx,data.classId);
+     // Explicit opt-in to the fictional Valor tenant for this new workflow.
+     const synthetic=await tx.execute(sql`
+       SELECT id FROM public.sites
+       WHERE id=${cls.siteId}::uuid
+         AND id='f1000000-0000-4000-8000-000000000003'::uuid
+         AND metadata @> '{"synthetic":true}'::jsonb
+       LIMIT 1
+     `);
+     if(synthetic.rows.length!==1)
+       throw new AuthorizationError("synthetic Valor revision scenario only");
+     const previous=await tx.execute(sql`
+       SELECT gs.id,gs.status,gs.response
+       FROM public.graded_submissions gs
+       JOIN public.learner_course_attempts ca
+         ON ca.id=gs.course_attempt_id
+        AND ca.course_version_id=gs.course_version_id
+        AND ca.status='active' AND ca.section_id IS NULL
+       JOIN public.class_enrollments ce
+         ON ce.id=ca.class_enrollment_id
+        AND ce.course_attempt_id=ca.id
+        AND ce.status='active'
+       JOIN public.graded_assignments ga
+         ON ga.id=gs.assignment_id
+        AND ga.course_version_id=ca.course_version_id
+        AND ga.section_id IS NULL
+       WHERE gs.id=${data.submissionId}::uuid
+         AND ce.class_id=${cls.id}::uuid
+         AND ca.course_version_id=${cls.courseVersionId}::uuid
+         AND gs.status='submitted'
+       FOR UPDATE OF gs
+     `);
+     if(previous.rows.length!==1)
+       throw new AuthorizationError("current submitted homework in your exact Class");
+     // Recheck session, Course publication and named appointment AFTER the
+     // learner submission has been locked.
+     const current=await authorizedTeacher(tx,data.classId);
+     if(current.id!==cls.id)
+       throw new AuthorizationError("unchanged current teacher Class authority");
+     const changed=await tx.execute(sql`
+       UPDATE public.graded_submissions
+       SET status='returned',
+           response=response||jsonb_build_object(
+             'teacherFeedback',${data.feedback},
+             'feedbackKind','synthetic_revision_request',
+             'synthetic',true,
+             'noncredit',true)
+       WHERE id=${data.submissionId}::uuid AND status='submitted'
+       RETURNING id
+     `);
+     if(changed.rows.length!==1)
+       throw new AuthorizationError("homework state changed; refresh and retry");
+     const actor=await getCanonicalCommandContext(getRequest());
+     await writeCanonicalAudit(tx,{
+       actorPersonId:actor.actorPersonId!,owningOrganizationId:cls.operatingOrganizationId,
+       eventCode:"valor.synthetic_homework.returned_for_revision",
+       entityKind:"graded_submission",entityId:data.submissionId,
+       payload:{classId:cls.id,synthetic:true,officialGradeIssued:false},
+     });
+     return {submissionId:data.submissionId,status:"returned" as const};
    });
  });
