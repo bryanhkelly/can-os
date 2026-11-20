@@ -5,7 +5,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import { discoverLaunchSitePrograms, getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { ActionFooter, EmptyState, FilterBar, StatusBadge } from "@/components/workspace";
+import { ActionFooter, EmptyState, FilterBar, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 
 const deliveryOptions = [
@@ -120,7 +120,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
         <Button type="submit" disabled={loading} loading={loading} loadingLabel="Checking availability...">Browse available Offerings</Button>
       </ActionFooter>
     </form>
-    {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
+    {error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
     {offerings && <>
       <FilterBar label="Published Offerings" query={query} onQueryChange={setQuery}
         searchLabel="Search titles or codes" searchPlaceholder="Search published Offerings"
