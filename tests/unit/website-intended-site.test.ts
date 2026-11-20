@@ -7,6 +7,8 @@ vi.mock("@/modules/sites/site-website-preview.server",()=>({getPartnerWebsitePre
 vi.mock("@/db/client",()=>({db:{transaction:state.transaction}}));
 vi.mock("@/modules/sites/site-brand.functions",()=>({
   assetInputSchema:{nullable:()=>({parse:(v:unknown)=>v})},
+}));
+vi.mock("@/modules/sites/site-brand.server",()=>({
   saveSiteBrandVersionWithinTransaction:state.brand,
 }));
 vi.mock("@/modules/sites/site-local-content.server",()=>({
