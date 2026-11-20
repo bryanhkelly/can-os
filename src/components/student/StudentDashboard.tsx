@@ -51,9 +51,9 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
     quickActions={<>
       <DashboardShortcut title="Continue Learning" description={learning?.lesson?.title ?? nextWork?.title ?? "Open your enrolled classes"}
         icon={<BookOpen className="size-5" />}>{learning?.lesson
-          ? <Link to="/classes" search={{section:learning.sectionId,tab:"lessons",lesson:learning.lesson.id}} />
+          ? <Link to="/class" search={{section:learning.sectionId,tab:"lessons",lesson:learning.lesson.id}} />
           : nextWork ? <StudentAssignmentLink assessmentId={nextWork.assessmentId} sectionId={nextWork.sectionId} />
-          : <Link to="/classes" />}</DashboardShortcut>
+          : <Link to="/class" />}</DashboardShortcut>
       <DashboardShortcut title="View Assignments" description={assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}
         icon={<FileText className="size-5" />}><Link to="/student/assignments" /></DashboardShortcut>
       <DashboardShortcut title="Today's Schedule" description={`${classesToday.length} class events scheduled`}
