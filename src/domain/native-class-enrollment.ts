@@ -93,7 +93,7 @@ export function authorizeNativeClassAttempt(args:{
   if(!actorPersonId || !attempt || !enrollment || !classInstance || !authority ||
      !Number.isFinite(now.getTime())) return deny();
   if(attempt.classEnrollmentId!==enrollment.id ||
-     attempt.enrollmentId!==null || attempt.noncreditRegistrationId!==null ||
+     attempt.enrollmentId!==null ||
      enrollment.courseAttemptId!==attempt.id ||
      enrollment.classId!==classInstance.id || enrollment.learnerPersonId!==actorPersonId ||
      attempt.deploymentId!==classInstance.deploymentId ||
