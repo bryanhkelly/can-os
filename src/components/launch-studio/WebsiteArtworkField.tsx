@@ -45,7 +45,7 @@ export function WebsiteArtworkField({ field, value, disabled, onSelect, onChange
           <option value="guardian_consent_confirmed">Documented guardian consent covers every identifiable child</option>
         </Select>
       </Label>
-      <Button type="button" variant="outline" onClick={()=>onChange(null)} className="min-h-11 border px-3 text-xs">
+      <Button type="button" variant="outline" onClick={()=>onChange(null)} className="min-h-11">
         Remove {field === "logoImage" ? "logo" : "artwork"}
       </Button>
     </div>}
