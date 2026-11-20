@@ -40,7 +40,7 @@ async function authorized(tx: Tx, actor: Actor, classEnrollmentId: string) {
   const [cls] = await tx.select().from(canonicalClasses)
     .where(eq(canonicalClasses.id, enrollment.classId)).limit(1);
   if (!cls || cls.state !== "active") throw new AuthorizationError("current Class");
-  if (actor.role === "student" && (actor.grantSiteId !== cls.siteId ||
+  if (actor.role === "student" && (actor.scope.siteIds?.[0] !== cls.siteId ||
       !actor.scope.organizationIds?.includes(cls.operatingOrganizationId))) {
     throw new AuthorizationError("own CAN student Site");
   }
