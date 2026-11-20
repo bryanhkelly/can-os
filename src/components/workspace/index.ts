@@ -1,4 +1,5 @@
 export { WorkspaceShell, type WorkspaceShellProps } from "./workspace-shell";
+export { WorkspaceActionLink } from "./workspace-action-link";
 export { PageFrame, PageHeader, PageEyebrow, PageTitle, type PageWidth } from "./page-frame";
 export { CreateAction, secondaryActionClassName } from "./create-action";
 export { FormSection, FormActions, useUnsavedChangesGuard } from "./form-page";
