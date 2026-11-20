@@ -97,6 +97,48 @@ describe("bounded outputs generated from one exact Site Brand",()=>{
     expect(output.plainText).toContain("Visit <unsafe>");
     expect(output.body).not.toContain("<script");
   });
+  it("keeps a released flyer and published website on their pinned Brand after a later Site save",()=>{
+    const previous=brand;
+    const flyer=renderSiteMarketingArtifact({
+      format:"flyer",brand:previous,content,websiteUrl:null,
+    });
+    const publication={
+      brandVersionId:previous.brandVersionId,
+      websiteCopyRevision:7,
+      templateId:"heritage",
+      renderedIdentity:siteBrandPresentationIdentity(previous,"heritage"),
+    };
+    const frozenPackage={
+      brandVersionId:previous.brandVersionId,
+      packageRevision:2,
+      contentSnapshot:{...content},
+      renderedOutput:flyer.body,
+    };
+
+    const newerVersion:SavedSiteBrandVersion={
+      ...version,id:"44444444-4444-4444-8444-444444444444",revision:4,
+      configuration:{...config,paletteId:"coastal",displayName:"Riverbend Learning"},
+    };
+    const current=resolveSiteBrandVersion(newerVersion,new Map([[logoId,asset]]));
+    const changedPackage={...content,headline:"An updated community announcement"};
+    const newFlyer=renderSiteMarketingArtifact({
+      format:"flyer",brand:current,content:changedPackage,websiteUrl:null,
+    });
+
+    expect(newFlyer.body).not.toBe(frozenPackage.renderedOutput);
+    expect(current.brandVersionId).not.toBe(frozenPackage.brandVersionId);
+    expect(frozenPackage.brandVersionId).toBe(version.id);
+    expect(frozenPackage.renderedOutput).toBe(flyer.body);
+    expect(frozenPackage.contentSnapshot.headline).toBe(content.headline);
+    expect(publication.brandVersionId).toBe(previous.brandVersionId);
+    expect(publication.renderedIdentity.paletteId).toBe("forest");
+
+    // An explicit new publication or Package Release is required to adopt v4.
+    const republished={...publication,brandVersionId:current.brandVersionId,
+      renderedIdentity:siteBrandPresentationIdentity(current,"heritage")};
+    expect(republished.renderedIdentity.paletteId).toBe("coastal");
+    expect(publication.renderedIdentity.paletteId).toBe("forest");
+  });
   it("refuses short-lived or missing QR destinations",()=>{
     expect(()=>renderSiteMarketingArtifact({format:"qr-card",brand,content,websiteUrl:null}))
       .toThrow(/durable/);
