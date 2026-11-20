@@ -1,6 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
 import {
   blueprints, blueprintVersions, blueprintComponents, catalogSites, siteOrganizationRoles,
 } from "@/db/canonical-v301";
@@ -27,7 +26,7 @@ export async function getPublishedSolutionWorkspaceReadOnly(
   if(context.scope.organizationIds?.length!==1)
     throw new AuthorizationError("one published Solution Organization scope");
   const organizationId=context.scope.organizationIds[0]!;
-  return withBlueprintDatabase(context, () => db.transaction(async tx=>{
+  return db.transaction(async tx=>{
     const isCanPlanning=isVerifiedCanSitePlanning(context);
     const [site]=await tx.select({id:catalogSites.id,status:catalogSites.status})
       .from(catalogSites).where(eq(catalogSites.id,siteId)).limit(1);
@@ -91,5 +90,5 @@ export async function getPublishedSolutionWorkspaceReadOnly(
         };
       }),
     };
-  }));
+  });
 }
