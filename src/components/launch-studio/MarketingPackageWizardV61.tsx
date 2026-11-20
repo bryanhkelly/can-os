@@ -1,12 +1,12 @@
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox, Radio } from "@/components/ui/choice";
+import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   marketingAudienceOptions, marketingFormatOptions, marketingPurposeOptions, marketingPackageSteps,
   type MarketingFormat, type MarketingPackageContent,
@@ -44,14 +44,13 @@ export function MarketingPackageWizardV61({
         {step===0&&<WorkspacePanel title="What would you like to share?" description="Choose a starting point. Your Site brand will be reused automatically later.">
           <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
             <legend className="sr-only">Package purpose</legend>
-            {purposeOptions.map(option=><label key={option.id}
-              className={"flex cursor-pointer gap-3 border p-4 text-sm "+
-                (content.purpose===option.id?"border-primary bg-accent":"bg-card")}>
-              <Radio name="package-purpose" className="mt-1"
-                checked={content.purpose===option.id} onChange={()=>
-                  onPatch({...starter(option.id),audiences:content.audiences,formats:content.formats})}/>
-              <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
-            </label>)}
+            {purposeOptions.map(option=><SelectionCard key={option.id} kind="radio"
+              name="package-purpose" value={option.id}
+              title={option.label} detail={option.description}
+              checked={content.purpose===option.id} disabled={busy}
+              onChange={() => onPatch({
+                ...starter(option.id), audiences:content.audiences, formats:content.formats,
+              })} />)}
           </fieldset>
           <div className="mt-5"><Field label="Package name" required>
             <Input value={title} maxLength={120} onChange={event=>onTitleChange(event.target.value)}/>
@@ -61,14 +60,12 @@ export function MarketingPackageWizardV61({
         {step===1&&<WorkspacePanel title="Who do you want to reach?" description="Select your intended audiences. This does not add contacts or authorize emails.">
           <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
             <legend className="sr-only">Intended audiences</legend>
-            {marketingAudienceOptions.map(option=><label key={option.id}
-              className="flex min-h-11 items-center gap-3 border bg-card p-3 text-sm">
-              <Checkbox checked={content.audiences.includes(option.id)}
-                onChange={event=>onPatch({audiences:event.target.checked
-                  ? [...new Set([...content.audiences,option.id])]
-                  : content.audiences.filter(id=>id!==option.id)})}/>
-              {option.label}
-            </label>)}
+            {marketingAudienceOptions.map(option=><SelectionCard key={option.id} kind="checkbox" compact
+              value={option.id} title={option.label} checked={content.audiences.includes(option.id)}
+              disabled={busy}
+              onChange={checked=>onPatch({audiences:checked
+                ? [...new Set([...content.audiences,option.id])]
+                : content.audiences.filter(id=>id!==option.id)})} />)}
           </fieldset>
           <div className="mt-5"><Field label="Geographic focus (optional)">
             <Input maxLength={120} value={content.geography} placeholder="Your community or neighborhood"
