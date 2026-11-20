@@ -83,6 +83,7 @@ export async function getCanonicalBlueprintWorkspace(
       tx.select({
         blueprintId: blueprints.id,
         title: blueprints.title,
+        publisherOrganizationId: blueprints.publisherOrganizationId,
         blueprintVersionId: blueprintVersions.id,
         versionNo: blueprintVersions.versionNo,
         spec: blueprintVersions.spec,
@@ -162,8 +163,10 @@ export async function getCanonicalBlueprintWorkspace(
       const code = (spec as Record<string, unknown>).offeringCode;
       return typeof code === "string" && code.trim() ? [code] : [];
     }))];
+    const linkedPublishers = [...new Set(templates.map(template => template.publisherOrganizationId))];
     const linkedPublishedProducts = linkedCodes.length
       ? await tx.select({
+          publisherOrganizationId: offerings.publisherOrganizationId,
           code: offerings.code,
           title: offerings.title,
           offeringVersionId: offeringVersions.id,
@@ -172,13 +175,16 @@ export async function getCanonicalBlueprintWorkspace(
           .innerJoin(offeringVersions, eq(offeringVersions.offeringId, offerings.id))
           .where(and(
             inArray(offerings.code, linkedCodes),
+            inArray(offerings.publisherOrganizationId, linkedPublishers),
             eq(offerings.status, "active"),
             eq(offeringVersions.lifecycle, "published"),
           )).orderBy(desc(offeringVersions.versionNo))
       : [];
-    const linkedByCode = new Map<string, (typeof linkedPublishedProducts)[number]>();
+    const linkedByPublisherAndCode = new Map<string, (typeof linkedPublishedProducts)[number]>();
     for (const product of linkedPublishedProducts) {
-      if (!linkedByCode.has(product.code)) linkedByCode.set(product.code, product);
+      const lookupKey = product.publisherOrganizationId + ":" + product.code;
+      if (!linkedByPublisherAndCode.has(lookupKey))
+        linkedByPublisherAndCode.set(lookupKey, product);
     }
     const components = templates.length
       ? await tx.select({
@@ -201,7 +207,7 @@ export async function getCanonicalBlueprintWorkspace(
       canExecute: context.capabilities.has("blueprint.execute"),
       affiliations,
       operations: [...new Map(operations.map(operation => [operation.id, operation])).values()],
-      templates: templates.map(({ spec, ...template }) => {
+      templates: templates.map(({ spec, publisherOrganizationId, ...template }) => {
         // Only expose the published, non-sensitive planning association.
         // Do not return unreviewed internal Blueprint spec to Site clients.
         const metadata: Record<string, unknown> = spec && typeof spec === "object"
@@ -213,7 +219,18 @@ export async function getCanonicalBlueprintWorkspace(
           // Planning-only. A published product is NOT a Site availability
           // decision, qualified adoption or permission to enroll learners.
           linkedPublishedOffering: typeof metadata.offeringCode === "string"
-            ? linkedByCode.get(metadata.offeringCode) ?? null : null,
+            ? (() => {
+                const product = linkedByPublisherAndCode.get(
+                  publisherOrganizationId + ":" + metadata.offeringCode);
+                // Publisher identity is used only to prove the exact content
+                // relationship; do not leak internal publisher fields.
+                if (!product) return null;
+                return {
+                  code: product.code, title: product.title,
+                  offeringVersionId: product.offeringVersionId,
+                  versionNo: product.versionNo,
+                };
+              })() : null,
           components: components
             .filter(component => component.blueprintVersionId === template.blueprintVersionId)
             .map(({ id, key, kind, requirementMode, componentSpec }) => ({
