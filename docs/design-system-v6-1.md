@@ -271,6 +271,16 @@ for `ActionFooter` or `FormActions`. ESLint treats duplicated native submit
 rows as errors for `src/components/**/*Form.tsx`, while other legacy
 surfaces remain visible as warnings pending migration.
 
+**Route-level adoption:** Messages, school-family alerts, curriculum creation,
+guardian enrichment and health updates, field trips, and platform adult-learner
+identity review now use the same `ActionFooter` patterns with the shared
+`Button.loading` behavior. Field-trip proposal and invitation forms now use
+`Field`-associated `Input`, `Textarea`, and `Select` primitives instead
+of locally styled label-wrapped controls. The scoped lint error and source
+contract tests protect these seven additional routes. Their data access,
+eligibility checks, confirmation steps, review authority, and writes remain
+feature/server owned.
+
 `can-os-design/no-duplicate-form-actions` reports a local `div` or
 `footer` directly wrapping a submit `Button` inside a form. It runs
 as an adoption warning across production JSX, and is an **error** for the
