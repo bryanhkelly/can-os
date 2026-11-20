@@ -26,7 +26,7 @@ export function sharedUiImportViolation(file, specifier) {
   // Foundational controls may compose UI primitives and generic lib utilities,
   // but must never pull feature state, domain policy, or command orchestration
   // into the bottom of the dependency graph.
-  if (layer === "ui" && /^src\\/(?:domain|platform|hooks)(?:\\/|$)/.test(target))
+  if (layer === "ui" && /^src\/(?:domain|platform|hooks)(?:\/|$)/.test(target))
     return "V6.1 primitives must not depend on domain, platform or feature hooks: " + specifier;
   if (layer === "ui" && target.startsWith("src/components/") &&
       !/^src\/components\/ui(?:\/|$)/.test(target))
