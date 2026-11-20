@@ -241,7 +241,13 @@ const adapter = {
       const original = await meeting(record.classSessionId);
       if (!original || original.classId !== cls.id)
         return { kind: "suppress", reason: "Class_Session_scope_mismatch" };
-      if (record.kind === "session_scheduled") {
+      if(record.kind==="session_reminder"){
+        if(original.state!=="scheduled"||original.startsAt<=now)
+          return {kind:"suppress",reason:"Class_Session_no_longer_upcoming"};
+        subject="Upcoming Class Session: "+label;
+        text=greeting+"Reminder: your Class Session for "+label+" is on "+
+          localTime(original.startsAt,site.timezone)+".\n\n"+view;
+      } else if (record.kind === "session_scheduled") {
         if (original.state !== "scheduled" || original.startsAt <= now)
           return { kind: "suppress", reason: "Class_Session_no_longer_upcoming" };
         assets.push(attachment("new-class-session.ics", [calendarEvent(original, label, email, organizerEmail)], "REQUEST"));

@@ -11,7 +11,7 @@ export const classParticipantDeliveries = pgTable("class_participant_deliveries"
   recipientPersonId: uuid("recipient_person_id").notNull(),
   classSessionId: uuid("class_session_id"),
   kind: text("kind").$type<
-    "enrollment_confirmed" | "invitation_issued" | "session_scheduled" | "session_changed"
+    "enrollment_confirmed" | "invitation_issued" | "session_scheduled" | "session_changed" | "session_reminder"
   >().notNull(),
   status: text("status").$type<
     "pending" | "processing" | "accepted" | "failed" | "suppressed"

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS "public"."class_participant_deliveries" (
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT "class_participant_delivery_kind_ck" CHECK ("kind" IN (
-    'enrollment_confirmed','invitation_issued','session_scheduled','session_changed'
+    'enrollment_confirmed','invitation_issued','session_scheduled','session_changed','session_reminder'
   )),
   CONSTRAINT "class_participant_delivery_status_ck" CHECK ("status" IN (
     'pending','processing','accepted','failed','suppressed'
