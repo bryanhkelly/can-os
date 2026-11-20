@@ -13,11 +13,11 @@ Status: source implementation on `feature/platform-admin-catalog-blueprints-2026
 ## Draft and publication behavior
 
 1. App Admin creates a new immutable `draft` version. Existing definitions require the latest version number, and concurrent edits fail by the database uniqueness/version checks.
-2. A **different verified App Admin** reviews and records a planning-only approval using the shared `public.audit_events` journal. The author cannot approve their own draft.
-3. App Admin publishes the latest approved draft. Published versions are immutable in the application workflow. No additional review or permission roles are created for catalog management.
+2. A **different verified App Admin** may optionally review and record a planning-only approval in the shared `public.audit_events` journal. The author cannot impersonate an independent reviewer.
+3. App Admin may publish the latest audited draft without a second human authorization. Published versions are immutable in the application workflow. Course/Offering, institutional, and enrollment approval requirements remain independent.
 4. Only published Program references and Blueprint recipe versions appear in Site planning discovery. A planning publication never publishes an Offering, Course, assessment or media asset; it never authorizes Site operation, enrollment, credit, funding or institutional compliance.
 
-The shared `public.audit_events` journal stores author, reviewer and publisher identities. No competing audit store, separate per-Organization role for central authoring, new enrollment path, or synthetic partner approval is created.
+The shared `public.audit_events` journal stores author, optional reviewer and publisher identities. No competing audit store, separate per-Organization role for central authoring, new enrollment path, or synthetic partner approval is created.
 
 ## COGIC migration caveat
 
@@ -27,8 +27,8 @@ Before using the central editor to create new versions of those exact recipe cod
 
 ## Acceptance gates
 
-- Confirm independently provisioned non-demo `app_admin` accounts, with at least two distinct verified people if independent publication review is required.
+- Confirm at least one independently provisioned non-demo `app_admin` account. A second verified App Admin is only necessary if an optional peer review is used.
 - Configure the approved CAN publisher Organization, and verify that the runtime database service account may perform these server-scoped operations without enabling anonymous database writes. If a dedicated restricted service principal is introduced, it must be applied as a single infrastructure role, not per Site or per Organization.
 - Run typecheck, build, authorization regression, and `platform-catalog-admin.test.ts` against the exact branch SHA.
-- In an authenticated browser: create a Program draft, create a Blueprint draft, deny review by the author, approve with a different App Admin, publish, verify Site discovery, and verify Site Admin cannot access platform authoring.
+- In an authenticated browser: create a Program draft, create a Blueprint draft, deny self-attributed peer review, optionally approve with a different App Admin, publish as App Admin, verify Site discovery, and verify Site Admin cannot access platform authoring.
 - Preserve existing institution-specific reviewer independence, Course publication and enrollment gates. This change does not make the COGIC pilot live.
