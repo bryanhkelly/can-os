@@ -33,6 +33,15 @@ test("AST ignores JSX-like comments and literal text; hidden inputs remain nativ
   assert.equal(result.syntaxErrors.length, 0);
 });
 
+test("brand shape discriminants are not Tailwind classes, but standalone rounded utilities are", () => {
+  const source = [
+    'const isRoundedEmblem = design.emblem === "rounded";',
+    'export const Card = () => <div className="rounded" />;',
+  ].join("\n");
+  const audit = analyzeSource(source, "/demo/src/components/launch-studio/BrandCard.tsx");
+  assert.deepEqual(audit.corners.map(corner => corner.utility), ["rounded"]);
+});
+
 test("full-card checkbox/radio labels are deliberate accessible wrappers, not migration debt", () => {
   const source = [
     "export const Options = () => <section>",

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
@@ -142,13 +143,13 @@ export function MarketingPackageWizardV61({
                         : content.formats.filter(id=>id!==option.id)});
                       if(event.target.checked)onPreviewFormatChange(option.id);
                     }}/>
-                  <label htmlFor={"marketing-format-"+option.id}
+                  <Label htmlFor={"marketing-format-"+option.id}
                     className="min-w-0 flex-1 cursor-pointer text-sm">
                     <strong className="block">{option.label}</strong>
                     <span className="mt-1 block text-xs leading-5 text-muted-foreground">
                       {option.description}
                     </span>
-                  </label>
+                  </Label>
                   <Button type="button" size="sm" variant="outline" disabled={!selected}
                     aria-pressed={activePreviewFormat===option.id}
                     onClick={()=>onPreviewFormatChange(option.id)}>Preview</Button>

@@ -77,8 +77,17 @@ export function analyzeSource(source, path, options = {}) {
     }
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ||
         ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
-      for (const match of node.text.matchAll(radiusPattern)) {
-        corners.push({ utility: match[0].trim(), ...location(syntax, node) });
+      // A Site Brand shape named "rounded" is data, not a CSS class. Keep
+      // actual className="rounded" and cn("rounded") source violations visible.
+      const shapeDiscriminant = ts.isStringLiteral(node) && node.text === "rounded" &&
+        ts.isBinaryExpression(node.parent) &&
+        [ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken,
+          ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken]
+          .includes(node.parent.operatorToken.kind);
+      if (!shapeDiscriminant) {
+        for (const match of node.text.matchAll(radiusPattern)) {
+          corners.push({ utility: match[0].trim(), ...location(syntax, node) });
+        }
       }
     }
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword &&

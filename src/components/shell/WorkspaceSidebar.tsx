@@ -51,7 +51,7 @@ function FocusedWorkspaceSidebar({ links, activePath, institutionSelection, expa
       </Link>
     </aside>
     <Modal open={expanded && mobile} onClose={() => onToggle?.()} label="Workspace navigation"
-      className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-dvh w-[min(18rem,85vw)] rounded-none">
+      className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-dvh w-[min(18rem,85vw)]">
       <div className="flex items-center justify-between border-b p-4"><span className="font-serif text-xl">CAN OS</span>
         <Button variant="ghost" size="icon" onClick={onToggle} aria-label="Collapse workspace sidebar"><PanelLeftClose aria-hidden="true"/></Button></div>
       <div id="classroom-mobile-links"><SidebarLinks links={links} activePath={activePath} onNavigate={onToggle} institutionSelection={institutionSelection}/></div>

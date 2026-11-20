@@ -14,7 +14,7 @@ export function ObsoleteExcuseClosure({excuse,onSaved}:{
  const mutation=useMutationFeedback(onSaved);
  const busy=mutation.pending||mutation.refreshFailed;
  const [validationError,setValidationError]=useState("");
- return <form className="mt-3 space-y-3 rounded border p-3" onSubmit={async event=>{
+ return <form className="mt-3 space-y-3 border p-3" onSubmit={async event=>{
   event.preventDefault();setValidationError("");
   if(!confirmed||reason.trim().length<10||!excuse.currentAttendanceEventId){
    setValidationError("Enter a closure reason and confirm the guardian notification.");return;
