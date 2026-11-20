@@ -182,6 +182,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     setSelectedReferences({});
     setOfferingAdoptions([]);
     setLocalExperiences([]);
+    setLocalComponentId("");
+    setLocalTitle("");
+    setLocalSummary("");
+    setRevisingFrozen(false);
     setSelectedComponents(template.components.filter(component =>
       component.requirementMode === "required"
     ).map(component => component.id));
@@ -247,6 +251,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         .filter(component => component.selectionStatus === "selected")
         .map(component => component.componentId));
       setLocalExperiences(result.localExperiences.map(item => ({ ...item, source: "proposed_local_experience" as const })));
+      setLocalComponentId("");
+      setLocalTitle("");
+      setLocalSummary("");
       setSelectedReferences(Object.fromEntries(
         result.components.map(component => [
           component.componentId,
@@ -686,6 +693,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 setSelectedReferences({});
                 setOfferingAdoptions([]);
                 setLocalExperiences([]);
+                setLocalComponentId("");
+                setLocalTitle("");
+                setLocalSummary("");
                 setName("");
                 setSavedDraftSnapshot(solutionDraftSnapshot({
                   name: "", templateId: original?.blueprintVersionId ?? "",
