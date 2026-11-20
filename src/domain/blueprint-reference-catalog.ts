@@ -75,7 +75,7 @@ export function projectBlueprintReferenceCatalog(
       title: row.title,
       summary: row.summary,
       versionNo: row.versionNo,
-      academicGradeRange,
+      ...(academicGradeRange ? { academicGradeRange } : {}),
       status: "reference_only",
     });
   }
