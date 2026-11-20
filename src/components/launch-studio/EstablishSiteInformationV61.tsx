@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
@@ -17,6 +17,7 @@ import {
 import { saveSiteInformationV61 } from "@/modules/programs/site-information-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
+import { GuidedSetupShell } from "@/components/workflow";
 
 type Step = 0 | 1 | 2 | 3;
 type EnvironmentDraft = Omit<SiteEnvironmentV61, "delivery"> & { delivery: SiteEnvironmentV61["delivery"] | "" };
@@ -292,30 +293,27 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     }
   }
 
+  const progressSteps = steps.map((item, index) => {
+    const saved = index === 0 ? hostSaved && !hostDirty :
+      index === 1 ? environmentSaved && !environmentDirty :
+      index === 3 ? storySaved && !storyDirty : false;
+    return {
+      id: String(index),
+      title: item.title,
+      description: item.description,
+      // Visiting is not completion. Only persisted, unchanged sections are complete.
+      status: index === step ? "current" as const : saved ? "complete" as const : "upcoming" as const,
+    };
+  });
+
   return <section aria-label="Site Information" className="min-w-0 space-y-5">
-    <div className="sticky top-0 z-10 border bg-background p-2 shadow-sm">
-      <nav aria-label="Site Information sections" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {steps.map((item, index) => {
-          const saved = index === 0 ? hostSaved && !hostDirty :
-            index === 1 ? environmentSaved && !environmentDirty :
-              index === 3 ? storySaved && !storyDirty : false;
-          return <Button key={item.title} type="button" variant="outline" disabled={busy || reloadRequired}
-            aria-current={index === step ? "step" : undefined}
-            onClick={() => selectStep(index as Step)}
-            className={"flex min-h-16 min-w-0 w-full shrink flex-col items-stretch justify-center gap-1 border p-3 text-left text-xs " +
-              (index === step ? "border-primary bg-accent" : "border-border bg-card")}>
-            <span className="flex items-center gap-2 text-xs font-bold">
-              <span>{index + 1}.</span><span>{item.title}</span>
-              {saved && <><Check aria-hidden="true" className="ml-auto size-3 shrink-0 text-success" /><span className="sr-only">Saved</span></>}
-            </span>
-            <span className="mt-1 hidden text-xs text-muted-foreground xl:block">{item.description}</span>
-          </Button>;
-        })}
-      </nav>
-    </div>
-    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {step + 1} of 4</p>
-    <div ref={panelRef} role="region" tabIndex={-1} aria-label={steps[step].title}
-      className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <GuidedSetupShell title="Site Information"
+      description="Establish how your Site is hosted and the story behind your community."
+      steps={progressSteps} progressLabel="Site Information sections"
+      onStepChange={id => selectStep(Number(id) as Step)}
+      navigationDisabled={busy || reloadRequired}>
+      <div ref={panelRef} role="region" tabIndex={-1} aria-label={steps[step].title}
+        className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
     {step === 0 && <WorkspacePanel id="site-information-step-0" title="Hosting & Organization"
       description="Who is responsible for your Site, and who hosts its activities?">
       <div className="space-y-5">
@@ -426,6 +424,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       </div>
     </WorkspacePanel>}
     </div>
+    </GuidedSetupShell>
     {error && <WorkspaceNotice tone={reloadRequired ? "attention" : "danger"}>{error}
       {reloadRequired && <span className="block">A save may have succeeded. Reload this Site to reconcile the current record before retrying.</span>}
     </WorkspaceNotice>}
