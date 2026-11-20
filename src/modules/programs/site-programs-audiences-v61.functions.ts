@@ -15,7 +15,7 @@ import {
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { getBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.server";
+import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const siteIdSchema = z.string().uuid();
@@ -76,7 +76,11 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
       const addedCodes = (data.intent.programCodes ?? []).filter(code =>
         !previouslySelected.has(code));
       if (addedCodes.length) {
-        const catalog = await getBlueprintReferenceCatalog(actor, { siteId: data.siteId });
+        // Exact Site authority was established on this locked Site row above.
+        // Validate new Program intent within the *same* transaction as the
+        // metadata save; no second, separately provisioned catalog role or
+        // nested connection is necessary.
+        const catalog = await readPublishedBlueprintReferences(tx);
         const available = new Set(catalog.filter(item => item.kind === "program_model")
           .map(item => item.code));
         if (!addedCodes.every(code => available.has(code)))
