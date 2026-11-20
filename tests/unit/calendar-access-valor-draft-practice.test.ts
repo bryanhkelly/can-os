@@ -31,15 +31,15 @@ describe("calendar sign-in and build provenance",()=>{
 });
 
 describe("Valor synthetic knowledge checks and practice grading",()=>{
-  const draft=read("src/modules/classes/native-class-draft-practice.functions.ts");
+  const draft=read("src/modules/classes/native-valor-practice-check.functions.ts");
   const teacher=read("src/modules/classes/native-class-teacher-homework.functions.ts");
   const route=read("src/routes/class_.$classId.tsx");
   it("allows only an exact synthetic current Class learner to respond privately",()=>{
     for(const expected of [
-      'actor.role === "student"', "authorizeCanonicalCourseAttempt",
-      "exact synthetic Course practice questions", "classEnrollmentId",
-      'aa.status=\'draft\'', "formativePracticeAttempts", "formativePracticeResponses",
-      "practiceOnly: true",
+      'actor.role!=="student"', "authorizeCanonicalCourseAttempt",
+      "complete matching synthetic practice questions", "classEnrollmentId",
+      'aa.status=\'draft\'', "public.formative_practice_attempts", "education_v30_secure.formative_practice_responses",
+      "practiceOnly:true",
     ])expect(draft).toContain(expected);
     expect(draft).not.toContain("assessmentAccess");
     expect(draft).not.toContain("grading_decisions");
