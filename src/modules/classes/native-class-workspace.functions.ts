@@ -132,7 +132,10 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
 
       // A Person's individual learning record is not exposed merely because
       // they teach, operate or administer the same Class.
-      if(actor.role==="learner"&&actor.capabilities.has("learning.participate")){
+      if((actor.role==="learner"&&actor.capabilities.has("learning.participate")) ||
+         (actor.role==="student"&&actor.capabilities.has("student:read") &&
+          !!instance.siteId && actor.grantSiteId===instance.siteId &&
+          actor.scope.organizationIds?.includes(instance.operatingOrganizationId))){
         const active=await tx.select({
           id:canonicalClassEnrollments.id,
           courseAttemptId:canonicalClassEnrollments.courseAttemptId,
