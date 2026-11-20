@@ -318,6 +318,10 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     ]}/>
     {!joinQueue&&<section className="mt-5 border-t border-border pt-4" aria-label="Choose your Class">
       <h3 className="text-sm font-semibold">Choose your Class</h3>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Joining a Class requires an independently verified adult learning identity.
+        Confirming your age below is also required but does not replace verification.
+      </p>
       {classChoiceLoading&&<QueryState loading="Checking authorized Classes and Sessions…"/>}
       {classChoiceError&&<WorkspaceNotice tone="attention" className="mt-2">
         Class availability could not be verified. Registration is temporarily unavailable.
