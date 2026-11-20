@@ -17,7 +17,7 @@ describe("shared native Class scheduling", () => {
     expect(html).toContain("America/Los_Angeles");
     expect(html).toContain("Four weekly Sessions");
     expect(html).toContain("disabled");
-    expect(html).toContain("Scheduling");
+    expect(html).toContain("Ambiguous or missing times are rejected");
     expect(html).not.toContain("Attendance verified");
   });
   it("shows a custom dated schedule without manufacturing more sessions", () => {
