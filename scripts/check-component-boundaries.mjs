@@ -41,6 +41,7 @@ const guardedFiles = [
   "src/components/support/CoachOutreachPanel.tsx",
   "src/components/teacher/TeacherLearningParticipationPanel.tsx",
   "src/components/student/StudentDashboardRail.tsx",
+  "src/components/student/StudentUpcomingAssignments.tsx",
   "src/components/support/CoachCaseloadList.tsx",
   "src/components/support/CoachStudentTimeline.tsx",
 ];
@@ -91,7 +92,7 @@ const owners = [
   ["src/components/admissions/PublicInterestInbox.tsx", ['aria-label="Family relationship history"', 'items.map(row => <article']],
   ["src/components/enrollment/NoncreditReleaseOperations.tsx", ['rows={query.data.roster}', '<h3 className="mt-7 text-base font-semibold">Participant roster</h3>']],
   ["src/components/enrollment/GuardianApplicationForm.tsx", ['<Label htmlFor={`${id}-transfer`}', '<Label htmlFor={`${id}-household`}']],
-  ["src/components/student/StudentDashboard.tsx", ['<DashboardPanel id="student-schedule"', '<DashboardPanel title="Announcements"']],
+  ["src/components/student/StudentDashboard.tsx", ['<DashboardPanel id="student-schedule"', '<DashboardPanel title="Announcements"', '<DashboardPanel id="student-assignments"']],
   ["src/components/home/TeacherHome.tsx", ['aria-label="Observed learning participation"']],
   ["src/components/home/CoachHome.tsx", ["students.map((student) => (", '<h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Timeline</h3>']],
   ["src/components/home/CoachHome.tsx", ['<section className="h-fit  border bg-card p-5"', 'onClick={submitOutreach}']],
