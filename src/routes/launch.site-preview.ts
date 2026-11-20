@@ -21,6 +21,7 @@ import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } f
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { linkPrivateSitePreviewPages } from "@/domain/site-private-preview-navigation";
+import { previewSyntheticSiteName, previewSyntheticSiteContent } from "@/domain/site-preview-presentation";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
@@ -102,8 +103,11 @@ export const Route=createFileRoute("/launch/site-preview")({
           ? siteBrandPresentationIdentity(savedBrand.resolved,
               resolveSiteTemplateId(copy.branding.templateId),true)
           : copy.branding;
-        const displaySiteName=savedBrand?.resolved.displayName??site.name;
-        const localContent:SiteLocalContent={
+        const synthetic=site.metadata.synthetic===true;
+        const sourceDisplayName=savedBrand?.resolved.displayName??site.name;
+        const displaySiteName=previewSyntheticSiteName(sourceDisplayName,synthetic);
+        const displayOrganizationName=previewSyntheticSiteName(site.organizationName,synthetic);
+        const localContent:SiteLocalContent=previewSyntheticSiteContent({
           ...copy,
           branding:{
             ...selectedBranding,
@@ -112,7 +116,7 @@ export const Route=createFileRoute("/launch/site-preview")({
             logoImage:siteLocalImagePublicationGaps(selectedBranding.logoImage??null).length
               ?null:selectedBranding.logoImage??null,
           },
-        };
+        },displaySiteName,[site.name,sourceDisplayName]);
         // Share the same reviewed parent-facing and school-media projections
         // as Website & Brand Studio and the live publisher. The Site-first
         // route must not silently omit approved address, contact, schedules,
@@ -122,7 +126,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           academics.map(program=>program.programId),site.metadata);
         const authorizedPrograms=withVerifiedPublicApplications(academics,parentExtras.admissions);
         const parentInformation=projectApprovedParentInformation({
-          site:{name:displaySiteName,organizationName:site.organizationName},
+          site:{name:displaySiteName,organizationName:displayOrganizationName},
           academicPrograms:authorizedPrograms,offerings:publicOfferings,
           localContent,...parentExtras,
         });
@@ -133,7 +137,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         const classes=await readOptionalSitePublishedClasses(site.id);
         const page:PublicSitePage={
           host:publicSiteHost(publication.slug),
-          site:{name:displaySiteName,organizationName:site.organizationName},
+          site:{name:displaySiteName,organizationName:displayOrganizationName},
           academicPrograms:authorizedPrograms,
           offerings:publicOfferings,
           parentInformation,media,
@@ -191,7 +195,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           path,localPreview:true,privateDraftPages:true,
         });
         const html=renderPrivateWebsitePreviewHtml(
-          linkPrivateSitePreviewPages(rendered,site.id),site.id,availablePages,Boolean(history.length),"site",
+          linkPrivateSitePreviewPages(rendered,site.id),site.id,availablePages,Boolean(history.length),"site",synthetic,
         );
         return new Response(html,{status:200,headers:siteFirstPreviewHeaders});
       }catch(error){
