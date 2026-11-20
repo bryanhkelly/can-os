@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isPrepareModuleV61, LaunchPrepareV61, prepareModulesV61 } from "@/components/launch-studio/LaunchPrepareV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { LaunchModuleDestinationV61, launchModuleDestinationsV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
-import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, resolveVisibleSolutionRecipe } from "@/domain/launch-prepare-v61";
+import { filterPublishedSolutionRecipes, matchingSolutionInterests, orderSolutionsByVision, preferredCatalogDelivery, resolveVisibleSolutionRecipe, selectSavedSolutionPlans } from "@/domain/launch-prepare-v61";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, search, ...props }: {
@@ -128,6 +128,18 @@ describe("V6.1 Prepare to Open", () => {
       ["can.program.ai_digital_skills", "can.program.custom_training"], "can.program.custom_training");
     expect(result.map(item => item.blueprintVersionId)).toEqual(["custom", "ai", "generic"]);
     expect(filterPublishedSolutionRecipes(recipes, "CLC-DIGITAL-01")).toEqual([recipes[1]]);
+  });
+
+  it("selects saved Solution plans by their immutable published Blueprint version", () => {
+    const plans = [
+      { configurationId: "a", blueprintVersionId: "v1", name: "Older version" },
+      { configurationId: "b", blueprintVersionId: "v2", name: "Current version" },
+      { configurationId: "c", blueprintVersionId: "v2", name: "Second location" },
+    ];
+    expect(selectSavedSolutionPlans(plans, "v2").map(plan => plan.configurationId))
+      .toEqual(["b", "c"]);
+    expect(selectSavedSolutionPlans(plans, "missing")).toEqual([]);
+    expect(plans).toHaveLength(3);
   });
 
   it("links to authorized workspaces without duplicating sidebar module navigation", () => {
