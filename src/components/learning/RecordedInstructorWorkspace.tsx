@@ -1,3 +1,4 @@
+import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -390,11 +391,11 @@ export function RecordedLessonCompletionAction({ allowed, completed, waived, pen
 }
 
 export function RecordedOfficialCourseLinks({ sectionId }: { sectionId: string }) {
-  return <nav aria-label="Official course records" className="flex flex-wrap gap-4 border bg-card p-4 text-sm">
+  return <WorkspaceLinkNavigation label="Official course records">
     <Link to="/classes" search={{ section: sectionId, tab: "lessons" }} className="underline">Official class lessons</Link>
     <Link to="/student/assignments" search={{ section: sectionId }} className="underline">Assignments and feedback</Link>
     <Link to="/student/courses" search={{ section: sectionId, tab: "grades" }} className="underline">Grades</Link>
-  </nav>;
+  </WorkspaceLinkNavigation>;
 }
 
 export function RecordedPracticeHistory({ history }: { history: PracticeHistory }) {
