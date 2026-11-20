@@ -82,7 +82,7 @@ function CredentialIssuerAccess(){
 
   return <WorkspaceShell eyebrow="CAN OS / Credential governance"
     title="Credential Issuer Access"
-    subtitle="One CAN login. Issuance requires independent, expiring approval for the exact canonical staff assignment. Being a Site Admin does not authorize awarding credentials."
+    subtitle="One CAN login. Issuance requires independent, expiring approval for the exact CAN Site staff grant. Being a Site Admin does not authorize awarding credentials."
     width="wide">
     <nav className="mt-6 flex flex-wrap gap-2" aria-label="Credential access workflow">
       {([
@@ -101,7 +101,7 @@ function CredentialIssuerAccess(){
       <h2 className="font-serif text-2xl">Request credential issuer authority</h2>
       <p className="mt-2 text-sm text-muted-foreground">An authorized Site Admin or Registrar may request issuance authority. Your verified active Site assignment determines the scope. The request itself grants nothing.</p>
       {my.isPending&&<p role="status" className="mt-4 text-sm">Checking your current authorization…</p>}
-      {my.isError&&<p role="alert" className="mt-4 text-sm text-destructive">Your account is not yet linked to an authorized canonical staff assignment. Review your Site identity setup.</p>}
+      {my.isError&&<p role="alert" className="mt-4 text-sm text-destructive">Your account needs a verified active CAN Site staff grant. Review your Site access and operating authority.</p>}
       {my.data&&<div className="mt-4 border bg-muted p-4 text-sm">
         <strong>Most recent request: {my.data.status}</strong>
         <p className="mt-1">Submitted {new Date(my.data.requestedAt).toLocaleDateString()}</p>
@@ -134,8 +134,8 @@ function CredentialIssuerAccess(){
           <input type="radio" name="issuer-review" checked={reviewId===item.id}
             onChange={()=>setReviewId(item.id)}/>
           <span>
-            <strong>{item.nativeRole} · Site {item.nativeSiteId}</strong>
-            <span className="mt-1 block text-muted-foreground">Requested {new Date(item.requestedAt).toLocaleDateString()} · Organization {item.nativeOrganizationId}</span>
+            <strong>{item.role} · Site {item.siteId}</strong>
+            <span className="mt-1 block text-muted-foreground">Requested {new Date(item.requestedAt).toLocaleDateString()} · Organization {item.organizationId}</span>
             <span className="mt-2 block">Evidence: {item.evidenceReference}</span>
           </span>
         </label>)}
@@ -172,8 +172,8 @@ function CredentialIssuerAccess(){
         <label key={item.id} className="flex cursor-pointer gap-3 border border-border p-4 text-sm">
           <input type="radio" name="issuer-revoke" checked={revokeId===item.id}
             onChange={()=>setRevokeId(item.id)}/>
-          <span><strong>Site {item.nativeSiteId}</strong>
-            <span className="mt-1 block text-muted-foreground">Expires {item.approvedUntil?new Date(item.approvedUntil).toLocaleDateString():"Unknown"} · Organization {item.nativeOrganizationId}</span>
+          <span><strong>Site {item.siteId}</strong>
+            <span className="mt-1 block text-muted-foreground">Expires {item.approvedUntil?new Date(item.approvedUntil).toLocaleDateString():"Unknown"} · Organization {item.organizationId}</span>
           </span>
         </label>)}</div>
       <form className="mt-5 space-y-4" onSubmit={revoke}>
