@@ -666,6 +666,13 @@
       "when": 1795132000000,
       "tag": "0094_class_participant_delivery_privacy",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1795133000000,
+      "tag": "0095_course_registration_class_placement",
+      "breakpoints": true
     }
   ]
 }
