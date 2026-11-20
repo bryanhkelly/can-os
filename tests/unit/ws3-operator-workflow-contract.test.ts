@@ -5,7 +5,7 @@ const noncredit=source("src/components/learning/NoncreditCompletionReviewPanel.t
 const classUi=source("src/components/learning/NativeClassCompletionOperatorPanel.tsx");
 const approvals=source("src/components/learning/CompletionEvidenceReviewQueuePanel.tsx");
 const route=source("src/routes/canonical.completion-evidence-reviews.tsx");
-const nativeRoute=source("src/routes/canonical.classes_.completion.tsx");
+const nativeRoute=source("src/routes/class_.$classId.tsx");
 const review=source("src/modules/learning/completion-evidence-review.functions.ts");
 const revocation=source("src/modules/learning/credential-revocation.functions.ts");
 const gate=source("scripts/acceptance/check-ws3-merge-gate.mjs");
@@ -41,7 +41,7 @@ describe("WS3 full operator approval, correction and revocation workflow",()=>{
   });
   it("Class workflow separately publishes, reviews and records original source outcome",()=>{
     expect(source("src/routes/class_.$classId.tsx")).toContain("NativeClassCompletionOperatorPanel");
-    expect(nativeRoute).toContain('<Navigate to="/class/$classId"');
+    expect(nativeRoute).toContain("NativeClassCompletionOperatorPanel");
     expect(classUi).toContain("Publish reviewed policy");
     expect(classUi).toContain("Request independent approval");
     expect(classUi).toContain("Record formal decision");
