@@ -578,6 +578,13 @@ integration("FullFlow: one school and Program across the six-stage academic jour
           interaction:{...opened,clientEventId:crypto.randomUUID(),
             kind:"resource_opened" as const,resourceId:"not-a-published-resource"},
         }})).rejects.toThrow("published lesson resource");
+        // A native video observation cannot be forged against a resource
+        // which is not part of this Section's published curriculum.
+        await expect(activity.recordLearningInteraction({data:{
+          learningSessionId:tracking.learningSessionId,
+          interaction:{...opened,clientEventId:crypto.randomUUID(),
+            kind:"video_played" as const,resourceId:"not-a-published-resource"},
+        }})).rejects.toThrow("published lesson video");
         expect(await tx.select().from(s.learningActivityEvents).where(eq(
           s.learningActivityEvents.learningSessionId,tracking.learningSessionId))).toHaveLength(1);
         const ownLearning = await activity.getLearningActivityHistory({data:{sectionId:section.id}});
