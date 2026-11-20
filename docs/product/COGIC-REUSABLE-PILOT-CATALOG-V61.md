@@ -107,3 +107,23 @@ All check prompts and survey instruments are labeled draft and require actual in
 2. **Phase 2:** Obtain approved AI/Digital Skills teaching media and qualified facilitator(s), approved participant safeguards (particularly if minors), actual operator Site/Deployment rights and a published Course/Offering. Then schedule and attach four dated Classes at **each of two real authorized Sites**, and verify registered learner attendance, homework/activity records, assessments, feedback, corrections and Site/provider reporting. The four dates may be nonconsecutive; never infer presence from QR pairing.
 3. **Network:** Independently operated COGIC churches require explicit cross-Organization delegation and publication-safe disclosure decisions before national network rollup.
 4. **Release:** Finish production database migrations, scoped DB roles, exact-SHA build/TypeScript/role-denial tests and authenticated browser acceptance. Do not equate Neon draft setup with operational enrollment activation.
+
+
+## Platform App Admin authoring update (November 20, 2026)
+
+The central CAN-owned Program Catalog and reusable Blueprint definition authoring
+now belongs to independently verified CAN `app_admin` in `/platform`.
+This is **not** an institutional `blueprint_author` or `blueprint_reviewer`
+appointment. A distinct verified App Admin reviews each new immutable planning
+version before publication. The original per-Organization SQL purpose roles
+remain for **native institutional** configuration/review paths only. A Site
+Admin continues to select a published Solution in Prepare, not author global
+recipes or automatically authorize enrollment.
+
+The existing two COGIC pilot recipes are demo-publisher-owned and must not be
+silently claimed by the CAN publisher. The new code requires an approved
+active `can_network` publishing Organization configured on the server before
+it can create CAN-owned Blueprint versions. This source change does not
+provision that Organization, appoint an App Admin, approve content, publish
+courses or activate the pilots. See
+`docs/architecture/platform-admin-catalog-blueprints.md`.
