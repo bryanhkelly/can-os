@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MutationFeedback, StatusBadge, WorkspacePanel } from "@/components/workspace";
@@ -104,8 +106,8 @@ export function OnsitePickupPanel({ date, onChanged }: {
     className="mt-9">
     {error && <p role="alert" className="mb-4 border p-3 text-sm">{error}</p>}
     <MutationFeedback state={{...mutation,retryRefresh}} className="mb-4" pendingMessage="Updating verified pickup records…"/>
-    <button type="button" disabled={loading||busy} onClick={()=>void load().catch(()=>{})}
-      className="mb-4 border px-3 py-2 text-sm disabled:opacity-50">Refresh verified roster</button>
+    <Button variant="outline" type="button" disabled={loading||busy} onClick={()=>void load().catch(()=>{})}
+      className="mb-4 border px-3 py-2 text-sm disabled:opacity-50">Refresh verified roster</Button>
     {loading && <p role="status" className="text-sm">Loading family release authority…</p>}
     {!loading && roster && <>
       <p className="mb-5 text-xs text-muted-foreground">{roster.note}</p>
@@ -164,12 +166,12 @@ export function OnsitePickupPanel({ date, onChanged }: {
               <p className="mt-1">{hold.reason}</p>
               {roster.canProposeHoldResolution && !hold.pendingResolution && <>
                 <p className="mt-2 text-xs">Only an authorized Site director may independently approve a proposal from a separately verified onsite staff member. This form does not clear the hold.</p>
-                <label className="mt-3 block text-xs font-semibold">Resolution note
+                <Label className="mt-3 block text-xs font-semibold">Resolution note
                   <Textarea rows={2} maxLength={2000} value={resolutions[hold.id] ?? ""}
                     onChange={event => setResolutions(current => ({...current, [hold.id]: event.target.value}))}
                     className="mt-1 w-full border bg-background p-2" />
-                </label>
-                <label className="mt-2 block text-xs">Documented authority basis
+                </Label>
+                <Label className="mt-2 block text-xs">Documented authority basis
                   <Select className="mt-1 block w-full border bg-background p-2"
                     value={resolutionBases[hold.id] ?? (hold.kind === "emergency" ? "documented_emergency_cleared" : "verified_court_order")}
                     onChange={event => setResolutionBases(current => ({...current, [hold.id]: event.target.value}))}>
@@ -180,13 +182,13 @@ export function OnsitePickupPanel({ date, onChanged }: {
                         <option value="verified_guardian_instructions">Verified guardian instructions</option>
                       </>}
                   </Select>
-                </label>
-                <label className="mt-2 block text-xs">Verified case or document reference
+                </Label>
+                <Label className="mt-2 block text-xs">Verified case or document reference
                   <Input maxLength={500} value={resolutionReferences[hold.id] ?? ""}
                     onChange={event => setResolutionReferences(current => ({...current, [hold.id]: event.target.value}))}
                     className="mt-1 block w-full border bg-background p-2" />
-                </label>
-                <button type="button"
+                </Label>
+                <Button variant="outline" type="button"
                   disabled={!!busy || (resolutions[hold.id] ?? "").trim().length < 20 ||
                     (resolutionReferences[hold.id] ?? "").trim().length < 15}
                   className="mt-2 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
@@ -200,7 +202,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                         (hold.kind === "emergency" ? "documented_emergency_cleared" : "verified_court_order")) as
                         "verified_court_order" | "verified_guardian_instructions" | "documented_emergency_cleared",
                       evidenceReference: resolutionReferences[hold.id] ?? "",
-                    } }))}>Propose release for independent review</button>
+                    } }))}>Propose release for independent review</Button>
               </>}
               {roster.canResolveHolds && hold.pendingResolution && <>
                 <p className="mt-2 text-xs font-semibold">Pending independent review</p>
@@ -208,7 +210,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <p className="mt-1 text-xs">Reference: {hold.pendingResolution.evidenceReference}</p>
                 <p className="mt-1 text-xs">Proposal: {hold.pendingResolution.resolutionNote}</p>
                 {hold.pendingResolution.proposerPersonId !== roster.reviewerPersonId
-                  ? <button type="button" disabled={!!busy}
+                  ? <Button variant="outline" type="button" disabled={!!busy}
                       className="mt-2 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                       onClick={() => void run(hold.id + ":resolve", "Independent release approved; hold cleared.",
                         mutationId => resolvePickupCustodyHold({ data: {
@@ -216,7 +218,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                           proposalId: hold.pendingResolution!.id,
                           resolutionNote: hold.pendingResolution!.resolutionNote,
                           mutationId,
-                        } }))}>Independently approve and clear hold</button>
+                        } }))}>Independently approve and clear hold</Button>
                   : <p className="mt-2 text-xs">You cannot approve your own proposal. A separately authorized Site director must review.</p>}
               </>}
             </div>)}
@@ -225,7 +227,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
               <h4 className="text-sm font-semibold">Family-authorized adults for this date</h4>
               {!student.authorizedAdults.length && <p className="mt-2 text-sm text-muted-foreground">No current authorization. Do not release this child.</p>}
               <div className="mt-2 grid gap-2">
-                {student.authorizedAdults.map(adult => <button key={adult.id} type="button"
+                {student.authorizedAdults.map(adult => <Button variant="outline" key={adult.id} type="button"
                   disabled={!!busy || !canAttempt || activeHold}
                   onClick={() => {
                     setSelected(current => ({ ...current, [key]: adult.id }));
@@ -235,25 +237,25 @@ export function OnsitePickupPanel({ date, onChanged }: {
                   aria-pressed={selected[key] === adult.id}>
                   <span className="font-semibold">{adult.pickupName}</span>
                   <span className="block text-xs text-muted-foreground">{adult.relationshipLabel} · require {adult.identityVerificationMethod.replaceAll("_", " ")}</span>
-                </button>)}
+                </Button>)}
               </div>
             </div>}
 
             {selectedAuth && canAttempt && !activeHold && <div className="mt-4 bg-muted/40 p-3">
               <h4 className="text-sm font-semibold">Witness release to {selectedAuth.pickupName}</h4>
-              <label className="mt-3 block text-xs font-semibold">Legal name verified on required credential
+              <Label className="mt-3 block text-xs font-semibold">Legal name verified on required credential
                 <Input value={verifiedNames[key] ?? ""} maxLength={201}
                   onChange={event => setVerifiedNames(current => ({ ...current, [key]: event.target.value }))}
                   className="mt-1 w-full border bg-background p-2 text-sm" />
-              </label>
-              <label className="mt-3 block text-xs font-semibold">Handoff evidence
+              </Label>
+              <Label className="mt-3 block text-xs font-semibold">Handoff evidence
                 <Textarea rows={2} maxLength={2000} value={evidence[key] ?? ""}
                   placeholder="What you checked and observed; never enter a document number"
                   onChange={event => setEvidence(current => ({ ...current, [key]: event.target.value }))}
                   className="mt-1 w-full border bg-background p-2 text-sm" />
-              </label>
+              </Label>
               <p className="mt-2 text-xs text-muted-foreground">By recording this command you attest that you checked the required credential, matched the adult, and personally witnessed the handoff.</p>
-              <button type="button" disabled={!!busy}
+              <Button variant="default" type="button" disabled={!!busy}
                 className="mt-3 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                 onClick={() => void run(key, `Verified release recorded for ${student.studentName}.`, (mutationId) => recordVerifiedPickupRelease({ data: {
                   date,
@@ -266,25 +268,25 @@ export function OnsitePickupPanel({ date, onChanged }: {
                   handoffEvidence: evidence[key] ?? "",
                   confirmedHandoff: true as const,
                   mutationId,
-                } }))}>Record verified release</button>
+                } }))}>Record verified release</Button>
             </div>}
 
             {canAttempt && <div className="mt-4 grid gap-3 lg:grid-cols-3">
               <details className="border p-3">
                 <summary className="cursor-pointer text-sm font-semibold">Record denied pickup</summary>
-                <label className="mt-3 block text-xs">Presented name
+                <Label className="mt-3 block text-xs">Presented name
                   <Input value={denialNames[key] ?? ""} maxLength={201}
                     onChange={event => setDenialNames(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full border bg-background p-2" />
-                </label>
-                <label className="mt-2 block text-xs">Household context
+                </Label>
+                <Label className="mt-2 block text-xs">Household context
                   <Select value={denialHouseholds[key] ?? student.householdIds[0] ?? ""}
                     onChange={event => setDenialHouseholds(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full border bg-background p-2">
                     {student.householdIds.map(id => <option key={id} value={id}>{id}</option>)}
                   </Select>
-                </label>
-                <label className="mt-2 block text-xs">Denial reason
+                </Label>
+                <Label className="mt-2 block text-xs">Denial reason
                   <Select value={denialReasons[key] ?? "not_authorized"}
                     onChange={event => setDenialReasons(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full border bg-background p-2">
@@ -294,8 +296,8 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     <option value="emergency_hold">Emergency hold</option>
                     <option value="expired_authorization">Expired authorization</option>
                   </Select>
-                </label>
-                <button type="button" disabled={!!busy || !student.householdIds.length}
+                </Label>
+                <Button variant="outline" type="button" disabled={!!busy || !student.householdIds.length}
                   className="mt-3 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                   onClick={() => void run(key + ":deny", `Denied pickup recorded for ${student.studentName}; school supervision continues.`, (mutationId) => recordDeniedPickup({ data: {
                     date,
@@ -306,32 +308,32 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     reason: (denialReasons[key] ?? "not_authorized") as "not_authorized" | "identity_not_verified" | "custody_dispute" | "emergency_hold" | "expired_authorization",
                     identityVerified: false,
                     mutationId,
-                  } }))}>Record denial — no release</button>
+                  } }))}>Record denial — no release</Button>
               </details>
 
               <details className="border p-3">
                 <summary className="cursor-pointer text-sm font-semibold">Create custody / emergency hold</summary>
-                <label className="mt-3 block text-xs">Hold type
+                <Label className="mt-3 block text-xs">Hold type
                   <Select value={holdKinds[key] ?? "disputed_custody"}
                     onChange={event => setHoldKinds(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full border bg-background p-2">
                     <option value="disputed_custody">Disputed custody</option>
                     <option value="emergency">Emergency</option>
                   </Select>
-                </label>
-                <label className="mt-2 block text-xs">Household context
+                </Label>
+                <Label className="mt-2 block text-xs">Household context
                   <Select value={holdHouseholds[key] ?? student.householdIds[0] ?? ""}
                     onChange={event => setHoldHouseholds(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full border bg-background p-2">
                     {student.householdIds.map(id => <option key={id} value={id}>{id}</option>)}
                   </Select>
-                </label>
-                <label className="mt-2 block text-xs">Safety reason
+                </Label>
+                <Label className="mt-2 block text-xs">Safety reason
                   <Textarea rows={2} maxLength={2000} value={holdReasons[key] ?? ""}
                     onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full border bg-background p-2" />
-                </label>
-                <button type="button" disabled={!!busy || !student.householdIds.length}
+                </Label>
+                <Button variant="outline" type="button" disabled={!!busy || !student.householdIds.length}
                   className="mt-3 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                   onClick={() => void run(key + ":hold", `All pickup release held for ${student.studentName}.`, (mutationId) => createPickupCustodyHold({ data: {
                     studentProfileId: student.studentProfileId,
@@ -341,17 +343,17 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     kind: (holdKinds[key] ?? "disputed_custody") as "disputed_custody" | "emergency",
                     reason: holdReasons[key] ?? "",
                     mutationId,
-                  } }))}>Block all release</button>
+                  } }))}>Block all release</Button>
               </details>
 
               <details className="border p-3">
                 <summary className="cursor-pointer text-sm font-semibold">Uncollected-child follow-up</summary>
-                <label className="mt-3 block text-xs">Supervision and family contact plan
+                <Label className="mt-3 block text-xs">Supervision and family contact plan
                   <Textarea rows={3} maxLength={2000} value={followUpPlans[key] ?? ""}
                     onChange={event => setFollowUpPlans(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full border bg-background p-2" />
-                </label>
-                <button type="button" disabled={!!busy || !!student.uncollectedActionId}
+                </Label>
+                <Button variant="outline" type="button" disabled={!!busy || !!student.uncollectedActionId}
                   className="mt-3 border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                   onClick={() => void run(key + ":uncollected", `Uncollected-child follow-up opened for ${student.studentName}.`, (mutationId) => recordUncollectedChild({ data: {
                     date,
@@ -360,7 +362,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     dismissalConfirmed: true as const,
                     followUpPlan: followUpPlans[key] ?? "",
                     mutationId,
-                  } }))}>Confirm dismissal & open follow-up</button>
+                  } }))}>Confirm dismissal & open follow-up</Button>
               </details>
             </div>}
 
@@ -375,8 +377,8 @@ export function OnsitePickupPanel({ date, onChanged }: {
           </section>;
         })}
       </div>
-      <button type="button" onClick={() => void load()} disabled={!!busy}
-        className="mt-5 text-sm underline">Refresh pickup roster</button>
+      <Button variant="ghost" type="button" onClick={() => void load()} disabled={!!busy}
+        className="mt-5 text-sm underline">Refresh pickup roster</Button>
     </>}
   </WorkspacePanel>;
 }

@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useState } from "react";
 import { getOnsiteRoomPlanningFn, submitOnsiteRoomPlanFn, reviewOnsiteRoomPlanFn } from "@/modules/operations/onsite-room-plan.functions";
@@ -32,11 +34,11 @@ export function OnsiteRoomPlanningPanel({programId, initialDate, onChanged}:{
   return <section className="mt-6 border p-4" aria-label="Room and adult coverage planning">
     <h3 className="font-semibold">Room and adult coverage planning</h3>
     <p className="mt-2 text-sm text-muted-foreground">The church records the room, capacity and named adults for a real scheduled block. An independent CAN officer reviews the plan. This is a staff plan, not a legal inspection, permission to open or a record of physical arrival.</p>
-    <label className="mt-3 block text-sm">School-local planning date
+    <Label className="mt-3 block text-sm">School-local planning date
       <Input type="date" value={date} onChange={event=>{setDate(event.target.value);setModel(null);}}
         className="ml-2 border bg-background p-2"/>
-    </label>
-    <button type="button" onClick={()=>void load().catch(()=>{})} disabled={loading||!date} className="mt-2 text-sm underline">Refresh room plans</button>
+    </Label>
+    <Button variant="ghost" type="button" onClick={()=>void load().catch(()=>{})} disabled={loading||!date} className="mt-2 text-sm underline">Refresh room plans</Button>
     {loading&&<p role="status" className="mt-3 text-sm">Loading current schedule and eligible adults…</p>}
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
     {model&&!loading&&<>
@@ -113,27 +115,27 @@ function RoomPlanBlock({block,model,changed}:{block:Block;model:Model;changed:()
       <summary className="cursor-pointer font-medium">{block.current?"Submit a corrected or replacement plan":"Record a room coverage plan"}</summary>
       <p className="mt-2">Scheduled primary: {primary?.name??"No single eligible primary in the current delivery arrangement. Ask the school staffing administrator to correct it."}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label>Physical classroom<Select value={room?.id??""} onChange={event=>setRoomId(event.target.value)} className="mt-1 block w-full border bg-background p-2">
+        <Label>Physical classroom<Select value={room?.id??""} onChange={event=>setRoomId(event.target.value)} className="mt-1 block w-full border bg-background p-2">
           <option value="">Choose a saved school room</option>
           {model.rooms.map(candidate=><option key={candidate.id} value={candidate.id}>{candidate.name} · capacity {candidate.capacity}</option>)}
-        </Select></label>
+        </Select></Label>
         <p>Saved occupancy limit: {room?.capacity??"Select a room"}</p>
         {roomId&&!room&&<p role="status">The previous classroom is retired or unavailable. Choose an active room for this new plan; existing approved evidence is unchanged.</p>}
-        <label>Named qualified backup<Select value={backup} onChange={event=>setBackup(event.target.value)} className="mt-1 block w-full border bg-background p-2">
+        <Label>Named qualified backup<Select value={backup} onChange={event=>setBackup(event.target.value)} className="mt-1 block w-full border bg-background p-2">
           <option value="">Choose an eligible Section adult</option>
           {block.staff.filter(row=>row.personId!==primary?.personId).map(row=><option key={row.personId} value={row.personId}>{row.name}</option>)}
-        </Select></label>
-        <label>Plan validity ends (your browser timezone)<Input type="datetime-local" value={expiry} onChange={event=>setExpiry(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></label>
+        </Select></Label>
+        <Label>Plan validity ends (your browser timezone)<Input type="datetime-local" value={expiry} onChange={event=>setExpiry(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></Label>
       </div>
-      <label className="mt-3 block">Basis for this room and adult plan<Textarea value={rationale} maxLength={2000} onChange={event=>setRationale(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></label>
+      <Label className="mt-3 block">Basis for this room and adult plan<Textarea value={rationale} maxLength={2000} onChange={event=>setRationale(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></Label>
       <p className="mt-2 text-xs text-muted-foreground">Replacing the current plan immediately removes its coverage authorization until CAN reviews the new version.</p>
-      <button type="button" disabled={busy||saved||!primary||!backup||!expiry||!room||rationale.trim().length<10}
-        onClick={()=>void submit()} className="mt-3 border px-3 py-2 disabled:opacity-50">Submit for independent review</button>
+      <Button variant="outline" type="button" disabled={busy||saved||!primary||!backup||!expiry||!room||rationale.trim().length<10}
+        onClick={()=>void submit()} className="mt-3 border px-3 py-2 disabled:opacity-50">Submit for independent review</Button>
     </details>}
     {block.current?.canReview&&<div className="mt-3">
-      <label>Independent review reason<Textarea value={reason} maxLength={2000} onChange={event=>setReason(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></label>
-      <div className="mt-2 flex gap-2">{(["approve","reject"] as const).map(decision=><button key={decision} type="button" disabled={busy||saved||reason.trim().length<10||(decision==="approve"&&!currentRoomReady)}
-        onClick={()=>void review(decision)} className="border px-3 py-2 disabled:opacity-50">{decision==="approve"?"Approve this plan":"Reject and request correction"}</button>)}</div>
+      <Label>Independent review reason<Textarea value={reason} maxLength={2000} onChange={event=>setReason(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></Label>
+      <div className="mt-2 flex gap-2">{(["approve","reject"] as const).map(decision=><Button variant="outline" key={decision} type="button" disabled={busy||saved||reason.trim().length<10||(decision==="approve"&&!currentRoomReady)}
+        onClick={()=>void review(decision)} className="border px-3 py-2 disabled:opacity-50">{decision==="approve"?"Approve this plan":"Reject and request correction"}</Button>)}</div>
     </div>}
   </article>;
 }

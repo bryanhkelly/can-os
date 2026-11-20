@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
@@ -95,17 +97,17 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     );
   }
   if(status && !status.eligible) return null;
-  return <section className="mt-7 rounded-xl border bg-card p-5" aria-label="CAN church institutional authorization">
+  return <section className="mt-7  border bg-card p-5" aria-label="CAN church institutional authorization">
     <h2 className="font-serif text-2xl">CAN–church operating agreement</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       A church-owned Site can request separately authorized CAN academic services without
       transferring church ownership. The contract, individual staff grants, school opening
       and safeguarding approvals are independent checks.
     </p>
-    <button type="button" disabled={refreshing||mutation.pending||mutation.refreshFailed} onClick={()=>void refresh()}
-      className="mt-3 min-h-11 rounded border px-3 py-2 text-sm disabled:opacity-50">
+    <Button variant="outline" type="button" disabled={refreshing||mutation.pending||mutation.refreshFailed} onClick={()=>void refresh()}
+      className="mt-3 min-h-11  border px-3 py-2 text-sm disabled:opacity-50">
       {busy?"Updating…":"Refresh agreement and readiness"}
-    </button>
+    </Button>
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Updating agreement and readiness…"/>
     <p className="mt-2 text-xs text-muted-foreground">
       After CAN reviews, renews or withdraws this agreement, refresh to recheck the
@@ -152,18 +154,18 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
         <Button type="submit" variant="outline" disabled={busy}>Revoke authorization</Button>
       </form>}
       {(status.authorization.status==="denied"||status.authorization.status==="revoked")&&
-        <button type="button" disabled={busy} onClick={()=>void request()}
-          className="mt-3 rounded border px-3 py-2 text-xs">Request new agreement version</button>}
+        <Button variant="outline" type="button" disabled={busy} onClick={()=>void request()}
+          className="mt-3  border px-3 py-2 text-xs">Request new agreement version</Button>}
     </div>:
     <div className="mt-3">
       <p className="text-sm font-semibold">Request service scope</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {operatingServices.filter(service=>status.canIssueCredit||service!=="credit_issuance")
-          .map(service=><label key={service} className="flex items-center gap-2 text-xs">
-          <input type="checkbox" checked={selected.includes(service)} onChange={e=>setSelected(v=>
+          .map(service=><Label key={service} className="flex items-center gap-2 text-xs">
+          <Checkbox checked={selected.includes(service)} onChange={e=>setSelected(v=>
             e.target.checked?[...v,service]:v.filter(x=>x!==service))}/>
           {service.replace(/_/g," ")}
-        </label>)}
+        </Label>)}
       </div>
       {requestAttempted&&!selected.length&&<FieldError className="mt-2">Select at least one requested service.</FieldError>}
       <Button type="button" variant="outline" className="mt-3" disabled={busy} onClick={()=>void request()}>

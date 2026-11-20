@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useCallback, useEffect, useState } from "react";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
@@ -132,13 +133,13 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
         Last reviewed: {new Date(review.reviewedAt).toLocaleString()}
       </p>}
       {review.canAttest && review.status!=="reviewed_snapshot"&&<>
-        <label className="mt-4 flex items-start gap-2 text-sm">
+        <Label className="mt-4 flex items-start gap-2 text-sm">
           <Checkbox checked={confirmed}
             onChange={event=>setConfirmed(event.target.checked)} disabled={busy||!ready} />
           I reviewed the expected roster, official attendance records and schedule gaps
           for this date. This records a snapshot review, not student release or
           a final lock of attendance.
-        </label>
+        </Label>
         <Button variant="outline" type="button" disabled={!ready||!confirmed||busy}
           className="mt-3 border px-4 py-2 text-sm font-semibold disabled:opacity-50"
           onClick={async()=>{
