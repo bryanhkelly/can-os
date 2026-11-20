@@ -104,6 +104,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   ];
   if (studio) return <LaunchSiteFrame
     site={{id:data.siteId,name:data.siteName}} active="website-brand"
+    previewAvailable={Boolean(data.host)}
     previewHref={privateWebsitePreviewUrl(data.siteId)}>
     <PageFrame width="wide" className="launch-studio-page">
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
