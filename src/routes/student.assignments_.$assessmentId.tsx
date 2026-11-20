@@ -267,7 +267,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
    header={<RecordHeader
     breadcrumbs={<>
     <Link to="/home" className="underline">Student Today</Link><span>/</span>
-    <Link to="/class" search={{ section: assignment.sectionId, tab: "lessons", lesson: assignment.metadata.curriculumLessonId ?? undefined }} className="underline">{assignment.course}</Link><span>/</span>
+    <Link to="/class"  className="underline">{assignment.course}</Link><span>/</span>
      <Link to="/student/assignments" search={{ filter, section }} className="underline">Assignments</Link><span>/</span>
      <span>{assignment.title}</span>
     </>}
@@ -302,7 +302,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
       </ul>
      </> : null}
      {assignment.metadata.curriculumLessonId && <Link to="/class"
-      search={{ section: assignment.sectionId, tab: "lessons", lesson: assignment.metadata.curriculumLessonId }}
+      
       className="mt-4 inline-block text-sm underline">Review publisher lesson: {assignment.metadata.curriculumLessonTitle ?? assignment.metadata.curriculumLessonId}</Link>}
     </WorkspacePanel>
     {content?.steps.length ? <WorkspacePanel title="What you'll do">
