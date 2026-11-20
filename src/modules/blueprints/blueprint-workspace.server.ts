@@ -173,6 +173,7 @@ export async function getCanonicalBlueprintWorkspace(
           configurationId: configuration.id,
           name: configuration.name,
           versionId: version.id,
+          blueprintVersionId: version.blueprintVersionId,
           revision: version.revision,
           lifecycle: version.lifecycle,
         }];
