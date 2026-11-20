@@ -9,6 +9,7 @@ import { Link } from "@tanstack/react-router";
 import { WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
 import { LaunchSitePublicationPanel } from "./LaunchSitePublicationPanel";
+import { LaunchReadinessPanelV61 } from "./LaunchReadinessPanelV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 
 const prepareModuleIcons: Record<PrepareStageModuleIdV61, LucideIcon> = {
@@ -228,6 +229,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
           </div>
         </div>
       </WorkspacePanel>}
+      <LaunchReadinessPanelV61 key={siteId + ":" + module} siteId={siteId} context="prepare" />
       <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}/>
       <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
         A shared preview is not Site publication. Publishing the Site is not approval to operate, publish an Offering, or enroll learners.
