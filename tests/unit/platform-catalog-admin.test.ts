@@ -58,7 +58,7 @@ describe("platform-owned Program Catalog and Solution Blueprint authority", () =
     expect(source).toContain("isDemoAccountEmail(account.email)");
     expect(source).toContain('assertCapability(actor, "platform.admin")');
     expect(source).toContain('mayApprovePlatformVersion(authorId, actor.actorPersonId)');
-    expect(source).toContain('mayApprovePlatformVersion(authorId, reviewerId)');
+    expect(source).toContain('if (!authorId) throw new AuthorizationError("audited CAN planning draft author")');
     expect(source).toContain('action: "platform.catalog.version.created"');
     expect(source).toContain('action: "platform.catalog.plan.approved"');
     expect(source).toContain('action: "platform.catalog.version.published"');
