@@ -9,8 +9,8 @@ import { siteArtifactReleases, siteArtifactReleaseAccess, siteMarketingPackageRe
   sites, siteMarketingPackages, sitePublications, siteBrandAssets } from "@/db/schema";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
-import { marketingPackageContentSchema, marketingFormatIds, marketingStepIssue } from "@/domain/marketing-package-v61";
-import { containsProtectedInstitutionalClaim } from "@/domain/site-local-content";
+import { marketingPackageContentSchema, marketingFormatIds, marketingStepIssue, marketingPackageClaimsRequireReview } from "@/domain/marketing-package-v61";
+
 import { renderSiteMarketingArtifact } from "@/domain/site-artifact-renderer";
 import { assertSiteBrandMediaRights } from "@/domain/site-brand";
 import { publicSiteHost } from "@/domain/public-site-address";
@@ -37,6 +37,7 @@ async function checkSite(siteId:string,write:boolean,reader:Pick<typeof db,"sele
  */
 const previewInputSchema=z.object({
   siteId:uuid,
+  title:z.string().trim().max(120),
   brandVersionId:uuid.nullable().optional(),
   format:z.enum(marketingFormatIds),
   content:marketingPackageContentSchema,
@@ -50,8 +51,7 @@ export const previewSiteMarketingArtifact=createServerFn({method:"POST"})
     const brand=await readSavedBrandVersion(site.id,data.brandVersionId??null);
     if(!brand)return {state:"missing-brand" as const};
     // Never preview unpublished claims or unconsented media as if distributable.
-    const copy=[data.content.headline,data.content.message,data.content.callToAction].join(" ");
-    if(containsProtectedInstitutionalClaim(copy))
+    if(marketingPackageClaimsRequireReview(data.title,data.content))
       return {state:"claims-review-required" as const};
     const resolvedBrand={...brand.resolved,
       logo:assertSiteBrandMediaRights(brand.resolved.logo)?brand.resolved.logo:null,
@@ -115,8 +115,7 @@ export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
     }
     if(new Set(content.formats).size!==content.formats.length)
       throw new DomainError("VALIDATION_FAILED","Select each material format only once.");
-    const claimText=[pkg.title,content.headline,content.message,content.callToAction].join(" ");
-    if(containsProtectedInstitutionalClaim(claimText))
+    if(marketingPackageClaimsRequireReview(pkg.title,content))
       throw new DomainError("VALIDATION_FAILED",
         "Remove unverified institutional, tuition or enrollment claims before releasing materials.");
     const brand=await readSavedBrandVersion(site.id,pkg.brandVersionId,tx);
