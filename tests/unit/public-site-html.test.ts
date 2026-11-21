@@ -72,68 +72,26 @@ describe("standalone public site HTML", () => {
     expect(html).not.toContain("guardian/enrichment");
     expect(html).not.toContain("studentProfileId");
   });
-  it("makes synthetic local previews fully navigable without real inquiry or enrollment submission", () => {
-    const original={host:"valorschool.can-os.com",site:{name:"Valor School",organizationName:"Synthetic school"},
-      demonstration:true,offerings:[],academicPrograms:[{programId:"school-a",title:"Hybrid High School",
-      typeLabel:"High school",summary:"A fictional example",grades:{min:"9",max:"12"},
-      delivery:{onsite:true,liveOnline:true,asynchronous:true,onsiteDaysPerWeek:2},
-      availability:"planned" as const}]};
-    const preview=withIllustrativeLocalPreview(original);
-    const paths=availablePublicSitePaths(preview);
-    expect(paths).toContain("/about");
-    expect(paths).toContain("/student-life");
-    expect(paths).toContain("/families");
-    for(const path of paths){
-      const html=renderPublicSiteHtml(preview,{path,localPreview:true,localPreviewSlug:"valorschool",
-        localPreviewSubmissionsEnabled:true,makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
-      expect(html).toContain('href="/published-site?site=valorschool"');
-      expect(html).not.toContain('href="/academics"');
-      expect(html).not.toContain('action="/apply"');
-      expect(html).not.toContain("<form");
-      expect(html).toContain("DEMONSTRATION SCHOOL");
-      expect(html).toContain('content="noindex,nofollow"');
-    }
-    const academics=renderPublicSiteHtml(preview,{path:"/academics",localPreview:true,
-      localPreviewSlug:"valorschool",localPreviewSubmissionsEnabled:true,
-      makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
-    expect(academics).toContain("Hybrid High School");
-    expect(academics).not.toContain('id="program-inquiry-school-a"');
-    expect(academics).not.toContain("Applications available · identity verification required");
-    expect(renderPublicSiteHtml(preview,{path:"/student-life",localPreview:true,
-      localPreviewSlug:"valorschool"})).toContain("Robotics &amp; Design Lab");
-    const readOnly=renderPublicSiteHtml(preview,{path:"/academics",localPreview:true,
-      localPreviewSlug:"valorschool",makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
-    expect(readOnly).not.toContain("<form");
-    expect(availablePublicSitePaths(original)).not.toContain("/about");
-  });
-
-  it("offers a complete, compelling fictional prospectus without fabricated enrollment actions", () => {
-    const demo=withIllustrativeLocalPreview({
-      host:"showcase.can-os.com",
-      site:{name:"Showcase Academy",organizationName:"Community Partner"},
+  it("renders identical Site pages regardless of a synthetic fixture marker",()=>{
+    const page={host:"valorschool.can-os.com",
+      site:{name:"Valor Demo School",organizationName:"Site Partner"},
       demonstration:true,offerings:[],
-    });
-    const paths=availablePublicSitePaths(demo);
-    expect(paths).toHaveLength(13);
-    const checks: Array<[typeof paths[number],string]> = [
-      ["/academics","Humanities &amp; Communication"],
-      ["/student-life","Robotics &amp; Design Lab"],
-      ["/school-day","Time to focus. Space to connect."],
-      ["/admissions","Discover the school. Picture your place in it."],
-      ["/tuition","An investment you can understand."],
-      ["/families","In the loop. In the conversation."],
-      ["/faq","The questions that matter most."],
-      ["/contact","A good school conversation starts"],
-    ];
-    for(const [path,copy] of checks) {
-      const html=renderPublicSiteHtml(demo,{path,makeRequestId:()=> "123"});
-      expect(html).toContain(copy);
-      expect(html).toContain("DEMONSTRATION SCHOOL");
-      expect(html).not.toContain("<form");
-      expect(html).not.toContain("Illustrative family experience");
-      expect(html).toContain('content="noindex,nofollow"');
+      localContent:{...emptySiteLocalContent,
+        schoolVision:"Our saved educational vision.",
+        localDescription:"Our community was founded to serve families.",
+      },
+    };
+    expect(withIllustrativeLocalPreview(page)).toEqual(page);
+    expect(availablePublicSitePaths(page))
+      .toEqual(availablePublicSitePaths({...page,demonstration:false}));
+    for(const path of availablePublicSitePaths(page)){
+      const opts={path,localPreview:true} as const;
+      expect(renderPublicSiteHtml(page,opts))
+        .toBe(renderPublicSiteHtml({...page,demonstration:false},opts));
     }
-    expect(availablePublicSitePaths({...demo,demonstration:false})).not.toContain("/academics");
+    expect(renderPublicSiteHtml(page)).toContain("Valor Demo School");
+    expect(renderPublicSiteHtml(page)).not.toContain("DEMONSTRATION SCHOOL");
+    expect(renderPublicSiteHtml(page)).not.toContain("Robotics &amp; Design Lab");
   });
 
   it("routes locally previewed application forms through the canonical verification endpoint only when authorized",()=>{
@@ -601,25 +559,17 @@ describe("standalone public site HTML", () => {
     expect(reviewed).toContain("Applications are not currently open through this website");
   });
 
-  it("marks synthetic schools explicitly without affecting real school pages", () => {
-    const site = { name: "Fictional Learning Academy", organizationName: "Sample Community" };
-    const page = { host: "example.can-os.com", site, offerings: [] };
-    const ordinary = renderPublicSiteHtml(page);
-    const demonstration = renderPublicSiteHtml({ ...page, demonstration: true });
-    expect(ordinary).not.toContain('class="demo-banner"');
-    expect(demonstration).toContain('class="demo-banner"');
-    expect(demonstration).toContain("Fictional Learning Academy is fictional.");
-    expect(demonstration).not.toContain("Valor is a fictional");
-    const hostedDemo = renderPublicSiteHtml({...page, demonstration: true}, {
-      makeRequestId: () => "00000000-0000-4000-8000-000000000001",
-    });
-    expect(hostedDemo).toContain('content="noindex,nofollow"');
-    expect(isIndexablePublicSite({...page, demonstration: true})).toBe(false);
+  it("has the same indexing and official website markup for regular and synthetic Sites",()=>{
+    const page={host:"example.can-os.com",
+      site:{name:"Barton Demo School",organizationName:"Community Partner"},
+      offerings:[]};
+    const options={makeRequestId:()=>"00000000-0000-4000-8000-000000000001"};
+    const ordinary=renderPublicSiteHtml(page,options);
+    const synthetic=renderPublicSiteHtml({...page,demonstration:true},options);
+    expect(synthetic).toBe(ordinary);
+    expect(synthetic).toContain('content="index,follow"');
+    expect(isIndexablePublicSite({...page,demonstration:true})).toBe(true);
     expect(isIndexablePublicSite(page)).toBe(true);
-    const hostedOrdinary = renderPublicSiteHtml(page, {
-      makeRequestId: () => "00000000-0000-4000-8000-000000000001",
-    });
-    expect(hostedOrdinary).toContain('content="index,follow"');
   });
 
   it("shows mission storytelling only when local school vision exists", () => {
@@ -663,40 +613,17 @@ describe("standalone public site HTML", () => {
   });
 });
 
-it("connects all twelve editorial photo roles to fictional school pages only when library readiness is enabled",()=> {
-  const prior=process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED;
-  process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED="true";
-  try {
-    const page=withIllustrativeLocalPreview({
-      host:"showcase.can-os.com",
-      site:{name:"Showcase Academy",organizationName:"Partner"},
-      offerings:[],demonstration:true,
-    });
-    const all=availablePublicSitePaths(page).map(path=>
-      renderPublicSiteHtml(page,{path})).join("\n");
-    for(const role of ["hero","story_01","story_02","program_01",
-      "program_02","program_03","community_01","community_02",
-      "admissions","portrait_01","portrait_02","portrait_03"]) {
-      expect(all).toContain(`/template-photo/heritage/${role}?v=20261109`);
-    }
-    expect((all.match(/class="demo-banner"/g)??[]).toHaveLength(13);
-    expect(all).not.toContain("Demonstration only");
-    expect(all).not.toContain("Illustrative template photography");
-    expect(all).not.toContain("<form");
-    expect(all).toContain('content="noindex,nofollow"');
-  } finally {
-    if(prior===undefined)delete process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED;
-    else process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED=prior;
-  }
-});
-
-it("uses explicit sample photography only in the fictional private template preview",()=>{
- const page={host:"valorschool.can-os.com",site:{name:"Valor School",organizationName:"School"},offerings:[],demonstration:true};
- const preview=renderPublicSiteHtml(page,{localPreview:true,sampleTemplate:"heritage"});
- expect(preview).toContain("/template-photo/heritage/hero?v=20261109");
- expect(preview).not.toContain("data:image/svg+xml,");
- const publishedDemo=renderPublicSiteHtml(page,{sampleTemplate:"heritage"});
- expect(publishedDemo).toContain("/school-template-previews/v1/heritage/hero.jpg");
- expect(publishedDemo).not.toContain("/template-photo/");
- expect(renderPublicSiteHtml({...page,demonstration:false},{localPreview:true,sampleTemplate:"heritage"})).not.toContain("/school-template-previews/");
+it("keeps fictional gallery assets separate from every actual Site preview",()=>{
+  const page={host:"valorschool.can-os.com",
+    site:{name:"Valor School",organizationName:"School"},
+    offerings:[],demonstration:true};
+  const realPreview=renderPublicSiteHtml(page,{localPreview:true});
+  const ordinaryPreview=renderPublicSiteHtml({...page,demonstration:false},{localPreview:true});
+  expect(realPreview).toBe(ordinaryPreview);
+  expect(realPreview).not.toContain("/template-photo/");
+  const gallery=renderPublicSiteHtml(page,{localPreview:true,
+    templateGallery:true,sampleTemplate:"heritage"});
+  expect(gallery).toContain("/template-photo/heritage/hero");
+  expect(renderPublicSiteHtml(page,{localPreview:true}))
+    .not.toContain("DEMONSTRATION SCHOOL");
 });
