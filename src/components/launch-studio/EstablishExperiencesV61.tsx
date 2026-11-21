@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import {
-  ArrowLeft, BookOpen, BriefcaseBusiness, Check, ChevronDown, ChevronUp,
+  BookOpen, BriefcaseBusiness, Check, ChevronDown, ChevronUp,
   Compass, FlaskConical, HandHeart, HeartPulse, House, Landmark, Monitor, Palette,
   Search, Sparkles, Users, Wallet, X, type LucideIcon,
 } from "lucide-react";
@@ -48,7 +48,10 @@ const priorities = ["featured","planned","exploring"] as const;
 const priorityLabel = (value:SiteExperienceDetail["priority"]) =>
   value==="featured"?"Featured":value==="exploring"?"Exploring":"Planned";
 
-/** Browse all 78 topics with recommendations identified, then personalize only
+/** Approved V6.1 image: 12 icon-led open categories; only the five selected
+ * topics have detail cards. The Featured/Planned/Exploring status chip remains
+ * on the left side of each card header, never buried at the bottom.
+ * Browse all 78 topics with recommendations identified, then personalize only
  * the chosen five. The parent owns Save & Continue and this stage transition.
  * Data stays in the canonical Programs & Audiences draft, not in local shadow state. */
 export function EstablishExperiencesV61({
@@ -341,7 +344,7 @@ export function EstablishExperiencesV61({
                 <span className="sr-only">{expanded?"Collapse":"Expand"} {topic.title}</span>
               </Button>
             </header>
-            {expanded&&<div id={"experience-choices-"+topic.id}
+            <div id={"experience-choices-"+topic.id} hidden={!expanded}
               className="space-y-5 p-4 sm:p-5">
               <p className="text-xs text-muted-foreground">
                 Choose activities and desired outcomes for this planned Experience.
@@ -447,7 +450,7 @@ export function EstablishExperiencesV61({
             </p>
           </div>
 
-            </div>}
+            </div>
           </article>;
         })}
         {customNames.map((name,index)=><article key={name}
@@ -467,10 +470,6 @@ export function EstablishExperiencesV61({
           </Button>
         </article>)}
       </div>
-      <Button type="button" variant="outline" disabled={disabled}
-        onClick={()=>onStageChange("choose")}>
-        <ArrowLeft aria-hidden="true"/> Back to Explore Topics
-      </Button>
       <p className="text-xs text-muted-foreground">
         Finish selecting the details you want, then use Save & Continue to Website & Brand below.
         There is no separate Review page.
