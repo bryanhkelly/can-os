@@ -1,4 +1,5 @@
 import type { SiteStoryV61 } from "./site-information-v61";
+import { siteIdentityEditorialContextV61, type SiteIdentityV61 } from "./site-identity-v61";
 import type { SiteProgramsAudiencesV61 } from "./site-launch-preferences";
 import type { SiteContentExperienceV61 } from "./site-content-brief-v61";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
@@ -15,6 +16,8 @@ export type MarketingStarterSourcesV61 = {
   /** No prior Site content is reused in marketing unless explicitly authorized. */
   reuseAllowed?: boolean;
   story: SiteStoryV61 | null;
+  /** Site identity is self-described and used only for operator-reviewed drafts. */
+  identity?: SiteIdentityV61 | null;
   intent: SiteProgramsAudiencesV61 | null;
   experiences?: readonly SiteContentExperienceV61[];
   /** Active published CAN Program titles; no Solution requirements or approvals. */
@@ -81,6 +84,8 @@ export function suggestMarketingStarterV61(
   const sources:string[]=[];
   const name=safeText(siteName,100)||"our learning community";
   const story=source.story;
+  const identity=source.identity??null;
+  const communityKind=siteIdentityEditorialContextV61(identity).kind;
   const intent=source.intent;
   // Establish names intended learners, not recipient contacts. Preselect a
   // suggested communication audience without importing personal information.
@@ -111,12 +116,15 @@ export function suggestMarketingStarterV61(
   const emphasis=story ? phrase(story.motivations) : "";
   const approach=story ? phrase(story.distinctives) : "";
   const outcome=story ? phrase(story.experiences) : "";
+  if(identity)sources.push("Site Information · Site identity");
   if(emphasis||approach||outcome)sources.push("Site Information · Purpose & Story");
   if(focus)sources.push("Establish · Programs & Audiences");
   if(experience)sources.push("Establish · Experiences");
   const mission=emphasis ? "shaped by "+emphasis
-    : approach ? "focused on "+approach : "rooted in community";
-  const aspiration=outcome ? " We hope learners experience "+outcome+"."
+    : approach ? "focused on "+approach
+    : identity?.faithOrientation==="faith_based" ? "inspired by faith and service"
+    : "rooted in community";
+  const aspiration=outcome ? " We hope participants experience "+outcome+"."
     : approach ? " We hope to create space for "+approach+".":"";
   const experienceLine=experience?.activities.length
     ? " Proposed activities could include "+
@@ -130,8 +138,8 @@ export function suggestMarketingStarterV61(
   switch(purpose){
     case "site-announcement":
       if(sources.length){
-        headline="A learning community "+mission+" is taking shape.";
-        message="At "+name+", we are exploring a new learning community "+mission+
+        headline="A "+communityKind+" "+mission+" is taking shape.";
+        message="At "+name+", we are exploring a new "+communityKind+" "+mission+
           "."+aspiration+focusLine+experienceLine+
           " We'd love to hear what matters to the people we hope to serve.";
       }
