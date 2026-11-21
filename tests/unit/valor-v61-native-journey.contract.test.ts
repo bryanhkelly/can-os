@@ -12,6 +12,13 @@ describe("CAN V6.1 canonical student Class experience in any Site",()=>{
  const route=read("src/routes/class.tsx");
  const detail=read("src/routes/class_.$classId.tsx");
 
+ it("allows server-authorized demo-admin student switching without bypassing Person or Class checks",()=>{
+   expect(session).toContain('if (actor.role === "student")');
+   expect(session).not.toContain('if (!actor.actorPersonId || actor.sessionAccountId ||');
+   expect(session).toContain('actor.grantSiteId');
+   expect(session).toContain('actor.capabilities.has("student:read")');
+   expect(classWorkspace).toContain('canonicalClassEnrollments');
+ });
  it("uses an authorized current CAN student Site grant, not a synthetic ID",()=>{
    expect(session).toContain('actor.role === "student"');
    expect(session).toContain('actor.capabilities.has("student:read")');
