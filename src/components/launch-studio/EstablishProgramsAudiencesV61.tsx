@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
-import { Select } from "@/components/ui/select";
 import { GuidedSetupShell } from "@/components/workflow";
 import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
@@ -15,7 +13,6 @@ import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference
 import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
   noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
-import { chooseStartingIdeaV61, selectedStartingIdeaV61 } from "@/domain/site-program-intent-focus-v61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 
 type InternalStep = 0 | 1;
@@ -218,9 +215,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     }
   }
 
-  const options = interests.filter(item => draft.interestIds.includes(item.id));
   const programs = programCatalog ?? [];
-  const chosenPrograms = programs.filter(item => draft.programCodes?.includes(item.code));
   // Preserve historical selections until the operator removes them explicitly.
   // A retired entry is absent from the active catalog, so it cannot render
   // through the regular published Program choices.
@@ -334,22 +329,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </div>
           <p className="text-xs text-muted-foreground">These are private preferences, not days, hours or dates booked for a Class.</p>
         </section>
-        <section className="space-y-3 border bg-muted/25 p-4" aria-labelledby="pa-focus-heading">
-          <h3 id="pa-focus-heading" className="text-sm font-semibold">One starting idea (optional)</h3>
-          <Field label="Which idea would you begin with?"
-            description="Choose one selected Program or broad learning idea. You can decide the Solution later.">
-            <Select value={selectedStartingIdeaV61(draft)} disabled={disabled}
-              onChange={event => setDraft(current => chooseStartingIdeaV61(current,event.target.value))}>
-              <option value="">I'll decide later</option>
-              {chosenPrograms.map(item =>
-                <option key={item.code} value={"program:"+item.code}
-                  disabled={!academyReferenceMayBeSelected(item,schoolYearAvailability)}>{item.title}</option>)}
-              {options.map(item =>
-                <option key={item.id} value={"interest:"+item.id}
-                  disabled={!schoolYearInterestMayBeSelected(item.id,schoolYearAvailability)}>{item.label}</option>)}
-            </Select>
-          </Field>
-        </section>
         <WorkspaceNotice>These are private planning interests, not approved Programs, Courses, Classes or enrollments. Adopt real offerings later in <strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
         <p className="text-xs text-muted-foreground">{(draft.programCodes ?? []).length} published Program ideas and {draft.interestIds.length} other learning interests selected. You can update your plans later in the Site Workspace.</p>
       </> : <>
@@ -374,12 +353,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           } onEdit={() => selectStep(0)} />
           <SummaryRow label="Days & times"
             value={draft.timingIds.length ? draft.timingIds.map(id => timingLabels[id]).join(" · ") : "Not selected yet"}
-            onEdit={() => selectStep(0)} />
-          <SummaryRow label="Starting idea" value={
-            (draft.startingProgramCode
-              ? programs.find(item => item.code === draft.startingProgramCode)?.title
-                ?? draft.startingProgramCode
-              : options.find(item => item.id === draft.startingFocus)?.label) ?? "Not selected"}
             onEdit={() => selectStep(0)} />
           <SummaryRow label="Intended audiences" value={labels(draft.audienceIds, audienceChoices)} />
         </section>
