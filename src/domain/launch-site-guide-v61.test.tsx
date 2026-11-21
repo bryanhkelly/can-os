@@ -27,9 +27,9 @@ describe("V6.1 contextual Site Guide", () => {
 
   it("adapts audience and Experience guidance to current planning selections", () => {
     const plan = {
-      ...emptySiteProgramsAudiencesV61(), interestIds: ["senior"] as const,
-      audienceIds: ["older_adults"] as const,
-      experienceIds: ["financial-literacy"] as const,
+      ...emptySiteProgramsAudiencesV61(), interestIds: ["senior"] as Array<"senior">,
+      audienceIds: ["older_adults"] as Array<"older_adults">,
+      experienceIds: ["financial-literacy"] as Array<"financial-literacy">,
     };
     const audience = programsAudiencesGuideV61(1, plan);
     const experience = programsAudiencesGuideV61(2, plan, [], "personalize");
@@ -41,7 +41,7 @@ describe("V6.1 contextual Site Guide", () => {
 
   it("does not expose unknown Program codes or imply that planning authorizes enrollment", () => {
     const plan = {
-      ...emptySiteProgramsAudiencesV61(), interestIds: ["adult"] as const,
+      ...emptySiteProgramsAudiencesV61(), interestIds: ["adult"] as Array<"adult">,
       programCodes: ["retired.unpublished_program"],
     };
     const guide = programsAudiencesGuideV61(0, plan, []);
