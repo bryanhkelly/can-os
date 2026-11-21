@@ -5,13 +5,15 @@ import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
+import { schoolPlanningLocationSchema } from "@/domain/school-stub";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { projectSiteEnrollmentOpportunities } from "@/domain/site-enrollment-opportunities";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { organizations, programs, sitePublications, sites } from "@/db/schema";
+import { organizations, programs, sitePublications, sites, siteAffiliations } from "@/db/schema";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { isAcademicMarketingType } from "@/domain/academic-program-publication";
@@ -113,9 +115,28 @@ export async function readPublishedSiteCatalog(slug: string) {
       noncredit:noncreditReleases,classes,enrollmentOrigin:enrollmentAppOrigin,
     });
     const contentConfig = readPublishedSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
+    const preferences=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+    const location=schoolPlanningLocationSchema.safeParse(site.metadata.schoolPlanningLocation);
+    // Public networks and statuses are sourced from actual Site affiliation
+    // records, never inferred from names or synthetic fixtures. The published
+    // section may accurately show pending/rejected/revoked relationships.
+    const affiliations=await tx.select({name:organizations.name,status:siteAffiliations.status})
+      .from(siteAffiliations)
+      .innerJoin(organizations,eq(organizations.id,siteAffiliations.denominationOrganizationId))
+      .where(eq(siteAffiliations.siteId,site.id)).limit(20);
+    const allowedStatuses=["pending","approved","rejected","revoked"] as const;
+    const networkAffiliations=affiliations.flatMap(row=>
+      allowedStatuses.includes(row.status as typeof allowedStatuses[number])
+        ? [{name:row.name,status:row.status as typeof allowedStatuses[number]}]
+        : []);
     const contentBlocks = resolveSiteContentBlocks(
       contentConfig, {
-        mode: "public", academicPrograms: authorizedPrograms,
+        mode: "public",preferences:preferences.success?preferences.data:null,
+        siteSetup:{name:brand.resolved.displayName,organizationName:site.organizationName,
+          city:location.success?location.data.city:null,
+          state:location.success?location.data.state:null,timezone:site.timezone},
+        networkStatusKnown:true,networkAffiliations,
+        academicPrograms: authorizedPrograms,
         enrichment: publicOfferings, noncredit: noncreditReleases,
         classes, classTimezone:site.timezone,
         enrollmentOrigin: enrollmentAppOrigin,
