@@ -3,7 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GuidedSetupShell } from "@/components/workflow";
-import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, SelectionCard, WorkspaceNotice } from "@/components/workspace";
 import {
   siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
@@ -268,11 +268,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               </div>;
             })}
           </div>}
-          {programCatalog && programs.length === 0 && <p className="text-sm text-muted-foreground">No published Program references are available to plan.</p>}
+          {programCatalog && programs.length === 0 && <p className="text-sm text-muted-foreground">No Programs available.</p>}
           {unavailablePrograms.length > 0 && <WorkspaceNotice tone="attention">
-            <p>These previously selected Programs are no longer in the published catalog.
-              They remain saved until you choose to remove them. You can remove a reference
-              without changing any independent Solution plan or Offering.</p>
+            <p>These saved Programs are no longer available. Remove any you no longer need.</p>
             <ul className="mt-3 space-y-2" aria-label="Unavailable selected Programs">
               {unavailablePrograms.map(code => <li key={code}
                 className="flex flex-wrap items-center justify-between gap-3 border bg-background p-3">
@@ -287,9 +285,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </WorkspaceNotice>}
           <div className="space-y-3 border-t pt-4">
             <h3 className="text-sm font-semibold">Other learning ideas</h3>
-            <p className="text-xs text-muted-foreground">
-              Choose other areas of interest.
-            </p>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {interests.map(choice => {
                 const schoolYearBlocked = !schoolYearInterestMayBeSelected(choice.id,schoolYearAvailability);
@@ -326,14 +321,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
                 </div>
               </fieldset>)}
           </div>
-          <p className="text-xs text-muted-foreground"></p>
         </section>
-        <WorkspaceNotice><strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
-        <p className="text-xs text-muted-foreground">{(draft.programCodes ?? []).length} published Program ideas and {draft.interestIds.length} other learning interests selected. You can update your plans later in the Site Workspace.</p>
       </> : <>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
-          <p className="text-xs text-muted-foreground">Select the people you hope to serve.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {audienceChoices.map(choice => <SelectionCard key={choice.id} kind="checkbox"
               value={choice.id} title={choice.label} detail={choice.detail} className="min-h-24"
@@ -341,23 +332,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               onChange={checked => toggleAudience(choice.id, checked)} />)}
           </div>
         </fieldset>
-        <WorkspaceNotice><strong></strong> Age restrictions, guardian consent and safeguarding are determined by authorized offerings, not these selections.</WorkspaceNotice>
-        <section className="space-y-3 border bg-muted/20 p-4" aria-labelledby="pa-summary">
-          <h3 id="pa-summary" className="text-sm font-semibold">Your selections so far</h3>
-          <p className="text-xs text-muted-foreground"></p>
-          <SummaryRow label="Learning interests" value={labels(draft.interestIds, interests)} onEdit={() => selectStep(0)} />
-          <SummaryRow label="Proposed Programs" value={
-            (draft.programCodes ?? []).length ? (draft.programCodes ?? [])
-              .map(code => programs.find(item => item.code === code)?.title ?? code).join(" · ") : "Not selected yet"
-          } onEdit={() => selectStep(0)} />
-          <SummaryRow label="Days & times"
-            value={draft.timingIds.length ? draft.timingIds.map(id => timingLabels[id]).join(" · ") : "Not selected yet"}
-            onEdit={() => selectStep(0)} />
-          <SummaryRow label="Intended audiences" value={labels(draft.audienceIds, audienceChoices)} />
-        </section>
-      </> : <>
-
-
       </>}
       </div>
     </GuidedSetupShell>
