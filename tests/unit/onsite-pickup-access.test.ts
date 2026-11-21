@@ -19,7 +19,7 @@ describe("onsite pickup capability and resource scope", () => {
     });
 
   it("denies guardians, teachers, organization-wide grants and empty program scope", () => {
-    for (const role of ["guardian", "teacher", "paraeducator"]) {
+    for (const role of ["guardian", "teacher", "paraeducator", "room_facilitator"]) {
       const actor = resolveAccessContext(session, [{ ...base, role }]);
       actor.scope.programIds = ["program"];
       expect(() => assertOnsitePickupScope(actor)).toThrow();
