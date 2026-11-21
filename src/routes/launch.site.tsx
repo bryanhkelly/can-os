@@ -59,7 +59,7 @@ export const Route = createFileRoute("/launch/site")({
     const overview = site && deps.module !== "website-brand" ? await (async () => {
       // Sidebar completion needs Site, planning and Brand facts. The expensive
       // Blueprint workspace and Marketing list are only needed for Overview
-      // (or Introduce itself). Their own modules load canonical detail.
+      // (or Share itself). Their own modules load canonical detail.
       const isOverview = !deps.module;
       const loadMarketing = isOverview || isIntroduceModuleV61(deps.module);
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
@@ -114,8 +114,8 @@ export const Route = createFileRoute("/launch/site")({
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
         ? informationRead ?? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
-      // Both Introduce modules use the same authorized Site package store
-      // and the same editorial projection of saved Establish information.
+      // Both Share modules use the same authorized Site package store
+      // and the same editorial projection of saved Shape information.
       // Failure of optional suggestions must not hide already saved packages.
       marketingPackages: site && isIntroduceModuleV61(deps.module)
         ? marketingRead ?? await listSiteMarketingPackagesV61({ data: { siteId: site.id } })
@@ -127,7 +127,7 @@ export const Route = createFileRoute("/launch/site")({
       introduceSiteRevision: site && isIntroduceModuleV61(deps.module) ? programsRead?.revision??null : null,
       programsAudiences: site && deps.module === "programs-audiences"
         ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
-      // Establish preferences are optional context for catalog discovery. The
+      // Shape preferences are optional context for catalog discovery. The
       // separately authorized catalog must remain navigable if this read is
       // unavailable or its data needs repair. Never pretend it loaded empty.
       prepareIntent: site && deps.module === "program-catalog"
