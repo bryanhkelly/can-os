@@ -12,9 +12,8 @@ export const siteLaunchModules = [
   { stage: "Establish", id: "site-information", title: "Site Information" },
   { stage: "Establish", id: "programs-audiences", title: "Programs & Audiences" },
   { stage: "Establish", id: "website-brand", title: "Website & Brand" },
-  { stage: "Introduce", id: "promote", title: "Promote" },
-  { stage: "Introduce", id: "recruit", title: "Recruit Families / Learners" },
-  { stage: "Introduce", id: "interest-events", title: "Interest Events" },
+  { stage: "Introduce", id: "create-outreach", title: "Create Outreach" },
+  { stage: "Introduce", id: "my-outreach", title: "My Outreach" },
   ...prepareStageModulesV61.map(module => ({
     stage: "Prepare" as const, id: module.id, title: module.title,
   })),
