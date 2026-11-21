@@ -205,6 +205,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     currentBrandConfiguration:savedBrand?.version.configuration??null,
     siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
     siteStoryCopyCandidates:storyCandidates,
+    // Saved Site identity guides private editorial prompts, never public authorization.
+    siteIdentity:siteBrief.identity,
     siteExperienceProfile,
     plannedExperienceNames,
     // Curated, clearly proposed draft phrasing. The content editor must
