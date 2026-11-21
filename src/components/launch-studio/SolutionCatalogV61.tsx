@@ -203,6 +203,11 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                 <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><BookOpen aria-hidden="true" className="size-4" /> About this solution</div>
                 <h3 className="mt-3 font-serif text-2xl">{selected.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">See what's included and what your site may need to provide.</p>
+                <details className="mt-3 text-xs text-muted-foreground">
+                  <summary className="cursor-pointer font-medium">Version details</summary>
+                  <p className="mt-2">Solution v{selected.versionNo} · {selected.components.length} listed parts</p>
+                  {selected.offeringCode && <p className="mt-1">Offering code: {selected.offeringCode}</p>}
+                </details>
                 {selected.offeringCode && <p className="mt-2 text-xs text-muted-foreground">
                   This solution is linked to an offering. You'll complete its requirements before registration can open.
                 </p>}
