@@ -207,6 +207,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   async function saveIdentity(required: boolean) {
     if (!required && !identityDirty) return;
     if (identitySaved && !identityDirty) return;
+    if (!identity.siteType) {selectStep(0);throw new Error("Choose what kind of Site you are building.");}
     const validated = siteIdentityV61Schema.safeParse(identity);
     if (!validated.success) {
       selectStep(0);
@@ -262,6 +263,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       const checkingHost = mode === "next" && (step === 0 || step === 3) ||
         mode === "exit" && (step === 0 || hostDirty);
       if (checkingIdentity) {
+        if (!identity.siteType) {selectStep(0);throw new Error("Choose what kind of Site you are building.");}
         const checked = siteIdentityV61Schema.safeParse(identity);
         if (!checked.success) {
           selectStep(0); throw new Error(checked.error.issues[0]?.message ?? "Choose your Site identity.");
