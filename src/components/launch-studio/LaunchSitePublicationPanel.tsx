@@ -258,7 +258,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
               {reachability && <p role="status" className="text-sm text-muted-foreground">
                 {reachability === "live" ? "Public HTTPS website is reachable."
                   : reachability === "hosting_disabled" ? "Website hosting is disabled."
-                  : reachability === "not_published" ? "Site publication is not active."
+                  : reachability === "not_published" ? "Website publication is not active."
                   : "Public HTTPS reachability could not be verified."}
               </p>}
             </div>
@@ -300,7 +300,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                   !state.publishingPrerequisitesPresent ||
                   state.latestWebsiteStatus==="draft"||state.latestWebsiteStatus==="review_required"}
                   onClick={()=>void change("republish")}>
-                  {busy?"Saving decision…":"Republish updated Site"}
+                  {busy?"Saving decision…":"Republish updated website"}
                 </Button>
               </div>}
               <Button disabled={busy || reason.trim().length < 10 ||
@@ -309,7 +309,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                    state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required"))}
                 variant={state.address.status === "published" ? "outline" : "default"}
                 onClick={() => void change(state.address!.status === "published" ? "unpublish" : "publish")}>
-                {busy ? "Saving decision…" : state.address.status === "published" ? "Unpublish Site" : "Publish Site website"}
+                {busy ? "Saving decision…" : state.address.status === "published" ? "Unpublish website" : "Publish website"}
               </Button>
             </div>
           </div> : <WorkspaceNotice tone="attention">
