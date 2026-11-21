@@ -26,6 +26,17 @@ describe("performance regression contracts", () => {
     expect(sourceText).toContain("const classes = await classesPromise");
   });
 
+  it("bulk-loads a student's Class memberships without bypassing Class publication authority", () => {
+    const sourceText = source("src/modules/classes/native-class-student-home.functions.ts");
+    expect(sourceText).toContain("inArray(canonicalClassEnrollments.classId,classIds)");
+    expect(sourceText).toContain("inArray(canonicalClassOfferingVersions.classId,classIds)");
+    expect(sourceText).toContain("const enrollmentsByClass=new Map");
+    expect(sourceText).toContain("const offeringByClass=new Map");
+    expect(sourceText).toContain("await currentClassAuthority(tx,item.classId,now)");
+    expect(sourceText).toContain('throw new AuthorizationError("ambiguous current Class enrollment")');
+    expect(sourceText).toContain('if(error instanceof AuthorizationError)continue;throw error;');
+  });
+
   it("times supplementary operations requests before errors are classified", () => {
     const sourceText = source("src/components/home/OperationsHome.tsx");
     expect(sourceText).toContain('supplementaryRead(() => measureServerStep("operations.home", "release-health"');
