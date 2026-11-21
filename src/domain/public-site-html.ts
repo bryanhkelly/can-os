@@ -203,8 +203,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const demo = options?.templateGallery === true;
   // A fictional school can demonstrate an admissions journey, but cannot submit
   // real inquiries, applications, or enrollment requests.
-  const submissionsEnabled = !options?.localPreview ||
-    (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true);
+  const submissionsEnabled = options?.templateGallery!==true &&
+    (!options?.localPreview ||
+      (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true));
   const inquiryAction = previewSlug
     ? `/published-site/inquiry?site=${encodeURIComponent(previewSlug)}`
     : "/inquiry";
@@ -955,7 +956,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ? `Learn about planned programs at ${school} and request founding-family information. Applications are not open.`
     : `Explore programs offered through ${school}.`) :
     `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
-  const isLive = Boolean(options?.makeRequestId) && !options?.localPreview;
+  const isLive = Boolean(options?.makeRequestId) && !options?.localPreview &&
+    options?.templateGallery!==true;
   const canonical = `https://${host}${path}`;
   return `<!doctype html>
 <html lang="en">
