@@ -3,8 +3,7 @@
  * honest planned states instead of a shared "not connected" placeholder.
  * These links do not grant Site, Program, Blueprint or publication authority.
  */
-import { CircleAlert } from "lucide-react";
-import { StatusBadge, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { StatusBadge, WorkspaceActionLink, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import type { siteLaunchModules } from "./LaunchStudioOverviewV61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import { LaunchReadinessPanelV61 } from "./LaunchReadinessPanelV61";
@@ -55,7 +54,6 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
     <div className="mt-5 space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge tone="info">Enrollment setup</StatusBadge>
-        <span className="text-xs text-muted-foreground"></span>
       </div>
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
       <WorkspacePanel title={module === "open" ? "Enable Enrollment" : "Continue with existing capabilities"}
@@ -68,9 +66,6 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
             actionLabel={item.label} />)}
         </div>
       </WorkspacePanel>
-      <WorkspaceNotice tone="info"><CircleAlert aria-hidden="true" className="mr-2 inline size-4"/>
-        
-      </WorkspaceNotice>
     </div>
   </WorkspaceShell>;
 }
