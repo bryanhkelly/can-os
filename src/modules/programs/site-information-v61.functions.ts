@@ -17,6 +17,14 @@ import {
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+/** Preserve change history without copying EINs into Site audit streams. */
+function safeHostingAuditValue(value:unknown){
+  const input=siteHostingV61Schema.safeParse(value);
+  if(!input.success)return value===null?null:{status:"unavailable"};
+  const {nonprofitEin,...safe}=input.data;
+  return {...safe,einSupplied:Boolean(nonprofitEin)};
+}
+
 const siteId = z.string().uuid();
 const expectedRevision = z.string().datetime({ offset: true });
 const saveInput = z.discriminatedUnion("section", [
@@ -131,11 +139,13 @@ export const saveSiteInformationV61 = createServerFn({ method: "POST" })
         action: "site.information_v61." + data.section + ".update",
         entityType: "site", entityId: site.id,
         scope: { organizationId: site.organizationId, siteId: site.id },
-        before: data.section === "story" ? storyAuditBefore : { value: before as object | null },
+        before: data.section === "story" ? storyAuditBefore
+          : { value: data.section === "hosting" ? safeHostingAuditValue(before) : before as object | null },
         after: data.section === "story"
           ? { revision: next.toISOString(), ...siteStoryAuditSummaryV61(data.story),
               selfReported: true, publicApproved: false }
-          : { value: after as object, selfReported: true, publicApproved: false },
+          : { value: data.section === "hosting" ? safeHostingAuditValue(after) : after as object,
+              selfReported: true, publicApproved: false },
       });
       // Notify the shared outbox of a revised private Site source, never its contents.
       await emitEvent(tx, {
