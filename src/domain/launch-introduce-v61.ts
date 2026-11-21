@@ -14,7 +14,7 @@ type Config={
 const encode=(id:string)=>encodeURIComponent(id);
 export const introduceModuleConfigV61:Record<IntroduceModuleV61,Config>={
   "create-outreach":{
-    title:"Create Outreach",eyebrow:"Introduce / Create Outreach",
+    title:"Create Outreach",eyebrow:"Share / Create Outreach",
     subtitle:"Tell the right people about your vision and invite a meaningful next step.",
     libraryTitle:"Create Outreach",libraryDescription:"Start a guided outreach plan.",
     guidance:"Build on what you've shared about your community, then shape a message people will care about.",
@@ -25,7 +25,7 @@ export const introduceModuleConfigV61:Record<IntroduceModuleV61,Config>={
       href:id=>"/launch/site?siteId="+encode(id)+"&module=my-outreach"}],
   },
   "my-outreach":{
-    title:"My Outreach",eyebrow:"Introduce / My Outreach",
+    title:"My Outreach",eyebrow:"Share / My Outreach",
     subtitle:"Review your saved plans and materials. Nothing is sent until you choose to share it.",
     libraryTitle:"My Outreach",libraryDescription:"Open, revise, duplicate, or archive an outreach plan.",
     guidance:"Find your outreach plans and earlier materials here. You can revisit or update them whenever you need.",
