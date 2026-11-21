@@ -1,4 +1,5 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { createHmac } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { parseInterestPageCursor, makeInterestPageCursor } from "@/domain/public-admissions-interest";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -271,6 +272,83 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         }),
       };
     }),nextCursor};
+  });
+
+/**
+ * A registrar may assign an adult's Site-wide prelaunch interest to one
+ * independently authorized Program for an application invitation. The
+ * original Site lead becomes the Program lead: no duplicate CRM record,
+ * child, seat reservation or Application is created.
+ */
+export const assignPublicSiteInterestToProgram=createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({
+    interestId:z.string().uuid(),programId:z.string().uuid(),
+  }).strict().parse(value))
+  .handler(async({data})=>{
+    const actor=await requireAdmissionsIntakeReader();
+    if(!actor.scope.programIds.includes(data.programId))
+      throw new AuthorizationError("authorized Program selection");
+    const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+    if(!pepper||pepper.length<32)throw new Error("Interest linkage security is unavailable");
+    return db.transaction(async tx=>{
+      // Require CURRENT admissions authority, not a marketing publication.
+      const destination=await resolvePrivateFamilyStartDestination(tx,data.programId);
+      if(!actor.scope.siteIds.includes(destination.siteId)||
+        !actor.scope.organizationIds.includes(destination.organizationId))
+        throw new AuthorizationError("Site-to-Program interest scope");
+      const [interest]=await tx.select({
+        id:publicAdmissionsInterests.id,siteId:publicAdmissionsInterests.siteId,
+        programId:publicAdmissionsInterests.programId,
+        status:publicAdmissionsInterests.status,
+        consentAt:publicAdmissionsInterests.contactConsentAt,
+        source:publicAdmissionsInterests.source,
+        email:publicAdmissionsInterests.contactEmail,
+      }).from(publicAdmissionsInterests).where(and(
+        eq(publicAdmissionsInterests.id,data.interestId),
+        eq(publicAdmissionsInterests.siteId,destination.siteId),
+        isNull(publicAdmissionsInterests.programId),
+      )).for("update").limit(1);
+      if(!interest||interest.source!=="published_site_general"||
+        !interest.consentAt||!["new","contacted"].includes(interest.status))
+        throw new AuthorizationError("eligible, consented Site interest");
+      const digest=createHmac("sha256",pepper)
+        .update(interest.siteId).update(":").update(data.programId)
+        .update(":").update(interest.email).digest("hex");
+      const [duplicate]=await tx.select({id:publicAdmissionsInterests.id})
+        .from(publicAdmissionsInterests).where(and(
+          eq(publicAdmissionsInterests.siteId,interest.siteId),
+          eq(publicAdmissionsInterests.programId,data.programId),
+          eq(publicAdmissionsInterests.emailDigest,digest),
+        )).limit(1);
+      if(duplicate)throw new DomainError("CONFLICT",
+        "This contact already has an inquiry for the selected Program.");
+      const now=new Date();
+      await tx.update(publicAdmissionsInterests).set({
+        programId:data.programId,emailDigest:digest,updatedAt:now,
+      }).where(and(eq(publicAdmissionsInterests.id,interest.id),
+        isNull(publicAdmissionsInterests.programId)));
+      await tx.update(actions).set({programId:data.programId,updatedAt:now})
+        .where(and(eq(actions.subjectType,"public_admissions_interest"),
+          eq(actions.subjectId,interest.id),
+          eq(actions.siteId,interest.siteId),
+          isNull(actions.programId)));
+      await emitEvent(tx,{
+        eventType:EventTypes.PublicSiteInterestProgramLinked,
+        aggregateType:"public_admissions_interest",aggregateId:interest.id,
+        actorPersonId:actor.actorPersonId,organizationId:destination.organizationId,
+        siteId:interest.siteId,programId:data.programId,
+        payload:{source:"published_site_general",programId:data.programId},
+      });
+      await writeAudit(tx,actor,{
+        action:"admissions.public_site_interest.link_program",
+        entityType:"public_admissions_interest",entityId:interest.id,
+        scope:{organizationId:destination.organizationId,siteId:interest.siteId,
+          programId:data.programId},
+        before:{programId:null},after:{programId:data.programId,
+          source:"published_site_general",consentRecorded:true},
+      });
+      return {changed:true,interestId:interest.id,programId:data.programId};
+    });
   });
 
 /** Send the canonical adult-only verified-email application entry. The public
