@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { BookOpen, Clock3, FileText } from "lucide-react";
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { DashboardProgress } from "@/components/workspace/dashboard-widgets";
@@ -18,8 +20,22 @@ export function StudentContinueLearningPanel({
   hasClasses: boolean;
 }) {
   const textLink = "student-dashboard-link";
+  const studentClasses = useQuery({
+    queryKey: ["native-my-student-classes"],
+    queryFn: () => getMyStudentClasses(),
+    retry: false,
+  });
+  const enrolledClasses = studentClasses.data?.kind === "student"
+    ? studentClasses.data.classes.filter(item => item.status === "active" && !!item.courseAttemptId)
+    : [];
+  // Never pass a legacy section ID to the canonical Class detail route.
+  const normalizedTitle = (title: string) => title.toLowerCase()
+    .split(/\s+[·|–]\s+/)[0].replace(/[^a-z0-9]+/g, " ").trim();
+  const matchingClasses = resume ? enrolledClasses.filter(item =>
+    normalizedTitle(item.title) === normalizedTitle(resume.title)) : [];
+  const resumeClassId = matchingClasses.length === 1 ? matchingClasses[0].classId : null;
   return <DashboardPanel id="continue-learning" title="Continue Learning"
-          action={resume?<Link to="/class" className={textLink}>View Classes →</Link>:
+          action={resume && resumeClassId?<Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons"}} className={textLink}>Open Class →</Link>:
             <Link to="/class" className={textLink}>View my classes →</Link>}>
           {resume ? <div className="student-resume-grid">
             <div>
@@ -31,9 +47,10 @@ export function StudentContinueLearningPanel({
                     max={resume.total} className="mt-4" /> : <p className="mt-3 text-xs text-muted-foreground">No published instructional lessons available.</p>}
                 </div>
               </div>
-              {resume.lesson ? <Link to="/class"
-                className="student-resume-action">Find Lesson in Classes <span aria-hidden="true">→</span></Link>
-                : <Link to="/class" className="student-resume-action">Find Class →</Link>}
+              {resumeClassId ? <Link to="/class/$classId" params={{classId:resumeClassId}}
+                search={{view:"learn",tab:"lessons"}} className="student-resume-action">
+                Open {resume.title} <span aria-hidden="true">→</span></Link>
+                : <Link to="/class" className="student-resume-action">Choose Class →</Link>}
               <p className="mt-2 text-3xs text-muted-foreground">Self-reported completion is not mastery or earned credit.</p>
             </div>
             <div className="student-up-next">
@@ -42,7 +59,12 @@ export function StudentContinueLearningPanel({
                 <p className="text-xs">{resume.lesson?.title ?? "Check your classwork and feedback"}</p></div>
               {resume.lesson?.estimatedMinutes && <div className="mt-3 flex gap-2"><Clock3 aria-hidden="true" className="size-4 shrink-0" />
                 <p className="text-xs">About {resume.lesson.estimatedMinutes} min · estimated duration</p></div>}
-              <Link to="/class" className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">Open Classes →</Link>
+              {resumeClassId ? <Link to="/class/$classId" params={{classId:resumeClassId}}
+                search={{view:"learn",tab:"lessons"}}
+                className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">
+                Open Class →</Link> : <Link to="/class"
+                className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">
+                Choose Class →</Link>}
               {nextWork && <div className="mt-4 space-y-2 border-t border-border pt-3">
                 <p className="text-xs font-semibold">Assignment needing attention</p>
                 <p className="text-xs text-muted-foreground">{nextWork.title}</p>
@@ -50,6 +72,13 @@ export function StudentContinueLearningPanel({
                   className="student-resume-action">Continue assignment →</StudentAssignmentLink>
               </div>}
             </div>
+            {enrolledClasses.length > 0 && <nav aria-label="Your enrolled Classes" className="mt-4 border-t border-border pt-3">
+              <p className="mb-2 text-xs font-semibold">Your Classes</p>
+              <div className="flex flex-wrap gap-2">{enrolledClasses.map(item =>
+                <Link key={item.classId} to="/class/$classId" params={{classId:item.classId}}
+                  search={{view:"learn",tab:"lessons"}} className="student-resume-action">
+                  {item.title} →</Link>)}</div>
+            </nav>}
           </div> : <div className="space-y-3">
             <p role="status" className="text-xs text-muted-foreground">{unavailable
               ? "Your lesson progress could not be loaded. Open your class to retry."
