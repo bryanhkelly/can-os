@@ -11,6 +11,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
 import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
+import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { EstablishSiteProfileUnified, EstablishSiteProfileGuidance } from "@/components/launch-studio/EstablishSiteProfileUnified";
 import { EstablishSiteInformationV61, SiteInformationV61Guidance, type SiteInformationV61Initial } from "@/components/launch-studio/EstablishSiteInformationV61";
@@ -112,6 +113,7 @@ export const Route = createFileRoute("/launch/site")({
       site: site ?? null,
       organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
+      siteGuidePlanning: site && deps.module === "site-information" ? programsRead?.intent ?? null : null,
       siteInformation: site && deps.module === "site-information"
         ? informationRead ?? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
       // Both Share modules use the same authorized Site package store
@@ -150,7 +152,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, siteInformation, programsAudiences, marketingPackages, marketingSuggestions, introduceIntent, introduceIntentUnavailable, introduceSiteRevision, prepareIntent, overview, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, siteGuidePlanning, programsAudiences, marketingPackages, marketingSuggestions, introduceIntent, introduceIntentUnavailable, introduceSiteRevision, prepareIntent, overview, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -176,7 +178,7 @@ function SiteLaunchPage() {
         onSaveAndExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
         onContinueToSiteInformation={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })} />
     </WorkspaceShell> : selected?.id === "site-information" && siteInformation ? <SiteInformationBody
-      key={site.id} site={site} initial={siteInformation} organizations={organizations}
+      key={site.id} site={site} initial={siteInformation} organizations={organizations} guidePlanning={siteGuidePlanning}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-profile" } })}
       onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "programs-audiences" } })} />
@@ -239,9 +241,10 @@ function SiteLaunchPage() {
 }
 
 /** Owns guidance state without adding another shell or left-navigation step. */
-function SiteInformationBody({ site, initial, organizations, onBack, onExit, onContinue }: {
+function SiteInformationBody({ site, initial, organizations, guidePlanning, onBack, onExit, onContinue }: {
   site: { id: string; organizationId: string };
   initial: SiteInformationV61Initial;
+  guidePlanning?: SiteProgramsAudiencesV61 | null;
   organizations: Array<{ id: string; name: string }>;
   onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
@@ -253,7 +256,7 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
     width="wide" rail={<SiteInformationV61Guidance step={step} guide={guide} />}>
     <EstablishSiteInformationV61 key={site.id + ":" + initial.revision}
       siteId={site.id} responsibleOrganizationName={organization?.name ?? null}
-      initial={initial} onInternalStepChange={setStep} onGuideChange={setGuide}
+      initial={initial} guidePlanning={guidePlanning} onInternalStepChange={setStep} onGuideChange={setGuide}
       onBackToSiteProfile={onBack} onSaveAndExit={onExit}
       onContinueToPrograms={onContinue} />
   </WorkspaceShell>;
