@@ -8,7 +8,7 @@ export type LaunchOverviewSource<T> =
   | { state: "unavailable" };
 
 export type LaunchOverviewEvidence = {
-  information: LaunchOverviewSource<{ hostingSaved: boolean; environmentSaved: boolean }>;
+  information: LaunchOverviewSource<{ identitySaved?: boolean; hostingSaved: boolean; environmentSaved: boolean }>;
   programs: LaunchOverviewSource<{ saved: boolean }>;
   brand: LaunchOverviewSource<{ saved: boolean }>;
   marketing: LaunchOverviewSource<{ hasPackages: boolean }>;
@@ -43,9 +43,9 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
       description: "Saved Site Information could not be verified. Check it before continuing.",
       href: route("site-information") };
   }
-  if (!evidence.information.value.hostingSaved || !evidence.information.value.environmentSaved) {
+  if (evidence.information.value.identitySaved === false || !evidence.information.value.hostingSaved || !evidence.information.value.environmentSaved) {
     return { title: "Complete Site Information",
-      description: "Save your hosting and learning environment choices.",
+      description: "Describe your Site identity, hosting and learning environment."
       href: route("site-information") };
   }
   if (evidence.programs.state === "unavailable") {
