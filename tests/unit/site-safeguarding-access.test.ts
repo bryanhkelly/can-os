@@ -8,7 +8,7 @@ import {
 const site = "site-a";
 const base: VerifiedAccessGrant = {
   id: "grant-1", accountId: "account-1", personId: "person-1",
-  organizationId: "org-1", siteId: site, role: "room_facilitator", active: true,
+  organizationId: "org-1", siteId: site, role: "site_staff", active: true,
 };
 
 describe("site safeguarding report-only authorization", () => {
