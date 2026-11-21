@@ -87,7 +87,9 @@ async function marketingSource(
           .map(item=>({code:item.code,title:item.title})))
         .catch(()=>[])
     : [];
-  return {story,intent,publishedPrograms,websiteCopy:copy
+  const reuseAllowed=copy?.contentReuseConsent === "granted";
+  return {reuseAllowed,story:reuseAllowed?story:null,intent:reuseAllowed?intent:null,
+    publishedPrograms:reuseAllowed?publishedPrograms:[],websiteCopy:reuseAllowed&&copy
     ? {heroHeadline:copy.heroHeadline,welcomeMessage:copy.welcomeMessage,
         schoolVision:copy.schoolVision,communityOutreach:copy.communityOutreach}
     : null};

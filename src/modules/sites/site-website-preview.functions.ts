@@ -25,7 +25,7 @@ export const getPartnerWebsitePreviewView = createServerFn({ method: "GET" })
 
 import {
   siteLocalContentLimits, siteLocalImageConsentStates, siteLocalImageMaxBase64Length,
-  siteLocalThemes, normalizeSiteLocalContent, websiteStarterFieldIds, siteLocalImagePublicationGaps,
+  siteLocalThemes, normalizeSiteLocalContent, websiteStarterFieldIds, safeSiteWebsitePreviewContent,
 } from "@/domain/site-local-content";
 import { publishPartnerLocalContent } from "./site-local-content.server";
 
@@ -48,6 +48,21 @@ const starterFieldSchemas = Object.fromEntries(websiteStarterFieldIds.map(field 
 const siteFontIds = Object.keys(siteFontCatalog) as [SiteFontId, ...SiteFontId[]];
 const localContentSchema = z.object({
   ...localFields,
+  contentReuseConsent: z.enum(["unselected", "granted", "denied"]).optional(),
+  leadershipMembers:z.array(z.object({
+    id:z.string().regex(/^[a-zA-Z0-9-]{8,64}$/),
+    name:z.string().max(120),
+    title:z.string().max(120),
+    biography:z.string().max(1600),
+    linkedinUrl:z.string().max(240).optional(),
+    consentConfirmed:z.boolean(),
+    photo:z.object({
+      dataUrl:z.string().max(siteLocalImageMaxBase64Length+32),
+      altText:z.string().max(180),
+      rightsConfirmed:z.boolean(),
+      childImageConsent:z.enum(siteLocalImageConsentStates),
+    }).strict().nullable().optional(),
+  }).strict()).max(16).optional(),
   editorialBaseline: z.object({
     version: z.literal(1),
     fields: z.object(starterFieldSchemas).strict(),
@@ -88,10 +103,7 @@ export const previewChurchWebsiteDraft = createServerFn({ method: "POST" })
     if (data.siteId && actor.grantSiteId !== data.siteId) throw new AuthorizationError("intended church website Site");
     const content = normalizeSiteLocalContent(data.content, { allowIncompleteImage: true });
     // Unapproved artwork stays in the editor but is never projected into a preview page.
-    const safeContent = { ...content, branding: { ...content.branding,
-      heroImage: siteLocalImagePublicationGaps(content.branding.heroImage).length ? null : content.branding.heroImage,
-      logoImage: siteLocalImagePublicationGaps(content.branding.logoImage ?? null).length ? null : content.branding.logoImage,
-    } };
+    const safeContent = safeSiteWebsitePreviewContent(content);
     const preview = await getPartnerWebsitePreview(actor, safeContent);
     return { previewHtml: preview.previewHtml, previewPages: preview.previewPages };
   });

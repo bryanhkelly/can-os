@@ -48,7 +48,7 @@ export function EstablishSiteProfileUnified({
   /** Only a server-authorized identity reader may populate this value. */
   administrator?: { name: string; email: string } | null;
   onBackToOverview: () => void;
-  onSaveAndExit: () => void;
+  onSaveAndExit: () => Promise<void>;
   onContinueToSiteInformation: () => void;
 }) {
   const router = useRouter();
@@ -67,8 +67,6 @@ export function EstablishSiteProfileUnified({
   const [contact, setContact] = useState(original.contact);
   const [address, setAddress] = useState(original.address);
   const [hasAddress, setHasAddress] = useState(original.hasAddress);
-  const [identityReason, setIdentityReason] = useState("");
-  const [locationReason, setLocationReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [reloadRequired, setReloadRequired] = useState(false);
   const [error, setError] = useState("");
@@ -76,23 +74,18 @@ export function EstablishSiteProfileUnified({
   const draft = { name, timezone, contact, address, hasAddress };
   const identityChanged = name.trim() !== original.name || timezone !== original.timezone;
   const contactChanged = JSON.stringify(contact) !== JSON.stringify(original.contact);
-  const addressChanged = hasAddress && (!original.hasAddress ||
-    JSON.stringify(address) !== JSON.stringify(original.address));
-  const dirty = JSON.stringify(draft) !== JSON.stringify(original) ||
-    Boolean(identityReason || locationReason);
+  const addressChanged = hasAddress !== original.hasAddress ||
+    hasAddress && JSON.stringify(address) !== JSON.stringify(original.address);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(original);
   const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const organization = organizations.find(item => item.id === site.organizationId);
 
-  async function saveAndNavigate(navigate: () => void) {
+  async function saveAndNavigate(navigate: () => void | Promise<void>) {
     if (busy.current || reloadRequired) return;
     setError("");
     if (name.trim().length < 2 || name.trim().length > 160 ||
         !siteTimezoneSchema.safeParse(timezone).success) {
       setError("Provide a valid Site name and time zone.");
-      return;
-    }
-    if (identityChanged && (identityReason.trim().length < 5 || identityReason.trim().length > 1000)) {
-      setError("Explain the Site name or time zone change (5–1000 characters).");
       return;
     }
     const hasContact = Boolean(contact.displayName.trim() || contact.email.trim() || contact.phone.trim());
@@ -106,17 +99,13 @@ export function EstablishSiteProfileUnified({
       setError(validAddress.error.issues[0]?.message ?? "Complete the physical address.");
       return;
     }
-    if (addressChanged && (locationReason.trim().length < 5 || locationReason.trim().length > 1000)) {
-      setError("Explain the location entry or change (5–1000 characters).");
-      return;
-    }
     busy.current = true;
     setSaving(true);
     const operations: Array<(revision: string) => Promise<{revision: string}>> = [];
     if (identityChanged) {
       operations.push(revision => updateLaunchSiteIdentity({ data: {
         siteId: site.id, expectedRevision: revision,
-        name: name.trim(), timezone, changeReason: identityReason.trim(),
+        name: name.trim(), timezone,
       } }));
     }
     if (contactChanged) {
@@ -125,10 +114,10 @@ export function EstablishSiteProfileUnified({
         contact: hasContact && validContact?.success ? validContact.data : null,
       } }));
     }
-    if (addressChanged && validAddress?.success) {
+    if (addressChanged) {
       operations.push(revision => updateLaunchSiteAddress({ data: {
         siteId: site.id, expectedRevision: revision,
-        address: validAddress.data, changeReason: locationReason.trim(),
+        address: hasAddress && validAddress?.success ? validAddress.data : null,
       } }));
     }
     let mutationsSucceeded = false;
@@ -138,7 +127,11 @@ export function EstablishSiteProfileUnified({
       // Even with no changes, read the currently authorized Site before handoff.
       await router.invalidate();
       releaseNavigation();
-      navigate();
+      try { await navigate(); }
+      catch (failure) {
+        setError(failure instanceof Error ? failure.message :
+          "Your changes were saved, but sign-out failed. Use the Account menu to sign out.");
+      }
     } catch (cause) {
       setReloadRequired(true);
       setError(mutationsSucceeded
@@ -158,12 +151,8 @@ export function EstablishSiteProfileUnified({
   }
 
   function toggleAddress(checked: boolean) {
-    if (original.hasAddress) return; // address removal is a separate governed amendment
     setHasAddress(checked);
-    if (!checked) {
-      setAddress(original.address);
-      setLocationReason("");
-    }
+    if (!checked) setAddress(original.address);
   }
 
   return <section aria-label="Site Profile" className="min-w-0 space-y-4">
@@ -186,12 +175,6 @@ export function EstablishSiteProfileUnified({
           <SiteTimezoneField label="Site time zone" value={timezone} onChange={setTimezone}
             disabled={saving || reloadRequired} />
         </div>
-        {identityChanged && <div className="mt-5">
-          <Field label="Reason for changing the Site name or time zone" required>
-            <Input value={identityReason} minLength={5} maxLength={1000} disabled={saving || reloadRequired}
-              onChange={event => setIdentityReason(event.target.value)} />
-          </Field>
-        </div>}
         <dl className="mt-5 grid gap-4 border-t pt-4 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs font-semibold text-muted-foreground">Responsible organization</dt>
@@ -229,12 +212,12 @@ export function EstablishSiteProfileUnified({
       <WorkspacePanel title="Physical location (optional)"
         description="Provide an address if you have identified your learning location.">
         <Label className="flex min-h-11 items-start gap-3 text-sm">
-          <Checkbox checked={hasAddress} disabled={saving || reloadRequired || original.hasAddress}
+          <Checkbox checked={hasAddress} disabled={saving || reloadRequired}
             onChange={event => toggleAddress(event.target.checked)} />
           <span><strong>Add a physical address</strong>
             <span className="mt-1 block text-xs text-muted-foreground">
               {original.hasAddress
-                ? "Address already on file. Removing it requires a separate governed amendment."
+                ? "You can edit or remove this address before operational approval."
                 : "You can continue without an address. Later program requirements may need one."}
             </span>
           </span>
@@ -242,11 +225,7 @@ export function EstablishSiteProfileUnified({
         {hasAddress && <div className="mt-5 space-y-5 border-t pt-5">
           <LaunchSiteAddressFields address={address} onChange={setAddress}
             disabled={saving || reloadRequired} />
-          {addressChanged && <Field label="Reason for entering or changing this location" required>
-            <Input value={locationReason} minLength={5} maxLength={1000} disabled={saving || reloadRequired}
-              onChange={event => setLocationReason(event.target.value)} />
-          </Field>}
-          <p className="text-xs text-muted-foreground">Changes to published or approved locations may require independent review.</p>
+          <p className="text-xs text-muted-foreground">Before operational approval, you can edit Site details without providing a reason. Approved locations use a separate amendment process.</p>
         </div>}
       </WorkspacePanel>
       {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
@@ -259,7 +238,7 @@ export function EstablishSiteProfileUnified({
         </Button>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="ghost" disabled={saving || reloadRequired}
-            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Exit</Button>
+            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Sign Out</Button>
           <Button type="submit" loading={saving} loadingLabel="Saving Site…" disabled={reloadRequired}>
             Save &amp; Continue <ArrowRight aria-hidden="true"/>
           </Button>

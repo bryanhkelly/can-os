@@ -97,7 +97,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   siteId: string;
   initial: ProgramsAudiencesV61Initial;
   onBackToSiteInformation: () => void;
-  onSaveAndExit: () => void;
+  onSaveAndExit: () => Promise<void>;
   onContinueToWebsiteBrand: () => void;
   onInternalStepChange?: (step: InternalStep) => void;
 }) {
@@ -200,7 +200,13 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       // Refresh authorized Site context and preview source before navigation.
       await router.invalidate();
       releaseNavigation();
-      if (exit) onSaveAndExit();
+      if (exit) {
+        try { await onSaveAndExit(); }
+        catch (failure) {
+          setError(failure instanceof Error ? failure.message :
+            "Changes saved, but sign-out failed. Use the Account menu to sign out.");
+        }
+      }
       else onContinueToWebsiteBrand();
     } catch (cause) {
       if (submitted) setReloadRequired(true); // Avoid blind replay after an uncertain commit.
@@ -404,7 +410,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         <ArrowLeft aria-hidden="true" />{step === 0 ? "Back to Site Information" : "Previous step"}
       </Button>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Exit</Button>
+        <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Sign Out</Button>
         {step === 0
           ? <Button disabled={disabled} onClick={() => selectStep(1)}>Continue to Audiences <ArrowRight aria-hidden="true" /></Button>
           : <Button loading={busy} disabled={disabled} onClick={() => void save(false)}>

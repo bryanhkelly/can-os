@@ -15,7 +15,7 @@ describe("Establish / Site Profile canonical handoff", () => {
     expect(route).toContain("organizations: options.organizations");
     expect(route).toContain("site: site ?? null");
     expect(form).toContain("Save &amp; Continue");
-    expect(form).toContain("Save &amp; Exit");
+    expect(form).toContain("Save &amp; Sign Out");
     expect(form).toContain("useLaunchUnsavedChanges");
     expect(form).toContain("LaunchSiteAddressFields");
     expect(form).toContain("SiteTimezoneField");

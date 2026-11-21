@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { Building2 } from "lucide-react";
+import { Building2, CheckCircle2 } from "lucide-react";
+import { completedLaunchStageV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { Button } from "@/components/ui/button";
 import { siteLaunchModules, siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
 
@@ -7,6 +8,7 @@ export type LaunchSiteNavigationProps = {
   site: { id: string; name: string };
   active?: string;
   statusLabel?: string;
+  completion?: LaunchModuleCompletion;
   expanded: string;
   instance: "desktop" | "drawer";
   stagePanelBaseId: string;
@@ -19,7 +21,7 @@ export type LaunchSiteNavigationProps = {
  * only: caller owns navigation state and the route owns Site authorization.
  */
 export function LaunchSiteNavigation({
-  site, active, statusLabel, expanded, instance, stagePanelBaseId,
+  site, active, statusLabel, completion = {}, expanded, instance, stagePanelBaseId,
   onToggleStage, onNavigate,
 }: LaunchSiteNavigationProps) {
   return <div className="flex h-full flex-col bg-card">
@@ -43,7 +45,10 @@ export function LaunchSiteNavigation({
             aria-controls={`${stagePanelBaseId}-${instance}-${stage}`}
             onClick={() => onToggleStage(stage)}
             className="flex min-h-11 w-full justify-between px-3 py-3 text-left text-sm font-semibold">
-            <span>{index + 1}. {stage}</span>
+            <span className="flex items-center gap-2">{index + 1}. {stage}
+              {completedLaunchStageV61(stage,completion)&&<CheckCircle2 className="size-4 shrink-0 text-success"
+                aria-label={stage+" saved setup complete"}/>}
+            </span>
             <span aria-hidden="true">{expanded === stage ? "−" : "+"}</span>
           </Button>
           <div id={`${stagePanelBaseId}-${instance}-${stage}`} hidden={expanded !== stage}
@@ -52,11 +57,13 @@ export function LaunchSiteNavigation({
               <Link key={item.id} to="/launch/site"
                 search={{ siteId: site.id, module: item.id }}
                 onClick={onNavigate} aria-current={active === item.id ? "page" : undefined}
-                className={"flex min-h-11 items-center border-l-2 px-3 py-2 text-xs " +
+                className={"flex min-h-11 items-center justify-between gap-2 border-l-2 px-3 py-2 text-xs " +
                   (active === item.id
                     ? "border-primary bg-accent font-bold text-primary"
                     : "border-transparent text-muted-foreground hover:bg-muted")}>
-                {item.title}
+                <span>{item.title}</span>
+                {completion[item.id]==="complete"&&<CheckCircle2 aria-label={item.title+" saved setup complete"}
+                  className="size-4 shrink-0 text-success" />}
               </Link>
             ))}
           </div>

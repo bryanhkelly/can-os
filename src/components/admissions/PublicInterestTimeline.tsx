@@ -4,9 +4,9 @@ import type { PublicInterestRecord } from "./PublicInterestRecordCard";
  * admissions state. A timeline item is never a grant of enrollment authority.
  */
 export function PublicInterestTimeline({ row }: { row: PublicInterestRecord }) {
-  return <ol className="mt-3 space-y-1 border-l pl-4 text-xs text-muted-foreground" aria-label="Family relationship history">
+  return <ol className="mt-3 space-y-1 border-l pl-4 text-xs text-muted-foreground" aria-label="Interest and follow-up history">
           {row.invitationBatchId && <li>Pre-opening invitation recorded · Provider receipt does not prove delivery or consent.</li>}
-          <li>Family inquiry received · {new Date(row.createdAt).toLocaleString()}</li>
+          <li>{row.programId===null?"Site interest received":"Family inquiry received"} · {new Date(row.createdAt).toLocaleString()}</li>
           <li>{row.consentAt
             ? `Follow-up requested by family · ${new Date(row.consentAt).toLocaleString()}`
             : "No affirmative follow-up consent recorded"}</li>
@@ -15,7 +15,9 @@ export function PublicInterestTimeline({ row }: { row: PublicInterestRecord }) {
             ? "Admissions authorization could not be checked. Refresh before taking action."
             : row.admissionsAuthorized
               ? "CAN admissions and school-of-record services authorized"
-              : "Application invitations blocked until CAN authorization"}</li>
+              : row.programId===null
+                ? "Site-level prospect. Choose an authorized Program before any application invitation."
+                : "Application invitations blocked until CAN authorization"}</li>
           {row.familyStartRequestId && <li>Verified-email application invitation requested · Delivery is not confirmed
             {row.applicationLinkExpiresAt && !row.emailVerifiedAt &&
               (new Date(row.applicationLinkExpiresAt).getTime() <= Date.now() ? " · Link expired" :

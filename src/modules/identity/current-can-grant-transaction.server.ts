@@ -4,7 +4,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 
 type Tx = Pick<typeof db, "execute">;
 
@@ -62,24 +62,27 @@ export async function assertCurrentCANGrantForMutation(
   const organizationCheck = expected.organizationType
     ? sql`AND verified_org.type::text=${expected.organizationType}::text`
     : sql``;
+  const ownerId=actor.impersonatedByAccountId ?? actor.accountId;
   const lockTargets = expected.organizationType
-    ? sql`FOR SHARE OF session,account,current_grant,person,verified_org`
-    : sql`FOR SHARE OF session,account,current_grant,person`;
+    ? sql`FOR SHARE OF session,session_owner,target_account,current_grant,person,verified_org`
+    : sql`FOR SHARE OF session,session_owner,target_account,current_grant,person`;
 
   const result = await tx.execute(sql`
-    SELECT account.email_normalized AS email
+    SELECT target_account.id AS effective_account_id
     FROM public.access_sessions session
-    JOIN public.access_accounts account
-      ON account.id=session.account_id
+    JOIN public.access_accounts session_owner
+      ON session_owner.id=session.account_id
     JOIN public.account_person_grants current_grant
       ON current_grant.id=session.active_grant_id
-     AND current_grant.account_id=account.id
-    JOIN public.people person ON person.id=account.person_id
+    JOIN public.access_accounts target_account
+      ON target_account.id=current_grant.account_id
+    JOIN public.people person ON person.id=current_grant.person_id
     ${organizationJoin}
     WHERE session.secret_hash=${digest}::text
       AND session.id=${actor.sessionId}::uuid
-      AND account.id=${actor.accountId}::uuid
-      AND account.person_id=${actor.actorPersonId}::uuid
+      AND session_owner.id=${ownerId}::uuid
+      AND target_account.id=${actor.accountId}::uuid
+      AND target_account.person_id=${actor.actorPersonId}::uuid
       AND current_grant.id=${actor.grantId}::uuid
       AND current_grant.person_id=person.id
       AND current_grant.role=${actor.role}::text
@@ -89,18 +92,45 @@ export async function assertCurrentCANGrantForMutation(
         IS NOT DISTINCT FROM ${expected.siteId}::uuid
       ${organizationCheck}
       AND current_grant.active=true AND person.active=true
-      AND account.disabled=false
-      AND account.email_verified_at IS NOT NULL
+      AND target_account.disabled=false AND target_account.email_verified_at IS NOT NULL
+      AND session_owner.disabled=false AND session_owner.email_verified_at IS NOT NULL
       AND session.revoked_at IS NULL
       AND session.expires_at>clock_timestamp()
       AND session.updated_at>clock_timestamp()-interval '30 minutes'
       AND (NOT session.shared_device OR
         session.last_activity_at>clock_timestamp()-interval '5 minutes')
+      AND NOT EXISTS(
+        SELECT 1 FROM public.account_person_grants conflict
+        WHERE conflict.account_id=target_account.id AND conflict.active
+          AND conflict.person_id<>person.id
+      )
+      AND (
+        (current_grant.account_id=session_owner.id
+          AND ${actor.impersonatedByAccountId ?? null}::uuid IS NULL)
+        OR
+        (session_owner.id=${LOCAL_DEMO_ADMIN.accountId}::uuid
+          AND session_owner.email_normalized=${LOCAL_DEMO_ADMIN.email}
+          AND ${actor.impersonatedByAccountId ?? null}::uuid=session_owner.id
+          AND EXISTS (
+            SELECT 1 FROM public.account_person_grants admin_grant
+            WHERE admin_grant.id=${LOCAL_DEMO_ADMIN.grantId}::uuid
+              AND admin_grant.account_id=session_owner.id
+              AND admin_grant.person_id=session_owner.person_id
+              AND admin_grant.role='site_admin' AND admin_grant.active
+              AND admin_grant.organization_id=current_grant.organization_id
+              AND admin_grant.site_id=current_grant.site_id
+          )
+          AND NOT EXISTS(
+            SELECT 1 FROM public.account_person_grants foreign_owner
+            WHERE foreign_owner.account_id=session_owner.id
+              AND foreign_owner.active
+              AND foreign_owner.person_id<>session_owner.person_id
+          ))
+      )
     ${lockTargets}
   `);
-  if (result.rows.length !== 1 ||
-      typeof result.rows[0]?.email !== "string" ||
-      isDemoAccountEmail(result.rows[0].email)) {
+  if(result.rows.length!==1 ||
+     result.rows[0]?.effective_account_id!==actor.accountId)
     throw new AuthorizationError("current verified exact CAN grant");
-  }
+
 }

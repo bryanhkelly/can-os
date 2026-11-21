@@ -4,6 +4,7 @@ import { ArrowRight, Check, Landmark, ShieldCheck } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LaunchAccountControls } from "@/components/shell/LaunchAccountControls";
 
 export type LaunchStudioStep = { id: string; title: string; complete?: boolean; disabled?: boolean };
 export type LaunchStudioProgress = { complete: number; total: number };
@@ -17,12 +18,13 @@ export function LaunchStudioStepContent({ active, children }: { active: boolean;
 export function LaunchStudioChrome({ children }: { children: ReactNode }) {
   return <div className="launch-studio min-h-screen bg-background">
     <header className="border-b bg-card">
-      <div className="can-shell-bar flex min-h-[var(--topbar-height)] flex-wrap items-center px-[var(--page-gutter)]">
+      <div className="can-shell-bar flex min-h-[var(--topbar-height)] flex-wrap items-center justify-between gap-3 px-[var(--page-gutter)]">
         <Link to="/launch" className="flex min-h-11 items-center gap-3 text-foreground">
           <span className="flex size-10 items-center justify-center bg-foreground text-background"><Landmark className="size-6" /></span>
           <span className="border-r pr-4 text-xs font-bold">CAN OS<span className="block text-3xs font-medium uppercase tracking-eyebrow">Launch Studio</span></span>
           <span className="font-serif text-2xl">Launch Studio</span>
         </Link>
+        <LaunchAccountControls />
       </div>
     </header>
     {children}

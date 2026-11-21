@@ -73,8 +73,20 @@ export type SiteLocalBranding = {
   headingFontId?: SiteFontId;
   bodyFontId?: SiteFontId;
 };
+export type SiteLeader = {
+  id:string;name:string;title:string;biography:string;
+  linkedinUrl?:string;photo?:SiteLocalImage|null;
+  /** The person or their authorized representative approved publication. */
+  consentConfirmed:boolean;
+};
+export type WebsiteContentReuseConsent = "unselected" | "granted" | "denied";
+
 export type SiteLocalContent = SiteLocalTextContent & {
+  /** Site-scoped authorization to derive website and marketing copy from Establish data. */
+  contentReuseConsent?: WebsiteContentReuseConsent;
   branding: SiteLocalBranding;
+  /** Site-owned, optional Leadership page content; never auto-scraped. */
+  leadershipMembers?:SiteLeader[];
   /** A versioned snapshot of this Site's original suggested copy, available
    * to its authorized editor for per-field reset. It is not public content. */
   editorialBaseline?: SiteEditorialBaseline;
@@ -90,6 +102,7 @@ export const emptySiteLocalBranding: SiteLocalBranding = Object.freeze({
   heroImage: null,
 });
 export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
+  contentReuseConsent: "unselected",
   heroHeadline: "",
   welcomeMessage: "",
   localDescription: "",
@@ -102,6 +115,7 @@ export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
   leadershipWelcome: "",
   localTraditions: "",
   branding: emptySiteLocalBranding,
+  leadershipMembers: [],
 });
 
 /** Polished, factual-claim-free suggested language. A Site editor must
@@ -287,10 +301,15 @@ export function validateInlinePng(dataUrl: string): void {
 }
 
 export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
+  contentReuseConsent?: WebsiteContentReuseConsent;
+  leadershipMembers?: SiteLeader[];
   branding?: SiteLocalBranding | null;
   editorialBaseline?: SiteEditorialBaseline;
 }, options: { allowIncompleteImage?: boolean } = {}): SiteLocalContent {
   const result = {} as SiteLocalContent;
+  if(input.contentReuseConsent !== undefined && !["unselected", "granted", "denied"].includes(input.contentReuseConsent))
+    throw new Error("Choose a valid website content reuse decision");
+  result.contentReuseConsent = input.contentReuseConsent ?? "unselected";
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
     result[field] = normalizeText(input[field] ?? "", field);
   }
@@ -327,6 +346,39 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
     heroImage: normalizeArtwork(branding.heroImage),
     ...(branding.logoImage !== undefined ? { logoImage: normalizeArtwork(branding.logoImage) } : {}),
   };
+  if (input.leadershipMembers !== undefined) {
+    if (!Array.isArray(input.leadershipMembers) || input.leadershipMembers.length > 16)
+      throw new Error("A Site may have up to 16 leadership profiles");
+    const ids=new Set<string>();
+    result.leadershipMembers=input.leadershipMembers.map(member=>{
+      if (!member || typeof member !== "object" ||
+        typeof member.id !== "string" ||
+        !/^[a-zA-Z0-9-]{8,64}$/.test(member.id) || ids.has(member.id))
+        throw new Error("Each leadership entry needs a distinct ID");
+      ids.add(member.id);
+      const text=(value:unknown,max:number)=>{
+        if(typeof value!=="string")throw new Error("Leadership text must be provided");
+        const normalized=value.replace(/\r\n?/g,"\n").trim();
+        if(normalized.length>max || /[<>\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(normalized))
+          throw new Error("Leadership content contains invalid characters");
+        return normalized;
+      };
+      const name=text(member.name,120);
+      const title=text(member.title,120);
+      const biography=text(member.biography,1600);
+      if(!name || !title)throw new Error("Leadership name and title are required");
+      if(typeof member.consentConfirmed!=="boolean")
+        throw new Error("Confirm whether this person's profile may be published");
+      const linkedinUrl=member.linkedinUrl?text(member.linkedinUrl,240):"";
+      if(linkedinUrl&&!/^https:\/\/(?:www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]{3,100}\/?$/.test(linkedinUrl))
+        throw new Error("Use a LinkedIn personal profile URL without tracking parameters");
+      return {
+        id:member.id,name,title,biography,consentConfirmed:member.consentConfirmed,
+        ...(linkedinUrl?{linkedinUrl}:{}),
+        ...(member.photo!==undefined?{photo:normalizeArtwork(member.photo)}:{}),
+      };
+    });
+  }
   if (input.editorialBaseline) {
     const baseline = input.editorialBaseline;
     if (baseline.version !== 1 || !baseline.fields || typeof baseline.fields !== "object" ||
@@ -347,6 +399,24 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   return result;
 }
 
+/** Private previews show drafted words but never publish unchecked artwork,
+ * including portraits attached to a not-yet-approved Leadership profile. */
+export function safeSiteWebsitePreviewContent(content:SiteLocalContent):SiteLocalContent {
+  const safe=(photo:SiteLocalImage|null|undefined)=>
+    photo&&!siteLocalImagePublicationGaps(photo).length?photo:null;
+  return {
+    ...content,branding:{
+      ...content.branding,
+      heroImage:safe(content.branding.heroImage),
+      ...(content.branding.logoImage!==undefined
+        ?{logoImage:safe(content.branding.logoImage)}:{}),
+    },
+    ...(content.leadershipMembers?{leadershipMembers:content.leadershipMembers.map(person=>({
+      ...person,photo:safe(person.photo),
+    }))}:{}),
+  };
+}
+
 export function classifySiteLocalContent(content: SiteLocalContent): SiteLocalContentDecision {
   const flaggedFields: SiteLocalTextField[] = [];
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
@@ -355,6 +425,16 @@ export function classifySiteLocalContent(content: SiteLocalContent): SiteLocalCo
       throw new Error("This text cannot be published. Remove unsafe markup or sensitive information.");
     }
     if (containsProtectedInstitutionalClaim(text ?? "")) flaggedFields.push(field);
+  }
+  // An authenticated editor may save a leadership draft without permission
+  // to display the person's profile. Only confirmed entries are projected.
+  for(const member of content.leadershipMembers??[]){
+    for(const field of [member.name,member.title,member.biography]){
+      if(unsafeText.some(rule=>rule.test(field)))
+        throw new Error("Leadership content cannot contain unsafe text");
+      if(containsProtectedInstitutionalClaim(field))
+        throw new Error("Leadership biographies cannot assert unverified institutional claims");
+    }
   }
   return flaggedFields.length ? { status: "review_required", flaggedFields }
     : { status: "published", flaggedFields: [] };

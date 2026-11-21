@@ -96,7 +96,6 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
           lessonId:lesson.lessonId,lessonTitle:lesson.lessonTitle,lessonOrder:lesson.lessonOrder,
           progressStatus:lesson.progressStatus,observedAt:lesson.observedAt,
           lessonBody:typeof content.body==="string"?content.body:"",
-          restoredDemo:content.source==="valor-v61-rehydration",
           videoResources,
         };
       });

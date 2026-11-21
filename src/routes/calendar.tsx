@@ -30,6 +30,8 @@ import { CalendarMonthGrid } from "@/components/calendar/CalendarMonthGrid";
 import { CalendarEventFactsPanels } from "@/components/calendar/CalendarEventFactsPanels";
 import { CalendarRecordContextPanel } from "@/components/calendar/CalendarRecordContextPanel";
 import { formatTime, formatEventDate, typeLabel } from "@/components/calendar/calendar-presentation";
+import { accessReturnToFromLocation } from "@/domain/access-navigation";
+import { normalizeClientError } from "@/lib/client-error";
 
 export const Route = createFileRoute("/calendar")({
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:CalendarView;q?:string}=>({
@@ -160,7 +162,16 @@ function CalendarPage() {
   const saving = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
-    void load(year, month).catch(() => setError("Unable to load your calendar. Sign in or reload to try again."));
+    void load(year, month).catch(error => {
+      if (normalizeClientError(error).kind === "authentication") {
+        const returnTo = accessReturnToFromLocation({
+          pathname: "/calendar", searchStr: window.location.search, hash: window.location.hash,
+        });
+        void navigate({ to: "/access", search: { returnTo }, replace: true });
+        return;
+      }
+      setError("Unable to load your calendar. Reload to try again.");
+    });
     return () => { loadVersion.current++; };
   }, [year, month, load]);
 

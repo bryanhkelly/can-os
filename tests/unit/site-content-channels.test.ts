@@ -100,8 +100,9 @@ describe("Site-owned website content channels", () => {
         city:"Brentwood",state:"CA",timezone:"America/Los_Angeles"},
       networkStatusKnown:true,networkAffiliations:[{name:"Example network",status:"approved"}],
     });
-    expect(published.some(block=>["site.setup","site.network","learning.interests"].includes(block.channel)))
-      .toBe(false);
+    expect(published.some(block=>block.channel==="site.setup")).toBe(true);
+    expect(published.some(block=>block.channel==="site.network")).toBe(true);
+    expect(published.some(block=>block.channel==="learning.interests")).toBe(true);
   });
   it("rejects duplicate feeds and unapproved institutional copy", () => {
     const block = defaultSiteContentChannelConfig.blocks[0]!;

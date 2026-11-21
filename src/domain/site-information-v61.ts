@@ -2,10 +2,22 @@ import { z } from "zod";
 import { siteLaunchPreferencesSchema } from "./site-launch-preferences";
 
 /** Private Site Information planning records. No public or institutional approval follows from these. */
+export const siteTaxStatusV61Values = [
+  "not_provided", "recognized_501c3", "qualifying_church", "group_exemption",
+  "fiscal_sponsor", "pending", "not_tax_exempt", "unsure",
+] as const;
+export type SiteTaxStatusV61 = (typeof siteTaxStatusV61Values)[number];
+
 export const siteHostingV61Schema = z.object({
   hostingMode: z.enum(["same", "different", "undecided"]),
   separateHostName: z.string().trim().max(160),
   separateHostType: z.union([z.enum(["church", "community_nonprofit", "education_provider", "other"]), z.literal("")]),
+  /** Self-reported status of the responsible organization, host or fiscal sponsor.
+   * This alone never grants a public verified 501(c)(3) claim. Optional for legacy Sites. */
+  nonprofitStatus: z.enum(siteTaxStatusV61Values).optional(),
+  nonprofitSubject: z.enum(["responsible", "host", "sponsor"]).optional(),
+  nonprofitOrganizationName: z.string().trim().max(160).optional(),
+  nonprofitEin: z.union([z.literal(""), z.string().regex(/^\d{2}-?\d{7}$/, "Enter a nine-digit EIN")]).optional(),
 }).strict().superRefine((host, ctx) => {
   if (host.hostingMode !== "different") return;
   if (host.separateHostName.length < 2) ctx.addIssue({
@@ -47,6 +59,8 @@ export const emptySiteStoryV61 = (): SiteStoryV61 => ({
 });
 export const emptySiteHostingV61 = (): SiteHostingV61 => ({
   hostingMode: "undecided", separateHostName: "", separateHostType: "",
+  nonprofitStatus: "not_provided", nonprofitSubject: "responsible",
+  nonprofitOrganizationName: "", nonprofitEin: "",
 });
 
 export const siteStorySourceV61Schema = z.object({

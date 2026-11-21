@@ -4,16 +4,19 @@ import { Globe2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
+import type { LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { LaunchSiteNavigation } from "./LaunchSiteNavigationV61";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
 import { LaunchNavigationGuardProvider } from "./LaunchNavigationGuardProvider";
+import { LaunchAccountControls } from "@/components/shell/LaunchAccountControls";
 
-export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previewAvailable = true, children }: {
+export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previewAvailable = true, completion = {}, children }: {
   site: { id: string; name: string };
   active?: string;
   previewHref?: string;
   statusLabel?: string;
   previewAvailable?: boolean;
+  completion?: LaunchModuleCompletion;
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
@@ -27,7 +30,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
   });
   const expanded = stageChoice.active === active ? stageChoice.stage : activeStage;
   const renderSidebar = (instance: "desktop" | "drawer") => (
-    <LaunchSiteNavigation site={site} active={active} statusLabel={statusLabel}
+    <LaunchSiteNavigation site={site} active={active} statusLabel={statusLabel} completion={completion}
       expanded={expanded} instance={instance} stagePanelBaseId={stagePanelBaseId}
       onToggleStage={stage => setStageChoice({
         active, stage: expanded === stage ? "" : stage,
@@ -46,7 +49,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
           <strong className="text-sm">Launch Studio</strong>
           <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Site setup</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-4">
           {previewAvailable && active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
           {previewAvailable ? <Button asChild variant="ghost" size="sm" className="min-h-11">
             <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer">
@@ -55,7 +58,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
           </Button> : <Button type="button" variant="ghost" size="sm" disabled
             title="Save a website draft in Website & Brand to enable private preview."
             className="min-h-11"><Globe2 className="size-4"/> Preview unavailable</Button>}
-
+          <div className="border-l border-border pl-3"><LaunchAccountControls /></div>
         </div>
       </header>
       <Modal id={navigationDrawerId} open={drawer} onClose={() => setDrawer(false)}

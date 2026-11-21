@@ -31,7 +31,7 @@ afterEach(()=>vi.unstubAllEnvs());
 describe("P0 single Person transactional CAN grant",()=>{
   it("requires exactly the current CAN bearer, Person, role, org and Site",async()=>{
     vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER","P".repeat(40));
-    const database=tx([{email:"current@example.org"}]);
+    const database=tx([{effective_account_id:actor.accountId}]);
     await expect(assertCurrentCANGrantForMutation(
       database as never,request(),actor,scope,
     )).resolves.toBeUndefined();
@@ -47,7 +47,7 @@ describe("P0 single Person transactional CAN grant",()=>{
       {...actor, role:"guardian"},
       {...actor, scope:{organizationIds:[scope.organizationId],siteIds:["another-site"]}},
     ]){
-      const database=tx([{email:"current@example.org"}]);
+      const database=tx([{effective_account_id:actor.accountId}]);
       await expect(assertCurrentCANGrantForMutation(
         database as never,request(),invalid,scope,
       )).rejects.toThrow();
@@ -55,28 +55,40 @@ describe("P0 single Person transactional CAN grant",()=>{
     }
   });
 
-  it("fails closed for no session, revoked session, or demo identity",async()=>{
+  it("fails closed for absent session, mismatched effective account or bad bearer",async()=>{
     vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER","P".repeat(40));
     await expect(assertCurrentCANGrantForMutation(
       tx([]) as never,request(),actor,scope,
     )).rejects.toThrow();
     await expect(assertCurrentCANGrantForMutation(
-      tx([{email:"anyone@valorschool.demo"}]) as never,request(),actor,scope,
+      tx([{effective_account_id:"different-account"}]) as never,request(),actor,scope,
     )).rejects.toThrow();
-    const database=tx([{email:"current@example.org"}]);
+    const database=tx([{effective_account_id:actor.accountId}]);
     await expect(assertCurrentCANGrantForMutation(
       database as never,request("bad"),actor,scope,
     )).rejects.toThrow();
     expect(database.execute).not.toHaveBeenCalled();
   });
 
+  it("rechecks privileged Demo Admin impersonation without changing target's grant",async()=>{
+    vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER","P".repeat(40));
+    const database=tx([{effective_account_id:actor.accountId}]);
+    await expect(assertCurrentCANGrantForMutation(database as never,request(),{
+      ...actor,impersonatedByAccountId:"f7100000-0000-4000-8000-000000000002",
+    },scope)).resolves.toBeUndefined();
+    const source=readFileSync("src/modules/identity/current-can-grant-transaction.server.ts","utf8");
+    expect(source).toContain("admin_grant.active");
+    expect(source).toContain("current_grant.account_id=session_owner.id");
+    expect(source).toContain("current_grant.person_id=person.id");
+  });
+
   it("does not introduce a canonical identity correspondence or accept privilege by email",()=>{
     const source=readFileSync("src/modules/identity/current-can-grant-transaction.server.ts","utf8");
-    expect(source).toContain("account.person_id=");
+    expect(source).toContain("target_account.person_id=");
     expect(source).toContain("current_grant.id=");
     expect(source).toContain("current_grant.organization_id");
     expect(source).toContain("current_grant.site_id");
-    expect(source).toContain("FOR SHARE OF session,account,current_grant,person");
+    expect(source).toContain("FOR SHARE OF session,session_owner,target_account,current_grant,person");
     expect(source).not.toContain("access_account_canonical_principals");
     expect(source).not.toContain("canonical_accounts");
     expect(source).not.toContain("education_v30.");

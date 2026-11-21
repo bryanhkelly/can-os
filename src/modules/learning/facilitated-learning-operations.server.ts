@@ -149,6 +149,17 @@ export async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSe
       eq(programDeployments.status,"active"),
     )).limit(1);
   if(!host)return false;
+  // Canonical Classes use the current ONE-account CAN grant and their exact
+  // approved Class facilitator assignment. Non-Class legacy rooms continue
+  // to use their existing native grant while that older workflow is supported.
+  // Never let a retired native grant stand in for a revoked CAN Class grant.
+  try {
+    const nativeClass = await assertNativeClassRoomStaff(tx,room);
+    if(nativeClass)return true;
+  } catch(error) {
+    if(error instanceof AuthorizationError)return false;
+    throw error;
+  }
   // Room ownership alone does not preserve a revoked facilitator's ability
   // to recruit or expose learner activity after their native grant is removed.
   const [grant] = await tx.select({id:canonicalAccountGrants.id})
@@ -165,14 +176,7 @@ export async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSe
       eq(canonicalAccountGrants.active,true),
       isNull(canonicalAccountGrants.revokedAt),
     )).limit(1);
-  if(!grant)return false;
-  try {
-    await assertNativeClassRoomStaff(tx,room);
-  }catch(error){
-    if(error instanceof AuthorizationError)return false;
-    throw error;
-  }
-  return true;
+  return Boolean(grant);
 }
 export async function schoolAttemptIsPlacedAtSite(
   tx:Tx, courseAttemptId:string, deploymentId:string, siteId:string, now:Date,

@@ -98,8 +98,14 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
           status:item.status??"not_started",
           submittedAt:item.submitted_at?.toISOString()??null,
           responseText:typeof response.text==="string"?response.text:"",
-          feedbackText:(item.status==="returned"||item.status==="graded") &&
-            typeof response.teacherFeedback==="string" ? response.teacherFeedback : null,
+          practiceFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"
+            ?response.teacherFeedback:null,
+          practiceScore:response.practiceResponse===true
+            ?(typeof response.practiceScore==="number"?response.practiceScore:
+              typeof response.demoScore==="number"?response.demoScore:null):null,
+          practiceScoreMax:response.practiceResponse===true
+            ?(typeof response.practiceScoreMax==="number"?response.practiceScoreMax:
+              typeof response.maxDemoScore==="number"?response.maxDemoScore:null):null,
           submitted:!!item.submission_id,
         };
       })};
@@ -118,7 +124,15 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
          actor.role==="learner"&&actor.capabilities.has("learning.participate")))
       throw new AuthorizationError("own homework submission capability");
     return db.transaction(async tx=>{
-      const {cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      const {enrollment,cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      // Ordinary non-credit Class assignments may receive private, unscored
+      // teacher feedback. This is determined by the current Enrollment's
+      // credit mode, never by a synthetic Site/Person marker or demo email.
+      const practiceOnly=enrollment.creditMode==="not_applicable";
+      const responseValue=JSON.stringify({
+        text:data.responseText,format:"text",
+        ...(practiceOnly?{practiceResponse:true}:{}),
+      });
       const assignment=await tx.execute(sql`
         SELECT a.id FROM public.graded_assignments a
         JOIN public.official_course_assignment_versions o
@@ -147,7 +161,7 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
           throw new AuthorizationError("this submission cannot be edited");
         const next=await tx.execute(sql`
           UPDATE public.graded_submissions
-          SET response=jsonb_build_object('text',${data.responseText},'format','text'),
+          SET response=${responseValue}::jsonb,
               status='submitted',submitted_at=now()
           WHERE id=${prior.id}::uuid AND status IN ('assigned','returned')
           RETURNING id
@@ -165,7 +179,7 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
           (course_attempt_id,course_version_id,assignment_id,submitted_at,status,response)
         VALUES (${courseAttemptId}::uuid,${cls.courseVersionId}::uuid,
           ${data.assignmentId}::uuid,now(),'submitted',
-          jsonb_build_object('text',${data.responseText},'format','text'))
+          ${responseValue}::jsonb)
         ON CONFLICT (course_attempt_id,assignment_id) DO NOTHING
         RETURNING id
       `);

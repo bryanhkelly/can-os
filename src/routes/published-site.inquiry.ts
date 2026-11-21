@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
 import { publicSiteDomain } from "@/domain/public-site-address";
 import {
-  readSmallUrlEncodedBody, parsePublicAdmissionsInterest,
+  readSmallUrlEncodedBody, parsePublicAdmissionsInterest, parsePublicSiteInterest,
 } from "@/domain/public-admissions-interest";
 
 const commonHeaders = {
@@ -52,9 +52,14 @@ export const Route = createFileRoute("/published-site/inquiry")({
         });
       }
 
-      let data;
+      let inquiry: {kind:"program";data:ReturnType<typeof parsePublicAdmissionsInterest>} |
+        {kind:"site";data:ReturnType<typeof parsePublicSiteInterest>};
       try {
-        data = parsePublicAdmissionsInterest(await readSmallUrlEncodedBody(request));
+        const params=await readSmallUrlEncodedBody(request);
+        // Prelaunch Site requests intentionally carry no Program ID.
+        inquiry=params.has("programId")
+          ? {kind:"program",data:parsePublicAdmissionsInterest(params)}
+          : {kind:"site",data:parsePublicSiteInterest(params)};
       } catch {
         return new Response("Please review the information in your request and try again.", {
           status: 400, headers: { ...commonHeaders,
@@ -63,9 +68,10 @@ export const Route = createFileRoute("/published-site/inquiry")({
       }
 
       try {
-        const { recordPublicAdmissionsInterest } =
+        const { recordPublicAdmissionsInterest, recordPublicSiteInterest } =
           await import("@/modules/enrollment/public-admissions-interest.server");
-        await recordPublicAdmissionsInterest(slug, data);
+        if(inquiry.kind==="site")await recordPublicSiteInterest(slug,inquiry.data);
+        else await recordPublicAdmissionsInterest(slug,inquiry.data);
         // Do not reflect the provided contact details or reveal duplicate status.
         return new Response(`<!doctype html><html lang="en"><head>
           <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

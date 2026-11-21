@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { emptySiteLocalContent } from "@/domain/site-local-content";
-import { resolveSiteContentBlocks, defaultSiteContentChannelConfig } from "@/domain/site-content-channels";
+import { resolveSiteContentBlocks, defaultSiteContentChannelConfig, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
+import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { siteTemplateIds } from "@/domain/site-theme";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
 
@@ -29,7 +30,7 @@ describe("Private Site preview pulls data channels through the actual template",
       expect(html).toContain("Afterschool");
       expect(html).toContain("Adult Learning");
       expect(html).toContain("Grades 6–8");
-      expect(html).toContain("Proposed · not enrolling");
+      expect(html).not.toContain("Proposed · not enrolling");
       expect(html).not.toContain("can-launch-section");
       expect(html).not.toContain("can-launch-interest");
       expect(html).not.toContain("<form");
@@ -38,22 +39,30 @@ describe("Private Site preview pulls data channels through the actual template",
     }
   });
 
-  it("renders all of the Site Setup choices inside every template's native layout",()=>{
+  it("shows saved Site and truthful affiliation information across all seven website layouts",()=>{
+    const preferences={delivery:"digital" as const,interestIds:["summer"]};
     const chosen=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
-      mode:"private",preferences:{delivery:"digital",interestIds:["summer"]},
+      mode:"private",preferences,
       siteSetup:{name:"Valor School",organizationName:"Example Church",
         city:"Brentwood",state:"CA",timezone:"America/Los_Angeles"},
       networkStatusKnown:true,networkAffiliations:[{name:"COGIC",status:"pending"}],
     });
+    const previewBlocks=[
+      ...websitePreviewEditorialBlocks(chosen),
+      ...projectPlannedSiteProgramsForPreview(preferences,chosen),
+    ];
     for(const templateId of siteTemplateIds){
-      const html=renderPublicSiteHtml({...base(templateId),contentBlocks:chosen},{localPreview:true});
-      for(const field of ["Valor School","Example Church","Brentwood, CA",
-        "America/Los_Angeles","Digital / online","COGIC","Summer &amp; Breaks"])
-        expect(html,templateId+" missing "+field).toContain(field);
-      for(const channel of ["site.setup","site.network","learning.interests"])
+      const html=renderPublicSiteHtml({...base(templateId),
+        contentBlocks:previewBlocks},{localPreview:true});
+      for(const channel of ["site.setup","site.network"])
         expect(html).toContain('data-content-channel="'+channel+'"');
+      for(const text of ["Brentwood, CA","America/Los_Angeles",
+        "Digital / online","Affiliation: pending","COGIC"])
+        expect(html).toContain(text);
+      expect(html).toContain("Summer &amp; Breaks");
     }
   });
+
   it("renders approved Class links on every template without claiming enrollment is open", () => {
     const id = "11111111-1111-4111-8111-111111111111";
     const classBlock=defaultSiteContentChannelConfig.blocks.find(block=>block.channel==="learning.classes")!;

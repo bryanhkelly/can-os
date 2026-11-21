@@ -2,9 +2,10 @@ import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
-import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
+import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
+import { projectSiteFundingPublicContext } from "@/domain/site-funding-public";
 import { recommendBrandDirection } from "@/domain/site-brand-direction";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
@@ -17,10 +18,10 @@ import { organizations, siteAffiliations, sitePublications, sites } from "@/db/s
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
-import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
+import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
 import { readSitePhysicalAddress, siteInformationSchema } from "@/domain/site-setup-configuration";
 import { canonicalPublicContact, publicIdentityReviewStatuses } from "@/domain/public-parent-identity";
@@ -84,7 +85,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // A new Site can explore a complete read-only design even before its first
   // saved draft. The starter is never persisted or published by this GET.
   const candidate = proposedContent ?? editingContent ?? local?.content
-    ?? prepareWebsiteCopyFromSiteInformation(createSchoolWebsiteStarterContent(site.name),storyCandidates);
+    ?? {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
   // A newly established Site can save its Brand before its first website
   // revision. Apply that canonical Brand to the first-visit starter, not the
   // legacy default palette. In-editor unsaved previews retain their proposed
@@ -96,13 +97,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const displaySiteName = savedBrand?.resolved.displayName ?? site.name;
   // The same rights gate applies to both artwork slots, including saved private drafts.
   // Unsigned logos must never bypass the hero-image gate in a private HTML preview.
-  const previewContent = { ...renderedCandidate, branding: {
-    ...renderedCandidate.branding,
-    heroImage: siteLocalImagePublicationGaps(renderedCandidate.branding.heroImage).length
-      ? null : renderedCandidate.branding.heroImage,
-    logoImage: siteLocalImagePublicationGaps(renderedCandidate.branding.logoImage ?? null).length
-      ? null : renderedCandidate.branding.logoImage ?? null,
-  } };
+  const previewContent = safeSiteWebsitePreviewContent(renderedCandidate);
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
     academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
   const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
@@ -161,11 +156,12 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const proposedPrograms = projectPlannedSiteProgramsForPreview(
     preferences.success ? preferences.data : null, baseContentBlocks);
   const contentBlocks = [
-    ...baseContentBlocks.filter(block => block.channel !== "learning.interests"),
+    ...websitePreviewEditorialBlocks(baseContentBlocks),
     ...proposedPrograms,
   ];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
+    siteFunding:projectSiteFundingPublicContext(siteConfiguration?.metadata?.siteHostingV61),
     host, site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media, contentBlocks, enrollmentOpportunities,

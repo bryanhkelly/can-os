@@ -13,7 +13,7 @@ type Lesson={
 
 /** Read the existing canonical Course lesson. No Section, track duplicate,
  * invented video file, or additional enrollment is created. */
-export function NativeValorLessonPanel({classEnrollmentId,lessons,selectedLessonId}:{
+export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selectedLessonId}:{
   classEnrollmentId:string;
   lessons:Lesson[];
   selectedLessonId:string|null;
@@ -56,8 +56,8 @@ export function NativeValorLessonPanel({classEnrollmentId,lessons,selectedLesson
     {selected.videoResources.length>0&&<section className="space-y-2 border-t border-border pt-4">
       <h3 className="font-semibold">Supplemental videos</h3>
       <p className="text-xs text-muted-foreground">
-        These external demonstration videos are awaiting teacher and accessibility review.
-        They are not required to complete the lesson.
+        Supplemental video resources come from this Course's saved lesson content.
+        Their presence does not constitute publication, accessibility, or shared-screen playback approval.
       </p>
       <div className="space-y-4">
         {selected.videoResources.map(video=>

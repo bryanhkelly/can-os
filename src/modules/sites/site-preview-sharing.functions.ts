@@ -1,15 +1,12 @@
 import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
-import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
-import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
-import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { organizations, siteLocalContentVersions, sites } from "@/db/schema";
+import { siteLocalContentVersions, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
 import { DomainError } from "@/domain/errors";
@@ -17,11 +14,12 @@ import { EventTypes } from "@/domain/event-types";
 import {
   classifySiteLocalContent, normalizeSiteLocalContent,
 } from "@/domain/site-local-content";
-import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import {
-  createPreviewShareToken, projectShareableSitePreview, readSitePreviewShares, type SitePreviewShare,
+  createPreviewShareToken, readSitePreviewShares, type SitePreviewShare,
 } from "@/domain/site-preview-sharing";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
+import { getPartnerWebsitePreview } from "./site-website-preview.server";
+import { sitePreviewSnapshotKey, writeSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
@@ -125,42 +123,30 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         throw new DomainError("UNAVAILABLE",
           "This website revision contains protected claims needing review. Update your website copy before sharing.");
 
-      // The shared public-safe projection never exports the Site Story,
-      // family contacts, unapproved imagery, or private editorial baseline.
-      const [organization] = await tx.select({ name: organizations.name })
-        .from(organizations).where(eq(organizations.id, site.organizationId)).limit(1);
-      // Saved Programs & Audiences are part of the proposed website, not merely
-      // private configuration. Use the existing bounded planning content channel
-      // for display, with zero independent enrollment or publication actions.
-      const preferences = siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
-      const authored = preferences.success
-        ? resolveSiteContentBlocks(
-            safeReadSiteContentChannelConfig(site.metadata.websiteContentChannels),
-            { mode: "private", preferences: preferences.data },
-          )
-        : [];
-      const plannedPrograms = projectPlannedSiteProgramsForPreview(
-        preferences.success ? preferences.data : null, authored);
-      const page = projectShareableSitePreview({
-        siteName: brand.resolved.displayName,
-        organizationName: organization?.name ?? "Proposed learning community",
-        content:websiteContent,
-        plannedPrograms,
-      });
-      const pages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
-        path, renderPublicSiteHtml(page, { path, localPreview: true }),
-      ]));
-      if (JSON.stringify(pages).length > 1_500_000)
-        throw new DomainError("UNAVAILABLE", "The preview is too large to share. Reduce the size of the website artwork and try again.");
+      // Render the SAME saved Site revision and CAN OS sections as the
+      // authenticated Website & Brand preview. Never synthesize a miniature
+      // second website or silently suppress its setup/network sections.
+      const preview=await getPartnerWebsitePreview(actor);
+      if(preview.siteId!==site.id ||
+        preview.currentRevision!==latest.revision ||
+        preview.currentBrandVersionId!==brand.version.id ||
+        !preview.previewPages["/"])
+        throw new DomainError("UNAVAILABLE",
+          "The website changed while preparing this share. Reload the saved revision and try again.");
+      const shareId=randomUUID();
+      const snapshot=await writeSitePreviewSnapshot(
+        sitePreviewSnapshotKey(site.id,shareId),preview.previewPages);
 
       const { token, tokenDigest } = createPreviewShareToken();
       const entry: SitePreviewShare = {
-        id: randomUUID(), tokenDigest,
+        id: shareId, tokenDigest,
         createdAt: now.toISOString(),
         expiresAt: data.expiresAfterDays === null ? null
           : new Date(now.getTime() + data.expiresAfterDays * 86_400_000).toISOString(),
         revokedAt: null, sourceRevision: latest.revision,
-        brandVersionId:brand.version.id,pages,
+        brandVersionId:brand.version.id,
+        snapshotKey:snapshot.key,snapshotDigest:snapshot.digest,
+        snapshotPaths:snapshot.paths,
       };
       // Keep a bounded number of recorded links. Old revocations remain in
       // the canonical audit trail, not unlimited Site metadata.

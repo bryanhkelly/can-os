@@ -15,7 +15,7 @@ export async function readWorkspaceSession(request: Request) {
     if (error instanceof AuthorizationError) return { authenticated: false as const };
     throw error;
   }
-  const sessionAccountId = context.sessionAccountId ?? context.accountId;
+  const sessionAccountId = context.impersonatedByAccountId ?? context.sessionAccountId ?? context.accountId;
   const [account] = await db.select({ email: accessAccounts.emailNormalized })
     .from(accessAccounts).where(eq(accessAccounts.id, sessionAccountId)).limit(1);
   if (!account) throw new AuthorizationError("authenticated account");

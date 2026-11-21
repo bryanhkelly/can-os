@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR } from "@/domain/local-demo-access";
+import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR, LOCAL_DEMO_RILEY_FACILITATOR } from "@/domain/local-demo-access";
 import { readSessionGrants } from "@/modules/identity/session-grants.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 
@@ -35,6 +35,30 @@ describe("public demo session isolation", () => {
     ...LOCAL_DEMO_ROOM_FACILITATOR, id: LOCAL_DEMO_ROOM_FACILITATOR.grantId,
     role: "room_facilitator", active: true,
   };
+  it("offers two separately verified grants to Riley with one immutable Person",async()=>{
+    const primary={
+      ...LOCAL_DEMO_RILEY_FACILITATOR,
+      id:"fb000000-0000-4000-8000-000000000002",
+      role:"teacher",active:true,
+    };
+    const facilitator={
+      ...LOCAL_DEMO_RILEY_FACILITATOR,
+      id:LOCAL_DEMO_RILEY_FACILITATOR.grantId,
+      role:"room_facilitator",active:true,
+    };
+    state.rows=[[primary,facilitator]];
+    expect(await readSessionGrants(primary.accountId,primary.email)).toEqual({
+      grants:[primary,facilitator],demoAccountSwitching:false,
+    });
+  });
+  it("never accepts an unauthorized replacement of Riley's second grant",async()=>{
+    const grant={
+      ...LOCAL_DEMO_RILEY_FACILITATOR,id:"replacement-grant",
+      role:"room_facilitator",active:true,
+    };
+    state.rows=[[grant]];
+    expect((await readSessionGrants(grant.accountId,grant.email)).grants).toEqual([]);
+  });
   it("gives Sally only her own room-facilitator workspace, not demo-admin switching", async () => {
     state.rows = [[facilitatorGrant]];
     expect(await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).toEqual({
@@ -48,10 +72,13 @@ describe("public demo session isolation", () => {
       expect((await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).grants).toEqual([]);
     },
   );
-  it("includes the canonical facilitator in admin switching, without creating mirrored authority", async () => {
-    state.rows = [[adminGrant], [facilitatorGrant]];
-    expect((await readSessionGrants(adminGrant.accountId, adminGrant.email)).grants)
-      .toEqual([adminGrant, facilitatorGrant]);
+  it("includes a currently verified Riley facilitator in Admin switching", async () => {
+    const riley={...LOCAL_DEMO_RILEY_FACILITATOR,
+      id:LOCAL_DEMO_RILEY_FACILITATOR.grantId,
+      role:"room_facilitator",active:true};
+    state.rows=[[adminGrant],[riley]];
+    expect((await readSessionGrants(adminGrant.accountId,adminGrant.email)).grants)
+      .toEqual([adminGrant,riley]);
   });
   const school = {
     domain: "newschool.demo", organizationId: "new-organization", siteId: "new-site",
@@ -90,18 +117,44 @@ describe("public demo session isolation", () => {
     state.rows = [[{ ...studentGrant, ...change }]];
     expect((await readSessionGrants(student.accountId, student.email)).grants).toEqual([]);
   });
-  it("restricts admin switching to canonical source identities, not copied emails", async () => {
-    state.rows = [[adminGrant], [
-      studentGrant, { ...studentGrant, accountId: "foreign-account" },
-      { ...studentGrant, personId: "authentic-person" },
-      { ...studentGrant, organizationId: "authentic-organization" },
-    ]];
-    const result = await readSessionGrants(LOCAL_DEMO_ADMIN.accountId, LOCAL_DEMO_ADMIN.email);
+  it("enumerates current existing Site users for Admin switch without a fixed roster", async () => {
+    const newStaff = {
+      ...studentGrant, id:"new-person-grant", accountId:"new-person-account",
+      personId:"new-person", role:"student",email:"student@valorschool.demo",
+    };
+    state.rows = [[adminGrant],[studentGrant,newStaff]];
+    const result=await readSessionGrants(LOCAL_DEMO_ADMIN.accountId,LOCAL_DEMO_ADMIN.email);
     expect(result).toEqual({
-      grants: [adminGrant, studentGrant],
-      demoAccountSwitching: true,
-      launchSiteId: LOCAL_DEMO_ADMIN.siteId,
+      grants:[adminGrant,studentGrant,newStaff],
+      demoAccountSwitching:true,
+      launchSiteId:LOCAL_DEMO_ADMIN.siteId,
     });
+  });
+  it("allows any verified, correctly scoped Valor demo Person without a fixed ID", async () => {
+    const newStudent = {
+      ...studentGrant, id:"new-verified-grant", accountId:"new-can-account",
+      personId:"new-canonical-person", email:"verified-new@valorschool.demo",
+      emailVerifiedAt:new Date("2026-11-20T12:00:00Z"),
+    };
+    state.rows=[[newStudent]];
+    expect(await readSessionGrants(newStudent.accountId,newStudent.email)).toEqual({
+      grants:[newStudent],demoAccountSwitching:false,
+    });
+  });
+  it("rejects disabled, unverified and wrong-Site demo memberships", async () => {
+    const base={
+      ...studentGrant,id:"new-verified-grant",accountId:"new-can-account",
+      personId:"new-canonical-person",email:"verified-new@valorschool.demo",
+      emailVerifiedAt:new Date("2026-11-20T12:00:00Z"),
+    };
+    for(const invalid of [
+      {emailVerifiedAt:null},{siteId:"another-site"},
+      {organizationId:"other-organization"},{email:"other@example.test"},
+    ]){
+      const candidate={...base,...invalid};
+      state.rows=[[candidate]];
+      expect((await readSessionGrants(base.accountId,base.email)).grants).toEqual([]);
+    }
   });
   it("does not grant code access to arbitrary demo-domain identities", async () => {
     state.rows = [[{ ...studentGrant, accountId: "new-account" }]];

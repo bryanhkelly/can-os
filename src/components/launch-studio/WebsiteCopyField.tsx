@@ -7,7 +7,7 @@ import { siteLocalContentLimits, websiteStarterFieldIds,
 import type { WebsiteStoryCandidate } from "@/domain/site-website-story-suggestions";
 
 export type WebsiteCopyFieldSpec={
-  key:SiteLocalTextField;label:string;help:string;multi:boolean;
+  key:SiteLocalTextField;label:string;help:string;multi:boolean;shownOn?:string;
 };
 
 /** Field editor with independently applied Site Story candidate and fixed original reset.
@@ -30,6 +30,14 @@ export function WebsiteCopyField({field,content,candidate,disabled,onChange,onRe
           {field.label}
         </span>
         <span className="mt-1 block text-xs leading-5 text-muted-foreground">{field.help}</span>
+        {field.shownOn&&<span className="mt-2 block text-xs leading-5">
+          <strong>Shown on:</strong> {field.shownOn}
+          <span className="mt-1 block text-muted-foreground">
+            <strong>Source:</strong> This Site's editable Website &amp; Brand draft.
+            Site Information may suggest starting wording, but does not overwrite
+            approved or saved website copy automatically.
+          </span>
+        </span>}
       </Label>
       {typeof starter==="string"&&<Button variant="outline" type="button"
         aria-label={`Reset ${field.label} to original suggested copy`}

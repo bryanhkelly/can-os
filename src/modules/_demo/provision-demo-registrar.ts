@@ -4,7 +4,7 @@ import {
   accessAccounts, accountPersonGrants, memberships, organizations, people,
   programs, roleAssignments, sites,
 } from "@/db/schema";
-import { isLocalDemoProvisioningEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR } from "@/domain/local-demo-access";
+import { isLocalDemoProvisioningEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR, LOCAL_DEMO_RILEY_FACILITATOR } from "@/domain/local-demo-access";
 import { roleCapabilities } from "@/domain/access-context";
 import { listDemoSourceGrants } from "@/modules/identity/session-grants.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -44,6 +44,100 @@ export async function provisionDemoSiteAdmin(database: Pick<Database, "transacti
 
 export async function provisionDemoRoomFacilitator(database: Pick<Database, "transaction">, env: DemoEnvironment) {
   return provisionScopedDemoStaff(database, env, LOCAL_DEMO_ROOM_FACILITATOR);
+}
+
+
+/** Exact, operator-gated second role for an ALREADY verified CAN Person.
+ * Never changes email verification, creates a Person, approves supervision,
+ * or creates a Class staff assignment. That assignment uses its manager API.
+ * Provisioning is audit/event-backed and idempotent, not part of sign-in.
+ */
+export async function provisionDemoRileyFacilitator(
+  database: Pick<Database, "transaction">, env: DemoEnvironment,
+) {
+  if (!isLocalDemoProvisioningEnabled(env))
+    throw new Error("Riley facilitator provisioning requires explicitly gated local/test mode");
+  const fixture = LOCAL_DEMO_RILEY_FACILITATOR;
+  return database.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('can-os:valor-riley-facilitator'))`);
+    const [org] = await tx.select().from(organizations)
+      .where(eq(organizations.id, fixture.organizationId)).for("update");
+    const [site] = await tx.select().from(sites)
+      .where(eq(sites.id, fixture.siteId)).for("update");
+    const [person] = await tx.select().from(people)
+      .where(eq(people.id, fixture.personId)).for("update");
+    const [account] = await tx.select().from(accessAccounts)
+      .where(eq(accessAccounts.id, fixture.accountId)).for("update");
+    if (org?.metadata.synthetic !== true || site?.metadata.synthetic !== true ||
+        site.organizationId !== fixture.organizationId ||
+        !person?.active || person.metadata.synthetic !== true ||
+        !account || account.personId !== fixture.personId ||
+        account.emailNormalized !== fixture.email || account.disabled ||
+        !account.emailVerifiedAt) {
+      throw new Error("Verified immutable Valor teacher identity and Site are required");
+    }
+    const existing = await tx.select().from(accountPersonGrants)
+      .where(eq(accountPersonGrants.accountId,fixture.accountId)).for("update");
+    const teacher = existing.find(grant =>
+      grant.id === "fb000000-0000-4000-8000-000000000002" &&
+      grant.personId === fixture.personId && grant.role === "teacher" &&
+      grant.active && grant.siteId === fixture.siteId &&
+      grant.organizationId === fixture.organizationId);
+    if (!teacher || existing.some(grant =>
+       grant.personId !== fixture.personId ||
+       grant.organizationId !== fixture.organizationId ||
+       grant.siteId !== fixture.siteId ||
+       !["teacher","room_facilitator"].includes(grant.role) ||
+       (grant.role === "room_facilitator" && grant.id !== fixture.grantId))) {
+      throw new Error("Riley role set contains a foreign, unauthorized or missing teacher grant");
+    }
+    const changes: string[] = [];
+    const inserted = await tx.insert(accountPersonGrants).values({
+      id:fixture.grantId,accountId:fixture.accountId,personId:fixture.personId,
+      role:"room_facilitator",organizationId:fixture.organizationId,siteId:fixture.siteId,
+    }).onConflictDoNothing().returning({id:accountPersonGrants.id});
+    if(inserted.length) changes.push("facilitator_grant");
+    const [grant] = await tx.select().from(accountPersonGrants)
+      .where(eq(accountPersonGrants.id,fixture.grantId)).for("update");
+    if(!grant || !grant.active || grant.accountId!==fixture.accountId ||
+       grant.personId!==fixture.personId || grant.role!=="room_facilitator" ||
+       grant.organizationId!==fixture.organizationId || grant.siteId!==fixture.siteId)
+      throw new Error("Riley facilitator grant does not match the approved fixture");
+    const capabilities=["learning.room.facilitate"];
+    const assigned = await tx.insert(roleAssignments).values({
+      id:fixture.roleAssignmentId,personId:fixture.personId,
+      organizationId:fixture.organizationId,siteId:fixture.siteId,
+      roleKey:"room_facilitator",capabilities,
+      metadata:{synthetic:true,source:"operator-bootstrap-valor-riley-classroom-connect"},
+    }).onConflictDoNothing().returning({id:roleAssignments.id});
+    if(assigned.length)changes.push("institutional_facilitator_role");
+    const [role] = await tx.select().from(roleAssignments)
+      .where(eq(roleAssignments.id,fixture.roleAssignmentId)).for("update");
+    if(!role || role.personId!==fixture.personId || role.roleKey!=="room_facilitator" ||
+       role.organizationId!==fixture.organizationId || role.siteId!==fixture.siteId ||
+       role.programId!==null || role.metadata.synthetic!==true ||
+       role.metadata.revokedAt!=null ||
+       role.capabilities.length!==1 || role.capabilities[0]!=="learning.room.facilitate")
+      throw new Error("Riley synthetic facilitator authority is not exact or was revoked");
+    if(changes.length){
+      const scope={organizationId:fixture.organizationId,siteId:fixture.siteId};
+      await writeAudit(tx,{
+        actorPersonId:null, action:"demo.room_facilitator.provision",
+        resourceType:"person",resourceId:fixture.personId,scope,
+        after:{changes,role:"room_facilitator",grantId:fixture.grantId,
+          roleAssignmentId:fixture.roleAssignmentId,capabilities},
+        context:{method:"explicit_operator_bootstrap",synthetic:true,
+          classStaffAssignment:"not_approved_by_provisioning"},
+      });
+      await emitEvent(tx,{
+        eventType:EventTypes.DemoRoomFacilitatorProvisioned,
+        aggregateType:"person",aggregateId:fixture.personId,...scope,
+        payload:{changes,roleAssignmentId:fixture.roleAssignmentId,
+          grantId:fixture.grantId,synthetic:true},
+      });
+    }
+    return {email:fixture.email,personId:fixture.personId,grantId:fixture.grantId,changes};
+  });
 }
 
 async function provisionScopedDemoStaff(
@@ -227,9 +321,14 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
     }
     const sources = await listDemoSourceGrants(tx);
     const expectedEmails = LOCAL_DEMO_ACCOUNTS.filter(account => account.email !== LOCAL_DEMO_ADMIN.email);
-    if (sources.length !== expectedEmails.length || expectedEmails.some(account =>
-      !sources.some(source => source.email === account.email))) {
-      throw new Error("Every approved demo user must have exactly one active school grant before enabling the admin");
+    const primarySources = sources.filter(source =>
+      source.id !== LOCAL_DEMO_RILEY_FACILITATOR.grantId);
+    if (expectedEmails.some(account =>
+      !primarySources.some(source => source.email === account.email &&
+        source.accountId === account.accountId &&
+        source.personId === account.personId &&
+        source.role === account.role.toLowerCase()))) {
+      throw new Error("Required original demo identities must retain their exact primary grants");
     }
     const changedGrants: string[] = [];
     const legacyGrants = [
@@ -239,7 +338,7 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
         role: "demo_facilitator",
       },
       ...expectedEmails.map((account, index) => {
-        const source = sources.find(grant => grant.email === account.email);
+        const source = primarySources.find(grant => grant.email === account.email && grant.role === account.role.toLowerCase());
         if (!source) throw new Error("Demo source membership is unavailable");
         return {
           id: `f7100000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`,

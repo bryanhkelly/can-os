@@ -15,8 +15,9 @@ describe("native Class room isolation contract",()=>{
     expect(source).toContain('throw new AuthorizationError("Class Course Attempt cannot join an unbound room")');
     expect(source).toContain("assertNativeClassRoomStaff");
     expect(source).toContain("assertCurrentNativeTeachingGrant");
-    expect(source).toContain("eq(canonicalAccountGrants.roleCode,\"room_facilitator\")");
+    expect(source).toContain("eq(accountPersonGrants.role,\"room_facilitator\")");
     expect(source).toContain("canonicalClassStaffAssignments");
+    expect(source).toContain('eq(canonicalClassStaffAssignments.roleCode,"facilitator")');
     expect(source).toContain("currentClassAuthority");
     const room=read("src/modules/learning/facilitated-learning-operations.server.ts");
     expect(room).toContain("await assertNativeClassRoomStaff(tx,room)");

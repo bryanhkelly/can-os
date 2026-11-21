@@ -1,9 +1,10 @@
 import { and, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassSessions, canonicalClassEnrollments,
   canonicalClassStaffAssignments, facilitatedClassroomPlans,
-  learnerCourseAttempts, canonicalAccountGrants, canonicalAccounts,
+  learnerCourseAttempts,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-authority.server";
@@ -19,19 +20,24 @@ type Room=typeof facilitatedLearningSessions.$inferSelect;
 export async function assertCurrentNativeTeachingGrant(
   tx:Tx,personId:string,organizationId:string,siteId:string,
 ):Promise<void>{
-  const [grant]=await tx.select({id:canonicalAccountGrants.id})
-    .from(canonicalAccountGrants)
-    .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+  const [grant]=await tx.select({id:accountPersonGrants.id})
+    .from(accountPersonGrants)
+    .innerJoin(accessAccounts,and(
+      eq(accessAccounts.id,accountPersonGrants.accountId),
+      eq(accessAccounts.personId,accountPersonGrants.personId),
+      eq(accessAccounts.disabled,false),
+      isNotNull(accessAccounts.emailVerifiedAt),
+    ))
+    .innerJoin(people,and(
+      eq(people.id,accountPersonGrants.personId),
+      eq(people.active,true),
+    ))
     .where(and(
-      eq(canonicalAccountGrants.personId,personId),
-      eq(canonicalAccountGrants.organizationId,organizationId),
-      eq(canonicalAccountGrants.siteId,siteId),
-      eq(canonicalAccountGrants.roleCode,"room_facilitator"),
-      eq(canonicalAccountGrants.active,true),
-      isNull(canonicalAccountGrants.revokedAt),
-      lte(canonicalAccountGrants.grantedAt,new Date()),
-      isNull(canonicalAccounts.disabledAt),
-      isNotNull(canonicalAccounts.emailVerifiedAt),
+      eq(accountPersonGrants.personId,personId),
+      eq(accountPersonGrants.organizationId,organizationId),
+      eq(accountPersonGrants.siteId,siteId),
+      eq(accountPersonGrants.role,"room_facilitator"),
+      eq(accountPersonGrants.active,true),
     )).limit(1);
   if(!grant)throw new AuthorizationError("current verified Class facilitator grant");
 }
@@ -95,12 +101,13 @@ export async function assertNativeClassRoomStaff(tx:Tx,room:Room){
     .from(canonicalClassStaffAssignments).where(and(
       eq(canonicalClassStaffAssignments.classId,linked.classId),
       eq(canonicalClassStaffAssignments.personId,room.facilitatorPersonId),
+      eq(canonicalClassStaffAssignments.roleCode,"facilitator"),
       eq(canonicalClassStaffAssignments.state,"approved"),
       lte(canonicalClassStaffAssignments.beginsAt,now),
       or(isNull(canonicalClassStaffAssignments.endsAt),
         gt(canonicalClassStaffAssignments.endsAt,now)),
     )).limit(1);
-  if(!staff)throw new AuthorizationError("current instructor assignment to the exact Class");
+  if(!staff)throw new AuthorizationError("current facilitator assignment to the exact Class");
   await assertCurrentNativeTeachingGrant(tx,room.facilitatorPersonId,room.hostOrganizationId,room.siteId);
   return linked;
 }
@@ -120,6 +127,7 @@ export async function assertNativeClassAttendanceReader(
     .from(canonicalClassStaffAssignments).where(and(
       eq(canonicalClassStaffAssignments.classId,linked.classId),
       eq(canonicalClassStaffAssignments.personId,actorPersonId),
+      eq(canonicalClassStaffAssignments.roleCode,"facilitator"),
       eq(canonicalClassStaffAssignments.state,"approved"),
       eq(canonicalClassStaffAssignments.attendanceAuthorized,true),
       lte(canonicalClassStaffAssignments.beginsAt,now),

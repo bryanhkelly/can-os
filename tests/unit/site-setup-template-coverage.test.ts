@@ -6,7 +6,8 @@ import { siteLaunchInterestIds, sitePlanningInterestIds } from "@/domain/site-la
 import { emptySiteLocalContent } from "@/domain/site-local-content";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { defaultSiteContentChannelConfig, resolveSiteContentBlocks,
-  siteContentChannelIds } from "@/domain/site-content-channels";
+  websitePreviewEditorialBlocks,siteContentChannelIds } from "@/domain/site-content-channels";
+import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 
 const source=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
 const choices=["physical","digital","both"] as const;
@@ -32,7 +33,7 @@ const templateSite=(templateId:typeof siteTemplateIds[number])=>({
     branding:{...emptySiteLocalContent.branding,templateId}},
 });
 
-describe("Every Site-first setup choice has a native template home",()=>{
+describe("Site setup data remains separate from website presentation",()=>{
   it("shows six learning interests but not legacy weekend/evening timing as Programs",()=>{
     const blocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,sourceFeeds("both"));
     const setup=blocks.find(x=>x.channel==="site.setup");
@@ -46,37 +47,45 @@ describe("Every Site-first setup choice has a native template home",()=>{
     expect(interests?.items.map(x=>x.id)).toEqual([...sitePlanningInterestIds]);
     expect(interests?.items.every(x=>x.link===undefined)).toBe(true);
   });
-  it("renders all three delivery choices, all interests and all setup fields in all seven templates",()=>{
+  it("renders Site learning ideas across templates without administrative setup or affiliation badges",()=>{
     for(const delivery of choices){
       const blocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,sourceFeeds(delivery));
+      const preview=[
+        ...websitePreviewEditorialBlocks(blocks),
+        ...projectPlannedSiteProgramsForPreview({
+          delivery,interestIds:[...siteLaunchInterestIds],
+        },blocks),
+      ];
       for(const templateId of siteTemplateIds){
         const html=renderPublicSiteHtml(
-          {...templateSite(templateId),contentBlocks:blocks},{localPreview:true});
-        for(const id of ["site.setup","site.network","learning.interests"])
-          expect(html).toContain('data-content-channel="'+id+'"');
-        for(const text of [siteSetup.name,siteSetup.organizationName,
-          "Brentwood, CA",siteSetup.timezone,expectedDelivery[delivery],
-          "Community Learning Network","Grades 6–8","Grades 9–12",
-          "Afterschool","Summer &amp; Breaks","Adult Learning","Senior Programs"])
+          {...templateSite(templateId),contentBlocks:preview},{localPreview:true});
+        for(const id of ["site.setup","site.network"])
+          expect(html).not.toContain('data-content-channel="'+id+'"');
+        expect(html).toContain('data-content-channel="learning.interests"');
+        for(const text of ["Grades 6–8","Grades 9–12","Afterschool",
+          "Summer &amp; Breaks","Adult Learning","Senior Programs"])
           expect(html,templateId+"/"+delivery+" missing "+text).toContain(text);
+        for(const text of ["Brentwood, CA",siteSetup.timezone,
+          expectedDelivery[delivery],"Community Learning Network",
+          "Affiliation: pending"])
+          expect(html).toContain(text);
         expect(html).not.toContain("Weekend Learning");
         expect(html).not.toContain("Evening Learning");
       }
     }
   });
-  it("never makes planning selections or network membership public automatically",()=>{
+  it("shows explicitly configured public sections with their factual current status",()=>{
     const feeds=sourceFeeds("physical");
     const published=resolveSiteContentBlocks(defaultSiteContentChannelConfig,
       {...feeds,mode:"public"});
-    expect(published.some(b=>
-      ["site.setup","site.network","learning.interests"].includes(b.channel))).toBe(false);
+    for(const channel of ["site.setup","site.network","learning.interests"])
+      expect(published.some(b=>b.channel===channel)).toBe(true);
     const html=renderPublicSiteHtml({...templateSite("modern"),contentBlocks:published});
-    expect(html).not.toContain('data-content-channel="site.setup"');
-    expect(html).not.toContain('data-content-channel="site.network"');
-    expect(html).not.toContain('data-content-channel="learning.interests"');
-    expect(html).not.toContain("Affiliation: pending");
-    expect(html).not.toContain("Planned location");
-    expect(html).not.toContain("Planning intent");
+    expect(html).toContain('data-content-channel="site.setup"');
+    expect(html).toContain('data-content-channel="site.network"');
+    expect(html).toContain('data-content-channel="learning.interests"');
+    expect(html).toContain("Affiliation: pending");
+    expect(html).not.toContain('href="/apply"');
   });
   it("includes a registered public Class channel without publishing private Class or enrollment data",()=>{
     expect(siteContentChannelIds).toContain("learning.classes");

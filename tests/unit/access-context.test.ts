@@ -11,6 +11,27 @@ describe("provider-independent authorization context",()=>{
   expect(ctx.scope.siteIds).toEqual(["site-1"]);
   expect(ctx.grantSiteId).toBe("site-1");
  });
+ it("resolves identical facilitation rights for any Person and any Site",()=>{
+  const granted:VerifiedAccessGrant={...grant,role:"room_facilitator"};
+  const actor=resolveAccessContext({accountId:granted.accountId,
+    sessionId:"session",activeGrantId:granted.id},[granted]);
+  const other={...granted,id:"different-grant",accountId:"another-account",
+    personId:"another-person",organizationId:"another-org",siteId:"another-site"};
+  const alternate=resolveAccessContext({accountId:other.accountId,
+    sessionId:"second-session",activeGrantId:other.id},[other]);
+  expect([...actor.capabilities]).toEqual(["learning.room.facilitate"]);
+  expect([...alternate.capabilities]).toEqual([...actor.capabilities]);
+  for(const forbidden of ["onsite.attendance.record","onsite.pickup.release",
+    "safeguarding.concern.submit","assignments:grade","attendance.write",
+    "credential.issuer.review","class.manage"]){
+    expect(actor.capabilities.has(forbidden)).toBe(false);
+    expect(alternate.capabilities.has(forbidden)).toBe(false);
+  }
+  const teacher=resolveAccessContext({accountId:grant.accountId,
+    sessionId:"session",activeGrantId:grant.id},[grant]);
+  expect(teacher.capabilities.has("teacher:read")).toBe(true);
+  expect(teacher.capabilities.has("learning.room.facilitate")).toBe(false);
+ });
  it("limits the student self-profile capability to student membership",()=>{
   const context=resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},
    [{...grant,role:"student"}]);

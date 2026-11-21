@@ -61,14 +61,14 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     id: "site-setup", channel: "site.setup",
     placement: "community", layout: "list", enabled: true,
     eyebrow: "Your Site",
-    title: "How your learning Site is taking shape",
-    description: "Private setup facts. These do not certify facilities, program delivery or operating approval.",
+    title: "About our learning community",
+    description: "Learn about our location, learning plans and how we are preparing to serve families.",
   }, {
     id: "site-network", channel: "site.network",
     placement: "closing", layout: "list", enabled: true,
     eyebrow: "Your network",
-    title: "Community and network",
-    description: "Affiliations are reviewed separately. A pending request does not confer network authority.",
+    title: "Community and partnerships",
+    description: "Explore our community connections and their current status.",
   }, {
     id: "planning-interests", channel: "learning.interests",
     placement: "learning", layout: "cards", enabled: true,
@@ -163,20 +163,20 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
   defaultTitle: string; defaultEyebrow: string; defaultDescription: string;
 }> = {
   "site.setup": {
-    label: "Site setup facts", privateOnly: true,
-    description: "Private Site identity, planning location, time zone and selected delivery mode.",
-    defaultTitle: "How your learning Site is taking shape", defaultEyebrow: "Your Site",
-    defaultDescription: "These details are planned, not verified public operating claims.",
+    label: "Site setup facts", privateOnly: false,
+    description: "Saved Site identity, location, time zone and selected delivery model.",
+    defaultTitle: "About our learning community", defaultEyebrow: "Our Site",
+    defaultDescription: "Here is how our learning community is taking shape.",
   },
   "site.network": {
-    label: "Network affiliation status", privateOnly: true,
-    description: "Private affiliation status from network review. Never a public brand endorsement.",
-    defaultTitle: "Community and network", defaultEyebrow: "Your network",
-    defaultDescription: "Network requests do not automatically grant membership or brand rights.",
+    label: "Network affiliation status", privateOnly: false,
+    description: "Current affiliation status from Site network records, with pending and revoked states labeled accurately.",
+    defaultTitle: "Community and partnerships", defaultEyebrow: "Our connections",
+    defaultDescription: "Our community partnerships and affiliations.",
   },
   "learning.interests": {
-    label: "Proposed learning programs", privateOnly: true,
-    description: "Private plans selected in Launch Studio. Never publish these as offerings.",
+    label: "Proposed learning programs", privateOnly: false,
+    description: "Proposed plans selected in Launch Studio. They are descriptive, not authorized Offerings."
     defaultTitle: "Programs you are exploring", defaultEyebrow: "Your learning community",
     defaultDescription: "These are planning interests, not approved offerings or enrollment opportunities.",
   },
@@ -230,6 +230,18 @@ export type SiteContentItem = {
 };
 export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentItem[]};
 
+/** Preserve the Site's own configured setup and network sections.
+ * The separate, canonical planning-program projection avoids duplicate
+ * "learning.interests" cards; no Site or network facts are suppressed.
+ * Authorization to read affiliation details remains with the source reader.
+ */
+export function websitePreviewEditorialBlocks(
+  blocks: readonly SiteContentBlockProjection[],
+): SiteContentBlockProjection[] {
+  return blocks.filter(block => block.channel !== "learning.interests");
+}
+
+
 export type SitePublishedClassListing = {
   classId:string;title:string;
   deliveryMode:"self_paced"|"scheduled"|"facilitated"|"hybrid";
@@ -273,25 +285,26 @@ export function resolveSiteContentBlocks(
   ] as const));
   return config.blocks.flatMap(block => {
     if (!block.enabled) return [];
-    if ((block.channel === "learning.interests" || block.channel === "site.setup" ||
-      block.channel === "site.network") && feeds.mode !== "private") return [];
+    // Site publishers choose exactly which saved sections to show.
+    // Pending intent/affiliation is labeled as such; a website section itself
+    // never grants operating, denominational or enrollment authorization.
     let items: SiteContentItem[] = [];
     switch (block.channel) {
       case "site.setup": {
         const setup=feeds.siteSetup;
         if (setup) {
           items = [
-            {id:"site-name",title:"Site name",description:setup.name,label:"Saved Site"},
+            {id:"site-name",title:"Site name",description:setup.name,label:"Our Site"},
             {id:"responsible-organization",title:"Responsible organization",
-              description:setup.organizationName,label:"Saved Site"},
+              description:setup.organizationName,label:"Organization"},
             ...(setup.city && setup.state ? [{id:"planning-location",title:"Planned location",
-              description:setup.city+", "+setup.state,label:"Planning information · not verified"}] : []),
+              description:setup.city+", "+setup.state,label:"Location"}] : []),
             ...(setup.timezone ? [{id:"site-timezone",title:"Site time zone",
-              description:setup.timezone,label:"Scheduling reference · not a public timetable"}] : []),
+              description:setup.timezone,label:"Time zone"}] : []),
             ...(feeds.preferences ? [{id:"delivery-intent",title:"Intended delivery",
               description:feeds.preferences.delivery==="both" ? "Physical and digital" :
                 feeds.preferences.delivery==="physical" ? "Physical / in person" : "Digital / online",
-              label:"Planning intent · not an approved delivery mode"}] : []),
+              label:"Learning plans"}] : []),
           ];
         }
         break;
@@ -308,7 +321,7 @@ export function resolveSiteContentBlocks(
           })) : [{
             id:"independent",title:"Independent Site",
             description:"No network affiliation is currently requested or approved.",
-            label:"Independent operation",
+            label:"Our community",
           }];
         }
         break;

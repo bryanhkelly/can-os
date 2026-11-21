@@ -8,7 +8,7 @@ import {
 const site = "site-a";
 const base: VerifiedAccessGrant = {
   id: "grant-1", accountId: "account-1", personId: "person-1",
-  organizationId: "org-1", siteId: site, role: "room_facilitator", active: true,
+  organizationId: "org-1", siteId: site, role: "site_staff", active: true,
 };
 
 describe("site safeguarding report-only authorization", () => {
@@ -29,6 +29,15 @@ describe("site safeguarding report-only authorization", () => {
     ]) expect(ctx.capabilities.has(capability)).toBe(false);
   });
 
+  it("classroom-only facilitator has no onsite safeguarding authority",()=>{
+    const actor=resolveAccessContext({
+      accountId:base.accountId,sessionId:"current",activeGrantId:base.id,
+    },[{...base,role:"room_facilitator"}]);
+    expect(actor.capabilities.has("learning.room.facilitate")).toBe(true);
+    expect(actor.capabilities.has("safeguarding.concern.submit")).toBe(false);
+    expect(isOnsiteSafeguardingRole("room_facilitator")).toBe(false);
+    expect(()=>assertOnsiteSafeguardingSubmissionScope(actor,site)).toThrow();
+  });
   it("requires a selected site for any reporter-only membership invitation", () => {
     for (const role of onsiteSafeguardingRoles) {
       expect(isOnsiteSafeguardingRole(role)).toBe(true);

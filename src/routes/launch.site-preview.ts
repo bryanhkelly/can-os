@@ -14,9 +14,8 @@ import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/site
 import { readSavedBrandVersion } from "@/modules/sites/site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
-import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
-import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
-import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
+import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
+import { projectSiteFundingPublicContext } from "@/domain/site-funding-public";
 import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
@@ -24,7 +23,7 @@ import { linkPrivateSitePreviewPages } from "@/domain/site-private-preview-navig
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
-import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "@/modules/sites/site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
@@ -83,17 +82,11 @@ export const Route=createFileRoute("/launch/site-preview")({
           readSavedBrandVersion(site.id),
         ]);
         const stored=history[0]?.content ?? published?.content;
-        // First-visit Website & Brand and the Launch topbar must derive their
-        // unsaved starter from the same private Site Story editorial projection.
-        // A returning Site's saved website revision always wins; no source
-        // suggestion silently overwrites a saved operator edit.
-        const sourceStory=siteStorySourceV61Schema.safeParse(site.metadata.siteStoryV61);
-        const storyCandidates=sourceStory.success
-          ?suggestWebsiteCopyFromStory(sourceStory.data.answers,site.name):[];
+        // An unsaved Site preview starts without reusing private Story information.
+        // Consent and editorial generation belong to Website & Brand Step 4.
         const copy:SiteLocalContent=stored
           ?normalizeSiteLocalContent(stored,{allowIncompleteImage:true})
-          :prepareWebsiteCopyFromSiteInformation(
-            createSchoolWebsiteStarterContent(site.name),storyCandidates);
+          :{...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
         // Mirror the Website & Brand editor: structural template and copy
         // come from the saved website draft, but the visual identity comes
         // ONLY from the canonical immutable Site Brand version. The old
@@ -102,17 +95,11 @@ export const Route=createFileRoute("/launch/site-preview")({
           ? siteBrandPresentationIdentity(savedBrand.resolved,
               resolveSiteTemplateId(copy.branding.templateId),true)
           : copy.branding;
+        const synthetic=site.metadata.synthetic===true;
         const displaySiteName=savedBrand?.resolved.displayName??site.name;
-        const localContent:SiteLocalContent={
-          ...copy,
-          branding:{
-            ...selectedBranding,
-            heroImage:siteLocalImagePublicationGaps(selectedBranding.heroImage).length
-              ?null:selectedBranding.heroImage,
-            logoImage:siteLocalImagePublicationGaps(selectedBranding.logoImage??null).length
-              ?null:selectedBranding.logoImage??null,
-          },
-        };
+        const localContent:SiteLocalContent=safeSiteWebsitePreviewContent({
+          ...copy,branding:selectedBranding,
+        });
         // Share the same reviewed parent-facing and school-media projections
         // as Website & Brand Studio and the live publisher. The Site-first
         // route must not silently omit approved address, contact, schedules,
@@ -133,6 +120,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         const classes=await readOptionalSitePublishedClasses(site.id);
         const page:PublicSitePage={
           host:publicSiteHost(publication.slug),
+          siteFunding:projectSiteFundingPublicContext(site.metadata.siteHostingV61),
           site:{name:displaySiteName,organizationName:site.organizationName},
           academicPrograms:authorizedPrograms,
           offerings:publicOfferings,
@@ -181,7 +169,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         const proposedPrograms=projectPlannedSiteProgramsForPreview(
           parsed.success?parsed.data:null,baseContentBlocks);
         page.contentBlocks=[
-          ...baseContentBlocks.filter(block=>block.channel!=="learning.interests"),
+          ...websitePreviewEditorialBlocks(baseContentBlocks),
           ...proposedPrograms,
         ];
         const availablePages=availablePublicSitePaths(page);
@@ -191,7 +179,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           path,localPreview:true,privateDraftPages:true,
         });
         const html=renderPrivateWebsitePreviewHtml(
-          linkPrivateSitePreviewPages(rendered,site.id),site.id,availablePages,Boolean(history.length),"site",
+          linkPrivateSitePreviewPages(rendered,site.id),site.id,availablePages,Boolean(history.length),"site",synthetic,
         );
         return new Response(html,{status:200,headers:siteFirstPreviewHeaders});
       }catch(error){

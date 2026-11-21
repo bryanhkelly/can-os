@@ -7,7 +7,6 @@ import type { AccessContext } from "@/domain/access-context";
  * on-duty escalation and jurisdiction rules are enabled.
  */
 export const onsiteSafeguardingRoles = [
-  "room_facilitator",
   "site_staff",
   "site_leader",
   "paraeducator",

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ContextTray } from "@/components/workspace";
 import type { WorkspaceInstitutionSelection, WorkspaceNavigationItem } from "./workspace-navigation.registry";
 import { SidebarLinks } from "./WorkspaceSidebarLinks";
+import { WorkspaceAccountMenu } from "./WorkspaceAccountMenu";
 
 const NotificationTray = lazy(() => import("./NotificationTray").then(module => ({ default: module.NotificationTray })));
 const AskCanConversation = lazy(() => import("@/components/conversation/AskCanConversation").then(module => ({ default: module.AskCanConversation })));
@@ -26,15 +27,8 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
   onCloseTray: () => void;
 }) {
   return <>
-    {authenticated && <ContextTray title="Account" open={accountOpen} onClose={onCloseAccount}>
-      <div className="space-y-2 text-sm">
-        <Link to="/account" onClick={onCloseAccount} className={`block p-3 font-semibold hover:bg-muted ${focusRingClass}`}>My CAN account</Link>
-        <Link to="/profiles" onClick={onCloseAccount} className={`block p-3 hover:bg-muted ${focusRingClass}`}>My profile</Link>
-        <Link to="/account/sessions" onClick={onCloseAccount} className={`block p-3 hover:bg-muted ${focusRingClass}`}>Account sessions</Link>
-        {member?.role === "student" && <Link to="/student/settings" onClick={onCloseAccount} className={`block p-3 hover:bg-muted ${focusRingClass}`}>Account settings</Link>}
-        <Button variant="ghost" size="sm" disabled={changing} onClick={onSignOut} className="w-full justify-start">Sign out</Button>
-      </div>
-    </ContextTray>}
+    {authenticated && <WorkspaceAccountMenu member={member} accountOpen={accountOpen}
+      onCloseAccount={onCloseAccount} changing={changing} onSignOut={onSignOut}/>}
     {member && <>
       <ContextTray title="Workspace navigation" open={menuOpen} onClose={onCloseMenu}>
         <SidebarLinks links={links} activePath={activePath} institutionSelection={institutionSelection} />

@@ -91,6 +91,7 @@ describe("Student Today summary navigation", () => {
     expect(html).toContain('href="/class"');
   });
 
+
   it("renders refined dashboard shortcuts and keeps canonical destinations", () => {
     const html = renderToStaticMarkup(<StudentExperience liveData={{
       student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },

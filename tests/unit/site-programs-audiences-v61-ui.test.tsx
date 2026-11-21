@@ -57,7 +57,7 @@ describe("V6.1 Programs & Audiences route and screen", () => {
     expect(html).toContain("Which idea would you begin with?");
     expect(html).toContain("I'll decide later");
     expect(html).toContain('value="grades-9-12"');
-    expect(html).toContain("Save &amp; Exit");
+    expect(html).toContain("Save &amp; Sign Out");
   });
 
   it("keeps all Site intent commands scoped, revision-aware and private", () => {

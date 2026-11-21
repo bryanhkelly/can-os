@@ -35,10 +35,6 @@ const grantSelection = {
 };
 
 const supportedRoles = Object.keys(roleCapabilities);
-const sourceAccounts = LOCAL_DEMO_ACCOUNTS.filter(
-  account => account.email !== LOCAL_DEMO_ADMIN.email,
-);
-
 async function listActiveAccountGrants(accountId: string, reader: GrantReader) {
   return reader.select(grantSelection).from(accountPersonGrants)
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
@@ -92,23 +88,33 @@ async function listPublicFamilyStartGrantIds(
   return allowed;
 }
 
-/** Current, tenant-bound source memberships; no mirrored admin grants are accepted. */
+/** Demo Admin may switch to any existing active Person/grant at the exact
+ * demo Site, not just people on a hardcoded fixture allowlist.
+ * This is LOGIN/SWITCH code ONLY. It never provisions or overrides a
+ * Person's role, Site scope, independent approvals, or Class enrollment.
+ * Unverified/disabled accounts are NOT offered for selection because a\n * dead-end selected session would prevent switching back. Protected commands\n * enforce the selected effective grant as usual.
+ */
 export async function listDemoSourceGrants(database: GrantReader = db) {
   const rows = await database.select(grantSelection).from(accountPersonGrants)
-    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
-    .innerJoin(people, eq(people.id, accountPersonGrants.personId))
-    .where(and(
-      inArray(accessAccounts.emailNormalized, sourceAccounts.map(account => account.email)),
+    .innerJoin(accessAccounts, and(
+      eq(accessAccounts.id, accountPersonGrants.accountId),
+      eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
+      isNotNull(accessAccounts.emailVerifiedAt),
+    ))
+    .innerJoin(people, and(
+      eq(people.id, accountPersonGrants.personId),
       eq(people.active, true),
+    ))
+    .where(and(
       eq(accountPersonGrants.active, true),
       eq(accountPersonGrants.organizationId, LOCAL_DEMO_ADMIN.organizationId),
       eq(accountPersonGrants.siteId, LOCAL_DEMO_ADMIN.siteId),
       inArray(accountPersonGrants.role, supportedRoles),
     ));
   return rows.filter(row =>
-    isApprovedDemoGrant(row, row.email),
-  );
+    row.accountId !== LOCAL_DEMO_ADMIN.accountId &&
+    row.personId !== LOCAL_DEMO_ADMIN.personId);
 }
 
 /** Resolve only current account grants or the separately provisioned demo-admin switch list. */
@@ -201,8 +207,18 @@ export async function readSessionGrants(accountId: string, email: string, reader
     };
   }
 
+  // The original fixed accounts retain their controlled demo login bindings.
+  // Additional verified users of the same Site use their own CAN grants.
+  // This exception belongs solely to demo authentication, not domain services.
+  const fixed = LOCAL_DEMO_ACCOUNTS.some(account =>
+    account.accountId === accountId && account.email === normalizedEmail);
   const grants = ownGrants.filter(grant =>
-    isApprovedDemoGrant(grant, normalizedEmail),
+    fixed ? isApprovedDemoGrant(grant, normalizedEmail) :
+      normalizedEmail.endsWith("@valorschool.demo") &&
+      grant.email === normalizedEmail &&
+      grant.emailVerifiedAt !== null &&
+      grant.organizationId === LOCAL_DEMO_ADMIN.organizationId &&
+      grant.siteId === LOCAL_DEMO_ADMIN.siteId,
   );
   return { grants, demoAccountSwitching: false };
 }

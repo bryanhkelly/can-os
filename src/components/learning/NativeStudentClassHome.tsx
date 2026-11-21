@@ -42,9 +42,22 @@ export function NativeStudentClassHome({classes,navigation}:{
                 search={{view:"learn",tab:"lessons"}}>
                 Open Class
               </Link>
-            </Button>:<p className="text-sm text-muted-foreground">
-              Enrollment and consent are managed through the regular Class Offering workflow.
-            </p>}
+            </Button>:<div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                {item.status==="pending"
+                  ?"Your Class enrollment is awaiting authorization."
+                  :item.canJoin
+                    ?"Ask your verified guardian to request this Class through Classes for my family. Your registrar can also help."
+                    :"This Class is not currently accepting learner enrollment."}
+              </p>
+              <Link to="/student/my-school" search={{tab:undefined}}
+                className="text-sm font-semibold text-primary underline underline-offset-4">
+                View my school and contacts
+              </Link>
+              <p className="text-xs text-muted-foreground">
+                Guardian requests, approval and consent use the normal Class enrollment workflow.
+              </p>
+            </div>}
           </article>;
         })}
       </div>

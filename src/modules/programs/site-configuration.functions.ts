@@ -7,10 +7,10 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { assertSiteSetupScope, assertSiteLocationProgramScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
+import { assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
 import { resolveSiteGeographicAreaId } from "./site-geographic-area.server";
-import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations, schoolYears, calendarEvents } from "@/db/schema";
+import { sites, programs, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | {[key:string]:JsonValue};
@@ -26,8 +26,8 @@ function serializableJson(value:unknown):JsonValue {
 const updateSiteConfigurationInput = z.object({
   siteId: z.string().uuid(),
   expectedRevision: z.string().datetime({offset:true}),
-  address: physicalSiteAddressSchema,
-  changeReason: z.string().trim().min(5).max(1000),
+  address: physicalSiteAddressSchema.nullable(),
+  changeReason: z.string().trim().min(5).max(1000).optional(),
 }).strict();
 
 /** A mutation is scoped to a verified registrar and one canonical Site. */
@@ -44,8 +44,9 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       assertSiteSetupScope(actor,site,"program.launch.start");
       const oldAddress=site.address??null;
       const address=data.address;
-      const geographicAreaId=await resolveSiteGeographicAreaId(tx,address);
-      const same=samePhysicalSiteAddress(oldAddress,address);
+      const geographicAreaId=address?await resolveSiteGeographicAreaId(tx,address):null;
+      const same=oldAddress===null&&address===null ||
+        oldAddress!==null&&address!==null&&samePhysicalSiteAddress(oldAddress,address);
       if(same && site.geographicAreaId===geographicAreaId &&
           typeof site.metadata.sitePhysicalAddressRevision==="string")
         return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString(),reviewRequested:false};
@@ -54,11 +55,10 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       const attached=await tx.select({id:programs.id,status:programs.status}).from(programs)
         .where(eq(programs.siteId,site.id));
       const attachedIds=attached.map(item=>item.id);
-      assertSiteLocationProgramScope(actor,attachedIds);
-      const [publication,approvedConfigurations,publishedPrograms,approvedServices]=await Promise.all([
-        tx.select({status:sitePublications.status})
-          .from(sitePublications).where(eq(sitePublications.siteId,site.id))
-          .for("update").limit(1),
+      // The verified Site-level registrar may revise this Site's draft
+      // location, even when draft Programs exist without individual Program
+      // grants. Independent operational approvals are still checked below.
+      const [approvedConfigurations,publishedPrograms,approvedServices]=await Promise.all([
         attachedIds.length?tx.select({id:schoolConfigurationVersions.id})
           .from(schoolConfigurationVersions)
           .where(and(inArray(schoolConfigurationVersions.programId,attachedIds),
@@ -72,10 +72,9 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
           .where(and(inArray(programSiteAuthorizations.programId,attachedIds),
             inArray(programSiteAuthorizations.status,["approved","suspended"]))).limit(1):Promise.resolve([]),
       ]);
-      // Fail closed even if a Program still says "launching". Independent
-      // authorization and marketing can already have been approved.
-      if(publication[0]?.status==="published" ||
-        attached.some(p=>p.status==="active" || p.status==="ready") ||
+      // Website hostname publication alone does not approve Site operations.
+      // Program readiness and independent operational authorization do.
+      if(attached.some(p=>p.status==="active" || p.status==="ready") ||
         approvedConfigurations.length>0 || publishedPrograms.length>0 ||
         approvedServices.length>0)
         throw new DomainError("SITE_LOCATION_AMENDMENT_REQUIRED");
@@ -86,43 +85,18 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         updatedAt:nextRevision,
       }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
       if(!changed)throw new Error("Unable to save Site configuration");
-      // Every location revision can change locality requirements or eligibility.
-      // Keep prior legal decisions untouched; flag them for independent review.
-      for(const program of attached){
-        const [prior]=await tx.select({id:actions.id,status:actions.status,metadata:actions.metadata})
-          .from(actions).where(and(
-            eq(actions.type,"site_location_change_review"),
-            eq(actions.subjectType,"program"),eq(actions.subjectId,program.id),
-            eq(actions.siteId,site.id),
-          )).limit(1);
-        const metadata={...(prior?.metadata??{}),reviewState:"needs_independent_review",
-          siteAddressRevision:changed.updatedAt.toISOString(),changeReason:data.changeReason,
-          requestedByPersonId:actor.actorPersonId};
-        if(prior){
-          await tx.update(actions).set({
-            status:"open",resolvedAt:null,resolutionNote:null,metadata,
-            updatedAt:new Date(),
-          }).where(eq(actions.id,prior.id));
-        }else{
-          await tx.insert(actions).values({
-            type:"site_location_change_review",status:"open",priority:"high",
-            title:"Review updated school physical location",
-            description:"School location changed. Recheck jurisdiction, locality, published claims, and opening approval against authoritative records. This task does not grant authorization.",
-            subjectType:"program",subjectId:program.id,
-            organizationId:site.organizationId,siteId:site.id,programId:program.id,
-            metadata,
-          });
-        }
-      }
+      // Unapproved Site location edits are saved as normal, audited draft revisions.
+      // Any already approved or published operation was denied above.
       await writeAudit(tx,actor,{
         action:"site.location.update",entityType:"site",entityId:site.id,
         scope:{organizationId:site.organizationId,siteId:site.id},
         before:{address:oldAddress,geographicAreaId:site.geographicAreaId},
-        after:{address,geographicAreaId,reason:data.changeReason,
-          reviewRequired:attached.length>0},
+        after:{address,geographicAreaId,
+          ...(data.changeReason?{reason:data.changeReason}:{}),
+          reviewRequired:false,planningRevision:true},
       });
       return {siteId:site.id,updated:true,revision:changed.updatedAt.toISOString(),
-        reviewRequested:attached.length>0};
+        reviewRequested:false};
     });
   });
 
@@ -212,7 +186,7 @@ export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
     expectedRevision:z.string().datetime({offset:true}),
     name:z.string().trim().min(2).max(160),
     timezone:siteTimezoneSchema,
-    changeReason:z.string().trim().min(5).max(1000),
+    changeReason:z.string().trim().min(5).max(1000).optional(),
   }).strict().parse(v))
   .handler(async({data})=>{
     const actor=await getCommandContext(getRequest());
@@ -232,13 +206,15 @@ export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
       const attached=await tx.select({id:programs.id,status:programs.status})
         .from(programs).where(eq(programs.siteId,site.id));
       const programIds=attached.map(program=>program.id);
-      assertSiteLocationProgramScope(actor,programIds);
-      const [sitePublication]=await tx.select({status:sitePublications.status})
-        .from(sitePublications).where(eq(sitePublications.siteId,site.id))
-        .for("update").limit(1);
-      if(sitePublication?.status==="published" || attached.some(program=>
+      // Site-wide draft identity belongs to the verified Site registrar.
+      // Requiring separate grants for every planning Program would incorrectly
+      // block basic edits before operations are independently approved.
+      // A published Site address is not itself approval to operate.
+      // Unapproved draft Site identity remains editable; operationally
+      // ready/active Programs and independent authorization still lock it.
+      if(attached.some(program=>
           program.status==="active" || program.status==="ready"))
-        throw new Error("An active, ready or publicly published Site requires CAN-coordinated identity amendment.");
+        throw new Error("An operating or approved Program requires a coordinated Site identity amendment.");
       if(programIds.length) {
         const [approved,published,authorized]=await Promise.all([
           tx.select({id:schoolConfigurationVersions.id}).from(schoolConfigurationVersions)
@@ -254,14 +230,9 @@ export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
         if(approved.length || published.length || authorized.length)
           throw new Error("School identity is institutionally approved or published. Request a controlled CAN amendment.");
       }
-      if(timezoneChanged) {
-        const [year]=await tx.select({id:schoolYears.id}).from(schoolYears)
-          .where(eq(schoolYears.siteId,site.id)).limit(1);
-        const [calendar]=await tx.select({id:calendarEvents.id}).from(calendarEvents)
-          .where(eq(calendarEvents.siteId,site.id)).limit(1);
-        if(programIds.length || year || calendar)
-          throw new Error("This Site has Program or calendar schedules. Request a coordinated timezone amendment; existing schedules were not changed.");
-      }
+      // Time zone stays editable before operating approval. Existing scheduled
+      // instants are not shifted by this metadata edit; launch checks must
+      // reconcile them before the Site becomes operational.
       // Serialize a name correction with Site creation to prevent silent duplicates.
       if(nameChanged) {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:"+site.organizationId+":"+data.name.toLowerCase()}))`);
@@ -281,7 +252,8 @@ export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
         action:"site.identity.draft.update",entityType:"site",entityId:site.id,
         scope:{organizationId:site.organizationId,siteId:site.id},
         before:{name:site.name,timezone:site.timezone},
-        after:{name:data.name,timezone:data.timezone,reason:data.changeReason,
+        after:{name:data.name,timezone:data.timezone,
+          ...(data.changeReason?{reason:data.changeReason}:{}),
           publicApproved:false,physicalLocationRevisionUnchanged:true},
       });
       return {siteId:site.id,updated:true,revision:saved.updatedAt.toISOString()};

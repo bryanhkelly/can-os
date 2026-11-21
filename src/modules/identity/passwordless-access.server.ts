@@ -13,7 +13,7 @@ import {
 import {readSessionGrants} from "./session-grants.server";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
 import type {SessionDeviceContext} from "@/domain/session-device";
-import { and,desc,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
+import { and,desc,eq,gt,inArray,isNull,isNotNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
@@ -275,8 +275,7 @@ export async function redeemDemoAccess(
  try{email=normalizeAccessEmail(rawEmail);}catch{
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
- if(!isDemoAccountEmail(email) ||
-   (email.endsWith("@valorschool.demo")&&!LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email))) {
+ if(!isDemoAccountEmail(email)) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
  // Fail with a safe configuration category before doing database work.
@@ -288,7 +287,8 @@ export async function redeemDemoAccess(
   step="account_lookup";
   const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized})
    .from(accessAccounts)
-   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
+   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false),
+     isNotNull(accessAccounts.emailVerifiedAt)))
    .limit(1);
   if(!account)throw new InvalidAccessCredentialError("Invalid demo credentials");
   step="grant_lookup";
@@ -302,10 +302,14 @@ export async function redeemDemoAccess(
   }
   const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx);
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
+  // Demo login chooses the fixed original primary membership; all additional
+  // roles are selected through the same normal server-authoritative switcher.
+  const fixed=LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===account.id);
   const grant=account.id===LOCAL_DEMO_ADMIN.accountId
    ?accountGrants.find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
-   :accountGrants.length===1?accountGrants[0]:undefined;
-  if(!grant||(email.endsWith("@valorschool.demo")&&!isApprovedDemoGrant(grant,email)))
+   :fixed?accountGrants.find(candidate=>candidate.role===fixed.role.toLowerCase())
+   :[...accountGrants].sort((a,b)=>a.role.localeCompare(b.role)||a.id.localeCompare(b.id))[0];
+  if(!grant||(fixed && !isApprovedDemoGrant(grant,email)))
    throw new InvalidAccessCredentialError("Invalid demo credentials");
   // Resolve the authenticated administrator's own operating Site, never a user-supplied ID.
   const adminSiteId=hasRegistrarAuthority(grant.role)?grant.siteId:undefined;

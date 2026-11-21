@@ -3,9 +3,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { parseInterestPageCursor, makeInterestPageCursor } from "@/domain/public-admissions-interest";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts, accountPersonGrants, actions, admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents, studentProfiles } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, actions, admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, sites, studentAccessConsents, studentProfiles } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { resolveOperationsSelection } from "@/modules/operations/operations-scope.server";
@@ -78,15 +78,19 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       createdAt: publicAdmissionsInterests.createdAt,
       contactedAt: publicAdmissionsInterests.contactedAt,
     }).from(publicAdmissionsInterests)
-      .innerJoin(programs, eq(programs.id, publicAdmissionsInterests.programId))
+      .innerJoin(sites,eq(sites.id,publicAdmissionsInterests.siteId))
+      .leftJoin(programs,eq(programs.id,publicAdmissionsInterests.programId))
       .leftJoin(publicFamilyStartRequests,
         eq(publicFamilyStartRequests.id, publicAdmissionsInterests.familyStartRequestId))
       .leftJoin(applications, eq(applications.id, publicAdmissionsInterests.applicationId))
       .where(and(
-        inArray(publicAdmissionsInterests.programId, actor.scope.programIds),
-        inArray(programs.organizationId, actor.scope.organizationIds),
-        inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
-        eq(publicAdmissionsInterests.siteId, programs.siteId),
+        inArray(sites.organizationId,actor.scope.organizationIds),
+        inArray(publicAdmissionsInterests.siteId,actor.scope.siteIds??[]),
+        or(isNull(publicAdmissionsInterests.programId),
+          and(isNotNull(publicAdmissionsInterests.programId),
+            inArray(publicAdmissionsInterests.programId,actor.scope.programIds),
+            inArray(programs.organizationId,actor.scope.organizationIds),
+            eq(publicAdmissionsInterests.siteId,programs.siteId))),
         ...(data.interestId ? [eq(publicAdmissionsInterests.id,data.interestId)] : []),
         ...(data.siteId ? [eq(publicAdmissionsInterests.siteId,data.siteId)] : []),
         ...(data.programId ? [eq(publicAdmissionsInterests.programId,data.programId)] : []),
@@ -170,7 +174,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
     // Ineligible admissions and unavailable authorization infrastructure are
     // different states. Do not report a database or network outage as a denial.
     const authorization = new Map<string, "authorized" | "not_authorized" | "temporarily_unavailable">();
-    await Promise.all([...new Set(pageRows.map(row => row.programId))].map(async programId => {
+    await Promise.all([...new Set(pageRows.flatMap(row => row.programId?[row.programId]:[]))].map(async programId => {
       try {
         await resolvePrivateFamilyStartDestination(db, programId);
         authorization.set(programId, "authorized");
@@ -212,7 +216,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       );
       const invitationEligible = canInviteConsentedFamily({
         status:row.status,consented:Boolean(row.consentAt),
-        authorized:authorization.get(row.programId) === "authorized",
+        authorized:row.programId!==null && authorization.get(row.programId) === "authorized",
         applicationId:row.applicationId,
         familyStartRequestId:row.familyStartRequestId,
         emailVerifiedAt:row.emailVerifiedAt,
@@ -242,24 +246,109 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       applicationLinkExpiresAt: row.applicationLinkExpiresAt?.toISOString() ?? null,
       canSendApplicationInvitation: invitationEligible,
       applicationSubmittedAt: row.applicationSubmittedAt?.toISOString() ?? null,
-      admissionsAuthorized: authorization.get(row.programId) === "authorized",
-      admissionsAuthorizationStatus: authorization.get(row.programId) ?? "temporarily_unavailable",
-      nextStep: familyInterestNextStep({
-        interestStatus: row.status,
-        consented: Boolean(row.consentAt),
-        admissionsAuthorized: authorization.get(row.programId) === "authorized",
-        authorizationUnavailable: authorization.get(row.programId) === "temporarily_unavailable",
-        canInvite: invitationEligible,
-        hasFamilyStartRequest: Boolean(row.familyStartRequestId),
-        emailVerified: Boolean(row.emailVerifiedAt),
-        hasApplication: Boolean(row.applicationId),
-        latestOfferStatus: displayOffer?.status ?? null,
-        activeEnrollment,
-        placedInClass,
-        studentAccessStatus,
-      }),
+      admissionsAuthorized: row.programId!==null && authorization.get(row.programId) === "authorized",
+      admissionsAuthorizationStatus:row.programId===null?"not_authorized":
+        authorization.get(row.programId) ?? "temporarily_unavailable",
+      nextStep:row.programId===null
+        ? {
+            state:row.status==="closed"?"closed" as const:"follow_up" as const,
+            owner:"registrar" as const,
+            message:row.status==="closed"
+              ?"This Site interest is closed."
+              :"Follow up on the adult's Site interest. When a Program is authorized, invite them through that Program's normal application process. Interest is not a seat reservation.",
+          }
+        :familyInterestNextStep({
+          interestStatus:row.status,
+          consented:Boolean(row.consentAt),
+          admissionsAuthorized:authorization.get(row.programId)==="authorized",
+          authorizationUnavailable:authorization.get(row.programId)==="temporarily_unavailable",
+          canInvite:invitationEligible,
+          hasFamilyStartRequest:Boolean(row.familyStartRequestId),
+          emailVerified:Boolean(row.emailVerifiedAt),
+          hasApplication:Boolean(row.applicationId),
+          latestOfferStatus:displayOffer?.status??null,
+          activeEnrollment,placedInClass,studentAccessStatus,
+        }),
       };
     }),nextCursor};
+  });
+
+/**
+ * A registrar may assign an adult's Site-wide prelaunch interest to one
+ * independently authorized Program for an application invitation. The
+ * original Site lead becomes the Program lead: no duplicate CRM record,
+ * child, seat reservation or Application is created.
+ */
+export const assignPublicSiteInterestToProgram=createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({
+    interestId:z.string().uuid(),programId:z.string().uuid(),
+  }).strict().parse(value))
+  .handler(async({data})=>{
+    const actor=await requireAdmissionsIntakeReader();
+    if(!actor.scope.programIds.includes(data.programId))
+      throw new AuthorizationError("authorized Program selection");
+    const {createHmac}=await import("node:crypto");
+    const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+    if(!pepper||pepper.length<32)throw new Error("Interest linkage security is unavailable");
+    return db.transaction(async tx=>{
+      // Require CURRENT admissions authority, not a marketing publication.
+      const destination=await resolvePrivateFamilyStartDestination(tx,data.programId);
+      if(!actor.scope.siteIds.includes(destination.siteId)||
+        !actor.scope.organizationIds.includes(destination.organizationId))
+        throw new AuthorizationError("Site-to-Program interest scope");
+      const [interest]=await tx.select({
+        id:publicAdmissionsInterests.id,siteId:publicAdmissionsInterests.siteId,
+        programId:publicAdmissionsInterests.programId,
+        status:publicAdmissionsInterests.status,
+        consentAt:publicAdmissionsInterests.contactConsentAt,
+        source:publicAdmissionsInterests.source,
+        email:publicAdmissionsInterests.contactEmail,
+      }).from(publicAdmissionsInterests).where(and(
+        eq(publicAdmissionsInterests.id,data.interestId),
+        eq(publicAdmissionsInterests.siteId,destination.siteId),
+        isNull(publicAdmissionsInterests.programId),
+      )).for("update").limit(1);
+      if(!interest||interest.source!=="published_site_general"||
+        !interest.consentAt||!["new","contacted"].includes(interest.status))
+        throw new AuthorizationError("eligible, consented Site interest");
+      const digest=createHmac("sha256",pepper)
+        .update(interest.siteId).update(":").update(data.programId)
+        .update(":").update(interest.email).digest("hex");
+      const [duplicate]=await tx.select({id:publicAdmissionsInterests.id})
+        .from(publicAdmissionsInterests).where(and(
+          eq(publicAdmissionsInterests.siteId,interest.siteId),
+          eq(publicAdmissionsInterests.programId,data.programId),
+          eq(publicAdmissionsInterests.emailDigest,digest),
+        )).limit(1);
+      if(duplicate)throw new DomainError("CONFLICT",
+        "This contact already has an inquiry for the selected Program.");
+      const now=new Date();
+      await tx.update(publicAdmissionsInterests).set({
+        programId:data.programId,emailDigest:digest,updatedAt:now,
+      }).where(and(eq(publicAdmissionsInterests.id,interest.id),
+        isNull(publicAdmissionsInterests.programId)));
+      await tx.update(actions).set({programId:data.programId,updatedAt:now})
+        .where(and(eq(actions.subjectType,"public_admissions_interest"),
+          eq(actions.subjectId,interest.id),
+          eq(actions.siteId,interest.siteId),
+          isNull(actions.programId)));
+      await emitEvent(tx,{
+        eventType:EventTypes.PublicSiteInterestProgramLinked,
+        aggregateType:"public_admissions_interest",aggregateId:interest.id,
+        actorPersonId:actor.actorPersonId,organizationId:destination.organizationId,
+        siteId:interest.siteId,programId:data.programId,
+        payload:{source:"published_site_general",programId:data.programId},
+      });
+      await writeAudit(tx,actor,{
+        action:"admissions.public_site_interest.link_program",
+        entityType:"public_admissions_interest",entityId:interest.id,
+        scope:{organizationId:destination.organizationId,siteId:interest.siteId,
+          programId:data.programId},
+        before:{programId:null},after:{programId:data.programId,
+          source:"published_site_general",consentRecorded:true},
+      });
+      return {changed:true,interestId:interest.id,programId:data.programId};
+    });
   });
 
 /** Send the canonical adult-only verified-email application entry. The public
@@ -305,6 +394,7 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
       if (previous.consumedAt || previous.expiresAt.getTime() > Date.now())
         return { requestId: interest.familyStartRequestId, created: false };
     }
+    if(!interest.programId)throw new AuthorizationError("a specific authorized Program is required for applications");
     const destination = await resolvePrivateFamilyStartDestination(db,interest.programId);
     if (destination.siteId!==interest.siteId || destination.organizationId!==interest.organizationId)
       throw new AuthorizationError("private family application destination");
@@ -371,21 +461,21 @@ export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST"
     const actor = await requireAdmissionsIntakeReader();
     return db.transaction(async tx => {
       const [current] = await tx.select({
-        id: publicAdmissionsInterests.id,
-        status: publicAdmissionsInterests.status,
-        siteId: publicAdmissionsInterests.siteId,
-        programId: publicAdmissionsInterests.programId,
-        organizationId: programs.organizationId,
-        contactedAt: publicAdmissionsInterests.contactedAt,
+        id:publicAdmissionsInterests.id,status:publicAdmissionsInterests.status,
+        siteId:publicAdmissionsInterests.siteId,programId:publicAdmissionsInterests.programId,
+        organizationId:sites.organizationId,contactedAt:publicAdmissionsInterests.contactedAt,
       }).from(publicAdmissionsInterests)
-        .innerJoin(programs, eq(programs.id, publicAdmissionsInterests.programId))
+        .innerJoin(sites,eq(sites.id,publicAdmissionsInterests.siteId))
+        .leftJoin(programs,eq(programs.id,publicAdmissionsInterests.programId))
         .where(and(
-          eq(publicAdmissionsInterests.id, data.interestId),
-          eq(publicAdmissionsInterests.siteId, programs.siteId),
-          inArray(publicAdmissionsInterests.programId, actor.scope.programIds ?? []),
-          inArray(programs.organizationId, actor.scope.organizationIds ?? []),
-          inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
-        )).for("update", { of: publicAdmissionsInterests }).limit(1);
+          eq(publicAdmissionsInterests.id,data.interestId),
+          inArray(sites.organizationId,actor.scope.organizationIds??[]),
+          inArray(publicAdmissionsInterests.siteId,actor.scope.siteIds??[]),
+          or(isNull(publicAdmissionsInterests.programId),
+            and(inArray(publicAdmissionsInterests.programId,actor.scope.programIds??[]),
+              eq(publicAdmissionsInterests.siteId,programs.siteId),
+              eq(programs.organizationId,sites.organizationId))),
+        )).for("update",{of:publicAdmissionsInterests}).limit(1);
       if (!current) throw new AuthorizationError("admissions interest scope");
       if (current.status === data.status) return { changed: false };
       if (current.status === "closed" || current.status === "converted")
@@ -405,7 +495,7 @@ export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST"
           eq(actions.subjectId,current.id),
           eq(actions.organizationId,current.organizationId),
           eq(actions.siteId,current.siteId),
-          eq(actions.programId,current.programId),
+          current.programId?eq(actions.programId,current.programId):isNull(actions.programId),
         )).for("update");
       for(const followup of followups) {
         if(["resolved","cancelled"].includes(followup.status))continue;

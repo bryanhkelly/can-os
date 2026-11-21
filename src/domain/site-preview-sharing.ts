@@ -3,7 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { escapePublicHtml, type PublicSitePage } from "./public-site-html";
 import { siteLocalImagePublicationGaps, type SiteLocalContent } from "./site-local-content";
-import { isPublicSitePagePath } from "./public-site-paths";
+import { isPublicSitePagePath, publicSitePagePaths } from "./public-site-paths";
 
 const uuid = z.string().uuid();
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -22,8 +22,19 @@ export const sitePreviewShareSchema = z.object({
   revokedAt: iso.nullable(),
   sourceRevision: z.number().int().nonnegative(),
   brandVersionId:z.string().uuid().optional(),
-  pages: snapshotPages,
-}).strict();
+  synthetic:z.boolean().optional(),
+  /** Legacy V1 frozen HTML, readable until its link is revoked or expires. */
+  pages: snapshotPages.optional(),
+  /** V2: immutable R2 snapshot descriptor, never a public object URL. */
+  snapshotKey:z.string().regex(/^site-website-preview-snapshots\/v2\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.json$/).optional(),
+  snapshotDigest:digest.optional(),
+  snapshotPaths:z.array(z.enum(publicSitePagePaths)).min(1).max(14).optional(),
+}).strict().superRefine((value,ctx)=>{
+  const legacy=!!value.pages;
+  const v2=!!value.snapshotKey&&!!value.snapshotDigest&&!!value.snapshotPaths;
+  if(legacy===Boolean(v2))
+    ctx.addIssue({code:"custom",message:"Exactly one immutable preview snapshot representation is required"});
+});
 export type SitePreviewShare = z.infer<typeof sitePreviewShareSchema>;
 
 export const sitePreviewShareListSchema = z.array(sitePreviewShareSchema).max(12);
@@ -67,6 +78,7 @@ export function activePreviewShare(
 export function renderSharedSitePreview(
   storedHtml: string, siteId: string, token: string,
   availablePages: readonly string[],
+  _synthetic = false,
 ): string {
   const known = new Set(availablePages.filter(isPublicSitePagePath));
   const rewritten = storedHtml.replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, "")
@@ -79,7 +91,7 @@ export function renderSharedSitePreview(
     });
   const banner = `<aside class="can-share-preview" role="status">
     <strong>Proposed learning community · Website preview</strong>
-    <span>Not published or independently approved. No accreditation or enrollment is implied.</span>
+    <span>Not published or independently approved. Images may be illustrative. Forms are disabled. No accreditation or enrollment is implied.</span>
   </aside>`;
   const style = `<style>
   .can-share-preview{z-index:99;position:relative;display:flex;flex-wrap:wrap;align-items:center;

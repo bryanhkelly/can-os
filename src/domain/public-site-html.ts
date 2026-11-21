@@ -6,15 +6,16 @@ import { resolveSiteExperienceProfile, siteExperienceCopy } from "./site-website
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
-import { templateDefaultImage, templateSampleImage } from "./template-sample-images";
+import { templateSampleImage } from "./template-sample-images";
 import { templateResponsiveAttributes,templateHeroPictureSources } from "./template-photo-responsive";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { PublicSiteProjection } from "./public-operation-projection";
+import { fundingStatusPublicNote, type SiteFundingPublicContext } from "./site-funding-public";
 import type {PublicSchoolSiteMedia} from "./school-site-media-public";
-import { createIllustrativeSchoolContent, normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
+import { normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
@@ -25,6 +26,8 @@ export type PublicSitePage = {
   demonstration?: boolean;
   /** Published-page-only status derived from active Program and legal evidence. */
   operatingStatus?: "authorized" | "development" | "review_required";
+  /** Auto-projected from Hosting & Organization; no EIN or verification promise. */
+  siteFunding?: SiteFundingPublicContext | null;
   offerings: PublicOffering[];
   academicPrograms?: PublicAcademicProgram[];
   /** Only institutionally reviewed claims with public display permission are rendered. */
@@ -42,29 +45,13 @@ export type PublicSitePage = {
   enrollmentOpportunities?: readonly SiteEnrollmentOpportunity[];
 };
 
-/** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */
+/** Synthetic fixture metadata never changes public website behavior.
+ * Template-gallery illustration is an explicit separate design-only mode. */
 export function withIllustrativeLocalPreview(page: PublicSitePage): PublicSitePage {
-  if (!page.demonstration || page.localContent) return page;
-  const sample = createIllustrativeSchoolContent(page.site.name);
-  // Valor is an explicitly fictional, existing reference-school fixture. This
-  // variant exists only for local/private previews; it is neither a CMS write
-  // nor a substitute for approved institution-owned program information.
-  const isValor = page.host === "valorschool.can-os.com" &&
-    page.site.name === "Valor School";
-  return {...page, localContent: isValor ? {...sample,
-    heroHeadline:"Be seen. Think boldly. Build what comes next.",
-    welcomeMessage:"A place where big ideas meet personal attention—and students discover the confidence to make their mark.",
-    localDescription:"At Valor School, ambition has a human scale. Students are encouraged to challenge assumptions, explore meaningful questions, and turn knowledge into action. Thoughtful academic instruction meets a connected community where every voice has room to be heard and every new interest has room to grow.",
-    schoolVision:"We believe education should develop curious minds, courageous character, and the ability to make a positive difference. Our vision is a school where intellectual challenge and genuine belonging strengthen one another.",
-    churchHistory:"Valor grew from a simple conviction: young people deserve an education that takes their ideas seriously and sees their potential beyond a test score. That vision shaped a learning community built around rigorous questions, meaningful relationships, and discovery that reaches beyond the classroom.",
-    communityOutreach:"Learning becomes more powerful when it connects to real people and real places. From neighborhood research and creative problem-solving to service projects and collaborative design, students connect classroom ideas with the communities around them.",
-    localTraditions:"Student exhibitions turn ambitious projects into shared celebrations. Design showcases, arts gatherings, community service days, and school-wide reflections give students opportunities to lead, contribute, and recognize one another's growth.",
-  } : sample};
+  return page;
 }
-
-/** A published synthetic school is a demonstration, never an indexed institution. */
-export function isIndexablePublicSite(page: PublicSitePage): boolean {
-  return page.demonstration !== true;
+export function isIndexablePublicSite(_page: PublicSitePage): boolean {
+  return true;
 }
 
 /** Optional Agent A approved, Program-scoped public calendar contract.
@@ -95,7 +82,8 @@ function renderSiteContentChannelBlock(block: SiteContentBlockProjection): strin
     escapePublicHtml(block.eyebrow) + '</p><h2>' + escapePublicHtml(block.title) +
     '</h2></div><p>' + escapePublicHtml(block.description) + '</p></div>';
   const items = block.items.map(item => {
-    const label = '<p class="tag">' + escapePublicHtml(item.label) + '</p>';
+    const label = block.channel === "learning.interests" ? "" :
+      '<p class="tag">' + escapePublicHtml(item.label) + '</p>';
     const title = '<h3>' + escapePublicHtml(item.title) + '</h3>';
     const detail = '<p>' + escapePublicHtml(item.description) + '</p>';
     // No URLs can be entered in Site block settings. Navigation comes solely
@@ -146,6 +134,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     local.schoolVision, local.leadershipWelcome, local.localTraditions, local.denomination,
     local.statementOfFaith, local.spiritualFormation, local.branding?.heroImage].some(Boolean));
   const hasReviewedPeople = Boolean(page.parentInformation?.people.length);
+  const hasLeadership = Boolean(local?.leadershipMembers?.some(member=>member.consentConfirmed));
   const academic = Boolean(page.academicPrograms?.length);
   const opportunities=page.enrollmentOpportunities??projectSiteEnrollmentOpportunities({
     academicPrograms:page.academicPrograms,enrichment:page.offerings,
@@ -155,20 +144,17 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const contentOn=(path:string)=>Boolean(page.contentBlocks?.some(block=>
     block.page===path && block.items.length>0));
   const parent = page.parentInformation;
-  const tuition = Boolean(academic || (parent?.tuition.description.canDisplay && parent.tuition.description.value) ||
-    (parent?.tuition.financialAid.canDisplay && parent.tuition.financialAid.value));
+  // Costs and funding belong on a prelaunch Site even before tuition is finalized.
+  const tuition = true;
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
-  const faq = Boolean(academic || tuition ||
+  // Prelaunch funding boilerplate alone is not evidence for a FAQ.
+  const faq = Boolean(academic ||
+    (parent?.tuition.description.canDisplay && parent.tuition.description.value) ||
+    (parent?.tuition.financialAid.canDisplay && parent.tuition.financialAid.value) ||
     (parent?.admissions.description.canDisplay && parent.admissions.description.value));
-  const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
-    (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
-  if (page.demonstration && hasStory) {
-    // Full fictional prospectus; these additional routes never grant real
-    // admissions, pricing, schedule or program authority.
-    return ["/", "/about", "/academics", "/student-life", "/school-day",
-      "/admissions", "/tuition", "/families", "/faq", "/contact",
-      "/programs", "/courses", "/classes"];
-  }
+  // Site-level prelaunch inquiries do not require a published academic Program.
+  // The public form itself is available only on a published Site origin.
+  const contact = true;
   const educational=[
     ...(academic?["/academics","/school-day","/admissions"] as const:[]),
     ...(kinds.program||contentOn("/programs")?["/programs"] as const:[]),
@@ -180,6 +166,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     ...(tuition?["/tuition"] as const:[]),
     ...(services?["/families"] as const:[]),
     ...(faq?["/faq"] as const:[]),...(contact?["/contact"] as const:[]),
+    ...(hasLeadership?["/leadership"] as const:[]),
   ];
   const profile=resolveSiteExperienceProfile(opportunities);
   return profile==="school" || profile==="mixed"
@@ -220,11 +207,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const host = escapePublicHtml(page.host);
   const previewSlug = options?.localPreview && options.localPreviewSlug &&
     isPublicSiteSlug(options.localPreviewSlug) ? options.localPreviewSlug : null;
-  const demo = page.demonstration === true;
+  const demo = options?.templateGallery === true;
   // A fictional school can demonstrate an admissions journey, but cannot submit
   // real inquiries, applications, or enrollment requests.
-  const submissionsEnabled = !demo && (!options?.localPreview ||
-    (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true));
+  const submissionsEnabled = options?.templateGallery!==true &&
+    (!options?.localPreview ||
+      (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true));
   const inquiryAction = previewSlug
     ? `/published-site/inquiry?site=${encodeURIComponent(previewSlug)}`
     : "/inquiry";
@@ -233,7 +221,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     : "/apply";
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
-  const sampleTemplate = options?.localPreview && page.demonstration ? options.sampleTemplate : undefined;
+  const sampleTemplate = options?.templateGallery ? options.sampleTemplate : undefined;
   const templateId = resolveSiteTemplateId(sampleTemplate ?? local?.branding.templateId);
   const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId, local?.branding.headingFontId, local?.branding.bodyFontId, templateId);
   const displayFont = visual.displayFont;
@@ -263,7 +251,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => sampleForRole(roleForSlot[slot]);
   // The full twelve-scene set is enabled for a hosted fictional school only
   // after the operator verifies all assets and enables the photo-readiness gate.
-  const fullDemoPhotoLibrary = demo && process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED === "true";
+  const fullDemoPhotoLibrary = false;
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
     if(options?.templateGallery || sampleTemplate || fullDemoPhotoLibrary)return sampleMedia(slot);
     const candidate=page.media?.[slot];
@@ -275,9 +263,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
           !url.search && !url.hash)return candidate;
       }catch{ /* Invalid photo URL: never treat it as approved. */ }
     }
-    if(options?.localPreview)return sampleMedia(slot);
-    const sample=templateDefaultImage(templateId,slot==="hero"?"hero":"story_01");
-    return sample?{...sample,assetId:"template-sample",sourceRevision:"v1"}:null;
+    if(options?.templateGallery)return sampleMedia(slot);
+    return null;
   };
   // Cloudflare receives bandwidth-appropriate responsive variants from its
   // private R2-backed Images binding. Netlify and user-owned media are unchanged.
@@ -296,7 +283,6 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const approvedHero=heroMedia?.assetId==="template-sample"?null:heroMedia;
   const heroPhotoSrc=image?.dataUrl ?? heroMedia?.src;
   const heroPhotoAlt=image?.altText ?? heroMedia?.altText ?? "";
-  const showingSamplePhotography=heroMedia?.assetId==="template-sample" && !image;
   const mediaImageAttributes = (media: PublicSchoolSiteMedia[keyof PublicSchoolSiteMedia] | null) => {
     if (!media) return "";
     const dimensions = media.width && media.height ? ` width="${media.width}" height="${media.height}"` : "";
@@ -311,9 +297,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ' alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
   });
   const pageLabels: Record<PublicSitePath, string> = {
-    "/": "Home", "/about": "About", "/academics": "Academics",
+    "/": "Home", "/about": "About", "/leadership": "Leadership", "/academics": "Academics",
     "/student-life": "Student life", "/school-day": "Learning model",
-    "/admissions": "Admissions", "/tuition": "Tuition & aid", "/families": "Families",
+    "/admissions": "Admissions", "/tuition": profile==="school"||profile==="mixed" ? "Tuition & funding" : "Fees & funding", "/families": "Families",
     "/faq": "FAQs", "/contact": "Contact",
     "/programs": "Programs", "/courses": "Courses", "/classes": "Classes",
   };
@@ -453,6 +439,36 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
       : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
     : null;
+  const siteInterestId=submissionsEnabled?options?.makeRequestId?.():undefined;
+  // A Site may gather adult interest before any individual Program is approved.
+  // Reuse the existing rate-limited public inquiry endpoint and canonical inbox.
+  const siteInterestForm=siteInterestId?`<form id="site-interest" action="${inquiryAction}" method="post" class="inquiry-form">
+    <h3>Stay connected with our community</h3>
+    <p class="availability">Get updates about future programs, tuition and funding.
+      Signing up does not create an application, reserve a seat or establish
+      enrollment priority.</p>
+    <input type="hidden" name="requestId" value="${escapePublicHtml(siteInterestId)}"/>
+    <label>First name<input name="firstName" autocomplete="given-name" maxlength="80" required/></label>
+    <label>Last name<input name="lastName" autocomplete="family-name" maxlength="80" required/></label>
+    <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required/></label>
+    <label>What would you like to hear about?
+      <select name="interestKind" required>
+        <option value="interest_list">Future program updates</option>
+        <option value="information">General information</option>
+        <option value="tuition_updates">Tuition and funding information</option>
+      </select>
+    </label>
+    <label>Question (optional; please do not include student information)
+      <textarea name="message" maxlength="400" rows="2"></textarea>
+    </label>
+    <div aria-hidden="true" class="bot-field"><label>Website
+      <input name="website" tabindex="-1" autocomplete="off"/></label></div>
+    <label class="consent"><input type="checkbox" name="contactConsent" value="yes" required/>
+      I agree to receive follow-up about this Site. This is an interest request,
+      not an application or enrollment.
+    </label>
+    <button type="submit">Join the interest list</button>
+  </form>`:"";
   // Keep the locally authored copy while using the shared template composition
   // and current photo delivery path.
   const hero = composePublicSiteHero(templateId, {
@@ -541,17 +557,15 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ${reviewedAddress ? `<div><h3>Published location</h3><p>${reviewedAddress}</p>
         <p class="availability">A published address is not confirmation that the site is open for visits.</p></div>` : ""}
       </div>` : ""}
-    <p>${options?.localPreview
-      ? submissionsEnabled
-        ? "Use the request-information form on a published program to contact the school. This is not an application or enrollment request."
-        : "This local preview is read-only. Request-information forms are available in the development server."
-      : academicCards
-        ? "For academic program questions, use the request-information form for a published program below."
+    <p>${siteInterestForm
+      ? "Sign up for future updates or request information. There is no application or reserved enrollment place."
+      : options?.localPreview
+        ? "This preview is read-only. Public interest forms become available after Site publication."
         : reviewedContact
           ? "Use the Site's published contact information for current next steps."
-          : "No public inquiry channel is currently available. This Site has not published a verified contact method."}
-    ${!options?.localPreview && academicCards
-      ? "An inquiry does not guarantee admission or enrollment." : ""}</p></section>`;
+          : "A public contact method is not yet available."}</p>
+    ${siteInterestForm}
+  </section>`;
   const approvedSchedules = ((page.parentInformation as
     (PublicParentSchoolProfile & {programSchedules?: ApprovedProgramSchedule[]}) | undefined)
     ?.programSchedules ?? []);
@@ -673,16 +687,19 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <article class="card"><h3>Planning together</h3><p>Understand payment timing and the questions to ask as you build an education budget.</p></article>
     <article class="card"><h3>Financial assistance</h3><p>Learn how scholarships or other assistance could be presented alongside eligibility and application guidance.</p></article></div>
     </section>`;
+  const nonprofitStatusNote=fundingStatusPublicNote(page.siteFunding);
   const tuitionSection = demo ? demoTuitionSection : `<section class="church-section" aria-labelledby="tuition-title">
-    <h2 id="tuition-title">Tuition and costs</h2>
-    <p>${tuitionText || "Reviewed tuition and fee details have not yet been published for these programs. Please request current costs before making an enrollment decision."}</p>
-    <h3>Financial assistance</h3>
-    <p>${aidText || "Reviewed financial assistance details are not yet available on this website. Availability and eligibility have not been established here."}</p>
-    ${availablePaths.includes("/academics")
-      ? '<p class="public-next-step"><a href="/academics">Choose a program to request tuition and assistance details →</a></p>'
-      : availablePaths.includes("/contact")
-        ? '<p class="public-next-step"><a href="/contact">Request current tuition information →</a></p>'
-        : ""}</section>`;
+    <p class="tag">Planning with confidence</p>
+    <h2 id="tuition-title">${profile==="school"||profile==="mixed"?"Tuition, fees and funding":"Program fees and funding"}</h2>
+    <p>${tuitionText || "Tuition and program fees are being established as offerings are prepared. Confirmed costs and included services will be published here when available."}</p>
+    <h3>Scholarships and financial assistance</h3>
+    <p>${aidText || "We are exploring relevant scholarships, financial assistance and other support options. Availability, eligibility and awards have not yet been established."}</p>
+    <h3>Public and community funding</h3>
+    <p>Depending on the specific program and applicable requirements, funding may include family payments, eligible public education support, grants, charitable contributions and community sponsorships. No funding eligibility or award is guaranteed.</p>
+    ${nonprofitStatusNote?`<h3>Organization status</h3><p>${escapePublicHtml(nonprofitStatusNote)}</p>`:""}
+    ${availablePaths.includes("/contact")
+      ? '<p class="public-next-step"><a href="/contact#site-interest">Request tuition and funding updates →</a></p>'
+      : ""}</section>`;
   const serviceCards = parent?.services.filter(item => item.description.canDisplay && item.description.value)
     .map(item => `<article class="card"><h3>${escapePublicHtml(item.category.replace(/_/g, " "))}</h3>
       <p>${verifiedText(item.description)}</p></article>`).join("") ?? "";
@@ -766,9 +783,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // The extra two template photography roles are intentionally mounted only
   // in fictional/private preview experiences after the full R2 library passes
   // the twelve-role readiness gate. Never imply these are real school pupils.
-  const includeExtraTemplatePhotoSections=
-    process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED==="true" &&
-    Boolean(options?.templateGallery || options?.localPreview || sampleTemplate || demo);
+  const includeExtraTemplatePhotoSections=options?.templateGallery===true &&
+    process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED==="true";
   const extraTemplatePhotoSection=(role:import("./template-sample-images").TemplatePhotographyRole,
     placement:"creative"|"portrait",label:string,title:string,summary:string)=>{
     if(!includeExtraTemplatePhotoSections)return "";
@@ -851,12 +867,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     if(!records.length) {
       if(authored || !privateDraftPages)return authored;
       const label=kind==="program"?"Programs":kind==="course"?"Courses":"Classes";
-      return '<section class="editorial-section site-private-empty-preview" role="status">'+
-        '<p class="tag">Private design preview · not published</p>'+
-        '<h2>No approved '+label+' to display yet</h2>'+
-        '<p>Once an eligible Offering is independently approved and published, '+
-        'this page will pull its current content and permitted registration actions. '+
-        'The public website does not show an empty catalog page.</p></section>';
+      return '<section class="editorial-section site-private-empty-preview">'+
+        '<h2>Explore '+label+'</h2>'+
+        '<p>We look forward to sharing more about our learning experiences here.</p></section>';
     }
     return authored+renderSiteContentChannelBlock({
       id:"auto-"+kind,channel:"learning.opportunities",
@@ -894,9 +907,33 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <h2>Find the learning opportunity that fits your family.</h2>
       <p>The right educational environment can make a lasting difference. Explore available programs, ask questions, and decide what fits your family.</p>
       <a href="/academics" class="hero-button">Explore available programs</a></section>` : "",
-    contact: reviewedContact || reviewedAddress ? contactSection : "",
+    contact: siteInterestForm || reviewedContact || reviewedAddress ? contactSection : "",
     channelsClosing: contentChannelAt("closing"),
   });
+  const leadershipProfiles=(local?.leadershipMembers??[])
+    .filter(person=>person.consentConfirmed)
+    .map(person=>{
+      const linkedin=person.linkedinUrl&&/^https:\/\/(?:www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]{3,100}\/??$/.test(person.linkedinUrl)
+        ? `<p><a class="text-action" rel="noopener noreferrer" target="_blank" href="${escapePublicHtml(person.linkedinUrl)}">View LinkedIn profile</a></p>`
+        : "";
+      const image=person.photo && !siteLocalImagePublicationGaps(person.photo).length
+        ? `<img class="leadership-photo" src="${escapePublicHtml(person.photo.dataUrl)}"
+          alt="${escapePublicHtml(person.photo.altText)}" loading="lazy" decoding="async"/>`
+        : "";
+      return `<article class="card leadership-person">${image}
+        <h3>${escapePublicHtml(person.name)}</h3>
+        <p class="tag">${escapePublicHtml(person.title)}</p>
+        ${person.biography?`<p>${escapePublicHtml(person.biography)}</p>`:""}
+        ${linkedin}</article>`;
+    }).join("");
+  const leadershipSection=leadershipProfiles?
+    `<section class="editorial-section" aria-label="Leadership team">
+      <div class="section-heading"><p class="tag">Our people</p>
+        <h2>Meet our leadership</h2>
+        <p>Get to know the people serving our community.</p>
+      </div>
+      <div class="grid leadership-grid">${leadershipProfiles}</div>
+    </section>`:"";
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
     "/programs": composePublicSiteInterior(templateId,
@@ -914,6 +951,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         "Browse public Classes and their learning formats. Enrollment depends on each Class Offering's approved terms."),
       renderOpportunityDirectory("class","Explore Classes",
         "Class availability and registration methods are rechecked at the enrollment service.")),
+    "/leadership": composePublicSiteInterior(templateId,
+      secondaryHero("Our people","Leadership","Meet the people who guide our learning community."),
+      leadershipSection),
     "/about": composePublicSiteInterior(templateId,
       secondaryHero("Our community",profile==="school"
         ?"A school shaped by purpose and the people around it.":experienceCopy.storyTitle,
@@ -930,8 +970,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : ""))),
     "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "The right school changes what feels possible",
       demo ? "Explore an admissions journey centered on understanding each family's questions and finding the right fit." : "Choosing a school is a personal decision. Find reviewed admissions information and the next step currently available to your family."), admissionsNextSteps, demo ? "" : academicSection + disclosureSection),
-    "/tuition": composePublicSiteInterior(templateId, secondaryHero("Planning your education", "Plan with confidence",
-      demo ? "Understand how transparent tuition and financial assistance information could help families plan." : "Find published costs, assistance details, and ways to request information for your family."), tuitionSection),
+    "/tuition": composePublicSiteInterior(templateId, secondaryHero("Costs & support", "Plan with confidence",
+      demo ? "Understand how transparent tuition and financial assistance information could help families plan." : "Understand program costs, potential funding pathways and published financial assistance as information becomes available."), tuitionSection),
     "/families": composePublicSiteInterior(templateId, secondaryHero("Supporting families", "Partners in your child’s education",
       demo ? "Because learning works best when the people who care about a student can stay connected." : "Discover the resources and support information currently available to families."),
       (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
@@ -954,7 +994,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ? `Learn about planned programs at ${school} and request founding-family information. Applications are not open.`
     : `Explore programs offered through ${school}.`) :
     `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
-  const isLive = Boolean(options?.makeRequestId) && !options?.localPreview;
+  const isLive = Boolean(options?.makeRequestId) && !options?.localPreview &&
+    options?.templateGallery!==true;
   const canonical = `https://${host}${path}`;
   return `<!doctype html>
 <html lang="en">
@@ -998,7 +1039,7 @@ main{padding-top:38px;padding-bottom:112px}main>section+section{margin-top:clamp
 footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-size:.82rem;color:#667085}
 .inquiry-form{margin-top:22px;padding-top:18px;border-top:1px solid #dce2e8;display:grid;gap:12px}
 .inquiry-form label{display:grid;gap:5px;font-size:.82rem;color:#475467}
-.inquiry-form input:not([type=checkbox]),.inquiry-form textarea{width:100%;padding:10px;border:1px solid #bcc6d2;border-radius:8px;font:inherit}
+.inquiry-form input:not([type=checkbox]),.inquiry-form textarea,.inquiry-form select{width:100%;padding:10px;border:1px solid #bcc6d2;border-radius:8px;font:inherit}
 .inquiry-form .consent{display:flex;align-items:start;gap:8px;line-height:1.4}
 .inquiry-form button{background:#173c60;color:white;border:none;border-radius:10px;padding:14px;font-weight:700;cursor:pointer;min-height:44px}
 .inquiry-form button:hover{background:#245b88}
@@ -1009,15 +1050,15 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .public-hero .tag{color:#e7d7bd}.hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:20px;margin-top:30px}.hero-button{display:inline-flex;align-items:center;min-height:48px;border-radius:10px;padding:12px 19px;background:#f6eee0;color:#17364d;text-decoration:none;font-weight:700}.hero-text-link{color:#fff;text-underline-offset:5px;font-weight:700}.hero-button:hover{background:#fff}.hero-button:focus-visible,.hero-text-link:focus-visible{outline:3px solid #ffda90;outline-offset:4px}
 .skip-link{position:absolute;left:12px;top:-100px;z-index:10;padding:12px;background:#fff;color:#112d34}.skip-link:focus{top:12px}.mission-split{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:clamp(24px,5vw,80px);padding:clamp(20px,4vw,42px) 0}.mission-split p:last-child{font-size:clamp(1.05rem,1.6vw,1.3rem);line-height:1.75}.editorial-section>.grid{gap:20px}.closing-action{background:var(--site-ink);color:#fff;padding:clamp(30px,6vw,70px);border-radius:12px}.closing-action .tag,.closing-action p{color:#fff}.closing-action h2{max-width:700px}.closing-action .hero-button{margin-top:15px}header nav a{min-height:44px;display:inline-flex;align-items:center}.site-nav-cta{min-height:44px;display:inline-flex;align-items:center;justify-content:center;background:var(--site-ink);color:#fff;padding:10px 17px;border-radius:5px;text-decoration:none;font-weight:700;font-size:.85rem}.site-nav-cta:hover{background:var(--site-secondary)}header .brand{color:var(--site-ink)}header{position:relative}header nav{gap:clamp(8px,1.4vw,20px)}.card{border-radius:8px}.card p{overflow-wrap:anywhere}.public-hero{border-radius:12px}.church-section{border-radius:8px}.public-hero h1{overflow-wrap:break-word;hyphens:auto}.public-hero.long-name h1{font-size:clamp(1.9rem,5.6vw,5rem);letter-spacing:-.04em;max-width:950px} .mobile-menu{display:none} .mobile-menu summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:8px 14px;border:1px solid var(--site-ink);border-radius:6px}.mobile-menu a{display:block;padding:11px 4px;min-height:44px} .mobile-menu[open]{width:100%} .mobile-menu[open] .mobile-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px} @media(max-width:800px){header>.desktop-nav,header>.site-nav-cta{display:none}.mobile-menu{display:block} .mission-split{grid-template-columns:1fr} .public-hero{min-height:350px}} @media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:12px;min-height:0;padding:clamp(24px,6vw,48px)}.card{padding:22px}header{align-items:flex-start}header nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;padding-top:12px}main{padding-top:24px;padding-bottom:60px}}
 .section-heading{max-width:740px;margin-bottom:32px}.section-heading>p:last-child{color:#475467}.explore-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.explore-link{display:flex;align-items:flex-start;gap:16px;min-width:0;padding:clamp(18px,3vw,30px);border-top:2px solid var(--site-ink);background:#fff;color:var(--site-ink);text-decoration:none;transition:background .2s ease,transform .2s ease}.explore-link:hover{background:#f4f5f2;transform:translateY(-2px)}.explore-number{font-size:.75rem;letter-spacing:.1em;color:#526578;font-weight:700;padding-top:5px}.explore-copy{display:grid;gap:7px;flex:1;min-width:0}.explore-copy strong{font-family:var(--site-display);font-size:clamp(1.3rem,2vw,1.8rem);font-weight:500;line-height:1.2}.explore-copy>span{font-size:.9rem;color:#475467;line-height:1.55}.explore-arrow{font-size:1.4rem;line-height:1.1;align-self:center}.explore-link:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
-.public-hero.has-image{background:#16373d}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.96) 0%,rgba(9,28,38,.78) 52%,rgba(9,28,38,.32) 100%)}.public-hero .intro{position:relative}.inquiry-form input:not([type=checkbox]):focus-visible,.inquiry-form textarea:focus-visible{outline-offset:2px}@media(max-width:700px){.explore-grid{grid-template-columns:1fr}.explore-link{padding:20px}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.94),rgba(9,28,38,.67))}}@media(max-width:375px){.mobile-menu[open] .mobile-links{grid-template-columns:1fr}.public-hero h1{font-size:clamp(2.1rem,11vw,3.2rem)}.hero-actions{align-items:stretch;gap:12px}.hero-button{justify-content:center}.explore-link{gap:12px}}\n .contact-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:24px;margin:24px 0;padding:22px 0;border-top:1px solid #e5e2d9;border-bottom:1px solid #e5e2d9}.contact-details h3{font-family:var(--site-display);font-size:1.3rem;font-weight:500;margin:0 0 6px}.contact-details p{white-space:pre-line;overflow-wrap:anywhere;margin:0}.admissions-status{border-left:3px solid var(--site-accent);padding:12px 18px;background:#fff}.admissions-next-steps{max-width:900px}.admissions-next-steps>p:not(.tag){color:#475467;line-height:1.75}.text-action{display:inline-flex;margin:12px 20px 8px 0;color:var(--site-ink);font-weight:700;text-underline-offset:5px}.public-next-step{margin-top:32px;font-weight:700}.public-next-step a{color:var(--site-ink);text-underline-offset:5px}.disclosure-item{border-top:1px solid #e5e2d9;padding:20px 0}.disclosure-item h3{font-family:var(--site-display);font-size:1.3rem;margin:0 0 8px}.disclosure-item p{margin:0;color:#475467;white-space:pre-line;overflow-wrap:anywhere}
+.public-hero.has-image{background:#16373d}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.96) 0%,rgba(9,28,38,.78) 52%,rgba(9,28,38,.32) 100%)}.public-hero .intro{position:relative}.inquiry-form input:not([type=checkbox]):focus-visible,.inquiry-form textarea:focus-visible,.inquiry-form select:focus-visible{outline-offset:2px}@media(max-width:700px){.explore-grid{grid-template-columns:1fr}.explore-link{padding:20px}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.94),rgba(9,28,38,.67))}}@media(max-width:375px){.mobile-menu[open] .mobile-links{grid-template-columns:1fr}.public-hero h1{font-size:clamp(2.1rem,11vw,3.2rem)}.hero-actions{align-items:stretch;gap:12px}.hero-button{justify-content:center}.explore-link{gap:12px}}\n .contact-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:24px;margin:24px 0;padding:22px 0;border-top:1px solid #e5e2d9;border-bottom:1px solid #e5e2d9}.contact-details h3{font-family:var(--site-display);font-size:1.3rem;font-weight:500;margin:0 0 6px}.contact-details p{white-space:pre-line;overflow-wrap:anywhere;margin:0}.admissions-status{border-left:3px solid var(--site-accent);padding:12px 18px;background:#fff}.admissions-next-steps{max-width:900px}.admissions-next-steps>p:not(.tag){color:#475467;line-height:1.75}.text-action{display:inline-flex;margin:12px 20px 8px 0;color:var(--site-ink);font-weight:700;text-underline-offset:5px}.public-next-step{margin-top:32px;font-weight:700}.public-next-step a{color:var(--site-ink);text-underline-offset:5px}.disclosure-item{border-top:1px solid #e5e2d9;padding:20px 0}.disclosure-item h3{font-family:var(--site-display);font-size:1.3rem;margin:0 0 8px}.disclosure-item p{margin:0;color:#475467;white-space:pre-line;overflow-wrap:anywhere}
 .community-section{margin-top:clamp(36px,8vw,108px)}.community-heading{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(230px,.7fr);gap:clamp(20px,5vw,90px);align-items:end;border-top:2px solid var(--site-ink);padding-top:30px;margin-bottom:34px}.community-heading h2{font-size:clamp(2rem,4.5vw,4.2rem);line-height:1.13;max-width:700px}.community-heading>p{color:var(--site-muted);font-size:1.06rem;line-height:1.8}.community-stories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(22px,5vw,72px)}.community-story{padding:28px 0;border-top:1px solid #cdd2cd;min-width:0}.community-story h3{font-family:var(--site-display);font-size:clamp(1.25rem,2.4vw,1.9rem);font-weight:500;line-height:1.25;margin:8px 0 12px}.community-story p:last-child{white-space:pre-line;overflow-wrap:anywhere;color:#475467;line-height:1.75}.story-index{margin:0;font-size:.76rem;letter-spacing:.12em;font-weight:700;color:var(--site-muted)}.community-photo{width:100%;max-height:580px;object-fit:cover;margin-bottom:34px}.community-section>.availability{margin-top:16px}@media(max-width:700px){.community-heading{grid-template-columns:1fr}.community-stories{grid-template-columns:1fr}.community-story{padding:24px 0}}
 .hero-subtitle{font-family:var(--site-display);font-size:clamp(1.5rem,3vw,2.85rem);font-weight:500;line-height:1.2;letter-spacing:-.028em;max-width:760px;margin:20px 0 20px;color:#fff}.public-hero h1{max-width:1100px}.public-hero.has-image .hero-subtitle{text-shadow:0 1px 12px rgba(0,0,0,.15)}
 .program-jump-nav{margin:28px 0;padding:22px;border:1px solid #dce2e8;border-radius:8px}.program-jump-links{display:flex;flex-wrap:wrap;gap:12px}.program-jump-links a{display:inline-block;padding:10px 14px;border:1px solid currentColor;border-radius:5px;text-underline-offset:3px}.program-jump-links a:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
 .approved-program-schedule{margin-top:24px;padding:22px;background:var(--site-paper);border:1px solid #dce2e8;border-radius:8px}.approved-program-schedule h4{margin:0 0 14px;font-size:1.07rem}.schedule-periods{list-style:none;margin:0;padding:0}.schedule-periods li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #dce2e8;padding:12px 0;flex-wrap:wrap}.schedule-periods li strong{min-width:110px}.schedule-periods li span{font-variant-numeric:tabular-nums}.schedule-periods+.availability{margin:12px 0 0}
 .inquiry-form{margin-top:22px;padding:clamp(18px,3vw,28px);background:var(--site-paper);border:1px solid #dce2e8;border-radius:10px;display:grid;gap:16px}
 .inquiry-form label:not(.consent){display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:.9rem}
-.inquiry-form input:not([type=checkbox]):not([type=hidden]),.inquiry-form textarea{display:block;width:100%;max-width:100%;font:inherit;padding:12px 13px;border:1px solid #8b989e;border-radius:5px;background:#fff;color:#172d38}
-.inquiry-form input:focus-visible,.inquiry-form textarea:focus-visible,.inquiry-form button:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
+.inquiry-form input:not([type=checkbox]):not([type=hidden]),.inquiry-form textarea,.inquiry-form select{display:block;width:100%;max-width:100%;font:inherit;padding:12px 13px;border:1px solid #8b989e;border-radius:5px;background:#fff;color:#172d38}
+.inquiry-form input:focus-visible,.inquiry-form textarea:focus-visible,.inquiry-form select:focus-visible,.inquiry-form button:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
 .inquiry-form .consent{display:flex;align-items:flex-start;gap:10px;font-size:.88rem;line-height:1.5}
 .inquiry-form .consent input{margin-top:4px;width:18px;height:18px;flex:0 0 18px}
 .inquiry-form button{width:100%;padding:13px 18px;min-height:46px;border:0;border-radius:5px;background:var(--site-ink);color:#fff;font:inherit;font-weight:700;cursor:pointer}
@@ -1091,6 +1132,9 @@ ${publicSiteTemplateCss}
   .template-photo-extra img{max-width:100%;max-height:380px}}
 ${sevenSchoolCss}
 .school-logo{display:inline-block;width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:12px}.brand{overflow-wrap:anywhere}
+.leadership-grid{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.leadership-person{min-width:0}.leadership-person .tag{margin:10px 0}
+.leadership-photo{display:block;aspect-ratio:4/5;max-height:340px;width:100%;object-fit:cover;margin-bottom:16px}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
@@ -1104,9 +1148,8 @@ ${composePublicSiteChrome(templateId, {
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="${experienceCopy.navLabel}">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
-  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual learners or facilities of this Site.</p>` : ""}
-  ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
-  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
+  main: `<main id="main-content">\n  ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
+  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy${options?.localPreview ? "" : " · "+host}</span></footer>`,
 })}
 </body>
 </html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {

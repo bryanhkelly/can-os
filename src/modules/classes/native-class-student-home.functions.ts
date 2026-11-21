@@ -53,8 +53,10 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
         inArray(canonicalClassEnrollments.status,["active","pending"]),
       )).limit(2);
       if(enrollments.length>1)throw new AuthorizationError("ambiguous current Class enrollment");
-      const offering=await tx.select({id:canonicalClassOfferingVersions.id})
-        .from(canonicalClassOfferingVersions).where(and(
+      const offering=await tx.select({
+        id:canonicalClassOfferingVersions.id,
+        enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
+      }).from(canonicalClassOfferingVersions).where(and(
           eq(canonicalClassOfferingVersions.classId,item.classId),
           eq(canonicalClassOfferingVersions.state,"published"),
         )).limit(1);
@@ -63,7 +65,7 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
         enrollmentId:enrollments[0]?.id??null,
         status:enrollments[0]?.status??"not_enrolled",
         courseAttemptId:enrollments[0]?.courseAttemptId??null,
-        canJoin:offering.length>0,
+        canJoin:offering.some(version=>version.enrollmentMethods.includes("approval")),
       });
     }
     available.sort((a,b)=>a.title.localeCompare(b.title));

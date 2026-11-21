@@ -1,4 +1,4 @@
-import {clearLearnerBrowserState} from "@/domain/session-client";
+import { signOutOfWorkspace } from "./workspace-sign-out";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import {useLocation} from "@tanstack/react-router";
 import {useEffect,useState,useSyncExternalStore,type ReactNode} from "react";
@@ -91,12 +91,6 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
     if(!authenticated)throw new Error("Sign in to change membership.");
     await switchVerifiedMembership({grants,activeGrantId:authenticated.activeGrantId,grantId:id,queryClient});
  };
- const signOut=async()=>{
-  const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});
-  if(!response.ok)throw new Error("Unable to sign out. Please try again.");
-  clearLearnerBrowserState();
-  window.location.assign("/access");
- };
  async function changeSession(command:()=>Promise<void>,switching=false){
   setChanging(true);setError("");setSwitcherError("");
   try{await command()}
@@ -128,7 +122,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  </>}
  <WorkspaceNavigationPanels member={current} authenticated={Boolean(authenticated)} accountOpen={accountOpen}
   onCloseAccount={()=>setAccountOpen(false)} changing={changing}
-  onSignOut={()=>void changeSession(signOut)} menuOpen={menuOpen}
+  onSignOut={()=>void changeSession(signOutOfWorkspace)} menuOpen={menuOpen}
   onCloseMenu={()=>setMenuOpen(false)} links={links} activePath={activePath} institutionSelection={institutionSelection}
   tray={tray} onCloseTray={()=>setTray(null)}/>
  </div>;
