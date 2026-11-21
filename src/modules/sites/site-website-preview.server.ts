@@ -2,6 +2,7 @@ import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
+import { resolveSiteExperienceProfile } from "@/domain/site-website-experience";
 import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
@@ -121,6 +122,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const publishedContentConfig = readPublishedSiteContentChannelConfig(
     siteConfiguration?.metadata?.publishedWebsiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
+  const planningPreferences = preferences.success ? preferences.data : null;
+  const siteExperienceProfile = resolveSiteExperienceProfile(enrollmentOpportunities, planningPreferences);
   const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
   const sourceIdentityReviews = publicIdentityReviewStatuses(
     site.id, siteConfiguration?.address ?? null, siteConfiguration?.metadata ?? null);
@@ -165,6 +168,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     host, site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media, contentBlocks, enrollmentOpportunities,
+    // Private planning context shapes editorial tone, never authorization.
+    planningPreferences,
     ...(noncreditReleases.length ? {
       noncreditReleases,
       enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
@@ -181,6 +186,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     currentBrandConfiguration:savedBrand?.version.configuration??null,
     siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
     siteStoryCopyCandidates:storyCandidates,
+    siteExperienceProfile,
     siteStorySourceChoices:siteStorySource.success ? {
       motivations:siteStorySource.data.answers.motivations,
       distinctives:siteStorySource.data.answers.distinctives,
