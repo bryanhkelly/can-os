@@ -16,16 +16,16 @@ import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-sto
 import type { getPartnerWebsitePreviewView } from "@/modules/sites/site-website-preview.functions";
 
 const contentFields:ReadonlyArray<WebsiteCopyFieldSpec>=[
-  {key:"heroHeadline",label:"Homepage headline",help:"The first words families see. Your Site name still appears in the website header.",shownOn:"Homepage hero H1, replacing the default Site-name heading. The saved Brand name remains in the masthead.",multi:true},
-  {key:"welcomeMessage",label:"Welcome to families",help:"Introduce the kind of community you hope to build.",shownOn:"Homepage hero subheading below the H1, only when supplied.",multi:true},
-  {key:"churchHistory",label:"Tell us about your church",help:"When did your church begin? Share its history and important milestones.",shownOn:"About → Our story; may supply the homepage community-story paragraph if the main Site story and vision are blank.",multi:true},
+  {key:"heroHeadline",label:"Homepage headline",help:"The first words visitors see. Your site name still appears in the header.",shownOn:"The main headline on your homepage.",multi:true},
+  {key:"welcomeMessage",label:"Welcome to your community",help:"Introduce the kind of community you hope to build.",shownOn:"The welcome below your homepage headline, when provided.",multi:true},
+  {key:"churchHistory",label:"Your church's story",help:"If your organization is a church, tell visitors how it began and what shaped it.",shownOn:"About → Our story; may supply the homepage community-story paragraph if the main Site story and vision are blank.",multi:true},
   {key:"communityOutreach",label:"Your community",help:"What relationships, partnerships or hopes connect your Site with the people around it? Avoid describing unconfirmed activities.",shownOn:"About → Serving our community (if supplied).",multi:true},
-  {key:"schoolVision",label:"Your vision",help:"What do you hope students will become? You can personalize the prepared wording.",shownOn:"Homepage Vision body and About → Why we started a school; can also be the community-story fallback.",multi:true},
-  {key:"leadershipWelcome",label:"A welcome from your host or Site leader",help:"Optional words approved by your church leader for families.",shownOn:"About → A welcome from our leadership; final homepage community-story fallback.",multi:true},
+  {key:"schoolVision",label:"Your vision",help:"What do you hope people will learn, experience, or achieve?",shownOn:"Your homepage vision and About page.",multi:true},
+  {key:"leadershipWelcome",label:"A welcome from your host or Site leader",help:"A personal message from your host or site leader, with their permission.",shownOn:"About → A welcome from our leadership; final homepage community-story fallback.",multi:true},
   {key:"localTraditions",label:"Local traditions and experiences",help:"Share real local traditions, service projects and community experiences.",shownOn:"About → Local traditions (if supplied).",multi:true},
-  {key:"localDescription",label:"Your Site story",help:"What makes your Site's purpose and community special? Avoid promises about unapproved academic services.",shownOn:"Homepage Community Story and About → Our community (when supplied).",multi:true},
+  {key:"localDescription",label:"Your Site story",help:"What makes this place and its purpose special? Describe what you're planning without promising services you can't yet offer.",shownOn:"Homepage Community Story and About → Our community (when supplied).",multi:true},
   {key:"denomination",label:"Denominational affiliation",help:"Describe your church's identity. Do not claim an endorsement that has not been granted.",shownOn:"About → Denominational identity. This editable description is not evidence of verified network affiliation.",multi:false},
-  {key:"statementOfFaith",label:"Statement of faith",help:"Your church's own theological statement, not CAN's academic policies.",shownOn:"About → Statement of faith (if supplied).",multi:true},
+  {key:"statementOfFaith",label:"Statement of faith",help:"Share your organization's statement of faith, if relevant.",shownOn:"About → Statement of faith (if supplied).",multi:true},
   {key:"spiritualFormation",label:"Spiritual formation",help:"Prayer, worship, discipleship, chapel or religious observances provided locally.",shownOn:"About → Spiritual formation (if supplied).",multi:true},
 ];
 
@@ -51,7 +51,7 @@ export function WebsiteSiteContentStep({
     if(field.key==="heroHeadline")return {...field,
       help:"The first words visitors see. Your saved Site name remains in the header."};
     if(field.key==="welcomeMessage")return {...field,
-      label:"Welcome to learners",help:"Introduce the people and community you hope to serve."};
+      label:"Welcome to your community",help:"Introduce the people and community you hope to serve."};
     if(field.key==="schoolVision")return {...field,
       help:"What might participants learn or experience here?",
       shownOn:"Homepage Vision and About → Our learning vision; may supply the community-story fallback."};
@@ -67,8 +67,9 @@ export function WebsiteSiteContentStep({
   const primaryFields=websiteStarterFieldIds.map(key=>
     fields.find(field=>field.key===key)!);
   const additionalFields=fields.filter(field=>
-    ["churchHistory","leadershipWelcome","localTraditions","denomination",
-      "statementOfFaith","spiritualFormation"].includes(field.key));
+    ["leadershipWelcome","localTraditions"].includes(field.key));
+  const faithFields=fields.filter(field=>
+    ["churchHistory","denomination","statementOfFaith","spiritualFormation"].includes(field.key));
   const renderField=(field:WebsiteCopyFieldSpec)=>
     <WebsiteCopyField key={field.key} field={field} content={content}
       candidate={canReuse?data.siteStoryCopyCandidates.find(item=>item.field===field.key):undefined}
@@ -78,7 +79,7 @@ export function WebsiteSiteContentStep({
 
   return <div className="space-y-5">
     <div>
-      <h3 className="font-serif text-2xl">Your Content</h3>
+      <h3 className="font-serif text-2xl">Tell your story</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         {canReuse
           ? "Edit suggested text or write your own."
@@ -100,9 +101,8 @@ export function WebsiteSiteContentStep({
     {data.plannedExperienceNames.length>0&&<div className="space-y-3 border p-4">
       <h4 className="text-sm font-semibold">Experiences from your Site plan</h4>
       <p className="text-xs text-muted-foreground">
-        These are planning ideas, not confirmed activities. They can be displayed on
-        the homepage and Experiences page through the Experience content channel.
-        The headings, descriptions and placement are editable under Arrange website sections.
+        These are ideas you're exploring. You can feature them on your homepage
+        and Experiences page, then refine how they're described and displayed.
       </p>
       <p className="text-sm">{data.plannedExperienceNames.join(" · ")}</p>
       <div className="flex flex-wrap items-center gap-3">
@@ -117,7 +117,7 @@ export function WebsiteSiteContentStep({
         </Button>}
       </div>
       {!canReuse&&<p className="text-xs text-muted-foreground">
-        Enable Site content reuse to apply suggested welcome copy. You can still edit website text manually.
+        Allow us to use what you've shared to suggest a welcome. You can always write your own.
       </p>}
       {!canApplyExperienceWelcome&&canReuse&&<p className="text-xs text-muted-foreground">
         Your authored welcome copy is preserved. Edit it directly if you want to mention Experiences.
@@ -125,16 +125,16 @@ export function WebsiteSiteContentStep({
     </div>}
     {refreshable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border border-border p-4" role="status">
       <div>
-        <p className="text-sm font-semibold">Program and audience suggestions have changed</p>
+        <p className="text-sm font-semibold">You have new ideas for your website</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {refreshable.length} untouched suggested fields can be updated for the current Site plan.
-          Your own wording, approved offerings and saved website versions stay unchanged.
+          We can update {refreshable.length} suggested sections from your latest plan.
+          Your own words and earlier saved versions won't change.
         </p>
       </div>
       <Button type="button" variant="outline" disabled={busy||!data.canEdit}
         onClick={()=>setContent(old=>refreshSiteWebsiteSuggestedCopy(
           old,data.siteName,data.siteExperienceProfile))}>
-        Refresh suggested wording
+        Update suggestions
       </Button>
     </div>}
     {canReuse&&data.siteStoryCopyCandidates.length>0&&
@@ -149,7 +149,7 @@ export function WebsiteSiteContentStep({
         </Button>
       </div>}
     {canReuse&&data.siteStorySourceChoices&&<div className="border bg-muted/20 p-4 text-sm" role="note">
-      <p className="font-semibold">Suggestions from Site Information</p>
+      <p className="font-semibold">Ideas from what you've shared</p>
       <p className="mt-2 text-muted-foreground">
         Values: {data.siteStorySourceChoices.values.join(", ")||"not selected"}.
         Priorities: {data.siteStorySourceChoices.motivations.join(", ")||"not selected"}.
@@ -173,6 +173,11 @@ export function WebsiteSiteContentStep({
     <details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">More details (optional)</summary>
       <div className="mt-4 space-y-5">{additionalFields.map(renderField)}</div>
+    </details>
+    <details className="border p-4">
+      <summary className="cursor-pointer text-sm font-semibold">Faith and church information (if relevant)</summary>
+      <p className="mt-2 text-xs text-muted-foreground">Only add these details if they reflect your organization.</p>
+      <div className="mt-4 space-y-5">{faithFields.map(renderField)}</div>
     </details>
     <WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>
     <details className="border p-4" id="website-content-layout">
