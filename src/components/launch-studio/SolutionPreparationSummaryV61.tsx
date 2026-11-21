@@ -7,10 +7,10 @@ export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
   siteId:string;plans:readonly SolutionPreparationViewV61[];open?:boolean;
 }){
   return <section className="border bg-background p-4" aria-label="Solution preparation summary">
-    <h3 className="text-sm font-semibold">Your Solution preparation</h3>
+    <h3 className="text-sm font-semibold">Your solution plans</h3>
     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-      These are saved Site configurations. Published requirements still need
-      independently verified facilities, staff, schedules and approvals.
+      These are the solutions you're preparing. Each one may need staff, spaces,
+      schedules, and approvals before it can be offered.
     </p>
     {!plans.length?<p className="mt-3 text-sm text-muted-foreground">
       No saved Solution plans yet. Start with Program Catalog.
@@ -22,7 +22,7 @@ export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
             <p className="mt-1 text-xs text-muted-foreground">
               {plan.template??"Saved template unavailable"}
               {plan.templateVersion!==null?" · v"+plan.templateVersion:""}
-              {" · Site revision "+plan.revision}
+              {" · Saved version "+plan.revision}
             </p>
           </div>
           <StatusBadge tone={plan.nextAction==="resolve-template"?"attention":"neutral"}>
@@ -31,9 +31,9 @@ export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
           </StatusBadge>
         </div>
         <p className="mt-3 text-sm">
-          {plan.requiredComponents.length} required components in the published definition
+          {plan.requiredComponents.length} required {plan.requiredComponents.length===1?"part":"parts"} to prepare
           {plan.componentReviewNeeded>0
-            ?" · "+plan.componentReviewNeeded+" explicitly require independent review":""}.
+            ?" · "+plan.componentReviewNeeded+" need independent review":""}.
         </p>
         {plan.requiredComponents.length>0&&<details className="mt-2 text-sm">
           <summary className="cursor-pointer font-medium text-primary">View requirements</summary>
@@ -46,12 +46,12 @@ export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
             </li>)}</ul>
         </details>}
         {open&&<div className="mt-3 space-y-1 text-xs text-muted-foreground">
-          <p>Published learning product: {plan.publishedProduct?"Present":"Not verified as published"}</p>
-          <p>Site publisher eligibility: {plan.publisherCandidateCount===null?"Unavailable":
+          <p>Learning content published: {plan.publishedProduct?"Present":"Not verified as published"}</p>
+          <p>Registration setup: {plan.publisherCandidateCount===null?"Unavailable":
             plan.publisherCandidateCount>0?"Candidate visible":"No eligible candidate returned"}</p>
-          <p>Open noncredit registration releases: {plan.openRegistrationCount===null?"Unavailable":
+          <p>Active noncredit registrations: {plan.openRegistrationCount===null?"Unavailable":
             plan.openRegistrationCount}</p>
-          <p>A visible candidate or saved plan does not authorize registration.</p>
+          <p>Complete all required approvals before opening registration.</p>
         </div>}
         <Link to="/launch/site" search={{siteId,module:"program-catalog",
           solutionPlanId:plan.configurationId}}
@@ -60,8 +60,7 @@ export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
         </Link>
       </article>)}</div>}
     <WorkspaceNotice tone="info" className="mt-3">
-      Requirements are descriptive until their owning service verifies evidence.
-      Nothing on this screen grants operational or enrollment approval.
+      Your plan shows what may be needed. Complete the appropriate reviews before you begin offering it or accepting registration.
     </WorkspaceNotice>
   </section>;
 }
