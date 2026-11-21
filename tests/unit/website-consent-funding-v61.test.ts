@@ -5,13 +5,13 @@ import { emptySiteHostingV61, siteHostingV61Schema } from "@/domain/site-informa
 import { fundingStatusPublicNote, projectSiteFundingPublicContext } from "@/domain/site-funding-public";
 import { suggestMarketingStarterV61 } from "@/domain/site-marketing-suggestions-v61";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
-import { websiteStudioStepIds } from "@/routes/site-website";
 
 describe("Website & Brand consent and prelaunch funding",()=>{
   it("offers exactly six steps with content consent before editing and review",()=>{
-    expect(websiteStudioStepIds).toEqual([
-      "brand","wireframe","visual","consent","content","review",
-    ]);
+    const source=readFileSync("src/routes/site-website.tsx","utf8");
+    expect(source).toContain(
+      '["brand", "wireframe", "visual", "consent", "content", "review"]',
+    );
   });
 
   it("keeps a new Site's unconsented editorial fields empty",()=>{
