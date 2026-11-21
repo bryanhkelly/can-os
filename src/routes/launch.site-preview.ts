@@ -14,7 +14,7 @@ import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/site
 import { readSavedBrandVersion } from "@/modules/sites/site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
-import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
+import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
 import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
@@ -104,16 +104,9 @@ export const Route=createFileRoute("/launch/site-preview")({
           : copy.branding;
         const synthetic=site.metadata.synthetic===true;
         const displaySiteName=savedBrand?.resolved.displayName??site.name;
-        const localContent:SiteLocalContent={
-          ...copy,
-          branding:{
-            ...selectedBranding,
-            heroImage:siteLocalImagePublicationGaps(selectedBranding.heroImage).length
-              ?null:selectedBranding.heroImage,
-            logoImage:siteLocalImagePublicationGaps(selectedBranding.logoImage??null).length
-              ?null:selectedBranding.logoImage??null,
-          },
-        };
+        const localContent:SiteLocalContent=safeSiteWebsitePreviewContent({
+          ...copy,branding:selectedBranding,
+        });
         // Share the same reviewed parent-facing and school-media projections
         // as Website & Brand Studio and the live publisher. The Site-first
         // route must not silently omit approved address, contact, schedules,
