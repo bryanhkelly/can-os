@@ -24,6 +24,7 @@ const activeScreens = [
   "src/components/launch-studio/LaunchReadinessPanelV61.tsx",
   "src/components/launch-studio/LaunchSitePublicationPanel.tsx",
   "src/components/launch-studio/LaunchStudioShell.tsx",
+  "src/components/launch-studio/SiteGuideV61.tsx",
 ] as const;
 
 // These phrases explain implementation details rather than guiding a person.
@@ -108,6 +109,43 @@ describe("Launch Studio V6.1 editorial contract", () => {
     expect(outreach).toContain('eyebrow:"Share / Create Outreach"');
     expect(website).toContain('eyebrow="Shape / Website & Brand"');
     expect(route).toContain('module: z.enum(siteLaunchModules.map(item=>item.id)');
+  });
+
+  it("uses one grounded Site Guide rather than repetitive static next-step rails", () => {
+    const guide = source("src/components/launch-studio/SiteGuideV61.tsx");
+    const companion = source("src/components/launch-studio/LaunchGuidancePanels.tsx");
+    const route = source("src/routes/launch.site.tsx");
+    const site = source("src/components/launch-studio/EstablishSiteInformationV61.tsx");
+    const programs = source("src/components/launch-studio/EstablishProgramsAudiencesV61.tsx");
+    const share = source("src/components/launch-studio/MarketingPackagesV61.tsx");
+    const prepare = source("src/components/launch-studio/LaunchPrepareV61.tsx");
+    const website = source("src/routes/site-website.tsx");
+    expect(guide).toContain('title="Site Guide"');
+    expect(guide).toContain("Worth considering");
+    expect(guide).toContain("How this connects");
+    expect(companion).toContain("guidance.why");
+    expect(companion).toContain("guidance.tip");
+    expect(route).toContain("onGuideChange={setGuide}");
+    expect(site).toContain("siteInformationGuideV61(step");
+    expect(programs).toContain("programsAudiencesGuideV61(");
+    expect(share).toContain("const guidePlan = view");
+    expect(share).toContain("materialAvailabilityMessage");
+    expect(prepare).toContain("prepareGuideInsights[module]");
+    expect(website).toContain("websiteGuideSteps[step]");
+    expect(website).toContain("data.status === \"published\"");
+  });
+
+  it("keeps Site Guide drafts local and does not infer releases or approvals", () => {
+    const derived = source("src/domain/launch-site-guide-v61.ts");
+    const route = source("src/routes/launch.site.tsx");
+    const website = source("src/routes/site-website.tsx");
+    expect(derived).toContain("not offerings currently open for registration");
+    expect(derived).toContain("With your permission");
+    expect(derived).not.toContain("foundingStory");
+    expect(derived).not.toContain("communityNeed");
+    expect(route).toContain("key={site.id} site={site}");
+    expect(route).toContain("key={site.id} siteId={site.id}");
+    expect(website).toContain("The private preview is not publication.");
   });
 
   it("keeps publication and registration decisions separate", () => {
