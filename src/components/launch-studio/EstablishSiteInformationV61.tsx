@@ -424,7 +424,6 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           </div>
         </fieldset>
         {networkChoice === "request" && <SiteAffiliationPanel siteId={siteId} />}
-        <WorkspaceNotice>Network membership requires approval.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
     {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
@@ -444,7 +443,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             onChange={event => setStory(current => ({ ...current, communityNeed: event.target.value }))} /></Field>
         <MultiChoice title="3. What makes your approach distinctive?" hint="Choose up to three."
           options={distinctives} selected={story.distinctives} onChange={selected => updateMulti("distinctives", selected)} />
-        <Field label="4. How did your vision begin?" description="">
+        <Field label="4. How did your vision begin?" >
           <Textarea rows={3} maxLength={2000} value={story.foundingStory}
             onChange={event => setStory(current => ({ ...current, foundingStory: event.target.value }))} /></Field>
         <MultiChoice title="5. What values matter most?" hint="Select what you want reflected in your messaging."
@@ -454,11 +453,6 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <Field label="7. What do you hope this community becomes?" description="">
           <Textarea rows={4} maxLength={2000} value={story.futureVision}
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
-        <p className="text-xs italic leading-5 text-muted-foreground">
-          By saving these optional answers, you authorize CAN OS to use them to prepare editable
-          website and promotional drafts. The original answers remain in Site Information.
-          You decide which wording appears in a shareable website preview or official publication.
-        </p>
       </div>
     </WorkspacePanel>}
     </div>
