@@ -93,7 +93,7 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
   });
 
   return <section className="border bg-card p-5 sm:p-6" aria-labelledby="program-discovery-title">
-    <h2 id="program-discovery-title" className="font-serif text-2xl">Explore published learning experiences</h2>
+    <h2 id="program-discovery-title" className="font-serif text-2xl">Explore available learning offerings</h2>
     <p className="mt-2 text-sm leading-6 text-muted-foreground">
       Browse real published Offerings for your Site and delivery model. These results are advisory:
       they are not a verified match for facilities, staff, funding, jurisdiction or enrollment.
@@ -117,26 +117,26 @@ export function ProgramDiscoveryPanel({ siteId, initialDelivery = "onsite" }: {
         </Select>
       </Field>
       <ActionFooter layout="inline" className="mt-0 self-end">
-        <Button type="submit" disabled={loading} loading={loading} loadingLabel="Checking availability...">Browse available Offerings</Button>
+        <Button type="submit" disabled={loading} loading={loading} loadingLabel="Checking availability...">Browse available offerings</Button>
       </ActionFooter>
     </form>
     {error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
     {offerings && <>
-      <FilterBar label="Published Offerings" query={query} onQueryChange={setQuery}
+      <FilterBar label="Learning offerings" query={query} onQueryChange={setQuery}
         searchLabel="Search titles or codes" searchPlaceholder="Search published Offerings"
         filters={<Field label="Availability" className="min-w-48">
           <Select value={availabilityFilter}
             onChange={event => setAvailabilityFilter(event.target.value as AvailabilityFilter)}>
             <option value="all">All published results</option>
             <option value="plan">Available for planning</option>
-            <option value="review">Not currently plannable</option>
+            <option value="review">Needs additional review</option>
           </Select>
         </Field>} />
       <p className="mt-4 text-xs text-muted-foreground" role="status">
         Showing {visible.length} of {offerings.length} published Offerings for {deliveryOptions.find(item => item.value === deliveryContext)?.label}.
       </p>
       {visible.length === 0 && <EmptyState className="mt-3" kind={offerings.length ? "matches" : "records"}
-        title={offerings.length ? "No matching Offerings" : "No published Offerings available"}
+        title={offerings.length ? "No matching Offerings" : "No learning offerings available"}
         description="Try another search, availability filter, or delivery model." />}
       {visible.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-2" aria-live="polite">
         {visible.map(item => {
