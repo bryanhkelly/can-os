@@ -81,7 +81,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
         onInvite={inviteToApply} onStatusChange={changeStatus} />)}
       {items.length === 0 && <p className="text-sm text-muted-foreground">
         {nextCursor ? "No matching inquiries on this page. Load older records to continue."
-          : "No family interest requests in your authorized programs yet."}
+          : "No Site or Program interest requests in your authorized scope yet."}
       </p>}
     </div>
     {loadError&&<WorkspaceNotice tone="danger" className="mt-3">{loadError}</WorkspaceNotice>}
