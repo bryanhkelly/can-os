@@ -324,7 +324,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           try { await onSaveAndExit(); }
           catch (failure) {
             setError(failure instanceof Error ? failure.message :
-              "Changes saved, but sign-out failed. Use the Account menu to sign out.");
+              "Your changes were saved, but we could not open your Site Workspace. Try again from the navigation.");
           }
         }
         else onContinueToPrograms();
@@ -578,7 +578,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       }}><ArrowLeft className="size-4" />{step === 0 ? "Back to Site Profile" : "Previous step"}</Button>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="ghost" disabled={busy || reloadRequired} onClick={() => void act("exit")}>
-          Save & Sign Out</Button>
+          Save & Exit</Button>
         <Button type="button" disabled={reloadRequired} loading={busy}
           loadingLabel="Saving Site Information…" onClick={() => void act("next")}>
           {step === 3 ? "Finish Site Information" : "Save & Continue"}<ArrowRight aria-hidden="true" className="size-4" />
