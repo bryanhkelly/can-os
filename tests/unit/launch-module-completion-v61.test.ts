@@ -30,10 +30,10 @@ describe("saved Site module green checks",()=>{
     expect(result["program-catalog"]).toBeUndefined();
     expect(result["opening-compliance"]).toBeUndefined();
     expect(result.open).toBeUndefined();
-    expect(completedLaunchStageV61("Establish",result)).toBe(true);
-    expect(completedLaunchStageV61("Introduce",result)).toBe(false);
+    expect(completedLaunchStageV61("Shape",result)).toBe(true);
+    expect(completedLaunchStageV61("Share",result)).toBe(false);
     expect(completedLaunchStageV61("Prepare",result)).toBe(false);
-    expect(completedLaunchStageV61("Open",result)).toBe(false);
+    expect(completedLaunchStageV61("Launch",result)).toBe(false);
   });
   it("does not award a green check to missing, failed or incomplete records",()=>{
     const evidence:LaunchOverviewEvidence={
@@ -50,7 +50,7 @@ describe("saved Site module green checks",()=>{
     expect(result["site-information"]).toBe("unavailable");
     expect(result["programs-audiences"]).toBe("incomplete");
     expect(result["website-brand"]).toBe("incomplete");
-    expect(completedLaunchStageV61("Establish",result)).toBe(false);
+    expect(completedLaunchStageV61("Shape",result)).toBe(false);
   });
   it("still requires actual saved identity fields, but not optional revision metadata",()=>{
     const result=launchModuleCompletionV61({...site,name:"",siteIdentityRevision:null},complete);
