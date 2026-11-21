@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowRight, Copy, Plus, Mail, Share2, Printer, MessageSquare, CalendarDays, Users } from "lucide-react";
+import { ArrowRight, Copy, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionDialog, ActionFooter, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {
@@ -427,7 +427,6 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         activePreviewFormat={activePreviewFormat}
         hasSavedPackage={Boolean(record)}
         onTitleChange={setTitle} onPatch={patch}
-        onPreviewFormatChange={setPreviewFormat}
         onBack={()=>{if(step===0)void leaveWizard();else setStep(value=>value-1);}}
         onSaveExit={()=>{void saveExit();}}
         onNext={()=>{void next();}}/>}
