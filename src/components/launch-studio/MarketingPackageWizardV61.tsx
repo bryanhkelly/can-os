@@ -1,179 +1,310 @@
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Sparkles, Users, MessageCircle, Star, MousePointerClick, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
 import { Textarea } from "@/components/ui/textarea";
+import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
 import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
-  marketingAudienceOptions, marketingFormatOptions, marketingPurposeOptions, marketingPackageSteps,
-  type MarketingFormat, type MarketingPackageContent,
+  composeOutreachDraftV61, initialOutreachPlanV61, marketingAudienceOptions,
+  marketingPurposeOptions, outreachFormatsV61, outreachStepIdsV61,
+  type MarketingFormat, type MarketingPackageContent, type OutreachPlanV61,
 } from "@/domain/marketing-package-v61";
+import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import { siteExperienceById } from "@/domain/site-experience-interests";
 import type { readSiteMarketingSuggestionsV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 
-type MarketingSuggestions=Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
-type MarketingSuggestion=MarketingSuggestions[MarketingPackageContent["purpose"]];
-const stepLabels=["Menu","Audience","Messages","Collateral & Assets"] as const;
+type Suggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
+type Suggestion = Suggestions[MarketingPackageContent["purpose"]];
+const stepTitles=["Who","Message","Highlight","Action","Channels","Review"] as const;
+const relationshipOptions=[
+  {id:"known",label:"People I know"},{id:"new",label:"People I don't know"},{id:"both",label:"Both"},
+] as const;
+const beneficiaryOptions=[
+  {id:"children",label:"Children"},{id:"teens",label:"Teens"},
+  {id:"adults",label:"Adults"},{id:"older_adults",label:"Older adults"},
+] as const;
+const messageOptions=[
+  {id:"coming-soon",label:"Coming soon",description:"Build anticipation for an idea or upcoming launch."},
+  {id:"feedback",label:"What do you think?",description:"Invite people to help shape the possibilities."},
+  {id:"invitation",label:"You're invited",description:"Invite people into an event or conversation."},
+  {id:"recruiting",label:"We're looking for...",description:"Find leaders, staff, volunteers, or partners."},
+  {id:"update",label:"Progress update",description:"Share what's changing or a milestone achieved."},
+] as const;
+const actionOptions=[
+  {id:"learn-more",label:"Learn more",detail:"See the vision and proposed opportunities."},
+  {id:"express-interest",label:"Express interest",detail:"Tell us you'd like to stay connected."},
+  {id:"share-feedback",label:"Share feedback",detail:"Contribute ideas or priorities."},
+  {id:"attend-event",label:"Attend an event",detail:"Join an information session or gathering."},
+  {id:"schedule-conversation",label:"Schedule a conversation",detail:"Request a discussion with the team."},
+] as const;
+const channelOptions=[
+  {id:"email",label:"Email",detail:"A branded, copy-ready email."},
+  {id:"social",label:"Social",detail:"An image and caption to post."},
+  {id:"print",label:"Print",detail:"A printable flyer."},
+  {id:"text",label:"Text",detail:"Short copy to use in an authorized messaging service."},
+  {id:"share-link",label:"Share link",detail:"Use a separately authorized public destination."},
+  {id:"conversation-kit",label:"Conversation Kit",detail:"Talking points and a printable overview."},
+] as const;
+const storyOptions=[
+  {id:"impact",label:"Community Impact",description:"Show how this could benefit people and their community."},
+  {id:"opportunity",label:"Opportunity",description:"Focus on skills, possibilities, and what people can explore."},
+  {id:"partnership",label:"Partnership",description:"Invite organizations and leaders to collaborate."},
+] as const;
+const programLabels:Record<string,string>={
+  "grades-6-8":"Middle School Learning","grades-9-12":"High School Learning",
+  afterschool:"After-school",summer:"Summer & Breaks",
+  adult:"Adult Learning",senior:"Older Adult Learning",
+};
+const beneficiaryLabels:Record<string,string>={
+  children:"Children",teens:"Teens",adults:"Adults",older_adults:"Older adults",
+};
+const formatNames:Record<MarketingFormat,string>={
+  email:"Email",social:"Social",flyer:"Flyer",handout:"Printable Handout","qr-card":"QR Card",
+};
+type Highlight=OutreachPlanV61["highlights"][number];
 
-/** Controlled, reusable Introduce authoring flow. Package persistence and Brand
- * versions belong to the parent controller and shared server-side services. */
+/** One canonical V6.1 six-step workspace; Site brand and releases remain owned
+ * by the existing Marketing Package service. No separate marketing CMS. */
 export function MarketingPackageWizardV61({
-  siteId,step,title,content,busy,brandVersionId,currentSuggestion,purposeOptions,
+  siteId,siteName,siteIntent,step,title,content,busy,brandVersionId,currentSuggestion,
   activePreviewFormat,starter,onTitleChange,onPatch,onPreviewFormatChange,
   onBack,onSaveExit,onNext,hasSavedPackage,
 }:{
-  siteId:string;step:number;title:string;content:MarketingPackageContent;busy:boolean;
-  brandVersionId:string|null;currentSuggestion:MarketingSuggestion|null;
+  siteId:string;siteName?:string;siteIntent?:SiteProgramsAudiencesV61|null;
+  step:number;title:string;content:MarketingPackageContent;busy:boolean;
+  brandVersionId:string|null;currentSuggestion:Suggestion|null;
   purposeOptions:ReadonlyArray<(typeof marketingPurposeOptions)[number]>;
   activePreviewFormat:MarketingFormat|null;
   starter:(purpose:MarketingPackageContent["purpose"])=>MarketingPackageContent;
-  onTitleChange:(value:string)=>void;
-  onPatch:(value:Partial<MarketingPackageContent>)=>void;
+  onTitleChange:(value:string)=>void;onPatch:(value:Partial<MarketingPackageContent>)=>void;
   onPreviewFormatChange:(format:MarketingFormat)=>void;
   onBack:()=>void;onSaveExit:()=>void;onNext:()=>void;hasSavedPackage:boolean;
 }){
+  const plan=content.plan??initialOutreachPlanV61(siteIntent?.audienceIds??[]);
+  const updatePlan=(patch:Partial<OutreachPlanV61>)=>onPatch({plan:{...plan,...patch}});
+  const toggle=(current:readonly string[],value:string)=>
+    current.includes(value)?current.filter(id=>id!==value):[...current,value];
+  const highlightOptions:Highlight[]=[
+    ...(siteIntent?.interestIds??[]).map(id=>({
+      source:"program" as const,id,label:programLabels[id]??id,role:"supporting" as const,
+    })),
+    ...(siteIntent?.audienceIds??[]).map(id=>({
+      source:"audience" as const,id,label:beneficiaryLabels[id]??id,role:"supporting" as const,
+    })),
+    ...(siteIntent?.experienceIds??[]).map(id=>({
+      source:"experience" as const,id,
+      label:siteExperienceById.get(id)?.title??id,role:"supporting" as const,
+    })),
+    ...(siteIntent?.customExperiences??[]).map(label=>({
+      source:"experience" as const,id:"custom:"+label,label,role:"supporting" as const,
+    })),
+  ];
+  const setHighlight=(candidate:Highlight)=>{
+    const existing=plan.highlights.find(item=>item.source===candidate.source&&item.id===candidate.id);
+    if(existing){
+      const remaining=plan.highlights.filter(item=>item!==existing);
+      const primaryExists=remaining.some(item=>item.role==="primary");
+      updatePlan({highlights:primaryExists?remaining:
+        remaining.map((item,index)=>({...item,role:index===0?"primary" as const:"supporting" as const}))});
+    }else if(plan.highlights.length<3){
+      updatePlan({highlights:[...plan.highlights,{
+        ...candidate,role:plan.highlights.length?"supporting":"primary",
+      }]});
+    }
+  };
+  const makePrimary=(item:Highlight)=>updatePlan({highlights:plan.highlights.map(value=>({
+    ...value,role:value.source===item.source&&value.id===item.id?"primary":"supporting",
+  }))});
+  const setFocus=(focus:OutreachPlanV61["messageFocus"])=>{
+    const purpose:MarketingPackageContent["purpose"]=
+      focus==="feedback"?"program-interest":
+      focus==="invitation"?"event-invitation":
+      focus==="recruiting"?"interest-invitation":"site-announcement";
+    const suggested=starter(purpose);
+    onPatch({...suggested,plan:{...plan,messageFocus:focus},
+      audiences:content.audiences,formats:content.formats});
+  };
+  const setChannels=(channel:OutreachPlanV61["channels"][number])=>{
+    const channels=toggle(plan.channels,channel) as OutreachPlanV61["channels"];
+    onPatch({plan:{...plan,channels},formats:outreachFormatsV61(channels)});
+  };
+  const suggested=composeOutreachDraftV61(siteName||"our learning community",plan);
+  const setStory=(storyAngle:OutreachPlanV61["storyAngle"])=>
+    updatePlan({storyAngle});
+  const chosenMaterial=activePreviewFormat&&content.formats.includes(activePreviewFormat)
+    ?activePreviewFormat:content.formats[0]??null;
+
   return <>
-
-        <GuidedSetupProgress label="Package progress" steps={marketingPackageSteps.map((id, index) => ({
-          id, title: stepLabels[index] ?? id, status: index === step ? "current" as const : "upcoming" as const,
-        }))} />
-
-        {step===0&&<WorkspacePanel title="What would you like to share?" description="Choose a starting point. Your Site brand will be reused automatically later.">
-          <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
-            <legend className="sr-only">Package purpose</legend>
-            {purposeOptions.map(option=><SelectionCard key={option.id} kind="radio"
-              name="package-purpose" value={option.id}
-              title={option.label} detail={option.description}
-              checked={content.purpose===option.id} disabled={busy}
-              onChange={() => onPatch({
-                ...starter(option.id), audiences:content.audiences, formats:content.formats,
-              })} />)}
+    <GuidedSetupProgress label="Introduce outreach steps"
+      steps={outreachStepIdsV61.map((id,index)=>({
+        id,title:stepTitles[index]??id,
+        status:index<step?"complete" as const:index===step?"current" as const:"upcoming" as const,
+      }))}/>
+    {step===0&&<WorkspacePanel title="Who do you want to tell?"
+      description="Choose the people receiving your outreach, then the people who will benefit from your work.">
+      <div className="mt-5 space-y-5">
+        <section className="space-y-3" aria-label="Primary Who">
+          <div><h3 className="text-sm font-semibold">Primary Who · Who are you reaching?</h3>
+            <p className="text-xs text-muted-foreground">Recipients. This does not add contacts or authorize sending.</p></div>
+          <fieldset className="flex flex-wrap gap-2">
+            <legend className="text-sm font-medium">Relationship</legend>
+            {relationshipOptions.map(item=><SelectionCard key={item.id} kind="radio"
+              name="outreach-relationship" value={item.id} title={item.label} compact
+              checked={plan.relationship===item.id} disabled={busy}
+              onChange={()=>updatePlan({relationship:item.id})}/>)}
           </fieldset>
-          <div className="mt-5"><Field label="Package name" required>
-            <Input value={title} maxLength={120} onChange={event=>onTitleChange(event.target.value)}/>
-          </Field></div>
-        </WorkspacePanel>}
-
-        {step===1&&<WorkspacePanel title="Who do you want to reach?" description="Select your intended audiences. This does not add contacts or authorize emails.">
-          <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
-            <legend className="sr-only">Intended audiences</legend>
-            {marketingAudienceOptions.map(option=><SelectionCard key={option.id} kind="checkbox" compact
-              value={option.id} title={option.label} checked={content.audiences.includes(option.id)}
-              disabled={busy}
-              onChange={checked=>onPatch({audiences:checked
-                ? [...new Set([...content.audiences,option.id])]
-                : content.audiences.filter(id=>id!==option.id)})} />)}
+          <fieldset className="grid gap-2 sm:grid-cols-2">
+            <legend className="mb-2 text-sm font-medium">Recipients</legend>
+            {marketingAudienceOptions.map(item=><SelectionCard key={item.id}
+              kind="checkbox" compact title={item.label} value={item.id}
+              checked={plan.recipients.includes(item.id)} disabled={busy}
+              onChange={()=>updatePlan({recipients:toggle(plan.recipients,item.id) as OutreachPlanV61["recipients"]})}/>)}
           </fieldset>
-          <div className="mt-5"><Field label="Geographic focus (optional)">
-            <Input maxLength={120} value={content.geography} placeholder="Your community or neighborhood"
-              onChange={event=>onPatch({geography:event.target.value})}/>
-          </Field></div>
-        </WorkspacePanel>}
-
-        {step===2&&<WorkspacePanel title="Your message"
-          description="Start with your Site's saved vision and learning interests. Review each suggestion before sharing it.">
-          {currentSuggestion&&<div className="mt-4 space-y-3 border bg-muted/30 p-4">
-            <p className="text-sm font-semibold">Built from what you already shared</p>
-            <p className="text-xs leading-5 text-muted-foreground">
-              {currentSuggestion.sources.length
-                ? currentSuggestion.sources.join(" · ")
-                : "No saved Site Story or program interests yet. Start with this editable introduction."}
-              {" "}These are proposed plans, not verified offerings or enrollment claims.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={busy}
-                onClick={()=>onPatch({
-                  headline:starter(content.purpose).headline,
-                  message:starter(content.purpose).message,
-                  callToAction:starter(content.purpose).callToAction,
-                })}>Restore suggested message</Button>
-              {currentSuggestion.websiteAlternative&&<Button type="button" size="sm"
-                variant="outline" disabled={busy}
-                onClick={()=>{
-                  const alternative=currentSuggestion.websiteAlternative;
-                  if(alternative)onPatch({
-                    headline:alternative.headline||content.headline,
-                    message:alternative.message,
-                  });
-                }}>Use saved website wording</Button>}
-            </div>
-            {currentSuggestion.websiteAlternative&&<p className="text-xs leading-5 text-muted-foreground">
-              Website wording is a separate suggestion and never overwrites your edits automatically.
-              Review any private planning details before generating materials.
-            </p>}
-          </div>}
-          <div className="mt-4 space-y-5">
-            <Field label="Headline" required><Input maxLength={160} value={content.headline}
-              onChange={event=>onPatch({headline:event.target.value})}/></Field>
-            <Field label="Your message" required><Textarea rows={7} maxLength={1600}
-              value={content.message} onChange={event=>onPatch({message:event.target.value})}/></Field>
-            <Field label="Call to action"><Input maxLength={100} value={content.callToAction}
-              onChange={event=>onPatch({callToAction:event.target.value})}/></Field>
+        </section>
+        <section className="space-y-3 border-t pt-5" aria-label="Secondary Who">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">Secondary Who · Who will benefit?</h3>
+            <span className="text-xs text-muted-foreground">Suggested from Establish</span>
           </div>
-        </WorkspacePanel>}
-
-        {step===3&&<WorkspacePanel title="Choose and preview your materials"
-          description="Your saved Site Brand is applied automatically. Review the real layout for each format before saving the package.">
-          <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-[minmax(12rem,0.8fr)_minmax(0,1.2fr)]">
-            <fieldset className="min-w-0 space-y-3">
-              <legend className="text-sm font-semibold">Available formats</legend>
-              <p className="text-xs leading-5 text-muted-foreground">
-                Select the materials you need, then preview each one.
-              </p>
-              {marketingFormatOptions.map(option=>{
-                const selected=content.formats.includes(option.id);
-                return <div key={option.id} className={"flex min-w-0 flex-wrap items-start gap-2 border p-3 "+
-                  (selected?"border-primary/60 bg-accent/25":"border-border bg-card")}>
-                  <SelectionCard kind="checkbox" compact value={option.id} title={option.label}
-                    detail={option.description} checked={selected} disabled={busy}
-                    className="min-w-0 flex-1 border-0 bg-transparent p-0 hover:bg-transparent"
-                    onChange={checked=>{
-                      onPatch({formats:checked
-                        ? [...new Set([...content.formats,option.id])]
-                        : content.formats.filter(id=>id!==option.id)});
-                      if(checked)onPreviewFormatChange(option.id);
-                    }}/>
-                  <Button type="button" size="sm" variant="outline" disabled={!selected}
-                    aria-pressed={activePreviewFormat===option.id}
-                    onClick={()=>onPreviewFormatChange(option.id)}>Preview</Button>
-                </div>;
-              })}
-            </fieldset>
-            <div className="min-w-0">
-              {activePreviewFormat
-                ? <MarketingMaterialPreviewV61
-                    siteId={siteId}
-                    title={title}
-                    brandVersionId={brandVersionId}
-                    format={activePreviewFormat}
-                    content={content}/>
-                : <div className="flex min-h-72 items-center justify-center border bg-muted/25 p-6">
-                    <p className="text-center text-sm text-muted-foreground">
-                      Select a material format to preview your design.
-                    </p>
-                  </div>}
-            </div>
-          </div>
-          <div className="mt-4"><WorkspaceNotice tone="info">
-            This is a private working preview, not a public release.
-            Graphic layouts use a shortened excerpt if the message is long. The full copy stays in your package.
-            Save your package to generate immutable, downloadable materials; email sending is separate.
-          </WorkspaceNotice></div>
-        </WorkspacePanel>}
-
-        <ActionFooter layout="step">
-          <Button variant="outline" disabled={busy} onClick={()=>onBack()}>
-            <ArrowLeft aria-hidden="true"/> {step===0?"Cancel":"Back"}
-          </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            {hasSavedPackage&&<Button variant="outline" disabled={busy} onClick={()=>onSaveExit()}>Save &amp; Exit</Button>}
-            <Button disabled={busy} loading={busy} loadingLabel="Saving package…" onClick={()=>onNext()}>
-              {step===3?"Save package":"Save & Continue"}
-              {step===3?<Check aria-hidden="true"/>:<ArrowRight aria-hidden="true"/>}
-            </Button>
-          </div>
-        </ActionFooter>
-      
+          <p className="text-xs text-muted-foreground">
+            Beneficiaries help explain the intended impact, even when they aren't the recipients.
+          </p>
+          <fieldset className="grid gap-2 sm:grid-cols-2">
+            <legend className="sr-only">Beneficiary audiences</legend>
+            {beneficiaryOptions.map(item=><SelectionCard key={item.id}
+              kind="checkbox" compact title={item.label} value={item.id}
+              checked={plan.beneficiaries.includes(item.id)} disabled={busy}
+              onChange={()=>updatePlan({beneficiaries:toggle(plan.beneficiaries,item.id) as OutreachPlanV61["beneficiaries"]})}/>)}
+          </fieldset>
+        </section>
+      </div>
+    </WorkspacePanel>}
+    {step===1&&<WorkspacePanel title="What do you want to say?"
+      description="Choose your message objective. CAN will help draft a starting point using the information you've selected.">
+      <fieldset className="mt-4 grid gap-3">
+        <legend className="sr-only">Message focus</legend>
+        {messageOptions.map(item=><SelectionCard key={item.id} kind="radio"
+          value={item.id} name="message-focus" title={item.label} detail={item.description}
+          checked={plan.messageFocus===item.id} disabled={busy}
+          onChange={()=>setFocus(item.id)}/>)}
+      </fieldset>
+    </WorkspacePanel>}
+    {step===2&&<WorkspacePanel title="What do you want to highlight?"
+      description="Choose one primary highlight and up to two supporting highlights from your saved planning information.">
+      {highlightOptions.length===0?<WorkspaceNotice tone="attention">
+        No saved Programs, audiences, or Experiences are available. Add them under Establish →
+        Programs &amp; Audiences before selecting a highlight.
+      </WorkspaceNotice>:<div className="mt-5 space-y-5">
+        {(["program","audience","experience"] as const).map(kind=>{
+          const options=highlightOptions.filter(item=>item.source===kind);
+          if(!options.length)return null;
+          return <section key={kind} className="space-y-3">
+            <h3 className="text-sm font-semibold">{kind==="program"?"Programs":kind==="audience"?"Audiences":"Experiences"}
+              <span className="ml-2 text-xs font-normal text-muted-foreground">From Establish</span>
+            </h3>
+            <div className="flex flex-wrap gap-2">{options.map(item=>{
+              const selected=plan.highlights.find(value=>value.source===item.source&&value.id===item.id);
+              return <Button key={item.source+":"+item.id} type="button" size="sm"
+                variant={selected?"default":"outline"} disabled={busy||(!selected&&plan.highlights.length>=3)}
+                aria-pressed={Boolean(selected)} onClick={()=>setHighlight(item)}>
+                {selected&&<Check className="mr-1 size-4"/>}{item.label}
+                {selected?.role==="primary"?" · Primary":""}
+              </Button>;
+            })}</div>
+          </section>;
+        })}
+        <div className="border-t pt-4">
+          <h3 className="text-sm font-semibold">Your selected highlights ({plan.highlights.length}/3)</h3>
+          <div className="mt-3 space-y-2">{plan.highlights.map(item=>
+            <div key={item.source+":"+item.id} className="flex flex-wrap items-center justify-between gap-2 border p-3">
+              <span className="text-sm">{item.label} · <strong>{item.role==="primary"?"Primary":"Supporting"}</strong></span>
+              {item.role!=="primary"&&<Button type="button" size="sm" variant="outline"
+                disabled={busy} onClick={()=>makePrimary(item)}>Make primary</Button>}
+            </div>)}</div>
+        </div>
+      </div>}
+    </WorkspacePanel>}
+    {step===3&&<WorkspacePanel title="What do you want them to do?"
+      description="Choose one primary action. Actual forms, events, and sending remain separately authorized.">
+      <fieldset className="mt-4 grid gap-3 sm:grid-cols-2">
+        <legend className="sr-only">Primary next action</legend>
+        {actionOptions.map(item=><SelectionCard key={item.id} kind="radio"
+          name="outreach-action" value={item.id} title={item.label} detail={item.detail}
+          checked={plan.action===item.id} disabled={busy}
+          onChange={()=>updatePlan({action:item.id})}/>)}
+      </fieldset>
+    </WorkspacePanel>}
+    {step===4&&<WorkspacePanel title="How do you want to reach them?"
+      description="Choose formats for your materials. Selecting a channel does not send a message or publish a page.">
+      <fieldset className="mt-4 grid gap-3 sm:grid-cols-2">
+        <legend className="sr-only">Channels and materials</legend>
+        {channelOptions.map(item=><SelectionCard key={item.id} kind="checkbox"
+          value={item.id} title={item.label} detail={item.detail}
+          checked={plan.channels.includes(item.id)} disabled={busy}
+          onChange={()=>setChannels(item.id)}/>)}
+      </fieldset>
+      <div className="mt-4"><WorkspaceNotice tone="info">
+        Email and social materials are downloadable, not automatically sent. Text and share links
+        require an authorized destination. Conversation Kit includes a printable overview.
+      </WorkspaceNotice></div>
+    </WorkspacePanel>}
+    {step===5&&<WorkspacePanel title="Review & create"
+      description="Choose your story angle, review the draft message, and create coordinated materials. Nothing is sent or published.">
+      <div className="mt-4 space-y-5">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {storyOptions.map(item=><SelectionCard key={item.id} kind="radio"
+            name="outreach-story-angle" value={item.id} title={item.label}
+            detail={item.description} checked={plan.storyAngle===item.id}
+            disabled={busy} onChange={()=>setStory(item.id)}/>)}
+        </div>
+        <WorkspaceNotice tone="info">
+          <Sparkles className="mr-1 inline size-4" aria-hidden="true"/>
+          Your suggested copy comes from the choices you reviewed. Planned Programs and Experiences
+          are not approved offerings. You control what you share.
+        </WorkspaceNotice>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Suggested message</h3>
+          <Button type="button" variant="outline" size="sm" disabled={busy}
+            onClick={()=>onPatch(suggested)}>Use suggestion for this plan</Button>
+        </div>
+        <Field label="Outreach name" required><Input value={title} maxLength={120}
+          onChange={event=>onTitleChange(event.target.value)}/></Field>
+        <Field label="Headline" required><Input value={content.headline} maxLength={160}
+          onChange={event=>onPatch({headline:event.target.value})}/></Field>
+        <Field label="Your message" required><Textarea value={content.message} rows={6}
+          maxLength={1600} onChange={event=>onPatch({message:event.target.value})}/></Field>
+        <Field label="What should they do next?"><Input value={content.callToAction}
+          maxLength={100} onChange={event=>onPatch({callToAction:event.target.value})}/></Field>
+        {currentSuggestion?.websiteAlternative&&
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>{
+            const alternative=currentSuggestion.websiteAlternative;
+            if(alternative)onPatch({
+              headline:alternative.headline||content.headline,message:alternative.message,
+            });
+          }}>Use saved Website &amp; Brand wording</Button>}
+        <div className="border p-4">
+          <h3 className="text-sm font-semibold">Included materials</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{content.formats.map(id=>formatNames[id]).join(", ")||"No supported printable or digital formats selected"}</p>
+          {chosenMaterial&&<div className="mt-4">
+            <MarketingMaterialPreviewV61 siteId={siteId} title={title} content={content}
+              brandVersionId={brandVersionId} format={chosenMaterial}/></div>}
+        </div>
+      </div>
+    </WorkspacePanel>}
+    <ActionFooter layout="step">
+      <Button type="button" variant="outline" disabled={busy} onClick={onBack}>
+        <ArrowLeft aria-hidden="true"/>{step===0?"Cancel":"Back"}
+      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" disabled={busy||!hasSavedPackage}
+          onClick={onSaveExit}>Save &amp; Exit</Button>
+        <Button type="button" disabled={busy} onClick={onNext}>
+          {step===5?"Save Outreach Plan":"Save & Continue"}
+          {step===5?<Check aria-hidden="true"/>:<ArrowRight aria-hidden="true"/>}
+        </Button>
+      </div>
+    </ActionFooter>
   </>;
 }
