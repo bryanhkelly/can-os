@@ -25,7 +25,7 @@ const props = {
 describe("Introduce V6.1 guided outreach editor",()=>{
   it("uses six shared progress steps and distinguishes recipients from beneficiaries",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props}/>);
-    expect(html).toContain("Introduce outreach steps");
+    expect(html).toContain("Share outreach steps");
     expect(html).toContain("Who would you like to reach?");
     expect(html).toContain("Who are you hoping to help?");
     expect(html).toContain("People I know");
@@ -37,7 +37,7 @@ describe("Introduce V6.1 guided outreach editor",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={2}/>);
     expect(html).toContain("Adult Learning");
     expect(html).toContain("Financial Literacy");
-    expect(html).toContain("From Establish");
+    expect(html).toContain("From Shape");
     expect(html).toContain("Choose what you most want people to know");
   });
   it("makes the operator choose material channels without falsely sending",()=>{
