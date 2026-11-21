@@ -87,6 +87,7 @@ function effectivePolicy(row: {
     guardianApprovalRequired: false,
     approvalMode: "registrar",
   };
+}
 
 /**
  * Read policies for an already authorized list of Section IDs.
