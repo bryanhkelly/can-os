@@ -121,14 +121,14 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "publish-site": {
-    question: "Ready to share your website with the world?",
+    question: "Is your website ready for visitors?",
     decision: "Review your site's identity, website text, photos, permissions, and hosting. Publishing your website doesn't open registration.",
     canSupplies: "Website review, publication records, and a way to check whether your site is live.",
     siteProvides: "Accurate website information, permission to use images, and a reason for your decision.",
     status: "governed",
     handoffs: [
       { title: "Edit Website & Brand", detail: "Update your website draft without publishing it.", href: id => "/launch/website?siteId=" + scoped(id) + "&returnToHub=true" },
-      { title: "Review publishing details", detail: "Check the publication status and any outstanding review steps.", href: id => "/sites/" + scoped(id) + "/publish" },
+      { title: "Review website publication", detail: "Check whether your website is published and what needs review.", href: id => "/sites/" + scoped(id) + "/publish" },
     ],
   },
 };
