@@ -57,16 +57,26 @@ export const Route = createFileRoute("/launch/site")({
     // Website & Brand redirects to its dedicated route; avoid five overview
     // reads for a page whose only rendered content is a redirect.
     const overview = site && deps.module !== "website-brand" ? await (async () => {
+      // Sidebar completion needs Site, planning and Brand facts. The expensive
+      // Blueprint workspace and Marketing list are only needed for Overview
+      // (or Introduce itself). Their own modules load canonical detail.
+      const isOverview = !deps.module;
+      const loadMarketing = isOverview || isIntroduceModuleV61(deps.module);
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
         measureServerStep("launch.site", "overview-information", () => readSiteInformationV61({ data: { siteId: site.id } })),
         measureServerStep("launch.site", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: site.id } })),
         measureServerStep("launch.site", "overview-brand", () => readSiteBrandVersionView({ data: { siteId: site.id } })),
-        measureServerStep("launch.site", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: site.id } })),
-        measureServerStep("launch.site", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: site.id } })),
+        loadMarketing
+          ? measureServerStep("launch.site", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: site.id } }))
+          : Promise.resolve(null),
+        isOverview
+          ? measureServerStep("launch.site", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: site.id } }))
+          : Promise.resolve(null),
       ]);
       if (info.status === "fulfilled") informationRead = info.value;
       if (programs.status === "fulfilled") programsRead = programs.value;
-      if (marketing.status === "fulfilled") marketingRead = marketing.value;
+      if (marketing.status === "fulfilled" && marketing.value !== null)
+        marketingRead = marketing.value;
       return {
         information: info.status === "fulfilled"
           ? { state: "ready" as const, value: {
@@ -79,11 +89,11 @@ export const Route = createFileRoute("/launch/site")({
         brand: brand.status === "fulfilled"
           ? { state: "ready" as const, value: { saved: !!brand.value.current } }
           : { state: "unavailable" as const },
-        marketing: marketing.status === "fulfilled"
+        marketing: marketing.status === "fulfilled" && marketing.value !== null
           ? { state: "ready" as const, value: {
               hasPackages: marketing.value.some(item => item.status !== "archived"),
             } } : { state: "unavailable" as const },
-        solutions: solutionPlans.status === "fulfilled" &&
+        solutions: solutionPlans.status === "fulfilled" && solutionPlans.value !== null &&
             solutionPlans.value.siteId === site.id
           ? { state: "ready" as const, value: {
               plans: solutionPlans.value.configurations.map(plan => ({
