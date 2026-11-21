@@ -325,7 +325,10 @@ export function EstablishExperiencesV61({
                     aria-label={"Priority for "+topic.title}
                     onChange={event=>patchDetail(topic.id,{
                       priority:event.currentTarget.value as SiteExperienceDetail["priority"]})}
-                    className="min-h-8 w-auto border-primary/40 bg-accent px-2 text-xs font-semibold text-primary">
+                    className={"min-h-8 w-auto px-2 text-xs font-semibold "+
+                      (detail.priority==="featured"
+                        ?"border-primary/40 bg-accent text-primary"
+                        :"border-border bg-card text-muted-foreground")}>
                     {priorities.map(priority=><option key={priority} value={priority}>
                       {priorityLabel(priority)}
                     </option>)}
