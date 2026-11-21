@@ -339,6 +339,51 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           </Select></Field>
         </div>}
         <WorkspaceNotice>A self-reported host does not create a verified organizational relationship, ownership or authorization.</WorkspaceNotice>
+        <fieldset className="space-y-3 border-t pt-5">
+          <legend className="text-sm font-semibold">Organization &amp; Tax-Exempt Status</legend>
+          <p className="text-xs leading-5 text-muted-foreground">
+            This helps CAN OS prepare accurate organization and funding information.
+            Self-reported status is private until reviewed; it does not establish
+            nonprofit recognition or make tuition tax-deductible.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Which organization does this status describe?">
+              <Select value={host.nonprofitSubject??"responsible"}
+                onChange={event=>setHost(current=>({...current,
+                  nonprofitSubject:event.target.value as NonNullable<SiteHostingV61["nonprofitSubject"]>}))}>
+                <option value="responsible">Your responsible organization</option>
+                <option value="host">The hosting organization</option>
+                <option value="sponsor">A fiscal sponsor</option>
+              </Select>
+            </Field>
+            <Field label="Tax-exempt status">
+              <Select value={host.nonprofitStatus??"not_provided"}
+                onChange={event=>setHost(current=>({...current,
+                  nonprofitStatus:event.target.value as NonNullable<SiteHostingV61["nonprofitStatus"]>}))}>
+                <option value="not_provided">Not provided</option>
+                <option value="recognized_501c3">IRS-recognized 501(c)(3)</option>
+                <option value="qualifying_church">Qualifying church or religious organization</option>
+                <option value="group_exemption">Covered by a group exemption</option>
+                <option value="fiscal_sponsor">Operating under a fiscal sponsor</option>
+                <option value="pending">Recognition/application pending</option>
+                <option value="not_tax_exempt">Not tax-exempt</option>
+                <option value="unsure">Unsure</option>
+              </Select>
+            </Field>
+            {host.nonprofitStatus&&host.nonprofitStatus!=="not_provided"&&
+              <Field label="Legal organization name (if different)">
+                <Input maxLength={160} value={host.nonprofitOrganizationName??""}
+                  onChange={event=>setHost(current=>({...current,
+                    nonprofitOrganizationName:event.target.value}))}/>
+              </Field>}
+            {host.nonprofitStatus&&host.nonprofitStatus!=="not_provided"&&
+              <Field label="Employer Identification Number (EIN, optional)">
+                <Input placeholder="XX-XXXXXXX" maxLength={10} value={host.nonprofitEin??""}
+                  onChange={event=>setHost(current=>({...current,
+                    nonprofitEin:event.target.value}))}/>
+              </Field>}
+          </div>
+        </fieldset>
       </div>
     </WorkspacePanel>}
     {step === 1 && <WorkspacePanel id="site-information-step-1" title="Learning Environment"
