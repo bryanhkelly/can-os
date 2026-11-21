@@ -56,7 +56,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
               <Globe2 className="size-4"/> Preview Website
             </a>
           </Button> : <Button type="button" variant="ghost" size="sm" disabled
-            title="Save a website draft in Website & Brand to enable private preview."
+            title="Save a draft in Shape → Website & Brand to enable a private preview."
             className="min-h-11"><Globe2 className="size-4"/> Preview unavailable</Button>}
           <div className="border-l border-border pl-3"><LaunchAccountControls /></div>
         </div>
