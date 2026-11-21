@@ -17,7 +17,7 @@ import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 
 type Suggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
 type Suggestion = Suggestions[MarketingPackageContent["purpose"]];
-const stepTitles=["Who","Message","Highlight","Action","Channels","Review"] as const;
+const stepTitles=["People","Message","Highlights","Action","Materials","Review"] as const;
 const relationshipOptions=[
   {id:"known",label:"People I know"},{id:"new",label:"People I don't know"},{id:"both",label:"Both"},
 ] as const;
@@ -144,8 +144,8 @@ export function MarketingPackageWizardV61({
         id,title:stepTitles[index]??id,
         status:index<step?"complete" as const:index===step?"current" as const:"upcoming" as const,
       }))}/>
-    {step===0&&<WorkspacePanel title="Who do you want to tell?"
-      description="Choose the people receiving your outreach, then the people who will benefit from your work.">
+    {step===0&&<WorkspacePanel title="Who should hear about this?"
+      description="Choose who should receive your message, then identify who you hope will benefit.">
       <div className="mt-5 space-y-5">
         <section className="space-y-3" aria-label="Primary Who">
           <div><h3 className="text-sm font-semibold">Who would you like to reach?</h3>
@@ -184,7 +184,7 @@ export function MarketingPackageWizardV61({
       </div>
     </WorkspacePanel>}
     {step===1&&<WorkspacePanel title="What do you want to say?"
-      description="Choose your message objective. CAN will help draft a starting point using the information you've selected.">
+      description="Choose what you want to communicate. We can suggest a starting message using information you've chosen to reuse.">
       <fieldset className="mt-4 grid gap-3">
         <legend className="sr-only">Message focus</legend>
         {messageOptions.map(item=><SelectionCard key={item.id} kind="radio"
@@ -238,10 +238,10 @@ export function MarketingPackageWizardV61({
           onChange={()=>updatePlan({action:item.id})}/>)}
       </fieldset>
     </WorkspacePanel>}
-    {step===4&&<WorkspacePanel title="How do you want to reach them?"
-      description="Choose formats for your materials. Selecting a channel does not send a message or publish a page.">
+    {step===4&&<WorkspacePanel title="Which materials would you like to create?"
+      description="Choose the formats you want to prepare. You can review them before sending or publishing anything.">
       <fieldset className="mt-4 grid gap-3 sm:grid-cols-2">
-        <legend className="sr-only">Channels and materials</legend>
+        <legend className="sr-only">Material formats and sharing options</legend>
         {channelOptions.map(item=><SelectionCard key={item.id} kind="checkbox"
           value={item.id} title={item.label} detail={item.detail}
           checked={plan.channels.includes(item.id)} disabled={busy}
