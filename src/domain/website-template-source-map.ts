@@ -216,6 +216,16 @@ export function websiteTemplateHomeSources(template:SiteTemplateId):WebsiteSecti
 }
 
 const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
+  "/leadership":[{
+    key:"leadership-people",title:"Leadership team",
+    description:"Optional Site-owned profiles of people with verified permission to appear.",
+    appearsWhen:"At least one member has consentConfirmed=true in the saved Website & Brand draft.",
+    elements:[
+      template("Page title and section headings","CAN OS provides Leadership and Meet our leadership headings."),
+      authored("Leadership profiles","leadershipMembers","Names, titles, short biographies and reviewed profile URLs are Site-edited, not imported from an unconsented external directory."),
+      approved("Portrait images","Consent-confirmed and rights-checked Site leader photos","Only approved PNG portraits are displayed; a LinkedIn profile URL is a link, not a remotely fetched photo."),
+    ],
+  }],
   "/about":[{
     key:"about-story",title:"About / Site story",description:"Editorial Site introduction, local story and eligible people/media.",
     appearsWhen:"The About page is eligible from saved Site copy or independently verified public information.",
