@@ -22,7 +22,7 @@ import { GuidedSetupShell } from "@/components/workflow";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
-import { emptySiteLocalContent, createSchoolWebsiteStarterContent, siteLocalContentLimits, websiteStarterFieldIds, type SiteLocalTextField,
+import { emptySiteLocalContent, createSiteWebsiteStarterContent, siteLocalContentLimits, websiteStarterFieldIds, type SiteLocalTextField,
   prepareWebsiteEditorContent, siteLocalImageMaxBytes,
   siteLocalImagePublicationGaps, type SiteLocalContent,
 } from "@/domain/site-local-content";
@@ -237,7 +237,7 @@ function LocalWebsiteCopyEditor({
     // Do not auto-generate from Site Information before the user grants consent.
     // A new Site starts with blank editorial fields while preserving visual defaults.
     const starter = data.editingContent
-      ? prepareWebsiteEditorContent(data.editingContent, data.siteName)
+      ? prepareWebsiteEditorContent(data.editingContent, data.siteName, data.siteExperienceProfile)
       : {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
     return { content: starter, saved: starter, revision: data.currentRevision, siteId: data.siteId };
   });
@@ -283,7 +283,7 @@ function LocalWebsiteCopyEditor({
       if (previous.siteId === data.siteId &&
           JSON.stringify(previous.content) !== JSON.stringify(previous.saved)) return previous;
       const latest = data.editingContent
-        ? prepareWebsiteEditorContent(data.editingContent, data.siteName)
+        ? prepareWebsiteEditorContent(data.editingContent, data.siteName, data.siteExperienceProfile)
         : {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
       return { content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId };
     });
@@ -292,7 +292,7 @@ function LocalWebsiteCopyEditor({
 
   function loadLatestRevision() {
     const latest = data.editingContent
-      ? prepareWebsiteEditorContent(data.editingContent, data.siteName)
+      ? prepareWebsiteEditorContent(data.editingContent, data.siteName, data.siteExperienceProfile)
       : {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
     setEditor({ content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId });
     setBrandDisplayName(data.currentBrandConfiguration?.displayName??data.siteName);
@@ -520,7 +520,7 @@ function LocalWebsiteCopyEditor({
             return cleared;
           }
           if(old.contentReuseConsent==="granted")return old;
-          const baseline=createSchoolWebsiteStarterContent(data.siteName);
+          const baseline=createSiteWebsiteStarterContent(data.siteName, data.siteExperienceProfile);
           const withStarter={...old,contentReuseConsent:"granted" as const,
             editorialBaseline:old.editorialBaseline??baseline.editorialBaseline};
           if(data.currentRevision===0||old.contentReuseConsent==="denied"){
