@@ -439,7 +439,6 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
       : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
     : null;
-  const generalInquiryHref=availablePaths.includes("/contact")?"/contact#site-interest":null;
   const siteInterestId=submissionsEnabled?options?.makeRequestId?.():undefined;
   // A Site may gather adult interest before any individual Program is approved.
   // Reuse the existing rate-limited public inquiry endpoint and canonical inbox.
