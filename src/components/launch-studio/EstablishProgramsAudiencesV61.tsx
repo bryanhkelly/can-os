@@ -18,7 +18,7 @@ import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import {
   siteExperienceCatalog, suggestedSiteExperiences,
   siteExperienceAudienceNames,
-  type SiteExperienceId,
+  type SiteExperienceId, validCustomExperienceName,
 } from "@/domain/site-experience-interests";
 
 type InternalStep = 0 | 1 | 2;
@@ -100,8 +100,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       ? { programCodes: [...initial.intent.programCodes] } : {}),
     ...(initial.intent.startingProgramCode !== undefined
       ? { startingProgramCode: initial.intent.startingProgramCode } : {}),
-    experienceIds: [...(initial.intent.experienceIds ?? [])],
-    customExperiences: [...(initial.intent.customExperiences ?? [])],
+    ...(initial.intent.experienceIds !== undefined
+      ? { experienceIds: [...initial.intent.experienceIds] } : {}),
+    ...(initial.intent.customExperiences !== undefined
+      ? { customExperiences: [...initial.intent.customExperiences] } : {}),
   }));
   const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(initial.intent));
   const [busy, setBusy] = useState(false);
@@ -175,7 +177,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   }
   function addCustomExperience() {
     const name = customExperience.trim();
-    if (name.length < 2 || name.length > 100 || /[<>\\u0000-\\u001f]/.test(name)) {
+    if (!validCustomExperienceName(name)) {
       setError("Enter a plain-text Experience name between 2 and 100 characters.");
       return;
     }

@@ -450,7 +450,7 @@ export function resolveSiteContentBlocks(
       const second=b.startsAt ? Date.parse(b.startsAt) : Number.POSITIVE_INFINITY;
       return first-second || a.title.localeCompare(b.title);
     });
-    items=items.slice(0,block.limit??12);
+    items=items.slice(0,block.limit??(block.channel==="learning.experiences"?40:12));
     // Upcast the legacy school-only default *only in the private projection*.
     // Authored section wording remains the Site operator's choice.
     const description = feeds.mode === "private" && block.channel === "site.setup" &&

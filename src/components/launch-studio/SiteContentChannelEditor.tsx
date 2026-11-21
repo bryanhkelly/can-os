@@ -188,7 +188,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
               </Select>
             </Field>
             <Field label="Maximum items">
-              <Select value={String(block.limit??12)}
+              <Select value={String(block.limit??(block.channel==="learning.experiences"?40:12))}
                 onChange={e=>editBlock(block.id,{limit:Number(e.target.value)})}>
                 <option value="3">3</option>
                 <option value="6">6</option>

@@ -26,6 +26,7 @@ describe("Site Experiences website integration",()=>{
     ]);
     expect(blocks[0]?.items[0]?.label).toContain("Older Adult Learning");
     expect(blocks[0]?.items.every(item=>item.link===undefined)).toBe(true);
+    expect(blocks[0]?.items).toHaveLength(3);
   });
   it("renders planned Experience content as a safe, non-enrollable page",()=>{
     const page={host:"example.can-os.com",site:{name:"Example Site",

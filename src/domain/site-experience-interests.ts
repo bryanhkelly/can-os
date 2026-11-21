@@ -12,6 +12,14 @@ export type SiteExperienceId = (typeof siteExperienceIds)[number];
 export type SiteExperienceAudienceId = SiteProgramsAudiencesV61["audienceIds"][number];
 export type SiteExperienceProgramId = SiteProgramsAudiencesV61["interestIds"][number];
 
+/** Shared validation for a custom Site idea, not an authorization claim. */
+export function validCustomExperienceName(value: string): boolean {
+  const name=value.trim();
+  return name.length>=2 && name.length<=100 &&
+    ![...name].some(character=>
+      character.charCodeAt(0)<32 || character==="<" || character===">");
+}
+
 export type SiteExperienceCategory = {
   id: SiteExperienceId;
   title: string;

@@ -210,7 +210,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     // request consent before applying this to an unedited welcome field.
     suggestedExperienceWelcome: plannedExperienceNames.length
       ? "We are exploring experiences such as " +
-        plannedExperienceNames.slice(0,3).join(", ") +
+        plannedExperienceNames.slice(0,2).map(name=>name.slice(0,48)).join(" and ") +
         ". Activities and schedules will be confirmed separately." : null,
     siteStorySourceChoices:siteStorySource.success ? {
       motivations:siteStorySource.data.answers.motivations,

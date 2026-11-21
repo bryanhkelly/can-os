@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { siteExperienceIds } from "./site-experience-interests";
+import { siteExperienceIds, validCustomExperienceName } from "./site-experience-interests";
 
 /** Legacy eight-code vocabulary is retained for existing private Site records. */
 export const siteLaunchInterestIds = [
@@ -15,11 +15,11 @@ export const sitePlanningTimingIds = ["weekdays", "weekends", "daytime", "evenin
 export const sitePlanningAudienceIds = ["children", "teens", "adults", "older_adults"] as const;
 
 const distinct = <T extends string>(values: T[]) => new Set(values).size === values.length;
-const customExperiences = z.array(z.string().trim().min(2).max(100)
-  .refine(value => !/[<>\\u0000-\\u001f]/.test(value),
-    "Experience names must be plain text")).max(12)
-  .refine(values => new Set(values.map(value => value.toLocaleLowerCase())).size === values.length,
-    "Choose each custom Experience once");
+const customExperiences = z.array(z.string().trim().refine(
+  validCustomExperienceName, "Experience names must be plain text between 2 and 100 characters",
+)).max(12).refine(values =>
+  new Set(values.map(value => value.toLocaleLowerCase())).size === values.length,
+  "Choose each custom Experience once");
 
 /**
  * The SAME Site-owned metadata.launchPreferences record used by Site Information

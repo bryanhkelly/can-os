@@ -862,10 +862,15 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // A Site with only a homepage Experience channel still has a full page.
   // Never infer an enrollment link or an approved Offering from this projection.
   const experiencePageBlocks=contentBlocks.filter(block=>block.page==="/experiences");
-  const experiencesPageContent=experiencePageBlocks.length
-    ? experiencePageBlocks.map(renderSiteContentChannelBlock).join("")
-    : contentBlocks.filter(block=>block.channel==="learning.experiences")
-      .map(block=>renderSiteContentChannelBlock({...block,page:"/experiences"})).join("");
+  const hasDedicatedExperiences=experiencePageBlocks.some(block=>
+    block.channel==="learning.experiences");
+  const experiencesPageContent=[
+    ...(!hasDedicatedExperiences
+      ? contentBlocks.filter(block=>block.channel==="learning.experiences" &&
+          (block.page??"/")==="/").map(block=>({...block,page:"/experiences" as const}))
+      : []),
+    ...experiencePageBlocks,
+  ].map(renderSiteContentChannelBlock).join("");
   const renderOpportunityDirectory=(kind:"program"|"course"|"class",
     title:string,description:string):string=>{
     const route=kind==="program"?"/programs":kind==="course"?"/courses":"/classes";
