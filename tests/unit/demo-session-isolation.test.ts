@@ -72,10 +72,13 @@ describe("public demo session isolation", () => {
       expect((await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).grants).toEqual([]);
     },
   );
-  it("includes the canonical facilitator in admin switching, without creating mirrored authority", async () => {
-    state.rows = [[adminGrant], [facilitatorGrant]];
-    expect((await readSessionGrants(adminGrant.accountId, adminGrant.email)).grants)
-      .toEqual([adminGrant, facilitatorGrant]);
+  it("includes a currently verified Riley facilitator in Admin switching", async () => {
+    const riley={...LOCAL_DEMO_RILEY_FACILITATOR,
+      id:LOCAL_DEMO_RILEY_FACILITATOR.grantId,
+      role:"room_facilitator",active:true};
+    state.rows=[[adminGrant],[riley]];
+    expect((await readSessionGrants(adminGrant.accountId,adminGrant.email)).grants)
+      .toEqual([adminGrant,riley]);
   });
   const school = {
     domain: "newschool.demo", organizationId: "new-organization", siteId: "new-site",
