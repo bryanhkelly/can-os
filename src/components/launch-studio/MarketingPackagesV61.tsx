@@ -1,4 +1,5 @@
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
+import { SiteGuideV61 } from "./SiteGuideV61";
 import { MarketingPackageReleaseHistoryV61 } from "./MarketingPackageReleaseHistoryV61";
 import { MarketingPackageLibraryList } from "./MarketingPackageLibraryList";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
@@ -389,21 +390,40 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         ? "Your reviewed materials can be downloaded. Nothing has been sent."
         : "Your plan is saved, but there are no complete materials to download yet. Review the previews and create materials first.";
   const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Create Outreach":view==="share"?"Use & Share":view==="followup"?"Follow Up":record?.title??"Outreach Details";
-  const rail=<div className="space-y-4">
-    <WorkspacePanel title="About this step">
-      <p className="text-sm leading-6 text-muted-foreground">{context.guidance}</p>
-    </WorkspacePanel>
-    <WorkspacePanel title={view==="wizard"?"Your next step":"Your outreach"}>
-      <p className="text-sm leading-6 text-muted-foreground">
-        {view==="wizard"
-          ?["Choose recipients and beneficiaries.","Choose a clear message objective.",
-            "Highlight the saved Programs and Experiences that matter.",
-            "Give people one meaningful next action.","Select your outreach channels.",
-            "Choose a story angle, review the message, and save."][step]
-          :"Saving a plan does not send a message. Generated materials keep the Brand and wording used when they were created."}
-      </p>
-    </WorkspacePanel>
-  </div>;
+  const guidePlan = view === "wizard" ? content.plan : record?.content.plan;
+  const guideRecipients = (guidePlan?.recipients ?? []).slice(0, 2).map(id =>
+    marketingAudienceOptions.find(option => option.id === id)?.label ?? id);
+  const guideFocus = guidePlan?.highlights.find(item => item.role === "primary")?.label;
+  const shareInsights = [
+    guidePlan?.beneficiaries.includes("older_adults")
+      ? "Participants and the people who help them decide may be different. Consider caregivers or trusted community connectors as possible recipients."
+      : "The person who benefits isn't always the person who decides. Choose recipients with a clear reason to care.",
+    "Lead with one purpose: invite feedback, introduce an opportunity, recruit support or share a verified update. Avoid implying a plan is already operating.",
+    "One strong highlight is easier to remember than a list. Start with a real Site priority and keep any future offering framed as proposed.",
+    "Choose one practical next action. A link, event or sign-up destination must actually exist and be authorized before sharing it.",
+    "Pick channels the intended audience really uses. Selecting a channel here creates materials; it does not automatically send anything.",
+    "Review how the message sounds to someone who knows nothing about your Site. The saved plan and downloadable material release are separate actions.",
+  ] as const;
+  const rail = <SiteGuideV61 guide={{
+    summary: view === "wizard"
+      ? context.guidance
+      : view === "library"
+        ? `You have ${visible.length} outreach plan${visible.length === 1 ? "" : "s"} in this view.`
+        : view === "share"
+          ? materialAvailabilityMessage
+          : view === "followup"
+            ? "Site-wide inquiries and events may include responses unrelated to this outreach plan."
+            : "This plan records your choices. Materials retain the saved Brand version and wording used when generated.",
+    highlights: [...guideRecipients, ...(guideFocus ? [guideFocus] : [])],
+    insight: view === "wizard" ? shareInsights[step] ?? shareInsights[0]
+      : view === "library" ? "Review an existing plan before creating another. A saved plan is not a sent message."
+      : view === "share" ? "Check the full materials before downloading. Sending and delivery are handled through separate authorized actions."
+      : view === "followup" ? "Treat Site-wide inquiries as leads to review, not proof that a specific message produced a response."
+      : "A clear audience, one highlight and one next action make an outreach plan easier to use.",
+    connection: view === "wizard"
+      ? "Your message can build on saved Shape details only where permitted. Editing or saving here does not publish, send or open registration."
+      : "Outreach plans, generated materials and actual delivery are tracked separately. Review the current status before making public claims.",
+  }} />;
   return <WorkspaceShell title={titleText} eyebrow={context.eyebrow}
     subtitle={context.subtitle}
     width="wide" rail={rail}>
