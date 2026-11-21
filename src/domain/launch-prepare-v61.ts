@@ -1,13 +1,13 @@
 /** Shared V6.1 Prepare navigation metadata. Requirements and readiness are not
  * defined here: each owning operational service determines those dynamically. */
 export const prepareStageModulesV61 = [
-  { id: "program-catalog", title: "Program Catalog", subtitle: "Find available learning experiences and their operating requirements." },
+  { id: "program-catalog", title: "Program Catalog", subtitle: "Find solutions that bring your ideas to life, and see what you'll need to offer them." },
   { id: "facilities-resources", title: "Facilities & Resources", subtitle: "Confirm the spaces, equipment and technology you can provide." },
-  { id: "invite-team", title: "Team & Responsibilities", subtitle: "Bring people into the right scoped roles and verify qualifications." },
+  { id: "invite-team", title: "Team & Responsibilities", subtitle: "Invite your team, decide who will do what, and confirm any required qualifications." },
   { id: "schedules-capacity", title: "Schedules & Capacity", subtitle: "Define dates, days, sessions, rooms and available seats." },
-  { id: "funding-enrollment", title: "Funding & Admissions Setup", subtitle: "Prepare funding, tuition, admissions policies and capacity before enrollment can open." },
-  { id: "opening-compliance", title: "Safety & Readiness", subtitle: "Collect evidence and request independent opening decisions." },
-  { id: "publish-site", title: "Publish Site", subtitle: "Review and launch your official public website without opening enrollment." },
+  { id: "funding-enrollment", title: "Funding & Admissions Setup", subtitle: "Plan how people will join, what it may cost, and how you'll support enrollment." },
+  { id: "opening-compliance", title: "Safety & Readiness", subtitle: "Review what's needed to open safely and provide any required documents." },
+  { id: "publish-site", title: "Publish Site", subtitle: "Review your website and publish it when the required checks are complete." },
 ] as const;
 
 export type PrepareStageModuleIdV61 = (typeof prepareStageModulesV61)[number]["id"];
