@@ -5,6 +5,7 @@ import { canonicalSessionRowSchema } from "@/domain/canonical-access";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
+import { getIdentityContext } from "@/modules/identity/command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -40,6 +41,14 @@ export async function assertCurrentNativeClassFacilitatorSession(
   if(result.rows.length!==1)
     throw new AuthorizationError("active canonical room facilitator session");
   const row=canonicalSessionRowSchema.parse(result.rows[0]);
+  // The request must still be using the same selected CAN grant, not merely
+  // another currently valid role for the same Person at the same Site.
+  const selected=await getIdentityContext(request);
+  if(selected.sessionAccountId || selected.role!=="room_facilitator" ||
+     selected.sessionId!==row.session_id || selected.accountId!==row.account_id ||
+     selected.grantId!==row.grant_id || selected.actorPersonId!==row.person_id ||
+     selected.grantSiteId!==row.site_id)
+    throw new AuthorizationError("unchanged selected facilitator grant and session");
   if(row.role_code!=="room_facilitator" ||
      row.person_id!==actor.actorPersonId ||
      row.organization_id!==actor.scope.organizationIds[0] ||
