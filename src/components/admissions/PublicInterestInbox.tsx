@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { WorkspaceNotice } from "@/components/workspace";
 import { PublicInterestRecordCard } from "@/components/admissions/PublicInterestRecordCard";
 import {
-  invitePublicAdmissionsInterestToApply, listPublicAdmissionsInterests,
+  assignPublicSiteInterestToProgram, invitePublicAdmissionsInterestToApply, listPublicAdmissionsInterests,
   setPublicAdmissionsInterestStatus,
 } from "@/modules/enrollment/public-admissions-interest.functions";
 
@@ -14,11 +14,13 @@ type Page = Awaited<ReturnType<typeof listPublicAdmissionsInterests>>;
 type Row = Page["items"][number];
 
 /** These records contain unverified parent-supplied contact data. */
-export function PublicInterestInbox({ initialPage, siteId, programId }: {
-  initialPage: Page; siteId?: string; programId?: string;
+export function PublicInterestInbox({ initialPage, siteId, programId, availablePrograms }: {
+  initialPage:Page; siteId?:string; programId?:string;
+  availablePrograms:readonly {id:string;name:string;siteId:string|null}[];
 }) {
   const router = useRouter();
   const [olderRows,setOlderRows] = useState<Row[]>([]);
+  const [programSelections,setProgramSelections] = useState<Record<string,string>>({});
   const [nextCursor,setNextCursor] = useState<string|null>(initialPage.nextCursor);
   const [loadingMore,setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
@@ -60,6 +62,17 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
       commandErrorMessage: "Could not update interest.",
     });
   }
+  async function assignToProgram(row:Row) {
+    const programId=programSelections[row.id];
+    if(!programId||!availablePrograms.some(item=>item.id===programId&&item.siteId===row.siteId))
+      return;
+    await mutation.run(()=>assignPublicSiteInterestToProgram({
+      data:{interestId:row.id,programId},
+    }),{
+      successMessage:"Site interest linked to an authorized Program. You can now use the standard application workflow.",
+      commandErrorMessage:"Could not link this interest. Confirm that Program admissions are currently authorized.",
+    });
+  }
   async function inviteToApply(row: Row) {
     await mutation.run(() => invitePublicAdmissionsInterestToApply({data:{interestId:row.id}}), {
       successMessage: "Verified-email application invitation requested. This does not verify guardianship or create an Application.",
@@ -78,6 +91,10 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
     <MutationFeedback state={mutation} pendingMessage="Saving interest..." className="mt-3"/>
     <div className="mt-4 grid gap-3">
       {items.map(row => <PublicInterestRecordCard key={row.id} row={row} busy={busy}
+        programChoices={availablePrograms.filter(item=>item.siteId===row.siteId)}
+        selectedProgramId={programSelections[row.id]??""}
+        onSelectProgram={id=>setProgramSelections(current=>({...current,[row.id]:id}))}
+        onAssign={assignToProgram}
         onInvite={inviteToApply} onStatusChange={changeStatus} />)}
       {items.length === 0 && <p className="text-sm text-muted-foreground">
         {nextCursor ? "No matching inquiries on this page. Load older records to continue."
