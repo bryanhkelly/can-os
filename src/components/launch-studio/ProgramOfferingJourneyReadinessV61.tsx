@@ -26,7 +26,7 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
         {pilotJourneys?.length===0 && <p className="mt-3 text-sm">
           You haven't chosen a program yet.{" "}
           <Link to="/launch/site" search={{siteId,module:"programs-audiences"}}
-            className="font-semibold text-primary underline">Select a Program in Establish</Link> first.
+            className="font-semibold text-primary underline">Select a Program in Shape</Link> first.
         </p>}
         {pilotJourneys && pilotJourneys.length>0 && <ul className="mt-4 space-y-3">
           {pilotJourneys.map(journey=><li key={journey.programCode}
@@ -41,7 +41,7 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
             </div>
             <dl className="mt-3 grid gap-2 sm:grid-cols-2">
               <div><dt className="text-xs text-muted-foreground">Program</dt>
-                <dd className="text-sm font-medium">Selected in Establish</dd></div>
+                <dd className="text-sm font-medium">Selected in Shape</dd></div>
               <div><dt className="text-xs text-muted-foreground">Solution</dt>
                 <dd className="text-sm font-medium">{journey.solution
                   ? "Available solution v"+journey.solution.versionNo : "Choose a solution"}</dd></div>
