@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { SelectionCard } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { siteBrandDirections, type SiteBrandDirectionId } from "@/domain/site-brand-direction";
@@ -50,17 +50,19 @@ export function WebsiteBrandIdentityStep({
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         {siteBrandDirections.map(option=>{
           const selected=direction===option.id;
-          return <Button key={option.id} type="button" variant="outline" aria-pressed={selected}
-            onClick={()=>onDirectionChange(option.id)}
-            className={`h-auto min-h-32 w-full flex-col items-start whitespace-normal border p-5 text-left ${selected?"border-primary ring-2 ring-primary/40":""}`}>
-            <span className="w-full text-sm font-bold">{option.name}</span>
-            <span className="mt-1 text-xs text-muted-foreground">{option.character}</span>
-            <span className="mt-2 text-xs leading-5 text-muted-foreground">{option.description}</span>
-            {(selected||recommendation===option.id)&&<span className="mt-3 text-xs font-semibold text-primary">
-              {selected?"Selected":""}{selected&&recommendation===option.id?" · ":""}
-              {recommendation===option.id?"Suggested from Site Information":""}
-            </span>}
-          </Button>;
+          return <SelectionCard key={option.id} kind="radio" name="site-brand-direction"
+            value={option.id} checked={selected}
+            onChange={checked=>{if(checked) onDirectionChange(option.id);}}
+            title={option.name}
+            detail={<>
+              <span className="block">{option.character}</span>
+              <span className="mt-1 block">{option.description}</span>
+              {(selected||recommendation===option.id)&&<span className="mt-2 block font-semibold text-primary">
+                {selected?"Selected":""}{selected&&recommendation===option.id?" · ":""}
+                {recommendation===option.id?"Suggested from Site Information":""}
+              </span>}
+            </>}
+            className="h-full min-h-28" />;
         })}
       </div>
     </fieldset>
