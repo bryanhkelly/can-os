@@ -314,20 +314,28 @@ const noCustomGuidedSelections = {
       }
       return false;
     }
+    function isMainJourneyNavigation(node) {
+      for (let parent = node.parent; parent; parent = parent.parent) {
+        if (parent.type !== "JSXElement" || jsxName(parent.openingElement.name) !== "nav") continue;
+        const label = attr(parent.openingElement, "aria-label");
+        if (label?.value?.type === "Literal" && label.value.value === "Launch steps") return true;
+      }
+      return false;
+    }
     function looksLikeCard(opening) {
       const className = attr(opening, "className");
       if (!className) return false;
       const source = context.sourceCode.getText(className);
-      return /(?:min-h-(?:16|20|24|28|32)|flex-col|items-start|text-left)/.test(source);
+      return /(?:min-h-(?:16|20|24|28|32)|flex-col|items-start\\s+gap-3)/.test(source);
     }
     return {
       JSXOpeningElement(node) {
         if (jsxName(node.name) !== "Button") return;
         const pressed = attr(node, "aria-pressed");
         const current = attr(node, "aria-current");
-        if (current && ancestorsInclude(node, new Set(["nav", "ol"]))) {
+        if (current && ancestorsInclude(node, new Set(["nav", "ol"])) && !isMainJourneyNavigation(node)) {
           context.report({ node, messageId: "step" });
-        } else if (pressed && looksLikeCard(node) && ancestorsInclude(node, new Set(["fieldset"]))) {
+        } else if (pressed && looksLikeCard(node)) {
           context.report({ node, messageId: "choice" });
         }
       },
