@@ -22,7 +22,7 @@ import { NativeClassKnowledgeCheckPanel } from "@/components/learning/NativeClas
 import { NativeClassTeacherHomeworkPanel, NativeClassTeacherAssessmentPanel } from
   "@/components/learning/NativeClassTeacherReviewPanels";
 import { NativeClassDiscussionPanel } from "@/components/learning/NativeClassDiscussionPanel";
-import { NativeValorLessonPanel } from "@/components/learning/NativeValorLessonPanel";
+import { NativeClassLessonContentPanel } from "@/components/learning/NativeClassLessonContentPanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
 import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
 import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
@@ -174,8 +174,9 @@ function LearnerClass({workspace}:{workspace:Workspace}){
     </p>}
     {workspace.tab==="lessons"&&(!data
       ?<p role="status" className="border border-border bg-card p-5 text-sm">Loading your Course lessons…</p>
-      :data.lessons.some(lesson=>lesson.restoredDemo)
-        ?<NativeValorLessonPanel classEnrollmentId={learner.classEnrollmentId}
+      :data.lessons.some(lesson=>lesson.lessonBody.trim().length>0 ||
+          lesson.videoResources.length>0)
+        ?<NativeClassLessonContentPanel classEnrollmentId={learner.classEnrollmentId}
           lessons={data.lessons} selectedLessonId={workspace.selectedLessonId}/>
         :<RecordedInstructorWorkspace
           key={learner.courseAttemptId} courseAttemptId={learner.courseAttemptId}
