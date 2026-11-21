@@ -256,10 +256,10 @@ export function MarketingPackageWizardV61({
       description="Choose your story angle and review your message. Save this outreach plan first, then create coordinated materials in the next step. Nothing is sent or published.">
       <div className="mt-4 space-y-5">
         <div className="grid gap-3 border bg-muted/20 p-3 text-sm sm:grid-cols-2">
-          <p><strong>Recipients:</strong> {plan.recipients.join(", ")||"None selected"}</p>
-          <p><strong>Beneficiaries:</strong> {plan.beneficiaries.join(", ")||"All audiences"}</p>
+          <p><strong>Who you want to reach:</strong> {plan.recipients.map(id=>marketingAudienceOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</p>
+          <p><strong>Who will benefit:</strong> {plan.beneficiaries.map(id=>beneficiaryOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</p>
           <p><strong>Highlights:</strong> {plan.highlights.map(x=>x.label).join(", ")||"Not selected"}</p>
-          <p><strong>Channels:</strong> {plan.channels.join(", ")||"Not selected"}</p>
+          <p><strong>Ways to reach people:</strong> {plan.channels.map(id=>channelOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {storyOptions.map(item=><SelectionCard key={item.id} kind="radio"
