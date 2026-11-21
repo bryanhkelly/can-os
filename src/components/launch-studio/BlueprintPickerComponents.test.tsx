@@ -29,7 +29,7 @@ describe("governed Blueprint pickers",()=>{
       components={components} selected={["required-1"]} disabled={false} onToggle={()=>{}}/>);
     expect(html).toContain("instruction delivery");
     expect(html).toContain("required");
-    expect(html).toContain("Independent verification remains separate from planning");
+    expect(html).toContain("This part requires a separate review before use");
     expect(html).toContain("disabled");
   });
   it("limits reference choices to the selected component kind",()=>{
@@ -39,7 +39,7 @@ describe("governed Blueprint pickers",()=>{
       disabled={false} onToggle={()=>{}}/>);
     expect(html).toContain("Published guide");
     expect(html).not.toContain("Experiential guide");
-    expect(html).toContain("curated references");
+    expect(html).toContain("available resources");
   });
   it("cannot present a curated reference chooser when references are disabled",()=>{
     const html=renderToStaticMarkup(<BlueprintReferencesPicker
