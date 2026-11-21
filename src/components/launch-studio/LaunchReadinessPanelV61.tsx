@@ -97,11 +97,11 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
           ? {candidates:noncredit.value.candidates,releases:noncredit.value.published}:{}),
       })
     : null;
-  return <WorkspacePanel title={context==="open" ? "Saved readiness and receiving Programs" : "Readiness from existing workspaces"}
-    description="Each status comes from its owning workflow. A saved plan, completed requirement, website or Program status never grants Offering-level enrollment authorization.">
+  return <WorkspacePanel title={context==="open" ? "Your opening checklist" : "Your preparation checklist"}
+    description="See what's ready and what still needs attention. Registration opens separately for each approved offering.">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-xs text-muted-foreground">
-        {pending ? "Reading current authorized records…" : "Latest requested Site-scoped records"}
+        {pending ? "Checking your latest progress…" : "Your current preparation status"}
       </p>
       <Button type="button" size="sm" variant="outline"
         onClick={()=>setReload(value=>value+1)}>Refresh readiness</Button>
@@ -114,8 +114,8 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
         ? <SolutionPreparationSummaryV61 siteId={siteId} plans={solutionPreparation}
             open={context==="open"}/>
         : <p role="status" className="border p-3 text-sm">
-            Solution plan evidence is {solutions.state==="loading"?"loading":"unavailable"}.
-            No approval or absence is inferred.
+            Solution information is {solutions.state==="loading"?"loading":"unavailable"}.
+            Try refreshing to check the latest requirements.
           </p>}
       <ProgramRequirementsReadinessV61 programs={programs} />
       <SitePublicationReadinessV61 publication={publication} />
@@ -123,8 +123,8 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
     </div>
     <p className="mt-4 text-xs leading-5 text-muted-foreground">
       {context==="open"
-        ? "Each Offering must be authorized to enroll in its receiving service. Nothing here activates a Class, admission or enrollment."
-        : "Use these records to identify next work. Facilities, staff, jurisdiction and safeguarding remain independently governed."}
+        ? "Each offering must be approved before people can register. This checklist doesn't open registration."
+        : "Use this checklist to see what's next. Some activities need additional facilities, staff, safety, or local approvals."}
     </p>
   </WorkspacePanel>;
 }
