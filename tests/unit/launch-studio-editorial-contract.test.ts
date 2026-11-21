@@ -177,11 +177,9 @@ describe("Launch Studio V6.1 editorial contract", () => {
   it("saves and exits to the authorized Site Workspace without signing the person out", () => {
     const route = source("src/routes/launch.site.tsx");
     const website = source("src/routes/site-website.tsx");
-    for (const p of [
-      "src/components/launch-studio/EstablishSiteProfileUnified.tsx",
-      "src/components/launch-studio/EstablishSiteInformationV61.tsx",
-      "src/components/launch-studio/EstablishProgramsAudiencesV61.tsx",
-    ]) expect(source(p)).toContain("Save & Exit");
+    expect(source("src/components/launch-studio/EstablishSiteProfileUnified.tsx")).toContain("Save &amp; Exit");
+    expect(source("src/components/launch-studio/EstablishSiteInformationV61.tsx")).toContain("Save & Exit");
+    expect(source("src/components/launch-studio/EstablishProgramsAudiencesV61.tsx")).toContain("Save & Exit");
     expect(website).toContain('onClick={()=>void saveDraft("exit")}>Save &amp; Exit');
     expect(website).toContain('router.navigate({ to: "/sites/$siteId", params: { siteId: data.siteId } })');
     expect(route).toContain('onSaveAndExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}');
