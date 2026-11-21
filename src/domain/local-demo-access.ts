@@ -22,6 +22,16 @@ export const LOCAL_DEMO_ADMIN = {
   email: "admin.demo@valorschool.demo",
 } as const;
 
+export const LOCAL_DEMO_RILEY_FACILITATOR = {
+  accountId: "fa000000-0000-4000-8000-000000000002",
+  personId: "f1000000-0000-4000-8000-000000000006",
+  grantId: "fb000000-0000-4000-8000-000000000102",
+  roleAssignmentId: "fb100000-0000-4000-8000-000000000102",
+  organizationId: LOCAL_DEMO_ADMIN.organizationId,
+  siteId: LOCAL_DEMO_ADMIN.siteId,
+  email: "riley.teacher@valorschool.demo",
+} as const;
+
 export const LOCAL_DEMO_ROOM_FACILITATOR = {
   personId: "f7200000-0000-4000-8000-000000000001",
   accountId: "f7200000-0000-4000-8000-000000000002",
@@ -56,7 +66,10 @@ export function isApprovedDemoGrant(grant: {
   const account = LOCAL_DEMO_ACCOUNTS.find(candidate => candidate.email === email.trim().toLowerCase());
   return Boolean(account && account.accountId === grant.accountId &&
     account.personId === grant.personId &&
-    grant.role === (account.email === LOCAL_DEMO_ADMIN.email ? "site_admin" : account.role.toLowerCase()) &&
+    (grant.role === (account.email === LOCAL_DEMO_ADMIN.email ? "site_admin" : account.role.toLowerCase()) ||
+      (account.email === LOCAL_DEMO_RILEY_FACILITATOR.email &&
+       grant.role === "room_facilitator" &&
+       "id" in grant && grant.id === LOCAL_DEMO_RILEY_FACILITATOR.grantId)) &&
     isDemoSchoolGrant(grant));
 }
 
