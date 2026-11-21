@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
   noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
+import { programsAudiencesGuideV61 } from "@/domain/launch-site-guide-v61";
+import type { SiteGuideContentV61 } from "./SiteGuideV61";
 import { EstablishExperiencesV61, type ExperiencesStageV61 } from "./EstablishExperiencesV61";
 
 type InternalStep = 0 | 1 | 2;
@@ -69,12 +71,12 @@ const guidance = [
   },
 ] as const;
 
-export function ProgramsAudiencesV61Guidance({ step }: { step: InternalStep }) {
-  return <LaunchGuidancePanels guidance={guidance[step]} />;
+export function ProgramsAudiencesV61Guidance({ step, guide }: { step: InternalStep; guide?: SiteGuideContentV61 | null }) {
+  return <LaunchGuidancePanels guidance={guidance[step]} guide={guide} />;
 }
 
 export function EstablishProgramsAudiencesV61({ siteId, initial,
-  onBackToSiteInformation, onSaveAndExit, onContinueToWebsiteBrand, onInternalStepChange,
+  onBackToSiteInformation, onSaveAndExit, onContinueToWebsiteBrand, onInternalStepChange, onGuideChange,
 }: {
   siteId: string;
   initial: ProgramsAudiencesV61Initial;
@@ -82,6 +84,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   onSaveAndExit: () => Promise<void>;
   onContinueToWebsiteBrand: () => void;
   onInternalStepChange?: (step: InternalStep) => void;
+  onGuideChange?: (guide: SiteGuideContentV61) => void;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<InternalStep>(0);
@@ -113,6 +116,12 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   const [programCatalog, setProgramCatalog] = useState<BlueprintReferenceCatalogItem[] | null>(null);
   const [catalogError, setCatalogError] = useState("");
   const [catalogReload, setCatalogReload] = useState(0);
+  // A live, read-only reflection of this screen's draft choices. No additional
+  // queries, persistence or approval claims are introduced by the rail.
+  const liveGuide = useMemo(() => programsAudiencesGuideV61(
+    step, draft, programCatalog ?? [], experienceStage,
+  ), [step, draft, programCatalog, experienceStage]);
+  useEffect(() => { onGuideChange?.(liveGuide); }, [liveGuide, onGuideChange]);
   const revision = useRef(initial.revision);
   const saving = useRef(false);
   const panel = useRef<HTMLDivElement>(null);
