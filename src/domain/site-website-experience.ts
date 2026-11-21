@@ -70,7 +70,7 @@ export const siteExperienceCopy: Record<SiteExperienceProfile, {
   training: {
     navLabel: "Adult learning website navigation", heroWelcome: "Welcome to adult learning",
     heroIntro: "Explore adult learning, skills and enrichment. Current registration is available only for authorized offerings.",
-    heroExplore: "Explore Programs", heroExplorePath: "/programs",
+    heroExplore: "Explore Courses", heroExplorePath: "/courses",
     storyTitle: "Learning that fits your life",
     visionTitle: "Opportunities to keep growing at every stage.",
     contactTitle: "Ask about adult learning",
