@@ -22,7 +22,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
   const [drawer, setDrawer] = useState(false);
   const stagePanelBaseId = useId();
   const navigationDrawerId = useId();
-  const activeStage = siteLaunchModules.find(item => item.id === active)?.stage ?? "Establish";
+  const activeStage = siteLaunchModules.find(item => item.id === active)?.stage ?? "Shape";
   // Derive active-stage expansion immediately on navigation. A prior manual
   // collapse only applies while its corresponding module remains active.
   const [stageChoice, setStageChoice] = useState<{ active?: string; stage: string }>({
