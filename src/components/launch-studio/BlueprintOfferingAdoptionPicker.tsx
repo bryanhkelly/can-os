@@ -78,19 +78,16 @@ export function BlueprintOfferingAdoptionPicker({
     intent.componentId === targetId &&
     intent.offeringVersionId === linkedOffering.offeringVersionId);
   return <fieldset className="border p-4" disabled={disabled} aria-label="Published Offering adoption">
-    <legend className="px-2 font-semibold">Adopt a published Offering</legend>
+    <legend className="px-2 font-semibold">Include a learning offering</legend>
     <p className="mt-2 text-sm text-muted-foreground">
-      Connect a published educational product to a selected program component.
-      Its availability is advisory. Independent review is required before execution.
+      Choose a published learning offering to include in your plan. Its availability for your site will be checked separately.
     </p>
     {linkedOffering && <article className="mt-4 border bg-background p-4">
-      <h3 className="text-sm font-semibold">Published learning product included in this Solution</h3>
+      <h3 className="text-sm font-semibold">Learning offering included with this solution</h3>
       <p className="mt-1 text-sm">{linkedOffering.title} · v{linkedOffering.versionNo}</p>
       <p className="mt-1 text-xs text-muted-foreground">{linkedOffering.code}</p>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">
-        You can include this published product in your private plan now.
-        Site availability, resources, qualification, approval and learner
-        enrollment must be verified independently.
+        You can include this offering in your plan now. Before anyone can participate, the site must meet its requirements and obtain the necessary approvals.
       </p>
       <Button type="button" variant="outline" className="mt-3"
         disabled={disabled || !targetId || linkedAttached}
@@ -105,7 +102,7 @@ export function BlueprintOfferingAdoptionPicker({
         {linkedAttached ? "Included in private plan" : "Include in private plan"}
       </Button>
       {!targetId && <p className="mt-2 text-xs text-muted-foreground">
-        Choose a Program component below to attach this learning product.
+        Choose which part of your solution will use this offering.
       </p>}
     </article>}
     <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -127,23 +124,21 @@ export function BlueprintOfferingAdoptionPicker({
         </Select>
       </Label>
       <Button type="button" variant="outline" onClick={() => void discover()} disabled={loading}>
-        {loading ? "Checking availability…" : "Find published Offerings"}
+        {loading ? "Checking availability…" : "Find learning offerings"}
       </Button>
     </div>
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     {offerings && offerings.length === 0 && <p role="status" className="mt-3 text-sm">
-      No published availability decisions currently match this Site and delivery model.
-      CAN must publish applicable qualification rules before it can establish
-      whether an Offering may operate here. This does not prevent private planning.
+      We can't confirm an available offering for this site and delivery choice yet. You can continue planning, but approval to offer it is separate.
     </p>}
     {(available.length > 0 || (linkedOffering && components.length > 1)) &&
       <Label htmlFor="blueprint-offering-component"
       className="mt-4 block text-sm">
-      Add to Blueprint component
+      Add to solution part
       <Select id="blueprint-offering-component" className="mt-2"
         value={targetComponentId}
         onChange={event => setTargetComponentId(event.currentTarget.value)}>
-        <option value="">Choose a program component</option>
+        <option value="">Choose a solution part</option>
         {components.map(component =>
           <option key={component.id} value={component.id}>
             {component.key.replaceAll("_", " ")}
@@ -182,7 +177,7 @@ export function BlueprintOfferingAdoptionPicker({
       })}
     </div>}
     {selected.length > 0 && <div className="mt-5">
-      <h3 className="font-semibold">Planned Offering adoptions</h3>
+      <h3 className="font-semibold">Learning offerings in your plan</h3>
       <ul className="mt-2 space-y-2">
         {selected.map(intent =>
           <li key={intent.componentId + ":" + intent.offeringVersionId}
@@ -205,7 +200,7 @@ export function BlueprintOfferingAdoptionPicker({
       </ul>
     </div>}
     <p className="mt-4 text-xs text-muted-foreground">
-      Adding an Offering does not establish regulatory approval, enrollment, or permission to operate.
+      Adding an offering to your plan does not open it for registration or authorize operations.
     </p>
   </fieldset>;
 }
