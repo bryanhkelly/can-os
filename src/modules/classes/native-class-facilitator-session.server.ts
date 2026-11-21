@@ -3,7 +3,8 @@ import { getRequest } from "@tanstack/react-start/server";
 import { db } from "@/db/client";
 import { canonicalSessionRowSchema } from "@/domain/canonical-access";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
-import { canonicalSessionDigestFromRequest } from "@/modules/identity/canonical-command-context.server";
+import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
+import { readCookie } from "@/domain/session-cookies";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -26,11 +27,15 @@ export async function assertCurrentNativeClassFacilitatorSession(
   }
   if(actor.role!=="room_facilitator" || !actor.capabilities.has("learning.room.facilitate"))
     throw new AuthorizationError("current canonical room facilitator");
-  const digest=canonicalSessionDigestFromRequest(request);
+  const raw=readCookie(request,accessSessionCookie);
+  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+  if(!raw || !/^[A-Za-z0-9_-]{40,}$/.test(raw) || !pepper || pepper.length<32)
+    throw new AuthorizationError("current CAN facilitator session");
+  const digest=hashAccessSecret(raw,pepper);
   const result=await tx.execute(sql`
     SELECT account_id,session_id,grant_id,person_id,
       role_code,organization_id,site_id
-    FROM education_v30.v301_canonical_session_context(${digest}::text)
+    FROM education_v30.v301_can_staff_session_context(${digest}::text)
   `);
   if(result.rows.length!==1)
     throw new AuthorizationError("active canonical room facilitator session");
