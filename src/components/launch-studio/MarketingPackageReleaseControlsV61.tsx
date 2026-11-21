@@ -73,7 +73,7 @@ export function MarketingPackageReleaseControlsV61({
                 onClick={onPreview}>
                 Preview Package
               </Button>
-              <Button type="button" disabled={busy||releasesLoading||releasesUnavailable||record.status==="archived"||!record.brandVersionId||packageUpToDate}
+              <Button type="button" disabled={busy||releasesLoading||releasesUnavailable||record.status==="archived"||!record.brandVersionId||packageUpToDate||!record.content.formats.length}
                 onClick={onRelease}>
                 {latestPackageRelease?"Release Updated Package":"Release Package"}
               </Button>
