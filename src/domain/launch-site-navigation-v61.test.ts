@@ -24,6 +24,6 @@ describe("canonical V6.1 Launch Studio navigation", () => {
     expect(siteLaunchModules.find(module => module.id === "website-brand")?.stage).toBe("Shape");
     expect(siteLaunchModules.find(module => module.id === "create-outreach")?.stage).toBe("Share");
     expect(siteLaunchModules.find(module => module.id === "my-outreach")?.stage).toBe("Share");
-    expect(siteLaunchModules.at(-1)).toMatchObject({ stage: "Launch", id: "open", title: "Launch" });
+    expect(siteLaunchModules.at(-1)).toMatchObject({ stage: "Launch", id: "open", title: "Opening Checklist" });
   });
 });
