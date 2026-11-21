@@ -60,10 +60,10 @@ export function siteInformationGuideV61(step: 0 | 1 | 2 | 3, input: SiteInformat
     summary: kind ? `You're shaping the story of your ${kind.toLowerCase()}.` : "You're shaping the story of your community.",
     highlights: input.values.slice(0, 3).map(value => values[value]),
     insight: input.siteType === "church_community"
-      ? "Share a concrete example of how your community hopes to serve people, without treating a future program as already available."
+      ? "Try a concrete line such as: We hope to bring neighbors together through learning and service. Keep planned activities clearly described as future possibilities."
       : input.siteType === "training_workforce"
-        ? "Name the skills or opportunities you hope to create and why they matter to the people you serve."
-        : "A useful story connects a real community need to your purpose and what participants could experience.",
+        ? "Try a specific line such as: We hope to help adults build practical digital skills for daily life and work. Adapt it to your actual vision."
+        : "A useful story names the people, a real need and a hoped-for experience. Try: We hope to bring our community together through practical learning and connection.",
     connection: "With your permission, these answers can inform editable website and outreach suggestions. They will not be published automatically.",
   };
 }
