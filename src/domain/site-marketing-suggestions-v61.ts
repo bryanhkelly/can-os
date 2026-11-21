@@ -8,7 +8,7 @@ import {
 } from "./marketing-package-v61";
 
 /**
- * Editorial starter only. Sources are privately recorded in Establish and are
+ * Editorial starter only. Sources are privately recorded in Shape and are
  * NOT factual approval to operate, publish courses or invite enrollment.
  * Free-form founding/needs narratives are never copied automatically.
  */
@@ -89,7 +89,7 @@ export function suggestMarketingStarterV61(
   const identity=source.identity??null;
   const communityKind=siteIdentityEditorialContextV61(identity).kind;
   const intent=source.intent;
-  // Establish names intended learners, not recipient contacts. Preselect a
+  // Shape names intended learners, not recipient contacts. Preselect a
   // suggested communication audience without importing personal information.
   const audienceFromPlan={
     children:"families",teens:"students",adults:"adult-learners",
@@ -120,8 +120,8 @@ export function suggestMarketingStarterV61(
   const outcome=story ? phrase(story.experiences) : "";
   if(identity)sources.push("Site Information · Site identity");
   if(emphasis||approach||outcome)sources.push("Site Information · Purpose & Story");
-  if(focus)sources.push("Establish · Programs & Audiences");
-  if(experience)sources.push("Establish · Experiences");
+  if(focus)sources.push("Shape · Programs & Audiences");
+  if(experience)sources.push("Shape · Experiences");
   const mission=emphasis ? "shaped by "+emphasis
     : approach ? "focused on "+approach
     : identity?.faithOrientation==="faith_based" ? "inspired by service and shared purpose"
