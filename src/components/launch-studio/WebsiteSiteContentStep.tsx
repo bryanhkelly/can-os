@@ -42,6 +42,9 @@ export function WebsiteSiteContentStep({
   onContentBlocksSaved:()=>void;onContentBlocksDirty:(dirty:boolean)=>void;
 }){
   const canReuse=content.contentReuseConsent === "granted";
+  const canApplyExperienceWelcome=canReuse &&
+    (!content.welcomeMessage.trim() ||
+      (content.editorialBaseline?.fields.welcomeMessage===content.welcomeMessage));
   const schoolExperience=data.siteExperienceProfile==="school";
   const fields=contentFields.map(field=>{
     if(schoolExperience)return field;
@@ -92,7 +95,34 @@ export function WebsiteSiteContentStep({
         See which sections use your text, template content, or Site information.
       </p>
       <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/" />
+      <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/experiences" />
     </details>
+    {data.plannedExperienceNames.length>0&&<div className="space-y-3 border p-4">
+      <h4 className="text-sm font-semibold">Experiences from your Site plan</h4>
+      <p className="text-xs text-muted-foreground">
+        These are planning ideas, not confirmed activities. They can be displayed on
+        the homepage and Experiences page through the Experience content channel.
+        The headings, descriptions and placement are editable under Arrange website sections.
+      </p>
+      <p className="text-sm">{data.plannedExperienceNames.join(" · ")}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link to="/launch/site" search={{siteId:data.siteId,module:"programs-audiences"}}
+          className="text-sm font-semibold text-primary underline">
+          Edit planned Experiences
+        </Link>
+        {data.suggestedExperienceWelcome&&<Button type="button" variant="outline"
+          disabled={busy||!data.canEdit||!canApplyExperienceWelcome}
+          onClick={()=>setContent(old=>({...old,welcomeMessage:data.suggestedExperienceWelcome??old.welcomeMessage}))}>
+          Use Experiences in welcome copy
+        </Button>}
+      </div>
+      {!canReuse&&<p className="text-xs text-muted-foreground">
+        Enable Site content reuse to apply suggested welcome copy. You can still edit website text manually.
+      </p>}
+      {!canApplyExperienceWelcome&&canReuse&&<p className="text-xs text-muted-foreground">
+        Your authored welcome copy is preserved. Edit it directly if you want to mention Experiences.
+      </p>}
+    </div>}
     {refreshable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border border-border p-4" role="status">
       <div>
         <p className="text-sm font-semibold">Program and audience suggestions have changed</p>

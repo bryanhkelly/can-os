@@ -146,6 +146,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const kinds=enrollmentOpportunityKinds(opportunities);
   const contentOn=(path:string)=>Boolean(page.contentBlocks?.some(block=>
     block.page===path && block.items.length>0));
+  const hasExperienceContent=Boolean(page.contentBlocks?.some(block=>
+    block.channel==="learning.experiences" && block.items.length>0));
   const parent = page.parentInformation;
   // Costs and funding belong on a prelaunch Site even before tuition is finalized.
   const tuition = true;
@@ -161,6 +163,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const educational=[
     ...(academic?["/academics","/school-day","/admissions"] as const:[]),
     ...(kinds.program||contentOn("/programs")?["/programs"] as const:[]),
+    ...(hasExperienceContent||contentOn("/experiences")?["/experiences"] as const:[]),
     ...(kinds.course||contentOn("/courses")?["/courses"] as const:[]),
     ...(kinds.class||contentOn("/classes")?["/classes"] as const:[]),
     ...(page.offerings.length||kinds.program||contentOn("/student-life")?["/student-life"] as const:[]),
@@ -304,7 +307,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/student-life": "Student life", "/school-day": "Learning model",
     "/admissions": "Admissions", "/tuition": profile==="school"||profile==="mixed" ? "Tuition & funding" : "Fees & funding", "/families": "Families",
     "/faq": "FAQs", "/contact": "Contact",
-    "/programs": "Programs", "/courses": "Courses", "/classes": "Classes",
+    "/programs": "Programs", "/experiences": "Experiences",
+    "/courses": "Courses", "/classes": "Classes",
   };
   const navigationLink = (destination: PublicSitePath) =>
     `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`;
@@ -426,6 +430,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     availablePaths.includes(experienceCopy.heroExplorePath) ? experienceCopy.heroExplorePath :
     availablePaths.includes("/classes") ? "/classes" :
     availablePaths.includes("/programs") ? "/programs" :
+    availablePaths.includes("/experiences") ? "/experiences" :
     availablePaths.includes("/courses") ? "/courses" :
     availablePaths.includes("/academics") ? "/academics" :
     availablePaths.includes("/contact") ? "/contact" : "/";
@@ -434,6 +439,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     navigationCtaPath==="/classes"?"Explore Classes":
     navigationCtaPath==="/courses"?"Explore Courses":
     navigationCtaPath==="/programs"?"Explore Programs":
+    navigationCtaPath==="/experiences"?"Explore Experiences":
     navigationCtaPath==="/academics"?"Explore Academics":
     navigationCtaPath==="/contact"?"Contact":"Home";
   const firstAcademicProgram = page.academicPrograms?.[0];
@@ -823,6 +829,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // This navigation is shared by all schools and never fabricates availability.
   const exploreLinks = [
     { path: "/programs", label:"Programs",description:"Explore authorized community and enrichment Programs." },
+    { path: "/experiences", label:"Experiences",
+      description:"See activities and learning experiences the Site is exploring; these are not confirmed offers." },
     { path: "/courses", label:"Courses",description:"Find approved public Courses and their enrollment status." },
     { path: "/classes", label:"Classes",description:"Discover published scheduled Classes and Sessions." },
     { path: "/academics", label: "Academics", description: demo ? "Explore purposeful, connected learning." : "Discover our published learning programs." },
@@ -851,6 +859,13 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       .map(renderSiteContentChannelBlock).join("");
   const pageBlocks=(route:PublicSitePath)=>contentBlocks
     .filter(block=>block.page===route).map(renderSiteContentChannelBlock).join("");
+  // A Site with only a homepage Experience channel still has a full page.
+  // Never infer an enrollment link or an approved Offering from this projection.
+  const experiencePageBlocks=contentBlocks.filter(block=>block.page==="/experiences");
+  const experiencesPageContent=experiencePageBlocks.length
+    ? experiencePageBlocks.map(renderSiteContentChannelBlock).join("")
+    : contentBlocks.filter(block=>block.channel==="learning.experiences")
+      .map(block=>renderSiteContentChannelBlock({...block,page:"/experiences"})).join("");
   const renderOpportunityDirectory=(kind:"program"|"course"|"class",
     title:string,description:string):string=>{
     const route=kind==="program"?"/programs":kind==="course"?"/courses":"/classes";
@@ -947,6 +962,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         "Explore current Programs and proposed learning interests. Only independently authorized offerings can accept registration."),
       renderOpportunityDirectory("program","Discover Programs",
         "Learn more about current Programs. Registration is handled through an approved Program workflow.")),
+    "/experiences": composePublicSiteInterior(templateId,
+      secondaryHero("Discover possibilities","Experiences we are exploring",
+        "See the activities, interests and connections we hope to develop. These are planning ideas, not confirmed or enrollable offerings."),
+      experiencesPageContent),
     "/courses": composePublicSiteInterior(templateId,
       secondaryHero("Independent learning","Courses to explore",
         "Discover published Courses and register only when an independently approved enrollment release is available."),

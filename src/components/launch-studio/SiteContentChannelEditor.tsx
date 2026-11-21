@@ -135,7 +135,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
         return <fieldset key={block.id} className="border p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold">{info.label}</legend>
           <p className="mb-4 text-xs text-muted-foreground">{info.description}
-            {["site.setup","site.network","learning.interests"].includes(block.channel)
+            {["site.setup","site.network","learning.interests","learning.experiences"].includes(block.channel)
               ? " This saved Site information can appear when its website section is published. It does not authorize operations or enrollment."
               : " Eligible connected records appear according to their own publication and access rules."}
           </p>
@@ -148,6 +148,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
               onChange={e=>editBlock(block.id,{page:e.target.value as SiteContentBlock["page"]})}>
               <option value="/">Homepage</option>
               <option value="/programs">Programs page</option>
+              <option value="/experiences">Experiences page</option>
               <option value="/courses">Courses page</option>
               <option value="/classes">Classes page</option>
               <option value="/academics">Academics page</option>

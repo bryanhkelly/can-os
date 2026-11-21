@@ -254,6 +254,20 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
       derived("Registration buttons","Only an approved publication and enrollment release can yield an actionable registration link."),
     ],
   }],
+  "/experiences":[{
+    key:"experiences-page",title:"Experiences / Planned ideas",
+    description:"Website presentation of Experiences selected in Establish, not adopted Solutions or registered offerings.",
+    appearsWhen:"Selected Experiences exist and the private preview or a published Experience content channel allows them to appear.",
+    elements:[
+      template("Page headline and introduction","Default eyebrow: 'Discover possibilities'. H1: 'Experiences we are exploring'. The introduction explicitly says these are planning ideas."),
+      field("Experience names, descriptions and intended audiences/Programs",
+        "Establish → Programs & Audiences → Experiences",
+        "Finite catalog categories and Site-authored ideas. Audience and Program associations are descriptive, not eligibility claims.",
+        "Establish → Programs & Audiences → Experiences","site-story"),
+      sourceLayout("Page block headings, description and placement","The Site-owned learning.experiences channel controls editable section headings, card layout and page placement."),
+      derived("No enrollment actions","Planned Experiences cannot create registration links; separately authorized Programs, Courses and Classes are published elsewhere."),
+    ],
+  }],
   "/courses":[{
     key:"courses-page",title:"Courses / Published directory",description:"Public independent Course listings and availability.",
     appearsWhen:"A Course listing is eligible or the private template gallery shows an illustrative page.",

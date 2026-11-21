@@ -3,13 +3,16 @@ import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
 import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch-preferences";
+import {
+  siteExperienceCatalog, siteExperienceAudienceNames, siteExperienceProgramNames,
+} from "./site-experience-interests";
 import { projectSiteEnrollmentOpportunities } from "./site-enrollment-opportunities";
 
 /** A Site owns placement and presentation. A channel only references a
  * separately authorized data source; the editor cannot write Program facts,
  * create an Offering or manufacture an enrollment link. */
 export const siteContentChannelIds = [
-  "learning.interests", "learning.academics",
+  "learning.interests", "learning.experiences", "learning.academics",
   "learning.enrichment", "learning.noncredit",
   "site.setup", "site.network", "learning.classes", "learning.opportunities",
 ] as const;
@@ -26,7 +29,7 @@ export const siteContentBlockSchema = z.object({
   placement: z.enum(["learning", "community", "closing"]),
   layout: z.enum(["cards", "list", "featured"]),
   /** Optional means legacy V1/V2 blocks remain valid and default to home. */
-  page: z.enum(["/", "/programs", "/courses", "/classes", "/academics", "/student-life"]).optional(),
+  page: z.enum(["/", "/programs", "/experiences", "/courses", "/classes", "/academics", "/student-life"]).optional(),
   targetKinds: z.array(z.enum(["school", "program", "course", "class"])).max(4).optional(),
   sort: z.enum(["source", "title", "upcoming"]).optional(),
   limit: z.number().int().min(1).max(40).optional(),
@@ -75,6 +78,16 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     eyebrow: "Your learning community",
     title: "Programs you are exploring",
     description: "These are planning interests, not approved offerings or enrollment opportunities.",
+  }, {
+    id: "planning-experiences-home", channel: "learning.experiences",
+    placement: "learning", layout: "cards", enabled: true,
+    eyebrow: "Your learning community", title: "Experiences we are exploring",
+    description: "Ideas for learning and connection. Activities and dates have not been confirmed.",
+  }, {
+    id: "planning-experiences-page", channel: "learning.experiences",
+    page: "/experiences", placement: "learning", layout: "cards", enabled: true,
+    eyebrow: "Discover possibilities", title: "Imagine what you could experience",
+    description: "These are proposed ideas, not scheduled or approved offerings.",
   }, {
     id: "public-classes", channel: "learning.classes",
     placement: "learning", layout: "cards", enabled: true,
@@ -179,6 +192,12 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
     description: "Proposed plans selected in Launch Studio. They are descriptive, not authorized Offerings.",
     defaultTitle: "Programs you are exploring", defaultEyebrow: "Your learning community",
     defaultDescription: "These are planning interests, not approved offerings or enrollment opportunities.",
+  },
+  "learning.experiences": {
+    label: "Planned Experiences", privateOnly: false,
+    description: "Experiences selected in Establish, organized by intended Programs and audiences. No Solution, schedule or enrollment is implied.",
+    defaultTitle: "Experiences we are exploring", defaultEyebrow: "Discover possibilities",
+    defaultDescription: "Explore ideas for learning, creativity and community connection. Details are still being planned.",
   },
   "learning.academics": {
     label: "Reviewed academic programs", privateOnly: false,
@@ -331,6 +350,25 @@ export function resolveSiteContentBlocks(
           label: "Proposed · not enrolling",
         }));
         break;
+      case "learning.experiences": {
+        const selected = new Set(feeds.preferences?.experienceIds ?? []);
+        const audiences = new Set(feeds.preferences?.audienceIds ?? []);
+        const programs = new Set(feeds.preferences?.interestIds ?? []);
+        items = siteExperienceCatalog.filter(item=>selected.has(item.id)).map(item=>{
+          const matchingAudiences=item.audiences.filter(id=>audiences.has(id))
+            .map(id=>siteExperienceAudienceNames[id]);
+          const matchingPrograms=item.programs.filter(id=>programs.has(id))
+            .map(id=>siteExperienceProgramNames[id]);
+          const scope=[...matchingPrograms,...matchingAudiences].join(" · ");
+          return {id:item.id,title:item.title,description:item.description,
+            label:"Planned Experience"+(scope?" · "+scope:"")};
+        });
+        items.push(...(feeds.preferences?.customExperiences ?? []).map((title,index)=>({
+          id:"custom-"+index,title,description:"A local experience our community is considering.",
+          label:"Proposed local Experience",
+        })));
+        break;
+      }
       case "learning.academics":
         items = (feeds.academicPrograms ?? []).map(program => ({
           id: program.programId, title: program.title, description: program.summary,

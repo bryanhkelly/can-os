@@ -19,7 +19,8 @@ import { organizations, siteAffiliations, sitePublications, sites } from "@/db/s
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
-import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
+import { defaultSiteContentChannelConfig, safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
+import { siteExperienceCatalog } from "@/domain/site-experience-interests";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
@@ -158,10 +159,27 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // They do not require an adopted Solution or grant registration authority.
   const proposedPrograms = projectPlannedSiteProgramsForPreview(
     preferences.success ? preferences.data : null, baseContentBlocks);
+  // Existing authored layouts remain authoritative, including an explicit
+  // Experience block disabled by the operator. Older Site layouts without
+  // this new channel get a private-only suggested homepage and detail page.
+  const experienceConfigured=contentConfig.blocks.some(block=>
+    block.channel==="learning.experiences");
+  const proposedExperiences=!experienceConfigured && preferences.success
+    ? resolveSiteContentBlocks({
+      ...defaultSiteContentChannelConfig,
+      blocks:defaultSiteContentChannelConfig.blocks.filter(block=>
+        block.channel==="learning.experiences"),
+    },{mode:"private",preferences:preferences.data})
+    : [];
   const contentBlocks = [
     ...websitePreviewEditorialBlocks(baseContentBlocks),
     ...proposedPrograms,
+    ...proposedExperiences,
   ];
+  const plannedExperienceNames=preferences.success
+    ? [...siteExperienceCatalog.filter(item=>preferences.data.experienceIds?.includes(item.id))
+      .map(item=>item.title),...(preferences.data.customExperiences??[])]
+    : [];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     siteFunding:projectSiteFundingPublicContext(siteConfiguration?.metadata?.siteHostingV61),
@@ -187,6 +205,13 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
     siteStoryCopyCandidates:storyCandidates,
     siteExperienceProfile,
+    plannedExperienceNames,
+    // Curated, clearly proposed draft phrasing. The content editor must
+    // request consent before applying this to an unedited welcome field.
+    suggestedExperienceWelcome: plannedExperienceNames.length
+      ? "We are exploring experiences such as " +
+        plannedExperienceNames.slice(0,3).join(", ") +
+        ". Activities and schedules will be confirmed separately." : null,
     siteStorySourceChoices:siteStorySource.success ? {
       motivations:siteStorySource.data.answers.motivations,
       distinctives:siteStorySource.data.answers.distinctives,
