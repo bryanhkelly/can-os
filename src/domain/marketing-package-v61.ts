@@ -43,7 +43,7 @@ export function outreachFormatsV61(channels: OutreachPlanV61["channels"]): Marke
     channel==="social" ? ["social" as const] :
     channel==="print" ? ["flyer" as const] :
     channel==="conversation-kit" ? ["handout" as const] :
-    channel==="share-link" ? ["qr-card" as const] : []
+    channel==="share-link" ? [] : []
   ))];
 }
 export function outreachStepIssueV61(step: typeof outreachStepIdsV61[number],
@@ -58,6 +58,52 @@ export function outreachStepIssueV61(step: typeof outreachStepIdsV61[number],
   if(step==="review" && (!title.trim() || !content.headline.trim() || !content.message.trim() ||
       !content.formats.length))return "Add a plan name, message, and at least one supported material format.";
   return null;
+}
+
+
+/** Deterministic editorial starting point until Site Intelligence is integrated.
+ * It reflects operator-selected planning interests, never approved offerings. */
+export function composeOutreachDraftV61(siteName: string, plan: OutreachPlanV61) {
+  const focus=plan.highlights.find(item=>item.role==="primary")?.label ??
+    "community learning opportunities";
+  const supporting=plan.highlights.filter(item=>item.role==="supporting")
+    .map(item=>item.label);
+  const beneficiaries=plan.beneficiaries.map(id=>({
+    children:"children",teens:"teens",adults:"adults",older_adults:"older adults",
+  }[id])).join(" and ");
+  const recipientText=plan.recipients.includes("partners")?"community partners":
+    plan.recipients.includes("prospective-leaders")?"prospective leaders":
+    plan.recipients.includes("employees")?"prospective team members":
+    plan.recipients.includes("families")?"families":"community members";
+  const objective={
+    "coming-soon":"Something new is taking shape",
+    feedback:"What would you like to see?",
+    invitation:"You're invited to shape what's next",
+    recruiting:"Help us build something meaningful",
+    update:"An update on our learning community",
+  }[plan.messageFocus];
+  const angle={
+    impact:"help create meaningful opportunities",
+    opportunity:"open the door to new learning possibilities",
+    partnership:"explore how we can work together",
+  }[plan.storyAngle];
+  const cta={
+    "learn-more":"Learn about our plans",
+    "express-interest":"Express interest",
+    "share-feedback":"Share your thoughts",
+    "attend-event":"Learn about a future event",
+    "schedule-conversation":"Request a conversation",
+  }[plan.action];
+  return {
+    headline: objective+" at "+siteName,
+    message: "At "+siteName+", we're exploring "+focus+
+      (supporting.length?", with interests such as "+supporting.join(" and "):"")+
+      (beneficiaries?", for "+beneficiaries:"")+
+      ". These are proposed opportunities, and details have not been finalized. "+
+      "We'd love to connect with "+recipientText+" to "+angle+
+      ". Your ideas and participation can help shape what comes next.",
+    callToAction:cta,
+  };
 }
 
 export const marketingPackageContentSchema = z.object({
