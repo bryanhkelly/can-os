@@ -134,7 +134,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
         Reload catalog
       </Button>}
     </div>}
-    {loading && <p role="status" className="text-sm">Loading published Solutions…</p>}
+    {loading && <p role="status" className="text-sm">Loading available solutions…</p>}
     {error && <div role="alert" className="border border-destructive/30 bg-card p-4 text-sm">
       <p className="font-semibold">Unable to load Solutions</p>
       <p className="mt-2 text-muted-foreground">{error}</p>
@@ -150,22 +150,22 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
         <span>{templates.length} published {templates.length === 1 ? "Solution" : "Solutions"}</span>
         <span>{workspace.configurations.length} saved {workspace.configurations.length === 1 ? "plan" : "plans"}</span>
       </div>
-      {templates.length === 0 ? <EmptyState title="No published Solutions"
-        description="A Solution must be published and available to this Site before it can be configured." className="mt-4" /> : <>
-        <FilterBar label="Published Solutions" query={query}
+      {templates.length === 0 ? <EmptyState title="No solutions available yet"
+        description="There are no published solutions available for this site right now. You can continue shaping your program ideas in Establish." className="mt-4" /> : <>
+        <FilterBar label="Available Solutions" query={query}
           onQueryChange={value => requestSwitch(() => {
             setQuery(value);
             setSelectedId(null);
             closeEditor();
           })}
-          searchLabel="Search published Solutions"
+          searchLabel="Search available solutions"
           searchPlaceholder="Search titles or components" className="mt-5" />
         <p role="status" className="mt-3 text-xs text-muted-foreground">
-          {visible.length} matching published Solutions.
+          {visible.length} available {visible.length===1?"solution":"solutions"} match your search.
           {delivery && ` Saved Site delivery preference: ${delivery === "physical" ? "On site" :
             delivery === "digital" ? "Online" : "Hybrid or blended"} (planning only).`}
           {(intent?.interestIds.length || intent?.programCodes?.length)
-            ? " Exact saved Program matches appear first. These are planning suggestions, not Site authorization."
+            ? " Solutions related to your saved program interests appear first. Availability and approval are checked separately."
             : ""}
         </p>
         {visible.length === 0 ? <EmptyState kind="matches" className="mt-4"
@@ -192,7 +192,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                     {academicBlocked && <span className="mt-1 block font-medium">Grades 6–12 academy · authorization required</span>}
                     {matchesProgram && <span className="mt-1 block font-semibold text-primary">Matches a Program selected in Establish</span>}
                     {visionMatches.length > 0 && <span className="mt-1 block font-medium text-primary">
-                      Matches {visionMatches.length} saved {visionMatches.length === 1 ? "interest" : "interests"} by title or component
+                      Related to {visionMatches.length} saved {visionMatches.length === 1 ? "interest" : "interests"}
                     </span>}
                   </>}
                   className="w-full" />;
@@ -224,7 +224,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                           {component.description}
                         </p>}
                         {component.requiresIndependentReview && <p className="mt-1 text-xs text-muted-foreground">
-                          Independent review required before operation
+                          Requires independent review before use
                         </p>}
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">{readable(component.requirementMode)} · {readable(component.kind)}</span>
@@ -235,8 +235,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                 <p className="text-xs leading-5 text-muted-foreground">When you start a plan, you'll see which activities, spaces, staffing, and safety checks apply to your site.</p>
                 {isSchoolYearBlocked(selected) ?
                   <p className="border bg-muted p-3 text-sm text-muted-foreground">
-                    This academic school-year Solution is not enabled for the Site.
-                    Other community learning Solutions remain available for planning.
+                    This school-year solution cannot be planned for your site yet. You can still explore other available solutions.
                   </p> : workspace.canConfigure ? <div className="space-y-3">
                   <Button type="button" onClick={() => requestSwitch(() => {
                     setEditorState({ unsaved: false, busy: false, reconciliationRequired: false });
@@ -261,7 +260,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                       </div>
                     </div>}
                 </div> : <p role="status" className="border bg-muted p-3 text-sm">
-                  You can review Solutions but are not authorized to configure them for this Site.
+                  You can explore these solutions, but your current role does not allow you to save a site plan.
                 </p>}
               </div>
             </article>}
@@ -292,9 +291,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
         })}/>
     </div>:null}
     <p className="mt-6 border-t pt-4 text-xs leading-5 text-muted-foreground">
-      When a selected Solution includes a Program model, you can choose its approved
-      published learning products while configuring the Site plan. Adoption, class
-      publication, and enrollment each require separate authorization.
+      Some solutions include learning offerings you can add to your plan. Each offering still needs its own review before it can be published or opened for registration.
     </p>
     <ActionDialog open={Boolean(pendingSwitch)}
       title="Discard unsaved Solution changes?"
