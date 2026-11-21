@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ActionDialog, EmptyState, FilterBar, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, EmptyState, FilterBar, SelectionCard, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
@@ -177,34 +177,24 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                 const matchesProgram = !!template.programCode &&
                   !!intent?.programCodes?.includes(template.programCode);
                 const academicBlocked = isSchoolYearBlocked(template);
-                return <Button key={template.blueprintVersionId} type="button"
-                  variant="ghost" onClick={() => requestSwitch(() => {
+                return <SelectionCard key={template.blueprintVersionId}
+                  kind="radio" name="published-solution" value={template.blueprintVersionId}
+                  checked={active} disabled={academicBlocked}
+                  onChange={checked=>{if(checked)requestSwitch(() => {
                     setSelectedId(template.blueprintVersionId);
                     closeEditor();
-                  })}
-                  aria-pressed={active} disabled={academicBlocked}
-                  title={academicBlocked ? "School-year academic authorization required" : undefined}
-                  className={"h-auto min-h-20 w-full justify-start whitespace-normal border p-4 text-left hover:bg-muted " +
-                    (active ? "border-primary bg-accent" : "bg-background")}>
-                  <span className="flex w-full items-start gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center bg-muted"><Layers3 aria-hidden="true" className="size-4" /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold">{template.title}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        Version {template.versionNo} · {template.components.length} components
-                      </span>
-                      {academicBlocked && <span className="mt-1 block text-xs font-medium text-muted-foreground">
-                        Grades 6–12 academy · authorization required
-                      </span>}
-                      {matchesProgram && <span className="mt-1 block text-xs font-semibold text-primary">
-                        Matches a Program selected in Establish
-                      </span>}
-                      {visionMatches.length > 0 && <span className="mt-1 block text-xs font-medium text-primary">
-                        Matches {visionMatches.length} saved {visionMatches.length === 1 ? "interest" : "interests"} by title or component
-                      </span>}
-                    </span>
-                  </span>
-                </Button>;
+                  });}}
+                  icon={<span className="flex size-9 shrink-0 items-center justify-center bg-muted"><Layers3 aria-hidden="true" className="size-4" /></span>}
+                  title={template.title}
+                  detail={<>
+                    <span className="block">Version {template.versionNo} · {template.components.length} components</span>
+                    {academicBlocked && <span className="mt-1 block font-medium">Grades 6–12 academy · authorization required</span>}
+                    {matchesProgram && <span className="mt-1 block font-semibold text-primary">Matches a Program selected in Establish</span>}
+                    {visionMatches.length > 0 && <span className="mt-1 block font-medium text-primary">
+                      Matches {visionMatches.length} saved {visionMatches.length === 1 ? "interest" : "interests"} by title or component
+                    </span>}
+                  </>}
+                  className="w-full" />;
               })}
             </div>
             {selected && <article className="border bg-background" aria-label="Selected Solution detail">
