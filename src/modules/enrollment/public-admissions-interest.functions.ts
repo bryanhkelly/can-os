@@ -425,7 +425,7 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
           eq(actions.subjectId,interest.id),
           eq(actions.organizationId,interest.organizationId),
           eq(actions.siteId,interest.siteId),
-          eq(actions.programId,interest.programId),
+          interest.programId === null ? isNull(actions.programId) : eq(actions.programId,interest.programId),
         )).for("update");
       for (const followup of followups) {
         if (["resolved","cancelled","in_progress"].includes(followup.status)) continue;
