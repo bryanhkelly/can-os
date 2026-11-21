@@ -18,6 +18,7 @@ import {launchOpeningDate} from "@/domain/launch-opening-date";
 import {readAcademicProgramCatalog} from "@/modules/sites/academic-program-catalog.server";
 import {readApprovedPublicParentExtras} from "@/modules/sites/public-parent-extras.server";
 import {projectApprovedParentInformation,withVerifiedPublicApplications} from "@/domain/parent-information";
+import {projectSiteFundingPublicContext} from "@/domain/site-funding-public";
 import {readCurrentLocalContent} from "@/modules/sites/site-local-content.server";
 import {readApprovedSchoolSitePhotos} from "@/modules/sites/site-media-folder.server";
 import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
@@ -111,6 +112,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
      academicPrograms,enrichment:offerings,classes,
    });
    const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
+    siteFunding:projectSiteFundingPublicContext(siteFlags?.metadata?.siteHostingV61),
     site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
     parentInformation:projectApprovedParentInformation({
       site,academicPrograms,offerings,localContent,...parentExtras,
