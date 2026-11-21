@@ -240,11 +240,11 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
         <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold">Which Programs or learning ideas are you considering?</legend>
+          <legend className="text-sm font-semibold">What kinds of programs are you thinking about offering?</legend>
           <p className="text-xs leading-5 text-muted-foreground">
             Select what interests you. You'll choose the details in Prepare.
           </p>
-          <h3 className="text-sm font-semibold">Published Program ideas</h3>
+          <h3 className="text-sm font-semibold">Programs to explore</h3>
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
           {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
             <p>{catalogError}</p>
@@ -285,7 +285,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             </ul>
           </WorkspaceNotice>}
           <div className="space-y-3 border-t pt-4">
-            <h3 className="text-sm font-semibold">Other learning ideas</h3>
+            <h3 className="text-sm font-semibold">Your other ideas</h3>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {interests.map(choice => {
                 const schoolYearBlocked = !schoolYearInterestMayBeSelected(choice.id,schoolYearAvailability);
