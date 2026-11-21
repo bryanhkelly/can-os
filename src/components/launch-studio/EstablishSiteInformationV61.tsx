@@ -301,7 +301,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
 
   return <section aria-label="Site Information" className="min-w-0 space-y-5">
     <GuidedSetupShell title="Site Information"
-      description="Add your hosting details and tell us about your community."
+      description="Tell us about your organization, where people will gather, and what matters to your community."
       steps={progressSteps} progressLabel="Site Information sections"
       onStepChange={id => selectStep(Number(id) as Step)}
       navigationDisabled={busy || reloadRequired}>
@@ -346,7 +346,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
               ...current,hostWebsiteUrl:event.target.value,
             }))}/>
           <p className="mt-1 text-xs text-muted-foreground">
-            Provide your organization's public website for future approved content suggestions.
+            Add a website to help us understand your organization and suggest content for you to review.
             Saving the URL does not retrieve or publish anything.
           </p>
         </Field>}
@@ -440,7 +440,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
       description="Optional. Tell us what matters to your learning community.">
       <div className="space-y-6">
-        <p className="text-xs text-muted-foreground">Your answers can be used to draft messaging you can review and edit. Avoid sharing private information about others.</p>
+        <p className="text-xs text-muted-foreground">Your answers can help shape your website and outreach. You'll review any suggested wording before using it. Please don't share private details about others.</p>
         <MultiChoice title="1. Why are you creating this learning community?" hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
         <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
