@@ -1,6 +1,6 @@
 import { SiteGuideV61 } from "./SiteGuideV61";
 /**
- * CAN OS V6.1 · Establish / Site Profile.
+ * CAN OS V6.1 · Shape / Site Profile.
  * One presentation, one canonical Site, three existing governed commands.
  * The commands are deliberately sequential and not an atomic transaction.
  */
