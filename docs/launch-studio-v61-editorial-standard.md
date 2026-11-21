@@ -40,6 +40,16 @@ Prefer:
 - "Who would you like to reach?" to "Primary Who"
 - "Nothing has been sent" to "a selected channel is not evidence of delivery"
 
+## Navigation, consent and exit language
+
+The UI says **Publish Website**, never Publish Site when the action only changes the public website. It also distinguishes **private preview**, **saved outreach plan**, **generated material**, **sending**, and **opening registration**.
+
+The Share material-selection question is **Which materials would you like to create?** because choosing an email, social, print or other output does not automatically send it. Avoid implying that selecting a channel sends communications.
+
+In Shape and Website & Brand, **Save & Exit** saves the authorized draft and returns to the Site Workspace without ending the user's session. Signing out stays in the Account menu and is not tied to finishing a step. Continue and Save & Exit retain the same validation, revision and unsaved-change protections.
+
+For the Website & Brand content-reuse decision, disclose *before selection* that choosing not to reuse previously saved information clears current editable website text and leadership entries, while earlier saved versions remain available. That choice is not a publication permission for other people's stories, images or biographies.
+
 ## Audience adaptation
 
 Keep shared workflows consistent. Use Site Information and saved site context to tailor optional prompts or helpful suggested text. Faith-related stories, denomination, and spiritual formation belong in an optional group rather than generic questions for secular organizations. Do not infer endorsement, accreditation, funding, permissions, operational readiness, or offered programming from planning interests.
