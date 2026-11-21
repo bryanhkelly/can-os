@@ -56,5 +56,8 @@ export async function resolveCanonicalSiteStaffFromCan(
       !actor.grantSiteId) {
     throw new AuthorizationError("current exact CAN Site staff membership");
   }
-  return projectCanonicalCommandContext(native);
+  return { ...projectCanonicalCommandContext(native),
+    ...(actor.impersonatedByAccountId
+      ? {impersonatedByAccountId: actor.impersonatedByAccountId} : {}),
+  };
 }
