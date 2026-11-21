@@ -22,10 +22,11 @@ const props = {
   onBack:vi.fn(),onSaveExit:vi.fn(),onNext:vi.fn(),hasSavedPackage:false,
 };
 
-describe("Introduce V6.1 guided outreach editor",()=>{
+describe("Share V6.1 guided outreach editor",()=>{
   it("uses six shared progress steps and distinguishes recipients from beneficiaries",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props}/>);
     expect(html).toContain("Share outreach steps");
+    expect(html).toContain("Who should hear about this?");
     expect(html).toContain("Who would you like to reach?");
     expect(html).toContain("Who are you hoping to help?");
     expect(html).toContain("People I know");
@@ -33,7 +34,7 @@ describe("Introduce V6.1 guided outreach editor",()=>{
     expect(html).toContain("Older adults");
     expect(html).toContain("You'll decide how to share it later.");
   });
-  it("shows the saved Establish highlights without implying approved offerings",()=>{
+  it("shows the saved Shape highlights without implying approved offerings",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={2}/>);
     expect(html).toContain("Adult Learning");
     expect(html).toContain("Financial Literacy");
@@ -45,7 +46,8 @@ describe("Introduce V6.1 guided outreach editor",()=>{
     for(const text of ["Email","Social","Print","Text","Share link","Conversation Kit"]){
       expect(html).toContain(text);
     }
-    expect(html).toContain("does not send a message");
+    expect(html).toContain("Which materials would you like to create?");
+    expect(html).toContain("before sending or publishing anything");
   });
   it("offers story angles and editable output on the final step",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={5}/>);
