@@ -54,8 +54,7 @@ export function outreachStepIssueV61(step: typeof outreachStepIdsV61[number],
       plan.highlights.filter(item=>item.role==="primary").length!==1))
     return "Choose one primary highlight and up to two supporting highlights.";
   if(step==="channels" && !plan.channels.length)return "Choose at least one way to reach people.";
-  if(step==="review" && (!title.trim() || !content.headline.trim() || !content.message.trim() ||
-      !content.formats.length))return "Add a plan name, message, and at least one supported material format.";
+  if(step==="review" && (!title.trim() || !content.headline.trim() || !content.message.trim()))return "Add a plan name, message, and at least one supported material format.";
   return null;
 }
 
