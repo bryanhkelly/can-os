@@ -101,17 +101,21 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
            assignmentTitle:String(spec.title??row.assignment_key),
            status:row.status,
            responseText:typeof response.text==="string"?response.text:"",
-           demoFeedback:response.synthetic===true&&typeof response.teacherFeedback==="string"
+           teacherFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"
               ?response.teacherFeedback:null,
-           isSyntheticPractice:response.synthetic===true&&response.practiceResponse===true,
-           practiceScore:response.synthetic===true&&typeof response.demoScore==="number"?response.demoScore:null,
-           practiceScoreMax:response.synthetic===true&&typeof response.maxDemoScore==="number"?response.maxDemoScore:null,
+           isPracticeSubmission:response.practiceResponse===true,
+           practiceScore:response.practiceResponse===true
+             ?(typeof response.practiceScore==="number"?response.practiceScore:
+               typeof response.demoScore==="number"?response.demoScore:null):null,
+           practiceScoreMax:response.practiceResponse===true
+             ?(typeof response.practiceScoreMax==="number"?response.practiceScoreMax:
+               typeof response.maxDemoScore==="number"?response.maxDemoScore:null):null,
            submittedAt:row.submitted_at?.toISOString()??null,
          };
        }),
        partial:result.rows.length>100,
        canRecordOfficialGrade:false,
-       canReturnPracticeFeedback:cls.siteId==="f1000000-0000-4000-8000-000000000003",
+       canReturnPracticeFeedback:true,
        notice:"Viewing submitted work does not confer independent grading authority. Official grading requires a verified independent grader appointment and governed Course policy.",
      };
    });
@@ -126,7 +130,7 @@ const practiceFeedbackInput=input.extend({
 }).strict();
 
 /**
- * Let verified Valor teachers return practice feedback to synthetic students.
+ * Assigned Class teachers may return private practice feedback in any Site.
  * This updates existing Class-linked homework only. Never grants authority
  * to write official grading_decisions, gradebook or credential records.
  */
@@ -136,8 +140,7 @@ export const returnNativeClassPracticeFeedback=createServerFn({method:"POST"})
    setResponseHeader("Cache-Control","private, no-store");
    return db.transaction(async tx=>{
      const {cls,actor}=await authorizedTeacher(tx,data.classId);
-     if(cls.siteId!=="f1000000-0000-4000-8000-000000000003")
-       throw new AuthorizationError("synthetic Valor demonstration only");
+
      const rows=await tx.execute(sql`
        SELECT gs.id,gs.status,gs.response
        FROM public.graded_submissions gs
@@ -147,28 +150,24 @@ export const returnNativeClassPracticeFeedback=createServerFn({method:"POST"})
         AND ce.course_attempt_id=ca.id AND ce.status='active'
        JOIN public.graded_assignments ga ON ga.id=gs.assignment_id
         AND ga.course_version_id=ca.course_version_id AND ga.section_id IS NULL
-       JOIN public.people p ON p.id=ce.learner_person_id
-       JOIN public.sites site ON site.id=${cls.siteId}::uuid
        WHERE gs.id=${data.submissionId}::uuid
          AND ce.class_id=${cls.id}::uuid
          AND ca.status='active' AND ca.section_id IS NULL
          AND ca.course_version_id=${cls.courseVersionId}::uuid
          AND gs.status IN ('submitted','returned')
-         AND gs.response @> '{"synthetic":true,"practiceResponse":true}'::jsonb
-         AND p.metadata @> '{"synthetic":true}'::jsonb
-         AND site.metadata @> '{"synthetic":true}'::jsonb
+         AND gs.response @> '{"practiceResponse":true}'::jsonb
        FOR UPDATE OF gs
      `);
      const row=rows.rows[0] as {id:string;status:string;response:unknown}|undefined;
-     if(!row)throw new AuthorizationError("current synthetic Class submission");
+     if(!row)throw new AuthorizationError("current Class practice submission");
      const original=asRecord(row.response);
      const updated=await tx.execute(sql`
        UPDATE public.graded_submissions
        SET response=response || jsonb_build_object(
          'teacherFeedback',${data.feedback}::text,
-         'demoScore',${data.practiceScore}::int,
-         'maxDemoScore',10,
-         'synthetic',true,'noncredit',true,'practiceResponse',true
+         'practiceScore',${data.practiceScore}::int,
+         'practiceScoreMax',10,
+         'practiceResponse',true
        ),status='returned'
        WHERE id=${row.id}::uuid AND status IN ('submitted','returned')
        RETURNING id
@@ -188,122 +187,6 @@ export const returnNativeClassPracticeFeedback=createServerFn({method:"POST"})
    });
  });
 
-
-/** Exact synthetic Class teacher preview of privately saved draft practice.
- * Answers remain formative: no scores, official grades, or assessment keys.
- * RLS and the current named Class teacher appointment are checked on each read.
- */
-export const getNativeClassTeacherDraftPractice=createServerFn({method:"GET"})
- .validator((value:unknown)=>input.parse(value))
- .handler(async({data})=>{
-   setResponseHeader("Cache-Control","private, no-store");
-   setResponseHeader("Referrer-Policy","no-referrer");
-   return db.transaction(async tx=>{
-     const {cls}=await authorizedTeacher(tx,data.classId);
-     if(cls.siteId!=="f1000000-0000-4000-8000-000000000003")
-       return {items:[],partial:false};
-     const result=await tx.execute(sql`
-       SELECT fp.id,fp.recorded_at AS "recordedAt",
-         pr.response,COALESCE(p.preferred_name,
-           concat_ws(' ',p.legal_first_name,p.legal_last_name)) AS "studentName"
-       FROM public.formative_practice_attempts fp
-       JOIN public.learner_course_attempts ca ON ca.id=fp.course_attempt_id
-         AND ca.course_version_id=fp.course_version_id
-       JOIN public.class_enrollments ce ON ce.id=ca.class_enrollment_id
-         AND ce.course_attempt_id=ca.id AND ce.status='active'
-       JOIN public.people p ON p.id=ce.learner_person_id
-       JOIN education_v30_secure.formative_practice_responses pr
-         ON pr.practice_attempt_id=fp.id
-       WHERE ce.class_id=${cls.id}::uuid
-         AND ca.status='active' AND ca.section_id IS NULL
-         AND fp.course_version_id=${cls.courseVersionId}::uuid
-         AND pr.response->>'mode'='valor_draft_assessment_practice'
-         AND p.metadata @> '{"synthetic":true}'::jsonb
-       ORDER BY fp.recorded_at DESC,fp.id DESC
-       LIMIT 51
-     `);
-     const items=result.rows.slice(0,50).map(row=>{
-       const raw=asRecord(row.response);
-       const answers=Array.isArray(raw.responses)
-         ?raw.responses.flatMap(answer=>{
-           const value=asRecord(answer);
-           return typeof value.promptText==="string"&&typeof value.response==="string"
-             ?[{prompt:value.promptText,answer:value.response}]:[];
-         }):[];
-       return {
-         id:String(row.id),studentName:String(row.studentName??"Learner"),
-         recordedAt:new Date(String(row.recordedAt)).toISOString(),answers,
-         teacherFeedback:typeof raw.teacherFeedback==="string"?raw.teacherFeedback:null,
-         practiceScore:typeof raw.demoScore==="number"?raw.demoScore:null,
-       };
-     });
-     return {items,partial:result.rows.length>50};
-   });
- });
-
-
-const practiceReviewInput=input.extend({
-  practiceAttemptId:z.string().uuid(),
-  feedback:z.string().trim().min(3).max(3000),
-  practiceScore:z.number().int().min(0).max(10).nullable(),
-}).strict();
-
-/** Teacher review of genuine saved synthetic draft-practice responses. The
- * academic assessment remains draft. An audit accompanies any returned
- * practice-only feedback; this grants no official grading authority.
- */
-export const returnNativeClassDraftPracticeFeedback=createServerFn({method:"POST"})
- .validator((value:unknown)=>practiceReviewInput.parse(value))
- .handler(async({data})=>{
-   setResponseHeader("Cache-Control","private, no-store");
-   return db.transaction(async tx=>{
-     const {cls,actor}=await authorizedTeacher(tx,data.classId);
-     if(cls.siteId!=="f1000000-0000-4000-8000-000000000003")
-       throw new AuthorizationError("synthetic Valor practice review only");
-     const matched=await tx.execute(sql`
-       SELECT fp.id
-       FROM public.formative_practice_attempts fp
-       JOIN public.learner_course_attempts ca ON ca.id=fp.course_attempt_id
-         AND ca.course_version_id=fp.course_version_id
-       JOIN public.class_enrollments ce ON ce.id=ca.class_enrollment_id
-         AND ce.course_attempt_id=ca.id AND ce.status='active'
-       JOIN public.people p ON p.id=ce.learner_person_id
-       JOIN public.sites s ON s.id=${cls.siteId}::uuid
-       JOIN education_v30_secure.formative_practice_responses pr
-         ON pr.practice_attempt_id=fp.id
-       WHERE fp.id=${data.practiceAttemptId}::uuid
-         AND ce.class_id=${cls.id}::uuid
-         AND ca.status='active' AND ca.section_id IS NULL
-         AND fp.course_version_id=${cls.courseVersionId}::uuid
-         AND p.metadata @> '{"synthetic":true}'::jsonb
-         AND s.metadata @> '{"synthetic":true}'::jsonb
-         AND pr.response->>'mode'='valor_draft_assessment_practice'
-       FOR UPDATE OF pr
-     `);
-     if(matched.rows.length!==1)
-       throw new AuthorizationError("exact private synthetic practice response");
-     const updated=await tx.execute(sql`
-       UPDATE education_v30_secure.formative_practice_responses
-       SET response=response || jsonb_build_object(
-         'teacherFeedback',${data.feedback}::text,
-         'demoScore',${data.practiceScore}::int,
-         'maxDemoScore',10
-       )
-       WHERE practice_attempt_id=${data.practiceAttemptId}::uuid
-         AND response->>'mode'='valor_draft_assessment_practice'
-       RETURNING practice_attempt_id
-     `);
-     if(updated.rows.length!==1)
-       throw new AuthorizationError("practice response changed");
-     await writeCanonicalAudit(tx,{
-       actorPersonId:actor.actorPersonId!,owningOrganizationId:cls.operatingOrganizationId,
-       eventCode:"class.knowledge_check.practice_feedback.recorded",
-       entityKind:"formative_practice_attempt",entityId:data.practiceAttemptId,
-       payload:{classId:cls.id,practiceOnly:true,scoreRecorded:data.practiceScore!==null},
-     });
-     return {practiceAttemptId:data.practiceAttemptId,practiceOnly:true as const};
-   });
- });
 
 /** Review readiness only. Draft questions, hidden keys, personal learner
  * attempts and official grading appointments are not exposed here. */
