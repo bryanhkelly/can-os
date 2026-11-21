@@ -61,11 +61,15 @@ authorizes tuition collection, child enrollment, operation or accreditation.
 
 ## Delivery gaps, not completion claims
 
-- General, Site-wide Level 1 interest/waitlist intake with a canonical Site
-  prospect record and authorized follow-up is **not yet implemented**; existing
-  public admissions-interest handling is Program-scoped and requires an
-  authorized Program publication. Do not put a decorative or unconnected
-  interest form on the public site.
+- General, Site-wide Level 1 adult interest capture is implemented through
+  the existing rate-limited public inquiry endpoint. It saves to the canonical
+  admissions-interest ledger with nullable Program reference, and creates the
+  existing registrar follow-up Action. Site-level leads can be reviewed,
+  marked contacted, or closed in the shared admissions inbox. This requires
+  migration 0099 before serving write requests.
+- Site-level interest is explicitly **not** a seat waitlist or application.
+  Linking a consented Site prospect to an authorized Program for verified
+  application outreach is a further workflow, not automatic enrollment.
 - Events, location directories, recurring schedules and per-Program routes must
   come from approved system records. They need supported public projection
   contracts and routing, not manual Site page fields or fabricated starter data.
@@ -82,6 +86,9 @@ authorizes tuition collection, child enrollment, operation or accreditation.
 - Step 4 Yes => editable boilerplate and eligible Site Story-derived drafts.
 - Updating Hosting & Organization immediately updates the published funding
   status note (self-reported only), without a website editor save.
+- A reviewed, publicly published Site with zero Programs serves a working
+  general-interest contact form. The public handler rechecks publication,
+  request origin, consent, deduplication and shared rate limits.
 - Updating reviewed tuition/aid facts updates public costs and funding text
   without rewriting Site-owned editorial revisions.
 - An approved or full Offering must never be confused with a planned Program.
