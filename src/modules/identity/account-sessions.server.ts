@@ -26,7 +26,7 @@ export async function listAccountSessions(actor: AccessContext) {
   osFamily:accessSessions.osFamily,
  }).from(accessSessions)
   .where(and(
-   eq(accessSessions.accountId, actor.sessionAccountId ?? actor.accountId),
+   eq(accessSessions.accountId, actor.impersonatedByAccountId ?? actor.sessionAccountId ?? actor.accountId),
    isNull(accessSessions.revokedAt),
    gt(accessSessions.expiresAt, now),
    gt(accessSessions.updatedAt, sessionIdleCutoff(now)),
@@ -60,7 +60,7 @@ export async function revokeOwnedAccountSessions(
  return db.transaction(async tx => {
   const now = new Date();
   const criteria = [
-   eq(accessSessions.accountId, actor.sessionAccountId ?? actor.accountId),
+   eq(accessSessions.accountId, actor.impersonatedByAccountId ?? actor.sessionAccountId ?? actor.accountId),
    isNull(accessSessions.revokedAt),
   ];
   if (selection.kind === "one") {
@@ -75,7 +75,7 @@ export async function revokeOwnedAccountSessions(
     action: selection.kind === "all"
      ? "identity.sessions.revoked_all" : "identity.session.revoked_remote",
     accountId: actor.accountId,
-    sessionAccountId: actor.sessionAccountId ?? actor.accountId,
+    sessionAccountId: actor.impersonatedByAccountId ?? actor.sessionAccountId ?? actor.accountId,
     actorPersonId: actor.actorPersonId!,
     sessionId: actor.sessionId,
     grantId: actor.grantId,
@@ -95,7 +95,7 @@ export async function revokeOwnedAccountSessions(
 export async function listAccountSessionSignals(actor:AccessContext){
  if(!actor.accountId||!actor.sessionId||!actor.actorPersonId)
   throw new AuthorizationError("authenticated account session");
- const owner=actor.sessionAccountId??actor.accountId;
+ const owner=actor.impersonatedByAccountId??actor.sessionAccountId??actor.accountId;
  const rows=await db.select({signal:accessSessionSignals.signal,occurredAt:accessSessionSignals.occurredAt})
   .from(accessSessionSignals).where(eq(accessSessionSignals.accountId,owner))
   .orderBy(desc(accessSessionSignals.occurredAt)).limit(10);
