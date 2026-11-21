@@ -104,7 +104,7 @@ export function resolveVisibleSolutionRecipe<T extends { blueprintVersionId: str
   return visible.find(template => template.blueprintVersionId === selectedId) ?? visible[0];
 }
 
-/** An Establish delivery preference guides catalog discovery; it is not
+/** A Shape delivery preference guides catalog discovery; it is not
  * a verified delivery configuration or a restriction on available options. */
 export function preferredCatalogDelivery(
   delivery: "physical" | "digital" | "both" | null | undefined,
