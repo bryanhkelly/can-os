@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import {
 import { saveSiteInformationV61 } from "@/modules/programs/site-information-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
+import { siteInformationGuideV61 } from "@/domain/launch-site-guide-v61";
+import type { SiteGuideContentV61 } from "./SiteGuideV61";
 import { GuidedSetupShell } from "@/components/workflow";
 
 type Step = 0 | 1 | 2 | 3;
@@ -70,8 +72,8 @@ export const siteInformationV61Guidance = [
   },
 ] as const;
 
-export function SiteInformationV61Guidance({ step }: { step: Step }) {
-  return <LaunchGuidancePanels guidance={siteInformationV61Guidance[step]} />;
+export function SiteInformationV61Guidance({ step, guide }: { step: Step; guide?: SiteGuideContentV61 | null }) {
+  return <LaunchGuidancePanels guidance={siteInformationV61Guidance[step]} guide={guide} />;
 }
 
 const motivations = [
@@ -133,7 +135,7 @@ function isEmptyStory(story: SiteStoryV61): boolean {
 function snapshot(value: unknown) { return JSON.stringify(value); }
 
 export function EstablishSiteInformationV61({ siteId, responsibleOrganizationName, initial,
-  onBackToSiteProfile, onSaveAndExit, onContinueToPrograms, onInternalStepChange,
+  onBackToSiteProfile, onSaveAndExit, onContinueToPrograms, onInternalStepChange, onGuideChange,
 }: {
   siteId: string;
   responsibleOrganizationName: string | null;
@@ -142,6 +144,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   onSaveAndExit: () => Promise<void>;
   onContinueToPrograms: () => void;
   onInternalStepChange?: (step: Step) => void;
+  onGuideChange?: (guide: SiteGuideContentV61) => void;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
@@ -158,6 +161,12 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   const [savedEnvironment, setSavedEnvironment] = useState(snapshot(initial.environment));
   const [savedStory, setSavedStory] = useState(snapshot(normalizeStory(initial.story)));
   const [networkChoice, setNetworkChoice] = useState<"independent" | "request">("independent");
+  // The rail follows live structured selections without reading free-text story fields.
+  const liveGuide = useMemo(() => siteInformationGuideV61(step, {
+    siteType: identity.siteType, hostingMode: host.hostingMode,
+    delivery: environment.delivery, values: story.values, networkChoice,
+  }), [step, identity.siteType, host.hostingMode, environment.delivery, story.values, networkChoice]);
+  useEffect(() => { onGuideChange?.(liveGuide); }, [liveGuide, onGuideChange]);
   const [busy, setBusy] = useState(false);
   const [reloadRequired, setReloadRequired] = useState(false);
   const [error, setError] = useState("");
