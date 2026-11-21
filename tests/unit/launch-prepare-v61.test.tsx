@@ -200,8 +200,8 @@ describe("V6.1 Prepare to Open", () => {
     expect(catalog).toContain("setResumeConfigurationId(saved.plan.configurationId)");
     expect(readiness).toContain("SolutionPlansReadinessV61");
     expect(solutionView).toContain("solutionPlanId:plan.configurationId");
-    expect(solutionView).toContain("View published Solution requirements");
-    expect(solutionView).toContain("These are not verified Site readiness.");
+    expect(solutionView).toContain("View what this solution needs");
+    expect(solutionView).toContain("Complete the necessary checks before offering this solution.");
     expect(solutionView).toContain("Continue plan");
     expect(solutionView).toContain("Review plan");
   });
