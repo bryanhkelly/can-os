@@ -98,12 +98,14 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
           status:item.status??"not_started",
           submittedAt:item.submitted_at?.toISOString()??null,
           responseText:typeof response.text==="string"?response.text:"",
-          practiceFeedback:response.synthetic===true&&typeof response.teacherFeedback==="string"
+          practiceFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"
             ?response.teacherFeedback:null,
-          practiceScore:response.synthetic===true&&typeof response.demoScore==="number"
-            ?response.demoScore:null,
-          practiceScoreMax:response.synthetic===true&&typeof response.maxDemoScore==="number"
-            ?response.maxDemoScore:null,
+          practiceScore:response.practiceResponse===true
+            ?(typeof response.practiceScore==="number"?response.practiceScore:
+              typeof response.demoScore==="number"?response.demoScore:null):null,
+          practiceScoreMax:response.practiceResponse===true
+            ?(typeof response.practiceScoreMax==="number"?response.practiceScoreMax:
+              typeof response.maxDemoScore==="number"?response.maxDemoScore:null):null,
           submitted:!!item.submission_id,
         };
       })};
@@ -122,25 +124,14 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
          actor.role==="learner"&&actor.capabilities.has("learning.participate")))
       throw new AuthorizationError("own homework submission capability");
     return db.transaction(async tx=>{
-      const {cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
-      // Real submissions to the fictional Valor Site must remain explicitly
-      // noncredit/synthetic so Riley can return practice feedback without
-      // accidentally manufacturing a grade or overwriting official evidence.
-      const demo=cls.siteId==="f1000000-0000-4000-8000-000000000003"
-        ?await tx.execute(sql`
-          SELECT EXISTS(SELECT 1 FROM public.people p
-            JOIN public.sites s ON s.id=${cls.siteId}::uuid
-            WHERE p.id=${actor.actorPersonId}::uuid
-              AND p.metadata @> '{"synthetic":true}'::jsonb
-              AND s.metadata @> '{"synthetic":true}'::jsonb) AS eligible
-        `)
-        :null;
-      const syntheticPractice=demo?.rows[0]?.eligible===true;
+      const {enrollment,cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      // Ordinary non-credit Class assignments may receive private, unscored
+      // teacher feedback. This is determined by the current Enrollment's
+      // credit mode, never by a synthetic Site/Person marker or demo email.
+      const practiceOnly=enrollment.creditMode==="not_applicable";
       const responseValue=JSON.stringify({
         text:data.responseText,format:"text",
-        ...(syntheticPractice
-          ?{synthetic:true,practiceResponse:true,noncredit:true}
-          :{}),
+        ...(practiceOnly?{practiceResponse:true}:{}),
       });
       const assignment=await tx.execute(sql`
         SELECT a.id FROM public.graded_assignments a
