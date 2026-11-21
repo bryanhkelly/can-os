@@ -148,6 +148,48 @@ describe("Launch Studio V6.1 editorial contract", () => {
     expect(website).toContain("The private preview is not publication.");
   });
 
+  it("uses inclusive customer copy and distinguishes website publication from Site launch", () => {
+    const route = source("src/routes/launch.site.tsx");
+    const identity = source("src/components/launch-studio/WebsiteBrandIdentityStep.tsx");
+    const wizard = source("src/components/launch-studio/MarketingPackageWizardV61.tsx");
+    const prepare = source("src/domain/launch-prepare-v61.ts");
+    const outreach = source("src/domain/launch-introduce-v61.ts");
+    expect(route).toContain("What would you like to bring to your community?");
+    expect(identity).toContain("How do you want people to feel when they discover your community?");
+    expect(identity).toContain('label="Name visitors will see"');
+    expect(wizard).toContain('title="Who should hear about this?"');
+    expect(wizard).toContain('title="Which materials would you like to create?"');
+    expect(wizard).toContain("using information you");
+    expect(prepare).toContain('id: "publish-site", title: "Publish Website"');
+    expect(outreach).toContain("Sending and publishing happen separately.");
+  });
+
+  it("explains exactly what declining content reuse clears", () => {
+    const consent = source("src/components/launch-studio/WebsiteContentConsentStep.tsx");
+    const editor = source("src/routes/site-website.tsx");
+    expect(consent).toContain("No, don't reuse my saved information");
+    expect(consent).toContain("current website draft's text and leadership entries");
+    expect(consent).toContain("Previously saved versions remain available");
+    expect(editor).toContain('if(choice==="denied")');
+    expect(editor).toContain('editorialBaseline:undefined,leadershipMembers:[]');
+  });
+
+  it("saves and exits to the authorized Site Workspace without signing the person out", () => {
+    const route = source("src/routes/launch.site.tsx");
+    const website = source("src/routes/site-website.tsx");
+    for (const p of [
+      "src/components/launch-studio/EstablishSiteProfileUnified.tsx",
+      "src/components/launch-studio/EstablishSiteInformationV61.tsx",
+      "src/components/launch-studio/EstablishProgramsAudiencesV61.tsx",
+    ]) expect(source(p)).toContain("Save & Exit");
+    expect(website).toContain('onClick={()=>void saveDraft("exit")}>Save &amp; Exit');
+    expect(website).toContain('router.navigate({ to: "/sites/$siteId", params: { siteId: data.siteId } })');
+    expect(route).toContain('onSaveAndExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}');
+    expect(route).toContain('onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}');
+    expect(route).not.toContain("signOutOfWorkspace");
+    expect(website).not.toContain("signOutOfWorkspace");
+  });
+
   it("keeps publication and registration decisions separate", () => {
     const copy = source("src/components/launch-studio/LaunchSitePublicationPanel.tsx");
     const readiness = source("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
