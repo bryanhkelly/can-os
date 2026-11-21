@@ -42,24 +42,24 @@ const steps = [
 
 export const siteInformationV61Guidance = [
   {
-    why: "The organization responsible for your Site may differ from the organization hosting its activities.",
-    tip: "Naming a host is private planning information, not a verified legal relationship.",
-    next: "Choose the learning environments your Site may support.",
+    why: "Choose the organization hosting your activities.",
+    tip: "Enter the host's details if known.",
+    next: "Choose how learners will participate.",
   },
   {
-    why: "In-person and online delivery have different needs. Your choice tailors later preparation.",
-    tip: "A delivery preference is not a timetable, facility approval, or approved offering.",
-    next: "Decide whether to explore network affiliation.",
+    why: "Choose how learning will take place.",
+    tip: "Schedules and facilities come later.",
+    next: "Choose a network affiliation, if applicable.",
   },
   {
-    why: "Networks may provide resources, but membership and shared access require separate review.",
-    tip: "You can continue independently. An affiliation request is never sent by clicking Continue.",
-    next: "Share why your learning community exists.",
+    why: "You can explore a network or continue independently.",
+    tip: "No request is sent until you submit one.",
+    next: "Tell us about your community.",
   },
   {
-    why: "Your private answers guide suggested About Us, mission, vision and outreach messaging.",
-    tip: "You can review and revise every suggestion. Nothing is published automatically.",
-    next: "Continue to Programs & Audiences, where you can state your broad Program intent.",
+    why: "Your answers help shape your community's story.",
+    tip: "You can edit these answers later.",
+    next: "Choose your Programs and audiences next.",
   },
 ] as const;
 
@@ -301,7 +301,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
 
   return <section aria-label="Site Information" className="min-w-0 space-y-5">
     <GuidedSetupShell title="Site Information"
-      description="Establish how your Site is hosted and the story behind your community."
+      description="Add your hosting details and tell us about your community."
       steps={progressSteps} progressLabel="Site Information sections"
       onStepChange={id => selectStep(Number(id) as Step)}
       navigationDisabled={busy || reloadRequired}>
@@ -313,7 +313,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <div className="border bg-muted/30 p-4">
           <p className="text-xs text-muted-foreground">Responsible organization · Site Profile (read-only)</p>
           <p className="mt-1 font-semibold">{responsibleOrganizationName ?? "Organization unavailable. Refresh your Site."}</p>
-          <p className="mt-2 text-xs text-muted-foreground">Changing the responsible organization requires its own authorized process.</p>
+          <p className="mt-2 text-xs text-muted-foreground"></p>
         </div>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who hosts your learning space or activities?</legend>
@@ -338,7 +338,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="other">Other</option>
           </Select></Field>
         </div>}
-        <WorkspaceNotice>A self-reported host does not create a verified organizational relationship, ownership or authorization.</WorkspaceNotice>
+        <WorkspaceNotice></WorkspaceNotice>
         <fieldset className="space-y-3 border-t pt-5">
           <legend className="text-sm font-semibold">Organization &amp; Tax-Exempt Status</legend>
           <p className="text-xs leading-5 text-muted-foreground">
@@ -387,7 +387,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       </div>
     </WorkspacePanel>}
     {step === 1 && <WorkspacePanel id="site-information-step-1" title="Learning Environment"
-      description="Choose how learners may participate. Specific Solutions and requirements come later.">
+      description="How will learners participate?">
       <div className="space-y-5">
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">How will learners participate?</legend>
@@ -409,11 +409,11 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="planned">Still looking for a location</option>
           </Select>
         </Field>}
-        <WorkspaceNotice>Your Site address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
+        <WorkspaceNotice>Your address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
     {step === 2 && <WorkspacePanel id="site-information-step-2" title="Network Affiliation"
-      description="Optional. You can operate independently while you establish your Site.">
+      description="Optional. Select a network or continue independently.">
       <div className="space-y-5">
         <fieldset className="space-y-3"><legend className="text-sm font-semibold">Would you like to explore network affiliation?</legend>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -424,7 +424,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           </div>
         </fieldset>
         {networkChoice === "request" && <SiteAffiliationPanel siteId={siteId} />}
-        <WorkspaceNotice>Only eligible denomination network requests are currently supported. Submitting a request is a separate explicit action and does not grant membership, private access or enrollment authority.</WorkspaceNotice>
+        <WorkspaceNotice>Network membership requires approval.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
     {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
@@ -442,16 +442,16 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
           <Textarea rows={3} maxLength={1000} value={story.communityNeed}
             onChange={event => setStory(current => ({ ...current, communityNeed: event.target.value }))} /></Field>
-        <MultiChoice title="3. What makes your approach distinctive?" hint="Select aspirations, not unverified claims."
+        <MultiChoice title="3. What makes your approach distinctive?" hint="Choose up to three."
           options={distinctives} selected={story.distinctives} onChange={selected => updateMulti("distinctives", selected)} />
-        <Field label="4. How did your vision begin?" description="Your origin story, in your own words.">
+        <Field label="4. How did your vision begin?" description="">
           <Textarea rows={3} maxLength={2000} value={story.foundingStory}
             onChange={event => setStory(current => ({ ...current, foundingStory: event.target.value }))} /></Field>
         <MultiChoice title="5. What values matter most?" hint="Select what you want reflected in your messaging."
           options={values} selected={story.values} onChange={selected => updateMulti("values", selected)} />
         <MultiChoice title="6. What do you hope learners experience?" hint="Select aspirations, not promised outcomes."
           options={experiences} selected={story.experiences} onChange={selected => updateMulti("experiences", selected)} />
-        <Field label="7. What do you hope this community becomes?" description="Your long-term vision. Optional.">
+        <Field label="7. What do you hope this community becomes?" description="">
           <Textarea rows={4} maxLength={2000} value={story.futureVision}
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
         <p className="text-xs italic leading-5 text-muted-foreground">
