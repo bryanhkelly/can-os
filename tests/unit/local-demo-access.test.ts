@@ -40,7 +40,8 @@ describe("tenant demo provisioning and identities",()=>{
   const riley=LOCAL_DEMO_RILEY_FACILITATOR;
   const grant={...riley,id:riley.grantId,role:"room_facilitator"};
   expect(isApprovedDemoGrant(grant,riley.email)).toBe(true);
-  expect(isApprovedDemoGrant({...grant,role:"teacher"},riley.email)).toBe(true);
+  expect(isApprovedDemoGrant({...grant,role:"teacher"},riley.email)).toBe(false);
+  expect(isApprovedDemoGrant({...grant,role:"teacher",id:"fb000000-0000-4000-8000-000000000002"},riley.email)).toBe(true);
   for(const changed of [
     {id:"foreign"}, {role:"site_admin"}, {siteId:"foreign"},
     {organizationId:"foreign"}, {personId:"foreign"}, {accountId:"foreign"},
