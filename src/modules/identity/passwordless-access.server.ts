@@ -302,8 +302,12 @@ export async function redeemDemoAccess(
   }
   const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx);
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
+  // Demo login chooses the fixed original primary membership; all additional
+  // roles are selected through the same normal server-authoritative switcher.
+  const fixed=LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===account.id);
   const grant=account.id===LOCAL_DEMO_ADMIN.accountId
    ?accountGrants.find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
+   :fixed?accountGrants.find(candidate=>candidate.role===fixed.role.toLowerCase())
    :accountGrants.length===1?accountGrants[0]:undefined;
   if(!grant||(email.endsWith("@valorschool.demo")&&!isApprovedDemoGrant(grant,email)))
    throw new InvalidAccessCredentialError("Invalid demo credentials");
