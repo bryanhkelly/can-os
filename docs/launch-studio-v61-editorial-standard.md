@@ -33,6 +33,16 @@ Prefer:
 
 Keep shared workflows consistent. Use Site Information and saved site context to tailor optional prompts or helpful suggested text. Faith-related stories, denomination, and spiritual formation belong in an optional group rather than generic questions for secular organizations. Do not infer endorsement, accreditation, funding, permissions, operational readiness, or offered programming from planning interests.
 
+## Canonical Site identity
+
+**Site identity** is declared in Establish → Site Information → Hosting & Organization and saved as `sites.metadata.siteIdentityV61`. It is intentionally distinct from the responsible organization, hosting arrangement, tax status, affiliation, audience and Program intent. A church may host a secular afterschool Site; a faith-based school may use another organization's facilities.
+
+Site identity records a Site type, whether faith is part of its identity, and an optional faith tradition. These are self-reported planning answers, not affiliation, recognition or approval. Do not infer identity from host type, tax status, audience or a network.
+
+The existing `projectSiteContentBriefV61` projection exposes `identity` to the authorized Website & Brand and Introduce read paths. Website & Brand uses it to tailor Tell Your Story prompts and faith fields; already saved faith copy remains editable when classification changes. Church-specific source suggestions are only offered to church Sites. Introduce uses the same identity for **consented, operator-reviewed** starter suggestions and the guided outreach draft. Existing user-authored or released materials must not be regenerated silently.
+
+Old Sites with no saved identity retain all their records and receive an unclassified default, never a guessed religious identity. The Site Information step asks for a classification at the next edit. Identity changes update the Site revision so existing outreach plans can indicate that their source context changed. No new database table, duplicated content store, or operating authorization is introduced.
+
 ## Safety and trust
 
 Preserve actual approvals, content and image consent, publisher authority, and readiness requirements. Be explicit when a decision matters. A shareable preview is not public publication, website publication does not open program registration, and saving a plan does not approve an offering. Do not make these warnings the dominant text of every step.
