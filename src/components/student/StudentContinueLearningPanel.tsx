@@ -29,6 +29,11 @@ export function StudentContinueLearningPanel({
     ? enrolledClasses[0]?.classId ?? null : null;
   return <DashboardPanel id="continue-learning" title="Continue Learning"
           action={resume && resumeClassId?<Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons"}} className={textLink}>Open Class →</Link>:
+            {enrolledClasses.length > 0 && <nav aria-label="Your enrolled Classes" className="mt-4 space-y-2">
+              {enrolledClasses.map(item => <Link key={item.classId} to="/class/$classId"
+                params={{classId:item.classId}} search={{view:"learn",tab:"lessons"}}
+                className="student-resume-action">{item.title} →</Link>)}
+            </nav>}
             <Link to="/class" className={textLink}>View my classes →</Link>}>
           {resume ? <div className="student-resume-grid">
             <div>
@@ -42,7 +47,7 @@ export function StudentContinueLearningPanel({
               </div>
               {resumeClassId ? <Link to="/class/$classId" params={{classId:resumeClassId}}
                 search={{view:"learn",tab:"lessons"}} className="student-resume-action">
-                Open {resume.title} <span aria-hidden="true">→</span></Link>
+                Open {enrolledClasses[0]?.title ?? "Class"} <span aria-hidden="true">→</span></Link>
                 : <Link to="/class" className="student-resume-action">Choose Class →</Link>}
               <p className="mt-2 text-3xs text-muted-foreground">Self-reported completion is not mastery or earned credit.</p>
             </div>
