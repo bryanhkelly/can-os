@@ -132,6 +132,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           localContent,
         };
         const parsed=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+        page.planningPreferences=parsed.success?parsed.data:null;
         const location=schoolPlanningLocationSchema.safeParse(site.metadata.schoolPlanningLocation);
         // Read only exact-Site affiliations when the active operator is granted
         // network read authority. These are NEVER public brand claims.

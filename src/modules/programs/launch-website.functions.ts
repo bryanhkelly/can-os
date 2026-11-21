@@ -110,6 +110,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
      academicPrograms,enrichment:offerings,classes,
    });
    const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
+    planningPreferences:launchPrefs.success?launchPrefs.data:null,
     siteFunding:projectSiteFundingPublicContext(siteFlags?.metadata?.siteHostingV61),
     site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
     parentInformation:projectApprovedParentInformation({
