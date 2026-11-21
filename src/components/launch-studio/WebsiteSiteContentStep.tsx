@@ -40,6 +40,7 @@ export function WebsiteSiteContentStep({
   busy:boolean;allowPublication:boolean;
   onContentBlocksSaved:()=>void;onContentBlocksDirty:(dirty:boolean)=>void;
 }){
+  const canReuse=content.contentReuseConsent === "granted";
   const primaryFields=websiteStarterFieldIds.map(key=>
     contentFields.find(field=>field.key===key)!);
   const additionalFields=contentFields.filter(field=>
@@ -56,19 +57,20 @@ export function WebsiteSiteContentStep({
     <div>
       <h3 className="font-serif text-2xl">Build your website from what you have already shared.</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Site Information provides your origin story, community needs, values, learner
-        experiences and future vision. Your words remain editable before sharing.
+        {canReuse
+          ? "Review prepared suggestions from your saved Site information, or write your own copy."
+          : "Your editorial fields start blank. Write your own copy; CAN OS will not prepare suggestions from previously collected Site information."}
       </p>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">
         Prepared text is a suggestion, not a verified promise about programs, staff
         or opening status. CAN OS remains the source of approved academic and admissions facts.
       </p>
     </div>
-    <p className="text-xs italic leading-5 text-muted-foreground">
-      We use your saved Purpose &amp; Story answers to prepare website copy and
-      potential outreach materials. Review names, permissions, personal details
-      and factual claims before sharing. Nothing goes live automatically.
-    </p>
+    {canReuse&&<p className="text-xs italic leading-5 text-muted-foreground">
+      With your permission, saved Purpose &amp; Story answers can prepare website
+      copy and outreach materials. Review facts and permissions before sharing.
+      Nothing goes live automatically.
+    </p>}
     <details className="border border-border p-3" aria-label="Website section source reference">
       <summary className="cursor-pointer text-sm font-semibold">
         See every homepage section, heading, element and source
@@ -79,7 +81,7 @@ export function WebsiteSiteContentStep({
       </p>
       <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/" />
     </details>
-    {data.siteStoryCopyCandidates.length>0&&
+    {canReuse&&data.siteStoryCopyCandidates.length>0&&
       <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
         <span className="text-sm">
           {data.siteStoryCopyCandidates.length} source-based drafts available from Site Information.
@@ -90,7 +92,7 @@ export function WebsiteSiteContentStep({
           Use Site Information in unchanged starter fields
         </Button>
       </div>}
-    {data.siteStorySourceChoices&&<div className="border bg-muted/20 p-4 text-sm" role="note">
+    {canReuse&&data.siteStorySourceChoices&&<div className="border bg-muted/20 p-4 text-sm" role="note">
       <p className="font-semibold">Suggestions from Site Information</p>
       <p className="mt-2 text-muted-foreground">
         Values: {data.siteStorySourceChoices.values.join(", ")||"not selected"}.
@@ -104,14 +106,14 @@ export function WebsiteSiteContentStep({
       </Link>
     </div>}
     {primaryFields.map(renderField)}
-    <details className="border p-4">
+    {canReuse&&<details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">
         Review source-attributed church story suggestions (optional)
       </summary>
       <div className="mt-4">
         <ChurchSourceSuggestionReview currentRevision={data.currentRevision}/>
       </div>
-    </details>
+    </details>}
     <details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">More optional church details</summary>
       <div className="mt-4 space-y-5">{additionalFields.map(renderField)}</div>
