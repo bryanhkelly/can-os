@@ -9,6 +9,9 @@ import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowRight, Copy, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ActionDialog, ActionFooter, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
@@ -71,6 +74,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   }));
   const [step,setStep]=useState(0);
   const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("email");
+  const [editingFormat,setEditingFormat]=useState<MarketingFormat|null>(null);
   const [showArchived,setShowArchived]=useState(false);
   const [busy,setBusy]=useState(false);
   const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
@@ -125,12 +129,13 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       setReleasesUnavailable(true);}});
     return ()=>{live=false;};
   },[view,record?.id,record?.brandVersionId,siteId,releaseRefreshKey]);
-  const dirty=view==="wizard" && (!record || title!==record.title ||
+  const dirty=(view==="wizard" || (view==="detail" && editingFormat!==null)) && (!record || title!==record.title ||
     JSON.stringify(content)!==JSON.stringify(record.content));
   const releaseNavigation=useLaunchUnsavedChanges(()=>dirty||busy,
     "Leave your Marketing Package? Unsaved changes will be lost.");
 
   function open(recordToOpen:PackageRecord,editing=false) {
+    setEditingFormat(null);
     setRecord(recordToOpen);setTitle(recordToOpen.title);
     setContent({...recordToOpen.content,plan:recordToOpen.content.plan??{
       ...initialOutreachPlanV61(siteIntent?.audienceIds??[]),
@@ -142,6 +147,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     setReleaseRequestId(crypto.randomUUID());setCompare(null);
   }
   function start() {
+    setEditingFormat(null);
     setRecord(null);setTitle(siteName+" outreach");
     setContent({...starter(context.defaultPurpose),
       plan:initialOutreachPlanV61(siteIntent?.audienceIds??[]),
@@ -211,6 +217,14 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       setContent(saved.content);
       if(step<5)setStep(value=>value+1);
       else {setView("detail");setNotice("Outreach plan saved. Materials are not generated or sent.");}
+    });
+  }
+  async function saveMaterialOverride() {
+    if(!record||!editingFormat)return;
+    await run(async()=>{
+      await saveCurrent();
+      setEditingFormat(null);
+      setNotice("Changes to this material were saved. Earlier generated versions are unchanged.");
     });
   }
   async function saveExit() {
@@ -445,8 +459,47 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             <Button type="button" key={format} size="sm" variant={activePreviewFormat===format?"default":"outline"}
               onClick={()=>setPreviewFormat(format)}>{format==="handout"?"Conversation Kit / Handout":format}</Button>)}</div>
           {activePreviewFormat&&<div className="mt-4">
-            <MarketingMaterialPreviewV61 siteId={siteId} title={record.title} content={record.content}
+            <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
+              content={editingFormat===activePreviewFormat?content:record.content}
               brandVersionId={record.brandVersionId} format={activePreviewFormat}/>
+          </div>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" variant="outline"
+              disabled={busy||record.status==="archived"} onClick={()=>{
+                setTitle(record.title);setContent(record.content);setStep(5);setView("wizard");
+              }}>Edit overall message</Button>
+            {activePreviewFormat&&<Button type="button" variant="outline"
+              disabled={busy||record.status==="archived"} onClick={()=>setEditingFormat(
+                current=>current===activePreviewFormat?null:activePreviewFormat)}>
+                {editingFormat===activePreviewFormat?"Close material editor":"Customize this material"}
+              </Button>}
+          </div>
+          {editingFormat&&activePreviewFormat===editingFormat&&<div className="mt-4 space-y-4 border bg-muted/20 p-4">
+            <h3 className="text-sm font-semibold">Customize {editingFormat} only</h3>
+            <Field label="Headline"><Input maxLength={160}
+              value={content.materialOverrides?.[editingFormat]?.headline??content.headline}
+              onChange={event=>patch({materialOverrides:{
+                ...content.materialOverrides,
+                [editingFormat]:{...content.materialOverrides?.[editingFormat],headline:event.target.value},
+              }})}/></Field>
+            <Field label="Message"><Textarea maxLength={1600} rows={6}
+              value={content.materialOverrides?.[editingFormat]?.message??content.message}
+              onChange={event=>patch({materialOverrides:{
+                ...content.materialOverrides,
+                [editingFormat]:{...content.materialOverrides?.[editingFormat],message:event.target.value},
+              }})}/></Field>
+            <Field label="Call to action"><Input maxLength={100}
+              value={content.materialOverrides?.[editingFormat]?.callToAction??content.callToAction}
+              onChange={event=>patch({materialOverrides:{
+                ...content.materialOverrides,
+                [editingFormat]:{...content.materialOverrides?.[editingFormat],callToAction:event.target.value},
+              }})}/></Field>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={busy}
+                onClick={()=>void saveMaterialOverride()}>Save this material</Button>
+              <Button type="button" variant="outline" disabled={busy}
+                onClick={()=>{setContent(record.content);setEditingFormat(null);}}>Discard material changes</Button>
+            </div>
           </div>}
           {record.content.plan?.channels.includes("conversation-kit")&&<div className="mt-4 border p-4 text-sm">
             <h3 className="font-semibold">Conversation Starter Kit</h3>
