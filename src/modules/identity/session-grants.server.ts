@@ -92,7 +92,7 @@ async function listPublicFamilyStartGrantIds(
  * demo Site, not just people on a hardcoded fixture allowlist.
  * This is LOGIN/SWITCH code ONLY. It never provisions or overrides a
  * Person's role, Site scope, independent approvals, or Class enrollment.
- * Protected commands enforce the selected effective grant as usual.
+ * Unverified/disabled accounts are NOT offered for selection because a\n * dead-end selected session would prevent switching back. Protected commands\n * enforce the selected effective grant as usual.
  */
 export async function listDemoSourceGrants(database: GrantReader = db) {
   const rows = await database.select(grantSelection).from(accountPersonGrants)
@@ -100,6 +100,7 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
       eq(accessAccounts.id, accountPersonGrants.accountId),
       eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
+      isNotNull(accessAccounts.emailVerifiedAt),
     ))
     .innerJoin(people, and(
       eq(people.id, accountPersonGrants.personId),
