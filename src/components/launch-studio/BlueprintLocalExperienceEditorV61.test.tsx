@@ -12,7 +12,7 @@ const base = {
 };
 
 function addButton(html:string) {
-  const index = html.indexOf("Add to private Blueprint draft");
+  const index = html.indexOf("Add to my plan");
   return html.slice(html.lastIndexOf("<button",index),html.indexOf("</button>",index)+9);
 }
 
