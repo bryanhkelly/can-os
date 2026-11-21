@@ -26,19 +26,19 @@ describe("Introduce V6.1 guided outreach editor",()=>{
   it("uses six shared progress steps and distinguishes recipients from beneficiaries",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props}/>);
     expect(html).toContain("Introduce outreach steps");
-    expect(html).toContain("Primary Who");
-    expect(html).toContain("Secondary Who");
+    expect(html).toContain("Who would you like to reach?");
+    expect(html).toContain("Who are you hoping to help?");
     expect(html).toContain("People I know");
     expect(html).toContain("Prospective leaders");
     expect(html).toContain("Older adults");
-    expect(html).toContain("does not add contacts or authorize sending");
+    expect(html).toContain("You'll decide how to share it later.");
   });
   it("shows the saved Establish highlights without implying approved offerings",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={2}/>);
     expect(html).toContain("Adult Learning");
     expect(html).toContain("Financial Literacy");
     expect(html).toContain("From Establish");
-    expect(html).toContain("Choose one primary highlight");
+    expect(html).toContain("Choose what you most want people to know");
   });
   it("makes the operator choose material channels without falsely sending",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={4}/>);
