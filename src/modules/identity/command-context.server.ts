@@ -66,7 +66,13 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   accountId:activeGrant.accountId,
   sessionId:session.id,activeGrantId:session.activeGrantId,
  },grants);
- if(demoAccountSwitching)context.sessionAccountId=session.accountId;
+ // Delegation is established ONLY by the server-verified Demo Admin login
+ // and selected active target grant. Downstream services receive the ordinary
+ // effective actor and use identical role, Site, Class and enrollment checks.
+ // Keep the session owner separately for audit, not as a domain authorization
+ // exclusion that turns demo data into a different application.
+ if(demoAccountSwitching && activeGrant.accountId!==session.accountId)
+  context.impersonatedByAccountId=session.accountId;
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
  const grantSites=context.scope.siteIds??[];
