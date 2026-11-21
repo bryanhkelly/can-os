@@ -5,7 +5,6 @@ import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { launchSiteLifecycleLabel, nextLaunchAction } from "@/domain/launch-overview-v61";
 import { launchModuleCompletionV61 } from "@/domain/launch-module-completion-v61";
-import { signOutOfWorkspace } from "@/components/shell/workspace-sign-out";
 import { safeLoader } from "@/lib/safe-loader";
 import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -174,17 +173,17 @@ function SiteLaunchPage() {
       <EstablishSiteProfileUnified key={`${site.id}:${site.updatedAt}`}
         site={site} organizations={organizations}
         onBackToOverview={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
-        onSaveAndExit={signOutOfWorkspace}
+        onSaveAndExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
         onContinueToSiteInformation={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })} />
     </WorkspaceShell> : selected?.id === "site-information" && siteInformation ? <SiteInformationBody
       key={site.id} site={site} initial={siteInformation} organizations={organizations}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-profile" } })}
-      onExit={signOutOfWorkspace}
+      onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "programs-audiences" } })} />
     : selected?.id === "programs-audiences" && programsAudiences ? <ProgramsAudiencesBody
       key={site.id} siteId={site.id} initial={programsAudiences}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })}
-      onExit={signOutOfWorkspace}
+      onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
@@ -250,7 +249,7 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
   const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
   const organization = organizations.find(item => item.id === site.organizationId);
   return <WorkspaceShell title="Site Information" eyebrow="Shape / Site Information"
-    subtitle="Shape your learning environment and introduce the community behind your Site."
+    subtitle="Tell us about your community, how people will take part and what inspires you."
     width="wide" rail={<SiteInformationV61Guidance step={step} guide={guide} />}>
     <EstablishSiteInformationV61 key={site.id + ":" + initial.revision}
       siteId={site.id} responsibleOrganizationName={organization?.name ?? null}
@@ -268,9 +267,9 @@ function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: 
 }) {
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
-  return <WorkspaceShell title="What could your community learn?"
+  return <WorkspaceShell title="What would you like to bring to your community?"
     eyebrow="Shape / Programs & Audiences"
-    subtitle="Choose your Programs, audiences and Experiences. Your vision can shape website content before Solutions are approved."
+    subtitle="Explore what you want to offer, who you hope to serve and the experiences that bring your vision to life."
     width="wide" rail={<ProgramsAudiencesV61Guidance step={step} guide={guide} />}>
     <EstablishProgramsAudiencesV61 key={siteId + ":" + initial.revision}
       siteId={siteId} initial={initial} onInternalStepChange={setStep} onGuideChange={setGuide}
