@@ -29,12 +29,13 @@ export async function requireNativeClassSessionHost(
     .where(and(
       eq(canonicalClassStaffAssignments.classId,instance.id),
       eq(canonicalClassStaffAssignments.personId,host.actor.actorPersonId!),
+      eq(canonicalClassStaffAssignments.roleCode,"facilitator"),
       eq(canonicalClassStaffAssignments.state,"approved"),
       lte(canonicalClassStaffAssignments.beginsAt,now),
       or(isNull(canonicalClassStaffAssignments.endsAt),
         gt(canonicalClassStaffAssignments.endsAt,now)),
     )).limit(1);
-  if(!assignment)throw new AuthorizationError("explicit active Class teaching assignment");
+  if(!assignment)throw new AuthorizationError("explicit active Class facilitator assignment");
   await assertCurrentNativeTeachingGrant(tx,host.actor.actorPersonId!,host.organizationId,instance.siteId);
   return instance;
 }
