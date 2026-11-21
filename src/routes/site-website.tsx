@@ -113,7 +113,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
         <div className="min-w-0">
           <PageHeader eyebrow="Establish / Website & Brand"
             title={data.host?["Brand Identity","Choose a Layout","Visual Identity",
-              "Content Consent","Your Content","Review & Finish"][step]:"Prepare your private website address"}
+              "Use Site Information","Your Content","Review"][step]:"Prepare your private website address"}
             subtitle="Design your Site website." />
           <div className="mt-5">
             {data.host ? <GuidedSetupShell
@@ -137,7 +137,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
         </div>
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Website and Brand guidance">
           <section className="border bg-card p-5">
-            <h2 className="text-sm font-semibold">Website preview</h2>
+            <h2 className="text-sm font-semibold">Preview</h2>
             {data.host?<><p className="mt-2 break-all font-mono text-xs">{data.host}</p>
               <p className="mt-3 text-xs text-muted-foreground">{data.status==="published"?"Published":"Draft"}</p>
               <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
@@ -153,14 +153,14 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   return <WorkspaceShell
     eyebrow="Website & Brand Studio"
     title={data.siteName + " · website & brand"}
-    subtitle={data.organizationName + " · a Site website and reusable communications"} actions={returnToLaunch}>
+    subtitle={data.organizationName} actions={returnToLaunch}>
     <GuidedSetupShell
-      title="Build your Site website and brand together"
+      title="Website & Brand"
       description="Choose a layout, customize your style and edit your content."
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Choose a style":index===1?"Choose a layout":
           index===2?"Colors, fonts and imagery":index===3?"Use saved information":
-            index===4?"Edit website content":"Review private draft",
+            index===4?"Edit website content":"Review website",
         status:step===index?"current":"upcoming",
       })) : [
         { id: "address", title: "Site address", description: "Prepare a private website address", status: "current" },
@@ -480,7 +480,6 @@ function LocalWebsiteCopyEditor({
     <div className="space-y-5">
       {step===0&&<WebsiteBrandIdentityStep
         displayName={brandDisplayName}
-        storyRevision={data.siteStoryRevision}
         currentRevision={data.currentBrandRevision}
         canEdit={data.canEdit} busy={busy}
         direction={brandDirection} recommendation={brandRecommendation}
@@ -505,7 +504,7 @@ function LocalWebsiteCopyEditor({
           paletteId={content.branding.paletteId} typographyId={content.branding.typographyId}
           headingFontId={content.branding.headingFontId} bodyFontId={content.branding.bodyFontId}
           disabled={busy || !data.canEdit}/>
-        <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps Site copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
+
       </div>}
 
       {step===3&&<WebsiteContentConsentStep
