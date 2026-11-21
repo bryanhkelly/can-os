@@ -59,7 +59,7 @@ export async function readSavedBrandVersion(siteId:string,brandVersionId?:string
 export async function requireSavedSiteBrand(siteId:string,reader:Reader=db){
   const brand=await readSavedBrandVersion(siteId,undefined,reader);
   if(!brand)throw new DomainError("UNAVAILABLE",
-    "Save your Site Brand in Establish → Website & Brand before sending interest outreach.");
+    "Save your Site Brand in Shape → Website & Brand before sharing outreach.");
   return brand;
 }
 
