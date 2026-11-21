@@ -5,6 +5,7 @@
  */
 import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, Globe2, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
 import { prepareStageModulesV61, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
+import { SiteGuideV61 } from "./SiteGuideV61";
 import { Link } from "@tanstack/react-router";
 import { WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
@@ -132,6 +133,38 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   },
 };
 
+/** Decisions to consider, not an inferred compliance or approval status. */
+const prepareGuideInsights: Record<PrepareModuleIdV61, { insight: string; connection: string }> = {
+  "program-catalog": {
+    insight: "A Solution is the way you deliver a Program. Compare the people, space, equipment and supervision it actually requires, not just the title.",
+    connection: "A selected Solution creates a plan to prepare and review. It does not yet authorize an offering.",
+  },
+  "facilities-resources": {
+    insight: "Think through the real activities, not just the room name: accessibility, internet access, equipment, capacity and any specialized materials may matter.",
+    connection: "Facilities can be checked against your selected Solution's needs before you schedule participants.",
+  },
+  "invite-team": {
+    insight: "Separate who leads the experience, who facilitates it locally, and who handles administration. One person may hold more than one role, but each role has its own requirements.",
+    connection: "Staff assignments and qualifications help determine whether a planned Solution can operate.",
+  },
+  "schedules-capacity": {
+    insight: "Start with the actual space, staff availability and session format. A large interested audience does not automatically mean those seats exist.",
+    connection: "Your dates and capacity feed operational planning; they do not publish a class or open registration.",
+  },
+  "funding-enrollment": {
+    insight: "Consider what participants can afford, who may pay on their behalf, and whether a funding source has actually been confirmed.",
+    connection: "Fees, funding and registration configuration are separate from the approval to accept participants.",
+  },
+  "opening-compliance": {
+    insight: "Start with the needs of each selected Solution. General Site setup is not enough to verify safety, staffing or an offering's specific requirements.",
+    connection: "The readiness workspaces show the records and decisions that actually govern launch.",
+  },
+  "publish-site": {
+    insight: "Read the website as a first-time visitor. Could someone mistake a planned experience or unverified affiliation for an approved service?",
+    connection: "A private preview can be shared before publication. Publishing the website does not open registration.",
+  },
+};
+
 const intentTitles: Record<SiteProgramsAudiencesV61["interestIds"][number], string> = {
   "grades-6-8": "Grades 6–8",
   "grades-9-12": "Grades 9–12",
@@ -189,9 +222,14 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
   return <WorkspaceShell width="wide" title={definition.title}
     eyebrow="Launch Studio / Prepare"
     subtitle={definition.subtitle}
-    rail={<WorkspacePanel title="Next">
-      <p className="text-sm leading-6 text-muted-foreground">{plan.question}</p>
-    </WorkspacePanel>}>
+    rail={<SiteGuideV61 guide={{
+      summary: plan.question,
+      highlights: module === "program-catalog"
+        ? (intent?.interestIds ?? []).slice(0, 3).map(id => intentTitles[id])
+        : [],
+      insight: prepareGuideInsights[module].insight,
+      connection: prepareGuideInsights[module].connection,
+    }} />}>
     <div className="mt-6 space-y-5">
       {module === "program-catalog" && <>
         <WorkspacePanel title="Your interests"
