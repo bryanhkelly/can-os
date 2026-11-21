@@ -355,11 +355,11 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           personId:canonicalClassStaffAssignments.personId,
           roleCode:canonicalClassStaffAssignments.roleCode,
           attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
-          firstName:canonicalPersons.legalFirstName,
-          lastName:canonicalPersons.legalLastName,
-          preferredName:canonicalPersons.preferredName,
+          firstName:people.legalFirstName,
+          lastName:people.legalLastName,
+          preferredName:people.preferredName,
         }).from(canonicalClassStaffAssignments)
-          .innerJoin(canonicalPersons,eq(canonicalPersons.id,canonicalClassStaffAssignments.personId))
+          .innerJoin(people,eq(people.id,canonicalClassStaffAssignments.personId))
           .where(and(eq(canonicalClassStaffAssignments.classId,instance.id),
             eq(canonicalClassStaffAssignments.state,"approved"),
             lte(canonicalClassStaffAssignments.beginsAt,now),
