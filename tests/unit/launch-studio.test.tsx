@@ -51,7 +51,8 @@ describe("canonical standalone Launch Studio", () => {
     expect(route).not.toContain("SiteFirstLaunch");
     expect(frame).toContain("Preview Website");
     expect(frame).toContain("Site Workspace");
-    expect(overview).toContain("Website & Brand");
+    expect(source("src/domain/launch-site-navigation-v61.ts")).toContain('title: "Website & Brand"');
+    expect(overview).toContain("Shape your vision. Share your story. Prepare to deliver. Launch when ready.");
     expect(prepareStageModulesV61.some(module => module.title === "Program Catalog")).toBe(true);
     expect(existsSync(new URL("../../src/components/launch-studio/SiteFirstLaunch.tsx", import.meta.url))).toBe(false);
   });
