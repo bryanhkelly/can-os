@@ -18,7 +18,7 @@ import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { chooseStartingIdeaV61, selectedStartingIdeaV61 } from "@/domain/site-program-intent-focus-v61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 
-type InternalStep = 0 | 1 | 2;
+type InternalStep = 0 | 1;
 type InterestId = SiteProgramsAudiencesV61["interestIds"][number];
 type TimingId = SiteProgramsAudiencesV61["timingIds"][number];
 type AudienceId = SiteProgramsAudiencesV61["audienceIds"][number];
@@ -66,12 +66,7 @@ const guidance = [
   {
     why: "Knowing your audiences helps shape your messaging without imposing age, admission or guardian-approval rules.",
     tip: "These are private plans, not approved Programs or enrollment eligibility.",
-    next: "Review your choices before saving.",
-  },
-  {
-    why: "Check all your Site planning choices before saving. Edit any section to make corrections.",
-    tip: "Unselected optional fields are not errors. Planning selections do not authorize enrollment.",
-    next: "Save and continue to Website & Brand.",
+    next: "Save your choices, then continue to Website & Brand.",
   },
 ] as const;
 
@@ -235,20 +230,17 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   const disabled = busy || reloadRequired;
   const sections = [
     { id: "interests", title: "Program Interests", description: "What you want to offer",
-      status: step === 0 ? "current" as const : "complete" as const },
+      status: step === 0 ? "current" as const : "upcoming" as const },
     { id: "audiences", title: "Your Audiences", description: "Who you want to reach",
-      status: step === 1 ? "current" as const : step === 2 ? "complete" as const : "upcoming" as const },
-    { id: "review", title: "Review & Save", description: "Check your selections",
-      status: step === 2 ? "current" as const : "upcoming" as const },
+      status: step === 1 ? "current" as const : "upcoming" as const },
   ];
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
-    <GuidedSetupShell title={step === 0 ? "What would you like to offer?" : step === 1 ? "Who do you hope to serve?" : "Review your selections"}
+    <GuidedSetupShell title={step === 0 ? "What would you like to offer?" : "Who do you hope to serve?"}
       description={step === 0
         ? "Choose the Programs and learning ideas you hope to offer. Delivery details come later."
-        : step === 1 ? "Choose the learner groups you hope to reach."
-        : "Review your planning choices, make any edits, then save and continue."}
-      steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : id === "audiences" ? 1 : 2)} navigationDisabled={disabled}>
-      <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : step === 1 ? "Your Audiences" : "Review & Save"}
+        : "Choose intended audiences and check your choices below. There is no separate review step."}
+      steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : 1)} navigationDisabled={disabled}>
+      <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : "Your Audiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
         <fieldset className="space-y-4">
@@ -368,7 +360,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         </section>
         <WorkspaceNotice>These are private planning interests, not approved Programs, Courses, Classes or enrollments. Adopt real offerings later in <strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
         <p className="text-xs text-muted-foreground">{(draft.programCodes ?? []).length} published Program ideas and {draft.interestIds.length} other learning interests selected. You can update your plans later in the Site Workspace.</p>
-      </> : step === 1 ? <>
+      </> : <>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
           <p className="text-xs text-muted-foreground">Select any learner groups you may welcome.</p>
@@ -380,10 +372,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </div>
         </fieldset>
         <WorkspaceNotice><strong>Audience is not enrollment eligibility.</strong> Age restrictions, guardian consent and safeguarding are determined by authorized offerings, not these selections.</WorkspaceNotice>
-      </> : <>
         <section className="space-y-3 border bg-muted/20 p-4" aria-labelledby="pa-summary">
-          <h3 id="pa-summary" className="text-sm font-semibold">Planning summary</h3>
-          <p className="text-xs text-muted-foreground">These are proposed Site plans. Edit any section before saving.</p>
+          <h3 id="pa-summary" className="text-sm font-semibold">Your selections so far</h3>
+          <p className="text-xs text-muted-foreground">A compact reference within this step, not a separate review screen.</p>
           <SummaryRow label="Learning interests" value={labels(draft.interestIds, interests)} onEdit={() => selectStep(0)} />
           <SummaryRow label="Proposed Programs" value={
             (draft.programCodes ?? []).length ? (draft.programCodes ?? [])
@@ -398,9 +389,11 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
                 ?? draft.startingProgramCode
               : options.find(item => item.id === draft.startingFocus)?.label) ?? "Not selected"}
             onEdit={() => selectStep(0)} />
-          <SummaryRow label="Intended audiences" value={labels(draft.audienceIds, audienceChoices)} onEdit={() => selectStep(1)} />
+          <SummaryRow label="Intended audiences" value={labels(draft.audienceIds, audienceChoices)} />
         </section>
-        <WorkspaceNotice><strong>Planning only.</strong> Selections do not authorize Programs, Solutions, Classes or enrollments. Authorization is reviewed independently in Prepare.</WorkspaceNotice>
+      </> : <>
+
+
       </>}
       </div>
     </GuidedSetupShell>
@@ -416,15 +409,13 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     </>}
     <footer aria-label="Programs & Audiences actions">
       <ActionFooter layout="step">
-      <Button variant="outline" disabled={busy} onClick={() => step === 0 ? onBackToSiteInformation() : selectStep(step === 2 ? 1 : 0)}>
+      <Button variant="outline" disabled={busy} onClick={() => step === 0 ? onBackToSiteInformation() : selectStep(0)}>
         <ArrowLeft aria-hidden="true" />{step === 0 ? "Back to Site Information" : "Previous step"}
       </Button>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Sign Out</Button>
         {step === 0
           ? <Button disabled={disabled} onClick={() => selectStep(1)}>Continue to Audiences <ArrowRight aria-hidden="true" /></Button>
-          : step === 1
-          ? <Button disabled={disabled} onClick={() => selectStep(2)}>Review selections <ArrowRight aria-hidden="true" /></Button>
           : <Button loading={busy} disabled={disabled} onClick={() => void save(false)}>
             Save & Continue <ArrowRight aria-hidden="true" />
           </Button>}
