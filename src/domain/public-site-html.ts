@@ -14,7 +14,7 @@ import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { PublicSiteProjection } from "./public-operation-projection";
 import type {PublicSchoolSiteMedia} from "./school-site-media-public";
-import { normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
+import { normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
