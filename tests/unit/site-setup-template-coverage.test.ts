@@ -67,26 +67,25 @@ describe("Site setup data remains separate from website presentation",()=>{
           expect(html,templateId+"/"+delivery+" missing "+text).toContain(text);
         for(const text of ["Brentwood, CA",siteSetup.timezone,
           expectedDelivery[delivery],"Community Learning Network",
-          "Saved Site","Affiliation: pending","Planning intent"])
-          expect(html).not.toContain(text);
+          "Affiliation: pending"])
+          expect(html).toContain(text);
         expect(html).not.toContain("Weekend Learning");
         expect(html).not.toContain("Evening Learning");
       }
     }
   });
-  it("never makes planning selections or network membership public automatically",()=>{
+  it("shows explicitly configured public sections with their factual current status",()=>{
     const feeds=sourceFeeds("physical");
     const published=resolveSiteContentBlocks(defaultSiteContentChannelConfig,
       {...feeds,mode:"public"});
-    expect(published.some(b=>
-      ["site.setup","site.network","learning.interests"].includes(b.channel))).toBe(false);
+    for(const channel of ["site.setup","site.network","learning.interests"])
+      expect(published.some(b=>b.channel===channel)).toBe(true);
     const html=renderPublicSiteHtml({...templateSite("modern"),contentBlocks:published});
-    expect(html).not.toContain('data-content-channel="site.setup"');
-    expect(html).not.toContain('data-content-channel="site.network"');
-    expect(html).not.toContain('data-content-channel="learning.interests"');
-    expect(html).not.toContain("Affiliation: pending");
-    expect(html).not.toContain("Planned location");
-    expect(html).not.toContain("Planning intent");
+    expect(html).toContain('data-content-channel="site.setup"');
+    expect(html).toContain('data-content-channel="site.network"');
+    expect(html).toContain('data-content-channel="learning.interests"');
+    expect(html).toContain("Affiliation: pending");
+    expect(html).not.toContain('href="/apply"');
   });
   it("includes a registered public Class channel without publishing private Class or enrollment data",()=>{
     expect(siteContentChannelIds).toContain("learning.classes");
