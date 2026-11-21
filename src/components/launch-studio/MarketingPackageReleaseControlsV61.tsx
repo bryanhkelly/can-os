@@ -55,16 +55,16 @@ export function MarketingPackageReleaseControlsV61({
                 <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
                   onClick={onSelectCurrentBrand}>Use newer Brand</Button>
               </div>}
-            {releasesLoading&&<p role="status" className="text-sm text-muted-foreground">Loading Package Release history…</p>}
-            {releasesUnavailable&&<WorkspaceNotice tone="attention">Package history is unavailable. To avoid duplicate releases, reload the history before generating new material.
+            {releasesLoading&&<p role="status" className="text-sm text-muted-foreground">Loading earlier materials…</p>}
+            {releasesUnavailable&&<WorkspaceNotice tone="attention">We couldn't check your earlier materials. Reload them before creating another version.
               <Button type="button" variant="outline" size="sm"
                 onClick={onRetryHistory}>Retry history</Button>
             </WorkspaceNotice>}
             {!releasesLoading&&latestPackageRelease&&<div className="space-y-2 border bg-muted/25 p-4">
               <p className="text-sm font-semibold">Latest generated: Materials v{latestPackageRelease.releaseNumber}</p>
               {packageChanges.length
-                ? <p className="text-sm">Updates available: {packageChanges.map(change=>changeLabels[change]??change).join(", ")}. Preview and release an updated Package when ready.</p>
-                : <p className="text-sm text-muted-foreground">The working Package matches the latest generated release. Reuse that release instead of creating a duplicate.</p>}
+                ? <p className="text-sm">Updates available: {packageChanges.map(change=>changeLabels[change]??change).join(", ")}. Preview and create updated materials when you're ready.</p>
+                : <p className="text-sm text-muted-foreground">Your materials are up to date. You can continue using the latest saved version.</p>}
             </div>}
             {!releasesLoading&&!latestPackageRelease&&
               <p className="text-sm text-muted-foreground">No materials have been created for this outreach yet. Select supported formats to generate them together.</p>}
@@ -78,8 +78,7 @@ export function MarketingPackageReleaseControlsV61({
                 {latestPackageRelease?"Create Updated Materials":"Create Materials"}
               </Button>
             </div>
-            <WorkspaceNotice tone="info">Creating materials does not publish the website,
-              send email, update scheduled communications, or change earlier Package Releases.</WorkspaceNotice>
+            <WorkspaceNotice tone="info">Your materials are saved here. Nothing is sent or published automatically, and earlier versions remain available.</WorkspaceNotice>
           </div>
         </WorkspacePanel>;
 }
