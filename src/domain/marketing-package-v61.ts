@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { siteIdentityEditorialContextV61, type SiteIdentityV61 } from "./site-identity-v61";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
 import type { SiteProgramsAudiencesV61 } from "./site-launch-preferences";
 import { projectSiteExperienceBriefV61 } from "./site-content-brief-v61";
@@ -74,6 +75,7 @@ export function outreachStepIssueV61(step: typeof outreachStepIdsV61[number],
  * It reflects operator-selected planning interests, never approved offerings. */
 export function composeOutreachDraftV61(
   siteName: string, plan: OutreachPlanV61, intent?: SiteProgramsAudiencesV61 | null,
+  siteIdentity?: SiteIdentityV61 | null,
 ) {
   const focus=plan.highlights.find(item=>item.role==="primary")?.label ??
     "community learning opportunities";
@@ -111,10 +113,13 @@ export function composeOutreachDraftV61(
     "attend-event":"Learn about a future event",
     "schedule-conversation":"Request a conversation",
   }[plan.action];
+  const identityIntro=siteIdentity
+    ? "We are developing this Site as a "+siteIdentityEditorialContextV61(siteIdentity).kind+". "
+    : "";
   const message="At "+siteName+", we're exploring "+focus+
     (supporting.length?", with interests such as "+supporting.join(" and "):"")+
     (beneficiaries?", for "+beneficiaries:"")+
-    ". These are proposed opportunities, and details have not been finalized. "+
+    ". These are proposed opportunities, and details have not been finalized. "+identityIntro+
     (activities.length?"Possible activities include "+activities.join(" and ")+". ":"")+
     "We'd love to connect with "+recipientText+" to "+angle+
     ". Your ideas and participation can help shape what comes next.";
