@@ -410,7 +410,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           
         </div>
         <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">Who hosts your learning space or activities?</legend>
+          <legend className="text-sm font-semibold">Who will host your activities or programs?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
             <SelectionCard kind="radio" name="site-host" checked={host.hostingMode === "same"} title="Your organization"
               detail="Your organization hosts its own activities" onChange={() => setHost(current => ({ ...current, hostingMode: "same" }))} />
@@ -537,7 +537,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <p className="text-xs text-muted-foreground">Your answers can help shape your website and outreach. You'll review any suggested wording before using it. Please don't share private details about others.</p>
         <MultiChoice title="1. What inspires this work?" hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
-        <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
+        <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. Please leave out private information about participants.">
           <Textarea rows={3} maxLength={1000} value={story.communityNeed}
             onChange={event => setStory(current => ({ ...current, communityNeed: event.target.value }))} /></Field>
         <MultiChoice title="3. What makes your approach distinctive?" hint="Choose up to three."
