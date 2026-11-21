@@ -141,6 +141,14 @@ const intentTitles: Record<SiteProgramsAudiencesV61["interestIds"][number], stri
   senior: "Older Adults",
 };
 
+function displaySelectedProgram(code:string, available?:readonly BlueprintReferenceCatalogItem[]):string {
+  const published=available?.find(item=>item.code===code)?.title;
+  if(published)return published;
+  const name=code.split(".").at(-1)?.replaceAll("_"," ").trim();
+  if(!name)return "Selected program";
+  return name.replace(/\b[a-z]/g,letter=>letter.toUpperCase()).replace(/\bAi\b/g,"AI");
+}
+
 function PrepareModuleHandoffs({ siteId, handoffs, secondary = false }: {
   siteId: string; handoffs: readonly Handoff[]; secondary?: boolean;
 }) {
@@ -196,8 +204,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
               <p className="text-xs font-medium text-muted-foreground">Programs you want to explore</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {intent.programCodes?.map(code => <span key={code} className="border bg-muted px-3 py-2 text-xs font-medium">
-                  {schoolYearAcademyPrograms?.find(item=>item.code===code)?.title ??
-                    code.split(".").at(-1)?.replaceAll("_"," ") ?? code}
+                  {displaySelectedProgram(code,schoolYearAcademyPrograms)}
                 </span>)}
               </div>
             </>}
