@@ -247,7 +247,7 @@ function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: 
   initial: ProgramsAudiencesV61Initial;
   onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
-  const [step, setStep] = useState<0 | 1>(0);
+  const [step, setStep] = useState<0 | 1 | 2>(0);
   return <WorkspaceShell title="What could your community learn?"
     eyebrow="Establish / Programs & Audiences"
     subtitle="Choose what you hope to offer and who you hope to serve. Saved intentions can shape your private website and guide preparation."
