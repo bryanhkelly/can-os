@@ -68,7 +68,7 @@ export function activePreviewShare(
 export function renderSharedSitePreview(
   storedHtml: string, siteId: string, token: string,
   availablePages: readonly string[],
-  synthetic = false,
+  _synthetic = false,
 ): string {
   const known = new Set(availablePages.filter(isPublicSitePagePath));
   const rewritten = storedHtml.replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, "")
@@ -80,7 +80,7 @@ export function renderSharedSitePreview(
       return `${prefix}href="/site-preview-share?${params.toString().replaceAll("&", "&amp;")}"`;
     });
   const banner = `<aside class="can-share-preview" role="status">
-    <strong>${synthetic ? "Demonstration website preview" : "Proposed learning community · Website preview"}</strong>
+    <strong>Proposed learning community · Website preview</strong>
     <span>Not published or independently approved. Images may be illustrative. Forms are disabled. No accreditation or enrollment is implied.</span>
   </aside>`;
   const style = `<style>
