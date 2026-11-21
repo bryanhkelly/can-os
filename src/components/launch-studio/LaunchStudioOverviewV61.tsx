@@ -28,7 +28,7 @@ const stagePresentation: Record<SiteLaunchStageV61, {
   summary: string;
 }> = {
   Establish: { icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
-  Introduce: { icon: Megaphone, summary: "Promote your community, connect with prospective learners and host events." },
+  Introduce: { icon: Megaphone, summary: "Create focused outreach plans, share your vision and connect with the community." },
   Prepare: { icon: ClipboardCheck, summary: "Choose offerings, prepare your team and facilities, and confirm readiness." },
   Open: { icon: Rocket, summary: "Open enrollment for approved offerings." },
 };
