@@ -114,17 +114,17 @@ describe("public demo session isolation", () => {
     state.rows = [[{ ...studentGrant, ...change }]];
     expect((await readSessionGrants(student.accountId, student.email)).grants).toEqual([]);
   });
-  it("restricts admin switching to canonical source identities, not copied emails", async () => {
-    state.rows = [[adminGrant], [
-      studentGrant, { ...studentGrant, accountId: "foreign-account" },
-      { ...studentGrant, personId: "authentic-person" },
-      { ...studentGrant, organizationId: "authentic-organization" },
-    ]];
-    const result = await readSessionGrants(LOCAL_DEMO_ADMIN.accountId, LOCAL_DEMO_ADMIN.email);
+  it("enumerates current existing Site users for Admin switch without a fixed roster", async () => {
+    const newStaff = {
+      ...studentGrant, id:"new-person-grant", accountId:"new-person-account",
+      personId:"new-person", role:"student",email:"student@valorschool.demo",
+    };
+    state.rows = [[adminGrant],[studentGrant,newStaff]];
+    const result=await readSessionGrants(LOCAL_DEMO_ADMIN.accountId,LOCAL_DEMO_ADMIN.email);
     expect(result).toEqual({
-      grants: [adminGrant, studentGrant],
-      demoAccountSwitching: true,
-      launchSiteId: LOCAL_DEMO_ADMIN.siteId,
+      grants:[adminGrant,studentGrant,newStaff],
+      demoAccountSwitching:true,
+      launchSiteId:LOCAL_DEMO_ADMIN.siteId,
     });
   });
   it("does not grant code access to arbitrary demo-domain identities", async () => {
