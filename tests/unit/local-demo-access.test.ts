@@ -2,6 +2,7 @@ import {describe,it,expect} from "vitest";
 import {
  isDemoAccountEmail,isLocalDemoProvisioningEnabled,isApprovedDemoGrant,
  LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,LOCAL_DEMO_ROOM_FACILITATOR,
+ LOCAL_DEMO_RILEY_FACILITATOR,
 } from "@/domain/local-demo-access";
 
 describe("tenant demo provisioning and identities",()=>{
@@ -34,6 +35,17 @@ describe("tenant demo provisioning and identities",()=>{
    "admin.demo@valorschool.demo",
    "sally.facilitator@valorschool.demo",
   ]);
+ });
+ it("accepts only Riley's exact, separately provisioned facilitator membership",()=>{
+  const riley=LOCAL_DEMO_RILEY_FACILITATOR;
+  const grant={...riley,id:riley.grantId,role:"room_facilitator"};
+  expect(isApprovedDemoGrant(grant,riley.email)).toBe(true);
+  expect(isApprovedDemoGrant({...grant,role:"teacher"},riley.email)).toBe(true);
+  for(const changed of [
+    {id:"foreign"}, {role:"site_admin"}, {siteId:"foreign"},
+    {organizationId:"foreign"}, {personId:"foreign"}, {accountId:"foreign"},
+  ])expect(isApprovedDemoGrant({...grant,...changed},riley.email)).toBe(false);
+  expect(isApprovedDemoGrant({...grant,id:undefined},riley.email)).toBe(false);
  });
  it("binds Sally only to the approved Valor room facilitator identity",()=>{
   const grant={...LOCAL_DEMO_ROOM_FACILITATOR,role:"room_facilitator"};
