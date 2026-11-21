@@ -3,6 +3,8 @@ import { ArrowRight, BookOpen, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionDialog, EmptyState, FilterBar, SelectionCard, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
+import { projectSiteSolutionPreparationV61 } from "@/domain/site-solution-preparation-v61";
+import { SolutionPreparationSummaryV61 } from "./SolutionPreparationSummaryV61";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import {
@@ -279,6 +281,12 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
         onUnsavedChange={setEditorState}
         embedded enableReferences />
     </>}
+    {workspace?.configurations.length ? <div className="mt-6">
+      <SolutionPreparationSummaryV61 siteId={siteId}
+        plans={projectSiteSolutionPreparationV61({
+          siteId,templates:workspace.templates,configurations:workspace.configurations,
+        })}/>
+    </div>:null}
     <p className="mt-6 border-t pt-4 text-xs leading-5 text-muted-foreground">
       When a selected Solution includes a Program model, you can choose its approved
       published learning products while configuring the Site plan. Adoption, class

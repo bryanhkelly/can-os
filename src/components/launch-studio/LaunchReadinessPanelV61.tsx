@@ -7,6 +7,8 @@ import { readLaunchSitePublication } from "@/modules/sites/launch-site-publicati
 import { getNoncreditEnrollmentPublisher } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
 import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { projectProgramOfferingJourneys } from "@/domain/program-offering-journey-v61";
+import { projectSiteSolutionPreparationV61 } from "@/domain/site-solution-preparation-v61";
+import { SolutionPreparationSummaryV61 } from "./SolutionPreparationSummaryV61";
 
 /** Existing authorities own every status. This is a read-only cross-workflow
  * projection, not a new readiness checklist, approval or enrollment toggle. */
@@ -15,7 +17,6 @@ import type {
   LaunchReadinessPublication, LaunchReadinessNoncredit, LaunchReadinessIntent,
 } from "./launch-readiness-types-v61";
 import { ProgramOfferingJourneyReadinessV61 } from "./ProgramOfferingJourneyReadinessV61";
-import { SolutionPlansReadinessV61 } from "./SolutionPlansReadinessV61";
 import { ProgramRequirementsReadinessV61 } from "./ProgramRequirementsReadinessV61";
 import { SitePublicationReadinessV61 } from "./SitePublicationReadinessV61";
 import { NoncreditPublisherReadinessV61 } from "./NoncreditPublisherReadinessV61";
@@ -88,6 +89,14 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
           : {}),
       })
     : null;
+  const solutionPreparation=solutions.state==="ready"
+    ? projectSiteSolutionPreparationV61({
+        siteId,templates:solutions.value.templates,
+        configurations:solutions.value.configurations,
+        ...(context==="open"&&noncredit.state==="ready"
+          ? {candidates:noncredit.value.candidates,releases:noncredit.value.published}:{}),
+      })
+    : null;
   return <WorkspacePanel title={context==="open" ? "Saved readiness and receiving Programs" : "Readiness from existing workspaces"}
     description="Each status comes from its owning workflow. A saved plan, completed requirement, website or Program status never grants Offering-level enrollment authorization.">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -101,7 +110,13 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
       <ProgramOfferingJourneyReadinessV61 siteId={siteId} context={context}
         savedIntent={savedIntent} solutions={solutions} noncredit={noncredit}
         pilotJourneys={pilotJourneys} />
-      <SolutionPlansReadinessV61 siteId={siteId} solutions={solutions} />
+      {solutionPreparation!==null
+        ? <SolutionPreparationSummaryV61 siteId={siteId} plans={solutionPreparation}
+            open={context==="open"}/>
+        : <p role="status" className="border p-3 text-sm">
+            Solution plan evidence is {solutions.state==="loading"?"loading":"unavailable"}.
+            No approval or absence is inferred.
+          </p>}
       <ProgramRequirementsReadinessV61 programs={programs} />
       <SitePublicationReadinessV61 publication={publication} />
       {context==="open" && <NoncreditPublisherReadinessV61 siteId={siteId} noncredit={noncredit}/>}

@@ -249,7 +249,13 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
           </div>
         </div>
       </WorkspacePanel>}
-      <LaunchReadinessPanelV61 key={siteId + ":" + module} siteId={siteId} context="prepare" />
+      {(module==="opening-compliance"||module==="funding-enrollment") &&
+        <LaunchReadinessPanelV61 key={siteId + ":" + module} siteId={siteId} context="prepare" />}
+      {module!=="opening-compliance"&&module!=="funding-enrollment"&&
+        <WorkspaceActionLink title="Review full readiness"
+          description="Inspect Site-scoped evidence, required approvals and remaining preparation."
+          href={"/launch/site?siteId="+scoped(siteId)+"&module=opening-compliance"}
+          actionLabel="Review readiness"/>}
       <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}
         secondary={module === "facilities-resources" || module === "invite-team" ||
           module === "schedules-capacity"} />
