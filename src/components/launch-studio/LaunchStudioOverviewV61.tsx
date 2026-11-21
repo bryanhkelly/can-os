@@ -79,11 +79,11 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
           </article>;
         })}</div>
       </section>
-      <WorkspacePanel title="Your tools">
+      <WorkspacePanel title="Your work, connected">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div><BookOpen className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Learning experiences</h3><p className="mt-1 text-xs text-muted-foreground">Programs, activities, classes, and schedules</p></div>
-          <div><Users className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Community connection</h3><p className="mt-1 text-xs text-muted-foreground">Websites, communications and engagement</p></div>
-          <div><Globe className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Daily operations</h3><p className="mt-1 text-xs text-muted-foreground">Teams, attendance and reporting</p></div>
+          <div><BookOpen className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Programs &amp; experiences</h3><p className="mt-1 text-xs text-muted-foreground">Plan classes, workshops, activities and gatherings</p></div>
+          <div><Users className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Outreach &amp; relationships</h3><p className="mt-1 text-xs text-muted-foreground">Share your website, tell your story and invite interest</p></div>
+          <div><Globe className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">People &amp; operations</h3><p className="mt-1 text-xs text-muted-foreground">Prepare staffing, schedules and readiness</p></div>
         </div>
       </WorkspacePanel>
       <div className="flex flex-wrap items-center justify-between gap-4 bg-accent p-5">
