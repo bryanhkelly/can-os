@@ -26,12 +26,12 @@ type Destination = {
 const scope = (siteId: string) => encodeURIComponent(siteId);
 export const launchModuleDestinationsV61: Record<DestinationModuleId, Destination> = {
   open: {
-    subtitle: "Open enrollment for approved offerings.",
-    intro: "Check your offerings and complete any remaining requirements before opening enrollment.",
+    subtitle: "Ready to welcome participants?",
+    intro: "You're nearly there. Check what's ready and finish any remaining steps before welcoming participants.",
     state: "governed",
-    note: "Enrollment is enabled separately for each approved offering.",
+    note: "Each approved offering has its own registration settings.",
     links: [
-      { label: "Review readiness and opening authority", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Check opening requirements" },
+      { label: "Review opening requirements", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Check opening requirements" },
       { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Review Site publication" },
       { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Review Programs and available seats" },
       { label: "Manage eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Manage approved noncredit registration" },
@@ -56,7 +56,7 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
         <StatusBadge tone="info">Enrollment setup</StatusBadge>
       </div>
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
-      <WorkspacePanel title={module === "open" ? "Enable Enrollment" : "Continue with existing capabilities"}
+      <WorkspacePanel title={module === "open" ? "Welcome participants" : "Your next steps"}
         description={module === "open"
           ? "Check readiness, then open registration for each eligible offering."
           : "Open the existing authorized workspace, retaining the selected Site where that destination supports it."}>
