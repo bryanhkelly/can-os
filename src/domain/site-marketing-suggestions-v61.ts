@@ -11,6 +11,8 @@ import {
  * Free-form founding/needs narratives are never copied automatically.
  */
 export type MarketingStarterSourcesV61 = {
+  /** No prior Site content is reused in marketing unless explicitly authorized. */
+  reuseAllowed?: boolean;
   story: SiteStoryV61 | null;
   intent: SiteProgramsAudiencesV61 | null;
   /** Active published CAN Program titles; no Solution requirements or approvals. */
@@ -70,6 +72,10 @@ export function suggestMarketingStarterV61(
   siteName:string, purpose:MarketingPurpose, source:MarketingStarterSourcesV61,
 ):MarketingStarterSuggestionV61 {
   const content=initialMarketingContent(siteName,purpose);
+  // The Site can still write a package manually when it declines reuse.
+  if(source.reuseAllowed !== true){
+    return {content:{...content,headline:"",message:"",audiences:[]},sources:[],websiteAlternative:null};
+  }
   const sources:string[]=[];
   const name=safeText(siteName,100)||"our learning community";
   const story=source.story;
