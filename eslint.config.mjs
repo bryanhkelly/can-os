@@ -90,6 +90,7 @@ export default tseslint.config(
       // Existing unmatched form layouts remain visible as warnings while
       // consolidated flows are protected with a stricter scoped rule below.
       "can-os-design/no-duplicate-form-actions": "warn",
+      "can-os-design/no-custom-guided-selections": "error",
     },
   },
   {
