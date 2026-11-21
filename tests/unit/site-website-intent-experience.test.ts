@@ -6,6 +6,7 @@ import {
 import {
   createSchoolWebsiteStarterContent, createSiteWebsiteEditorialBaseline,
   createSiteWebsiteStarterContent, refreshSiteWebsiteSuggestedCopy,
+  emptySiteLocalContent,
 } from "@/domain/site-local-content";
 import type { SiteLaunchPreferences } from "@/domain/site-launch-preferences";
 import type { SiteEnrollmentOpportunity } from "@/domain/site-enrollment-opportunities";
@@ -85,6 +86,7 @@ describe("Site Program and audience website experience", () => {
       site: {name: "Community Learning", organizationName: "Neighborhood Organization"},
       offerings: [],
       planningPreferences: adult,
+      localContent: {...emptySiteLocalContent,schoolVision:"A future of community learning."},
     };
     const html=renderPublicSiteHtml(page,{localPreview:true});
     expect(html).toContain("Learning for every chapter of life");
