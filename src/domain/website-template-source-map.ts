@@ -62,7 +62,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
       authored("Main heading (H1)","heroHeadline","Uses the saved headline when provided; otherwise uses the exact Site Brand display name."),
       authored("Subheading","welcomeMessage","Saved welcome message, when provided."),
       brand("Name above the headline","When a custom headline is present, the exact saved Site Brand display name appears as the kicker."),
-      template("Introductory paragraph","Renderer-supplied introduction tailored to available approved academic Programs and enrollment status. A synthetic template gallery may display fictional sample copy."),
+      template("Introductory paragraph","Renderer-supplied introduction tailored to available approved academic Programs and enrollment status. Wireframe selection has no copy."),
       field("Hero image and alt text","Saved website artwork or Site media library","Uses rights-cleared Site hero artwork first, then approved Site media or a clearly illustrative template image in preview.","Establish → Website & Brand → Visual Identity → Imagery; Site media folder","site-media"),
       derived("Buttons and text links","Built from eligible public page routes, published opportunities and independently authorized inquiry destinations. No direct enrollment link without an approved release."),
       template("Template artwork and ornaments","Static folio, stamp, side note, cover label, tile or mosaic text specific to the selected wireframe."),
@@ -98,7 +98,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
   },
   academics:{
     key:"academics",title:"Academic pathways",description:"Cards describing publicly authorized academic Programs.",
-    appearsWhen:"Approved academic Program data is available and this placement is not replaced by an eligible learning.academics content channel. Fictional gallery samples are not real Programs.",
+    appearsWhen:"Approved academic Program data is available and this placement is not replaced by an eligible learning.academics content channel. A grayscale wireframe has no programs or descriptive sample data.",
     elements:[
       template("Section label and H2","Actual eyebrow: 'Learning pathways'. H2: 'Serious learning. A more personal path.' The supporting paragraph varies with the current academic and preview context."),
       approved("Program card names, summaries and delivery","Approved Site academic Program versions","Includes only approved public descriptions and permissible delivery information; cards do not inherit broad Establish-stage intent."),
@@ -110,7 +110,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     key:"enrichment",title:"Student life / enrichment",description:"Cards for independently published enrichment activities and community programs.",
     appearsWhen:"Published enrichment records exist, an eligible channel supplies the section, or the sample template is illustrating a layout.",
     elements:[
-      template("Eyebrow and section heading","Default eyebrow: 'Life beyond lessons'. Default H2: 'Enrichment and student experiences'. Synthetic gallery copy may instead say 'A place to explore what makes you, you.' A Site channel can replace this section."),
+      template("Eyebrow and section heading","Default eyebrow: 'Life beyond lessons'. Default H2: 'Enrichment and student experiences'. A Site channel can replace this section."),
       approved("Activity cards, dates, season and fees","Approved enrichment catalog and public Offering data","Reads current authorized records, fees, capacity status and registration windows; no synthetic event is published from a template."),
       sourceLayout("Edited section title, description and layout","Site-configured learning.enrichment channels can replace the renderer's default panel."),
       derived("Availability messages","Comes from the published Offering's live registration terms, not manually entered template text."),
@@ -148,7 +148,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     appearsWhen:"An enabled content block has placement 'community' and qualifying data.",
     elements:[
       sourceLayout("Eyebrow, H2, description and layout","Saved Site content-channel configuration determines headings and presentation."),
-      approved("Cards or records","Channel-specific approved public sources","Never reads private Site setup, draft affiliation, student data or unapproved media directly into public content."),
+      approved("Cards or records","Channel-specific approved public sources","Saved Site setup and affiliation status are separate configurable channels. Learner records and unapproved media remain excluded."),
     ],
   },
   channelsClosing:{
@@ -232,7 +232,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     elements:[
       template("Page eyebrow, H1 and introductory paragraph","Default eyebrow: 'Our community'. School-focused H1: 'A school shaped by purpose and the people around it.' Non-school experiences use their own source-controlled story title. Introductory text is renderer-owned."),
       authored("Site story and vision","localDescription / churchHistory / schoolVision","Published Site-owned copy, optionally first suggested from Purpose & Story."),
-      approved("People, leader photos and portraits","Reviewed Site parent information and approved Site media","A Site's private staff and contact roster are never copied into a public page by the template."),
+      approved("People, leader photos and portraits","Reviewed Site parent information and approved Site media","Profiles belong to the optional, consented Leadership page; private rosters are not automatically published."),
     ],
   }],
   "/academics":[{
