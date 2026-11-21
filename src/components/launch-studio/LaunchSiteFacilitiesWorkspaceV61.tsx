@@ -71,7 +71,7 @@ function ResourceEditor({value,onChange,disabled}:{
       </Label>
     </div>
     <div className="border-t pt-4">
-      <h4 className="font-semibold">Devices available for learners</h4>
+      <h4 className="font-semibold">Devices available for participants</h4>
       <p className="mt-1 text-xs text-muted-foreground">
         Record device type and quantity, not private device identifiers.
         Counts are self-reported; managed device registration is separate.
