@@ -5,7 +5,7 @@ import {
 } from "@/domain/onsite-attendance-access";
 
 const base: VerifiedAccessGrant = {
-  id:"grant",accountId:"account",personId:"onsite-adult",role:"room_facilitator",
+  id:"grant",accountId:"account",personId:"onsite-adult",role:"site_staff",
   organizationId:"org-1",siteId:"site-a",active:true,
 };
 const session = {accountId:"account",sessionId:"login",activeGrantId:"grant"};
@@ -26,6 +26,15 @@ describe("Hybrid Site onsite staff attendance authority",()=>{
       "referrals:read","support-plans:manage","action.resolve"]) {
       expect(actor.capabilities.has(forbidden)).toBe(false);
     }
+  });
+  it("classroom facilitator does not inherit physical attendance or pickup authority",()=>{
+    const actor=resolveAccessContext(session,[{...base,role:"room_facilitator"}]);
+    actor.scope.programIds=["program-a"];
+    expect(actor.capabilities.has("learning.room.facilitate")).toBe(true);
+    expect(actor.capabilities.has("onsite.attendance.record")).toBe(false);
+    expect(actor.capabilities.has("onsite.pickup.release")).toBe(false);
+    expect(isOnsiteAttendanceRole("room_facilitator")).toBe(false);
+    expect(()=>assertOnsiteAttendanceScope(actor,"site-a")).toThrow();
   });
   it("rejects wrong site even when an expanded scope lists a sibling site",()=>{
     const actor=resolveAccessContext(session,[base]);
