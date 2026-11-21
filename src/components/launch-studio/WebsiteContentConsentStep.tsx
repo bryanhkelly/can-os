@@ -15,9 +15,8 @@ export function WebsiteContentConsentStep({
     <div>
       <h3 id="website-consent-title" className="font-serif text-2xl">Build on what you've shared</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        CAN OS can use information you already provided about your Site, its story,
-        community, intended Programs and audiences to prepare editable website
-        copy and related marketing materials.
+        We can use what you've shared about your organization, story, programs,
+        and community to suggest website and outreach wording you can edit.
       </p>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         You review and edit the content before it is shared or published.
@@ -25,15 +24,14 @@ export function WebsiteContentConsentStep({
       </p>
     </div>
     <fieldset className="space-y-3" disabled={disabled}>
-      <legend className="text-sm font-semibold">May CAN OS reuse this information to prepare content?</legend>
+      <legend className="text-sm font-semibold">May we use what you've shared to suggest content?</legend>
       <label className={"flex cursor-pointer items-start gap-3 border p-4 "+(value==="granted"?"border-primary bg-primary/5":"border-border")}>
         <input className="mt-1 size-4 accent-primary" type="radio" name="website-content-reuse"
           checked={value==="granted"} onChange={()=>onChange("granted")} />
         <span className="space-y-1">
           <span className="block font-semibold">Yes, use my information</span>
           <span className="block text-sm text-muted-foreground">
-            Prepare editable website copy from eligible Site information. Reuse the
-            authorized information to suggest related marketing package content.
+            Use the information I've shared to suggest website and outreach text I can review.
           </span>
         </span>
       </label>
@@ -43,8 +41,7 @@ export function WebsiteContentConsentStep({
         <span className="space-y-1">
           <span className="block font-semibold">No, I'll write my own content</span>
           <span className="block text-sm text-muted-foreground">
-            Start with a blank editorial content page. Do not derive website or
-            marketing copy from information previously collected during setup.
+            Start with a blank page and write my own website and outreach content.
           </span>
         </span>
       </label>
@@ -53,15 +50,12 @@ export function WebsiteContentConsentStep({
       Choose an option before continuing to Your Content.
     </WorkspaceNotice>}
     {value==="denied"&&hasSavedContent&&<WorkspaceNotice tone="attention">
-      Selecting No clears the current editable website copy so that Step 5
-      starts blank. Previously saved and published revisions remain in history
-      until you explicitly replace them with a new saved revision.
+      Choosing No clears the text in your current website draft. Earlier saved
+      versions will still be available.
     </WorkspaceNotice>}
     <p className="text-xs leading-5 text-muted-foreground">
-      Site-level reuse consent does not grant permission to publish an individual
-      person's biography, identifiable photograph or private learner information.
-      Those require their own review and permissions. Official publication and
-      enrollment authorization remain separate.
+      You still need permission to publish someone's photo, biography, or personal
+      details. Website publication and program registration have their own reviews.
     </p>
   </section>;
 }
