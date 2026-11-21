@@ -17,6 +17,8 @@ export type LaunchOverviewEvidence = {
     configurationId: string; lifecycle: "draft" | "frozen";
   }[] }>;
   websiteDraftAvailable: boolean;
+  /** An actual versioned Site website-copy record, not merely a reserved host. */
+  websiteContentSaved?: boolean;
 };
 
 export function launchSiteLifecycleLabel(status: "planning" | "active" | "closed" | null | undefined) {
@@ -61,7 +63,8 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
       description: "Your saved Site Brand could not be verified.",
       href: route("website-brand") };
   }
-  if (!evidence.brand.value.saved || !evidence.websiteDraftAvailable) {
+  if (!evidence.brand.value.saved || !evidence.websiteDraftAvailable ||
+      !evidence.websiteContentSaved) {
     return { title: "Continue Website & Brand",
       description: "Save a Site Brand and a private website draft. Publishing is separate.",
       href: route("website-brand") };

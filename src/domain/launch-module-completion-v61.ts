@@ -32,8 +32,8 @@ export function launchModuleCompletionV61(site: {
   result["programs-audiences"] = evidence.programs.state === "unavailable"
     ? "unavailable" : evidence.programs.value.saved ? "complete" : "incomplete";
   result["website-brand"] = evidence.brand.state === "unavailable"
-    ? "unavailable" : evidence.brand.value.saved && evidence.websiteDraftAvailable
-      ? "complete" : "incomplete";
+    ? "unavailable" : evidence.brand.value.saved && evidence.websiteDraftAvailable &&
+      evidence.websiteContentSaved === true ? "complete" : "incomplete";
 
   // An editable package is not proof of completed outreach or an actual event.
   // An unapproved Solution is not a launch-ready Program Catalog selection.

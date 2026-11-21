@@ -43,7 +43,7 @@ type MarketingPackagesV61Props = {
   siteId:string;siteName:string;initial:PackageRecord[];
   suggestions:MarketingSuggestions|null;onExit:()=>void;
   module?:IntroduceModuleV61;suggestionsUnavailable?:boolean;
-  siteIntent?:SiteProgramsAudiencesV61|null;
+  siteIntent?:SiteProgramsAudiencesV61|null;intentUnavailable?:boolean;
 };
 
 /**
@@ -57,7 +57,8 @@ export function MarketingPackagesV61(props:MarketingPackagesV61Props) {
 }
 
 function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
-  module="create-outreach",suggestionsUnavailable=false,siteIntent=null}:MarketingPackagesV61Props) {
+  module="create-outreach",suggestionsUnavailable=false,siteIntent=null,
+  intentUnavailable=false}:MarketingPackagesV61Props) {
   const router=useRouter();
   const context=introduceModuleConfigV61[module];
   const purposeOptions=marketingPurposeOptions.filter(option=>context.purposes.includes(option.id));
@@ -395,6 +396,10 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     <div className="mt-6 space-y-5">
       {error&&<p role="alert" className="border border-destructive bg-card p-4 text-sm text-destructive">{error}</p>}
       {notice&&<p role="status" className="border bg-card p-4 text-sm">{notice}</p>}
+      {intentUnavailable&&<WorkspaceNotice tone="attention">
+        Saved Programs, Audiences and Experiences could not be verified.
+        Refresh the Site before choosing highlights; empty choices are not assumed.
+      </WorkspaceNotice>}
       {suggestionsUnavailable&&<WorkspaceNotice tone="attention">
         Suggestions are unavailable. Saved packages are still available.
       </WorkspaceNotice>}

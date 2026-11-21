@@ -7,7 +7,7 @@ const complete:LaunchOverviewEvidence = {
   programs:ready({saved:true}),
   brand:ready({saved:true}),
   marketing:ready({hasPackages:true}),
-  websiteDraftAvailable:true,
+  websiteDraftAvailable:true,websiteContentSaved:true,
 };
 
 describe("Launch Overview source-derived next steps", () => {
@@ -76,6 +76,10 @@ describe("Launch Overview source-derived next steps", () => {
     expect(action.title).toBe("Review Closed Site");
     expect(action.href).toBe("/sites/closed-site");
     expect(action.description).toContain("closed");
+  });
+  it("does not equate a reserved address and Brand with saved website copy",()=>{
+    expect(nextLaunchAction("site",{...complete,websiteContentSaved:false}).href)
+      .toContain("module=website-brand");
   });
   it("does not treat a missing website draft as publication readiness", () => {
     expect(nextLaunchAction("site",{...complete,websiteDraftAvailable:false}).href)

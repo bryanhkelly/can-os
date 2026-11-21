@@ -133,6 +133,14 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
         .from(s.organizations).where(eq(s.organizations.type, "can_network"))
         .orderBy(asc(s.organizations.name)),
     ]);
+    // One scoped lookup establishes whether the Site has a real saved copy
+    // revision. A reserved public address alone is not Website & Brand completion.
+    const contentRows = siteRows.length
+      ? await db.selectDistinct({siteId:s.siteLocalContentVersions.siteId})
+        .from(s.siteLocalContentVersions)
+        .where(inArray(s.siteLocalContentVersions.siteId,siteRows.map(site=>site.id)))
+      : [];
+    const sitesWithContent = new Set(contentRows.map(row=>row.siteId));
     const knownIds = new Set(organizationRows.map(organization => organization.id));
     const academicProviderOrganizations = [
       ...organizationRows,
@@ -144,7 +152,8 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       creditIssuingOrganizations: academicProviderOrganizations,
       sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => {
         const planningLocation=schoolPlanningLocationSchema.safeParse(metadata.schoolPlanningLocation);
-        return { ...site, planningLocation:planningLocation.success?planningLocation.data:null, ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), siteInformationDraft:safeJson(metadata.siteInformation??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null }; }),
+        return { ...site, planningLocation:planningLocation.success?planningLocation.data:null, ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), siteInformationDraft:safeJson(metadata.siteInformation??null),
+          websiteContentSaved:sitesWithContent.has(site.id),websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null }; }),
       jurisdictions: jurisdictionRows,
       canCreateSite: context.grantSiteId === null && context.capabilities.has("program.launch.start"),
         schoolSetupAdministrator: context.role === "site_admin",

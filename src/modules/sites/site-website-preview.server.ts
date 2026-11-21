@@ -20,8 +20,8 @@ import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks, projectMissingSiteExperienceSectionsForPreview } from "@/domain/site-content-channels";
-import { siteExperienceById } from "@/domain/site-experience-interests";
-import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
+import { projectSiteExperienceBriefV61 } from "@/domain/site-content-brief-v61";
+import { readSiteProgramsAudiencesV61,siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
@@ -166,10 +166,10 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ...proposedPrograms,
     ...proposedExperiences,
   ];
+  // The same typed Experience projection serves Website & Brand and Introduce.
   const plannedExperienceNames=preferences.success
-    ? [...(preferences.data.experienceIds??[]).flatMap(id=>{
-        const topic=siteExperienceById.get(id);return topic?[topic.title]:[];
-      }),...(preferences.data.customExperiences??[])]
+    ? projectSiteExperienceBriefV61(
+        readSiteProgramsAudiencesV61(preferences.data)).map(item=>item.title)
     : [];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
