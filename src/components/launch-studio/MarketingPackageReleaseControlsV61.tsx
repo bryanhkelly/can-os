@@ -50,7 +50,7 @@ export function MarketingPackageReleaseControlsV61({
             </p>
             {currentBrand&&currentBrand.id!==record.brandVersionId&&
               <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
-                <p className="text-sm">Brand v{currentBrand.revision} is available in Establish.
+                <p className="text-sm">Brand v{currentBrand.revision} is available in Shape.
                   Updating your working Package will not change older releases.</p>
                 <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
                   onClick={onSelectCurrentBrand}>Use newer Brand</Button>
