@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
-import { ArrowLeft, ArrowRight, Check, Pencil, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Pencil, Search, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SelectionCard,WorkspaceNotice } from "@/components/workspace";
@@ -8,8 +8,8 @@ import {
   siteExperienceGroups,siteExperienceCatalog,siteExperienceById,
   siteExperienceOutcomes,siteExperienceLimit,siteExperienceActivityLimit,
   siteExperienceOutcomeLimit,siteExperienceAudienceNames,siteExperienceProgramNames,
-  suggestedSiteExperiences,describeSiteExperience,validCustomExperienceName,
-  type SiteExperienceGroupId,type SiteExperienceId,type SiteExperienceOutcomeId,
+  recommendedSiteExperiences,describeSiteExperience,validCustomExperienceName,
+  type SiteExperienceId,type SiteExperienceOutcomeId,
   type SiteExperienceAudienceId,type SiteExperienceProgramId,
 } from "@/domain/site-experience-interests";
 
@@ -26,7 +26,6 @@ type Props={
  * update the one canonical Site planning draft. */
 export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}:Props){
   const [stage,setStage]=useState<Stage>("choose");
-  const [group,setGroup]=useState<SiteExperienceGroupId>("academic");
   const [query,setQuery]=useState("");
   const [customName,setCustomName]=useState("");
   const [customError,setCustomError]=useState("");
@@ -37,11 +36,23 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
   const selectedTopics=selectedIds.flatMap(id=>{
     const topic=siteExperienceById.get(id);return topic?[topic]:[];
   });
-  const suggested=new Set(suggestedSiteExperiences(draft).map(topic=>topic.id));
-  const topics=siteExperienceCatalog.filter(topic=>
-    (topic.groupIds.includes(group)||!!query.trim()) &&
-    (!query.trim()||[topic.title,...topic.groupIds].join(" ").toLowerCase()
-      .includes(query.trim().toLowerCase())));
+  // The initial screen is a complete, non-navigational catalog: recommendations
+  // are highlighted at the top; every other topic remains visible once below.
+  const recommendations=recommendedSiteExperiences(draft);
+  const recommendedIds=new Set(recommendations.map(topic=>topic.id));
+  const search=query.trim().toLocaleLowerCase();
+  const matches=(topic:typeof siteExperienceCatalog[number])=>
+    !search||[topic.title,
+      ...topic.groupIds.flatMap(id=>siteExperienceGroups.filter(group=>group.id===id).map(group=>group.title)),
+      ...topic.activities.map(activity=>activity.label),
+    ].some(label=>label.toLocaleLowerCase().includes(search));
+  const recommendedTopics=recommendations.filter(matches);
+  const groupedTopics=siteExperienceGroups.map(group=>({
+    ...group,
+    topics:siteExperienceCatalog.filter(topic=>
+      topic.groupIds[0]===group.id && !recommendedIds.has(topic.id) && matches(topic)),
+  })).filter(group=>group.topics.length>0);
+  const topicCount=siteExperienceCatalog.length;
   const selectedDetail=activeId===null?null:
     draft.experienceDetails?.find(detail=>detail.id===activeId)??newDetail(activeId,draft);
   const activeTopic=activeId?siteExperienceById.get(activeId):null;
@@ -143,57 +154,107 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
           onClick={()=>selectStage(key)}>{label}</Button>)}
     </div>
 
-    {stage==="choose"&&<div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold">Experience groups</h4>
-          <p className="text-xs text-muted-foreground">Browse all 12 groups. Your five choices can come from any combination.</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-            {siteExperienceGroups.map(item=><Button key={item.id}
-              type="button" variant={group===item.id?"default":"outline"}
-              size="sm" disabled={disabled} aria-pressed={group===item.id}
-              onClick={()=>{setGroup(item.id);setQuery("");}}
-              className="min-h-12 min-w-0 justify-start whitespace-normal px-3 py-2 text-left">
-              {item.title}
+    {stage==="choose"&&<div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <h4 className="font-serif text-lg">Explore all Experience topics</h4>
+          <p className="text-sm text-muted-foreground">
+            All {topicCount} topics are shown below, organized for scanning.
+            Recommendations are identified, not automatically selected.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <Search className="size-4" aria-hidden="true"/>
+          <span className="sr-only">Search all Experience topics</span>
+          <Input type="search" value={query} disabled={disabled}
+            placeholder="Search topics or activities" aria-label="Search all Experience topics"
+            onChange={event=>setQuery(event.target.value)} className="w-56"/>
+        </label>
+      </div>
+      <div className="space-y-3 border border-border bg-muted/30 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h5 className="text-sm font-semibold">Your selected Experiences</h5>
+          <span className="text-xs text-muted-foreground">{count} of {siteExperienceLimit} selected</span>
+        </div>
+        {count===0
+          ? <p className="text-sm text-muted-foreground">Choose any five topics below to start shaping your community.</p>
+          : <div className="flex flex-wrap gap-2">
+            {selectedTopics.map(topic=><Button key={topic.id} type="button" size="sm"
+              variant="default" aria-label={"Remove "+topic.title}
+              disabled={disabled} onClick={()=>toggleTopic(topic.id)}
+              className="min-h-10 whitespace-normal">
+              <Check aria-hidden="true"/>{topic.title}<X aria-hidden="true"/>
             </Button>)}
-          </div>
+            {customNames.map(name=><Button key={name} type="button" size="sm"
+              variant="default" aria-label={"Remove "+name}
+              disabled={disabled} onClick={()=>setDraft(current=>({...current,
+                customExperiences:(current.customExperiences??[]).filter(item=>item!==name)}))}
+              className="min-h-10 whitespace-normal">
+              <Check aria-hidden="true"/>{name}<X aria-hidden="true"/>
+            </Button>)}
+          </div>}
+      </div>
+      {recommendedTopics.length>0&&<section aria-labelledby="experience-suggested-heading" className="space-y-3">
+        <div className="space-y-1">
+          <h5 id="experience-suggested-heading" className="flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className="size-4 text-primary" aria-hidden="true"/>
+            Recommended for your community
+          </h5>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Based on the Programs and audiences you selected. These suggestions are optional.
+          </p>
         </div>
-        <div className="min-w-0 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {recommendedTopics.map(topic=>{
+            const checked=selectedIds.includes(topic.id);
+            return <Button key={topic.id} type="button" size="sm"
+              variant={checked?"default":"outline"} aria-pressed={checked}
+              aria-label={topic.title+". Recommended."+(checked?" Selected.":" Not selected.")}
+              disabled={disabled||(!checked&&count>=siteExperienceLimit)}
+              onClick={()=>toggleTopic(topic.id)}
+              className={"min-h-11 whitespace-normal text-left "+
+                (checked?"":"border-primary/60 bg-accent/50")}>
+              {checked?<Check aria-hidden="true"/>:<Sparkles aria-hidden="true"/>}
+              {topic.title}
+            </Button>;
+          })}
+        </div>
+      </section>}
+      <div className="space-y-3 border-t border-border pt-4">
+        <h5 className="font-serif text-lg">Browse every other topic</h5>
+        <p className="text-xs text-muted-foreground">
+          All groups are expanded. Tap any chip to add it to your five.
+          A selected chip is blue; an unselected chip has an outline.
+        </p>
+        <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+          {groupedTopics.map(group=><section key={group.id}
+            aria-labelledby={"experience-group-"+group.id}
+            className="min-w-0 space-y-3 border border-border bg-card p-4">
             <div className="space-y-1">
-              <h4 className="font-serif text-lg">{siteExperienceGroups.find(item=>item.id===group)?.title}</h4>
-              <p className="text-xs text-muted-foreground">
-                {siteExperienceGroups.find(item=>item.id===group)?.description}
-              </p>
+              <h6 id={"experience-group-"+group.id} className="text-sm font-semibold">
+                {group.title}
+              </h6>
+              <p className="text-xs leading-5 text-muted-foreground">{group.description}</p>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Search size={16} aria-hidden="true"/>
-              <span className="sr-only">Search Experience topics</span>
-              <Input type="search" value={query} disabled={disabled} placeholder="Find a topic"
-                aria-label="Search Experience topics"
-                onChange={event=>setQuery(event.target.value)} className="w-44"/>
-            </label>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {topics.map(topic=>{
-              const checked=selectedIds.includes(topic.id);
-              const blocked=!checked&&count>=siteExperienceLimit;
-              return <SelectionCard key={topic.id} kind="checkbox" value={topic.id}
-                title={topic.title}
-                detail={<span className="space-y-2">
-                  <span className="block">{topic.description}</span>
-                  {suggested.has(topic.id)&&<span className="block font-semibold text-primary">
-                    Suggested for your audiences and Programs
-                  </span>}
-                </span>}
-                checked={checked} disabled={disabled||blocked} className="min-h-24"
-                onChange={()=>toggleTopic(topic.id)}/>;
-            })}
-          </div>
-          {!topics.length&&<WorkspaceNotice tone="attention">
-            No matching topics. Search another term or choose another Experience group.
-          </WorkspaceNotice>}
+            <div className="flex flex-wrap gap-2">
+              {group.topics.map(topic=>{
+                const checked=selectedIds.includes(topic.id);
+                return <Button key={topic.id} type="button" size="sm"
+                  variant={checked?"default":"outline"} aria-pressed={checked}
+                  aria-label={topic.title+(checked?". Selected.":". Not selected.")}
+                  disabled={disabled||(!checked&&count>=siteExperienceLimit)}
+                  onClick={()=>toggleTopic(topic.id)}
+                  className="min-h-10 whitespace-normal text-left">
+                  {checked&&<Check aria-hidden="true"/>}{topic.title}
+                </Button>;
+              })}
+            </div>
+          </section>)}
         </div>
+        {recommendedTopics.length===0&&groupedTopics.length===0&&
+          <WorkspaceNotice tone="info">
+            No Experience topics match your search. Try another word.
+          </WorkspaceNotice>}
       </div>
       <details className="border-t pt-4" aria-label="Optional local Experience topic">
         <summary className="cursor-pointer text-sm font-semibold">Can't find your idea? Add a local topic</summary>
