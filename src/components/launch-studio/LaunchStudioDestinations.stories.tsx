@@ -12,7 +12,7 @@ const meta = {
   args: {
     siteId: "00000000-0000-4000-8000-000000000001",
     module: "open",
-    title: "Launch",
+    title: "Opening Checklist",
     stage: "Launch",
   },
 } satisfies Meta<typeof LaunchModuleDestinationV61>;
@@ -21,6 +21,6 @@ type Story = StoryObj<typeof meta>;
 
 export const FinalGate: Story = {
   args: {
-    module: "open", title: "Launch", stage: "Launch",
+    module: "open", title: "Opening Checklist", stage: "Launch",
   },
 };
