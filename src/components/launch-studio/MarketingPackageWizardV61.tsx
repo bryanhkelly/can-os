@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, Sparkles, Users, MessageCircle, Star, MousePointerClick, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,7 @@ type Highlight=OutreachPlanV61["highlights"][number];
  * by the existing Marketing Package service. No separate marketing CMS. */
 export function MarketingPackageWizardV61({
   siteId,siteName,siteIntent,step,title,content,busy,brandVersionId,currentSuggestion,
-  activePreviewFormat,starter,onTitleChange,onPatch,onPreviewFormatChange,
+  activePreviewFormat,starter,onTitleChange,onPatch,
   onBack,onSaveExit,onNext,hasSavedPackage,
 }:{
   siteId:string;siteName?:string;siteIntent?:SiteProgramsAudiencesV61|null;
@@ -83,7 +83,10 @@ export function MarketingPackageWizardV61({
   onBack:()=>void;onSaveExit:()=>void;onNext:()=>void;hasSavedPackage:boolean;
 }){
   const plan=content.plan??initialOutreachPlanV61(siteIntent?.audienceIds??[]);
-  const updatePlan=(patch:Partial<OutreachPlanV61>)=>onPatch({plan:{...plan,...patch}});
+  const updatePlan=(patch:Partial<OutreachPlanV61>)=>onPatch({
+    plan:{...plan,...patch},
+    audiences:patch.recipients??plan.recipients,
+  });
   const toggle=(current:readonly string[],value:string)=>
     current.includes(value)?current.filter(id=>id!==value):[...current,value];
   const highlightOptions:Highlight[]=[
