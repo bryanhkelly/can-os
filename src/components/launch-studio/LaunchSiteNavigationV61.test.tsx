@@ -46,6 +46,7 @@ describe("shared Launch Studio Site navigation", () => {
       expect(html).toContain(stage);
     }
     expect(html).toContain("Program Catalog");
+    expect(html).toContain("Opening Checklist");
     expect(html).toContain("1. Shape");
     expect(html).not.toContain("Approved to open");
   });
