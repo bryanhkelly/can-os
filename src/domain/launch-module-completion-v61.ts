@@ -27,8 +27,9 @@ export function launchModuleCompletionV61(site: {
     site.slug && site.timezone ? "complete" : "incomplete";
   if (!evidence) return result;
   result["site-information"] = evidence.information.state === "unavailable"
-    ? "unavailable" : evidence.information.value.hostingSaved &&
-      evidence.information.value.environmentSaved ? "complete" : "incomplete";
+    ? "unavailable" : evidence.information.value.identitySaved !== false &&
+      evidence.information.value.hostingSaved && evidence.information.value.environmentSaved
+      ? "complete" : "incomplete";
   result["programs-audiences"] = evidence.programs.state === "unavailable"
     ? "unavailable" : evidence.programs.value.saved ? "complete" : "incomplete";
   result["website-brand"] = evidence.brand.state === "unavailable"
