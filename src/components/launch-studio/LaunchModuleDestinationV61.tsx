@@ -50,7 +50,9 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
   const destination = launchModuleDestinationsV61[module];
   return <WorkspaceShell title={title} eyebrow={`${stage} / ${title}`}
     subtitle={destination.subtitle} width="wide"
-    rail={<LaunchGuidancePanels guidance={{ why: destination.intro, next: destination.note }} />}>
+    rail={<LaunchGuidancePanels guidance={{ why: destination.intro,
+      tip: "Review the actual readiness results below, including any missing Solution-specific, staffing or safety decisions. A published website is not proof that registration can open.",
+      next: destination.note }} />}>
     <div className="mt-5 space-y-5">
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
       <WorkspacePanel title={module === "open" ? "Welcome participants" : "Your next steps"}
