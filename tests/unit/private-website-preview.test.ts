@@ -43,7 +43,7 @@ describe("authenticated school full-page preview", () => {
     expect(fullPage).toContain("Private school website preview");
     expect(fullPage).toContain("Saved design · not published · sign-in required");
     const firstVisit = renderPrivateWebsitePreviewHtml(html, siteId, paths, false);
-    expect(firstVisit).toContain("Unsaved school starter · illustrative only");
+    expect(firstVisit).toContain("Unsaved illustrative design");
     expect(firstVisit).not.toContain("Saved design · not published");
     expect(firstVisit).toContain(`href="${privateWebsitePreviewUrl(siteId,"/about")}"`);
     expect(fullPage).toContain(privateWebsitePreviewUrl(siteId,"/about").replaceAll("&","&amp;").split("&amp;")[0]);
@@ -73,7 +73,7 @@ describe("authenticated school full-page preview", () => {
     const html = '<html><head><title>Sample</title></head><body></body></html>';
     const result = renderPrivateWebsitePreviewHtml(html, siteId, [], false, "site");
     expect(result).toContain("Private Site website preview");
-    expect(result).toContain("Unsaved Site starter");
+    expect(result).toContain("Unsaved illustrative design");
     expect(result).toContain(`href="/launch/site?siteId=${siteId}"`);
     expect(result).toContain("Return to Launch Studio");
     expect(result).not.toContain("Return to Website &amp; Brand Studio");
