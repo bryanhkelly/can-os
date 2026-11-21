@@ -497,7 +497,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     actions:
       (availablePaths.includes(experienceCopy.heroExplorePath)
         ? '<a class="hero-button" href="'+experienceCopy.heroExplorePath+'">'+experienceCopy.heroExplore+'</a>'
-        : availablePaths.includes("/classes")?'<a class="hero-button" href="/classes">Explore Classes</a>':"") +
+        : navigationCtaPath!=="/" && navigationCtaPath!=="/contact"
+          ? '<a class="hero-button" href="'+navigationCtaPath+'">'+navigationCtaLabel+'</a>' : "") +
       (firstInquiryHref && submissionsEnabled
         ? '<a class="hero-text-link" href="' + firstInquiryHref + '">Request information</a>' : "") +
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
