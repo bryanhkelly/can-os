@@ -110,8 +110,8 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(wizard).toContain("<GuidedSetupProgress");
     expect(wizard).toContain('label="Package progress"');
     expect(gallery).toContain("aria-pressed={viewport === size}");
-    expect(gallery).toContain("aria-pressed:border-primary");
-    expect(gallery).toContain("aria-pressed:bg-accent");
+    expect(gallery).toContain('kind="radio" name="site-wireframe"');
+    expect(gallery).toContain("<SelectionCard");
   });
 
   it("keeps the Launch Studio navigation drawer accessible and aligned", () => {
