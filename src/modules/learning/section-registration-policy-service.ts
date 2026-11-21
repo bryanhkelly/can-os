@@ -44,7 +44,7 @@ export async function getSectionRegistrationPolicy(
         .where(eq(sectionPrerequisites.sectionId, sectionId))
     : [];
 
-  return effectivePolicy(row, prerequisites.map(p => p.code));
+  return effectivePolicy(row, prerequisites.map((p: { code: string }) => p.code));
 }
 
 /** Normalizes current saved rules and pre-migration fallback identically. */
