@@ -301,7 +301,7 @@ const noCustomGuidedSelections = {
     docs: { description: "Use SelectionCard for choice cards and GuidedSetupProgress for internal steps" },
     schema: [],
     messages: {
-      choice: "Use <SelectionCard kind=\\"radio|checkbox\\"> for option cards, not a custom selectable Button.",
+      choice: 'Use <SelectionCard kind="radio|checkbox"> for option cards, not a custom selectable Button.',
       step: "Use <GuidedSetupProgress> for internal wizard steps, not a custom Button-based step bar.",
     },
   },
