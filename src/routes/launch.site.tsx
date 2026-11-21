@@ -41,6 +41,16 @@ export const Route = createFileRoute("/launch/site")({
     const site = deps.siteId
       ? options.sites.find(candidate => candidate.id === deps.siteId)
       : options.sites.length === 1 ? options.sites[0] : null;
+    // Reuse overview reads for the active module. Previously these same
+    // authorized server functions were called a second time on each navigation.
+    let informationRead: Awaited<ReturnType<typeof readSiteInformationV61>> | undefined;
+    let programsRead: Awaited<ReturnType<typeof readSiteProgramsAudiencesV61>> | undefined;
+    let marketingRead: Awaited<ReturnType<typeof listSiteMarketingPackagesV61>> | undefined;
+    // Suggestions are independent of overview readiness. Start their read
+    // concurrently instead of placing it behind the five overview reads.
+    const suggestionsRead = site && isIntroduceModuleV61(deps.module)
+      ? readSiteMarketingSuggestionsV61({ data: { siteId: site.id } }).catch(() => null)
+      : Promise.resolve(null);
     // Project next steps from real Site-scoped reads. A failed read must never
     // be confused with an empty saved answer or falsely reported as complete.
     const overview = site ? await (async () => {
@@ -51,6 +61,9 @@ export const Route = createFileRoute("/launch/site")({
         listSiteMarketingPackagesV61({ data: { siteId: site.id } }),
         readCanonicalBlueprintWorkspace({ data: { siteId: site.id } }),
       ]);
+      if (info.status === "fulfilled") informationRead = info.value;
+      if (programs.status === "fulfilled") programsRead = programs.value;
+      if (marketing.status === "fulfilled") marketingRead = marketing.value;
       return {
         information: info.status === "fulfilled"
           ? { state: "ready" as const, value: {
@@ -85,23 +98,22 @@ export const Route = createFileRoute("/launch/site")({
       organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
-        ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
+        ? informationRead ?? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
       // All three Introduce modules use the same authorized Site package store
       // and the same editorial projection of saved Establish information.
       // Failure of optional suggestions must not hide already saved packages.
       marketingPackages: site && isIntroduceModuleV61(deps.module)
-        ? await listSiteMarketingPackagesV61({ data: { siteId: site.id } })
+        ? marketingRead ?? await listSiteMarketingPackagesV61({ data: { siteId: site.id } })
             .catch(() => null) : null,
       marketingSuggestions: site && isIntroduceModuleV61(deps.module)
-        ? await readSiteMarketingSuggestionsV61({ data: { siteId: site.id } })
-            .catch(() => null) : null,
+        ? await suggestionsRead : null,
       programsAudiences: site && deps.module === "programs-audiences"
-        ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
+        ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
       // Establish preferences are optional context for catalog discovery. The
       // separately authorized catalog must remain navigable if this read is
       // unavailable or its data needs repair. Never pretend it loaded empty.
       prepareIntent: site && deps.module === "program-catalog"
-        ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } })
+        ? await Promise.resolve(programsRead ?? readSiteProgramsAudiencesV61({ data: { siteId: site.id } }))
             .then(result => ({
               kind: "ready" as const, intent: result.intent, delivery: result.delivery,
               schoolYearAvailability: result.schoolYearAvailability,
