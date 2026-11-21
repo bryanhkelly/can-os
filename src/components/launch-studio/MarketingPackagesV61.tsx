@@ -322,13 +322,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
   const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
   const rail=<div className="space-y-4">
-    <WorkspacePanel title="Why this matters">
+    <WorkspacePanel title="About this step">
       <p className="text-sm leading-6 text-muted-foreground">{context.guidance}</p>
     </WorkspacePanel>
-    <WorkspacePanel title="What CAN prepares">
-      <p className="text-sm leading-6 text-muted-foreground">Save the audience, message and preferred formats in one reusable package. Generated downloads use the exact saved Site Brand version of their Package.</p>
+    <WorkspacePanel title="Create a package">
+      <p className="text-sm leading-6 text-muted-foreground">Choose your audience, message and formats. Save them together as a package.</p>
     </WorkspacePanel>
-    <WorkspaceNotice tone="info">Saved package content is private planning information. It does not publish a Site, create an event, open enrollment or send email.</WorkspaceNotice>
   </div>;
   return <WorkspaceShell title={titleText} eyebrow={context.eyebrow}
     subtitle={context.subtitle}
@@ -337,8 +336,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       {error&&<p role="alert" className="border border-destructive bg-card p-4 text-sm text-destructive">{error}</p>}
       {notice&&<p role="status" className="border bg-card p-4 text-sm">{notice}</p>}
       {suggestionsUnavailable&&<WorkspaceNotice tone="attention">
-        Current Site Story and program suggestions could not be loaded. Saved packages remain
-        available. Review the source information in Establish before using suggested wording.
+        Suggestions are unavailable. Saved packages are still available.
       </WorkspaceNotice>}
       {view==="library"&&brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
         Save your Site identity in Establish before building branded materials.
@@ -346,13 +344,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           className="font-semibold underline">Open Website &amp; Brand</a>
       </WorkspaceNotice>}
       {view==="library"&&brandReadiness==="loading"&&<WorkspaceNotice tone="info">
-        Checking your saved Site Brand before enabling new Marketing Packages.
+        Checking your Site settings…
       </WorkspaceNotice>}
       {view==="library"&&brandReadiness==="unavailable"&&<WorkspaceNotice tone="attention">
-        Site Brand status could not be checked. Existing packages remain available,
-        but new packages cannot start until the saved Brand is verified.
+        Couldn't check your Site settings. Try again to create new packages.
         <div className="mt-3"><Button type="button" variant="outline" size="sm"
-          onClick={()=>setBrandRefreshKey(value=>value+1)}>Retry Brand check</Button></div>
+          onClick={()=>setBrandRefreshKey(value=>value+1)}>Try again</Button></div>
       </WorkspaceNotice>}
 
       {view==="library"&&<>
@@ -378,13 +375,13 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             {showArchived?"View active":"View archived"}
           </Button>
         </div>
-        {!visible.length&&<WorkspacePanel title="No packages in this view">
-          <p className="text-sm text-muted-foreground">Create a package to save your messaging for future use.</p>
+        {!visible.length&&<WorkspacePanel title="No packages yet">
+          <p className="text-sm text-muted-foreground">Create your first package.</p>
         </WorkspacePanel>}
         <MarketingPackageLibraryList records={visible} busy={busy}
           onOpen={open} onDuplicate={duplicate} onArchiveToggle={setArchived}
           onDelete={setDeleteCandidate} />
-        <WorkspacePanel title={module==="promote"?"Continue in Introduce":"Continue with existing capabilities"}
+        <WorkspacePanel title={module==="promote"?"Continue in Introduce":"More actions"}
           description={context.handoffDescription}>
           <div className="grid gap-3">
             {context.handoffs.map(item=><WorkspaceActionLink key={item.title}
@@ -409,7 +406,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         onNext={()=>{void next();}}/>}
 
       {view==="detail"&&record&&<>
-        <WorkspacePanel title={record.title} description="Reusable package content, saved for your Site.">
+        <WorkspacePanel title={record.title} description="">
           <dl className="mt-3 space-y-4 text-sm">
             <div><dt className="font-semibold">Purpose</dt><dd className="text-muted-foreground">
               {marketingPurposeOptions.find(option=>option.id===record.content.purpose)?.label}</dd></div>
@@ -425,12 +422,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           <WorkspacePanel title={packageHandoff.title}
             description={packageHandoff.description}>
             {record.status==="archived"
-              ? <WorkspaceNotice tone="attention">Restore this package before using it for a new activity.</WorkspaceNotice>
+              ? <WorkspaceNotice tone="attention">Restore this package to use it again.</WorkspaceNotice>
               : <Button asChild variant="outline"><a href={
                 packageHandoff.href(siteId,record.id)
               }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
           </WorkspacePanel>}
-        <WorkspaceNotice tone="info">The package's content is saved. New branded releases are available to download. Sending marketing email requires separate authorization.</WorkspaceNotice>
+        <WorkspaceNotice tone="info">Your materials are ready to download.</WorkspaceNotice>
         <MarketingPackageReleaseControlsV61 record={record} versions={packageReleases}
           currentBrand={currentBrand} selectedBrandRevision={selectedBrandRevision}
           busy={busy} releasesLoading={releasesLoading}
@@ -456,7 +453,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </ActionFooter>
       </>}
       <ActionDialog open={discardDialogOpen} title="Discard unsaved package changes?"
-        description="Your unsaved edits will be lost. Previously saved Package content and generated releases will remain unchanged."
+        description="Your unsaved edits will be lost. Previously saved content will remain."
         confirmLabel="Discard changes" destructive pending={busy}
         onClose={()=>setDiscardDialogOpen(false)} onConfirm={discardWizard} />
       <ActionDialog open={Boolean(deleteCandidate)} title="Delete Marketing Package"
