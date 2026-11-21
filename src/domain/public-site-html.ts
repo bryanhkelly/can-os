@@ -866,8 +866,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     block.channel==="learning.experiences");
   const experiencesPageContent=[
     ...(!hasDedicatedExperiences
-      ? contentBlocks.filter(block=>block.channel==="learning.experiences" &&
-          (block.page??"/")==="/").map(block=>({...block,page:"/experiences" as const}))
+      ? contentBlocks.filter(block=>block.channel==="learning.experiences")
+          .map(block=>({...block,page:"/experiences" as const}))
       : []),
     ...experiencePageBlocks,
   ].map(renderSiteContentChannelBlock).join("");
