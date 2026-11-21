@@ -14,7 +14,7 @@ type Page = Awaited<ReturnType<typeof listPublicAdmissionsInterests>>;
 type Row = Page["items"][number];
 
 /** These records contain unverified parent-supplied contact data. */
-export function PublicInterestInbox({ initialPage, siteId, programId, availablePrograms }: {
+export function PublicInterestInbox({ initialPage, siteId, programId, availablePrograms=[] }: {
   initialPage:Page; siteId?:string; programId?:string;
   availablePrograms:readonly {id:string;name:string;siteId:string|null}[];
 }) {
