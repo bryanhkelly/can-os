@@ -268,7 +268,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               const schoolYearBlocked = !academyReferenceMayBeSelected(item,schoolYearAvailability);
               const selected = draft.programCodes?.includes(item.code) ?? false;
               return <div key={item.code} className="min-w-0 space-y-1">
-                <SelectionCard kind="checkbox" layout="vertical"
+                <SelectionCard kind="checkbox"
                   value={item.code} title={item.title}
                   detail={<>{item.summary}{schoolYearBlocked && <span className="mt-2 block font-medium">
                     School-year authorization required · not currently selectable
