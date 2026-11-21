@@ -323,11 +323,12 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
     const expectedEmails = LOCAL_DEMO_ACCOUNTS.filter(account => account.email !== LOCAL_DEMO_ADMIN.email);
     const primarySources = sources.filter(source =>
       source.id !== LOCAL_DEMO_RILEY_FACILITATOR.grantId);
-    if (primarySources.length !== expectedEmails.length || expectedEmails.some(account =>
+    if (expectedEmails.some(account =>
       !primarySources.some(source => source.email === account.email &&
-        source.role === account.role.toLowerCase())) ||
-        sources.length > expectedEmails.length + 1) {
-      throw new Error("Every fixed demo user needs its approved primary grant; Riley may additionally hold only his explicit facilitator role");
+        source.accountId === account.accountId &&
+        source.personId === account.personId &&
+        source.role === account.role.toLowerCase()))) {
+      throw new Error("Required original demo identities must retain their exact primary grants");
     }
     const changedGrants: string[] = [];
     const legacyGrants = [
