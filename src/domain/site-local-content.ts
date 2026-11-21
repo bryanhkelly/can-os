@@ -83,7 +83,7 @@ export type SiteLeader = {
 export type WebsiteContentReuseConsent = "unselected" | "granted" | "denied";
 
 export type SiteLocalContent = SiteLocalTextContent & {
-  /** Site-scoped authorization to derive website and marketing copy from Establish data. */
+  /** Site-scoped authorization to derive website and marketing copy from Shape data. */
   contentReuseConsent?: WebsiteContentReuseConsent;
   branding: SiteLocalBranding;
   /** Site-owned, optional Leadership page content; never auto-scraped. */
