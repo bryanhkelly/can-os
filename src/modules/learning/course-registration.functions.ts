@@ -11,7 +11,7 @@ import { and,desc,eq,inArray,isNull,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { resolveCourseGuardianConsent } from "./course-guardian-consent";
-import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
+import { getSectionRegistrationPolicy, getSectionRegistrationPolicies } from "./section-registration-policy-service";
 import { todayInTimezone } from "@/modules/calendar/timezone";
 
 import { EventTypes } from "@/domain/event-types";
@@ -65,18 +65,31 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
         viewerRole === "student" ? eq(s.actions.ownerPersonId,actor.actorPersonId) : inArray(s.actions.siteId,sites))),
   ]);
   const latest = new Map<string,(typeof memberships)[number]>();
-  const teachers=catalog.length?await db.select({sectionId:s.sectionTeachers.sectionId,personId:s.people.id,
-    firstName:s.people.legalFirstName,lastName:s.people.legalLastName,preferredName:s.people.preferredName})
-    .from(s.sectionTeachers).innerJoin(s.people,eq(s.people.id,s.sectionTeachers.personId))
-    .where(inArray(s.sectionTeachers.sectionId,catalog.map(course=>course.id))):[];
+  // Catalog is already restricted to the actor's Site and Program grants.
+  // The bulk reader only receives these authorized Section IDs.
+  const catalogIds = catalog.map(course => course.id);
+  const [teachers, policies] = await Promise.all([
+    catalogIds.length ? db.select({sectionId:s.sectionTeachers.sectionId,personId:s.people.id,
+      firstName:s.people.legalFirstName,lastName:s.people.legalLastName,preferredName:s.people.preferredName})
+      .from(s.sectionTeachers).innerJoin(s.people,eq(s.people.id,s.sectionTeachers.personId))
+      .where(inArray(s.sectionTeachers.sectionId,catalogIds)) : Promise.resolve([]),
+    getSectionRegistrationPolicies(catalogIds),
+  ]);
+  const teachersBySection = new Map<string, typeof teachers>();
+  for (const teacher of teachers) {
+    const assigned = teachersBySection.get(teacher.sectionId) ?? [];
+    assigned.push(teacher);
+    teachersBySection.set(teacher.sectionId, assigned);
+  }
   for (const membership of memberships) if (membership.sectionId && !latest.has(membership.sectionId)) latest.set(membership.sectionId,membership);
-  const sectionsWithPolicy=await Promise.all(catalog.map(async course=>{
-    const policy=await getSectionRegistrationPolicy(course.id);
+  const sectionsWithPolicy=catalog.map(course=>{
+    const policy=policies.get(course.id);
+    if (!policy) throw new Error("Section policy unavailable");
     return {
       id:course.id,title:course.title,code:course.code,subject:course.subject,description:course.description,
       contentReady:course.curriculumStatus==="published"&&hasAccessibleFirstLesson(course.curriculum),
       timezone:course.timezone,
-      teachers:teachers.filter(teacher=>teacher.sectionId===course.id).map(teacher=>({
+      teachers:(teachersBySection.get(course.id) ?? []).map(teacher=>({
         personId:teacher.personId,name:personDisplayName({ preferredName: teacher.preferredName, legalFirstName: teacher.firstName, legalLastName: teacher.lastName }),
       })),
       credits:policy.credits,
@@ -87,7 +100,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
       enrollmentStatus:latest.get(course.id)?.status??null,
       withdrawalNotation:latest.get(course.id)?.metadata.withdrawalNotation??null,
     };
-  }));
+  });
   return {
     connected:true,
     viewerRole,
