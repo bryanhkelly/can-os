@@ -67,11 +67,8 @@ export function WebsiteTemplateGallery({value,onChange,disabled=false}:{
   const [viewport,setViewport]=useState<"desktop"|"mobile">("desktop");
   const chosen=siteTemplateCatalog.find(item=>item.id===value)??siteTemplateCatalog[0]!;
   return <fieldset disabled={disabled} className="min-w-0">
-    <legend className="text-sm font-semibold">Choose your website wireframe</legend>
-    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-      Compare only structure, whitespace, hierarchy and page rhythm. Colors,
-      photographs, typography and your wording are added in the next steps.
-    </p>
+    <legend className="text-sm font-semibold">Choose a layout</legend>
+
     <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
       <div role="group" aria-label="Website wireframe choices" className="space-y-2">
         {siteTemplateCatalog.map(item=><SelectionCard key={item.id}
@@ -92,7 +89,7 @@ export function WebsiteTemplateGallery({value,onChange,disabled=false}:{
         <h3 className="font-serif text-xl font-semibold">{chosen.name}</h3>
         <div className="flex flex-wrap items-end gap-3">
           <Label className="grid gap-1 text-xs font-semibold">
-            Page structure
+            Preview page
             <Select aria-label="Preview page structure" value={page}
               onChange={event=>setPage(event.target.value as PublicSitePath)}>
               {publicSitePagePaths.map(path=><option key={path} value={path}>
@@ -111,10 +108,7 @@ export function WebsiteTemplateGallery({value,onChange,disabled=false}:{
         <div className={cn("mx-auto w-full",viewport==="mobile"?"max-w-64":"max-w-3xl")}>
           <Structure id={value} page={page} viewport={viewport}/>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Layout only. Continue to Visual Identity and Your Content to see the
-          actual website with your saved branding, words and images.
-        </p>
+
       </section>
     </div>
   </fieldset>;
