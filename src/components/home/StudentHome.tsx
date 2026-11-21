@@ -5,6 +5,7 @@ import { getQuickWinActions } from "@/modules/actions/student-actions.functions"
 import { getStudentReportCard } from "@/modules/learning/report-cards.functions";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getClassWorkspace } from "@/modules/learning/class-workspace.functions";
+import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { DataUnavailableError, safeLoader } from "@/lib/safe-loader";
 import type { StudentDashboardData } from "@/components/student/student-dashboard-data";
@@ -95,7 +96,8 @@ export async function loadStudentToday() {
     if (!completedFallback && candidates.length) throw new DataUnavailableError();
     return completedFallback;
   })();
-  const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community };
+  const classes = await safeLoader(() => getMyStudentClasses())();
+  const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community, classes };
   return { today, success, support, dashboard };
 }
 
