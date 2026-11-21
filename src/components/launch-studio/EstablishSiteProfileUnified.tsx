@@ -1,3 +1,4 @@
+import { SiteGuideV61 } from "./SiteGuideV61";
 /**
  * CAN OS V6.1 · Establish / Site Profile.
  * One presentation, one canonical Site, three existing governed commands.
@@ -227,7 +228,10 @@ export function EstablishSiteProfileUnified({
 
 /** Keep the companion rail focused on the next setup section. */
 export function EstablishSiteProfileGuidance() {
-  return <WorkspacePanel title="Next: Site Information">
-    <p className="text-sm text-muted-foreground">Add hosting and learning environment details.</p>
-  </WorkspacePanel>;
+  return <SiteGuideV61 guide={{
+    summary: "A Site is the community or program you are shaping. It may have a different name from the organization responsible for it.",
+    insight: "Choose a name people will recognize. Include a physical address or contact details only when they are useful for this Site.",
+    connection: "Your Site profile anchors the website, outreach, operations and future offerings without deciding what is approved to run.",
+    next: "In Site Information, describe the Site's identity, its host and how people will participate.",
+  }} />;
 }
