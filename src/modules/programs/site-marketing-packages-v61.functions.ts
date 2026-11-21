@@ -58,7 +58,7 @@ async function authorizedSite(
 }
 
 /**
- * Authorized projection of previously saved Establish information.
+ * Authorized projection of previously saved Shape information.
  * Only purpose-specific editorial suggestions leave the server; raw private
  * Story answers are never added to package metadata, audit or analytics.
  */
@@ -136,7 +136,7 @@ export const createSiteMarketingPackageV61 = createServerFn({method:"POST"})
     const [currentBrand]=await tx.select({id:sites.currentBrandVersionId}).from(sites)
       .where(eq(sites.id,site.id)).limit(1);
     if(!currentBrand?.id)
-      throw new DomainError("UNAVAILABLE","Save your Site identity in Establish → Website & Brand before creating Marketing Packages.");
+      throw new DomainError("UNAVAILABLE","Save your Site Brand in Shape → Website & Brand before creating outreach materials.");
     const [created]=await tx.insert(siteMarketingPackages).values({
       siteId:site.id,organizationId:site.organizationId,
       createdByPersonId:actor.actorPersonId!,title:data.title,
