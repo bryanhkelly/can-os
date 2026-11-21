@@ -331,7 +331,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </div>
         </fieldset>
       </> : <>
-        <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled}/>
+        <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled} programCatalog={programs}/>
       </>}
       </div>
     </GuidedSetupShell>

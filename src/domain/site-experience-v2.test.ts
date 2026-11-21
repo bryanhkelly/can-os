@@ -23,6 +23,7 @@ const plan={
     outcomeIds:["civic","confidence"] as Array<"civic"|"confidence">,
     audienceIds:["adults"] as Array<"adults">,
     programIds:["adult"] as Array<"adult">,
+    programCodes:["can.program.adult-skills"],
     priority:"featured" as const,
   }],
 };
@@ -48,6 +49,7 @@ describe("Site Experience Catalog v2",()=>{
     expect(result.experienceIds).toEqual(plan.experienceIds);
     expect(result.experienceDetails?.[0]?.outcomeIds).toEqual(["civic","confidence"]);
     expect(result.experienceDetails?.[0]?.priority).toBe("featured");
+    expect(result.experienceDetails?.[0]?.programCodes).toEqual(["can.program.adult-skills"]);
     expect(stored.delivery).toBe("both");
   });
   it("rejects more than five including legacy custom ideas, too many chips, or invalid chip IDs",()=>{

@@ -17,12 +17,13 @@ type Props={
   draft:SiteProgramsAudiencesV61;
   setDraft:Dispatch<SetStateAction<SiteProgramsAudiencesV61>>;
   disabled:boolean;
+  programCatalog:readonly {code:string;title:string}[];
 };
 
 /** A guided V6.1 Site-vision surface, not another Program/Solution editor.
  * Catalog discovery, structured chip selection and website-ready review all
  * update the one canonical Site planning draft. */
-export function EstablishExperiencesV61({draft,setDraft,disabled}:Props){
+export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}:Props){
   const [stage,setStage]=useState<Stage>("choose");
   const [group,setGroup]=useState<SiteExperienceGroupId>("academic");
   const [query,setQuery]=useState("");
@@ -39,7 +40,7 @@ export function EstablishExperiencesV61({draft,setDraft,disabled}:Props){
     (!query.trim()||[topic.title,...topic.groupIds].join(" ").toLowerCase()
       .includes(query.trim().toLowerCase())));
   const selectedDetail=activeId===null?null:
-    draft.experienceDetails?.find(detail=>detail.id===activeId)??null;
+    draft.experienceDetails?.find(detail=>detail.id===activeId)??newDetail(activeId,draft);
   const activeTopic=activeId?siteExperienceById.get(activeId):null;
 
   function newDetail(id:SiteExperienceId,current:SiteProgramsAudiencesV61):SiteExperienceDetail{
@@ -48,6 +49,7 @@ export function EstablishExperiencesV61({draft,setDraft,disabled}:Props){
       id,activityIds:[],outcomeIds:[],
       audienceIds:topic.audiences.filter(a=>current.audienceIds.includes(a)),
       programIds:topic.programs.filter(p=>current.interestIds.includes(p)),
+      programCodes:[...(current.programCodes??[])],
       priority:"planned",
     };
   }
@@ -295,6 +297,20 @@ export function EstablishExperiencesV61({draft,setDraft,disabled}:Props){
             {!draft.interestIds.length&&<p className="text-xs text-muted-foreground">
               Program associations are optional; you can select Program interests on the first step.
             </p>}
+            {!!draft.programCodes?.length&&<div className="space-y-2 pt-2">
+              <p className="text-xs font-semibold">Published Program ideas</p>
+              <div className="flex flex-wrap gap-2">
+                {draft.programCodes.map(code=>{
+                  const active=selectedDetail?.programCodes?.includes(code)??false;
+                  const title=programCatalog.find(item=>item.code===code)?.title??code;
+                  return <Button key={code} size="sm" variant={active?"default":"outline"}
+                    aria-pressed={active} disabled={disabled}
+                    onClick={()=>patchDetail(activeTopic.id,{
+                      programCodes:toggleChip(selectedDetail?.programCodes??[],code,30)})}>
+                    {active&&<Check aria-hidden="true"/>}{title}</Button>;
+                })}
+              </div>
+            </div>}
           </fieldset>
           <fieldset className="space-y-3 border-t pt-4">
             <legend className="text-sm font-semibold">How important is this to your plans?</legend>

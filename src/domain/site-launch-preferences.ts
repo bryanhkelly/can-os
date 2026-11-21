@@ -40,6 +40,9 @@ export const siteExperienceDetailSchema=z.object({
     .refine(distinct,"Choose each audience once"),
   programIds:z.array(z.enum(sitePlanningInterestIds)).max(6)
     .refine(distinct,"Choose each Program once"),
+  /** Published Program reference associations, separate from high-level interests. */
+  programCodes:z.array(z.string().trim().min(3).max(128)).max(30)
+    .refine(distinct,"Choose each Program reference once").optional(),
   priority:z.enum(["featured","planned","exploring"]),
 }).strict().superRefine((value,ctx)=>{
   const topic=siteExperienceById.get(value.id);
