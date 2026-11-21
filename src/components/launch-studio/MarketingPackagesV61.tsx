@@ -48,7 +48,7 @@ type MarketingPackagesV61Props = {
 };
 
 /**
- * Each Site and Introduce module owns a separate working editor session.
+ * Each Site and Share module owns a separate working editor session.
  * React must discard private Package drafts, action dialogs, release previews,
  * and mutation feedback before rendering another Site's records.
  */
@@ -101,7 +101,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const [brandRefreshKey,setBrandRefreshKey]=useState(0);
   const [selectedBrandRevision,setSelectedBrandRevision]=useState<number|null>(null);
   // Shared prerequisite for Create Outreach and My Outreach. Brand edits
-  // stay in Establish; a Marketing Package only selects an immutable version.
+  // stay in Shape; a Marketing Package only selects an immutable version.
   useEffect(()=>{
     let live=true;
     setBrandReadiness("loading");
