@@ -19,7 +19,7 @@ export function BlueprintComponentPicker({
 }) {
   const selectedComponents=selected;
   return <fieldset className="border p-4" disabled={disabled}>
-            <legend className="px-2 font-semibold">Blueprint components</legend>
+            <legend className="px-2 font-semibold">What this solution includes</legend>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               {components.map(component =>
                 <Label key={component.id} className="flex items-center gap-3 text-sm">
@@ -35,7 +35,7 @@ export function BlueprintComponentPicker({
                       {component.description}
                     </span>}
                     {component.requiresIndependentReview && <span className="mt-1 block text-xs text-muted-foreground">
-                      Independent verification remains separate from planning
+                      This part requires a separate review before use
                     </span>}
                   </span>
                 </Label>)}
