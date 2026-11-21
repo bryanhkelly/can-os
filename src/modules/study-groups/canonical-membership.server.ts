@@ -22,8 +22,12 @@ export function canonicalGroupClassId(group: GroupScope): string | null {
 }
 
 export function assertGroupScope(actor: Actor, group: GroupScope) {
+  // A Class-linked group derives Program authority from its exact current
+  // Class enrollment or staff appointment, not from a retired Program grant.
+  const isCanonicalClassGroup = canonicalGroupClassId(group) !== null;
   if (!group.siteId || !actorSiteIds(actor).includes(group.siteId) ||
-      (group.programId && !(actor.scope.programIds ?? []).includes(group.programId))) {
+      (!isCanonicalClassGroup && group.programId &&
+       !(actor.scope.programIds ?? []).includes(group.programId))) {
     throw new AuthorizationError("study group school/program grant");
   }
 }
