@@ -195,9 +195,9 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
     <div className="mt-6 space-y-5">
       {module === "program-catalog" && <>
         <WorkspacePanel title="Your interests"
-          description="Your saved program ideas and areas of interest from Establish.">
+          description="Your saved program ideas and areas of interest from Shape.">
           {intentUnavailable && <WorkspaceNotice tone="attention">
-            We couldn't load your saved program ideas. You can still explore solutions, but return to Establish to check your selections before making a plan.
+            We couldn't load your saved program ideas. You can still explore solutions, but return to Shape to check your selections before making a plan.
           </WorkspaceNotice>}
           {intent && (intent.interestIds.length > 0 || (intent.programCodes?.length??0)>0) ? <>
             {(intent.programCodes?.length??0)>0&&<>
@@ -225,7 +225,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
             </div>
             {intent.startingFocus && <p className="mt-3 text-sm">Starting focus: <strong>{intentTitles[intent.startingFocus]}</strong></p>}
             </>}
-          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You haven't chosen any program ideas yet. Explore the catalog or return to Establish to add them.</p>}
+          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You haven't chosen any program ideas yet. Explore the catalog or return to Shape to add them.</p>}
           <Link to="/launch/site" search={{siteId, module:"programs-audiences"}}
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary underline">
             Review Programs &amp; Audiences <ArrowRight aria-hidden="true" className="size-4" />
