@@ -147,7 +147,10 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   // Costs and funding belong on a prelaunch Site even before tuition is finalized.
   const tuition = true;
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
-  const faq = Boolean(academic || tuition ||
+  // Prelaunch funding boilerplate alone is not evidence for a FAQ.
+  const faq = Boolean(academic ||
+    (parent?.tuition.description.canDisplay && parent.tuition.description.value) ||
+    (parent?.tuition.financialAid.canDisplay && parent.tuition.financialAid.value) ||
     (parent?.admissions.description.canDisplay && parent.admissions.description.value));
   // Site-level prelaunch inquiries do not require a published academic Program.
   // The public form itself is available only on a published Site origin.
