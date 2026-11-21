@@ -123,6 +123,7 @@ export const Route = createFileRoute("/launch/site")({
         ? await suggestionsRead : null,
       introduceIntent: site && isIntroduceModuleV61(deps.module) ? programsRead?.intent ?? null : null,
       introduceIntentUnavailable: Boolean(site && isIntroduceModuleV61(deps.module) && !programsRead),
+      introduceSiteRevision: site && isIntroduceModuleV61(deps.module) ? programsRead?.revision??null : null,
       programsAudiences: site && deps.module === "programs-audiences"
         ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
       // Establish preferences are optional context for catalog discovery. The
@@ -148,7 +149,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, siteInformation, programsAudiences, marketingPackages, marketingSuggestions, introduceIntent, introduceIntentUnavailable, prepareIntent, overview, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, programsAudiences, marketingPackages, marketingSuggestions, introduceIntent, introduceIntentUnavailable, introduceSiteRevision, prepareIntent, overview, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -188,7 +189,8 @@ function SiteLaunchPage() {
     : selected && isIntroduceModuleV61(selected.id) && marketingPackages ? <MarketingPackagesV61
       key={site.id + ":" + selected.id} module={selected.id}
       siteId={site.id} siteName={site.name} siteIntent={introduceIntent}
-      intentUnavailable={introduceIntentUnavailable} initial={marketingPackages}
+      intentUnavailable={introduceIntentUnavailable} siteRevision={introduceSiteRevision}
+      initial={marketingPackages}
       suggestions={marketingSuggestions} suggestionsUnavailable={!marketingSuggestions}
       onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })} />
     : selected && isIntroduceModuleV61(selected.id) ? <WorkspaceShell

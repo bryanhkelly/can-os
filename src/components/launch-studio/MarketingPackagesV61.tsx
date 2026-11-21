@@ -17,8 +17,8 @@ import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
   marketingPackageContentSchema, marketingPurposeOptions,
   outreachStepIdsV61, outreachStepIssueV61, initialOutreachPlanV61,
-  outreachFormatsV61, composeOutreachDraftV61,
-  type MarketingFormat, type MarketingPackageContent,
+  outreachFormatsV61, composeOutreachDraftV61, outreachSourceChangedV61,
+  type MarketingFormat, type MarketingPackageContent, type OutreachPlanV61,
 } from "@/domain/marketing-package-v61";
 import {
   archiveSiteMarketingPackageV61, createSiteMarketingPackageV61,
@@ -44,6 +44,7 @@ type MarketingPackagesV61Props = {
   suggestions:MarketingSuggestions|null;onExit:()=>void;
   module?:IntroduceModuleV61;suggestionsUnavailable?:boolean;
   siteIntent?:SiteProgramsAudiencesV61|null;intentUnavailable?:boolean;
+  siteRevision?:string|null;
 };
 
 /**
@@ -58,19 +59,22 @@ export function MarketingPackagesV61(props:MarketingPackagesV61Props) {
 
 function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   module="create-outreach",suggestionsUnavailable=false,siteIntent=null,
-  intentUnavailable=false}:MarketingPackagesV61Props) {
+  intentUnavailable=false,siteRevision=null}:MarketingPackagesV61Props) {
   const router=useRouter();
   const context=introduceModuleConfigV61[module];
   const purposeOptions=marketingPurposeOptions.filter(option=>context.purposes.includes(option.id));
   const starter=(purpose:MarketingPackageContent["purpose"])=>(
     suggestions?.[purpose]?.content??initialMarketingContent(siteName,purpose));
+  const newPlan=(beneficiaries:OutreachPlanV61["beneficiaries"])=>
+    ({...initialOutreachPlanV61(beneficiaries),
+      ...(siteRevision?{sourceSiteRevision:siteRevision}:{})});
   const [packages,setPackages]=useState(initial);
   const [view,setView]=useState<"library"|"wizard"|"detail"|"share"|"followup">(module==="create-outreach"?"wizard":"library");
   const [record,setRecord]=useState<PackageRecord|null>(null);
   const [title,setTitle]=useState(siteName+" outreach");
   const [content,setContent]=useState<MarketingPackageContent>(()=>({
     ...starter(context.defaultPurpose),
-    plan:initialOutreachPlanV61(siteIntent?.audienceIds??[]),
+    plan:newPlan(siteIntent?.audienceIds??[]),
     formats:outreachFormatsV61(initialOutreachPlanV61().channels),
   }));
   const [step,setStep]=useState(0);
@@ -142,7 +146,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     setEditingFormat(null);
     setRecord(recordToOpen);setTitle(recordToOpen.title);
     setContent({...recordToOpen.content,plan:recordToOpen.content.plan??{
-      ...initialOutreachPlanV61(siteIntent?.audienceIds??[]),
+      ...newPlan(siteIntent?.audienceIds??[]),
       recipients:recordToOpen.content.audiences,
     }});
     setHasAuthoredCopy(true);
@@ -155,7 +159,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     setEditingFormat(null);
     setRecord(null);setTitle(siteName+" outreach");
     setContent({...starter(context.defaultPurpose),
-      plan:initialOutreachPlanV61(siteIntent?.audienceIds??[]),
+      plan:newPlan(siteIntent?.audienceIds??[]),
       formats:outreachFormatsV61(initialOutreachPlanV61().channels)});
     setHasAuthoredCopy(false);
     setStep(0);setView("wizard");setError("");setNotice("");
@@ -448,6 +452,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         <ActionFooter><Button variant="outline" onClick={()=>void exitLaunch()}>Back to Launch Overview</Button></ActionFooter>
       </>}
 
+      {view==="wizard"&&record&&
+        outreachSourceChangedV61(record.content.plan,siteRevision)&&
+        <WorkspaceNotice tone="attention">
+          Establish information changed after this plan was saved. Review the
+          highlights before saving; nothing is replaced automatically.
+        </WorkspaceNotice>}
       {view==="wizard"&&<MarketingPackageWizardV61
         siteId={siteId} siteName={siteName} siteIntent={siteIntent} step={step} title={title} content={content}
         busy={busy} brandVersionId={record?.brandVersionId??null}
@@ -460,6 +470,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         onNext={()=>{void next();}}/>}
 
       {view==="detail"&&record&&<>
+        {outreachSourceChangedV61(record.content.plan,siteRevision)&&
+          <WorkspaceNotice tone="attention">
+            Establish information has changed since this outreach plan was drafted.
+            Review its highlights and message before creating another release.
+            Earlier materials are unchanged.
+          </WorkspaceNotice>}
         {record.content.plan&&<WorkspacePanel title="Your outreach plan">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <p><strong>Recipients:</strong> {record.content.plan.recipients.join(", ")||"Not selected"}</p>

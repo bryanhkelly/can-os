@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe,expect,it } from "vitest";
 import { introduceModuleConfigV61,introduceModuleIdsV61,isIntroduceModuleV61 } from "../../src/domain/launch-introduce-v61";
 import { marketingPurposeIds,marketingPackageContentSchema,
-  initialOutreachPlanV61,composeOutreachDraftV61 } from "../../src/domain/marketing-package-v61";
+  initialOutreachPlanV61,composeOutreachDraftV61,outreachSourceChangedV61 } from "../../src/domain/marketing-package-v61";
 
 const source=(path:string)=>readFileSync(new URL("../../"+path,import.meta.url),"utf8");
 
@@ -53,6 +53,13 @@ describe("Launch Studio V6.1 Introduce integration",()=>{
     expect(withActivities.message).toContain("Creating a budget");
     expect(draft.message).not.toMatch(/now enrolling|accredited|approved to operate/i);
     expect(source("src/db/schema/marketing-packages.ts")).toContain("jsonb");
+  });
+  it("flags revised Establish facts without rejecting older outreach plans",()=>{
+    const old=initialOutreachPlanV61();
+    expect(outreachSourceChangedV61(old,"2026-11-21T00:00:00Z")).toBe(false);
+    const tagged={...old,sourceSiteRevision:"2026-11-20T00:00:00Z"};
+    expect(outreachSourceChangedV61(tagged,"2026-11-21T00:00:00Z")).toBe(true);
+    expect(outreachSourceChangedV61(tagged,"2026-11-20T00:00:00Z")).toBe(false);
   });
   it("keeps sending, events, and enrollment independently governed",()=>{
     const controller=source("src/components/launch-studio/MarketingPackagesV61.tsx");

@@ -30,8 +30,17 @@ export const outreachPlanSchemaV61 = z.object({
   action: z.enum(["learn-more","express-interest","share-feedback","attend-event","schedule-conversation"]),
   channels: z.array(z.enum(["email","social","print","text","share-link","conversation-kit"])).max(6),
   storyAngle: z.enum(["impact","opportunity","partnership"]),
+  /** Establish source observed when the outreach plan was created.
+   * Revisions warn operators; previously generated materials stay immutable. */
+  sourceSiteRevision:z.string().datetime({offset:true}).optional(),
 }).strict();
 export type OutreachPlanV61 = z.infer<typeof outreachPlanSchemaV61>;
+export function outreachSourceChangedV61(
+  plan:OutreachPlanV61|null|undefined,currentSiteRevision:string|null|undefined,
+):boolean {
+  return Boolean(plan?.sourceSiteRevision&&currentSiteRevision&&
+    plan.sourceSiteRevision!==currentSiteRevision);
+}
 export function initialOutreachPlanV61(beneficiaries: OutreachPlanV61["beneficiaries"] = []): OutreachPlanV61 {
   return {
     relationship:"both",recipients:[],beneficiaries,
