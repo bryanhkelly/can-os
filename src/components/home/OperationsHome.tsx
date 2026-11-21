@@ -5,15 +5,17 @@ import { OperationsWorkspace } from "@/components/operations/OperationsWorkspace
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { supplementaryRead } from "@/lib/supplementary-read";
+import { measureServerStep } from "@/lib/performance/measure-server-step";
 
 export const loadOperationsHome = (deps: { siteId?: string; programId?: string }) => safeLoader(async () => {
-  const operations = await getOperationsActions({ data: deps });
+  const operations = await measureServerStep("operations.home", "actions", () => getOperationsActions({ data: deps }));
   const [health, commandCenter, dashboard, launches] = await Promise.all([
-    supplementaryRead(() => getReleaseHealth(), () => false),
-    supplementaryRead(() => getLiveOperationsCommandCenter({ data: deps }), () => false),
-    supplementaryRead(() => getLiveFullFlowOperations({ data: deps }), () => false),
-    supplementaryRead(() => import("@/modules/programs/launch.functions").then(module => module.listLaunches()),
-      data => data.launches.length === 0),
+    measureServerStep("operations.home", "release-health", () => supplementaryRead(() => getReleaseHealth(), () => false)),
+    measureServerStep("operations.home", "command-center", () => supplementaryRead(() => getLiveOperationsCommandCenter({ data: deps }), () => false)),
+    measureServerStep("operations.home", "full-flow", () => supplementaryRead(() => getLiveFullFlowOperations({ data: deps }), () => false)),
+    measureServerStep("operations.home", "launches", () =>
+      supplementaryRead(() => import("@/modules/programs/launch.functions").then(module => module.listLaunches()),
+        data => data.launches.length === 0)),
   ]);
   return { operations, health, commandCenter, dashboard, launches, authError: "" };
 })();
