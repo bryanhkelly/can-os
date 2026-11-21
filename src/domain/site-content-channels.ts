@@ -109,7 +109,7 @@ export function readSiteContentChannelConfig(raw: unknown): SiteContentChannelCo
     (block.channel === "site.setup" || block.channel === "site.network" || block.channel === "learning.classes") &&
     !v1.blocks.some(existing => existing.channel === block.channel));
   return siteContentChannelConfigSchema.parse({
-    ...v1, version: 2, blocks: [...v1.blocks, ...missing],
+    ...v1, version: 2, blocks: [...v1.blocks, ...missing.slice(0, Math.max(0, 12 - v1.blocks.length))],
   });
 }
 export function safeReadSiteContentChannelConfig(raw: unknown): SiteContentChannelConfig {
@@ -326,7 +326,7 @@ export function resolveSiteContentBlocks(
         }
         break;
       case "learning.interests":
-        items = (feeds.preferences?.interestIds ?? []).filter(id => id !== "weekend" && id !== "evening").map(id => ({
+        items = (feeds.preferences?.interestIds ?? []).map(id => ({
           id, title: interestCopy[id].title, description: interestCopy[id].description,
           label: "Proposed · not enrolling",
         }));
