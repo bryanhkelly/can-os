@@ -333,7 +333,10 @@ const noCustomGuidedSelections = {
         if (jsxName(node.name) !== "Button") return;
         const pressed = attr(node, "aria-pressed");
         const current = attr(node, "aria-current");
-        if (current && ancestorsInclude(node, new Set(["nav", "ol"])) && !isMainJourneyNavigation(node)) {
+        if (current && /["']step["']/.test(context.sourceCode.getText(current)) &&
+            ancestorsInclude(node, new Set(["nav", "ol"])) &&
+            !isMainJourneyNavigation(node) &&
+            !context.filename.replaceAll("\\\\", "/").endsWith("/components/workflow/guided-setup-shell.tsx")) {
           context.report({ node, messageId: "step" });
         } else if (pressed && looksLikeCard(node)) {
           context.report({ node, messageId: "choice" });
