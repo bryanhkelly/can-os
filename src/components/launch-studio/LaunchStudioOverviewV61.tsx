@@ -50,9 +50,9 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
       connection: "Shape informs your website and outreach. Prepare translates intentions into plans; Launch checks each offering's actual readiness.",
       next: nextAction.description,
     }} />
-    <WorkspacePanel title="Your website, as it grows">
-      <p className="text-sm leading-6 text-muted-foreground">Preview your website whenever you like. You can share a private preview with others before you publish it.</p>
-      <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Ready for you to view" : "Not available yet"}</div>
+    <WorkspacePanel title="Your website preview">
+      <p className="text-sm leading-6 text-muted-foreground">Preview your saved website before publishing. You can also invite others to review a private preview link.</p>
+      <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Available" : "Save a website draft to enable preview"}</div>
     </WorkspacePanel>
   </div>;
   return <WorkspaceShell title={mode === "first-visit" ? "Bring your community's vision to life." : `Continue preparing ${site.name}.`}
