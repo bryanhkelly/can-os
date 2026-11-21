@@ -236,7 +236,7 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
   const [confirmClose, setConfirmClose] = useState(false);
   const siteYears = years.data?.years.filter(year => year.siteId === siteId) ?? [];
   const authorizedSite = years.data?.sites.some(site => site.id === siteId) ?? false;
-  return <WorkspacePanel title="School years & academic calendars"
+  return <WorkspacePanel title="Academic calendars (if relevant)"
     description="Plan academic years, terms, and holidays if your site offers school-year learning.">
     {years.isPending && <p role="status" className="mt-3 text-sm">
       Reading authorized school-year records…
