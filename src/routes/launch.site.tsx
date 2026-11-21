@@ -211,7 +211,7 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
   site: { id: string; organizationId: string };
   initial: SiteInformationV61Initial;
   organizations: Array<{ id: string; name: string }>;
-  onBack: () => void; onExit: () => void; onContinue: () => void;
+  onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const organization = organizations.find(item => item.id === site.organizationId);
@@ -230,7 +230,7 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
 function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: {
   siteId: string;
   initial: ProgramsAudiencesV61Initial;
-  onBack: () => void; onExit: () => void; onContinue: () => void;
+  onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
   const [step, setStep] = useState<0 | 1>(0);
   return <WorkspaceShell title="What could your community learn?"
