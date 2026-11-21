@@ -285,7 +285,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                   including consent and any required independent approval.
                 </Label>
               </div>}
-              <Field label="Decision reason" description="Briefly explain what you checked and why the website is ready (10–500 characters).">
+              <Field label="Decision reason" description="Explain why you're publishing, updating, or unpublishing this website (10–500 characters).">
                 <Textarea value={reason} onChange={event => setReason(event.target.value)}
                   maxLength={500} rows={3} placeholder="Document what was reviewed and why this decision is appropriate." />
               </Field>
