@@ -41,6 +41,22 @@ describe("shared Site Content Brief V6.1",()=>{
       expect(JSON.stringify(brief)).not.toContain("Private copy");
     }
   });
+  it("includes only approved leader biographies and LinkedIn references",()=>{
+    const brief=projectSiteContentBriefV61({...input,websiteContent:{
+      contentReuseConsent:"granted",leadershipMembers:[
+        {name:"Approved Leader",title:"Director",biography:"Approved bio",
+          linkedinUrl:"https://www.linkedin.com/in/approved",consentConfirmed:true},
+        {name:"Unapproved Leader",title:"Advisor",biography:"Private bio",
+          consentConfirmed:false},
+      ],
+    }});
+    expect(brief.leadership).toEqual([{
+      name:"Approved Leader",title:"Director",biography:"Approved bio",
+      linkedinUrl:"https://www.linkedin.com/in/approved",
+    }]);
+    expect(JSON.stringify(brief)).not.toContain("Unapproved Leader");
+    expect(JSON.stringify(brief)).not.toContain("Private bio");
+  });
   it("rejects invalid saved Story instead of inventing an empty source",()=>{
     expect(()=>projectSiteContentBriefV61({...input,
       metadata:{...input.metadata,siteStoryV61:{bad:"source"}},

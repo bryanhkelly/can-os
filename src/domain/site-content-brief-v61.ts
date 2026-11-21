@@ -26,6 +26,9 @@ export const siteContentBriefV61Schema=z.object({
   planning:siteProgramsAudiencesV61Schema.nullable(),
   experiences:z.array(experienceSchema),
   story:siteStoryV61Schema.nullable(),
+  leadership:z.array(z.object({
+    name:z.string(),title:z.string(),biography:z.string(),linkedinUrl:z.string().nullable(),
+  }).strict()),
   websiteCopy:z.object({
     heroHeadline:z.string(),welcomeMessage:z.string(),
     schoolVision:z.string(),communityOutreach:z.string(),
@@ -59,6 +62,10 @@ export function projectSiteExperienceBriefV61(intent:SiteProgramsAudiencesV61|nu
 type WebsiteSource={
   contentReuseConsent?:"unselected"|"granted"|"denied";
   heroHeadline?:string;welcomeMessage?:string;schoolVision?:string;communityOutreach?:string;
+  leadershipMembers?:readonly {
+    name:string;title:string;biography:string;linkedinUrl?:string;
+    consentConfirmed:boolean;
+  }[];
 }|null;
 /** The caller supplies server-authorized Site records, never untrusted client fields.
  * A denied/unselected consent excludes private Story and saved website copy. */
@@ -80,6 +87,12 @@ export function projectSiteContentBriefV61(input:{
   const planning=metadata.launchPreferences==null?null:
     readSiteProgramsAudiencesV61(metadata.launchPreferences);
   const consent=input.websiteContent?.contentReuseConsent==="granted";
+  const leadership=consent?input.websiteContent?.leadershipMembers
+    ?.filter(person=>person.consentConfirmed===true&&Boolean(person.name.trim()))
+    .map(person=>({
+      name:person.name,title:person.title,biography:person.biography,
+      linkedinUrl:person.linkedinUrl?.trim()||null,
+    }))??[]:[];
   const websiteCopy=consent&&input.websiteContent?{
     heroHeadline:input.websiteContent.heroHeadline??"",
     welcomeMessage:input.websiteContent.welcomeMessage??"",
@@ -95,7 +108,7 @@ export function projectSiteContentBriefV61(input:{
       websiteContentRevision:input.websiteContentRevision??null,
     },
     hosting,environment,planning,experiences:projectSiteExperienceBriefV61(planning),
-    story:consent?story?.answers??null:null,websiteCopy,
+    story:consent?story?.answers??null:null,leadership,websiteCopy,
     consent:{contentReuseAllowed:consent},
   });
 }

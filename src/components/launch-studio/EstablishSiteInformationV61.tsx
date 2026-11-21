@@ -338,6 +338,18 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="other">Other</option>
           </Select></Field>
         </div>}
+        {host.hostingMode!=="undecided"&&<Field label="Hosting organization website (optional)">
+          <Input inputMode="url" maxLength={2048}
+            placeholder="https://www.example.org"
+            value={host.hostWebsiteUrl??""}
+            onChange={event=>setHost(current=>({
+              ...current,hostWebsiteUrl:event.target.value,
+            }))}/>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Provide your organization's public website for future approved content suggestions.
+            Saving the URL does not retrieve or publish anything.
+          </p>
+        </Field>}
         <fieldset className="space-y-3 border-t pt-5">
           <legend className="text-sm font-semibold">Organization &amp; Tax-Exempt Status</legend>
           <p className="text-xs leading-5 text-muted-foreground">
