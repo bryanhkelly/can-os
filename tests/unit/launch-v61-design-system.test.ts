@@ -82,6 +82,28 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(frame).not.toContain('href="#launch-help"');
   });
 
+  it("uses the shared internal-step and choice-card controls throughout Launch Studio", () => {
+    const website = read("src/routes/site-website.tsx");
+    const workflow = read("src/components/workflow/index.ts");
+    expect(website).toContain("<GuidedSetupProgress");
+    expect(website).not.toContain('<nav aria-label="Website & Brand steps"');
+    expect(workflow).toContain("GuidedSetupProgress");
+    for (const path of [
+      "src/components/launch-studio/EstablishSiteInformationV61.tsx",
+      "src/components/launch-studio/EstablishProgramsAudiencesV61.tsx",
+      "src/components/launch-studio/WebsiteBrandIdentityStep.tsx",
+      "src/components/launch-studio/WebsiteTemplateGallery.tsx",
+      "src/components/launch-studio/WebsiteVisualIdentityStep.tsx",
+      "src/components/launch-studio/SolutionCatalogV61.tsx",
+      "src/components/operations/LaunchSchoolModelPicker.tsx",
+      "src/components/operations/OnsitePickupPanel.tsx",
+      "src/routes/canonical.lab.enrollment.tsx",
+    ]) {
+      expect(read(path), path).toContain("<SelectionCard");
+    }
+    expect(read("src/components/workspace/selection-card.tsx")).not.toContain('layout?: "horizontal" | "vertical"');
+  });
+
   it("reuses internal-step visuals and exposes selectable preview states", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
