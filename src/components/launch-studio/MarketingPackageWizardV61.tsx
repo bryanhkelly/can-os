@@ -79,7 +79,6 @@ export function MarketingPackageWizardV61({
   activePreviewFormat:MarketingFormat|null;
   starter:(purpose:MarketingPackageContent["purpose"])=>MarketingPackageContent;
   onTitleChange:(value:string)=>void;onPatch:(value:Partial<MarketingPackageContent>)=>void;
-  onPreviewFormatChange:(format:MarketingFormat)=>void;
   onBack:()=>void;onSaveExit:()=>void;onNext:()=>void;hasSavedPackage:boolean;
 }){
   const plan=content.plan??initialOutreachPlanV61(siteIntent?.audienceIds??[]);
@@ -90,6 +89,7 @@ export function MarketingPackageWizardV61({
   const toggle=(current:readonly string[],value:string)=>
     current.includes(value)?current.filter(id=>id!==value):[...current,value];
   const highlightOptions:Highlight[]=[
+    {source:"vision",id:"site-vision",label:"Our learning community",role:"supporting"},
     ...(siteIntent?.interestIds??[]).map(id=>({
       source:"program" as const,id,label:programLabels[id]??id,role:"supporting" as const,
     })),
