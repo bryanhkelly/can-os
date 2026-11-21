@@ -247,6 +247,35 @@ export function recommendedSiteExperiences(
     .flatMap(id=>{const item=siteExperienceById.get(id);return item?[item]:[];});
 }
 
+/**
+ * Each of the 78 topic chips appears exactly once on the first Establish page.
+ * Group headings organize scrolling content, never hide it behind a menu.
+ * Recommendations are labeled but never auto-select or consume capacity.
+ */
+export function discoverSiteExperienceTopics(
+  intent:Pick<SiteProgramsAudiencesV61,"interestIds"|"audienceIds">,
+  query:string="",
+){
+  const search=query.trim().toLocaleLowerCase();
+  const matches=(topic:SiteExperienceCategory)=>
+    !search||[topic.title,
+      ...topic.groupIds.flatMap(id=>
+        siteExperienceGroups.filter(group=>group.id===id).map(group=>group.title)),
+      ...topic.activities.map(activity=>activity.label),
+    ].some(label=>label.toLocaleLowerCase().includes(search));
+  const recommended=recommendedSiteExperiences(intent).filter(matches);
+  // Reserve *all* recommended topics, including those filtered out by search,
+  // so the same topic never appears in a group and the recommended row.
+  const recommendedIds=new Set(recommendedSiteExperiences(intent).map(topic=>topic.id));
+  const groups=siteExperienceGroups.map(group=>({
+    ...group,
+    topics:siteExperienceCatalog.filter(topic=>
+      topic.groupIds[0]===group.id &&
+      !recommendedIds.has(topic.id) && matches(topic)),
+  })).filter(group=>group.topics.length>0);
+  return {recommended,groups};
+}
+
 export function describeSiteExperience(
   topic:SiteExperienceCategory,
   detail?:{activityIds:readonly string[];outcomeIds:readonly SiteExperienceOutcomeId[]},

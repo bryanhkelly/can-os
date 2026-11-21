@@ -6,7 +6,7 @@
 
 ## Three V6.1 pages
 
-1. **Explore topics.** Browse 12 groups and 78 topic options; select no more than five total across groups, including legacy custom choices. Suggest relevant topics based on Site Programs and audiences, but don't prohibit other choices.
+1. **Explore topics.** Show all 78 topic chips on one scrollable page. A short, optional recommended row sits above twelve permanently expanded group sections; each topic appears exactly once. Recommended chips are visually identified but never automatically selected. A live selected-chips summary lets operators remove choices without hunting through groups. The hard five-topic limit includes legacy custom choices. Search filters the catalog without clearing selections.
 2. **Make them yours.** For each selected topic choose up to four predefined activity chips, up to three outcomes, associated selected audiences and Programs, and one Featured / Planned / Exploring status. No narrative writing is required.
 3. **Review vision.** Show generated planning-stage website copy, selected scope, priority, and an Edit choices action. Operators proceed through the existing Save & Continue action.
 

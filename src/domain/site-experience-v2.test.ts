@@ -2,7 +2,7 @@ import { describe,expect,it } from "vitest";
 import {
   siteExperienceGroups,siteExperienceCatalog,siteExperienceById,
   siteExperienceIds,siteExperienceLimit,siteExperienceOutcomes,
-  describeSiteExperience,
+  describeSiteExperience,recommendedSiteExperiences,discoverSiteExperienceTopics,
 } from "./site-experience-interests";
 import {
   applySiteProgramsAudiencesV61,readSiteProgramsAudiencesV61,
@@ -42,6 +42,26 @@ describe("Site Experience Catalog v2",()=>{
     for(const id of legacy)expect(siteExperienceById.has(id as typeof siteExperienceIds[number])).toBe(true);
     expect(siteExperienceCatalog.every(item=>item.groupIds.length>0&&item.activities.length>=5)).toBe(true);
     expect(siteExperienceOutcomes.length).toBeGreaterThanOrEqual(10);
+  });
+  it("shows every topic once and never treats a recommendation as selected",()=>{
+    const suggested=recommendedSiteExperiences(plan);
+    expect(suggested.length).toBeGreaterThan(0);
+    expect(suggested.length).toBeLessThanOrEqual(7);
+    expect(suggested.map(item=>item.id)).toContain("financial-literacy");
+    const {recommended,groups}=discoverSiteExperienceTopics(plan);
+    const all=[...recommended,...groups.flatMap(group=>group.topics)];
+    expect(all).toHaveLength(siteExperienceCatalog.length);
+    expect(new Set(all.map(item=>item.id)).size).toBe(all.length);
+    expect(groups).toHaveLength(siteExperienceGroups.length);
+    // All 78 choices are available even when no audience or Program is selected.
+    const empty=discoverSiteExperienceTopics({interestIds:[],audienceIds:[]});
+    const every=[...empty.recommended,...empty.groups.flatMap(group=>group.topics)];
+    expect(new Set(every.map(item=>item.id)).size).toBe(siteExperienceCatalog.length);
+    // Search filters visible chips; selected Site choices remain independent.
+    const search=discoverSiteExperienceTopics(plan,"Robotics");
+    expect([...search.recommended,...search.groups.flatMap(group=>group.topics)]
+      .some(topic=>topic.id==="robotics")).toBe(true);
+    expect(plan.experienceIds).toEqual(["voting-elections","financial-literacy","robotics"]);
   });
   it("saves structured choices alongside Programs and audiences without a new database",()=>{
     const stored=applySiteProgramsAudiencesV61(null,plan,"both");

@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { SelectionCard,WorkspaceNotice } from "@/components/workspace";
 import type { SiteExperienceDetail, SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import {
-  siteExperienceGroups,siteExperienceCatalog,siteExperienceById,
+  siteExperienceCatalog,siteExperienceById,
   siteExperienceOutcomes,siteExperienceLimit,siteExperienceActivityLimit,
   siteExperienceOutcomeLimit,siteExperienceAudienceNames,siteExperienceProgramNames,
-  recommendedSiteExperiences,describeSiteExperience,validCustomExperienceName,
+  discoverSiteExperienceTopics,describeSiteExperience,validCustomExperienceName,
   type SiteExperienceId,type SiteExperienceOutcomeId,
   type SiteExperienceAudienceId,type SiteExperienceProgramId,
 } from "@/domain/site-experience-interests";
@@ -36,22 +36,8 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
   const selectedTopics=selectedIds.flatMap(id=>{
     const topic=siteExperienceById.get(id);return topic?[topic]:[];
   });
-  // The initial screen is a complete, non-navigational catalog: recommendations
-  // are highlighted at the top; every other topic remains visible once below.
-  const recommendations=recommendedSiteExperiences(draft);
-  const recommendedIds=new Set(recommendations.map(topic=>topic.id));
-  const search=query.trim().toLocaleLowerCase();
-  const matches=(topic:typeof siteExperienceCatalog[number])=>
-    !search||[topic.title,
-      ...topic.groupIds.flatMap(id=>siteExperienceGroups.filter(group=>group.id===id).map(group=>group.title)),
-      ...topic.activities.map(activity=>activity.label),
-    ].some(label=>label.toLocaleLowerCase().includes(search));
-  const recommendedTopics=recommendations.filter(matches);
-  const groupedTopics=siteExperienceGroups.map(group=>({
-    ...group,
-    topics:siteExperienceCatalog.filter(topic=>
-      topic.groupIds[0]===group.id && !recommendedIds.has(topic.id) && matches(topic)),
-  })).filter(group=>group.topics.length>0);
+  const {recommended:recommendedTopics,groups:groupedTopics}=
+    discoverSiteExperienceTopics(draft,query);
   const topicCount=siteExperienceCatalog.length;
   const selectedDetail=activeId===null?null:
     draft.experienceDetails?.find(detail=>detail.id===activeId)??newDetail(activeId,draft);
