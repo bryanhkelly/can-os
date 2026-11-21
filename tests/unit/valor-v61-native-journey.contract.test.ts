@@ -50,7 +50,8 @@ describe("Valor V6.1 native synthetic student journey",()=>{
     expect(classroom).toContain("authorizeCanonicalCourseAttempt(");
     expect(classroom).toContain("getInstructionalLearnerContext(getRequest())");
     expect(classroom).toContain("learnerLessonProgress");
-    expect(detail).toContain("NativeValorLessonPanel");
+    expect(detail).toContain("NativeClassLessonContentPanel");
+    expect(detail).not.toContain("lesson.restoredDemo");
   });
 
   it("stores written homework on the same canonical Course Attempt without overwriting submitted work",()=>{
