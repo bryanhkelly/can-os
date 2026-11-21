@@ -42,7 +42,7 @@ describe("Launch Overview source-derived next steps", () => {
       const result=nextLaunchAction("site",{
         ...complete,[section]:{state:"unavailable" as const},
       });
-      expect(result.description.toLowerCase()).toMatch(/verify|verified|unavailable/);
+      expect(result.description.toLowerCase()).toMatch(/couldn.t load|couldn.t check/);
       expect(result.title).toMatch(/Review/);
     }
   });
@@ -60,7 +60,7 @@ describe("Launch Overview source-derived next steps", () => {
       ...complete, solutions: ready({plans:[{configurationId:id,lifecycle:"frozen"}]}),
     });
     expect(frozen.title).toBe("Review Submitted Solution");
-    expect(frozen.description).toContain("independent approval");
+    expect(frozen.description).toContain("review decision");
     expect(frozen.href).toContain("solutionPlanId="+id);
   });
 
@@ -76,7 +76,7 @@ describe("Launch Overview source-derived next steps", () => {
       ...complete, solutions: {state:"unavailable"},
     });
     expect(unavailable.title).toBe("Review Program Catalog");
-    expect(unavailable.description).toContain("could not be verified");
+    expect(unavailable.description).toContain("couldn't load");
   });
 
   it("never recommends resuming configuration for a closed Site", () => {
