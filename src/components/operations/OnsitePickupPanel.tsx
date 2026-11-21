@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MutationFeedback, StatusBadge, WorkspacePanel } from "@/components/workspace";
+import { MutationFeedback, SelectionCard, StatusBadge, WorkspacePanel } from "@/components/workspace";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -262,17 +262,19 @@ export function OnsitePickupPanel({ date, onChanged }: {
               <h4 className="text-sm font-semibold">Family-authorized adults for this date</h4>
               {!student.authorizedAdults.length && <p className="mt-2 text-sm text-muted-foreground">No current authorization. Do not release this child.</p>}
               <div className="mt-2 grid gap-2">
-                {student.authorizedAdults.map(adult => <Button variant="outline" key={adult.id} type="button"
+                {student.authorizedAdults.map(adult => <SelectionCard key={adult.id}
+                  kind="radio" name={`pickup-adult-${key}`} value={adult.id}
+                  checked={selected[key] === adult.id}
                   disabled={!!busy || !canAttempt || activeHold}
-                  onClick={() => {
+                  title={adult.pickupName}
+                  detail={`${adult.relationshipLabel} · require ${adult.identityVerificationMethod.replaceAll("_", " ")}`}
+                  onChange={checked => {
+                    if (!checked) return;
                     setSelected(current => ({ ...current, [key]: adult.id }));
                     setVerifiedNames(current => ({ ...current, [key]: adult.pickupName }));
                   }}
-                  className="w-full flex-col items-start text-left whitespace-normal aria-pressed:bg-muted"
-                  aria-pressed={selected[key] === adult.id}>
-                  <span className="font-semibold">{adult.pickupName}</span>
-                  <span className="block text-xs text-muted-foreground">{adult.relationshipLabel} · require {adult.identityVerificationMethod.replaceAll("_", " ")}</span>
-                </Button>)}
+                  className="w-full" />)}
+
               </div>
             </div>}
 
