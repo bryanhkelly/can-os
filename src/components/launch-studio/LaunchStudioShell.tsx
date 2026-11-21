@@ -29,7 +29,7 @@ export function LaunchStudioChrome({ children }: { children: ReactNode }) {
     </header>
     {children}
     <footer className="flex flex-wrap justify-between gap-3 px-[var(--page-gutter)] py-8 text-xs text-muted-foreground">
-      <span>Launch Studio</span><span>School records stay private. Access and approvals remain server-verified.</span>
+      <span>Launch Studio</span><span>Your information stays private. Access and approvals are checked securely.</span>
     </footer>
   </div>;
 }
@@ -55,7 +55,7 @@ export function LaunchStudioShell({ role, subject, title, description, steps, cu
       <aside className="border bg-card p-5 xl:sticky xl:top-6" aria-label="Journey navigation">
         <h2 className="hidden font-serif text-2xl xl:block">{subject}</h2>
         <p className="mt-2 hidden text-sm text-muted-foreground xl:block">{role}</p>
-        <p className="mt-4 hidden text-xs leading-5 text-muted-foreground xl:block">Your saved information stays with this journey. Visiting a step does not complete it.</p>
+        <p className="mt-4 hidden text-xs leading-5 text-muted-foreground xl:block">Your answers are saved as you go. You can come back to finish later.</p>
         <Button variant="outline" className="w-full justify-between xl:hidden" aria-expanded={navigationOpen}
           aria-controls="launch-step-navigation" onClick={() => setNavigationOpen(value => !value)}>
           Step {index + 1} of {steps.length}: {steps[index]?.title} <span>{navigationOpen ? "Close" : "View steps"}</span>
@@ -96,11 +96,11 @@ export function LaunchStudioShell({ role, subject, title, description, steps, cu
               aria-label={progressLabel} />
             <p className="mt-3 text-xs">{progress!.complete} of {progress!.total} {progressLabel.toLowerCase()} complete</p>
           </>}
-          <p className="mt-3 text-xs leading-5">Progress reflects saved school requirements, not pages visited. Completion is not approval.</p>
+          <p className="mt-3 text-xs leading-5">Progress reflects what you've saved. Some steps still need review before opening.</p>
         </section>
         <section className="border bg-card p-5">
           <h2 className="font-serif text-2xl">Saved work &amp; next steps</h2>
-          <div className="mt-4 space-y-3 text-sm">{status ?? <p className="text-muted-foreground">Save draft keeps your entries for later. Continue only moves to the next page; submit actions send information for review.</p>}</div>
+          <div className="mt-4 space-y-3 text-sm">{status ?? <p className="text-muted-foreground">Save your work and return whenever you're ready. We'll let you know when something needs review.</p>}</div>
           {saveAction && <div className="mt-4">{saveAction}</div>}
         </section>
         <section id="launch-help" tabIndex={-1} className="scroll-mt-6 border bg-card p-5 sm:col-span-2 xl:col-span-1">
