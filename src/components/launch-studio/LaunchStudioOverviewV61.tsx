@@ -5,12 +5,12 @@
  * navigation via the shared module registry. Render this under a Site-scoped
  * route only after the server has verified active Site access.
  */
-import { ArrowRight, BookOpen, Building2, CheckCircle2, ClipboardCheck, Globe, Info, Megaphone, Rocket, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, CheckCircle2, ClipboardCheck, Globe, Megaphone, Rocket, Users } from "lucide-react";
 import { completedLaunchStageV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { Button } from "@/components/ui/button";
 export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
-import { WorkspaceShell, WorkspacePanel, WorkspaceNotice, StatusBadge, type StatusTone } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, type StatusTone } from "@/components/workspace";
 
 export type LaunchOverviewProps = {
   site: { id: string; name: string; statusLabel: string; statusTone: StatusTone };
@@ -57,15 +57,11 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
     width="wide" rail={rail}>
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 border bg-card p-5">
-        <div><h2 className="text-lg font-semibold">{site.name}</h2><p className="mt-1 text-xs text-muted-foreground"></p></div>
+        <h2 className="text-lg font-semibold">{site.name}</h2>
         <StatusBadge tone={site.statusTone}>{site.statusLabel}</StatusBadge>
       </div>
-      <WorkspacePanel title="Your Site" description="Add programs as your community grows.">
-        <p className="text-sm leading-6 text-muted-foreground">You can add programs and services as your community grows.</p>
-      </WorkspacePanel>
       <section aria-labelledby="launch-stage-heading">
         <h2 id="launch-stage-heading" className="mb-2 text-lg font-semibold">Your path to opening</h2>
-        <p className="mb-4 text-sm text-muted-foreground"></p>
         <div className="grid gap-3 sm:grid-cols-2">{stages.map((stage, index) => {
           const Icon = stage.icon;
           return <article key={stage.id} className="border bg-card p-5">
@@ -90,7 +86,6 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
         <div><h2 className="text-sm font-semibold">{mode === "first-visit" ? "Ready to begin?" : "Continue where you left off"}</h2><p className="mt-1 text-xs text-muted-foreground">{nextAction.description}</p></div>
         <Button asChild><a href={nextAction.href}>{nextAction.title} <ArrowRight aria-hidden="true"/></a></Button>
       </div>
-      <WorkspaceNotice tone="info"><Info aria-hidden="true" className="inline size-4"/> </WorkspaceNotice>
       <div className="text-right"><Button asChild variant="outline"><a href={workspaceUrl}>Open Site Workspace</a></Button></div>
     </div>
   </WorkspaceShell>;
