@@ -12,7 +12,7 @@ import type { PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
 type ModuleId = typeof siteLaunchModules[number]["id"];
 export type DestinationModuleId = Exclude<ModuleId,
   "site-profile" | "site-information" | "programs-audiences" | "website-brand" |
-  "promote" | "recruit" | "interest-events" |
+  "create-outreach" | "my-outreach" |
   PrepareStageModuleIdV61>;
 
 type ModuleLink = { label: string; path: (siteId: string) => string; detail: string };

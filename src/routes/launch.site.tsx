@@ -113,7 +113,7 @@ export const Route = createFileRoute("/launch/site")({
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
       siteInformation: site && deps.module === "site-information"
         ? informationRead ?? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
-      // All three Introduce modules use the same authorized Site package store
+      // Both Introduce modules use the same authorized Site package store
       // and the same editorial projection of saved Establish information.
       // Failure of optional suggestions must not hide already saved packages.
       marketingPackages: site && isIntroduceModuleV61(deps.module)

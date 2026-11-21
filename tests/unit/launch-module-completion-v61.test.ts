@@ -26,7 +26,7 @@ describe("saved Site module green checks",()=>{
     for(const id of ["site-profile","site-information","programs-audiences","website-brand"])
       expect(result[id as keyof typeof result]).toBe("complete");
     expect(result["publish-site"]).toBe("incomplete");
-    expect(result.promote).toBeUndefined();
+    expect(result["create-outreach"]).toBeUndefined();
     expect(result["program-catalog"]).toBeUndefined();
     expect(result["opening-compliance"]).toBeUndefined();
     expect(result.open).toBeUndefined();
