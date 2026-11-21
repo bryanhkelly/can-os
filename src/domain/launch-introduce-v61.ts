@@ -26,7 +26,7 @@ export const introduceModuleConfigV61:Record<IntroduceModuleV61,Config>={
   },
   "my-outreach":{
     title:"My Outreach",eyebrow:"Share / My Outreach",
-    subtitle:"Review your saved plans and materials. Nothing is sent until you choose to share it.",
+    subtitle:"Review your saved plans and materials. Sending and publishing happen separately.",
     libraryTitle:"My Outreach",libraryDescription:"Open, revise, duplicate, or archive an outreach plan.",
     guidance:"Find your outreach plans and earlier materials here. You can revisit or update them whenever you need.",
     defaultPurpose:"site-announcement",
