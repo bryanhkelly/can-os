@@ -26,6 +26,18 @@ function safeHostingAuditValue(value:unknown){
   return {...safe,einSupplied:Boolean(nonprofitEin)};
 }
 
+/** Faith identity is private and self-described. Audit only whether the Site
+ * supplied it, not the tradition or religious classification itself. */
+function safeIdentityAuditValue(value:unknown) {
+  const parsed=siteIdentityV61Schema.safeParse(value);
+  if(!parsed.success)return value==null?null:{status:"unavailable"};
+  return {
+    siteTypeProvided:Boolean(parsed.data.siteType),
+    faithOrientationProvided:parsed.data.faithOrientation!=="undecided",
+    traditionProvided:Boolean(parsed.data.faithTradition),
+  };
+}
+
 const siteId = z.string().uuid();
 const expectedRevision = z.string().datetime({ offset: true });
 const saveInput = z.discriminatedUnion("section", [
@@ -153,11 +165,13 @@ export const saveSiteInformationV61 = createServerFn({ method: "POST" })
         entityType: "site", entityId: site.id,
         scope: { organizationId: site.organizationId, siteId: site.id },
         before: data.section === "story" ? storyAuditBefore
-          : { value: data.section === "hosting" ? safeHostingAuditValue(before) : before as object | null },
+          : { value: data.section === "hosting" ? safeHostingAuditValue(before)
+            : data.section === "identity" ? safeIdentityAuditValue(before) : before as object | null },
         after: data.section === "story"
           ? { revision: next.toISOString(), ...siteStoryAuditSummaryV61(data.story),
               selfReported: true, publicApproved: false }
-          : { value: data.section === "hosting" ? safeHostingAuditValue(after) : after as object,
+          : { value: data.section === "hosting" ? safeHostingAuditValue(after)
+            : data.section === "identity" ? safeIdentityAuditValue(after) : after as object,
               selfReported: true, publicApproved: false },
       });
       // Notify the shared outbox of a revised private Site source, never its contents.
