@@ -61,14 +61,14 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     id: "site-setup", channel: "site.setup",
     placement: "community", layout: "list", enabled: true,
     eyebrow: "Your Site",
-    title: "How your learning Site is taking shape",
-    description: "Private setup facts. These do not certify facilities, program delivery or operating approval.",
+    title: "About our learning community",
+    description: "Learn about our location, learning plans and how we are preparing to serve families.",
   }, {
     id: "site-network", channel: "site.network",
     placement: "closing", layout: "list", enabled: true,
     eyebrow: "Your network",
-    title: "Community and network",
-    description: "Affiliations are reviewed separately. A pending request does not confer network authority.",
+    title: "Community and partnerships",
+    description: "Explore our community connections and their current status.",
   }, {
     id: "planning-interests", channel: "learning.interests",
     placement: "learning", layout: "cards", enabled: true,
@@ -165,14 +165,14 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
   "site.setup": {
     label: "Site setup facts", privateOnly: true,
     description: "Private Site identity, planning location, time zone and selected delivery mode.",
-    defaultTitle: "How your learning Site is taking shape", defaultEyebrow: "Your Site",
-    defaultDescription: "These details are planned, not verified public operating claims.",
+    defaultTitle: "About our learning community", defaultEyebrow: "Our Site",
+    defaultDescription: "Here is how our learning community is taking shape.",
   },
   "site.network": {
     label: "Network affiliation status", privateOnly: true,
     description: "Private affiliation status from network review. Never a public brand endorsement.",
-    defaultTitle: "Community and network", defaultEyebrow: "Your network",
-    defaultDescription: "Network requests do not automatically grant membership or brand rights.",
+    defaultTitle: "Community and partnerships", defaultEyebrow: "Our connections",
+    defaultDescription: "Our community partnerships and affiliations.",
   },
   "learning.interests": {
     label: "Proposed learning programs", privateOnly: true,
@@ -230,17 +230,15 @@ export type SiteContentItem = {
 };
 export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentItem[]};
 
-/** The website preview is a presentation, not a mirror of Launch Studio.
- * Private setup/affiliation evidence stays in the Site administrator screens;
- * saved planning interests get independent editorial projection below.
+/** Preserve the Site's own configured setup and network sections.
+ * The separate, canonical planning-program projection avoids duplicate
+ * "learning.interests" cards; no Site or network facts are suppressed.
+ * Authorization to read affiliation details remains with the source reader.
  */
 export function websitePreviewEditorialBlocks(
   blocks: readonly SiteContentBlockProjection[],
 ): SiteContentBlockProjection[] {
-  return blocks.filter(block =>
-    block.channel !== "site.setup" &&
-    block.channel !== "site.network" &&
-    block.channel !== "learning.interests");
+  return blocks.filter(block => block.channel !== "learning.interests");
 }
 
 
@@ -295,17 +293,17 @@ export function resolveSiteContentBlocks(
         const setup=feeds.siteSetup;
         if (setup) {
           items = [
-            {id:"site-name",title:"Site name",description:setup.name,label:"Saved Site"},
+            {id:"site-name",title:"Site name",description:setup.name,label:"Our Site"},
             {id:"responsible-organization",title:"Responsible organization",
-              description:setup.organizationName,label:"Saved Site"},
+              description:setup.organizationName,label:"Organization"},
             ...(setup.city && setup.state ? [{id:"planning-location",title:"Planned location",
-              description:setup.city+", "+setup.state,label:"Planning information · not verified"}] : []),
+              description:setup.city+", "+setup.state,label:"Location"}] : []),
             ...(setup.timezone ? [{id:"site-timezone",title:"Site time zone",
-              description:setup.timezone,label:"Scheduling reference · not a public timetable"}] : []),
+              description:setup.timezone,label:"Time zone"}] : []),
             ...(feeds.preferences ? [{id:"delivery-intent",title:"Intended delivery",
               description:feeds.preferences.delivery==="both" ? "Physical and digital" :
                 feeds.preferences.delivery==="physical" ? "Physical / in person" : "Digital / online",
-              label:"Planning intent · not an approved delivery mode"}] : []),
+              label:"Learning plans"}] : []),
           ];
         }
         break;
@@ -322,7 +320,7 @@ export function resolveSiteContentBlocks(
           })) : [{
             id:"independent",title:"Independent Site",
             description:"No network affiliation is currently requested or approved.",
-            label:"Independent operation",
+            label:"Our community",
           }];
         }
         break;
