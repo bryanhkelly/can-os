@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import {
-  ArrowLeft, ArrowRight, BookOpen, BriefcaseBusiness, Check, ChevronDown, ChevronUp,
+  ArrowLeft, BookOpen, BriefcaseBusiness, Check, ChevronDown, ChevronUp,
   Compass, FlaskConical, HandHeart, HeartPulse, House, Landmark, Monitor, Palette,
   Search, Sparkles, Users, Wallet, X, type LucideIcon,
 } from "lucide-react";
@@ -56,7 +56,7 @@ export function EstablishExperiencesV61({
   const [query,setQuery]=useState("");
   const [customName,setCustomName]=useState("");
   const [customError,setCustomError]=useState("");
-  const [activeId,setActiveId]=useState<SiteExperienceId|null>(null);
+  const [activeId,setActiveId]=useState<SiteExperienceId|"none"|null>(null);
   const selectedIds=draft.experienceIds??[];
   const customNames=draft.customExperiences??[];
   const count=selectedIds.length+customNames.length;
@@ -75,11 +75,8 @@ export function EstablishExperiencesV61({
   const groups=siteExperienceGroups.map(group=>({
     ...group,topics:siteExperienceCatalog.filter(topic=>topic.groupIds[0]===group.id&&matches(topic)),
   })).filter(group=>group.topics.length>0);
-  const currentId=activeId&&selectedIds.includes(activeId)?activeId:selectedIds[0]??null;
-  const activeTopic=currentId?siteExperienceById.get(currentId):null;
-  const selectedDetail=currentId
-    ? draft.experienceDetails?.find(detail=>detail.id===currentId)??newDetail(currentId,draft)
-    : null;
+  const currentId=activeId==="none"?null:
+    activeId&&selectedIds.includes(activeId)?activeId:selectedIds[0]??null;
 
   function newDetail(id:SiteExperienceId,current:SiteProgramsAudiencesV61):SiteExperienceDetail{
     const topic=siteExperienceById.get(id)!;
@@ -141,10 +138,6 @@ export function EstablishExperiencesV61({
   function toggleChip<T extends string>(selected:readonly T[],id:T,max:number):T[]{
     if(selected.includes(id))return selected.filter(value=>value!==id);
     return selected.length>=max?[...selected]:[...selected,id];
-  }
-  function editTopic(id:SiteExperienceId){
-    setActiveId(id);
-    onStageChange("personalize");
   }
   const previewDetail=(id:SiteExperienceId):SiteExperienceDetail=>
     draft.experienceDetails?.find(detail=>detail.id===id)??newDetail(id,draft);
@@ -347,7 +340,7 @@ export function EstablishExperiencesV61({
               <Button type="button" variant="ghost" size="sm"
                 disabled={disabled} aria-expanded={expanded}
                 aria-controls={"experience-choices-"+topic.id}
-                onClick={()=>setActiveId(expanded?null:topic.id)}
+                onClick={()=>setActiveId(expanded?"none":topic.id)}
                 className="min-w-0 shrink-0 whitespace-normal text-left">
                 <span className="hidden text-xs text-muted-foreground md:inline">
                   {detail.activityIds.length} activities · {detail.outcomeIds.length} outcomes
@@ -365,17 +358,17 @@ export function EstablishExperiencesV61({
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold">What might people do?
               <span className="ml-2 font-normal text-muted-foreground">
-                {(selectedDetail?.activityIds.length??0)}/{siteExperienceActivityLimit}
+                {(detail?.activityIds.length??0)}/{siteExperienceActivityLimit}
               </span>
             </legend>
             <p className="text-xs text-muted-foreground">Choose up to four activities.</p>
             <div className="flex flex-wrap gap-2">
-              {activeTopic.activities.map(chip=>{
-                const active=selectedDetail?.activityIds.includes(chip.id)??false;
+              {topic.activities.map(chip=>{
+                const active=detail?.activityIds.includes(chip.id)??false;
                 return <Button key={chip.id} size="sm" variant={active?"default":"outline"}
-                  aria-pressed={active} disabled={disabled||(!active&&(selectedDetail?.activityIds.length??0)>=siteExperienceActivityLimit)}
-                  onClick={()=>patchDetail(activeTopic.id,{
-                    activityIds:toggleChip(selectedDetail?.activityIds??[],chip.id,siteExperienceActivityLimit)})}>
+                  aria-pressed={active} disabled={disabled||(!active&&(detail?.activityIds.length??0)>=siteExperienceActivityLimit)}
+                  onClick={()=>patchDetail(topic.id,{
+                    activityIds:toggleChip(detail?.activityIds??[],chip.id,siteExperienceActivityLimit)})}>
                   {active&&<Check aria-hidden="true"/>}{chip.label}</Button>;
               })}
             </div>
@@ -383,20 +376,20 @@ export function EstablishExperiencesV61({
           <fieldset className="space-y-3 border-t pt-4">
             <legend className="text-sm font-semibold">What do you hope they gain?
               <span className="ml-2 font-normal text-muted-foreground">
-                {(selectedDetail?.outcomeIds.length??0)}/{siteExperienceOutcomeLimit}
+                {(detail?.outcomeIds.length??0)}/{siteExperienceOutcomeLimit}
               </span>
             </legend>
             <p className="text-xs text-muted-foreground">Choose up to three outcomes.</p>
             <div className="flex flex-wrap gap-2">
               {[...siteExperienceOutcomes].sort((a,b)=>
-                Number(activeTopic.recommendedOutcomeIds.includes(b.id))-
-                Number(activeTopic.recommendedOutcomeIds.includes(a.id))).map(chip=>{
-                const active=selectedDetail?.outcomeIds.includes(chip.id)??false;
+                Number(topic.recommendedOutcomeIds.includes(b.id))-
+                Number(topic.recommendedOutcomeIds.includes(a.id))).map(chip=>{
+                const active=detail?.outcomeIds.includes(chip.id)??false;
                 return <Button key={chip.id} size="sm" variant={active?"default":"outline"}
-                  aria-pressed={active} disabled={disabled||(!active&&(selectedDetail?.outcomeIds.length??0)>=siteExperienceOutcomeLimit)}
-                  onClick={()=>patchDetail(activeTopic.id,{
+                  aria-pressed={active} disabled={disabled||(!active&&(detail?.outcomeIds.length??0)>=siteExperienceOutcomeLimit)}
+                  onClick={()=>patchDetail(topic.id,{
                     outcomeIds:toggleChip<SiteExperienceOutcomeId>(
-                      selectedDetail?.outcomeIds??[],chip.id,siteExperienceOutcomeLimit)})}>
+                      detail?.outcomeIds??[],chip.id,siteExperienceOutcomeLimit)})}>
                   {active&&<Check aria-hidden="true"/>}{chip.label}</Button>;
               })}
             </div>
@@ -406,12 +399,12 @@ export function EstablishExperiencesV61({
             <p className="text-xs text-muted-foreground">Choose from the audiences you selected in Establish. You can update them later.</p>
             <div className="flex flex-wrap gap-2">
               {draft.audienceIds.map(id=>{
-                const active=selectedDetail?.audienceIds.includes(id)??false;
+                const active=detail?.audienceIds.includes(id)??false;
                 return <Button key={id} size="sm" variant={active?"default":"outline"}
                   aria-pressed={active} disabled={disabled}
-                  onClick={()=>patchDetail(activeTopic.id,{
+                  onClick={()=>patchDetail(topic.id,{
                     audienceIds:toggleChip<SiteExperienceAudienceId>(
-                      selectedDetail?.audienceIds??[],id,4)})}>
+                      detail?.audienceIds??[],id,4)})}>
                   {active&&<Check aria-hidden="true"/>}{siteExperienceAudienceNames[id]}</Button>;
               })}
             </div>
@@ -423,12 +416,12 @@ export function EstablishExperiencesV61({
             <legend className="text-sm font-semibold">Which Program interests might include this Experience?</legend>
             <div className="flex flex-wrap gap-2">
               {draft.interestIds.map(id=>{
-                const active=selectedDetail?.programIds.includes(id)??false;
+                const active=detail?.programIds.includes(id)??false;
                 return <Button key={id} size="sm" variant={active?"default":"outline"}
                   aria-pressed={active} disabled={disabled}
-                  onClick={()=>patchDetail(activeTopic.id,{
+                  onClick={()=>patchDetail(topic.id,{
                     programIds:toggleChip<SiteExperienceProgramId>(
-                      selectedDetail?.programIds??[],id,6)})}>
+                      detail?.programIds??[],id,6)})}>
                   {active&&<Check aria-hidden="true"/>}{siteExperienceProgramNames[id]}</Button>;
               })}
             </div>
@@ -439,12 +432,12 @@ export function EstablishExperiencesV61({
               <p className="text-xs font-semibold">Published Program ideas</p>
               <div className="flex flex-wrap gap-2">
                 {draft.programCodes.map(code=>{
-                  const active=selectedDetail?.programCodes?.includes(code)??false;
+                  const active=detail?.programCodes?.includes(code)??false;
                   const title=programCatalog.find(item=>item.code===code)?.title??code;
                   return <Button key={code} size="sm" variant={active?"default":"outline"}
                     aria-pressed={active} disabled={disabled}
-                    onClick={()=>patchDetail(activeTopic.id,{
-                      programCodes:toggleChip(selectedDetail?.programCodes??[],code,30)})}>
+                    onClick={()=>patchDetail(topic.id,{
+                      programCodes:toggleChip(detail?.programCodes??[],code,30)})}>
                     {active&&<Check aria-hidden="true"/>}{title}</Button>;
                 })}
               </div>
@@ -455,7 +448,7 @@ export function EstablishExperiencesV61({
             <p className="flex items-center gap-2 text-sm font-semibold"><Sparkles aria-hidden="true" size={16}/>
               Preview generated website copy</p>
             <p className="bg-muted p-3 text-sm leading-6">
-              {describeSiteExperience(activeTopic,selectedDetail??newDetail(activeTopic.id,draft))}
+              {describeSiteExperience(topic,detail)}
             </p>
             <p className="text-xs text-muted-foreground">
               This describes an idea only. Website & Brand controls public wording and publication.
