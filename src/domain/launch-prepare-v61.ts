@@ -7,7 +7,7 @@ export const prepareStageModulesV61 = [
   { id: "schedules-capacity", title: "Schedules & Capacity", subtitle: "Define dates, days, sessions, rooms and available seats." },
   { id: "funding-enrollment", title: "Funding & Registration", subtitle: "Plan how people can participate, what it may cost, and any registration requirements." },
   { id: "opening-compliance", title: "Safety & Readiness", subtitle: "Review what's needed to open safely and provide any required documents." },
-  { id: "publish-site", title: "Publish Site", subtitle: "Review your website and publish it when the required checks are complete." },
+  { id: "publish-site", title: "Publish Website", subtitle: "Review your website and publish it when the required checks are complete." },
 ] as const;
 
 export type PrepareStageModuleIdV61 = (typeof prepareStageModulesV61)[number]["id"];
