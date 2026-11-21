@@ -23,6 +23,9 @@ describe("Valor canonical, private synthetic community fixtures",()=>{
     expect(groups).toContain('eq(canonicalClassEnrollments.status,"active")');
     expect(groups).toContain('eq(canonicalClassStaffAssignments.state,"approved")');
     expect(workspace).toContain("permittedNativeClasses");
+    expect(workspace).toContain("inArray(s.studyGroups.siteId, sites)");
+    expect(workspace).toContain("permittedNativeClasses.has");
+    expect(groups).toContain("!isCanonicalClassGroup && group.programId");
     expect(workspace).toContain('eq(canonicalClassEnrollments.status,"active")');
   });
 
