@@ -22,6 +22,7 @@ import { saveSiteInformationV61 } from "@/modules/programs/site-information-v61.
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import { siteInformationGuideV61 } from "@/domain/launch-site-guide-v61";
+import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import type { SiteGuideContentV61 } from "./SiteGuideV61";
 import { GuidedSetupShell } from "@/components/workflow";
 
@@ -135,7 +136,7 @@ function isEmptyStory(story: SiteStoryV61): boolean {
 function snapshot(value: unknown) { return JSON.stringify(value); }
 
 export function EstablishSiteInformationV61({ siteId, responsibleOrganizationName, initial,
-  onBackToSiteProfile, onSaveAndExit, onContinueToPrograms, onInternalStepChange, onGuideChange,
+  onBackToSiteProfile, onSaveAndExit, onContinueToPrograms, onInternalStepChange, onGuideChange, guidePlanning,
 }: {
   siteId: string;
   responsibleOrganizationName: string | null;
@@ -145,6 +146,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   onContinueToPrograms: () => void;
   onInternalStepChange?: (step: Step) => void;
   onGuideChange?: (guide: SiteGuideContentV61) => void;
+  guidePlanning?: SiteProgramsAudiencesV61 | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
@@ -164,8 +166,8 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   // The rail follows live structured selections without reading free-text story fields.
   const liveGuide = useMemo(() => siteInformationGuideV61(step, {
     siteType: identity.siteType, hostingMode: host.hostingMode,
-    delivery: environment.delivery, values: story.values, networkChoice,
-  }), [step, identity.siteType, host.hostingMode, environment.delivery, story.values, networkChoice]);
+    delivery: environment.delivery, values: story.values, networkChoice, planning: guidePlanning,
+  }), [step, identity.siteType, host.hostingMode, environment.delivery, story.values, networkChoice, guidePlanning]);
   useEffect(() => { onGuideChange?.(liveGuide); }, [liveGuide, onGuideChange]);
   const [busy, setBusy] = useState(false);
   const [reloadRequired, setReloadRequired] = useState(false);
