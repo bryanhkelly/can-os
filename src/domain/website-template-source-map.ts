@@ -205,8 +205,7 @@ const homeKeys=Object.keys(sections) as (keyof PublicSiteHomeSections)[];
 function orderedHomepageKeys(template:SiteTemplateId):(keyof PublicSiteHomeSections)[]{
   // Compose the real public-home layout using safe sentinel strings. The
   // resulting sequence, not a duplicate layout list, drives the provenance UI.
-  const snippets=Object.fromEntries(homeKeys.map(key=>[key,`__can_site_section_${key}__`]))
-    as PublicSiteHomeSections;
+  const snippets=Object.fromEntries(homeKeys.map(key=>[key,`__can_site_section_${key}__`])) as PublicSiteHomeSections;
   const html=composePublicSiteHome(template,snippets);
   return [...homeKeys].sort((a,b)=>
     html.indexOf(snippets[a])-html.indexOf(snippets[b]));
