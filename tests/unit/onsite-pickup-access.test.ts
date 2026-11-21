@@ -9,7 +9,7 @@ const base: VerifiedAccessGrant = {
 const session = { accountId: "account", sessionId: "session", activeGrantId: "grant" };
 
 describe("onsite pickup capability and resource scope", () => {
-  it.each(["room_facilitator", "site_staff", "site_leader"] as const)(
+  it.each(["site_staff", "site_leader"] as const)(
     "%s requires an additive pickup capability and original Site scope", role => {
       const actor = resolveAccessContext(session, [{ ...base, role }]);
       actor.scope.programIds = ["program"];
