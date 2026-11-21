@@ -173,7 +173,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Website and Brand guidance">
           <SiteGuideV61 guide={data.host ? {
             ...websiteGuideSteps[step]!,
-            highlights: [data.status === "published" ? "Published website" : "Private website draft"],
+            highlights: [data.siteName, data.status === "published" ? "Published website" : "Private website draft"],
           } : {
             summary: "Prepare a private Site website address before you choose a layout or begin editing.",
             insight: "You can design and review privately without opening enrollment or publishing your Site.",
