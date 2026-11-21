@@ -17,13 +17,13 @@ export function WebsiteBrandIdentityStep({
 }){
   return <section aria-label="Brand Identity" className="space-y-5">
     <div>
-      <h3 className="font-serif text-2xl font-semibold">What should families feel about your Site?</h3>
-      <p className="mt-2 text-sm text-muted-foreground">Choose a style for your Site.</p>
+      <h3 className="font-serif text-2xl font-semibold">How do you want people to feel when they discover your community?</h3>
+      <p className="mt-2 text-sm text-muted-foreground">Choose a visual direction that reflects the community you want to create.</p>
     </div>
-    <Field label="Public Site name">
+    <Field label="Name visitors will see">
       <Input type="text" maxLength={120} value={displayName} disabled={busy||!canEdit}
         onChange={event=>onDisplayNameChange(event.target.value)}
-        placeholder="Your learning community name" className="min-h-11 w-full"/>
+        placeholder="Your Site or community name" className="min-h-11 w-full"/>
     </Field>
     <p className="text-sm text-muted-foreground">{currentRevision>0?"Saved":"Not saved yet"}</p>
     <fieldset disabled={busy||!canEdit}>
