@@ -29,7 +29,7 @@ export const Route=createFileRoute("/access/session")({
       (body as {kind:unknown}).kind==="activity" &&
       Object.keys(body).length===1){
       await recordMeaningfulSessionActivity(
-       context.sessionId,context.sessionAccountId??context.accountId,
+       context.sessionId,context.impersonatedByAccountId??context.sessionAccountId??context.accountId,
       );
       return new Response(null,{status:204,headers:{"Cache-Control":"no-store"}});
     }
@@ -46,7 +46,7 @@ export const Route=createFileRoute("/access/session")({
     }
     const grantId=body&&typeof body==="object"&&"grantId" in body?(body as {grantId:unknown}).grantId:null;
     if(typeof grantId!=="string")return Response.json({error:"Invalid membership"},{status:400});
-    await selectAccessGrant(context.sessionId,context.sessionAccountId??context.accountId,grantId);
+    await selectAccessGrant(context.sessionId,context.impersonatedByAccountId??context.sessionAccountId??context.accountId,grantId);
     return Response.json({ok:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     return Response.json({error:error instanceof AuthorizationError?"Unauthorized":"Unable to switch membership"},
