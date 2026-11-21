@@ -79,6 +79,7 @@ export async function requestConsentedInterestFamilyStart(
     .for("update").limit(1);
   if(!interest||!interest.consentAt||!["new","contacted"].includes(interest.status))
    throw new AuthorizationError("consented family interest");
+  if(!interest.programId)throw new AuthorizationError("an authorized Program is required for application invitations");
   const school=await resolvePrivateFamilyStartDestination(tx,interest.programId);
   if(school.siteId!==interest.siteId)throw new AuthorizationError("original interest Site");
   return {school,contact:{
