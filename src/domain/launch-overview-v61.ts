@@ -34,13 +34,13 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   // that can be reopened or make enrollment-ready without a new authorization.
   if (lifecycleStatus === "closed") {
     return { title: "Review Closed Site",
-      description: "This Site is closed. Review its authorized record before any further planning.",
+      description: "This site is closed. Review its information before deciding what to do next.",
       href: "/sites/" + encodeURIComponent(siteId) };
   }
   const route = (module: string) => "/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=" + module;
   if (evidence.information.state === "unavailable") {
     return { title: "Review Site Information",
-      description: "Saved Site Information could not be verified. Check it before continuing.",
+      description: "We couldn't load your Site Information. Check it before continuing.",
       href: route("site-information") };
   }
   if (evidence.information.value.identitySaved === false || !evidence.information.value.hostingSaved || !evidence.information.value.environmentSaved) {
@@ -50,7 +50,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   }
   if (evidence.programs.state === "unavailable") {
     return { title: "Review Programs & Audiences",
-      description: "Saved planning interests could not be verified.",
+      description: "We couldn't load your saved program ideas. Try again before making changes.",
       href: route("programs-audiences") };
   }
   if (!evidence.programs.value.saved) {
@@ -60,28 +60,28 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   }
   if (evidence.brand.state === "unavailable") {
     return { title: "Review Website & Brand",
-      description: "Your saved Site Brand could not be verified.",
+      description: "We couldn't load your saved brand. Check Website & Brand before continuing.",
       href: route("website-brand") };
   }
   if (!evidence.brand.value.saved || !evidence.websiteDraftAvailable ||
       !evidence.websiteContentSaved) {
     return { title: "Continue Website & Brand",
-      description: "Save a Site Brand and a private website draft. Publishing is separate.",
+      description: "Save your brand and a private website draft. You can publish the website later.",
       href: route("website-brand") };
   }
   if (evidence.marketing.state === "unavailable") {
     return { title: "Review Introduce",
-      description: "Saved Marketing Packages could not be verified. No outreach status is inferred.",
+      description: "We couldn't load your saved outreach plans. Try again before editing or creating materials.",
       href: route("create-outreach") };
   }
   if (!evidence.marketing.value.hasPackages) {
     return { title: "Create an Outreach Plan",
-      description: "Create a focused outreach plan using your saved Site Brand and Story.",
+      description: "Choose who to reach and create a message using your saved brand and story.",
       href: route("create-outreach") };
   }
   if (evidence.solutions?.state === "unavailable") {
     return { title: "Review Program Catalog",
-      description: "Saved Solution plans could not be verified. Review them before continuing.",
+      description: "We couldn't load your solution plans. Check them before continuing.",
       href: route("program-catalog") };
   }
   if (evidence.solutions?.state === "ready") {
@@ -91,19 +91,19 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
       return {
         title: plan.lifecycle === "draft" ? "Continue Solution Plan" : "Review Submitted Solution",
         description: plan.lifecycle === "draft"
-          ? "Resume your saved Solution configuration in Prepare."
-          : "Review your submitted Solution plan and its independent approval status.",
+          ? "Continue building your saved solution plan."
+          : "Check your submitted solution plan and its review decision.",
         href: route("program-catalog") + "&solutionPlanId=" +
           encodeURIComponent(plan.configurationId),
       };
     }
     if (plans.length > 1) {
       return { title: "Continue Preparing Solutions",
-        description: "Review your saved plans in Program Catalog and choose which to continue.",
+        description: "Open Program Catalog and choose a saved plan to continue.",
         href: route("program-catalog") };
     }
   }
   return { title: "Explore the Program Catalog",
-    description: "Select and privately configure a Solution. Readiness and approval remain independent.",
+    description: "Explore available solutions and choose one to plan for your community.",
     href: route("program-catalog") };
 }
