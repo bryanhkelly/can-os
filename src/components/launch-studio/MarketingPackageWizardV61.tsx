@@ -162,7 +162,7 @@ export function MarketingPackageWizardV61({
             <legend className="mb-2 text-sm font-medium">Recipients</legend>
             {marketingAudienceOptions.map(item=><SelectionCard key={item.id}
               kind="checkbox" compact title={item.label} value={item.id}
-              checked={plan.recipients.includes(item.id)} disabled={busy}
+              checked={plan.recipients.includes(item.id)} disabled={busy||(!plan.recipients.includes(item.id)&&plan.recipients.length>=8)}
               onChange={()=>updatePlan({recipients:toggle(plan.recipients,item.id) as OutreachPlanV61["recipients"]})}/>)}
           </fieldset>
         </section>
@@ -256,6 +256,12 @@ export function MarketingPackageWizardV61({
     {step===5&&<WorkspacePanel title="Review & create"
       description="Choose your story angle, review the draft message, and create coordinated materials. Nothing is sent or published.">
       <div className="mt-4 space-y-5">
+        <div className="grid gap-3 border bg-muted/20 p-3 text-sm sm:grid-cols-2">
+          <p><strong>Recipients:</strong> {plan.recipients.join(", ")||"None selected"}</p>
+          <p><strong>Beneficiaries:</strong> {plan.beneficiaries.join(", ")||"All audiences"}</p>
+          <p><strong>Highlights:</strong> {plan.highlights.map(x=>x.label).join(", ")||"Not selected"}</p>
+          <p><strong>Channels:</strong> {plan.channels.join(", ")||"Not selected"}</p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {storyOptions.map(item=><SelectionCard key={item.id} kind="radio"
             name="outreach-story-angle" value={item.id} title={item.label}
@@ -289,7 +295,7 @@ export function MarketingPackageWizardV61({
           }}>Use saved Website &amp; Brand wording</Button>}
         <div className="border p-4">
           <h3 className="text-sm font-semibold">Included materials</h3>
-          <p className="mt-1 text-xs text-muted-foreground">{content.formats.map(id=>formatNames[id]).join(", ")||"No supported printable or digital formats selected"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{content.formats.map(id=>formatNames[id]).join(", ")||"Text or share-link copy only. No rendered material selected"}</p>
           {chosenMaterial&&<div className="mt-4">
             <MarketingMaterialPreviewV61 siteId={siteId} title={title} content={content}
               brandVersionId={brandVersionId} format={chosenMaterial}/></div>}
