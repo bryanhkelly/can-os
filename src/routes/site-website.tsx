@@ -72,9 +72,9 @@ function PartnerSiteWebsitePage() {
 function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare:boolean}) {
   const router=useRouter();
   const mutation=useMutationFeedback(()=>router.invalidate());
-  return <section className="border bg-card p-5"><p className="text-sm">Prepare a private website address to begin designing. This does not publish your Site or create a Program.</p>
+  return <section className="border bg-card p-5"><p className="text-sm">Set up your website address to start designing.</p>
     {canPrepare && <Button className="mt-4" disabled={mutation.pending||mutation.refreshFailed} onClick={()=>void mutation.run(()=>prepareSchoolWebsite({data:{siteId}}),{successMessage:"Private website address prepared.",commandErrorMessage:"Unable to prepare the website address."})}>Prepare Site website</Button>}
-    {!canPrepare && <p className="mt-3 text-sm">Your Site Administrator or publication manager must prepare the website address.</p>}
+    {!canPrepare && <p className="mt-3 text-sm">Ask a Site Administrator to set up the website address.</p>}
     <MutationFeedback state={mutation} pendingMessage="Preparing website…"/>
   </section>;
 }
@@ -112,20 +112,20 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
         <div className="min-w-0">
           <PageHeader eyebrow="Establish / Website & Brand"
-            title={data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
+            title={data.host?["Brand Identity","Choose a Layout","Visual Identity",
               "Content Consent","Your Content","Review & Finish"][step]:"Prepare your private website address"}
-            subtitle="One Site-owned, revisioned private website. Draft changes never open enrollment, approve a Site or publish content." />
+            subtitle="Design your Site website." />
           <div className="mt-5">
             {data.host ? <GuidedSetupShell
               title="Website & Brand"
-              description="Choose a direction, design your private website and review your draft."
+              description="Choose a layout, customize your style and edit your content."
               progressLabel="Website & Brand steps"
               steps={steps.map((item,index)=>({
                 id:item.id,
                 title:item.title,
-                description:index===0?"Choose your editorial direction":index===1?"Choose a structure":
-                  index===2?"Colors, fonts and imagery":index===3?"Consent to reuse Site information":
-                  index===4?"Edit website content":"Review private draft",
+                description:index===0?"Choose a style":index===1?"Choose a layout":
+                  index===2?"Colors, fonts and imagery":index===3?"Use saved information":
+                  index===4?"Edit website content":"Review website",
                 status:step===index?"current" as const:"upcoming" as const,
               }))}
               onStepChange={id=>changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]))}>
@@ -136,28 +136,16 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
           <div className="mt-5 border-t pt-4 text-sm">{returnToLaunch??<Link to="/home" className="font-semibold text-primary">Exit to workspace</Link>}</div>
         </div>
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Website and Brand guidance">
-          <section className="bg-foreground p-5 text-background">
-            <h2 className="font-serif text-xl font-semibold">What you can do</h2>
-            <p className="mt-3 text-sm leading-6">Choose your identity, explore seven website structures,
-              apply approved colors and fonts, add rights-cleared media, and edit your story.</p>
-            <p className="mt-3 text-xs leading-5">Your Site's tools, approved catalog and learning experiences
-              can later appear on the website through the existing content channels.</p>
-          </section>
           <section className="border bg-card p-5">
-            <h2 className="text-sm font-semibold">Your private website</h2>
+            <h2 className="text-sm font-semibold">Website preview</h2>
             {data.host?<><p className="mt-2 break-all font-mono text-xs">{data.host}</p>
-              <p className="mt-3 text-xs text-muted-foreground">Saved revision {data.currentRevision} · {data.status==="published"?"Some content is already published":"Private draft, not published"}</p>
+              <p className="mt-3 text-xs text-muted-foreground">{data.status==="published"?"Published":"Draft"}</p>
               <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
                 className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-4">
-                Open saved private preview
-              </a></>:<p className="mt-2 text-sm text-muted-foreground">Prepare a private address before editing.</p>}
+                Open preview
+              </a></>:<p className="mt-2 text-sm text-muted-foreground">Set up an address to begin.</p>}
           </section>
-          <section className="border bg-card p-5">
-            <h2 className="text-sm font-semibold">What happens next</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Save an editable website draft. Official publication and protected institutional claims follow separate review and authorization.
-            </p>
-          </section>
+
         </aside>
       </div>
     </PageFrame>
@@ -168,10 +156,10 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     subtitle={data.organizationName + " · a Site website and reusable communications"} actions={returnToLaunch}>
     <GuidedSetupShell
       title="Build your Site website and brand together"
-      description="Choose a wireframe, establish your Brand, decide on content reuse, then review and save your website."
+      description="Choose a layout, customize your style and edit your content."
       steps={data.host ? steps.map((item,index)=>({
-        id:item.id,title:item.title,description:index===0?"Choose your editorial direction":index===1?"Choose a structure":
-          index===2?"Colors, fonts and rights-cleared media":index===3?"Consent to reuse Site information":
+        id:item.id,title:item.title,description:index===0?"Choose a style":index===1?"Choose a layout":
+          index===2?"Colors, fonts and imagery":index===3?"Use saved information":
             index===4?"Edit website content":"Review private draft",
         status:step===index?"current":"upcoming",
       })) : [
@@ -182,15 +170,12 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
         {data.host ? <>
           <p className="break-all font-mono text-xs">{data.host}</p>
           <p className="text-muted-foreground">
-            {data.status === "published" ? "Published" : "Private draft"}. {data.canPrepareWebsite ? "Publish reviewed Site-owned content from this workspace." : "The Site address follows its existing approval workflow."}
+            {data.status === "published" ? "Published" : "Draft"}
           </p>
         </> : <p role="status" className="text-muted-foreground">
           No address is reserved yet.
         </p>}
-        <p className="border-t pt-3 text-xs leading-5 text-muted-foreground">
-          You can publish church-owned content. CAN retains control of academic claims,
-          admissions and institutional information.
-        </p>
+
       </div>}>
       {data.host
         ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio} />
@@ -466,14 +451,7 @@ function LocalWebsiteCopyEditor({
   }
 
   return <section aria-label="Website content setup">
-    {data.demonstration && !data.editingContent && <WorkspaceNotice tone="attention" className="mt-3">
-      <p className="font-semibold">Fictional sample prepared for this demo Site</p>
-      <p className="mt-1">We filled the draft with an example welcome, community story, vision and theme.
-        This content has not been saved or published. Review and edit the story, then
-        save your private draft. Site publication and legal authorization are separate.</p>
-      <p className="mt-2">To change any suggested wording, go to Your Content and use the Reset to original action
-        beside that individual field. No other answers are affected.</p>
-    </WorkspaceNotice>}
+
     {revisionConflict && <WorkspaceNotice tone="attention" className="mt-3 space-y-2">
       <p className="font-semibold">A newer website revision ({data.currentRevision}) is available.</p>
       <p>Your unsaved edits remain here. Saving is paused to prevent overwriting someone else's revision.
@@ -489,11 +467,11 @@ function LocalWebsiteCopyEditor({
       Your latest proposed wording includes a protected claim. It is held for review;
       the last published church copy remains unchanged.
     </WorkspaceNotice>}
-    {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">Using illustrative template images. No Site photography selected.</p>}
+
     {artworkGaps.length > 0 &&
       <div role="status" className="mt-3 border p-3 text-sm">
-        <p className="font-semibold">Artwork is incomplete. You can save a private draft now.</p>
-        <p className="mt-1">This artwork stays private and will not appear in a preview or published page until these items are complete:</p>
+        <p className="font-semibold">Some images need attention.</p>
+        <p className="mt-1">Complete these items before using the images:</p>
         <ul className="mt-2 list-disc pl-5">{[...new Set(artworkGaps)].map(gap =>
           <li key={gap}>{gap}</li>)}</ul>
       </div>}
@@ -510,8 +488,8 @@ function LocalWebsiteCopyEditor({
         onDirectionChange={id=>setContent(old=>({...old,
           branding:{...old.branding,brandDirectionId:id}}))}/>}
       {step === 1 && <div className="space-y-5">
-        <h3 className="font-serif text-2xl font-semibold">Choose your wireframe</h3>
-        <p className="text-sm text-muted-foreground">Compare seven structures in grayscale. Colors, typography and imagery come next.</p>
+        <h3 className="font-serif text-2xl font-semibold">Choose a layout</h3>
+
         {brandDirection && <div className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
           <span>Suggested structure: <strong>{schoolBrandDesigns[brandRecommendedLayout(brandDirection)].name}</strong></span>
           <Button type="button" variant="outline" disabled={busy || !data.canEdit}
@@ -578,13 +556,11 @@ function LocalWebsiteCopyEditor({
           ?setConfirmation({kind:"restore",revision})
           :void restore(revision)}/>}
       {!data.draftStorageReady && <WorkspaceNotice tone="attention">
-        <strong>Private draft storage requires an update.</strong> This Cloudflare-connected database has not
-        applied website migration 0077. Draft saving is unavailable until an authorized database
-        migration is completed. You can still preview the website, but your changes are not saved.
+        <strong>Saving is currently unavailable.</strong> You can still preview your website. Contact support to restore saving.
       </WorkspaceNotice>}
       <ActionDialog open={confirmation!==null}
         title={confirmation?.kind==="reload" ? "Discard changes and load latest?" : "Restore an earlier website revision?"}
-        description="Unsaved website copy and Brand edits will be discarded. Previously saved versions stay in history."
+        description="Your unsaved changes will be lost. Saved versions will remain available."
         confirmLabel={confirmation?.kind==="reload" ? "Discard edits and reload" : "Restore revision"}
         destructive pending={busy} onClose={()=>setConfirmation(null)}
         onConfirm={()=>{
@@ -605,7 +581,7 @@ function LocalWebsiteCopyEditor({
             onClick={()=>onStepChange(Math.min(5,step+1))}>Continue</Button>
             : <Button type="button" disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
               loading={busy} loadingLabel="Saving private draft…"
-              onClick={()=>void saveDraft("stay")}>Save private draft & finish</Button>}
+              onClick={()=>void saveDraft("stay")}>Save & Finish</Button>}
         </div>
       </ActionFooter>
     </div>
