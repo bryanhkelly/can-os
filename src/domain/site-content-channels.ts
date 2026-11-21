@@ -285,8 +285,9 @@ export function resolveSiteContentBlocks(
   ] as const));
   return config.blocks.flatMap(block => {
     if (!block.enabled) return [];
-    if ((block.channel === "learning.interests" || block.channel === "site.setup" ||
-      block.channel === "site.network") && feeds.mode !== "private") return [];
+    // Site publishers choose exactly which saved sections to show.
+    // Pending intent/affiliation is labeled as such; a website section itself
+    // never grants operating, denominational or enrollment authorization.
     let items: SiteContentItem[] = [];
     switch (block.channel) {
       case "site.setup": {
