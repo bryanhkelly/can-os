@@ -97,6 +97,8 @@ tester.run("no-custom-guided-selections", plugin.rules["no-custom-guided-selecti
     'const nav = <GuidedSetupProgress steps={steps} />;',
     'const toolbar = <div><Button aria-pressed={enabled} className="text-left">Preview</Button></div>;',
     'const action = <fieldset><Button variant="outline">Add option</Button></fieldset>;',
+    'const sidebar = <nav aria-label="Launch steps"><ol><li><Button aria-current="step">Site</Button></li></ol></nav>;',
+    'const pages = <nav><Button aria-current={current ? "page" : undefined}>Page</Button></nav>;',
   ],
   invalid: [
     {
@@ -110,6 +112,10 @@ tester.run("no-custom-guided-selections", plugin.rules["no-custom-guided-selecti
     {
       code: 'const nav = <ol><li><Button aria-current="step">Start</Button></li></ol>;',
       errors: [{ messageId: "step" }],
+    },
+    {
+      code: 'const cards = <div role="group"><Button aria-pressed={active} className="min-h-20">Solution A</Button></div>;',
+      errors: [{ messageId: "choice" }],
     },
   ],
 });
