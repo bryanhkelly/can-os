@@ -1,7 +1,8 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { ArrowLeft, ArrowRight, Check, Pencil, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNotice } from "@/components/workspace";
+import { Input } from "@/components/ui/input";
+import { SelectionCard,WorkspaceNotice } from "@/components/workspace";
 import type { SiteExperienceDetail, SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import {
   siteExperienceGroups,siteExperienceCatalog,siteExperienceById,
@@ -128,13 +129,13 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
           <h4 className="text-sm font-semibold">Experience groups</h4>
           <p className="text-xs text-muted-foreground">Browse all 12 groups. Your five choices can come from any combination.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-            {siteExperienceGroups.map(item=><button key={item.id}
-              type="button" disabled={disabled} aria-pressed={group===item.id}
+            {siteExperienceGroups.map(item=><Button key={item.id}
+              type="button" variant={group===item.id?"default":"outline"}
+              size="sm" disabled={disabled} aria-pressed={group===item.id}
               onClick={()=>{setGroup(item.id);setQuery("");}}
-              className={"min-h-12 border px-3 py-2 text-left text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary "+
-                (group===item.id?"border-primary bg-primary/10 text-foreground":"border-border bg-card hover:bg-muted")}>
+              className="min-h-12 min-w-0 justify-start whitespace-normal px-3 py-2 text-left">
               {item.title}
-            </button>)}
+            </Button>)}
           </div>
         </div>
         <div className="min-w-0 space-y-3">
@@ -145,29 +146,28 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
                 {siteExperienceGroups.find(item=>item.id===group)?.description}
               </p>
             </div>
-            <label className="flex min-h-10 items-center gap-2 border border-input bg-background px-3 text-sm">
+            <label className="flex items-center gap-2 text-sm">
               <Search size={16} aria-hidden="true"/>
               <span className="sr-only">Search Experience topics</span>
-              <input type="search" value={query} disabled={disabled} placeholder="Find a topic"
-                onChange={event=>setQuery(event.target.value)} className="w-40 min-w-0 bg-transparent outline-none"/>
+              <Input type="search" value={query} disabled={disabled} placeholder="Find a topic"
+                aria-label="Search Experience topics"
+                onChange={event=>setQuery(event.target.value)} className="w-44"/>
             </label>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {topics.map(topic=>{
               const checked=selectedIds.includes(topic.id);
               const blocked=!checked&&count>=siteExperienceLimit;
-              return <button key={topic.id} type="button" aria-pressed={checked}
-                disabled={disabled||blocked} onClick={()=>toggleTopic(topic.id)}
-                className={"flex min-h-24 min-w-0 flex-col gap-2 border p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 "+
-                  (checked?"border-primary bg-primary/10":"border-border bg-card hover:bg-muted")}>
-                <span className="flex w-full items-start justify-between gap-2">
-                  <span className="text-sm font-semibold">{topic.title}</span>
-                  <span className="flex size-5 shrink-0 items-center justify-center border border-current"
-                    aria-hidden="true">{checked&&<Check className="size-4"/>}</span>
-                </span>
-                <span className="text-xs leading-5 text-muted-foreground">{topic.description}</span>
-                {suggested.has(topic.id)&&<span className="text-xs font-semibold text-primary">Suggested for your audiences and Programs</span>}
-              </button>;
+              return <SelectionCard key={topic.id} kind="checkbox" value={topic.id}
+                title={topic.title}
+                detail={<span className="space-y-2">
+                  <span className="block">{topic.description}</span>
+                  {suggested.has(topic.id)&&<span className="block font-semibold text-primary">
+                    Suggested for your audiences and Programs
+                  </span>}
+                </span>}
+                checked={checked} disabled={disabled||blocked} className="min-h-24"
+                onChange={()=>toggleTopic(topic.id)}/>;
             })}
           </div>
           {!topics.length&&<WorkspaceNotice tone="attention">
