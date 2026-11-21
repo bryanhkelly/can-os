@@ -53,7 +53,7 @@ describe("Launch Studio V6.1 Introduce integration",()=>{
     expect(controller).toContain("Materials are not generated or sent");
     const service=source("src/modules/programs/site-marketing-packages-v61.functions.ts");
     expect(service).toContain("assertSiteSetupScope");
-    expect(service).toContain("siteId:data.siteId");
+    expect(service).toContain("authorizedSite(data.siteId");
     expect(service).toContain("marketingPackageContentSchema");
   });
 });
