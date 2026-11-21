@@ -83,28 +83,28 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   },
   "schedules-capacity": {
     question: "When could people participate, and how many places will be available?",
-    decision: "Set dates, times, rooms and learner capacity.",
+    decision: "Plan dates, times, rooms and available places.",
     canSupplies: "Class calendars and schedules.",
     siteProvides: "Available rooms, staff and capacity.",
     status: "operational",
     handoffs: [
-      { title: "Configure school years", detail: "Set up academic terms.", href: () => "/operations/school-years" },
-      { title: "Configure Class sessions", detail: "Schedule Classes.", href: id => "/class?view=manage&siteId=" + scoped(id) },
+      { title: "Set up school years (for schools)", detail: "Manage academic terms when your program uses them.", href: () => "/operations/school-years" },
+      { title: "Schedule Classes", detail: "Set up class sessions when relevant.", href: id => "/class?view=manage&siteId=" + scoped(id) },
       { title: "Review seat capacity", detail: "Review available seats.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
       { title: "View calendar", detail: "View upcoming activities.", href: () => "/calendar" },
     ],
   },
   "funding-enrollment": {
     question: "How will you fund your programs and help people join?",
-    decision: "Set funding, pricing, admissions and capacity. Enrollment opens later for approved offerings.",
+    decision: "Review funding, participation costs, registration and places available. Registration opens separately for approved offerings.",
     canSupplies: "Admissions and enrollment tools.",
-    siteProvides: "Funding, pricing and admissions policies.",
+    siteProvides: "Funding, pricing and participation policies.",
     status: "governed",
     handoffs: [
-      { title: "Review admissions", detail: "View applications.", href: id => "/admissions?siteId=" + scoped(id) },
-      { title: "Prepare admissions capacity", detail: "Set available seats.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
-      { title: "Manage Class Offerings and enrollment", detail: "Manage Class registration.", href: id => "/class?view=manage&siteId=" + scoped(id) },
-      { title: "Publish approved noncredit Course registration", detail: "Manage noncredit Course registration.", href: () => "/programs/noncredit/enrollment" },
+      { title: "Review school admissions", detail: "View applications when your program uses school admissions.", href: id => "/admissions?siteId=" + scoped(id) },
+      { title: "Review admissions capacity", detail: "Check available places when using school admissions.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
+      { title: "Manage Class registration", detail: "Manage registration for eligible Classes.", href: id => "/class?view=manage&siteId=" + scoped(id) },
+      { title: "Manage noncredit registration", detail: "Set up registration for approved noncredit offerings.", href: () => "/programs/noncredit/enrollment" },
     ],
   },
   "opening-compliance": {
@@ -114,7 +114,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     siteProvides: "Safety, training, insurance and facility documents.",
     status: "governed",
     handoffs: [
-      { title: "Review opening and compliance", detail: "Review outstanding requirements.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
+      { title: "Review opening requirements", detail: "See any outstanding requirements.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
       { title: "Review Site qualification", detail: "Review Site qualification.", href: () => "/canonical/lab/site-qualification" },
       { title: "Return to Solution planning", detail: "Review your selected Solution.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=program-catalog" },
     ],
@@ -126,8 +126,8 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     siteProvides: "Accurate website information, permission to use images, and a reason for your decision.",
     status: "governed",
     handoffs: [
-      { title: "Edit Website & Brand", detail: "Return to Establish to revise and save the Site website without automatically publishing it.", href: id => "/launch/website?siteId=" + scoped(id) + "&returnToHub=true" },
-      { title: "Review full publishing details", detail: "See the existing institutional publication and approved content workflows.", href: id => "/sites/" + scoped(id) + "/publish" },
+      { title: "Edit Website & Brand", detail: "Update your website draft without publishing it.", href: id => "/launch/website?siteId=" + scoped(id) + "&returnToHub=true" },
+      { title: "Review publishing details", detail: "Check the publication status and any outstanding review steps.", href: id => "/sites/" + scoped(id) + "/publish" },
     ],
   },
 };
@@ -187,13 +187,22 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
     <div className="mt-6 space-y-5">
       {module === "program-catalog" && <>
         <WorkspacePanel title="Your interests"
-          description="These are the interests you selected during setup.">
+          description="Your saved program ideas and areas of interest from Establish.">
           {intentUnavailable && <WorkspaceNotice tone="attention">
-            Saved Programs & Audiences could not be loaded. You can still browse the published catalog,
-            but return to Establish to review your preferences before planning a Solution.
+            We couldn't load your saved program ideas. You can still explore solutions, but return to Establish to check your selections before making a plan.
           </WorkspaceNotice>}
-          {intent && intent.interestIds.length > 0 ? <>
-            <p className="text-xs font-medium text-muted-foreground">Selected interests</p>
+          {intent && (intent.interestIds.length > 0 || (intent.programCodes?.length??0)>0) ? <>
+            {(intent.programCodes?.length??0)>0&&<>
+              <p className="text-xs font-medium text-muted-foreground">Programs you want to explore</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {intent.programCodes?.map(code => <span key={code} className="border bg-muted px-3 py-2 text-xs font-medium">
+                  {schoolYearAcademyPrograms?.find(item=>item.code===code)?.title ??
+                    code.split(".").at(-1)?.replaceAll("_"," ") ?? code}
+                </span>)}
+              </div>
+            </>}
+            {intent.interestIds.length>0&&<>
+            <p className="text-xs font-medium text-muted-foreground">Other areas of interest</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {intent.interestIds.map(id => {
                 const blocked = !schoolYearAvailability ||
@@ -208,7 +217,8 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
               })}
             </div>
             {intent.startingFocus && <p className="mt-3 text-sm">Starting focus: <strong>{intentTitles[intent.startingFocus]}</strong></p>}
-          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">No interests selected. Browse the catalog or add interests.</p>}
+            </>}
+          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You haven't chosen any program ideas yet. Explore the catalog or return to Establish to add them.</p>}
           <Link to="/launch/site" search={{siteId, module:"programs-audiences"}}
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary underline">
             Review Programs &amp; Audiences <ArrowRight aria-hidden="true" className="size-4" />
@@ -217,9 +227,9 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
         <WorkspacePanel title="How offerings work">
           <div className="grid gap-3 md:grid-cols-3">
             {[
-              ["Program", "What you want to offer."],
-              ["Solution", "The staffing, space, equipment and schedule needed."],
-              ["Offering", "The experience learners can register for after approval."],
+              ["Program", "Your broad idea of what you want to offer."],
+              ["Solution", "A specific way to deliver it, including people, space, equipment and safety needs."],
+              ["Offering", "What participants can join when the necessary approvals and registration are in place."],
             ].map(([name, detail], i) => <div key={name} className="border bg-background p-4">
               <p className="text-xs font-semibold text-muted-foreground">0{i + 1}</p>
               <h3 className="mt-2 font-semibold">{name}</h3>
@@ -232,8 +242,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
           schoolYearAcademyPrograms={schoolYearAcademyPrograms}
           initialPlanId={solutionPlanId} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
-          CAN administers the published Solution definition. Site operators configure their own plan with the existing governed commands.
-          Discovery and planning never grant Site qualification, publication or enrollment authority.
+          Choosing a solution is a planning step, not permission to offer it yet. You'll see its specific requirements as you prepare.
         </WorkspaceNotice>
       </>}
       {module === "publish-site" && <LaunchSitePublicationPanel key={siteId} siteId={siteId} />}
@@ -259,9 +268,12 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
       <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}
         secondary={module === "facilities-resources" || module === "invite-team" ||
           module === "schedules-capacity"} />
-      <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
-        A shared preview is not Site publication. Publishing the Site is not approval to operate, publish an Offering, or enroll learners.
-      </WorkspaceNotice>
+      {module==="publish-site"&&<WorkspaceNotice tone="info">
+        Sharing a private preview is different from publishing your website. Publishing does not open registration.
+      </WorkspaceNotice>}
+      {module==="funding-enrollment"&&<WorkspaceNotice tone="info">
+        Saving registration settings does not open enrollment. Each offering needs its own approval and publication steps.
+      </WorkspaceNotice>}
     </div>
   </WorkspaceShell>;
 }
