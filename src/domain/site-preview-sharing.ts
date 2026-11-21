@@ -26,7 +26,7 @@ export const sitePreviewShareSchema = z.object({
   /** Legacy V1 frozen HTML, readable until its link is revoked or expires. */
   pages: snapshotPages.optional(),
   /** V2: immutable R2 snapshot descriptor, never a public object URL. */
-  snapshotKey:z.string().regex(/^site-website-preview-snapshots\\/v2\\/[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.json$/).optional(),
+  snapshotKey:z.string().regex(/^site-website-preview-snapshots\/v2\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.json$/).optional(),
   snapshotDigest:digest.optional(),
   snapshotPaths:z.array(z.enum(publicSitePagePaths)).min(1).max(14).optional(),
 }).strict().superRefine((value,ctx)=>{
