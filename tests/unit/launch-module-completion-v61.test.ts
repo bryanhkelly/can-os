@@ -17,7 +17,7 @@ const complete:LaunchOverviewEvidence={
   brand:{state:"ready",value:{saved:true}},
   marketing:{state:"ready",value:{hasPackages:true}},
   solutions:{state:"ready",value:{plans:[{configurationId:"p",lifecycle:"frozen"}]}},
-  websiteDraftAvailable:true,
+  websiteDraftAvailable:true,websiteContentSaved:true,
 };
 
 describe("saved Site module green checks",()=>{
@@ -57,6 +57,12 @@ describe("saved Site module green checks",()=>{
     expect(result["site-profile"]).toBe("incomplete");
     expect(launchModuleCompletionV61({...site,siteIdentityRevision:null},complete)["site-profile"])
       .toBe("complete");
+  });
+  it("requires an actual saved website copy revision for Website & Brand completion",()=>{
+    const result=launchModuleCompletionV61(site,{
+      ...complete,websiteContentSaved:false,
+    });
+    expect(result["website-brand"]).toBe("incomplete");
   });
   it("checks website publishing only when the Site really has published it",()=>{
     expect(launchModuleCompletionV61({
