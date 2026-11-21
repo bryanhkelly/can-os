@@ -544,8 +544,11 @@ function LocalWebsiteCopyEditor({
           const withStarter={...old,contentReuseConsent:"granted" as const,
             editorialBaseline:old.editorialBaseline??baseline.editorialBaseline};
           if(data.currentRevision===0||old.contentReuseConsent==="denied"){
-            for(const field of websiteStarterFieldIds)
-              if(!(withStarter[field]??"").trim() && typeof baseline[field]==="string")withStarter[field]=baseline[field];
+            for(const field of websiteStarterFieldIds) {
+              const suggestion = baseline[field];
+              if (!(withStarter[field] ?? "").trim() && typeof suggestion === "string")
+                withStarter[field] = suggestion;
+            }
             return prepareWebsiteCopyFromSiteInformation(withStarter,data.siteStoryCopyCandidates);
           }
           return withStarter;
