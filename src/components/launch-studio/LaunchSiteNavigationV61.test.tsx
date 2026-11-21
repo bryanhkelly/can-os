@@ -17,7 +17,7 @@ vi.mock("@tanstack/react-router", () => ({
 const props = {
   site: { id: "00000000-0000-4000-8000-000000000121", name: "Test Learning Site" },
   active: "site-information",
-  expanded: "Establish",
+  expanded: "Shape",
   instance: "desktop" as const,
   stagePanelBaseId: "launch-navigation",
   onToggleStage: vi.fn(),
@@ -36,17 +36,17 @@ describe("shared Launch Studio Site navigation", () => {
       expect(html).toContain('aria-current="page"');
       expect(html).toContain("siteId=00000000-0000-4000-8000-000000000121");
     }
-    expect(desktop).toContain("launch-navigation-desktop-Establish");
-    expect(drawer).toContain("launch-navigation-drawer-Establish");
+    expect(desktop).toContain("launch-navigation-desktop-Shape");
+    expect(drawer).toContain("launch-navigation-drawer-Shape");
   });
 
   it("renders four stages without granting capability or completion", () => {
     const html = renderToStaticMarkup(<LaunchSiteNavigation {...props} expanded="Prepare"/>);
-    for (const stage of ["Establish", "Introduce", "Prepare", "Open"]) {
+    for (const stage of ["Shape", "Share", "Prepare", "Launch"]) {
       expect(html).toContain(stage);
     }
     expect(html).toContain("Program Catalog");
-    expect(html).toContain("1. Establish");
+    expect(html).toContain("1. Shape");
     expect(html).not.toContain("Approved to open");
   });
 });
