@@ -32,17 +32,13 @@ export function WebsiteCopyField({field,content,candidate,disabled,onChange,onRe
         <span className="mt-1 block text-xs leading-5 text-muted-foreground">{field.help}</span>
         {field.shownOn&&<span className="mt-2 block text-xs leading-5">
           <strong>Shown on:</strong> {field.shownOn}
-          <span className="mt-1 block text-muted-foreground">
-            <strong>Source:</strong> This Site's editable Website &amp; Brand draft.
-            Site Information may suggest starting wording, but does not overwrite
-            approved or saved website copy automatically.
-          </span>
+
         </span>}
       </Label>
       {typeof starter==="string"&&<Button variant="outline" type="button"
         aria-label={`Reset ${field.label} to original suggested copy`}
         disabled={disabled||!changed} onClick={onRestore} className="min-h-11">
-        Reset to original
+        Reset
       </Button>}
     </div>
     {field.multi
@@ -56,15 +52,9 @@ export function WebsiteCopyField({field,content,candidate,disabled,onChange,onRe
           value={content[field.key]??""} onChange={event=>onChange(event.target.value)}
           className="mt-3 min-h-11 w-full border bg-background p-3 text-sm"/>}
     {candidate&&<div className="mt-3 border bg-muted/20 p-3">
-      <p className="text-xs font-semibold">Draft from Purpose &amp; Story</p>
+      <p className="text-xs font-semibold">Suggested text</p>
       <p className="mt-1 text-xs text-muted-foreground">{candidate.reason}</p>
-      <p className="mt-1 text-2xs italic text-muted-foreground">
-        Source: {candidate.sourceFields.map(item => ({
-          motivations:"Reasons for creating the Site", communityNeed:"Community need",
-          distinctives:"Distinctive approach", foundingStory:"Origin story", values:"Community values",
-          experiences:"Desired learner experiences", futureVision:"Future vision",
-        })[item]).join(", ")}
-      </p>
+      <p className="mt-1 text-2xs text-muted-foreground">Based on your Site Information.</p>
       <p className="mt-2 whitespace-pre-wrap text-sm">{candidate.text}</p>
       <Button variant="outline" type="button" className="mt-3 min-h-11"
         disabled={disabled||content[field.key]===candidate.text}
@@ -72,9 +62,6 @@ export function WebsiteCopyField({field,content,candidate,disabled,onChange,onRe
         {content[field.key]===candidate.text?"Suggestion applied":"Apply suggestion"}
       </Button>
     </div>}
-    {typeof starter==="string"&&<p className="mt-2 text-xs text-muted-foreground">
-      {changed?"Personalized copy. Reset restores the original prepared wording for this field.":
-        "Prepared starting copy. Edit anything, or keep it as written after review."}
-    </p>}
+
   </div>;
 }
