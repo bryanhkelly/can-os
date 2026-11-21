@@ -28,10 +28,10 @@ const stagePresentation: Record<SiteLaunchStageV61, {
   icon: LucideIcon;
   summary: string;
 }> = {
-  Shape: { icon: Shapes, summary: "Define your identity, choose who you want to serve, and bring your vision to life." },
-  Share: { icon: Send, summary: "Tell your story, invite participation, and connect with your community." },
-  Prepare: { icon: ClipboardCheck, summary: "Choose solutions, plan your resources, and complete the checks needed to deliver." },
-  Launch: { icon: Rocket, summary: "Welcome participants when each offering is approved and ready." },
+  Shape: { icon: Shapes, summary: "Define your community, who you hope to serve, and what you want to offer." },
+  Share: { icon: Send, summary: "Tell your story, invite ideas, and build community interest." },
+  Prepare: { icon: ClipboardCheck, summary: "Choose how to deliver your programs and get the right people and resources in place." },
+  Launch: { icon: Rocket, summary: "Welcome participants when each offering is ready and approved." },
 };
 const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }));
 
