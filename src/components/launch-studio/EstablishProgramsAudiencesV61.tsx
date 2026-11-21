@@ -309,7 +309,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
                 const schoolYearBlocked = !schoolYearInterestMayBeSelected(choice.id,schoolYearAvailability);
                 const selected = draft.interestIds.includes(choice.id);
                 return <div key={choice.id} className="min-w-0 space-y-1">
-                  <SelectionCard kind="checkbox" layout="vertical"
+                  <SelectionCard kind="checkbox"
                     value={choice.id} title={choice.label}
                     detail={<>{choice.detail}{schoolYearBlocked && <span className="mt-2 block font-medium">
                       School-year authorization required · unavailable for this Site
