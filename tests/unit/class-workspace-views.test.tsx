@@ -42,6 +42,15 @@ describe("canonical Class navigation", () => {
     expect(panel).not.toContain('params={{classId:resume.sectionId}}');
   });
 
+  it("loads administration-only review and survey tools on demand", () => {
+    const route = source("src/routes/class_.$classId.tsx");
+    expect(route).toContain('await import("@/components/learning/NativeClassAssessmentReviewPanel")');
+    expect(route).toContain('await import("@/components/learning/NativeClassSurveyCampaignPanel")');
+    expect(route).not.toContain('import { NativeClassSurveyCampaignPanel }');
+    expect(route).not.toContain('import { NativeClassAssessmentReviewPanel }');
+    expect(route).toContain('Loading Class administrative tools');
+  });
+
   it("does not reload the Class workspace for lesson/session-only navigation", () => {
     const route = source("src/routes/class_.$classId.tsx");
     const server = source("src/modules/classes/native-class-workspace.functions.ts");
