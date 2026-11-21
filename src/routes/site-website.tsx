@@ -531,8 +531,8 @@ function LocalWebsiteCopyEditor({
         value={content.contentReuseConsent??"unselected"}
         onChange={choice=>setContent(old=>{
           if(choice==="denied"){
-            // First-time Sites start blank. Never silently erase saved historic copy.
-            if(data.currentRevision>0)return {...old,contentReuseConsent:"denied"};
+            // An explicit No clears the editable draft, not saved version history.
+            // A subsequent save creates a new revision; previous revisions persist.
             const cleared={...old,contentReuseConsent:"denied" as const,
               editorialBaseline:undefined,leadershipMembers:[]};
             for(const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[])
@@ -543,7 +543,7 @@ function LocalWebsiteCopyEditor({
           const baseline=createSchoolWebsiteStarterContent(data.siteName);
           const withStarter={...old,contentReuseConsent:"granted" as const,
             editorialBaseline:old.editorialBaseline??baseline.editorialBaseline};
-          if(data.currentRevision===0){
+          if(data.currentRevision===0||old.contentReuseConsent==="denied"){
             for(const field of websiteStarterFieldIds)
               if(!(withStarter[field]??"").trim())withStarter[field]=baseline[field];
             return prepareWebsiteCopyFromSiteInformation(withStarter,data.siteStoryCopyCandidates);
