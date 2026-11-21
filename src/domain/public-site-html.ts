@@ -6,7 +6,7 @@ import { resolveSiteExperienceProfile, siteExperienceCopy } from "./site-website
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
-import { templateDefaultImage, templateSampleImage } from "./template-sample-images";
+import { templateSampleImage } from "./template-sample-images";
 import { templateResponsiveAttributes,templateHeroPictureSources } from "./template-photo-responsive";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -14,7 +14,7 @@ import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { PublicSiteProjection } from "./public-operation-projection";
 import type {PublicSchoolSiteMedia} from "./school-site-media-public";
-import { createIllustrativeSchoolContent, normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
+import { normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
@@ -273,7 +273,6 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const approvedHero=heroMedia?.assetId==="template-sample"?null:heroMedia;
   const heroPhotoSrc=image?.dataUrl ?? heroMedia?.src;
   const heroPhotoAlt=image?.altText ?? heroMedia?.altText ?? "";
-  const showingSamplePhotography=heroMedia?.assetId==="template-sample" && !image;
   const mediaImageAttributes = (media: PublicSchoolSiteMedia[keyof PublicSchoolSiteMedia] | null) => {
     if (!media) return "";
     const dimensions = media.width && media.height ? ` width="${media.width}" height="${media.height}"` : "";
