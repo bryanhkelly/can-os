@@ -15,6 +15,7 @@ const plan={
   timingIds:[] as Array<"weekdays">,
   audienceIds:["adults"] as Array<"adults">,
   startingFocus:null,
+  programCodes:["can.program.adult-skills"],
   experienceIds:["voting-elections","financial-literacy","robotics"] as Array<
     "voting-elections"|"financial-literacy"|"robotics">,
   experienceDetails:[{
