@@ -56,14 +56,14 @@ const timingLabels: Record<TimingId, string> = {
 
 const guidance = [
   {
-    why: "Share the types of learning your Site hopes to offer. CAN OS can use saved intentions to guide future setup and private website copy.",
-    tip: "Choose weekdays, weekends, daytime and evenings independently. Exact calendars and class schedules come later.",
-    next: "Identify the learner groups you hope to serve.",
+    why: "Choose the learning experiences you want to offer.",
+    tip: "Select any days and times that interest you.",
+    next: "Choose your audiences next.",
   },
   {
-    why: "Knowing your audiences helps shape your messaging without imposing age, admission or guardian-approval rules.",
-    tip: "These are private plans, not approved Programs or enrollment eligibility.",
-    next: "Save your choices, then continue to Website & Brand.",
+    why: "Choose who you hope to serve.",
+    tip: "",
+    next: "Save your choices and continue.",
   },
 ] as const;
 
@@ -232,8 +232,8 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
     <GuidedSetupShell title={step === 0 ? "What would you like to offer?" : "Who do you hope to serve?"}
       description={step === 0
-        ? "Choose the Programs and learning ideas you hope to offer. Delivery details come later."
-        : "Choose intended audiences and check your choices below. There is no separate review step."}
+        ? "Choose the Programs and learning experiences you want to offer."
+        : "Choose the people you hope to serve."}
       steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : 1)} navigationDisabled={disabled}>
       <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : "Your Audiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -241,8 +241,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         <fieldset className="space-y-4">
           <legend className="text-sm font-semibold">Which Programs or learning ideas are you considering?</legend>
           <p className="text-xs leading-5 text-muted-foreground">
-            Start with the big idea. You'll select how to deliver it, including staff,
-            facilities and other requirements, when you choose a Solution in Prepare.
+            Select what interests you. You'll choose the details in Prepare.
           </p>
           <h3 className="text-sm font-semibold">Published Program ideas</h3>
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
@@ -289,7 +288,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           <div className="space-y-3 border-t pt-4">
             <h3 className="text-sm font-semibold">Other learning ideas</h3>
             <p className="text-xs text-muted-foreground">
-              You can also describe broad learning interests without selecting a published Program.
+              Choose other areas of interest.
             </p>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {interests.map(choice => {
@@ -314,7 +313,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         </fieldset>
         <section aria-labelledby="pa-timing-title" className="space-y-3 border-t pt-5">
           <h3 id="pa-timing-title" className="text-sm font-semibold">When might you offer learning? <span className="font-normal text-muted-foreground">(optional)</span></h3>
-          <p className="text-xs leading-5 text-muted-foreground">Choose days and time of day independently. Daytime can mean a regular day school or a daytime older-adult program. Exact class schedules come later in Prepare.</p>
+          <p className="text-xs leading-5 text-muted-foreground">Select the days and times you're considering.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {[{ title: "Days", options: days }, { title: "Time of day", options: times }].map(group =>
               <fieldset key={group.title} className="min-w-0 border p-3">
@@ -327,14 +326,14 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
                 </div>
               </fieldset>)}
           </div>
-          <p className="text-xs text-muted-foreground">These are private preferences, not days, hours or dates booked for a Class.</p>
+          <p className="text-xs text-muted-foreground"></p>
         </section>
-        <WorkspaceNotice>These are private planning interests, not approved Programs, Courses, Classes or enrollments. Adopt real offerings later in <strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
+        <WorkspaceNotice><strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
         <p className="text-xs text-muted-foreground">{(draft.programCodes ?? []).length} published Program ideas and {draft.interestIds.length} other learning interests selected. You can update your plans later in the Site Workspace.</p>
       </> : <>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
-          <p className="text-xs text-muted-foreground">Select any learner groups you may welcome.</p>
+          <p className="text-xs text-muted-foreground">Select the people you hope to serve.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {audienceChoices.map(choice => <SelectionCard key={choice.id} kind="checkbox"
               value={choice.id} title={choice.label} detail={choice.detail} className="min-h-24"
@@ -342,10 +341,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               onChange={checked => toggleAudience(choice.id, checked)} />)}
           </div>
         </fieldset>
-        <WorkspaceNotice><strong>Audience is not enrollment eligibility.</strong> Age restrictions, guardian consent and safeguarding are determined by authorized offerings, not these selections.</WorkspaceNotice>
+        <WorkspaceNotice><strong></strong> Age restrictions, guardian consent and safeguarding are determined by authorized offerings, not these selections.</WorkspaceNotice>
         <section className="space-y-3 border bg-muted/20 p-4" aria-labelledby="pa-summary">
           <h3 id="pa-summary" className="text-sm font-semibold">Your selections so far</h3>
-          <p className="text-xs text-muted-foreground">A compact reference within this step, not a separate review screen.</p>
+          <p className="text-xs text-muted-foreground"></p>
           <SummaryRow label="Learning interests" value={labels(draft.interestIds, interests)} onEdit={() => selectStep(0)} />
           <SummaryRow label="Proposed Programs" value={
             (draft.programCodes ?? []).length ? (draft.programCodes ?? [])
