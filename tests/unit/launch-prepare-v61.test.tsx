@@ -285,7 +285,7 @@ describe("V6.1 Prepare to Open", () => {
     const open = renderToStaticMarkup(
       <LaunchModuleDestinationV61 module="open" title="Opening Checklist" stage="Launch" siteId={siteId} />,
     );
-    expect(open).toContain("Opening checklist");
+    expect(open).toContain("Opening Checklist");
     expect(open).toContain("/programs/noncredit/enrollment?publicSiteId=" + siteId);
     expect(open).toContain("approved noncredit registration");
   });
