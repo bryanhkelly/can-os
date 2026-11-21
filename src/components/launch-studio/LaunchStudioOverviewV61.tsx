@@ -5,7 +5,7 @@
  * navigation via the shared module registry. Render this under a Site-scoped
  * route only after the server has verified active Site access.
  */
-import { ArrowRight, BookOpen, Building2, CheckCircle2, ClipboardCheck, Globe, Megaphone, Rocket, Users } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ClipboardCheck, Globe, Rocket, Send, Shapes, Users, type LucideIcon } from "lucide-react";
 import { completedLaunchStageV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { Button } from "@/components/ui/button";
 export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
@@ -24,13 +24,13 @@ export type LaunchOverviewProps = {
 };
 
 const stagePresentation: Record<SiteLaunchStageV61, {
-  icon: typeof Building2;
+  icon: LucideIcon;
   summary: string;
 }> = {
-  Establish: { icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
-  Introduce: { icon: Megaphone, summary: "Create focused outreach plans, share your vision and connect with the community." },
-  Prepare: { icon: ClipboardCheck, summary: "Explore solutions, prepare your team and facilities, and review what is needed to open." },
-  Open: { icon: Rocket, summary: "Open registration for eligible offerings when they are approved and ready." },
+  Shape: { icon: Shapes, summary: "Define your identity, choose who you want to serve, and bring your vision to life." },
+  Share: { icon: Send, summary: "Tell your story, invite participation, and connect with your community." },
+  Prepare: { icon: ClipboardCheck, summary: "Choose solutions, plan your resources, and complete the checks needed to deliver." },
+  Launch: { icon: Rocket, summary: "Welcome participants when each offering is approved and ready." },
 };
 const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }));
 
@@ -61,7 +61,7 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
         <StatusBadge tone={site.statusTone}>{site.statusLabel}</StatusBadge>
       </div>
       <section aria-labelledby="launch-stage-heading">
-        <h2 id="launch-stage-heading" className="mb-2 text-lg font-semibold">Your path to opening</h2>
+        <h2 id="launch-stage-heading" className="mb-2 text-lg font-semibold">Your path to launch</h2>
         <div className="grid gap-3 sm:grid-cols-2">{stages.map((stage, index) => {
           const Icon = stage.icon;
           return <article key={stage.id} className="border bg-card p-5">
