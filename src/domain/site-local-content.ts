@@ -350,7 +350,7 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
       const text=(value:unknown,max:number)=>{
         if(typeof value!=="string")throw new Error("Leadership text must be provided");
         const normalized=value.replace(/\r\n?/g,"\n").trim();
-        if(normalized.length>max || /[<>\u0000-\u001f]/.test(normalized))
+        if(normalized.length>max || /[<>\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(normalized))
           throw new Error("Leadership content contains invalid characters");
         return normalized;
       };
@@ -361,7 +361,7 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
       if(typeof member.consentConfirmed!=="boolean")
         throw new Error("Confirm whether this person's profile may be published");
       const linkedinUrl=member.linkedinUrl?text(member.linkedinUrl,240):"";
-      if(linkedinUrl&&!/^https:\/\/(?:www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]{3,100}\/??$/.test(linkedinUrl))
+      if(linkedinUrl&&!/^https:\/\/(?:www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]{3,100}\/?$/.test(linkedinUrl))
         throw new Error("Use a LinkedIn personal profile URL without tracking parameters");
       return {
         id:member.id,name,title,biography,consentConfirmed:member.consentConfirmed,
