@@ -100,7 +100,7 @@ describe("Launch Studio V6.1 editorial contract", () => {
     expect(navigation).toContain('["Shape", "Share", "Prepare", "Launch"]');
     expect(navigation).toContain('stage: "Shape", id: "site-profile"');
     expect(navigation).toContain('stage: "Share", id: "create-outreach"');
-    expect(navigation).toContain('stage: "Launch", id: "open", title: "Launch"');
+    expect(navigation).toContain('stage: "Launch", id: "open", title: "Opening Checklist"');
     expect(overview).toContain("Your path to launch");
     expect(overview).toContain("Shape your vision. Share your story. Prepare to deliver. Launch when ready.");
     expect(route).toContain('eyebrow="Shape / Site Profile"');
