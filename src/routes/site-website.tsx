@@ -13,6 +13,7 @@ import { signOutOfWorkspace } from "@/components/shell/workspace-sign-out";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
+import { SiteGuideV61, type SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
@@ -35,6 +36,40 @@ import {siteProgramSelectionSchema} from "@/lib/route-search";
 import { z } from "zod";
 
 export const websiteStudioStepIds = ["brand", "wireframe", "visual", "consent", "content", "review"] as const;
+
+const websiteGuideSteps: readonly SiteGuideContentV61[] = [
+  {
+    summary: "Your Brand makes this Site recognizable across the website and your outreach.",
+    insight: "Start with the tone and values you want visitors to feel. The Site and its hosting organization may have different identities.",
+    connection: "Saving a Brand version allows future outreach materials to retain the exact identity used to create them.",
+  },
+  {
+    summary: "First choose the structure of your website, before adding color or images.",
+    insight: "Look at the order of sections: can a first-time visitor quickly find who you serve, what you hope to offer and how to get in touch?",
+    connection: "Your layout can change while the underlying Site information stays in one place.",
+  },
+  {
+    summary: "Visual choices should support the Site's story and help people find their way.",
+    insight: "Check contrast, readable type, image rights and whether the imagery reflects your actual community instead of promising facilities you do not yet have.",
+    connection: "These choices belong to a versioned Brand, so existing outreach materials do not silently change.",
+  },
+  {
+    summary: "Your Site Information can help create editable copy, but you decide what can be reused.",
+    insight: "Only share information you have permission to use. Personal stories, names and images need separate care, especially when children are involved.",
+    connection: "Content reuse consent controls suggestions. Declining does not prevent you from writing your own website copy.",
+  },
+  {
+    summary: "Turn your Site's purpose and planned experiences into a clear visitor story.",
+    insight: "Use a concrete opening, name the people you hope to serve, then offer one meaningful next action. Describe unapproved programs as plans, not services already available.",
+    connection: "Saved copy can be reviewed in the private preview before any publishing decision.",
+  },
+  {
+    summary: "Review the whole website as a visitor would see it.",
+    insight: "Check names, links, accessibility, consent, dates and any statement that could sound like accreditation, partnership or open registration.",
+    connection: "The private preview is not publication. Website publishing happens separately in Prepare and does not open registration.",
+  },
+] as const;
+
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
   // an invalid Site and open the editor under a different active membership.
@@ -136,6 +171,14 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
           <div className="mt-5 border-t pt-4 text-sm">{returnToLaunch??<Link to="/home" className="font-semibold text-primary">Exit to workspace</Link>}</div>
         </div>
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Website and Brand guidance">
+          <SiteGuideV61 guide={data.host ? {
+            ...websiteGuideSteps[step]!,
+            highlights: [data.status === "published" ? "Published website" : "Private website draft"],
+          } : {
+            summary: "Prepare a private Site website address before you choose a layout or begin editing.",
+            insight: "You can design and review privately without opening enrollment or publishing your Site.",
+            connection: "Website & Brand uses your existing Site information; no separate organization or program setup is needed.",
+          }} />
           <section className="border bg-card p-5">
             <h2 className="text-sm font-semibold">Preview</h2>
             {data.host?<><p className="mt-2 break-all font-mono text-xs">{data.host}</p>
