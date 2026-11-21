@@ -66,7 +66,7 @@ export function PublicInterestRecordCard({
           </div>
         </div>
         <div className="mt-3  border bg-muted/30 p-3 text-sm" role="status">
-          <p className="font-semibold">Next family step · {row.nextStep.owner}</p>
+          <p className="font-semibold">Next step · {row.nextStep.owner}</p>
           <p className="mt-1">{row.nextStep.message}</p>
         </div>
         {row.programId===null&&!row.applicationId&&
