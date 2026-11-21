@@ -4,6 +4,7 @@ import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-local-content";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
+import { projectSiteFundingPublicContext } from "@/domain/site-funding-public";
 import { readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
@@ -149,6 +150,7 @@ export async function readPublishedSiteCatalog(slug: string) {
       }),
       demonstration: site.metadata?.synthetic === true,
       operatingStatus,
+      siteFunding:projectSiteFundingPublicContext(site.metadata.siteHostingV61),
       host: publicSiteHost(slug),
       site: { name: brand.resolved.displayName, organizationName: site.organizationName },
       academicPrograms:authorizedPrograms,
