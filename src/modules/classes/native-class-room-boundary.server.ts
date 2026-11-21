@@ -127,6 +127,7 @@ export async function assertNativeClassAttendanceReader(
     .from(canonicalClassStaffAssignments).where(and(
       eq(canonicalClassStaffAssignments.classId,linked.classId),
       eq(canonicalClassStaffAssignments.personId,actorPersonId),
+      eq(canonicalClassStaffAssignments.roleCode,"facilitator"),
       eq(canonicalClassStaffAssignments.state,"approved"),
       eq(canonicalClassStaffAssignments.attendanceAuthorized,true),
       lte(canonicalClassStaffAssignments.beginsAt,now),
