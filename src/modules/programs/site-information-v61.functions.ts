@@ -9,6 +9,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
+import { siteIdentityV61Schema, emptySiteIdentityV61 } from "@/domain/site-identity-v61";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import {
   applySiteEnvironmentDeliveryV61, cleanSiteEnvironmentV61, cleanSiteHostingV61, emptySiteHostingV61, emptySiteStoryV61, siteStoryAuditSummaryV61,
@@ -28,6 +29,7 @@ function safeHostingAuditValue(value:unknown){
 const siteId = z.string().uuid();
 const expectedRevision = z.string().datetime({ offset: true });
 const saveInput = z.discriminatedUnion("section", [
+  z.object({ siteId, expectedRevision, section: z.literal("identity"), identity: siteIdentityV61Schema }).strict(),
   z.object({ siteId, expectedRevision, section: z.literal("hosting"), host: siteHostingV61Schema }).strict(),
   z.object({ siteId, expectedRevision, section: z.literal("environment"), environment: siteEnvironmentV61Schema }).strict(),
   z.object({ siteId, expectedRevision, section: z.literal("story"), story: siteStoryV61Schema }).strict(),
@@ -50,11 +52,13 @@ export const readSiteInformationV61 = createServerFn({ method: "GET" })
     const [site] = await db.select().from(sites).where(eq(sites.id, data.siteId)).limit(1);
     assertSiteSetupScope(actor, site, "program.read");
     const metadata = site.metadata;
+    const identity = siteIdentityV61Schema.safeParse(metadata.siteIdentityV61);
     const host = siteHostingV61Schema.safeParse(metadata.siteHostingV61);
     const environment = siteEnvironmentV61Schema.safeParse(metadata.siteEnvironmentV61);
     const preferences = siteLaunchPreferencesSchema.safeParse(metadata.launchPreferences);
     const story = siteStorySourceV61Schema.safeParse(metadata.siteStoryV61);
     // A corrupt/unsupported private source is not an empty draft. Never silently erase it.
+    if (metadata.siteIdentityV61 != null && !identity.success) throw new Error("Stored Site identity needs review.");
     if (metadata.siteHostingV61 != null && !host.success) throw new Error("Stored Site hosting information needs review.");
     if (metadata.siteEnvironmentV61 != null && !environment.success) throw new Error("Stored learning environment needs review.");
     if (metadata.siteStoryV61 != null && !story.success) throw new Error("Stored Site Story needs review.");
@@ -65,6 +69,8 @@ export const readSiteInformationV61 = createServerFn({ method: "GET" })
     return {
       siteId: site.id,
       revision: site.updatedAt.toISOString(),
+      identity: identity.success ? identity.data : emptySiteIdentityV61(),
+      identitySaved: identity.success,
       host: host.success ? host.data : emptySiteHostingV61(),
       hostingSaved: host.success,
       environment: { delivery, physicalSpaceArrangement },
@@ -90,7 +96,14 @@ export const saveSiteInformationV61 = createServerFn({ method: "POST" })
       let before: unknown;
       let after: unknown;
       let storyAuditBefore: Record<string, unknown> | null = null;
-      if (data.section === "hosting") {
+      if (data.section === "identity") {
+        const current = siteIdentityV61Schema.safeParse(metadata.siteIdentityV61);
+        if (metadata.siteIdentityV61 != null && !current.success)
+          throw new Error("Stored Site identity needs review.");
+        before = metadata.siteIdentityV61 ?? null;
+        after = data.identity;
+        nextMetadata = { ...metadata, siteIdentityV61: data.identity };
+      } else if (data.section === "hosting") {
         const current = siteHostingV61Schema.safeParse(metadata.siteHostingV61);
         if (metadata.siteHostingV61 != null && !current.success)
           throw new Error("Stored Site hosting information needs review.");
