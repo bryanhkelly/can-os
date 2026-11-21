@@ -5,6 +5,7 @@ import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-prev
 import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
+import { projectSiteFundingPublicContext } from "@/domain/site-funding-public";
 import { recommendBrandDirection } from "@/domain/site-brand-direction";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
@@ -160,6 +161,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   ];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
+    siteFunding:projectSiteFundingPublicContext(siteConfiguration?.metadata?.siteHostingV61),
     host, site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media, contentBlocks, enrollmentOpportunities,
