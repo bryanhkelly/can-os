@@ -14,7 +14,7 @@ import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
   noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
-import { EstablishExperiencesV61 } from "./EstablishExperiencesV61";
+import { EstablishExperiencesV61, type ExperiencesStageV61 } from "./EstablishExperiencesV61";
 
 type InternalStep = 0 | 1 | 2;
 type InterestId = SiteProgramsAudiencesV61["interestIds"][number];
@@ -85,6 +85,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
 }) {
   const router = useRouter();
   const [step, setStep] = useState<InternalStep>(0);
+  const [experienceStage,setExperienceStage]=useState<ExperiencesStageV61>("choose");
   const schoolYearAvailability = initial.schoolYearAvailability ?? noSchoolYearAvailability;
   const [draft, setDraft] = useState<SiteProgramsAudiencesV61>(() => ({
     interestIds: [...initial.intent.interestIds],
@@ -117,6 +118,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   const panel = useRef<HTMLDivElement>(null);
   const firstStepRender = useRef(true);
   const dirty = JSON.stringify(draft) !== savedSnapshot;
+  const selectedExperienceCount=(draft.experienceIds?.length??0)+(draft.customExperiences?.length??0);
   const releaseNavigation = useLaunchUnsavedChanges(() => dirty || saving.current,
     "Leave Programs & Audiences? Unsaved Site planning choices will be lost.");
   useEffect(() => {
@@ -331,7 +333,8 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </div>
         </fieldset>
       </> : <>
-        <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled} programCatalog={programs}/>
+        <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled}
+          programCatalog={programs} stage={experienceStage} onStageChange={setExperienceStage}/>
       </>}
       </div>
     </GuidedSetupShell>
@@ -347,18 +350,31 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     </>}
     <footer aria-label="Programs & Audiences actions">
       <ActionFooter layout="step">
-      <Button variant="outline" disabled={busy} onClick={() => step === 0 ? onBackToSiteInformation() : selectStep((step-1) as InternalStep)}>
-        <ArrowLeft aria-hidden="true" />{step === 0 ? "Back to Site Information" : "Previous step"}
+      <Button variant="outline" disabled={busy} onClick={() => {
+        if(step===2&&experienceStage==="personalize")setExperienceStage("choose");
+        else if(step===0)onBackToSiteInformation();
+        else selectStep((step-1) as InternalStep);
+      }}>
+        <ArrowLeft aria-hidden="true"/>
+        {step===2&&experienceStage==="personalize"?"Back to Explore Topics":
+          step===0?"Back to Site Information":"Previous step"}
       </Button>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Sign Out</Button>
-        {step !== 2
+        {step!==2
           ? <Button disabled={disabled} onClick={() => selectStep((step+1) as InternalStep)}>
-              Continue to {step===0?"Audiences":"Experiences"} <ArrowRight aria-hidden="true" />
+              Continue to {step===0?"Audiences":"Experiences"} <ArrowRight aria-hidden="true"/>
             </Button>
-          : <Button loading={busy} disabled={disabled} onClick={() => void save(false)}>
-              Save & Continue <ArrowRight aria-hidden="true" />
-            </Button>}
+          : experienceStage==="choose"&&selectedExperienceCount>0
+            ? <Button disabled={disabled||selectedExperienceCount>5}
+                onClick={()=>setExperienceStage("personalize")}>
+                Make these Experiences yours <ArrowRight aria-hidden="true"/>
+              </Button>
+            : <Button loading={busy} disabled={disabled||selectedExperienceCount>5}
+                onClick={()=>void save(false)}>
+                {experienceStage==="choose"?"Save & Continue without Experiences":"Save & Continue to Website & Brand"}
+                <ArrowRight aria-hidden="true"/>
+              </Button>}
       </div>
       </ActionFooter>
     </footer>
