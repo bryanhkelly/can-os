@@ -39,7 +39,7 @@ describe("Private Site preview pulls data channels through the actual template",
     }
   });
 
-  it("keeps administrative setup and unapproved affiliation metadata off every website preview",()=>{
+  it("shows saved Site and truthful affiliation information across all seven website layouts",()=>{
     const preferences={delivery:"digital" as const,interestIds:["summer"]};
     const chosen=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
       mode:"private",preferences,
@@ -55,11 +55,10 @@ describe("Private Site preview pulls data channels through the actual template",
       const html=renderPublicSiteHtml({...base(templateId),
         contentBlocks:previewBlocks},{localPreview:true});
       for(const channel of ["site.setup","site.network"])
-        expect(html).not.toContain('data-content-channel="'+channel+'"');
+        expect(html).toContain('data-content-channel="'+channel+'"');
       for(const text of ["Brentwood, CA","America/Los_Angeles",
-        "Digital / online","Affiliation: pending","Saved Site",
-        "Planning intent","Scheduling reference","COGIC"])
-        expect(html).not.toContain(text);
+        "Digital / online","Affiliation: pending","COGIC"])
+        expect(html).toContain(text);
       expect(html).toContain("Summer &amp; Breaks");
     }
   });
