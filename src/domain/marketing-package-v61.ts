@@ -113,9 +113,16 @@ export function composeOutreachDraftV61(
     "attend-event":"Learn about a future event",
     "schedule-conversation":"Request a conversation",
   }[plan.action];
-  const identityIntro=siteIdentity
-    ? "We are developing this Site as a "+siteIdentityEditorialContextV61(siteIdentity).kind+". "
-    : "";
+  const identityIntro=!siteIdentity ? ""
+    : siteIdentity.siteType==="church_community"
+      ? "We hope to build on our faith community\u0027s traditions of learning and service. "
+    : siteIdentity.faithOrientation==="faith_based"
+      ? "Faith and service are part of our vision for this work. "
+    : siteIdentity.siteType==="training_workforce"
+      ? "Our focus is practical skills and new possibilities. "
+    : siteIdentity.siteType==="community_nonprofit"
+      ? "We want these opportunities to reflect local needs. "
+    : "This plan reflects our vision for a "+siteIdentityEditorialContextV61(siteIdentity).kind+". ";
   const message="At "+siteName+", we're exploring "+focus+
     (supporting.length?", with interests such as "+supporting.join(" and "):"")+
     (beneficiaries?", for "+beneficiaries:"")+
