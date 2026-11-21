@@ -28,7 +28,7 @@ const base = {
 };
 
 function buttonFor(html: string, label: string) {
-  const button = (html.match(/<button\\b[^>]*>[\\s\\S]*?<\\/button>/g) ?? [])
+  const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [])
     .find(candidate => candidate.includes(label));
   if(!button) throw new Error("Missing button: " + label);
   return button;
