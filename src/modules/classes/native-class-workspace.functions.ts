@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import {
   canonicalClasses, canonicalClassStaffAssignments, canonicalClassEnrollments,
   canonicalClassOfferings, canonicalClassOfferingVersions, canonicalPersons,
@@ -182,10 +183,12 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           // Revoke or expire underlying publisher, deployment, adoption or Site
           // authority and teaching access disappears immediately.
           await currentClassAuthority(tx,instance.id,now);
-          staffRole=assignments.some(x=>x.roleCode==="teacher")?"teacher":"facilitator";
-          canVerifyAttendance=assignments.some(x=>x.attendanceAuthorized);
-          canControlRoom=true;
-          canTeach=true;
+          const facilitator=assignments.some(x=>x.roleCode==="facilitator");
+          staffRole=facilitator?"facilitator":null;
+          canVerifyAttendance=facilitator && assignments.some(x=>
+            x.roleCode==="facilitator" && x.attendanceAuthorized);
+          canControlRoom=facilitator;
+          canTeach=facilitator;
         }
       }
 
@@ -319,21 +322,26 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       let staffAssignments:Array<{id:string;personId:string;roleCode:string;name:string;attendanceAuthorized:boolean}>=[];
       if(view==="manage" && instance.siteId){
         const candidateRows=await tx.select({
-          personId:canonicalPersons.id,
-          firstName:canonicalPersons.legalFirstName,
-          lastName:canonicalPersons.legalLastName,
-          preferredName:canonicalPersons.preferredName,
-        }).from(canonicalAccountGrants)
-          .innerJoin(canonicalPersons,eq(canonicalPersons.id,canonicalAccountGrants.personId))
-          .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+          personId:people.id,
+          firstName:people.legalFirstName,
+          lastName:people.legalLastName,
+          preferredName:people.preferredName,
+        }).from(accountPersonGrants)
+          .innerJoin(people,and(
+            eq(people.id,accountPersonGrants.personId),
+            eq(people.active,true),
+          ))
+          .innerJoin(accessAccounts,and(
+            eq(accessAccounts.id,accountPersonGrants.accountId),
+            eq(accessAccounts.personId,accountPersonGrants.personId),
+            eq(accessAccounts.disabled,false),
+            isNotNull(accessAccounts.emailVerifiedAt),
+          ))
           .where(and(
-            eq(canonicalAccountGrants.organizationId,instance.operatingOrganizationId),
-            eq(canonicalAccountGrants.siteId,instance.siteId),
-            eq(canonicalAccountGrants.roleCode,"room_facilitator"),
-            eq(canonicalAccountGrants.active,true),
-            isNull(canonicalAccountGrants.revokedAt),
-            isNull(canonicalAccounts.disabledAt),
-            isNotNull(canonicalAccounts.emailVerifiedAt),
+            eq(accountPersonGrants.organizationId,instance.operatingOrganizationId),
+            eq(accountPersonGrants.siteId,instance.siteId),
+            eq(accountPersonGrants.role,"room_facilitator"),
+            eq(accountPersonGrants.active,true),
           )).limit(100);
         staffCandidates=[...new Map<string,{personId:string;name:string}>(
           candidateRows.map(row=>[row.personId,{
