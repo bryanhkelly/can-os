@@ -744,7 +744,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // The extra two template photography roles are intentionally mounted only
   // in fictional/private preview experiences after the full R2 library passes
   // the twelve-role readiness gate. Never imply these are real school pupils.
-  const includeExtraTemplatePhotoSections=options?.templateGallery===true;
+  const includeExtraTemplatePhotoSections=options?.templateGallery===true &&
+    process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED==="true";
   const extraTemplatePhotoSection=(role:import("./template-sample-images").TemplatePhotographyRole,
     placement:"creative"|"portrait",label:string,title:string,summary:string)=>{
     if(!includeExtraTemplatePhotoSections)return "";
