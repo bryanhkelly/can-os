@@ -28,9 +28,10 @@ const base = {
 };
 
 function buttonFor(html: string, label: string) {
-  const index = html.indexOf(label);
-  if(index < 0) throw new Error("Missing button: " + label);
-  return html.slice(html.lastIndexOf("<button",index), html.indexOf("</button>",index)+9);
+  const button = (html.match(/<button\\b[^>]*>[\\s\\S]*?<\\/button>/g) ?? [])
+    .find(candidate => candidate.includes(label));
+  if(!button) throw new Error("Missing button: " + label);
+  return button;
 }
 
 describe("V6.1 immutable Marketing Package release controls", () => {
