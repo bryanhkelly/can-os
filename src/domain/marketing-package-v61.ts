@@ -6,9 +6,59 @@ export const marketingPurposeIds = ["site-announcement", "program-interest", "in
 export const marketingAudienceIds = [
   "families", "students", "adult-learners", "older-adults",
   "congregation", "community", "partners", "volunteers",
+  "prospective-leaders", "employees", "supporters", "funders",
 ] as const;
 export const marketingFormatIds = ["email", "flyer", "social", "handout", "qr-card"] as const;
 export const marketingPackageStatusIds = ["draft", "archived"] as const;
+
+/** Structured operator selections live inside the existing canonical Package content JSON.
+ * These are private planning choices, not contact lists, authorization or a new CMS. */
+export const outreachStepIdsV61 = ["who","message","highlight","action","channels","review"] as const;
+export const outreachPlanSchemaV61 = z.object({
+  relationship: z.enum(["known","new","both"]),
+  recipients: z.array(z.enum(marketingAudienceIds)).max(8),
+  beneficiaries: z.array(z.enum(["children","teens","adults","older_adults"])).max(4),
+  messageFocus: z.enum(["coming-soon","feedback","invitation","recruiting","update"]),
+  highlights: z.array(z.object({
+    source: z.enum(["program","audience","experience","vision"]),
+    id: z.string().trim().min(1).max(128),
+    label: z.string().trim().min(2).max(100),
+    role: z.enum(["primary","supporting"]),
+  }).strict()).max(3),
+  action: z.enum(["learn-more","express-interest","share-feedback","attend-event","schedule-conversation"]),
+  channels: z.array(z.enum(["email","social","print","text","share-link","conversation-kit"])).max(6),
+  storyAngle: z.enum(["impact","opportunity","partnership"]),
+}).strict();
+export type OutreachPlanV61 = z.infer<typeof outreachPlanSchemaV61>;
+export function initialOutreachPlanV61(beneficiaries: OutreachPlanV61["beneficiaries"] = []): OutreachPlanV61 {
+  return {
+    relationship:"both",recipients:[],beneficiaries,
+    messageFocus:"coming-soon",highlights:[],action:"learn-more",
+    channels:["email","print","conversation-kit"],storyAngle:"impact",
+  };
+}
+export function outreachFormatsV61(channels: OutreachPlanV61["channels"]): MarketingFormat[] {
+  return [...new Set(channels.flatMap(channel =>
+    channel==="email" ? ["email" as const] :
+    channel==="social" ? ["social" as const] :
+    channel==="print" ? ["flyer" as const] :
+    channel==="conversation-kit" ? ["handout" as const] :
+    channel==="share-link" ? ["qr-card" as const] : []
+  ))];
+}
+export function outreachStepIssueV61(step: typeof outreachStepIdsV61[number],
+  title: string, content: MarketingPackageContent): string | null {
+  const plan=content.plan;
+  if(!plan)return "Choose the people you want to reach.";
+  if(step==="who" && !plan.recipients.length)return "Choose at least one group to reach.";
+  if(step==="highlight" && (!plan.highlights.length ||
+      plan.highlights.filter(item=>item.role==="primary").length!==1))
+    return "Choose one primary highlight and up to two supporting highlights.";
+  if(step==="channels" && !plan.channels.length)return "Choose at least one way to reach people.";
+  if(step==="review" && (!title.trim() || !content.headline.trim() || !content.message.trim() ||
+      !content.formats.length))return "Add a plan name, message, and at least one supported material format.";
+  return null;
+}
 
 export const marketingPackageContentSchema = z.object({
   purpose: z.enum(marketingPurposeIds),
@@ -18,6 +68,7 @@ export const marketingPackageContentSchema = z.object({
   message: z.string().trim().max(1600),
   callToAction: z.string().trim().max(100),
   formats: z.array(z.enum(marketingFormatIds)).max(5),
+  plan: outreachPlanSchemaV61.optional(),
 }).strict();
 export type MarketingPackageContent = z.infer<typeof marketingPackageContentSchema>;
 export type MarketingPurpose = MarketingPackageContent["purpose"];
@@ -51,6 +102,10 @@ export const marketingAudienceOptions: ReadonlyArray<{id: MarketingPackageConten
   { id: "community", label: "Neighbors and community members" },
   { id: "partners", label: "Community partners" },
   { id: "volunteers", label: "Potential volunteers" },
+  { id: "prospective-leaders", label: "Prospective leaders" },
+  { id: "employees", label: "Prospective employees" },
+  { id: "supporters", label: "Supporters and donors" },
+  { id: "funders", label: "Funders and institutions" },
 ];
 
 export const marketingFormatOptions: ReadonlyArray<{id: MarketingFormat; label: string; description: string}> = [
