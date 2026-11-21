@@ -79,12 +79,12 @@ export function MarketingMaterialPreviewV61({siteId,title,brandVersionId,format,
       {!pending&&preview?.state==="claims-review-required"&&
         <div className="max-w-sm space-y-2 text-center">
           <p className="font-semibold">Review your message</p>
-          <p className="text-sm text-muted-foreground">Remove unverified institutional or enrollment claims before previewing this material.</p>
+          <p className="text-sm text-muted-foreground">Check statements about approvals or registration. Remove anything you can't confirm before sharing.</p>
         </div>}
       {!pending&&preview?.state==="requires-public-destination"&&
         <div className="max-w-sm space-y-2 text-center">
           <p className="font-semibold">A public destination is required</p>
-          <p className="text-sm text-muted-foreground">QR cards need a stable, authorized public URL. A temporary website preview link is not appropriate for printed materials.</p>
+          <p className="text-sm text-muted-foreground">Printed QR cards need a public link that will stay available. Don't use a temporary website preview link.</p>
         </div>}
       {!pending&&isVector&&vectorSrc&&
         <img src={vectorSrc} alt={"Branded "+label+" layout with your current draft copy"}
