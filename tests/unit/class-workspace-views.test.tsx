@@ -29,12 +29,16 @@ describe("canonical Class navigation", () => {
     expect(teacherDirectory).not.toContain('teacher.isSynthetic ? teacher.name :');
   });
 
-  it("keeps student continue-learning links on the canonical Class directory", () => {
+  it("deep-links enrolled student Classes by canonical Class ID with a safe directory fallback", () => {
     const panel = source("src/components/student/StudentContinueLearningPanel.tsx");
     expect(panel).toContain('to="/class"');
     expect(panel).not.toContain('to="/classes"');
     expect(panel).not.toContain('section:resume.sectionId');
-    expect(panel).not.toContain('tab:"lessons"');
+    expect(panel).toContain('to="/class/$classId"');
+    expect(panel).toContain('params={{classId:resumeClassId}}');
+    expect(panel).toContain('search={{view:"learn",tab:"lessons"}}');
+    expect(panel).toContain('getMyStudentClasses');
+    expect(panel).not.toContain('params={{classId:resume.sectionId}}');
   });
 
   it("keeps learner and operator commands behind the Class authority service", () => {
