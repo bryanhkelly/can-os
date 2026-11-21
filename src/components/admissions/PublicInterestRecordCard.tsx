@@ -21,19 +21,20 @@ export function PublicInterestRecordCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{row.firstName} {row.lastName}</h3>
-            <p className="text-sm text-muted-foreground">{row.programName}</p>
+            <p className="text-sm text-muted-foreground">{row.programName??"General Site interest"}</p>
             <p className="mt-1 text-sm">{row.email}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {new Date(row.createdAt).toLocaleString()} · {row.status} · {row.source === "staff_invitation" ? "Pre-opening invitation response" : "Public website inquiry"}
+              {new Date(row.createdAt).toLocaleString()} · {row.status} · {row.source === "staff_invitation" ? "Pre-opening invitation response" :
+                row.source === "published_site_general" ? "Prelaunch Site interest" : "Public website inquiry"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {row.applicationId ? <Link to="/admissions/intake"
+            {row.applicationId && row.programId ? <Link to="/admissions/intake"
               search={{siteId:row.siteId,programId:row.programId,
                 application:row.applicationId,interest:undefined}}
               className={buttonVariants({ variant: "outline", size: "sm" })}>
               View linked inquiry
-            </Link> : row.status !== "closed" && row.admissionsAuthorized && <Link to="/admissions/intake/new"
+            </Link> : row.programId && row.status !== "closed" && row.admissionsAuthorized && <Link to="/admissions/intake/new"
               search={{siteId:row.siteId,programId:row.programId,
                 interest:row.id}}
               className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -63,7 +64,7 @@ export function PublicInterestRecordCard({
           <p className="mt-1">{row.nextStep.message}</p>
         </div>
         <PublicInterestTimeline row={row} />
-        {row.applicationId && <div className="mt-3  border bg-background p-3 text-sm">
+        {row.applicationId && row.programId && <div className="mt-3  border bg-background p-3 text-sm">
           <p className="font-semibold">Next school handoff</p>
           {!row.activeEnrollment
             ? <p className="mt-1">{row.latestOfferStatus === "accepted"
@@ -89,7 +90,7 @@ export function PublicInterestRecordCard({
         </div>}
         {row.familyStartRequestId && !row.emailVerifiedAt && !row.applicationId &&
           <p className="mt-2 text-xs text-muted-foreground">Awaiting family email verification or application. A sent invitation is not an accepted application.</p>}
-        {row.admissionsAuthorizationStatus === "not_authorized" && !row.applicationId && row.status !== "closed" &&
+        {row.programId && row.admissionsAuthorizationStatus === "not_authorized" && !row.applicationId && row.status !== "closed" &&
           <p className="mt-2 text-xs text-muted-foreground">The family's interest is saved. Application invitations become available after CAN authorizes this school.</p>}
         {row.message && <p className="mt-3 whitespace-pre-wrap text-sm">{row.message}</p>}
       </article>;
