@@ -3,6 +3,7 @@ import { siteTemplateCatalog } from "@/domain/public-site-templates";
 import type { SiteTemplateId, SitePaletteId, SiteTypographyId, SiteFontId } from "@/domain/site-theme";
 import { publicSitePagePaths, type PublicSitePath } from "@/domain/public-site-paths";
 import { Button } from "@/components/ui/button";
+import { SelectionCard } from "@/components/workspace";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -73,20 +74,18 @@ export function WebsiteTemplateGallery({value,onChange,disabled=false}:{
     </p>
     <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
       <div role="group" aria-label="Website wireframe choices" className="space-y-2">
-        {siteTemplateCatalog.map(item=><Button key={item.id} type="button"
-          variant="outline" aria-pressed={item.id===value} disabled={disabled}
-          onClick={()=>onChange(item.id)}
-          className={cn("h-auto w-full items-start gap-3 whitespace-normal border p-2 text-left",
-            item.id===value?"border-primary ring-2 ring-primary/40":"border-border")}>
-          <span className="w-24 shrink-0">
-            <Structure id={item.id} page="/" viewport="desktop" thumbnail/>
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold">{item.name}</span>
-            <span className="mt-1 block text-xs text-muted-foreground">{item.character}</span>
-            {item.id===value&&<span className="mt-2 block text-xs font-semibold">Selected</span>}
-          </span>
-        </Button>)}
+        {siteTemplateCatalog.map(item=><SelectionCard key={item.id}
+          kind="radio" name="site-wireframe" value={item.id}
+          checked={item.id===value} disabled={disabled}
+          onChange={checked=>{if(checked)onChange(item.id);}}
+          icon={<span className="block w-24 shrink-0"><Structure id={item.id} page="/" viewport="desktop" thumbnail/></span>}
+          title={item.name}
+          detail={<>
+            <span className="block">{item.character}</span>
+            {item.id===value&&<span className="mt-1 block font-semibold text-primary">Selected</span>}
+          </>}
+          className="w-full" />)}
+
       </div>
       <section className="min-w-0 space-y-3 border border-border bg-card p-4"
         aria-label="Selected full-size grayscale wireframe" aria-live="polite">
