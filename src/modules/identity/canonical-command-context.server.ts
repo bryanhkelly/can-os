@@ -121,6 +121,11 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
   const hasNative = readCookie(request, canonicalSessionCookie) !== undefined;
   if (hasCan) {
     const actor = await getIdentityContext(request);
+    if (actor.role === "room_facilitator" && hasNative) {
+      // A second unrelated native bearer cannot coexist with an active CAN
+      // facilitator membership during protected Class Session operations.
+      throw new AuthorizationError("incompatible native facilitator session");
+    }
     if (actor.role === "site_admin" || actor.role === "registrar" ||
         actor.role === "room_facilitator") {
       return resolveCanonicalSiteStaffFromCan(actor, request);
