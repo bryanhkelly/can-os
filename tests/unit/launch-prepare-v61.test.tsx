@@ -258,7 +258,7 @@ describe("V6.1 Prepare to Open", () => {
       intent={{interestIds:[],programCodes:["can.program.ai_digital_skills"],
         timingIds:[],audienceIds:[],startingFocus:null}} />);
     expect(html).toContain("Programs you want to explore");
-    expect(html).toContain("ai digital skills");
+    expect(html).toContain("AI Digital Skills");
     expect(html).not.toContain("You haven&#x27;t chosen any program ideas yet");
   });
 
