@@ -1,4 +1,5 @@
 import { siteBrandDirectionIds, type SiteBrandDirectionId } from "./site-brand-direction";
+import type { SiteExperienceProfile } from "./site-website-experience";
 import { isSiteFontId, type SiteFontId, sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
@@ -135,6 +136,85 @@ export function createSchoolWebsiteEditorialBaseline(schoolName: string): SiteEd
   };
 }
 
+/** Suggested text follows the saved Site plan, not a hard-coded K-12 identity.
+ * Nothing here asserts an adopted Solution, enrollment, licensing or operations. */
+export function createSiteWebsiteEditorialBaseline(
+  siteName: string, profile: SiteExperienceProfile = "school",
+): SiteEditorialBaseline {
+  if (profile === "school") return createSchoolWebsiteEditorialBaseline(siteName);
+  const name = siteName.trim().slice(0, 80) || "Our learning community";
+  const examples: Record<Exclude<SiteExperienceProfile, "school">, {
+    headline: string; welcome: string; description: string; vision: string; outreach: string;
+  }> = {
+    community: {
+      headline: "A place to learn and belong.",
+      welcome: "Explore possibilities for learning, enrichment and meaningful community connection.",
+      description: "We are building a community centered on learning, shared interests and connection.",
+      vision: "We envision a welcoming place where people can explore interests, discover opportunities and connect with neighbors.",
+      outreach: "We hope to grow community partnerships that encourage learning, service and belonging.",
+    },
+    training: {
+      headline: "Keep learning. Keep moving forward.",
+      welcome: "Discover possibilities for adult learning, practical skills and enrichment.",
+      description: "Our vision is to make adult learning more accessible, welcoming and relevant to everyday life.",
+      vision: "We hope adults can explore new skills, pursue interests and continue growing at every stage of life.",
+      outreach: "We hope to connect adults with local partners and opportunities for learning and development.",
+    },
+    "older-adult": {
+      headline: "Learning and connection at every age.",
+      welcome: "Explore lifelong learning, shared interests and new connections for older adults.",
+      description: "Our vision is a welcoming place for older adults to stay curious, build connections and share experiences.",
+      vision: "We hope older adults find meaningful opportunities to learn, connect and contribute.",
+      outreach: "We hope to build local relationships that support connection, enrichment and belonging for older adults.",
+    },
+    lifelong: {
+      headline: "Learn, connect and grow together.",
+      welcome: "Explore learning and community experiences for adults and older adults.",
+      description: "Our vision brings adults and older adults together around learning, curiosity and community connection.",
+      vision: "We hope people at different stages of adult life find opportunities to explore, grow and connect.",
+      outreach: "We hope to connect adult learners, older neighbors and community partners through shared interests.",
+    },
+    mixed: {
+      headline: "Learning for every stage of life.",
+      welcome: "Explore possibilities for learners of different ages, interests and experiences.",
+      description: "Our vision brings people across generations together around learning and connection.",
+      vision: "We hope learners of different ages find meaningful paths to curiosity, skills and community.",
+      outreach: "We hope to connect learners, families and neighbors through meaningful partnerships.",
+    },
+  };
+  const example = examples[profile];
+  return {
+    version: 1,
+    fields: {
+      heroHeadline: example.headline,
+      welcomeMessage: example.welcome,
+      localDescription: `At ${name}, ${example.description.charAt(0).toLowerCase() + example.description.slice(1)}`,
+      schoolVision: example.vision,
+      communityOutreach: example.outreach,
+    },
+  };
+}
+
+/** Only text that still exactly matches its original suggested baseline is
+ * eligible for a Program-based refresh. Keep all other authored content,
+ * snapshots, Brand versions and the immutable original baseline untouched. */
+export function refreshSiteWebsiteSuggestedCopy(
+  content: SiteLocalContent, siteName: string, profile: SiteExperienceProfile,
+): SiteLocalContent {
+  const original = content.editorialBaseline?.fields;
+  if (!original || content.contentReuseConsent !== "granted") return content;
+  const suggestions = createSiteWebsiteEditorialBaseline(siteName, profile).fields;
+  let changed = false;
+  const updated = { ...content };
+  for (const field of websiteStarterFieldIds) {
+    if (content[field] === original[field] && content[field] !== suggestions[field]) {
+      updated[field] = suggestions[field];
+      changed = true;
+    }
+  }
+  return changed ? updated : content;
+}
+
 /** Starts real school sites with useful editable copy, not blank fields.
  * No save, publication or approval occurs until the editor acts. */
 
@@ -150,14 +230,21 @@ export function websiteCopyOnlyForStorage(content:SiteLocalContent):SiteLocalCon
   }};
 }
 
-export function createSchoolWebsiteStarterContent(schoolName: string): SiteLocalContent {
-  const editorialBaseline = createSchoolWebsiteEditorialBaseline(schoolName);
+export function createSiteWebsiteStarterContent(
+  schoolName: string, profile: SiteExperienceProfile = "school",
+): SiteLocalContent {
+  const editorialBaseline = createSiteWebsiteEditorialBaseline(schoolName, profile);
   return {
     ...emptySiteLocalContent,
     ...editorialBaseline.fields,
     branding: { ...emptySiteLocalBranding, paletteId: "heritage" },
     editorialBaseline,
   };
+}
+
+/** Legacy school callers retain the same behavior. */
+export function createSchoolWebsiteStarterContent(schoolName: string): SiteLocalContent {
+  return createSiteWebsiteStarterContent(schoolName, "school");
 }
 
 /** Demo sites use the same reviewed starter rather than fictional school facts. */
@@ -181,13 +268,14 @@ export function restoreOriginalWebsiteField(
 export function prepareWebsiteEditorContent(
   existing: SiteLocalContent | null,
   schoolName: string,
+  profile: SiteExperienceProfile = "school",
 ): SiteLocalContent {
-  if (!existing) return createSchoolWebsiteStarterContent(schoolName);
+  if (!existing) return createSiteWebsiteStarterContent(schoolName, profile);
   if (existing.editorialBaseline) return existing;
   // A pre-Studio school's original is the content already saved by its editor,
   // not a newly introduced template suggestion. Never silently replace it.
   // Historic protected claims are not copied into reset metadata.
-  const suggested = createSchoolWebsiteEditorialBaseline(schoolName);
+  const suggested = createSiteWebsiteEditorialBaseline(schoolName, profile);
   const fields = { ...suggested.fields };
   for (const key of websiteStarterFieldIds) {
     const authored = existing[key] ?? "";
