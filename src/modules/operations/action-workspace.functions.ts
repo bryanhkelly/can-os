@@ -85,10 +85,12 @@ export const getOperationsActions=createServerFn({method:"GET"})
    enrollmentChangeKind:record?.type==="guardian_enrollment_change_request"&&
      (record.metadata.kind==="withdrawal"||record.metadata.kind==="transfer")?record.metadata.kind:null};
  }));
- const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor","site_leader"])));
- const [siteChoices,programChoices]=await Promise.all([
-  db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!)),
-  scoped.programIds.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,scoped.programIds),isNotNull(programs.siteId))) : Promise.resolve([]),
+ // These three reads only depend on the already-verified operator scope.
+ // Fetch concurrently rather than serializing assignees before site/program choices.
+ const [assignees,siteChoices,programChoices]=await Promise.all([
+  measureServerStep("operations.actions","assignees",()=>db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor","site_leader"])))),
+  measureServerStep("operations.actions","site-choices",()=>db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!))),
+  measureServerStep("operations.actions","program-choices",()=>scoped.programIds.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,scoped.programIds),isNotNull(programs.siteId))) : Promise.resolve([])),
  ]);
  return {items:scopedItems,assignees,sites:siteChoices,programs:programChoices,selected:data,summary:{...notificationSummary(items),...schoolActionBacklog(scopedItems)}};
 });
