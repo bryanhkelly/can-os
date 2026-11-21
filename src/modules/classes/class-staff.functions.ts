@@ -51,19 +51,23 @@ async function lockedManagedClass(tx:Tx,manager:Awaited<ReturnType<typeof requir
   });
   return instance;
 }
-/** Staff delegation is not a publication or academic credential. A Person
- * must independently hold a current verified room-facilitator grant at the
- * exact hosting Site before becoming a Class teacher/facilitator.
+/** Class staffing uses the selected ordinary CAN role: a Teacher appointment
+ * requires a current teacher grant, and a Facilitator appointment requires a
+ * separately current room_facilitator grant. Both must match exact Site/Org.
+ * Neither role implicitly approves physical attendance or safeguarding.
  */
 export const assignNativeClassStaff=createServerFn({method:"POST"})
   .validator((raw:unknown)=>assignInput.parse(raw))
   .handler(async({data})=>{
     guarded();
     const manager=await requireClassManager();
+    if(data.roleCode==="teacher" && data.canVerifyAttendance)
+      throw new AuthorizationError("teaching assignment cannot approve physical attendance");
+    const requiredRole=data.roleCode==="teacher"?"teacher":"room_facilitator";
     return db.transaction(async tx=>{
       const instance=await lockedManagedClass(tx,manager,data.classId);
       // A Class assignment uses the already verified, immutable CAN Person
-      // and the EXACT current room-facilitator grant at this Class Site.
+      // and a role-matched verified grant at this exact Class Site.
       // Native canonical Persons/accounts/grants and email-only identity
       // matching cannot create a second Person or silently grant staff power.
       const staffGrants=await tx.select({
@@ -85,14 +89,14 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
           eq(people.active,true),
           eq(accountPersonGrants.organizationId,instance.operatingOrganizationId),
           eq(accountPersonGrants.siteId,instance.siteId!),
-          eq(accountPersonGrants.role,"room_facilitator"),
+          eq(accountPersonGrants.role,requiredRole),
           eq(accountPersonGrants.active,true),
           eq(accessAccounts.disabled,false),
           isNotNull(accessAccounts.emailVerifiedAt),
         )).for("share").limit(2);
       if(staffGrants.length!==1 ||
          staffGrants[0]!.personId!==data.personId)
-        throw new AuthorizationError("current verified CAN room-facilitator grant at exact Site");
+        throw new AuthorizationError("current verified CAN Class staff role grant at exact Site");
       const [prior]=await tx.select({
         id:canonicalClassStaffAssignments.id,
         attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
