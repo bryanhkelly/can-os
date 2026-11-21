@@ -9,7 +9,7 @@ approved Program/Offering/Course/Class and contact projections. They change
 **layout**, not the ownership of content or the truthfulness of school claims.
 
 An administrator should be able to answer the following questions for every
-page element **without leaving Choose Wireframe**:
+page element in **Your Content**, after selecting a grayscale wireframe:
 
 1. What section and element is this?
 2. Is the heading/text supplied by a saved Site editor, fixed by CAN OS's
@@ -19,9 +19,9 @@ page element **without leaving Choose Wireframe**:
    gate? Is the preview photo real or illustrative?
 
 The source of truth for the browser-facing guide is
-`src/domain/website-template-source-map.ts`. The UI reuses that registry in
-`WebsiteTemplateSourceGuide`, shown alongside the selected template and in
-Your Content. It does not render source/debug/administrative labels in any
+`src/domain/website-template-source-map.ts`. The UI exposes that registry in `WebsiteTemplateSourceGuide` under Your Content.
+The wireframe picker intentionally contains geometry only, without sample prose,
+colors, photographs or source diagnostics. It does not render source/debug/administrative labels in any
 public or privately shared school website.
 
 ## Seven templates and their compositions
@@ -67,13 +67,13 @@ disclosure is confined to the preview banner; no name rewriting occurs.
 
 - An early planning choice in Programs & Audiences may be presented as a
   proposed idea, but it is **not** a published Offering or available enrollment.
-- No Site planning timezone, private host identity, affiliation-review state,
-  unapproved address, or internal setup status is automatically placed in
-  public website copy.
+- The Site operator can publish configured Site setup, timezone, location,
+  network affiliation status and planning sections as website content. The
+  displayed status is factual, not a license or enrollment authorization.
 - Academic Programs and Classes use separate, approved publications. Links
   and registration actions require their independent authorizations.
-- Unconsented or incomplete imagery is excluded. Template gallery imagery is
-  fictional and not persisted into Site assets.
+- Unconsented or incomplete imagery is excluded. The wireframe gallery contains
+  no imagery whatsoever. Reviewed Site media is used only after Visual Identity.
 - Empty/optional sections are allowed to disappear. The guide's **When shown**
   text explains these conditions without adding placeholder administrative
   warnings to the actual website.
@@ -89,8 +89,28 @@ disclosure is confined to the preview banner; no name rewriting occurs.
   by the actual public template composer;
 - every supported interior page has a source map;
 - every described element has a source, editing location and display rule;
-- the guide renders inside Website & Brand, not in public website HTML.
+- the guide renders in Your Content, never the grayscale wireframe selector or
+  the website HTML.
 
 The registry is an editor explanation; it is not a new publication or
 school-content storage model. Changes are confined to PR #355 until tests,
 TypeScript, build and browser acceptance pass.
+
+## Optional Leadership page and preview sharing
+
+An optional `/leadership` page uses consented, Site-owned profiles saved in the
+**same** Website & Brand content revision, not a new CMS. Administrators may
+enter a LinkedIn personal profile URL and review information supplied by the
+leader. The application does not scrape LinkedIn or import information without
+an authorized account connection. Unconsented people are not displayed.
+
+Shareable website previews capture a **fixed, full saved revision** using the
+same server-generated Website & Brand preview pages. New snapshots are written
+to the existing private Cloudflare R2 bucket under an immutable Site/Share key;
+Site metadata holds only the signed-off revision, brand version, digest, key,
+paths, token digest, expiry and revocation. Previous V1 links with embedded HTML
+remain readable until revoked or expired. A share never makes enrollment or
+contact forms actionable.
+
+The synthetic flag is not a website-content switch. Real and synthetic Sites
+are displayed identically; names are always rendered exactly as saved.
