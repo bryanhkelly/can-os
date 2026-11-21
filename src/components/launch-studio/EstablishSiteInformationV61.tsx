@@ -313,7 +313,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <div className="border bg-muted/30 p-4">
           <p className="text-xs text-muted-foreground">Responsible organization · Site Profile (read-only)</p>
           <p className="mt-1 font-semibold">{responsibleOrganizationName ?? "Organization unavailable. Refresh your Site."}</p>
-          <p className="mt-2 text-xs text-muted-foreground"></p>
+          
         </div>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who hosts your learning space or activities?</legend>
