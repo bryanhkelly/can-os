@@ -92,14 +92,15 @@ export function composeOutreachDraftV61(siteName: string, plan: OutreachPlanV61)
     "attend-event":"Learn about a future event",
     "schedule-conversation":"Request a conversation",
   }[plan.action];
+  const message="At "+siteName+", we're exploring "+focus+
+    (supporting.length?", with interests such as "+supporting.join(" and "):"")+
+    (beneficiaries?", for "+beneficiaries:"")+
+    ". These are proposed opportunities, and details have not been finalized. "+
+    "We'd love to connect with "+recipientText+" to "+angle+
+    ". Your ideas and participation can help shape what comes next.";
   return {
-    headline: objective+" at "+siteName,
-    message: "At "+siteName+", we're exploring "+focus+
-      (supporting.length?", with interests such as "+supporting.join(" and "):"")+
-      (beneficiaries?", for "+beneficiaries:"")+
-      ". These are proposed opportunities, and details have not been finalized. "+
-      "We'd love to connect with "+recipientText+" to "+angle+
-      ". Your ideas and participation can help shape what comes next.",
+    headline:(objective+" at "+siteName).slice(0,160),
+    message:message.slice(0,1600),
     callToAction:cta,
   };
 }
