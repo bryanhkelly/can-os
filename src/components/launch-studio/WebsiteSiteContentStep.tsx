@@ -6,6 +6,7 @@ import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSour
 import { WebsiteCopyField, type WebsiteCopyFieldSpec } from "./WebsiteCopyField";
 import { SiteContentChannelEditor } from "./SiteContentChannelEditor";
 import { WebsiteTemplateSourceGuide } from "./WebsiteTemplateSourceGuide";
+import { WebsiteLeadershipEditor } from "./WebsiteLeadershipEditor";
 import {
   restoreOriginalWebsiteField, websiteStarterFieldIds,
   type SiteLocalContent, type SiteLocalTextField,
@@ -115,6 +116,7 @@ export function WebsiteSiteContentStep({
       <summary className="cursor-pointer text-sm font-semibold">More optional church details</summary>
       <div className="mt-4 space-y-5">{additionalFields.map(renderField)}</div>
     </details>
+    <WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>
     <details className="border p-4" id="website-content-layout">
       <summary className="cursor-pointer text-sm font-semibold">
         Arrange Programs, Courses, Classes and website sections
