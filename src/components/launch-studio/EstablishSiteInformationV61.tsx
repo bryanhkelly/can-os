@@ -42,7 +42,7 @@ export type SiteInformationV61Initial = {
 
 const steps = [
   { title: "Hosting & Organization", description: "Your Site identity and who supports it" },
-  { title: "Learning Environment", description: "How learning will happen" },
+  { title: "Learning Environment", description: "Where and how people participate" },
   { title: "Network Affiliation", description: "Optional connections" },
   { title: "Purpose & Story", description: "Why this community exists" },
 ] as const;
@@ -51,10 +51,10 @@ export const siteInformationV61Guidance = [
   {
     why: "Describe your Site, then choose who will host its activities.",
     tip: "Your Site identity is different from the identity of its hosting organization.",
-    next: "Choose how learners will participate.",
+    next: "Choose how people will participate.",
   },
   {
-    why: "Choose how learning will take place.",
+    why: "Choose how people will participate.",
     tip: "Schedules and facilities come later.",
     next: "Choose a network affiliation, if applicable.",
   },
@@ -75,13 +75,13 @@ export function SiteInformationV61Guidance({ step }: { step: Step }) {
 }
 
 const motivations = [
-  ["access", "Expand access to educational opportunities"],
+  ["access", "Make opportunities accessible to more people"],
   ["belonging", "Build a supportive, welcoming community"],
-  ["personalized", "Offer more personalized learning"],
+  ["personalized", "Offer experiences that respond to individual needs"],
   ["practical", "Develop practical and career skills"],
   ["alternative", "Give families more choices"],
   ["creative", "Provide enrichment and creative opportunities"],
-  ["character", "Develop character, leadership and service"],
+  ["character", "Encourage character, leadership and service"],
   ["need", "Address an unmet community need"],
 ] as const;
 const distinctives = [
@@ -343,7 +343,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
 
   return <section aria-label="Site Information" className="min-w-0 space-y-5">
     <GuidedSetupShell title="Site Information"
-      description="Tell us about your organization, where people will gather, and what matters to your community."
+      description="Describe your site, how people will participate, and the story behind your vision."
       steps={progressSteps} progressLabel="Site Information sections"
       onStepChange={id => selectStep(Number(id) as Step)}
       navigationDisabled={busy || reloadRequired}>
@@ -492,10 +492,10 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       </div>
     </WorkspacePanel>}
     {step === 1 && <WorkspacePanel id="site-information-step-1" title="Learning Environment"
-      description="How will learners participate?">
+      description="How will people participate?">
       <div className="space-y-5">
         <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">How will learners participate?</legend>
+          <legend className="text-sm font-semibold">How will people participate?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
             <SelectionCard kind="radio" name="site-delivery" title="In person" detail="At a physical learning location"
               checked={environment.delivery === "physical"} onChange={() => setEnvironment(current => ({ ...current, delivery: "physical" }))} />
@@ -535,7 +535,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       description={identityContext.storyPrompt}>
       <div className="space-y-6">
         <p className="text-xs text-muted-foreground">Your answers can help shape your website and outreach. You'll review any suggested wording before using it. Please don't share private details about others.</p>
-        <MultiChoice title={"1. Why are you creating this "+identityContext.kind+"?"} hint="Choose up to three motivations. Optional."
+        <MultiChoice title="1. What inspires this work?" hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
         <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
           <Textarea rows={3} maxLength={1000} value={story.communityNeed}
@@ -547,9 +547,9 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             onChange={event => setStory(current => ({ ...current, foundingStory: event.target.value }))} /></Field>
         <MultiChoice title="5. What values matter most?" hint="Select what you want reflected in your messaging."
           options={values} selected={story.values} onChange={selected => updateMulti("values", selected)} />
-        <MultiChoice title="6. What do you hope learners experience?" hint="Select aspirations, not promised outcomes."
+        <MultiChoice title="6. What do you hope participants experience?" hint="Select aspirations, not promised outcomes."
           options={experiences} selected={story.experiences} onChange={selected => updateMulti("experiences", selected)} />
-        <Field label="7. What do you hope this community becomes?">
+        <Field label="7. What do you hope to build over time?">
           <Textarea rows={4} maxLength={2000} value={story.futureVision}
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
       </div>
