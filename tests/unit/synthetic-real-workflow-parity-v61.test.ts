@@ -55,6 +55,15 @@ describe("CAN V6.1 real/synthetic authorization parity",()=>{
   expect(canResolveCanSiteStaff({...actor,impersonatedByAccountId:"demo-owner"})).toBe(true);
   expect(canResolveCanSiteStaff({...actor,sessionAccountId:"unverified-client-owner"})).toBe(false);
  });
+ it("assigns teaching and room facilitation through separate ordinary CAN grants",()=>{
+  const staff=source("src/modules/classes/class-staff.functions.ts");
+  expect(staff).toContain('data.roleCode==="teacher"?"teacher":"room_facilitator"');
+  expect(staff).toContain('eq(accountPersonGrants.role,requiredRole)');
+  expect(staff).toContain('if(data.roleCode==="teacher" && data.canVerifyAttendance)');
+  expect(staff).toContain("exact Class Site");
+  expect(staff).not.toContain('eq(accountPersonGrants.role,"room_facilitator")');
+  expect(staff).not.toContain("LOCAL_DEMO_RILEY_FACILITATOR");
+ });
  it("domain services contain no Riley-specific or Valor-specific grant permission exceptions",()=>{
   for(const file of [
     "src/domain/access-context.ts",
