@@ -2,7 +2,7 @@ import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
-import { suggestWebsiteCopyFromStory, prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
+import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
 import { recommendBrandDirection } from "@/domain/site-brand-direction";
@@ -20,7 +20,7 @@ import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-
 import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
+import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
 import { readSitePhysicalAddress, siteInformationSchema } from "@/domain/site-setup-configuration";
 import { canonicalPublicContact, publicIdentityReviewStatuses } from "@/domain/public-parent-identity";
@@ -84,7 +84,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // A new Site can explore a complete read-only design even before its first
   // saved draft. The starter is never persisted or published by this GET.
   const candidate = proposedContent ?? editingContent ?? local?.content
-    ?? prepareWebsiteCopyFromSiteInformation(createSchoolWebsiteStarterContent(site.name),storyCandidates);
+    ?? {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
   // A newly established Site can save its Brand before its first website
   // revision. Apply that canonical Brand to the first-visit starter, not the
   // legacy default palette. In-editor unsaved previews retain their proposed
