@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { GuidedSetupShell } from "@/components/workflow";
 import { ActionFooter, SelectionCard, WorkspaceNotice } from "@/components/workspace";
 import {
-  siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61,
+  siteProgramsAudiencesV61SaveSchema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
 import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
@@ -15,11 +14,7 @@ import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
   noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
-import {
-  siteExperienceCatalog, suggestedSiteExperiences,
-  siteExperienceAudienceNames,
-  type SiteExperienceId, validCustomExperienceName,
-} from "@/domain/site-experience-interests";
+import { EstablishExperiencesV61 } from "./EstablishExperiencesV61";
 
 type InternalStep = 0 | 1 | 2;
 type InterestId = SiteProgramsAudiencesV61["interestIds"][number];
@@ -104,6 +99,11 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       ? { experienceIds: [...initial.intent.experienceIds] } : {}),
     ...(initial.intent.customExperiences !== undefined
       ? { customExperiences: [...initial.intent.customExperiences] } : {}),
+    ...(initial.intent.experienceDetails !== undefined
+      ? { experienceDetails: initial.intent.experienceDetails.map(detail=>({
+        ...detail,activityIds:[...detail.activityIds],outcomeIds:[...detail.outcomeIds],
+        audienceIds:[...detail.audienceIds],programIds:[...detail.programIds],
+      })) } : {}),
   }));
   const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(initial.intent));
   const [busy, setBusy] = useState(false);
@@ -112,9 +112,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   const [programCatalog, setProgramCatalog] = useState<BlueprintReferenceCatalogItem[] | null>(null);
   const [catalogError, setCatalogError] = useState("");
   const [catalogReload, setCatalogReload] = useState(0);
-  const [audienceFilter, setAudienceFilter] = useState<AudienceId | "all">("all");
-  const [programFilter, setProgramFilter] = useState<InterestId | "all">("all");
-  const [customExperience, setCustomExperience] = useState("");
   const revision = useRef(initial.revision);
   const saving = useRef(false);
   const panel = useRef<HTMLDivElement>(null);
@@ -170,30 +167,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     setDraft(current => ({ ...current, audienceIds: checked
       ? [...new Set([...current.audienceIds, id])] : current.audienceIds.filter(value => value !== id) }));
   }
-  function toggleExperience(id: SiteExperienceId, checked: boolean) {
-    setDraft(current => ({...current, experienceIds: checked
-      ? [...new Set([...(current.experienceIds ?? []), id])]
-      : (current.experienceIds ?? []).filter(value => value !== id)}));
-  }
-  function addCustomExperience() {
-    const name = customExperience.trim();
-    if (!validCustomExperienceName(name)) {
-      setError("Enter a plain-text Experience name between 2 and 100 characters.");
-      return;
-    }
-    if ((draft.customExperiences ?? []).some(item=>item.toLocaleLowerCase()===name.toLocaleLowerCase())
-        || (draft.customExperiences ?? []).length >= 12) {
-      setError("Choose a different name. You can add up to 12 custom Experiences.");
-      return;
-    }
-    setDraft(current=>({...current,customExperiences:[...(current.customExperiences??[]),name]}));
-    setCustomExperience("");
-    setError("");
-  }
 
   async function save(exit: boolean) {
     if (saving.current || reloadRequired) return;
-    const checked = siteProgramsAudiencesV61Schema.safeParse(draft);
+    const checked = siteProgramsAudiencesV61SaveSchema.safeParse(draft);
     if (!checked.success) {
       setError(checked.error.issues[0]?.message ?? "Review your planning choices.");
       return;
@@ -240,11 +217,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     ? (draft.programCodes ?? []).filter(code => !programs.some(item => item.code === code))
     : [];
   const disabled = busy || reloadRequired;
-  const suggestedIds = new Set(suggestedSiteExperiences(draft).map(item=>item.id));
-  const visibleExperiences = [...siteExperienceCatalog]
-    .filter(item=>(audienceFilter==="all" || item.audiences.includes(audienceFilter)) &&
-      (programFilter==="all" || item.programs.includes(programFilter)))
-    .sort((a,b)=>Number(suggestedIds.has(b.id))-Number(suggestedIds.has(a.id)));
   const sections = [
     { id: "interests", title: "Programs", description: "What you want to offer",
       status: step === 0 ? "current" as const : "upcoming" as const },
@@ -359,75 +331,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </div>
         </fieldset>
       </> : <>
-        <section className="space-y-4" aria-label="Experience selection">
-          <p className="text-sm text-muted-foreground">
-            Recommended first based on your Programs and audiences. You may select others too.
-            These ideas do not create approved Solutions, Classes, schedules or registration.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-2 text-sm font-medium">Audience
-              <Select value={audienceFilter} disabled={disabled}
-                onChange={event=>setAudienceFilter(event.currentTarget.value as AudienceId|"all")}>
-                <option value="all">All audiences</option>
-                {audienceChoices.map(choice=><option key={choice.id} value={choice.id}>{choice.label}</option>)}
-              </Select>
-            </label>
-            <label className="space-y-2 text-sm font-medium">Program
-              <Select value={programFilter} disabled={disabled}
-                onChange={event=>setProgramFilter(event.currentTarget.value as InterestId|"all")}>
-                <option value="all">All Programs</option>
-                {interests.map(choice=><option key={choice.id} value={choice.id}>{choice.label}</option>)}
-              </Select>
-            </label>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {visibleExperiences.map(item => <div key={item.id} className="min-w-0 space-y-1">
-              <SelectionCard kind="checkbox" value={item.id} title={item.title}
-                detail={<span className="space-y-1">
-                  <span className="block">{item.description}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {suggestedIds.has(item.id)?"Suggested · ":""}
-                    {item.audiences.filter(id=>draft.audienceIds.includes(id))
-                      .map(id=>siteExperienceAudienceNames[id]).join(", ") ||
-                      item.audiences.map(id=>siteExperienceAudienceNames[id]).join(", ")}
-                  </span>
-                </span>}
-                checked={draft.experienceIds?.includes(item.id)??false}
-                disabled={disabled} onChange={checked=>toggleExperience(item.id,checked)}/>
-            </div>)}
-          </div>
-          {visibleExperiences.length===0 && <WorkspaceNotice tone="attention">
-            No experience suggestions match these filters. Try another Program or audience.
-          </WorkspaceNotice>}
-          <div className="space-y-3 border-t pt-4">
-            <h3 className="text-sm font-semibold">Add your own Experience</h3>
-            <p className="text-xs text-muted-foreground">A local idea can be explored here before its Solution is configured.</p>
-            <div className="flex flex-wrap items-end gap-2">
-              <label className="min-w-56 flex-1 space-y-2 text-sm font-medium">Experience name
-                <input className="min-h-11 w-full border border-input bg-background px-3 text-sm"
-                  value={customExperience} maxLength={100} disabled={disabled}
-                  placeholder="e.g. Community gardening" onChange={event=>setCustomExperience(event.target.value)}/>
-              </label>
-              <Button type="button" variant="outline" disabled={disabled||!customExperience.trim()}
-                onClick={addCustomExperience}>Add Experience</Button>
-            </div>
-            {!!draft.customExperiences?.length && <ul className="space-y-2">
-              {draft.customExperiences.map(name=><li key={name}
-                className="flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
-                <span>{name}</span>
-                <Button size="sm" type="button" variant="outline" disabled={disabled}
-                  onClick={()=>setDraft(current=>({...current,customExperiences:
-                    (current.customExperiences??[]).filter(item=>item!==name)}))}>
-                  Remove
-                </Button>
-              </li>)}
-            </ul>}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {(draft.experienceIds?.length??0)+(draft.customExperiences?.length??0)} planned Experiences selected.
-            Website & Brand can show them as ideas, with no enrollment links.
-          </p>
-        </section>
+        <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled}/>
       </>}
       </div>
     </GuidedSetupShell>
