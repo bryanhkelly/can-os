@@ -21,6 +21,12 @@ const interestNames: Record<SiteProgramsAudiencesV61["interestIds"][number], str
   "grades-6-8": "Middle school", "grades-9-12": "High school",
   afterschool: "After-school", summer: "Summer", adult: "Adult learning", senior: "Older adults",
 };
+const storyIdeas: Record<SiteProgramsAudiencesV61["interestIds"][number], string> = {
+  "grades-6-8": "middle school learning and enrichment",
+  "grades-9-12": "high school learning and enrichment",
+  afterschool: "after-school enrichment", summer: "summer experiences",
+  adult: "practical learning", senior: "lifelong learning and connection",
+};
 const deliveryNames = { physical: "In person", digital: "Online", both: "In person and online" } as const;
 const values: Record<SiteStoryV61["values"][number], string> = {
   belonging: "Belonging", curiosity: "Curiosity", excellence: "Excellence", integrity: "Integrity",
@@ -60,7 +66,7 @@ export function siteInformationGuideV61(step: 0 | 1 | 2 | 3, input: SiteInformat
   const plannedAudience = input.planning?.audienceIds[0];
   const plannedProgram = input.planning?.interestIds[0];
   const storyExample = plannedAudience || plannedProgram
-    ? `You might say: We hope to bring ${plannedProgram ? interestNames[plannedProgram].toLowerCase() : "meaningful"} experiences to ${plannedAudience ? audienceNames[plannedAudience].toLowerCase() : "our community"}, guided by ${input.values[0] ? values[input.values[0]].toLowerCase() : "our shared purpose"}. Make this your own.`
+    ? `You might say: We hope to bring ${plannedProgram ? storyIdeas[plannedProgram] : "meaningful experiences"} to ${plannedAudience ? audienceNames[plannedAudience].toLowerCase() : "our community"}, ${input.values[0] ? "guided by a commitment to " + values[input.values[0]].toLowerCase() : "guided by our shared purpose"}. Make this your own.`
     : null;
   return {
     summary: kind ? `You're shaping the story of your ${kind.toLowerCase()}.` : "You're shaping the story of your community.",
