@@ -114,7 +114,7 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
 
   return <div className="space-y-5">
     <WorkspacePanel title="Learning environment"
-      description="The same authoritative answers saved in Establish → Site Information. Changing these values here updates that Site record, not a second facilities checklist.">
+      description="Update how your site will welcome people in person or online. These details stay in sync with Site Information.">
       {loading ? <p role="status" className="mt-3 text-sm">Reading saved learning environment…</p>
       : <>
         {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
@@ -199,7 +199,7 @@ export function PrepareTeamV61({ siteId }: { siteId: string }) {
   const [view, setView] = useState<"invite" | "access">("invite");
   return <div className="space-y-5">
     <WorkspacePanel title="Build the Site team"
-      description="Invite people to this Site and inspect accepted role grants and safeguarding progress without granting them approval automatically.">
+      description="Invite the people who will help run your site, review their responsibilities, and check any required qualifications.">
       <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Team tasks">
         <Button type="button" variant={view === "invite" ? "default" : "outline"}
           aria-pressed={view === "invite"} onClick={() => setView("invite")}>Invite team</Button>
@@ -237,7 +237,7 @@ export function PrepareSchoolYearsV61({siteId}: {siteId:string}) {
   const siteYears = years.data?.years.filter(year => year.siteId === siteId) ?? [];
   const authorizedSite = years.data?.sites.some(site => site.id === siteId) ?? false;
   return <WorkspacePanel title="School years & academic calendars"
-    description="Create and review real Site school years. Terms, holidays, grading periods and calendar days belong to the existing academic-year record.">
+    description="Plan academic years, terms, and holidays if your site offers school-year learning.">
     {years.isPending && <p role="status" className="mt-3 text-sm">
       Reading authorized school-year records…
     </p>}
