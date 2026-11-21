@@ -35,10 +35,6 @@ const grantSelection = {
 };
 
 const supportedRoles = Object.keys(roleCapabilities);
-const sourceAccounts = LOCAL_DEMO_ACCOUNTS.filter(
-  account => account.email !== LOCAL_DEMO_ADMIN.email,
-);
-
 async function listActiveAccountGrants(accountId: string, reader: GrantReader) {
   return reader.select(grantSelection).from(accountPersonGrants)
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
@@ -92,23 +88,32 @@ async function listPublicFamilyStartGrantIds(
   return allowed;
 }
 
-/** Current, tenant-bound source memberships; no mirrored admin grants are accepted. */
+/** Demo Admin may switch to any existing active Person/grant at the exact
+ * demo Site, not just people on a hardcoded fixture allowlist.
+ * This is LOGIN/SWITCH code ONLY. It never provisions or overrides a
+ * Person's role, Site scope, independent approvals, or Class enrollment.
+ * Protected commands enforce the selected effective grant as usual.
+ */
 export async function listDemoSourceGrants(database: GrantReader = db) {
   const rows = await database.select(grantSelection).from(accountPersonGrants)
-    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
-    .innerJoin(people, eq(people.id, accountPersonGrants.personId))
-    .where(and(
-      inArray(accessAccounts.emailNormalized, sourceAccounts.map(account => account.email)),
+    .innerJoin(accessAccounts, and(
+      eq(accessAccounts.id, accountPersonGrants.accountId),
+      eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
+    ))
+    .innerJoin(people, and(
+      eq(people.id, accountPersonGrants.personId),
       eq(people.active, true),
+    ))
+    .where(and(
       eq(accountPersonGrants.active, true),
       eq(accountPersonGrants.organizationId, LOCAL_DEMO_ADMIN.organizationId),
       eq(accountPersonGrants.siteId, LOCAL_DEMO_ADMIN.siteId),
       inArray(accountPersonGrants.role, supportedRoles),
     ));
   return rows.filter(row =>
-    isApprovedDemoGrant(row, row.email),
-  );
+    row.accountId !== LOCAL_DEMO_ADMIN.accountId &&
+    row.personId !== LOCAL_DEMO_ADMIN.personId);
 }
 
 /** Resolve only current account grants or the separately provisioned demo-admin switch list. */
