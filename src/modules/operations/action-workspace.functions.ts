@@ -43,11 +43,13 @@ export const getOperationsActions=createServerFn({method:"GET"})
   metadata:actions.metadata
  }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
    asc(actions.dueAt),desc(actions.createdAt)).limit(250);
- const coverageGapOwners=new Map<string,string|null>();
- for(const record of records){
-  if(record.type==="onsite_coverage_gap"&&record.programId&&!coverageGapOwners.has(record.programId))
-   coverageGapOwners.set(record.programId,await currentSiteDirectorPersonId(db,record.programId));
- }
+ // Resolve distinct coverage owners concurrently instead of performing one
+ // sequential database read per matching Program.
+ const coverageProgramIds=[...new Set(records.filter(record=>
+  record.type==="onsite_coverage_gap"&&record.programId).map(record=>record.programId!))];
+ const coverageGapOwners=new Map(await Promise.all(coverageProgramIds.map(async programId=>
+  [programId,await currentSiteDirectorPersonId(db,programId)] as const)));
+ const recordsById=new Map(records.map(record=>[record.id,record]));
  const items=dedupeQueue(records.map(record=>({
   id:record.id,kind:"action" as const,
   title:record.type==="support_referral"?"Restricted student support referral":record.title,
@@ -69,7 +71,7 @@ export const getOperationsActions=createServerFn({method:"GET"})
   needsResponse:record.status==="open",
  })));
  const scopedItems=prioritizeSchoolActions(items.map(item=>{
-  const record=records.find(record=>record.id===item.id);
+  const record=recordsById.get(item.id);
   return {...item,type:record?.type??"operations",programId:record?.programId??null,
    siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
    eligibleOwnerPersonId:record?.type==="onsite_coverage_gap"&&record.programId
