@@ -52,7 +52,7 @@ describe("canonical standalone Launch Studio", () => {
     expect(frame).toContain("Preview Website");
     expect(frame).toContain("Site Workspace");
     expect(overview).toContain("Website & Brand");
-    expect(prepareStageModulesV61.some(module => module.title === "Programs & Solutions")).toBe(true);
+    expect(prepareStageModulesV61.some(module => module.title === "Program Catalog")).toBe(true);
     expect(existsSync(new URL("../../src/components/launch-studio/SiteFirstLaunch.tsx", import.meta.url))).toBe(false);
   });
   it("never treats unconfigured requirements or a visited step as completion", () => {
@@ -63,7 +63,7 @@ describe("canonical standalone Launch Studio", () => {
       steps={[{ id: "welcome", title: "Welcome" }, { id: "school", title: "School details" }]}
       currentId="school" onStepChange={vi.fn()}><p>Canonical task</p></LaunchStudioShell>);
     expect(html).toContain('aria-current="step"');
-    expect(html).toContain("Visiting a step does not complete it.");
+    expect(html).toContain("Your answers are saved as you go.");
     expect(html).not.toContain("100%");
     expect(html).not.toContain("Recorded complete");
   });
