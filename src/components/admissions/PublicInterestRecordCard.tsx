@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Field } from "@/components/ui/field";
 import { PublicInterestTimeline } from "./PublicInterestTimeline";
 import type { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
 
@@ -10,12 +12,16 @@ export type PublicInterestRecord = Awaited<ReturnType<typeof listPublicAdmission
  * endpoints verify each registrar action independently.
  */
 export function PublicInterestRecordCard({
-  row, busy, onInvite, onStatusChange,
+  row, busy, onInvite, onStatusChange, programChoices, selectedProgramId,
+  onSelectProgram, onAssign,
 }: {
-  row: PublicInterestRecord;
-  busy: boolean;
-  onInvite: (row: PublicInterestRecord) => void | Promise<void>;
-  onStatusChange: (row: PublicInterestRecord, status: "contacted" | "closed") => void | Promise<void>;
+  row:PublicInterestRecord;busy:boolean;
+  onInvite:(row:PublicInterestRecord)=>void|Promise<void>;
+  onStatusChange:(row:PublicInterestRecord,status:"contacted"|"closed")=>void|Promise<void>;
+  programChoices?:readonly {id:string;name:string;siteId:string|null}[];
+  selectedProgramId?:string;
+  onSelectProgram?:(programId:string)=>void;
+  onAssign?:(row:PublicInterestRecord)=>void|Promise<void>;
 }) {
   return <article className=" border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -63,6 +69,34 @@ export function PublicInterestRecordCard({
           <p className="font-semibold">Next family step · {row.nextStep.owner}</p>
           <p className="mt-1">{row.nextStep.message}</p>
         </div>
+        {row.programId===null&&!row.applicationId&&
+          ["new","contacted"].includes(row.status)&&row.consentAt&&
+          <div className="mt-3 border p-3 text-sm">
+            <p className="font-semibold">Move this Site interest to an authorized Program</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Only a registrar may select the appropriate Program. The server
+              rechecks current admissions authorization. Linking the existing
+              prospect does not create an Application or reserve a place.
+            </p>
+            {programChoices?.length&&onAssign&&onSelectProgram
+              ? <div className="mt-3 flex flex-wrap items-end gap-2">
+                  <Field label="Authorized Program to invite about">
+                    <Select value={selectedProgramId??""}
+                      disabled={busy} onChange={event=>onSelectProgram(event.target.value)}>
+                      <option value="">Choose a Program</option>
+                      {programChoices.map(program=><option key={program.id}
+                        value={program.id}>{program.name}</option>)}
+                    </Select>
+                  </Field>
+                  <Button type="button" variant="outline"
+                    disabled={busy||!selectedProgramId} onClick={()=>void onAssign(row)}>
+                    Link to Program
+                  </Button>
+                </div>
+              : <p className="mt-2 text-xs text-muted-foreground">
+                  No authorized Program is available for selection in your current scope.
+                </p>}
+          </div>}
         <PublicInterestTimeline row={row} />
         {row.applicationId && row.programId && <div className="mt-3  border bg-background p-3 text-sm">
           <p className="font-semibold">Next school handoff</p>
