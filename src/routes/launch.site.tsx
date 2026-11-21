@@ -167,7 +167,7 @@ function SiteLaunchPage() {
     completion={launchModuleCompletionV61(site, overview)}
     previewAvailable={Boolean(site.websiteDraft)}>
     {selected?.id === "site-profile" ? <WorkspaceShell title="Site Profile"
-      eyebrow="Establish / Site Profile"
+      eyebrow="Shape / Site Profile"
       subtitle="Confirm your Site identity and add contact or location details when available."
       width="wide" rail={<EstablishSiteProfileGuidance />}>
       <EstablishSiteProfileUnified key={`${site.id}:${site.updatedAt}`}
@@ -204,7 +204,7 @@ function SiteLaunchPage() {
       </p>
       <a href={base + "&module=" + selected.id}
         className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
-        Retry this Introduce module
+        Retry this Share step
       </a>
     </WorkspaceShell>
     : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61 key={site.id}
@@ -247,7 +247,7 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
 }) {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const organization = organizations.find(item => item.id === site.organizationId);
-  return <WorkspaceShell title="Site Information" eyebrow="Establish / Site Information"
+  return <WorkspaceShell title="Site Information" eyebrow="Shape / Site Information"
     subtitle="Shape your learning environment and introduce the community behind your Site."
     width="wide" rail={<SiteInformationV61Guidance step={step} />}>
     <EstablishSiteInformationV61 key={site.id + ":" + initial.revision}
@@ -266,7 +266,7 @@ function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: 
 }) {
   const [step, setStep] = useState<0 | 1 | 2>(0);
   return <WorkspaceShell title="What could your community learn?"
-    eyebrow="Establish / Programs & Audiences"
+    eyebrow="Shape / Programs & Audiences"
     subtitle="Choose your Programs, audiences and Experiences. Your vision can shape website content before Solutions are approved."
     width="wide" rail={<ProgramsAudiencesV61Guidance step={step} />}>
     <EstablishProgramsAudiencesV61 key={siteId + ":" + initial.revision}
