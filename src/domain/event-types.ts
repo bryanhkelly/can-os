@@ -160,6 +160,7 @@ export const EventTypes = {
   PublicAdmissionsInterestSurveyReceived: "PublicAdmissionsInterestSurveyReceived",
   PublicAdmissionsInterestStatusChanged: "PublicAdmissionsInterestStatusChanged",
   PublicAdmissionsInterestConverted: "PublicAdmissionsInterestConverted",
+  PublicSiteInterestProgramLinked: "PublicSiteInterestProgramLinked",
   PublicFamilyStartRequested: "PublicFamilyStartRequested",
   PublicFamilyStartVerified: "PublicFamilyStartVerified",
   FamilyInvitationBatchRequested: "FamilyInvitationBatchRequested",
