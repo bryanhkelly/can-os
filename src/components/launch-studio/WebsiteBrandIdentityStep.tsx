@@ -6,10 +6,10 @@ import { siteBrandDirections, type SiteBrandDirectionId } from "@/domain/site-br
 /** Presentation only. Brand source, permission checks and immutable saves
  * stay with the canonical Website & Brand controller/server command. */
 export function WebsiteBrandIdentityStep({
-  displayName,storyRevision,currentRevision,canEdit,busy,
+  displayName,currentRevision,canEdit,busy,
   direction,recommendation,onDisplayNameChange,onDirectionChange,
 }:{
-  displayName:string;storyRevision:string|null;currentRevision:number;
+  displayName:string;currentRevision:number;
   canEdit:boolean;busy:boolean;
   direction:SiteBrandDirectionId|null;recommendation:SiteBrandDirectionId|null;
   onDisplayNameChange:(name:string)=>void;
