@@ -161,8 +161,7 @@ function PrepareModuleHandoffs({ siteId, handoffs, secondary = false }: {
     </p>
     {links}
   </details>;
-  return <WorkspacePanel title="Additional tools"
-    description="">
+  return <WorkspacePanel title="Additional tools">
     {links}
   </WorkspacePanel>;
 }
@@ -179,7 +178,6 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
 }) {
   const definition = prepareModulesV61.find(item => item.id === module)!; // Module navigation is owned by LaunchSiteFrame.
   const plan = modulePlans[module];
-  const Icon = definition.icon;
   return <WorkspaceShell width="wide" title={definition.title}
     eyebrow="Launch Studio / Prepare"
     subtitle={definition.subtitle}
@@ -194,15 +192,8 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
         <h3 className="mt-4 border-t pt-4 text-sm font-semibold">Your Site provides</h3>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{plan.siteProvides}</p>
       </WorkspacePanel>
-      <p className="text-xs leading-5 text-muted-foreground"></p>
     </div>}>
     <div className="mt-6 space-y-5">
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon aria-hidden="true" className="size-4" />
-        {plan.status === "governed"
-          ? "Review required before approval"
-          : "Complete the setup tasks below"}
-      </p>
       {module === "program-catalog" && <>
         <WorkspacePanel title="Your interests"
           description="These are the interests you selected during setup.">
@@ -232,8 +223,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
             Review Programs &amp; Audiences <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         </WorkspacePanel>
-        <WorkspacePanel title="How offerings work"
-          description="">
+        <WorkspacePanel title="How offerings work">
           <div className="grid gap-3 md:grid-cols-3">
             {[
               ["Program", "What you want to offer."],
@@ -265,7 +255,6 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
           <ClipboardCheck aria-hidden="true" className="mt-1 size-5 shrink-0 text-primary" />
           <div className="text-sm leading-6">
             <p>{plan.decision}</p>
-            <p className="mt-2 text-muted-foreground"></p>
           </div>
         </div>
       </WorkspacePanel>}
