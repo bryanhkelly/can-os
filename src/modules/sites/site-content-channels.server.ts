@@ -12,6 +12,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { getRequest } from "@tanstack/react-start/server";
+import { siteLaunchPreferencesSchema, snapshotSiteExperienceVision } from "@/domain/site-launch-preferences";
 
 /** School setup users and exact-Site Website Studio editors share one
  * presentation document. Neither access path grants Program approvals or
@@ -97,10 +98,15 @@ export async function publishAuthorizedSiteContentChannels(input: {
       throw new Error("Website channel revision has changed. Reload before publishing.");
     const published = site.metadata.publishedWebsiteContentChannels == null ? null :
       safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
-    if (published && published.revision === draft.revision)
+    const intent=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+    const experienceSnapshot=snapshotSiteExperienceVision(intent.success?intent.data:null);
+    const previousExperience=site.metadata.publishedSiteExperiencePreferencesV2;
+    if (published && published.revision === draft.revision &&
+        JSON.stringify(previousExperience)===JSON.stringify(experienceSnapshot))
       return {siteId: site.id, publishedRevision: draft.revision, changed: false};
     const [updated] = await tx.update(sites).set({
-      metadata: {...site.metadata, publishedWebsiteContentChannels: draft},
+      metadata: {...site.metadata, publishedWebsiteContentChannels: draft,
+        publishedSiteExperiencePreferencesV2:experienceSnapshot},
       updatedAt: new Date(),
     }).where(eq(sites.id, site.id)).returning({id: sites.id});
     if (!updated) throw new Error("Unable to publish Site content channel settings");

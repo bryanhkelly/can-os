@@ -20,7 +20,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks, projectMissingSiteExperienceSectionsForPreview } from "@/domain/site-content-channels";
-import { siteExperienceCatalog } from "@/domain/site-experience-interests";
+import { siteExperienceById } from "@/domain/site-experience-interests";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
@@ -167,8 +167,9 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ...proposedExperiences,
   ];
   const plannedExperienceNames=preferences.success
-    ? [...siteExperienceCatalog.filter(item=>preferences.data.experienceIds?.includes(item.id))
-      .map(item=>item.title),...(preferences.data.customExperiences??[])]
+    ? [...(preferences.data.experienceIds??[]).flatMap(id=>{
+        const topic=siteExperienceById.get(id);return topic?[topic.title]:[];
+      }),...(preferences.data.customExperiences??[])]
     : [];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,

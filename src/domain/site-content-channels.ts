@@ -2,9 +2,10 @@ import { z } from "zod";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
-import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch-preferences";
+import { siteLaunchInterestIds, type SiteLaunchPreferences, type SitePublishedExperienceSnapshot } from "./site-launch-preferences";
 import {
-  siteExperienceCatalog, siteExperienceAudienceNames, siteExperienceProgramNames,
+  siteExperienceById, siteExperienceAudienceNames, siteExperienceProgramNames,
+  describeSiteExperience,
 } from "./site-experience-interests";
 import { projectSiteEnrollmentOpportunities } from "./site-enrollment-opportunities";
 
@@ -287,6 +288,8 @@ export type SiteContentChannelFeeds = {
   /** The Site, not the preview route, resolves its channel sources. */
   mode: "private" | "public";
   preferences?: SiteLaunchPreferences | null;
+  /** Website-published snapshot; live Site edits do not alter public Experience copy. */
+  publishedExperiences?: SitePublishedExperienceSnapshot | null;
   siteSetup?: {
     name: string; organizationName: string; city?: string | null;
     state?: string | null; timezone?: string | null;
@@ -367,19 +370,25 @@ export function resolveSiteContentBlocks(
         }));
         break;
       case "learning.experiences": {
-        const selected = new Set(feeds.preferences?.experienceIds ?? []);
-        const audiences = new Set(feeds.preferences?.audienceIds ?? []);
-        const programs = new Set(feeds.preferences?.interestIds ?? []);
-        items = siteExperienceCatalog.filter(item=>selected.has(item.id)).map(item=>{
-          const matchingAudiences=item.audiences.filter(id=>audiences.has(id))
-            .map(id=>siteExperienceAudienceNames[id]);
-          const matchingPrograms=item.programs.filter(id=>programs.has(id))
-            .map(id=>siteExperienceProgramNames[id]);
-          const scope=[...matchingPrograms,...matchingAudiences].join(" · ");
-          return {id:item.id,title:item.title,description:item.description,
-            label:"Planned Experience"+(scope?" · "+scope:"")};
+        const vision=feeds.mode==="public"?feeds.publishedExperiences:feeds.preferences;
+        const audiences=new Set(vision?.audienceIds??[]);
+        const programs=new Set(vision?.interestIds??[]);
+        const details=new Map((vision?.experienceDetails??[]).map(item=>[item.id,item] as const));
+        items=(vision?.experienceIds??[]).flatMap(id=>{
+          const topic=siteExperienceById.get(id);
+          if(!topic)return [];
+          const detail=details.get(id);
+          const audienceLabels=(detail?.audienceIds??topic.audiences.filter(value=>audiences.has(value)))
+            .map(value=>siteExperienceAudienceNames[value]);
+          const programLabels=(detail?.programIds??topic.programs.filter(value=>programs.has(value)))
+            .map(value=>siteExperienceProgramNames[value]);
+          const scope=[...programLabels,...audienceLabels].join(" · ");
+          const status=detail?.priority==="featured"?"Featured planning idea":
+            detail?.priority==="exploring"?"Exploring":"Planned Experience";
+          return [{id:topic.id,title:topic.title,description:describeSiteExperience(topic,detail),
+            label:status+(scope?" · "+scope:"")}];
         });
-        items.push(...(feeds.preferences?.customExperiences ?? []).map((title,index)=>({
+        items.push(...(vision?.customExperiences??[]).map((title,index)=>({
           id:"custom-"+index,title,description:"A local experience our community is considering.",
           label:"Proposed local Experience",
         })));

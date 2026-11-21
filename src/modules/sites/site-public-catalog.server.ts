@@ -6,7 +6,7 @@ import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { projectSiteFundingPublicContext } from "@/domain/site-funding-public";
 import { readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
-import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
+import { siteLaunchPreferencesSchema, sitePublishedExperienceSnapshotSchema } from "@/domain/site-launch-preferences";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
@@ -117,6 +117,8 @@ export async function readPublishedSiteCatalog(slug: string) {
     });
     const contentConfig = readPublishedSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
     const preferences=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+    const publishedExperiences=sitePublishedExperienceSnapshotSchema.safeParse(
+      site.metadata.publishedSiteExperiencePreferencesV2);
     const location=schoolPlanningLocationSchema.safeParse(site.metadata.schoolPlanningLocation);
     // Public networks and statuses are sourced from actual Site affiliation
     // records, never inferred from names or synthetic fixtures. The published
@@ -133,6 +135,7 @@ export async function readPublishedSiteCatalog(slug: string) {
     const contentBlocks = resolveSiteContentBlocks(
       contentConfig, {
         mode: "public",preferences:preferences.success?preferences.data:null,
+        publishedExperiences:publishedExperiences.success?publishedExperiences.data:null,
         siteSetup:{name:brand.resolved.displayName,organizationName:site.organizationName,
           city:location.success?location.data.city:null,
           state:location.success?location.data.state:null,timezone:site.timezone},

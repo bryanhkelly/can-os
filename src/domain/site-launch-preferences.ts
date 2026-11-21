@@ -89,6 +89,26 @@ export const siteLaunchPreferencesSchema = z.object({
 
 export type SiteLaunchPreferences = z.infer<typeof siteLaunchPreferencesSchema>;
 
+/** Public Experience source, captured only on an authorized website-channel publish. */
+export const sitePublishedExperienceSnapshotSchema=z.object({
+  version:z.literal(2),
+  interestIds:z.array(z.enum(siteLaunchInterestIds)).max(8),
+  audienceIds:z.array(z.enum(sitePlanningAudienceIds)).max(4),
+  experienceIds:z.array(z.enum(siteExperienceIds)).max(siteExperienceIds.length),
+  customExperiences:customExperiences,
+  experienceDetails:experienceDetailsSchema,
+}).strict();
+export type SitePublishedExperienceSnapshot=z.infer<typeof sitePublishedExperienceSnapshotSchema>;
+export function snapshotSiteExperienceVision(preferences:SiteLaunchPreferences|null):SitePublishedExperienceSnapshot{
+  return sitePublishedExperienceSnapshotSchema.parse({
+    version:2,interestIds:preferences?.interestIds??[],
+    audienceIds:preferences?.audienceIds??[],
+    experienceIds:preferences?.experienceIds??[],
+    customExperiences:preferences?.customExperiences??[],
+    experienceDetails:preferences?.experienceDetails??[],
+  });
+}
+
 export const siteProgramsAudiencesV61Schema = z.object({
   interestIds: z.array(z.enum(sitePlanningInterestIds)).max(6)
     .refine(distinct, "Choose each learning interest once"),
