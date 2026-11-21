@@ -13,6 +13,7 @@ import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { PublicSiteProjection } from "./public-operation-projection";
+import { fundingStatusPublicNote, type SiteFundingPublicContext } from "./site-funding-public";
 import type {PublicSchoolSiteMedia} from "./school-site-media-public";
 import { normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "./site-local-content";
 
@@ -25,6 +26,8 @@ export type PublicSitePage = {
   demonstration?: boolean;
   /** Published-page-only status derived from active Program and legal evidence. */
   operatingStatus?: "authorized" | "development" | "review_required";
+  /** Auto-projected from Hosting & Organization; no EIN or verification promise. */
+  siteFunding?: SiteFundingPublicContext | null;
   offerings: PublicOffering[];
   academicPrograms?: PublicAcademicProgram[];
   /** Only institutionally reviewed claims with public display permission are rendered. */
@@ -141,8 +144,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const contentOn=(path:string)=>Boolean(page.contentBlocks?.some(block=>
     block.page===path && block.items.length>0));
   const parent = page.parentInformation;
-  const tuition = Boolean(academic || (parent?.tuition.description.canDisplay && parent.tuition.description.value) ||
-    (parent?.tuition.financialAid.canDisplay && parent.tuition.financialAid.value));
+  // Costs and funding belong on a prelaunch Site even before tuition is finalized.
+  const tuition = true;
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
   const faq = Boolean(academic || tuition ||
     (parent?.admissions.description.canDisplay && parent.admissions.description.value));
@@ -292,7 +295,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const pageLabels: Record<PublicSitePath, string> = {
     "/": "Home", "/about": "About", "/leadership": "Leadership", "/academics": "Academics",
     "/student-life": "Student life", "/school-day": "Learning model",
-    "/admissions": "Admissions", "/tuition": "Tuition & aid", "/families": "Families",
+    "/admissions": "Admissions", "/tuition": profile==="school"||profile==="mixed" ? "Tuition & funding" : "Fees & funding", "/families": "Families",
     "/faq": "FAQs", "/contact": "Contact",
     "/programs": "Programs", "/courses": "Courses", "/classes": "Classes",
   };
@@ -652,11 +655,16 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <article class="card"><h3>Planning together</h3><p>Understand payment timing and the questions to ask as you build an education budget.</p></article>
     <article class="card"><h3>Financial assistance</h3><p>Learn how scholarships or other assistance could be presented alongside eligibility and application guidance.</p></article></div>
     </section>`;
+  const nonprofitStatusNote=fundingStatusPublicNote(page.siteFunding);
   const tuitionSection = demo ? demoTuitionSection : `<section class="church-section" aria-labelledby="tuition-title">
-    <h2 id="tuition-title">Tuition and costs</h2>
-    <p>${tuitionText || "Reviewed tuition and fee details have not yet been published for these programs. Please request current costs before making an enrollment decision."}</p>
-    <h3>Financial assistance</h3>
-    <p>${aidText || "Reviewed financial assistance details are not yet available on this website. Availability and eligibility have not been established here."}</p>
+    <p class="tag">Planning with confidence</p>
+    <h2 id="tuition-title">${profile==="school"||profile==="mixed"?"Tuition, fees and funding":"Program fees and funding"}</h2>
+    <p>${tuitionText || "Tuition and program fees are being established as offerings are prepared. Confirmed costs and included services will be published here when available."}</p>
+    <h3>Scholarships and financial assistance</h3>
+    <p>${aidText || "We are exploring relevant scholarships, financial assistance and other support options. Availability, eligibility and awards have not yet been established."}</p>
+    <h3>Public and community funding</h3>
+    <p>Depending on the specific program and applicable requirements, funding may include family payments, eligible public education support, grants, charitable contributions and community sponsorships. No funding eligibility or award is guaranteed.</p>
+    ${nonprofitStatusNote?`<h3>Organization status</h3><p>${escapePublicHtml(nonprofitStatusNote)}</p>`:""}
     ${availablePaths.includes("/academics")
       ? '<p class="public-next-step"><a href="/academics">Choose a program to request tuition and assistance details →</a></p>'
       : availablePaths.includes("/contact")
@@ -932,8 +940,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : ""))),
     "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "The right school changes what feels possible",
       demo ? "Explore an admissions journey centered on understanding each family's questions and finding the right fit." : "Choosing a school is a personal decision. Find reviewed admissions information and the next step currently available to your family."), admissionsNextSteps, demo ? "" : academicSection + disclosureSection),
-    "/tuition": composePublicSiteInterior(templateId, secondaryHero("Planning your education", "Plan with confidence",
-      demo ? "Understand how transparent tuition and financial assistance information could help families plan." : "Find published costs, assistance details, and ways to request information for your family."), tuitionSection),
+    "/tuition": composePublicSiteInterior(templateId, secondaryHero("Costs & support", "Plan with confidence",
+      demo ? "Understand how transparent tuition and financial assistance information could help families plan." : "Understand program costs, potential funding pathways and published financial assistance as information becomes available."), tuitionSection),
     "/families": composePublicSiteInterior(templateId, secondaryHero("Supporting families", "Partners in your child’s education",
       demo ? "Because learning works best when the people who care about a student can stay connected." : "Discover the resources and support information currently available to families."),
       (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
