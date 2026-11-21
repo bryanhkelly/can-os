@@ -447,9 +447,8 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <fieldset className="space-y-3 border-t pt-5">
           <legend className="text-sm font-semibold">Organization &amp; Tax-Exempt Status</legend>
           <p className="text-xs leading-5 text-muted-foreground">
-            This helps CAN OS prepare accurate organization and funding information.
-            Self-reported status is private until reviewed; it does not establish
-            nonprofit recognition or make tuition tax-deductible.
+            This helps us understand your organization for planning and funding.
+            Self-reported status is private until reviewed. It does not verify nonprofit recognition or tax-deductibility.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Which organization does this status describe?">
