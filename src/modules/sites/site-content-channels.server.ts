@@ -4,7 +4,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { sites } from "@/db/schema";
 import { readSiteContentChannelConfig, planSiteContentChannelSave,
   requireSavedSiteContentChannelDraft, safeReadSiteContentChannelConfig,
-  type SiteContentBlock } from "@/domain/site-content-channels";
+  type SiteContentBlock, projectSiteExperienceItems, sitePublishedExperienceCardsSchema } from "@/domain/site-content-channels";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
@@ -100,13 +100,18 @@ export async function publishAuthorizedSiteContentChannels(input: {
       safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
     const intent=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
     const experienceSnapshot=snapshotSiteExperienceVision(intent.success?intent.data:null);
+    const experienceCards=sitePublishedExperienceCardsSchema.parse(
+      projectSiteExperienceItems(experienceSnapshot));
     const previousExperience=site.metadata.publishedSiteExperiencePreferencesV2;
+    const previousCards=site.metadata.publishedSiteExperienceCardsV2;
     if (published && published.revision === draft.revision &&
-        JSON.stringify(previousExperience)===JSON.stringify(experienceSnapshot))
+        JSON.stringify(previousExperience)===JSON.stringify(experienceSnapshot) &&
+        JSON.stringify(previousCards)===JSON.stringify(experienceCards))
       return {siteId: site.id, publishedRevision: draft.revision, changed: false};
     const [updated] = await tx.update(sites).set({
       metadata: {...site.metadata, publishedWebsiteContentChannels: draft,
-        publishedSiteExperiencePreferencesV2:experienceSnapshot},
+        publishedSiteExperiencePreferencesV2:experienceSnapshot,
+        publishedSiteExperienceCardsV2:experienceCards},
       updatedAt: new Date(),
     }).where(eq(sites.id, site.id)).returning({id: sites.id});
     if (!updated) throw new Error("Unable to publish Site content channel settings");

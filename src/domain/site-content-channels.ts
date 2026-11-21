@@ -250,6 +250,41 @@ export type SiteContentItem = {
 };
 export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentItem[]};
 
+/** Publish the exact rendered Experience cards so future catalog edits cannot
+ * silently change text on an already published website. */
+export const sitePublishedExperienceCardsSchema=z.array(z.object({
+  id:z.string().max(128),title:z.string().max(120),
+  description:z.string().max(1200),label:z.string().max(500),
+}).strict()).max(40);
+export type SitePublishedExperienceCard=z.infer<typeof sitePublishedExperienceCardsSchema>;
+
+export function projectSiteExperienceItems(
+  vision:Pick<SiteLaunchPreferences,"experienceIds"|"customExperiences"|"experienceDetails"|"interestIds"|"audienceIds">|SitePublishedExperienceSnapshot|null,
+):SiteContentItem[]{
+  const audiences=new Set(vision?.audienceIds??[]);
+  const programs=new Set(vision?.interestIds??[]);
+  const details=new Map((vision?.experienceDetails??[]).map(item=>[item.id,item] as const));
+  const items:SiteContentItem[]=(vision?.experienceIds??[]).flatMap(id=>{
+    const topic=siteExperienceById.get(id);
+    if(!topic)return [];
+    const detail=details.get(id);
+    const audienceLabels=(detail?.audienceIds??topic.audiences.filter(value=>audiences.has(value)))
+      .map(value=>siteExperienceAudienceNames[value]);
+    const programLabels=(detail?.programIds??topic.programs.filter(value=>programs.has(value)))
+      .map(value=>siteExperienceProgramNames[value]);
+    const scope=[...programLabels,...audienceLabels].join(" · ");
+    const status=detail?.priority==="featured"?"Featured planning idea":
+      detail?.priority==="exploring"?"Exploring":"Planned Experience";
+    return [{id:topic.id,title:topic.title,description:describeSiteExperience(topic,detail),
+      label:status+(scope?" · "+scope:"")}];
+  });
+  items.push(...(vision?.customExperiences??[]).map((title,index)=>({
+    id:"custom-"+index,title,description:"A local experience our community is considering.",
+    label:"Proposed local Experience",
+  })));
+  return items;
+}
+
 /** Preserve the Site's own configured setup and network sections.
  * The separate, canonical planning-program projection avoids duplicate
  * "learning.interests" cards; no Site or network facts are suppressed.
@@ -290,6 +325,7 @@ export type SiteContentChannelFeeds = {
   preferences?: SiteLaunchPreferences | null;
   /** Website-published snapshot; live Site edits do not alter public Experience copy. */
   publishedExperiences?: SitePublishedExperienceSnapshot | null;
+  publishedExperienceCards?: readonly SitePublishedExperienceCard[] | null;
   siteSetup?: {
     name: string; organizationName: string; city?: string | null;
     state?: string | null; timezone?: string | null;
@@ -370,28 +406,9 @@ export function resolveSiteContentBlocks(
         }));
         break;
       case "learning.experiences": {
-        const vision=feeds.mode==="public"?feeds.publishedExperiences:feeds.preferences;
-        const audiences=new Set(vision?.audienceIds??[]);
-        const programs=new Set(vision?.interestIds??[]);
-        const details=new Map((vision?.experienceDetails??[]).map(item=>[item.id,item] as const));
-        items=(vision?.experienceIds??[]).flatMap(id=>{
-          const topic=siteExperienceById.get(id);
-          if(!topic)return [];
-          const detail=details.get(id);
-          const audienceLabels=(detail?.audienceIds??topic.audiences.filter(value=>audiences.has(value)))
-            .map(value=>siteExperienceAudienceNames[value]);
-          const programLabels=(detail?.programIds??topic.programs.filter(value=>programs.has(value)))
-            .map(value=>siteExperienceProgramNames[value]);
-          const scope=[...programLabels,...audienceLabels].join(" · ");
-          const status=detail?.priority==="featured"?"Featured planning idea":
-            detail?.priority==="exploring"?"Exploring":"Planned Experience";
-          return [{id:topic.id,title:topic.title,description:describeSiteExperience(topic,detail),
-            label:status+(scope?" · "+scope:"")}];
-        });
-        items.push(...(vision?.customExperiences??[]).map((title,index)=>({
-          id:"custom-"+index,title,description:"A local experience our community is considering.",
-          label:"Proposed local Experience",
-        })));
+        items=feeds.mode==="public"
+          ? [...(feeds.publishedExperienceCards??[])]
+          : projectSiteExperienceItems(feeds.preferences??null);
         break;
       }
       case "learning.academics":

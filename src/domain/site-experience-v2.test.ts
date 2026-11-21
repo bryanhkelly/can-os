@@ -8,7 +8,7 @@ import {
   applySiteProgramsAudiencesV61,readSiteProgramsAudiencesV61,
   siteProgramsAudiencesV61SaveSchema,snapshotSiteExperienceVision,
 } from "./site-launch-preferences";
-import { defaultSiteContentChannelConfig,resolveSiteContentBlocks } from "./site-content-channels";
+import { defaultSiteContentChannelConfig,resolveSiteContentBlocks,projectSiteExperienceItems } from "./site-content-channels";
 
 const plan={
   interestIds:["adult"] as Array<"adult">,
@@ -78,7 +78,7 @@ describe("Site Experience Catalog v2",()=>{
     const topic=siteExperienceById.get("voting-elections")!;
     const copy=describeSiteExperience(topic,plan.experienceDetails[0]);
     expect(copy).toContain("First-time voting");
-    expect(copy).toContain("understanding the ballot");
+    expect(copy).toContain("Understanding the ballot");
     expect(copy).toContain("participate in civic life");
     expect(copy).not.toContain("enroll");
   });
@@ -90,6 +90,7 @@ describe("Site Experience Catalog v2",()=>{
     },"physical");
     const publicBlocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
       mode:"public",preferences:edited,publishedExperiences:published,
+      publishedExperienceCards:projectSiteExperienceItems(published),
     }).filter(block=>block.channel==="learning.experiences");
     const privateBlocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
       mode:"private",preferences:edited,
