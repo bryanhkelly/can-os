@@ -40,6 +40,22 @@ describe("family interest record presentation", () => {
     expect(html).not.toContain("Invite to apply");
     expect(html).not.toContain(">Mark contacted</button>");
   });
+  it("offers a scoped Program handoff for a consented Site-level lead without auto-enrolling",()=>{
+    const siteLead={...base,programId:null,programName:null,applicationId:null,
+      source:"published_site_general",consentAt:"2026-11-20T00:00:00.000Z",
+      admissionsAuthorized:false,canSendApplicationInvitation:false,
+      nextStep:{state:"follow_up",owner:"registrar",
+        message:"Follow up on the Site interest."}} as unknown as PublicInterestRecord;
+    const html=renderToStaticMarkup(<PublicInterestRecordCard row={siteLead} busy={false}
+      programChoices={[{id:"program-1",siteId:"site-1",name:"Authorized Program"}]}
+      selectedProgramId="program-1" onSelectProgram={()=>{}} onAssign={()=>{}}
+      onInvite={()=>{}} onStatusChange={()=>{}}/>);
+    expect(html).toContain("General Site interest");
+    expect(html).toContain("Prelaunch Site interest");
+    expect(html).toContain("Link to Program");
+    expect(html).not.toContain("Invite to apply");
+    expect(html).not.toContain("Verify email to apply");
+  });
   it("keeps inquiry contact and guardianship verification separate", () => {
     const html=renderToStaticMarkup(<PublicInterestTimeline row={base}/>);
     expect(html).toContain("No affirmative follow-up consent recorded");
