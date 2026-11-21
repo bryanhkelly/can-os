@@ -30,15 +30,15 @@ const field=(element:string, source:string, details:string, editAt:string,
 const template=(element:string,details:string):WebsiteElementSource=>
   field(element,"CAN OS template renderer",details,"Fixed layout copy, not editable in Website & Brand","template-copy");
 const authored=(element:string,key:string,details:string):WebsiteElementSource=>
-  field(element,"Site website draft · "+key,details,"Establish → Website & Brand → Your Content","site-copy");
+  field(element,"Site website draft · "+key,details,"Shape → Website & Brand → Your Content","site-copy");
 const brand=(element:string,details:string):WebsiteElementSource=>
   field(element,"Current immutable Site Brand version",details,
-    "Establish → Website & Brand → Brand Identity / Visual Identity","site-identity");
+    "Shape → Website & Brand → Brand Identity / Visual Identity","site-identity");
 const approved=(element:string,source:string,details:string):WebsiteElementSource=>
   field(element,source,details,"Edit and approve in the owning Site/Program/Course module, not in the template","approved-records");
 const sourceLayout=(element:string,details:string):WebsiteElementSource=>
   field(element,"Site website content-channel configuration",details,
-    "Establish → Website & Brand → Your Content → Arrange website sections","site-layout");
+    "Shape → Website & Brand → Your Content → Arrange website sections","site-layout");
 const derived=(element:string,details:string):WebsiteElementSource=>
   field(element,"CAN OS approved-content projection",details,
     "Determined by verified source records and publication rules; not a separate website value","computed");
@@ -51,7 +51,7 @@ export const websiteChromeSources:readonly WebsiteElementSource[]=[
   template("Decorative masthead language","Template-specific issue labels, motto strips, icons and ornaments. These are design copy, not sourced from Site Information or verified accreditation."),
   brand("Colors and typography","Applied from the selected Site Brand version. Changing the wireframe does not rewrite these values."),
   brand("Website logo and favicon","Only rights-reviewed current artwork is eligible for published output; a template illustration is never a Site logo."),
-  field("Footer name and organization","Saved Site and Organization/Brand names","Renders those values exactly as stored, followed by CAN's platform attribution.","Establish → Site Profile / Website & Brand → Brand Identity","site-identity"),
+  field("Footer name and organization","Saved Site and Organization/Brand names","Renders those values exactly as stored, followed by CAN's platform attribution.","Shape → Site Profile / Website & Brand → Brand Identity","site-identity"),
 ];
 
 const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
@@ -63,7 +63,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
       authored("Subheading","welcomeMessage","Saved welcome message, when provided."),
       brand("Name above the headline","When a custom headline is present, the exact saved Site Brand display name appears as the kicker."),
       template("Introductory paragraph","Renderer-supplied introduction tailored to available approved academic Programs and enrollment status. Wireframe selection has no copy."),
-      field("Hero image and alt text","Saved website artwork or Site media library","Uses rights-cleared Site hero artwork first, then approved Site media or a clearly illustrative template image in preview.","Establish → Website & Brand → Visual Identity → Imagery; Site media folder","site-media"),
+      field("Hero image and alt text","Saved website artwork or Site media library","Uses rights-cleared Site hero artwork first, then approved Site media or a clearly illustrative template image in preview.","Shape → Website & Brand → Visual Identity → Imagery; Site media folder","site-media"),
       derived("Buttons and text links","Built from eligible public page routes, published opportunities and independently authorized inquiry destinations. No direct enrollment link without an approved release."),
       template("Template artwork and ornaments","Static folio, stamp, side note, cover label, tile or mosaic text specific to the selected wireframe."),
     ],
@@ -73,7 +73,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     appearsWhen:"The Site has a nonempty website vision field.",
     elements:[
       template("Eyebrow and H2","Actual fixed label: 'Our vision'. Actual fixed H2: 'Helping students discover who they are and what they can become.' The chosen template changes its placement, not its source."),
-      authored("Body paragraph","schoolVision","Uses the Site's saved editable vision copy, possibly initially suggested from Establish → Site Information → Purpose & Story."),
+      authored("Body paragraph","schoolVision","Uses the Site's saved editable vision copy, possibly initially suggested from Shape → Site Information → Purpose & Story."),
       template("Decorative monogram or index","The selected layout provides its own visual marker."),
     ],
   },
@@ -83,7 +83,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     elements:[
       template("Section eyebrow and heading","Actual fixed eyebrow: 'Our community'. H2 is 'A community where every student has room to grow.' when the Site has a vision and school content; otherwise the renderer uses the experience-profile story title."),
       authored("Story paragraph","localDescription","Uses Site story first; if blank, falls back to schoolVision, churchHistory or leadershipWelcome, in that order."),
-      field("Initial source suggestions","Site Information → Purpose & Story","Optional suggested copy uses saved community needs, founding story, motivation, values and future vision. The final saved website draft is authoritative.","Establish → Site Information → Purpose & Story; then Website & Brand → Your Content","site-story"),
+      field("Initial source suggestions","Site Information → Purpose & Story","Optional suggested copy uses saved community needs, founding story, motivation, values and future vision. The final saved website draft is authoritative.","Shape → Site Information → Purpose & Story; then Website & Brand → Your Content","site-story"),
       derived("About link","Only shown when /about is an eligible website page."),
     ],
   },
@@ -101,7 +101,7 @@ const sections: Record<keyof PublicSiteHomeSections,WebsiteSectionSource>={
     appearsWhen:"Approved academic Program data is available and this placement is not replaced by an eligible learning.academics content channel. A grayscale wireframe has no programs or descriptive sample data.",
     elements:[
       template("Section label and H2","Actual eyebrow: 'Learning pathways'. H2: 'Serious learning. A more personal path.' The supporting paragraph varies with the current academic and preview context."),
-      approved("Program card names, summaries and delivery","Approved Site academic Program versions","Includes only approved public descriptions and permissible delivery information; cards do not inherit broad Establish-stage intent."),
+      approved("Program card names, summaries and delivery","Approved Site academic Program versions","Includes only approved public descriptions and permissible delivery information; cards do not inherit broad Shape-stage intent."),
       derived("Program inquiry and application actions","Application status comes from verified application permissions; an approved Program is not necessarily open for admission."),
       sourceLayout("Section placement or replacement","An eligible learning.academics block can supply Site-configured section headings and card layouts instead of this automatic block."),
     ],
@@ -256,14 +256,14 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
   }],
   "/experiences":[{
     key:"experiences-page",title:"Experiences / Planned ideas",
-    description:"Website presentation of Experiences selected in Establish, not adopted Solutions or registered offerings.",
+    description:"Website presentation of Experiences selected in Shape, not adopted Solutions or registered offerings.",
     appearsWhen:"Selected Experiences exist and the private preview or a published Experience content channel allows them to appear.",
     elements:[
       template("Page headline and introduction","Default eyebrow: 'Discover possibilities'. H1: 'Experiences we are exploring'. The introduction explicitly says these are planning ideas."),
       field("Experience names, descriptions and intended audiences/Programs",
-        "Establish → Programs & Audiences → Experiences",
+        "Shape → Programs & Audiences → Experiences",
         "Finite catalog categories and Site-authored ideas. Audience and Program associations are descriptive, not eligibility claims.",
-        "Establish → Programs & Audiences → Experiences","site-planning"),
+        "Shape → Programs & Audiences → Experiences","site-planning"),
       sourceLayout("Page block headings, description and placement","The Site-owned learning.experiences channel controls editable section headings, card layout and page placement."),
       derived("No enrollment actions","Planned Experiences cannot create registration links; separately authorized Programs, Courses and Classes are published elsewhere."),
     ],
@@ -321,7 +321,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
       template("Page heading and explanatory text","Default eyebrow: 'Costs & support'. H1: 'Plan with confidence'. The text adapts to school versus community-program context."),
       template("Prelaunch tuition and assistance guidance","Universal boilerplate explains that costs and funding are being determined; it does not promise scholarship awards, tax deductibility or government eligibility."),
       approved("Confirmed tuition, assistance and fees","Verified tuition/financial-aid projections","Approved current costs and support terms replace prelaunch boilerplate automatically."),
-      field("Organization status disclosure","Hosting & Organization · self-reported tax status","A non-verified organizational status is clearly labeled as self-reported or pending; EIN is never included.","Establish → Site Information → Hosting & Organization","site-identity"),
+      field("Organization status disclosure","Hosting & Organization · self-reported tax status","A non-verified organizational status is clearly labeled as self-reported or pending; EIN is never included.","Shape → Site Information → Hosting & Organization","site-identity"),
     ],
   }],
   "/families":[{
