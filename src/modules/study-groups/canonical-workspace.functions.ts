@@ -62,10 +62,10 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
             ) : undefined,
           ),
         )
-      : and(
-          inArray(s.studyGroups.siteId, sites),
-          or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs)),
-        ),
+      : inArray(s.studyGroups.siteId, sites),
+      // For students, do not pre-filter canonical Class groups using legacy
+      // Program grants. Exact active Class enrollment is checked below;
+      // legacy groups still require their original Program/Section evidence.
   )).orderBy(desc(s.studyGroups.createdAt)).limit(100);
 
   const teaching = actor.role === "teacher" ? await db.select({
@@ -93,7 +93,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
   }))];
   const nativeEligible=linkedClassIds.length
     ? actor.role==="student"
-      ? await db.select({classId:canonicalClasses.id})
+      ? await db.select({classId:canonicalClasses.id,siteId:canonicalClasses.siteId})
           .from(canonicalClassEnrollments)
           .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
           .innerJoin(s.sites,eq(s.sites.id,canonicalClasses.siteId))
@@ -113,10 +113,11 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
             eq(canonicalClasses.state,"active"),
             eq(canonicalClasses.operatingOrganizationId,s.sites.organizationId)))
     :[];
-  const permittedNativeClasses=new Set(nativeEligible.map(row=>row.classId));
+  const permittedNativeClasses=new Set(nativeEligible.map(row =>
+    `${row.classId}:${row.siteId}`));
   const allowed = groups.filter(g=>{
     const nativeClassId=canonicalGroupClassId(g);
-    if(nativeClassId)return permittedNativeClasses.has(nativeClassId) &&
+    if(nativeClassId)return permittedNativeClasses.has(`${nativeClassId}:${g.siteId}`) &&
       (actor.role==="student"||g.facilitatorPersonId===actor.actorPersonId);
     return actor.role==="teacher"
       ? g.facilitatorPersonId===actor.actorPersonId &&
