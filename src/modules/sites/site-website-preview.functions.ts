@@ -48,6 +48,20 @@ const starterFieldSchemas = Object.fromEntries(websiteStarterFieldIds.map(field 
 const siteFontIds = Object.keys(siteFontCatalog) as [SiteFontId, ...SiteFontId[]];
 const localContentSchema = z.object({
   ...localFields,
+  leadershipMembers:z.array(z.object({
+    id:z.string().regex(/^[a-zA-Z0-9-]{8,64}$/),
+    name:z.string().max(120),
+    title:z.string().max(120),
+    biography:z.string().max(1600),
+    linkedinUrl:z.string().max(240).optional(),
+    consentConfirmed:z.boolean(),
+    photo:z.object({
+      dataUrl:z.string().max(siteLocalImageMaxBase64Length+32),
+      altText:z.string().max(180),
+      rightsConfirmed:z.boolean(),
+      childImageConsent:z.enum(siteLocalImageConsentStates),
+    }).strict().nullable().optional(),
+  }).strict()).max(16).optional(),
   editorialBaseline: z.object({
     version: z.literal(1),
     fields: z.object(starterFieldSchemas).strict(),
