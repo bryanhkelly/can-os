@@ -4,7 +4,7 @@ import type { AccessContext } from "@/domain/access-context";
 /** Classroom-facing staff may record actual onsite attendance at ONE grant site.
  * This does not confer gradebook, counseling, case, check-out, guardian-excuse
  * review or schoolwide registrar authority. */
-export const onsiteAttendanceRoles = ["room_facilitator", "site_staff", "site_leader"] as const;
+export const onsiteAttendanceRoles = ["site_staff", "site_leader"] as const;
 
 export function isOnsiteAttendanceRole(role: string): boolean {
   return (onsiteAttendanceRoles as readonly string[]).includes(role);
