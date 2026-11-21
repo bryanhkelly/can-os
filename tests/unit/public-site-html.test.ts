@@ -228,9 +228,9 @@ describe("standalone public site HTML", () => {
     expect(() => renderPublicSiteHtml({ ...page, academicPrograms: [] },
       { path: "/academics" })).toThrow(/not available/);
   });
-  it("does not advertise an unconfigured contact page and clarifies pre-opening interest", () => {
+  it("makes funding and contact pages available to new prelaunch Sites", () => {
     const empty = {host: "church.can-os.com", site: {name: "Church School", organizationName: "Church"}, offerings: []};
-    expect(availablePublicSitePaths(empty)).toEqual(["/"]);
+    expect(availablePublicSitePaths(empty)).toEqual(["/","/tuition","/contact"]);
     const planned = {...empty, academicPrograms: [{
       programId: "00000000-0000-4000-8000-000000000002",
       title: "Elementary program", typeLabel: "Hybrid program", summary: "Proposed program",
