@@ -6,15 +6,9 @@ export type LaunchGuidance = {
   next: string;
 };
 
-/** Consistent, data-driven V6.1 guidance rail for Launch Studio modules. */
+/** One concise guidance panel for Launch Studio steps. */
 export function LaunchGuidancePanels({ guidance }: { guidance: LaunchGuidance }) {
-  return <div className="space-y-4">
-    <WorkspacePanel title="About this step">
-      <p className="text-sm leading-6 text-muted-foreground">{guidance.why}</p>
-      {guidance.tip && <p className="mt-3 text-sm leading-6 text-muted-foreground">{guidance.tip}</p>}
-    </WorkspacePanel>
-    <WorkspacePanel title="Next step">
-      <p className="text-sm leading-6 text-muted-foreground">{guidance.next}</p>
-    </WorkspacePanel>
-  </div>;
+  return <WorkspacePanel title="Next">
+    <p className="text-sm leading-6 text-muted-foreground">{guidance.next}</p>
+  </WorkspacePanel>;
 }
