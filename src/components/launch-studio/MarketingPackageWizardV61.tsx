@@ -139,7 +139,7 @@ export function MarketingPackageWizardV61({
     ?activePreviewFormat:content.formats[0]??null;
 
   return <>
-    <GuidedSetupProgress label="Introduce outreach steps"
+    <GuidedSetupProgress label="Share outreach steps"
       steps={outreachStepIdsV61.map((id,index)=>({
         id,title:stepTitles[index]??id,
         status:index<step?"complete" as const:index===step?"current" as const:"upcoming" as const,
@@ -168,7 +168,7 @@ export function MarketingPackageWizardV61({
         <section className="space-y-3 border-t pt-5" aria-label="Secondary Who">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Who are you hoping to help?</h3>
-            <span className="text-xs text-muted-foreground">Suggested from Establish</span>
+            <span className="text-xs text-muted-foreground">Suggested from Shape</span>
           </div>
           <p className="text-xs text-muted-foreground">
             Beneficiaries help explain the intended impact, even when they aren't the recipients.
@@ -196,7 +196,7 @@ export function MarketingPackageWizardV61({
     {step===2&&<WorkspacePanel title="What do you want to highlight?"
       description="Choose what you most want people to know. You can add two more things worth sharing.">
       {highlightOptions.length===0?<WorkspaceNotice tone="attention">
-        No saved Programs, audiences, or Experiences are available. Add them under Establish →
+        No saved Programs, audiences, or Experiences are available. Add them under Shape →
         Programs &amp; Audiences before selecting a highlight.
       </WorkspaceNotice>:<div className="mt-5 space-y-5">
         {(["program","audience","experience"] as const).map(kind=>{
@@ -204,7 +204,7 @@ export function MarketingPackageWizardV61({
           if(!options.length)return null;
           return <section key={kind} className="space-y-3">
             <h3 className="text-sm font-semibold">{kind==="program"?"Programs":kind==="audience"?"Audiences":"Experiences"}
-              <span className="ml-2 text-xs font-normal text-muted-foreground">From Establish</span>
+              <span className="ml-2 text-xs font-normal text-muted-foreground">From Shape</span>
             </h3>
             <div className="flex flex-wrap gap-2">{options.map(item=>{
               const selected=plan.highlights.find(value=>value.source===item.source&&value.id===item.id);
