@@ -62,7 +62,7 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     placement: "community", layout: "list", enabled: true,
     eyebrow: "Your Site",
     title: "About our learning community",
-    description: "Learn about our location, learning plans and how we are preparing to serve families.",
+    description: "Learn about our location, learning plans and how we are preparing to serve our community.",
   }, {
     id: "site-network", channel: "site.network",
     placement: "closing", layout: "list", enabled: true,
@@ -413,6 +413,12 @@ export function resolveSiteContentBlocks(
       return first-second || a.title.localeCompare(b.title);
     });
     items=items.slice(0,block.limit??12);
-    return items.length ? [{...block, items}] : [];
+    // Upcast the legacy school-only default *only in the private projection*.
+    // Authored section wording remains the Site operator's choice.
+    const description = feeds.mode === "private" && block.channel === "site.setup" &&
+      block.description === "Learn about our location, learning plans and how we are preparing to serve families."
+      ? "Learn about our location, learning plans and how we are preparing to serve our community."
+      : block.description;
+    return items.length ? [{...block, description, items}] : [];
   });
 }
