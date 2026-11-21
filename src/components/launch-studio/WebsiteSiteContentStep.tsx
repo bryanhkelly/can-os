@@ -48,7 +48,7 @@ export function WebsiteSiteContentStep({
       "statementOfFaith","spiritualFormation"].includes(field.key));
   const renderField=(field:WebsiteCopyFieldSpec)=>
     <WebsiteCopyField key={field.key} field={field} content={content}
-      candidate={data.siteStoryCopyCandidates.find(item=>item.field===field.key)}
+      candidate={canReuse?data.siteStoryCopyCandidates.find(item=>item.field===field.key):undefined}
       disabled={busy||!data.canEdit}
       onChange={value=>setContent(old=>({...old,[field.key]:value}))}
       onRestore={()=>setContent(old=>restoreOriginalWebsiteField(old,field.key))}/>;
