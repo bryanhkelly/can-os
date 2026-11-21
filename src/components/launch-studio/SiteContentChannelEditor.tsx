@@ -135,7 +135,9 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
         return <fieldset key={block.id} className="border p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold">{info.label}</legend>
           <p className="mb-4 text-xs text-muted-foreground">{info.description}
-            {info.privateOnly ? " This channel is never included on the public website." : " Only authorized catalog records appear."}
+            {["site.setup","site.network","learning.interests"].includes(block.channel)
+              ? " This saved Site information can appear when its website section is published. It does not authorize operations or enrollment."
+              : " Eligible connected records appear according to their own publication and access rules."}
           </p>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Block heading"><Input value={block.title} maxLength={120}
@@ -234,8 +236,9 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
     {published&&<p role="status" className="mt-4 text-sm text-success">Website content block settings published. This does not approve Programs or make a Site publicly reachable.</p>}
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
       <p className="max-w-xl text-xs leading-5 text-muted-foreground">
-        Site blocks customize presentation only. Planning interests remain private;
-        approved programs retain their existing content and publication reviews.
+        Site blocks customize presentation. Saved Site details, affiliations and planning interests
+        may appear on the website when published. Their current status remains visible,
+        and Program, licensing and enrollment approvals are independently governed.
       </p>
       <div className="flex flex-wrap gap-3">
         <Button disabled={saving||publishing||!siteId} onClick={()=>void save()}>
