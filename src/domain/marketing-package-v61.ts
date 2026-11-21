@@ -104,6 +104,11 @@ export function composeOutreachDraftV61(siteName: string, plan: OutreachPlanV61)
   };
 }
 
+export const marketingMaterialOverrideSchemaV61=z.object({
+  headline:z.string().trim().max(160).optional(),
+  message:z.string().trim().max(1600).optional(),
+  callToAction:z.string().trim().max(100).optional(),
+}).strict();
 export const marketingPackageContentSchema = z.object({
   purpose: z.enum(marketingPurposeIds),
   audiences: z.array(z.enum(marketingAudienceIds)).max(8),
@@ -113,6 +118,13 @@ export const marketingPackageContentSchema = z.object({
   callToAction: z.string().trim().max(100),
   formats: z.array(z.enum(marketingFormatIds)).max(5),
   plan: outreachPlanSchemaV61.optional(),
+  materialOverrides:z.object({
+    email:marketingMaterialOverrideSchemaV61.optional(),
+    flyer:marketingMaterialOverrideSchemaV61.optional(),
+    social:marketingMaterialOverrideSchemaV61.optional(),
+    handout:marketingMaterialOverrideSchemaV61.optional(),
+    "qr-card":marketingMaterialOverrideSchemaV61.optional(),
+  }).strict().optional(),
 }).strict();
 export type MarketingPackageContent = z.infer<typeof marketingPackageContentSchema>;
 export type MarketingPurpose = MarketingPackageContent["purpose"];
@@ -124,7 +136,9 @@ export function marketingPackageClaimsRequireReview(
   title:string,content:MarketingPackageContent,
 ):boolean{
   return containsProtectedInstitutionalClaim(
-    [title,content.headline,content.message,content.callToAction].join(" "),
+    [title,content.headline,content.message,content.callToAction,
+      ...Object.values(content.materialOverrides??{}).flatMap(value=>
+        [value?.headline??"",value?.message??"",value?.callToAction??""])].join(" "),
   );
 }
 
