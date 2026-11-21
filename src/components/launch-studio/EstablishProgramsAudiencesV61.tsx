@@ -250,14 +250,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             facilities and other requirements, when you choose a Solution in Prepare.
           </p>
           <h3 className="text-sm font-semibold">Published Program ideas</h3>
-          {(!schoolYearAvailability["grades-6-8"] || !schoolYearAvailability["grades-9-12"]) &&
-            <WorkspaceNotice tone="attention">
-              Grades 6–12 school-year academy choices are disabled until this Site has
-              independently verified school-opening authorization. After-school, summer,
-              Saturday, adult learning and other community Programs remain available for
-              private planning. A published Program or an existing demo Class does not
-              authorize enrollment.
-            </WorkspaceNotice>}
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
           {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
             <p>{catalogError}</p>
@@ -271,7 +263,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
                 <SelectionCard kind="checkbox"
                   value={item.code} title={item.title}
                   detail={<>{item.summary}{schoolYearBlocked && <span className="mt-2 block font-medium">
-                    School-year authorization required · not currently selectable
+                    Currently unavailable
                   </span>}</>}
                   checked={selected} disabled={disabled || schoolYearBlocked}
                   onChange={checked => toggleProgram(item.code, checked)} />
@@ -312,7 +304,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
                   <SelectionCard kind="checkbox"
                     value={choice.id} title={choice.label}
                     detail={<>{choice.detail}{schoolYearBlocked && <span className="mt-2 block font-medium">
-                      School-year authorization required · unavailable for this Site
+                      Currently unavailable
                     </span>}</>} icon={choice.icon}
                     checked={selected} disabled={disabled || schoolYearBlocked}
                     onChange={checked => toggleInterest(choice.id, checked)} />
