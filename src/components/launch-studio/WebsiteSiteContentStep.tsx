@@ -3,6 +3,9 @@ import type { Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceNotice } from "@/components/workspace";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
+import {
+  isChurchSiteIdentityV61, isFaithBasedSiteIdentityV61, siteIdentityEditorialContextV61,
+} from "@/domain/site-identity-v61";
 import { WebsiteCopyField, type WebsiteCopyFieldSpec } from "./WebsiteCopyField";
 import { SiteContentChannelEditor } from "./SiteContentChannelEditor";
 import { WebsiteTemplateSourceGuide } from "./WebsiteTemplateSourceGuide";
@@ -46,7 +49,16 @@ export function WebsiteSiteContentStep({
     (!content.welcomeMessage.trim() ||
       (content.editorialBaseline?.fields.welcomeMessage===content.welcomeMessage));
   const schoolExperience=data.siteExperienceProfile==="school";
+  const identityContext=siteIdentityEditorialContextV61(data.siteIdentity);
+  const faithBased=isFaithBasedSiteIdentityV61(data.siteIdentity);
+  const churchSite=isChurchSiteIdentityV61(data.siteIdentity);
   const fields=contentFields.map(field=>{
+    if(field.key==="churchHistory"&&!churchSite)return {...field,
+      label:"Your faith-based organization\u0027s story",
+      help:"How did your community or mission begin? Include only facts you want visitors to read."};
+    if(field.key==="denomination"&&!churchSite)return {...field,
+      label:"Faith tradition or affiliation",
+      help:"Describe your Site\u0027s tradition. Only claim formal membership or endorsement when verified."};
     if(schoolExperience)return field;
     if(field.key==="heroHeadline")return {...field,
       help:"The first words visitors see. Your saved Site name remains in the header."};
@@ -70,6 +82,10 @@ export function WebsiteSiteContentStep({
     ["leadershipWelcome","localTraditions"].includes(field.key));
   const faithFields=fields.filter(field=>
     ["churchHistory","denomination","statementOfFaith","spiritualFormation"].includes(field.key));
+  // Existing authored faith content remains editable if the Site changes identity.
+  // A non-faith Site does not see empty church-specific forms or fetch church sources.
+  const hasSavedFaithContent=faithFields.some(field=>Boolean(content[field.key as SiteLocalTextField]?.trim()));
+  const showFaithFields=faithBased||hasSavedFaithContent;
   const renderField=(field:WebsiteCopyFieldSpec)=>
     <WebsiteCopyField key={field.key} field={field} content={content}
       candidate={canReuse?data.siteStoryCopyCandidates.find(item=>item.field===field.key):undefined}
@@ -81,10 +97,15 @@ export function WebsiteSiteContentStep({
     <div>
       <h3 className="font-serif text-2xl">Tell your story</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        {canReuse
-          ? "Edit suggested text or write your own."
+        {identityContext.storyPrompt} {canReuse
+          ? "Review suggested text or write your own."
           : "Add the text you want on your website."}
       </p>
+      {data.siteIdentity&&<p className="mt-2 text-xs text-muted-foreground">
+        Based on your Site identity: {identityContext.label}.{" "}
+        <Link to="/launch/site" search={{siteId:data.siteId,module:"site-information"}}
+          className="font-semibold text-primary underline">Edit Site Information</Link>
+      </p>}
 
     </div>
 
@@ -162,7 +183,7 @@ export function WebsiteSiteContentStep({
       </Link>
     </div>}
     {primaryFields.map(renderField)}
-    {canReuse&&<details className="border p-4">
+    {canReuse&&churchSite&&<details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">
         Suggested text (optional)
       </summary>
@@ -174,11 +195,16 @@ export function WebsiteSiteContentStep({
       <summary className="cursor-pointer text-sm font-semibold">More details (optional)</summary>
       <div className="mt-4 space-y-5">{additionalFields.map(renderField)}</div>
     </details>
-    <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Faith and church information (if relevant)</summary>
-      <p className="mt-2 text-xs text-muted-foreground">Only add these details if they reflect your organization.</p>
+    {showFaithFields&&<details className="border p-4">
+      <summary className="cursor-pointer text-sm font-semibold">
+        {faithBased ? "Faith and community information (optional)" : "Previously saved faith information"}
+      </summary>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {faithBased ? "Use only descriptions that reflect your Site. Formal affiliations are reviewed separately."
+          : "These earlier answers are preserved so you can review, edit or clear them after changing Site identity."}
+      </p>
       <div className="mt-4 space-y-5">{faithFields.map(renderField)}</div>
-    </details>
+    </details>}
     <WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>
     <details className="border p-4" id="website-content-layout">
       <summary className="cursor-pointer text-sm font-semibold">
