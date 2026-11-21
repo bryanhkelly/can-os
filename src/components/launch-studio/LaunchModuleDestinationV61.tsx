@@ -27,13 +27,13 @@ const scope = (siteId: string) => encodeURIComponent(siteId);
 export const launchModuleDestinationsV61: Record<DestinationModuleId, Destination> = {
   open: {
     subtitle: "Ready to welcome participants?",
-    intro: "You're nearly there. Check what's ready and finish any remaining steps before welcoming participants.",
+    intro: "Review what is ready, what still needs attention, and which offerings can accept participants.",
     state: "governed",
     note: "Each approved offering has its own registration settings.",
     links: [
       { label: "Review opening requirements", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Check opening requirements" },
       { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Review Site publication" },
-      { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Review Programs and available seats" },
+      { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Review available seats for programs using admissions" },
       { label: "Manage eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Manage approved noncredit registration" },
       { label: "Open your Site workspace", path: id => `/sites/${scope(id)}`, detail: "Go to your Site Workspace" },
     ],
@@ -53,7 +53,7 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
     rail={<LaunchGuidancePanels guidance={{ why: destination.intro, next: destination.note }} />}>
     <div className="mt-5 space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <StatusBadge tone="info">Enrollment setup</StatusBadge>
+        <StatusBadge tone="neutral">Opening checklist</StatusBadge>
       </div>
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
       <WorkspacePanel title={module === "open" ? "Welcome participants" : "Your next steps"}
