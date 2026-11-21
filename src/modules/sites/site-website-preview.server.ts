@@ -20,7 +20,7 @@ import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-
 import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
+import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
 import { readSitePhysicalAddress, siteInformationSchema } from "@/domain/site-setup-configuration";
 import { canonicalPublicContact, publicIdentityReviewStatuses } from "@/domain/public-parent-identity";
@@ -96,13 +96,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const displaySiteName = savedBrand?.resolved.displayName ?? site.name;
   // The same rights gate applies to both artwork slots, including saved private drafts.
   // Unsigned logos must never bypass the hero-image gate in a private HTML preview.
-  const previewContent = { ...renderedCandidate, branding: {
-    ...renderedCandidate.branding,
-    heroImage: siteLocalImagePublicationGaps(renderedCandidate.branding.heroImage).length
-      ? null : renderedCandidate.branding.heroImage,
-    logoImage: siteLocalImagePublicationGaps(renderedCandidate.branding.logoImage ?? null).length
-      ? null : renderedCandidate.branding.logoImage ?? null,
-  } };
+  const previewContent = safeSiteWebsitePreviewContent(renderedCandidate);
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
     academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
   const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
