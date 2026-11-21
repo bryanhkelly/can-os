@@ -17,7 +17,7 @@ import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { readSiteSchoolYearAvailability } from "./site-school-year-availability.server";
-import { isSchoolYearAcademyReference, newlyRestrictedSiteIntent } from "@/domain/site-program-access-v61";
+import { isSchoolYearAcademyReference } from "@/domain/site-program-access-v61";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const siteIdSchema = z.string().uuid();
@@ -80,7 +80,6 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
         throw new Error("This Site changed since you opened Programs & Audiences. Reload and review before saving.");
       const old = site.metadata.launchPreferences;
       const previousIntent = normalizeSiteProgramsAudiencesV61(old);
-      const schoolYearAvailability = await readSiteSchoolYearAvailability(tx,site.id);
       const previouslySelected = new Set(previousIntent.programCodes ?? []);
       const addedCodes = (data.intent.programCodes ?? []).filter(code =>
         !previouslySelected.has(code));
@@ -96,12 +95,6 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
         if (!addedCodes.every(code => available.has(code)))
           throw new AuthorizationError("selected published Program references");
       }
-      const newlyRestricted = newlyRestrictedSiteIntent(
-        data.intent,previousIntent,catalog,schoolYearAvailability);
-      if (newlyRestricted.length) throw new AuthorizationError(
-        "School-year Programs require independently authorized academic operations: " +
-        newlyRestricted.join(", "),
-      );
       const rawEnvironment = site.metadata.siteEnvironmentV61;
       const environment = siteEnvironmentV61Schema.safeParse(rawEnvironment);
       if (rawEnvironment != null && !environment.success)
