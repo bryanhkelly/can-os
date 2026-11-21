@@ -206,7 +206,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       if(incomplete){setStep(incomplete.index);setError(incomplete.issue!);return;}
     }
     if(!record&&brandReadiness!=="available"){
-      setError("Save a Site Brand in Establish → Website & Brand before creating outreach.");
+      setError("Save a Site Brand in Shape → Website & Brand before creating outreach.");
       return;
     }
     await run(async()=>{
@@ -417,7 +417,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         Suggestions are unavailable. Saved packages are still available.
       </WorkspaceNotice>}
       {brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
-        Save your Site Brand in Establish → Website & Brand before creating materials.
+        Save your Site Brand in Shape → Website & Brand before creating materials.
         {" "}<a href={`/launch/site?siteId=${encodeURIComponent(siteId)}&module=website-brand`}
           className="font-semibold underline">Open Website &amp; Brand</a>
       </WorkspaceNotice>}
@@ -450,7 +450,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         <MarketingPackageLibraryList records={visible} busy={busy}
           onOpen={open} onDuplicate={duplicate} onArchiveToggle={setArchived}
           onDelete={setDeleteCandidate} />
-        <WorkspacePanel title="Continue in Introduce"
+        <WorkspacePanel title="Continue in Share"
           description={context.handoffDescription}>
           <div className="grid gap-3">
             {context.handoffs.map(item=><WorkspaceActionLink key={item.title}
@@ -464,7 +464,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       {view==="wizard"&&record&&
         outreachSourceChangedV61(record.content.plan,siteRevision)&&
         <WorkspaceNotice tone="attention">
-          Establish information changed after this plan was saved. Review the
+          Shape information changed after this plan was saved. Review the
           highlights before saving; nothing is replaced automatically.
         </WorkspaceNotice>}
       {view==="wizard"&&<MarketingPackageWizardV61
@@ -481,7 +481,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       {view==="detail"&&record&&<>
         {outreachSourceChangedV61(record.content.plan,siteRevision)&&
           <WorkspaceNotice tone="attention">
-            Establish information has changed since this outreach plan was drafted.
+            Your Site information has changed since this outreach plan was drafted.
             Review its highlights and message before creating another release.
             Earlier materials are unchanged.
           </WorkspaceNotice>}
