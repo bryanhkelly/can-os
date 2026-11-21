@@ -67,7 +67,7 @@ describe("Valor Biology hybrid Classroom Connect P0 contracts",()=>{
     expect(fixture).toContain("SET delivery_mode='hybrid'");
     expect(fixture).toContain("WHERE id=target AND delivery_mode='self_paced'");
     expect(fixture).not.toMatch(/INSERT INTO public\.(sections|cohorts|class_enrollments)/i);
-    expect(fixture).toContain("other Valor Class modes");
+    expect(fixture).toContain("Other Valor Class modes");
   });
 });
 function fixGrant(){return LOCAL_DEMO_RILEY_FACILITATOR.grantId;}
