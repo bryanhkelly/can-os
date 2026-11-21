@@ -115,9 +115,11 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
             title={data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
               "Content Consent","Your Content","Review & Finish"][step]:"Prepare your private website address"}
             subtitle="One Site-owned, revisioned private website. Draft changes never open enrollment, approve a Site or publish content." />
-          {data.host && <div className="mt-5 border border-border bg-card">
-            <GuidedSetupProgress
-              label="Website & Brand steps"
+          <div className="mt-5">
+            {data.host ? <GuidedSetupShell
+              title="Website & Brand"
+              description="Choose a direction, design your private website and review your draft."
+              progressLabel="Website & Brand steps"
               steps={steps.map((item,index)=>({
                 id:item.id,
                 title:item.title,
@@ -126,12 +128,9 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
                   index===4?"Edit website content":"Review private draft",
                 status:step===index?"current" as const:"upcoming" as const,
               }))}
-              onStepChange={id=>changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]))}
-            />
-          </div>}
-          <div className="mt-5">
-            {data.host
-              ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio}/>
+              onStepChange={id=>changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]))}>
+                <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio}/>
+              </GuidedSetupShell>
               : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/>}
           </div>
           <div className="mt-5 border-t pt-4 text-sm">{returnToLaunch??<Link to="/home" className="font-semibold text-primary">Exit to workspace</Link>}</div>
