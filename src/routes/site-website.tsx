@@ -18,7 +18,7 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { WorkspaceNotice, WorkspacePanel, ActionDialog, ActionFooter, PageHeader, PageFrame } from "@/components/workspace";
-import { GuidedSetupShell } from "@/components/workflow";
+import { GuidedSetupShell, GuidedSetupProgress } from "@/components/workflow";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
@@ -115,16 +115,20 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
             title={data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
               "Content Consent","Your Content","Review & Finish"][step]:"Prepare your private website address"}
             subtitle="One Site-owned, revisioned private website. Draft changes never open enrollment, approve a Site or publish content." />
-          {data.host && <nav aria-label="Website & Brand steps" className="mt-5 flex min-w-0 gap-2 overflow-x-auto border-y py-3">
-            {steps.map((item,index)=><Button key={item.id} type="button"
-              variant={step===index?"default":"outline"}
-              aria-current={step===index?"step":undefined}
-              onClick={()=>changeStep(index)}
-              className="h-auto min-h-12 min-w-28 shrink-0 flex-col items-start border px-3 py-2 text-left text-xs">
-              <span className="text-2xs opacity-80">Step {index+1}</span>
-              <span>{item.title}</span>
-            </Button>)}
-          </nav>}
+          {data.host && <div className="mt-5 border border-border bg-card">
+            <GuidedSetupProgress
+              label="Website & Brand steps"
+              steps={steps.map((item,index)=>({
+                id:item.id,
+                title:item.title,
+                description:index===0?"Choose your editorial direction":index===1?"Choose a structure":
+                  index===2?"Colors, fonts and imagery":index===3?"Consent to reuse Site information":
+                  index===4?"Edit website content":"Review private draft",
+                status:step===index?"current" as const:"upcoming" as const,
+              }))}
+              onStepChange={id=>changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]))}
+            />
+          </div>}
           <div className="mt-5">
             {data.host
               ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio}/>
