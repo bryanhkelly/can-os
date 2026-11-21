@@ -26,10 +26,7 @@ export function WebsiteReviewStep({
   onSubmit:()=>void;onRestore:(revision:number)=>void;
 }){
   return <div className="space-y-4">
-    <div>
-      <h3 className="text-lg font-semibold">Review your website</h3>
-
-    </div>
+    <h3 className="text-lg font-semibold">Review your website</h3>
     <div className="flex flex-wrap items-center gap-3">
       <Button type="button" disabled={previewPending} onClick={onPreview}
         size="lg">
@@ -37,7 +34,7 @@ export function WebsiteReviewStep({
       </Button>
       <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center border border-primary px-4 py-2 text-sm font-semibold text-primary">
-        {data.currentRevision===0?"Open full-page preview":"Open full-page preview"}
+        Open full-page preview
       </a>
       {data.currentRevision>0&&<Button type="button" variant="outline" className="min-h-11 border"
         onClick={()=>void navigator.clipboard.writeText(
@@ -49,7 +46,7 @@ export function WebsiteReviewStep({
     </div>
     <p className="text-xs text-muted-foreground">This preview requires sign-in. Use Share preview to send a link to others.</p>
     {data.currentRevision===0&&<p className="border p-3 text-sm" role="status">
-      No saved website draft exists yet. Sharing your customized design requires saving.
+      Save your website before sharing.
     </p>}
     {shareMessage&&<p role="status" className="border p-3 text-sm">{shareMessage}</p>}
     {previewError&&<WorkspaceNotice tone="danger">{previewError}</WorkspaceNotice>}
@@ -57,14 +54,11 @@ export function WebsiteReviewStep({
       draftPreview={draftPreview?.source===content?draftPreview.rendered:null}/>
     {!dirty&&editorRevision>0&&!revisionConflict
       ?<div className="flex flex-wrap items-center justify-between gap-3 border p-4">
-          <div>
-            <p className="text-sm font-semibold">Ready to show your proposed website?</p>
-    
-          </div>
+          <p className="text-sm font-semibold">Share your website</p>
           <LaunchPreviewSharing siteId={data.siteId}/>
         </div>
       :<p role="status" className="border p-3 text-sm">
-          Save your latest website edits before sharing a review link.
+          Save your changes before sharing.
         </p>}
     <WebsiteSourceMappingPanel data={data}/>
     <details className="border p-4">
@@ -76,7 +70,7 @@ export function WebsiteReviewStep({
       <div className="mt-4"><WebsiteDesignChecklist data={data}/></div>
     </details>
     {!data.canPublish&&<p role="status" className="border p-3 text-sm">
-      You can preview this Site, but your current Site assignment does not include local website publishing.
+      You do not have permission to publish this website.
     </p>}
     {allowPublication&&<Button type="button" variant="outline"
       disabled={busy||!data.canPublish||revisionConflict} onClick={onSubmit}>
@@ -98,7 +92,7 @@ export function WebsiteReviewStep({
             version.revision<data.currentRevision&&
             <Button type="button" variant="outline" disabled={busy||revisionConflict}
               onClick={()=>onRestore(version.revision)} size="sm">
-              Restore as new revision
+              Restore version
             </Button>}
         </li>)}
       </ul>
