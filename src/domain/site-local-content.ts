@@ -79,7 +79,11 @@ export type SiteLeader = {
   /** The person or their authorized representative approved publication. */
   consentConfirmed:boolean;
 };
+export type WebsiteContentReuseConsent = "unselected" | "granted" | "denied";
+
 export type SiteLocalContent = SiteLocalTextContent & {
+  /** Site-scoped authorization to derive website and marketing copy from Establish data. */
+  contentReuseConsent?: WebsiteContentReuseConsent;
   branding: SiteLocalBranding;
   /** Site-owned, optional Leadership page content; never auto-scraped. */
   leadershipMembers?:SiteLeader[];
@@ -98,6 +102,7 @@ export const emptySiteLocalBranding: SiteLocalBranding = Object.freeze({
   heroImage: null,
 });
 export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
+  contentReuseConsent: "unselected",
   heroHeadline: "",
   welcomeMessage: "",
   localDescription: "",
@@ -296,11 +301,15 @@ export function validateInlinePng(dataUrl: string): void {
 }
 
 export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
+  contentReuseConsent?: WebsiteContentReuseConsent;
   leadershipMembers?: SiteLeader[];
   branding?: SiteLocalBranding | null;
   editorialBaseline?: SiteEditorialBaseline;
 }, options: { allowIncompleteImage?: boolean } = {}): SiteLocalContent {
   const result = {} as SiteLocalContent;
+  if(input.contentReuseConsent !== undefined && !["unselected", "granted", "denied"].includes(input.contentReuseConsent))
+    throw new Error("Choose a valid website content reuse decision");
+  result.contentReuseConsent = input.contentReuseConsent ?? "unselected";
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
     result[field] = normalizeText(input[field] ?? "", field);
   }
