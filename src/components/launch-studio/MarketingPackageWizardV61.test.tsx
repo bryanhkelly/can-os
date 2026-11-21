@@ -1,43 +1,57 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { initialMarketingContent, marketingPurposeOptions } from "@/domain/marketing-package-v61";
+import { initialMarketingContent, initialOutreachPlanV61, marketingPurposeOptions } from "@/domain/marketing-package-v61";
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
 
-const content = initialMarketingContent("Test Learning Site", "site-announcement");
+const content = {
+  ...initialMarketingContent("Test Learning Site","site-announcement"),
+  plan:initialOutreachPlanV61(["adults","older_adults"]),
+};
 const props = {
-  siteId: "00000000-0000-4000-8000-000000000121",
-  step: 0, title: "Community introduction", content,
-  busy: false, brandVersionId: null, currentSuggestion: null,
-  purposeOptions: marketingPurposeOptions,
-  activePreviewFormat: null,
-  starter: (purpose: typeof content.purpose) => initialMarketingContent("Test Learning Site", purpose),
-  onTitleChange: vi.fn(), onPatch: vi.fn(), onPreviewFormatChange: vi.fn(),
-  onBack: vi.fn(), onSaveExit: vi.fn(), onNext: vi.fn(), hasSavedPackage: false,
+  siteId:"00000000-0000-4000-8000-000000000121",
+  siteName:"Test Learning Site",siteIntent:{
+    interestIds:["adult","senior"],timingIds:[],audienceIds:["adults","older_adults"],
+    startingFocus:"adult",experienceIds:["financial-literacy"],
+  } as const,
+  step:0,title:"Community introduction",content,
+  busy:false,brandVersionId:null,currentSuggestion:null,
+  purposeOptions:marketingPurposeOptions,activePreviewFormat:null,
+  starter:(purpose:typeof content.purpose)=>initialMarketingContent("Test Learning Site",purpose),
+  onTitleChange:vi.fn(),onPatch:vi.fn(),onPreviewFormatChange:vi.fn(),
+  onBack:vi.fn(),onSaveExit:vi.fn(),onNext:vi.fn(),hasSavedPackage:false,
 };
 
-describe("V6.1 Marketing Package shared controls", () => {
-  it("uses labelled selection-card radio inputs for package purpose", () => {
-    const html = renderToStaticMarkup(<MarketingPackageWizardV61 {...props} />);
-    expect(html).toContain("Introduce our Site");
-    expect(html).toContain('name="package-purpose"');
-    expect(html.match(/type="radio"/g)).toHaveLength(marketingPurposeOptions.length);
-    expect(html).toContain("Package name");
-  });
-
-  it("uses shared checkbox options for audiences and never implies contact permission", () => {
-    const html = renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={1}/>);
-    expect(html).toContain("Parents and families");
+describe("Introduce V6.1 guided outreach editor",()=>{
+  it("uses six shared progress steps and distinguishes recipients from beneficiaries",()=>{
+    const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props}/>);
+    expect(html).toContain("Introduce outreach steps");
+    expect(html).toContain("Primary Who");
+    expect(html).toContain("Secondary Who");
+    expect(html).toContain("People I know");
+    expect(html).toContain("Prospective leaders");
     expect(html).toContain("Older adults");
-    expect(html).toContain("This does not add contacts or authorize emails.");
-    expect(html).toContain('type="checkbox"');
+    expect(html).toContain("does not add contacts or authorize sending");
   });
-
-  it("keeps material format choice separate from the preview action", () => {
-    const html = renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={3}/>);
-    expect(html).toContain("Available formats");
-    expect(html).toContain("QR card");
-    expect(html.match(/type="checkbox"/g)).toHaveLength(5);
-    expect(html.match(/>Preview<\/button>/g)).toHaveLength(5);
-    expect(html).toContain("This is a private working preview");
+  it("shows the saved Establish highlights without implying approved offerings",()=>{
+    const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={2}/>);
+    expect(html).toContain("Adult Learning");
+    expect(html).toContain("Financial Literacy");
+    expect(html).toContain("From Establish");
+    expect(html).toContain("Make primary");
+  });
+  it("makes the operator choose material channels without falsely sending",()=>{
+    const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={4}/>);
+    for(const text of ["Email","Social","Print","Text","Share link","Conversation Kit"]){
+      expect(html).toContain(text);
+    }
+    expect(html).toContain("does not send a message");
+  });
+  it("offers story angles and editable output on the final step",()=>{
+    const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={5}/>);
+    expect(html).toContain("Community Impact");
+    expect(html).toContain("Partnership");
+    expect(html).toContain("Outreach name");
+    expect(html).toContain("Use suggestion for this plan");
+    expect(html).toContain("Save Outreach Plan");
   });
 });
