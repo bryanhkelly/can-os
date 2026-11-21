@@ -157,7 +157,7 @@ export function EstablishSiteProfileUnified({
 
   return <section aria-label="Site Profile" className="min-w-0 space-y-4">
     <form className="space-y-4" onSubmit={submit} noValidate aria-busy={saving}>
-      <WorkspacePanel title="Site identity">
+      <WorkspacePanel title="Your site">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Site name" required>
             <Input value={name} minLength={2} maxLength={160} disabled={saving || reloadRequired}
