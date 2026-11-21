@@ -173,6 +173,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         }).from(canonicalClassStaffAssignments).where(and(
           eq(canonicalClassStaffAssignments.classId,instance.id),
           eq(canonicalClassStaffAssignments.personId,actor.actorPersonId!),
+          eq(canonicalClassStaffAssignments.roleCode,"facilitator"),
           eq(canonicalClassStaffAssignments.state,"approved"),
           lte(canonicalClassStaffAssignments.beginsAt,now),
           or(isNull(canonicalClassStaffAssignments.endsAt),
