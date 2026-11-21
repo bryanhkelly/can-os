@@ -53,7 +53,7 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
   </div>;
   return <WorkspaceShell title={mode === "first-visit" ? "Bring your community's vision to life." : `Continue preparing ${site.name}.`}
     eyebrow="Launch Studio / Overview"
-    subtitle="Turn your ideas into meaningful experiences for your community."
+    subtitle="Shape your vision. Share your story. Prepare to deliver. Launch when ready."
     width="wide" rail={rail}>
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 border bg-card p-5">
