@@ -24,7 +24,7 @@ Step 4 records one Site-scoped decision in the versioned website content:
 `unselected`, `granted`, or `denied`. Existing data without a decision is
 treated as `unselected`; absence is never implied consent. A new Site starts
 with blank editorial fields. Granting consent fills eligible starter fields
-and optional suggestions derived from Establish, but does not fabricate
+and optional suggestions derived from Shape, but does not fabricate
 history, academic approval or a real offering. Declining consent clears the
 current editable copy while preserving earlier saved revisions. Neither
 choice changes rights for individual photos or biographies.
