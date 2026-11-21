@@ -406,7 +406,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         onNext={()=>{void next();}}/>}
 
       {view==="detail"&&record&&<>
-        <WorkspacePanel title={record.title} description="">
+        <WorkspacePanel title={record.title}>
           <dl className="mt-3 space-y-4 text-sm">
             <div><dt className="font-semibold">Purpose</dt><dd className="text-muted-foreground">
               {marketingPurposeOptions.find(option=>option.id===record.content.purpose)?.label}</dd></div>
