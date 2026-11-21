@@ -113,12 +113,12 @@ export function MarketingPackageWizardV61({
         remaining.map((item,index)=>({...item,role:index===0?"primary" as const:"supporting" as const}))});
     }else if(plan.highlights.length<3){
       updatePlan({highlights:[...plan.highlights,{
-        ...candidate,role:plan.highlights.length?"supporting":"primary",
+        ...candidate,role:plan.highlights.length?"supporting" as const:"primary" as const,
       }]});
     }
   };
   const makePrimary=(item:Highlight)=>updatePlan({highlights:plan.highlights.map(value=>({
-    ...value,role:value.source===item.source&&value.id===item.id?"primary":"supporting",
+    ...value,role:value.source===item.source&&value.id===item.id?"primary" as const:"supporting" as const,
   }))});
   const setFocus=(focus:OutreachPlanV61["messageFocus"])=>{
     const purpose:MarketingPackageContent["purpose"]=
