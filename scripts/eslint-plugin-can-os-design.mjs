@@ -288,8 +288,56 @@ const noNativeFeatureTables = {
   },
 };
 
+
+/**
+ * The V6.1 choice-card and internal-step patterns are shared components.
+ * Detect feature-owned replacements, including JSX buttons rendered in a
+ * fieldset as toggle cards and nav buttons masquerading as wizard steps.
+ * This does not target ordinary toolbar toggles or discrete action buttons.
+ */
+const noCustomGuidedSelections = {
+  meta: {
+    type: "problem",
+    docs: { description: "Use SelectionCard for choice cards and GuidedSetupProgress for internal steps" },
+    schema: [],
+    messages: {
+      choice: "Use <SelectionCard kind=\\"radio|checkbox\\"> for option cards, not a custom selectable Button.",
+      step: "Use <GuidedSetupProgress> for internal wizard steps, not a custom Button-based step bar.",
+    },
+  },
+  create(context) {
+    const attr = (node, name) => node.attributes.find(a =>
+      a.type === "JSXAttribute" && a.name.name === name);
+    function ancestorsInclude(node, tags) {
+      for (let parent = node.parent; parent; parent = parent.parent) {
+        if (parent.type === "JSXElement" && tags.has(jsxName(parent.openingElement.name))) return true;
+      }
+      return false;
+    }
+    function looksLikeCard(opening) {
+      const className = attr(opening, "className");
+      if (!className) return false;
+      const source = context.sourceCode.getText(className);
+      return /(?:min-h-(?:16|20|24|28|32)|flex-col|items-start|text-left)/.test(source);
+    }
+    return {
+      JSXOpeningElement(node) {
+        if (jsxName(node.name) !== "Button") return;
+        const pressed = attr(node, "aria-pressed");
+        const current = attr(node, "aria-current");
+        if (current && ancestorsInclude(node, new Set(["nav", "ol"]))) {
+          context.report({ node, messageId: "step" });
+        } else if (pressed && looksLikeCard(node) && ancestorsInclude(node, new Set(["fieldset"]))) {
+          context.report({ node, messageId: "choice" });
+        }
+      },
+    };
+  },
+};
+
 export default {
   rules: {
+    "no-custom-guided-selections": noCustomGuidedSelections,
     "no-native-feature-controls": noNativeFeatureControls,
     "no-native-feature-tables": noNativeFeatureTables,
     "no-duplicate-form-actions": noDuplicateFormActions,
