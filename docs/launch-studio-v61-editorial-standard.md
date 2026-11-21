@@ -66,6 +66,16 @@ The Program Catalog's Shape context includes both broad interest IDs and selecte
 
 Keep approval warnings next to publication, review and registration decisions. Ordinary preparation and editing pages should focus on what the person can accomplish next.
 
+## Site Guide right-hand companion
+
+Use **Site Guide** in the right rail for relevant, grounded decision support, not a second navigation menu or a repetition of the center pane. Its optional sections are: **Your direction**, **Worth considering**, **How this connects**, and **What comes next**. Two useful sections are preferable to four generic ones.
+
+Site Information and Programs & Audiences reflect live selections from the current private editor. Use only structured Site type, delivery, audience, Program and Experience selections; do not place private free-text stories, contact information, unverified public claims or unknown internal catalog codes in the guide. Keep the rail isolated when switching Sites and do not add background fetches for guidance.
+
+Share may reflect the current plan's selected recipients, beneficiaries and highlights. Actual release availability comes only from the existing material-release state. Website & Brand advice changes by design step, while the real preview status stays in the separate preview panel. Prepare guidance is Solution-specific and never converts planning interest to authorization; Launch points to verified readiness in the actual owning services.
+
+The guide is initially deterministic and uses no additional content store. Any future LLM suggestions must be explicitly labeled as suggestions, follow existing content-reuse consent, and must never silently alter saved or released materials.
+
 ## Safety and trust
 
 Preserve actual approvals, content and image consent, publisher authority, and readiness requirements. Be explicit when a decision matters. A shareable preview is not public publication, website publication does not open program registration, and saving a plan does not approve an offering. Do not make these warnings the dominant text of every step.
