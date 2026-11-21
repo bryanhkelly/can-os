@@ -103,19 +103,21 @@ export function WebsiteLeadershipEditor({content,setContent,disabled}:{
             <Input maxLength={180} disabled={disabled} value={person.photo.altText}
               onChange={event=>update(person.id,{photo:{...person.photo!,altText:event.target.value}})}/>
           </label>
-          <Checkbox disabled={disabled} checked={person.photo.rightsConfirmed}
-            onChange={event=>update(person.id,{photo:{
-              ...person.photo!,rightsConfirmed:event.target.checked,
-            }})}>
-            I have permission to display this portrait
-          </Checkbox>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox disabled={disabled} checked={person.photo.rightsConfirmed}
+              onChange={event=>update(person.id,{photo:{
+                ...person.photo!,rightsConfirmed:event.target.checked,
+              }})}/>
+            <span>I have permission to display this portrait</span>
+          </label>
           <Button variant="outline" size="sm" type="button" disabled={disabled}
             onClick={()=>update(person.id,{photo:null})}>Remove portrait</Button>
         </div>}
-        <Checkbox disabled={disabled} checked={person.consentConfirmed}
-          onChange={event=>update(person.id,{consentConfirmed:event.target.checked})}>
-          Permission to publish this person's name, title, biography and profile link is confirmed
-        </Checkbox>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox disabled={disabled} checked={person.consentConfirmed}
+            onChange={event=>update(person.id,{consentConfirmed:event.target.checked})}/>
+          <span>Permission to publish this person's name, title, biography and profile link is confirmed</span>
+        </label>
       </section>)}
       <Button type="button" variant="outline" disabled={disabled||people.length>=16}
         onClick={add}>Add a leader</Button>
