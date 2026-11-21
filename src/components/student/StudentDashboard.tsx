@@ -65,7 +65,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
       <div className="student-feature-grid">
         <StudentContinueLearningPanel resume={learning}
           unavailable={Boolean(data && !data.learning.ok)}
-          nextWork={nextWork} hasClasses={liveData.sections.length>0} />
+          nextWork={nextWork} hasClasses={liveData.sections.length>0}
+          classes={data?.classes?.ok && data.classes.data.kind === "student" ? data.classes.data.classes : []} />
         <StudentTodayAtGlance localDate={localDate}
           classesToday={classesToday} upcomingEvents={upcomingEvents}
           plan={plan} assignmentsError={assignmentsError} />
