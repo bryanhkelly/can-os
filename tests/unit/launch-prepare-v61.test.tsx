@@ -253,6 +253,15 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).not.toContain("Approved for enrollment");
   });
 
+  it("shows selected Programs even when there are no broad learning interests", () => {
+    const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="program-catalog"
+      intent={{interestIds:[],programCodes:["can.program.ai_digital_skills"],
+        timingIds:[],audienceIds:[],startingFocus:null}} />);
+    expect(html).toContain("Programs you want to explore");
+    expect(html).toContain("ai digital skills");
+    expect(html).not.toContain("You haven&#x27;t chosen any program ideas yet");
+  });
+
   it("keeps catalog exploration available when Establish preferences are unavailable", () => {
     const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="program-catalog"
       intentUnavailable />);
