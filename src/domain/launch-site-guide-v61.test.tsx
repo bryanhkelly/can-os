@@ -25,6 +25,23 @@ describe("V6.1 contextual Site Guide", () => {
     expect(result.connection).toContain("With your permission");
   });
 
+  it("tailors a private Purpose & Story example to the Site's saved plans and values", () => {
+    const planning = {
+      ...emptySiteProgramsAudiencesV61(),
+      interestIds: ["senior"] as Array<"senior">,
+      audienceIds: ["older_adults"] as Array<"older_adults">,
+    };
+    const result = siteInformationGuideV61(3, {
+      siteType: "community_nonprofit", hostingMode: "same", delivery: "physical",
+      values: ["service", "belonging"], networkChoice: "independent", planning,
+    });
+    expect(result.highlights).toEqual(["Service", "Belonging", "Older adults"]);
+    expect(result.insight).toContain("older adults");
+    expect(result.insight).toContain("service");
+    expect(result.insight).toContain("Make this your own");
+    expect(result.insight).not.toContain("approved");
+  });
+
   it("adapts audience and Experience guidance to current planning selections", () => {
     const plan = {
       ...emptySiteProgramsAudiencesV61(), interestIds: ["senior"] as Array<"senior">,
