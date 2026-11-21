@@ -4,7 +4,7 @@
 -- Unlike raw grant insertion, this checks existing CAN identity, active verified
 -- teacher grant and exact synthetic Site, writes audit + event in the SAME
 -- transaction, and refuses to revive revoked or conflicting memberships.
--- This deliberately does NOT issue a user session, approve a Class staff
+-- For this active synthetic Site, also reconcile its null Organization lifecycle.\n-- This deliberately does NOT issue a user session, approve a Class staff
 -- assignment, mark an email verified, or grant attendance/physical supervision.
 -- Idempotent, additive, transaction-owned, and scoped to one CAN Person.
 DO $valor_riley_facilitator$
@@ -19,6 +19,7 @@ DECLARE
   v_email CONSTANT text := 'riley.teacher@valorschool.demo';
   v_inserted_grant uuid;
   v_inserted_role uuid;
+  v_org_activated uuid;
   v_changes jsonb := '[]'::jsonb;
 BEGIN
   IF current_setting('neon.project_id',true) <> 'sweet-hall-62441909'
@@ -32,7 +33,7 @@ BEGIN
 
   PERFORM 1 FROM public.organizations o
     WHERE o.id=v_org AND o.metadata @> '{"synthetic":true}'::jsonb
-    AND o.lifecycle_status='active' FOR UPDATE;
+    AND (o.lifecycle_status IS NULL OR o.lifecycle_status='active') FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Synthetic operating Organization is not current'; END IF;
 
   PERFORM 1 FROM public.sites s WHERE s.id=v_site AND
@@ -40,6 +41,25 @@ BEGIN
     s.metadata @> '{"synthetic":true}'::jsonb AND
     s.lifecycle_status IN ('planning','active') FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Synthetic Valor Site is not current'; END IF;
+
+  -- Valor's existing Site and Classes are active, but the older synthetic
+  -- Organization had no lifecycle value. The restricted CAN staff projection
+  -- explicitly requires 'active'. Reconcile just this synthetic Organization,
+  -- without touching any real tenant or inventing an external approval.
+  UPDATE public.organizations
+    SET lifecycle_status='active', updated_at=clock_timestamp()
+    WHERE id=v_org AND lifecycle_status IS NULL
+  RETURNING id INTO v_org_activated;
+  IF v_org_activated IS NOT NULL THEN
+    INSERT INTO public.audit_events
+      (actor_person_id,action,resource_type,resource_id,scope,before,after,context)
+    VALUES (NULL,'demo.organization.lifecycle.reconciled','organization',v_org,
+      jsonb_build_object('organizationId',v_org,'siteId',v_site),
+      '{"lifecycleStatus":null}'::jsonb,
+      '{"lifecycleStatus":"active"}'::jsonb,
+      '{"method":"explicit_operator_sql_fixture_reconciliation","synthetic":true,"requestedBy":"user_in_chat","approvalEvidence":"not_inferred"}'::jsonb);
+    v_changes := v_changes || '["synthetic_organization_lifecycle"]'::jsonb;
+  END IF;
 
   PERFORM 1 FROM public.people p WHERE p.id=v_person
     AND p.active AND p.metadata @> '{"synthetic":true}'::jsonb FOR UPDATE;
