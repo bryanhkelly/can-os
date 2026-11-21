@@ -55,7 +55,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   }
   if (!evidence.programs.value.saved) {
     return { title: "Choose Programs & Audiences",
-      description: "Record the types of learning and audiences you want to serve.",
+      description: "Choose the programs and experiences you hope to bring to your community, and who you want to serve.",
       href: route("programs-audiences") };
   }
   if (evidence.brand.state === "unavailable") {
@@ -70,7 +70,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
       href: route("website-brand") };
   }
   if (evidence.marketing.state === "unavailable") {
-    return { title: "Review Share",
+    return { title: "Review your outreach plans",
       description: "We couldn't load your saved outreach plans. Try again before editing or creating materials.",
       href: route("create-outreach") };
   }
