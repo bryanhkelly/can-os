@@ -61,6 +61,10 @@ describe("Site identity flows from Establish through Website and Introduce",()=>
     });
     expect(denied.siteIdentity).toBeNull();
     expect(denied.content.message).toBe("");
+    const guided=source("src/components/launch-studio/MarketingPackageWizardV61.tsx");
+    const controller=source("src/components/launch-studio/MarketingPackagesV61.tsx");
+    expect(guided).toContain("plan,siteIntent,currentSuggestion?.siteIdentity");
+    expect(controller).toContain("siteIntent,suggestions?.[content.purpose]?.siteIdentity");
     const plan={...initialOutreachPlanV61(),recipients:["community" as const]};
     const faithDraft=composeOutreachDraftV61("Hope",plan,null,faithSuggestion.siteIdentity);
     expect(faithDraft.message).toContain("faith community");
