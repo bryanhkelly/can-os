@@ -80,6 +80,7 @@ export const Route = createFileRoute("/launch/site")({
       return {
         information: info.status === "fulfilled"
           ? { state: "ready" as const, value: {
+              identitySaved: info.value.identitySaved,
               hostingSaved: info.value.hostingSaved,
               environmentSaved: info.value.environmentSaved,
             } } : { state: "unavailable" as const },
