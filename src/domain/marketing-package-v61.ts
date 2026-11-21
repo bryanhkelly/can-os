@@ -42,8 +42,7 @@ export function outreachFormatsV61(channels: OutreachPlanV61["channels"]): Marke
     channel==="email" ? ["email" as const] :
     channel==="social" ? ["social" as const] :
     channel==="print" ? ["flyer" as const] :
-    channel==="conversation-kit" ? ["handout" as const] :
-    channel==="share-link" ? [] : []
+    channel==="conversation-kit" ? ["handout" as const] : []
   ))];
 }
 export function outreachStepIssueV61(step: typeof outreachStepIdsV61[number],
