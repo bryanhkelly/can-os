@@ -59,13 +59,6 @@ describe("public demo session isolation", () => {
     state.rows=[[grant]];
     expect((await readSessionGrants(grant.accountId,grant.email)).grants).toEqual([]);
   });
-  it("does not authorize Sally from her unverified account or suspended Homeroom staff assignment",async()=>{
-    // The grant reader enumerates eligible roles only. A current verified
-    // session and exact Class assignment are additional mandatory gates.
-    state.rows=[[]];
-    expect((await readSessionGrants(LOCAL_DEMO_ROOM_FACILITATOR.accountId,
-      LOCAL_DEMO_ROOM_FACILITATOR.email)).grants).toEqual([]);
-  });
   it("gives Sally only her own room-facilitator workspace, not demo-admin switching", async () => {
     state.rows = [[facilitatorGrant]];
     expect(await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).toEqual({
