@@ -4,14 +4,17 @@ import { MarketingPackageLibraryList } from "./MarketingPackageLibraryList";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
 import { useEffect, useState } from "react";
+import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowRight, Copy, Megaphone, Plus } from "lucide-react";
+import { ArrowRight, Copy, Plus, Mail, Share2, Printer, MessageSquare, CalendarDays, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionDialog, ActionFooter, WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {
   initialMarketingContent, marketingAudienceOptions, marketingFormatOptions,
-  marketingPackageContentSchema, marketingPurposeOptions, marketingStepIssue,
-  marketingPackageSteps,
+  marketingPackageContentSchema, marketingPurposeOptions,
+  outreachStepIdsV61, outreachStepIssueV61, initialOutreachPlanV61,
+  outreachFormatsV61, composeOutreachDraftV61,
   type MarketingFormat, type MarketingPackageContent,
 } from "@/domain/marketing-package-v61";
 import {
@@ -37,6 +40,7 @@ type MarketingPackagesV61Props = {
   siteId:string;siteName:string;initial:PackageRecord[];
   suggestions:MarketingSuggestions|null;onExit:()=>void;
   module?:IntroduceModuleV61;suggestionsUnavailable?:boolean;
+  siteIntent?:SiteProgramsAudiencesV61|null;
 };
 
 /**
@@ -46,24 +50,27 @@ type MarketingPackagesV61Props = {
  */
 export function MarketingPackagesV61(props:MarketingPackagesV61Props) {
   return <MarketingPackagesV61Scoped
-    key={props.siteId+":"+(props.module??"promote")} {...props}/>;
+    key={props.siteId+":"+(props.module??"create-outreach")} {...props}/>;
 }
 
 function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
-  module="promote",suggestionsUnavailable=false}:MarketingPackagesV61Props) {
+  module="create-outreach",suggestionsUnavailable=false,siteIntent=null}:MarketingPackagesV61Props) {
   const router=useRouter();
   const context=introduceModuleConfigV61[module];
   const purposeOptions=marketingPurposeOptions.filter(option=>context.purposes.includes(option.id));
   const starter=(purpose:MarketingPackageContent["purpose"])=>(
     suggestions?.[purpose]?.content??initialMarketingContent(siteName,purpose));
   const [packages,setPackages]=useState(initial);
-  const [view,setView]=useState<"library"|"wizard"|"detail">("library");
+  const [view,setView]=useState<"library"|"wizard"|"detail"|"share"|"followup">(module==="create-outreach"?"wizard":"library");
   const [record,setRecord]=useState<PackageRecord|null>(null);
-  const [title,setTitle]=useState("");
-  const [content,setContent]=useState<MarketingPackageContent>(()=>
-    starter(context.defaultPurpose));
+  const [title,setTitle]=useState(siteName+" outreach");
+  const [content,setContent]=useState<MarketingPackageContent>(()=>({
+    ...starter(context.defaultPurpose),
+    plan:initialOutreachPlanV61(siteIntent?.audienceIds??[]),
+    formats:outreachFormatsV61(initialOutreachPlanV61().channels),
+  }));
   const [step,setStep]=useState(0);
-  const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("flyer");
+  const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("email");
   const [showArchived,setShowArchived]=useState(false);
   const [busy,setBusy]=useState(false);
   const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
@@ -81,7 +88,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const [brandReadiness,setBrandReadiness]=useState<"loading"|"available"|"missing"|"unavailable">("loading");
   const [brandRefreshKey,setBrandRefreshKey]=useState(0);
   const [selectedBrandRevision,setSelectedBrandRevision]=useState<number|null>(null);
-  // Shared prerequisite for Promote, Recruit and Interest Events. Brand edits
+  // Shared prerequisite for Create Outreach and My Outreach. Brand edits
   // stay in Establish; a Marketing Package only selects an immutable version.
   useEffect(()=>{
     let live=true;
@@ -97,7 +104,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     return ()=>{live=false;};
   },[siteId,brandRefreshKey]);
   useEffect(()=>{
-    if(view!=="detail"||!record)return;
+    if((view!=="detail"&&view!=="share"&&view!=="followup")||!record)return;
     let live=true;
     setReleasesLoading(true);setReleasesUnavailable(false);
     setReleases([]);setPackageReleases([]);setCompare(null);
@@ -124,14 +131,21 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     "Leave your Marketing Package? Unsaved changes will be lost.");
 
   function open(recordToOpen:PackageRecord,editing=false) {
-    setRecord(recordToOpen);setTitle(recordToOpen.title);setContent(recordToOpen.content);
+    setRecord(recordToOpen);setTitle(recordToOpen.title);
+    setContent({...recordToOpen.content,plan:recordToOpen.content.plan??{
+      ...initialOutreachPlanV61(siteIntent?.audienceIds??[]),
+      recipients:recordToOpen.content.audiences,
+    }});
     setStep(0);setView(editing?"wizard":"detail");setError("");setNotice("");
     setReleases([]);setPackageReleases([]);setReleasesLoading(!editing);
     setReleasesUnavailable(false);
     setReleaseRequestId(crypto.randomUUID());setCompare(null);
   }
   function start() {
-    setRecord(null);setTitle("");setContent(starter(context.defaultPurpose));
+    setRecord(null);setTitle(siteName+" outreach");
+    setContent({...starter(context.defaultPurpose),
+      plan:initialOutreachPlanV61(siteIntent?.audienceIds??[]),
+      formats:outreachFormatsV61(initialOutreachPlanV61().channels)});
     setStep(0);setView("wizard");setError("");setNotice("");
   }
   function patch(value:Partial<MarketingPackageContent>) {
@@ -152,9 +166,9 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     // retain their requestId only while the same revision is being released.
     setReleaseRequestId(crypto.randomUUID());
   }
-  async function saveCurrent() {
-    if(!record)throw new Error("Create the package before saving its details.");
-    const parsed=marketingPackageContentSchema.parse(content);
+  async function saveCurrent(nextContent:MarketingPackageContent=content) {
+    if(!record)throw new Error("Create the outreach plan before saving its details.");
+    const parsed=marketingPackageContentSchema.parse(nextContent);
     const saved=await saveSiteMarketingPackageV61({data:{
       siteId,packageId:record.id,expectedRevision:record.revision,title,content:parsed,
     }});
@@ -163,28 +177,40 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   }
 
   async function next() {
-    const issue=marketingStepIssue(marketingPackageSteps[step]!,title,content);
+    const id=outreachStepIdsV61[step];
+    if(!id)return;
+    const issue=outreachStepIssueV61(id,title,content);
     if(issue){setError(issue);return;}
-    if(step===3){
-      const incomplete=marketingPackageSteps.map((item,index)=>({index,issue:marketingStepIssue(item,title,content)}))
-        .find(item=>item.issue);
+    if(step===5){
+      const incomplete=outreachStepIdsV61.map((part,index)=>({
+        index,issue:outreachStepIssueV61(part,title,content),
+      })).find(item=>item.issue);
       if(incomplete){setStep(incomplete.index);setError(incomplete.issue!);return;}
     }
+    if(!record&&brandReadiness!=="available"){
+      setError("Save a Site Brand in Establish → Website & Brand before creating outreach.");
+      return;
+    }
     await run(async()=>{
-      if(!record) {
-        // The server persists the canonical starter. Keep any operator edits made
-        // before creation as a working draft until the next save.
+      if(!record){
         const workingDraft=content;
         const created=await createSiteMarketingPackageV61({data:{siteId,title,purpose:content.purpose}});
         updateList(created);
-        setContent(workingDraft);
-        setStep(1);
-        setNotice("Draft package created. Continue adding your audience and message.");
+        const parsed=marketingPackageContentSchema.parse(workingDraft);
+        const saved=await saveSiteMarketingPackageV61({data:{
+          siteId,packageId:created.id,expectedRevision:created.revision,title,content:parsed,
+        }});
+        updateList(saved);setContent(parsed);
+        setStep(1);setNotice("Outreach draft saved.");
         return;
       }
-      await saveCurrent();
-      if(step<3)setStep(value=>value+1);
-      else {setView("detail");setNotice("Package content saved. Creative assets are not generated yet.");}
+      const nextContent=step===4&&content.plan
+        ? {...content,...composeOutreachDraftV61(siteName,content.plan)}
+        : content;
+      const saved=await saveCurrent(nextContent);
+      setContent(saved.content);
+      if(step<5)setStep(value=>value+1);
+      else {setView("detail");setNotice("Outreach plan saved. Materials are not generated or sent.");}
     });
   }
   async function saveExit() {
@@ -317,16 +343,26 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     (showArchived?item.status==="archived":item.status!=="archived"));
   const currentSuggestion=suggestions?.[content.purpose]??null;
   const legacyReleases=releases.filter(item=>!item.packageReleaseId);
-  const packageHandoff=record && context.packageHandoff?.purpose===record.content.purpose
-    ?context.packageHandoff:null;
+  const packageHandoff=record?.content.plan?.action==="attend-event" &&
+    record.content.purpose==="event-invitation"
+      ? {title:"Create an Interest Event",description:"Set the event details before inviting people.",
+          href:(id:string,packageId:string)=>"/operations/interest-events/new?siteId="+
+            encodeURIComponent(id)+"&packageId="+encodeURIComponent(packageId)} : null;
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
-  const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
+  const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Create Outreach":view==="share"?"Use & Share":view==="followup"?"Follow Up":record?.title??"Outreach Details";
   const rail=<div className="space-y-4">
     <WorkspacePanel title="About this step">
       <p className="text-sm leading-6 text-muted-foreground">{context.guidance}</p>
     </WorkspacePanel>
-    <WorkspacePanel title="Create a package">
-      <p className="text-sm leading-6 text-muted-foreground">Choose your audience, message and formats. Save them together as a package.</p>
+    <WorkspacePanel title={view==="wizard"?"Your next step":"Your outreach"}>
+      <p className="text-sm leading-6 text-muted-foreground">
+        {view==="wizard"
+          ?["Choose recipients and beneficiaries.","Choose a clear message objective.",
+            "Highlight the saved Programs and Experiences that matter.",
+            "Give people one meaningful next action.","Select your outreach channels.",
+            "Choose a story angle, review the message, and save."][step]
+          :"An outreach draft is not a sent message. Releases preserve the exact materials and Brand used."}
+      </p>
     </WorkspacePanel>
   </div>;
   return <WorkspaceShell title={titleText} eyebrow={context.eyebrow}
@@ -338,15 +374,15 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       {suggestionsUnavailable&&<WorkspaceNotice tone="attention">
         Suggestions are unavailable. Saved packages are still available.
       </WorkspaceNotice>}
-      {view==="library"&&brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
+      {brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
         Save your Site identity in Establish before building branded materials.
         {" "}<a href={`/launch/site?siteId=${encodeURIComponent(siteId)}&module=website-brand`}
           className="font-semibold underline">Open Website &amp; Brand</a>
       </WorkspaceNotice>}
-      {view==="library"&&brandReadiness==="loading"&&<WorkspaceNotice tone="info">
+      {brandReadiness==="loading"&&<WorkspaceNotice tone="info">
         Checking your Site settings…
       </WorkspaceNotice>}
-      {view==="library"&&brandReadiness==="unavailable"&&<WorkspaceNotice tone="attention">
+      {brandReadiness==="unavailable"&&<WorkspaceNotice tone="attention">
         Couldn't check your Site settings. Try again to create new packages.
         <div className="mt-3"><Button type="button" variant="outline" size="sm"
           onClick={()=>setBrandRefreshKey(value=>value+1)}>Try again</Button></div>
@@ -356,32 +392,23 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">{context.libraryDescription}</p>
           <Button disabled={busy||brandReadiness!=="available"} onClick={start}>
-            <Plus aria-hidden="true"/> New package
+            <Plus aria-hidden="true"/> New Outreach
           </Button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {purposeOptions.map(option=><Button key={option.id} type="button" variant="outline"
-            disabled={busy||brandReadiness!=="available"}
-            className="h-auto min-h-32 w-full flex-col items-start justify-start whitespace-normal p-5 text-left hover:border-primary"
-            onClick={()=>{start();setTitle(option.label);setContent(starter(option.id));}}>
-            <Megaphone className="mb-3 size-5 text-primary" aria-hidden="true"/>
-            <strong className="block text-sm">{option.label}</strong>
-            <span className="mt-2 block text-xs leading-5 text-muted-foreground">{option.description}</span>
-          </Button>)}
-        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
-          <h2 className="text-lg font-semibold">Saved packages ({visible.length})</h2>
+          <h2 className="text-lg font-semibold">Saved outreach plans ({visible.length})</h2>
           <Button variant="outline" size="sm" onClick={()=>setShowArchived(value=>!value)}>
             {showArchived?"View active":"View archived"}
           </Button>
         </div>
-        {!visible.length&&<WorkspacePanel title="No packages yet">
-          <p className="text-sm text-muted-foreground">Create your first package.</p>
+        {!visible.length&&<WorkspacePanel title="No outreach plans yet">
+          <p className="text-sm text-muted-foreground">Start with Who, Message, Highlight, Action, Channels, and Review.</p>
         </WorkspacePanel>}
         <MarketingPackageLibraryList records={visible} busy={busy}
           onOpen={open} onDuplicate={duplicate} onArchiveToggle={setArchived}
           onDelete={setDeleteCandidate} />
-        <WorkspacePanel title={module==="promote"?"Continue in Introduce":"More actions"}
+        <WorkspacePanel title="Continue in Introduce"
           description={context.handoffDescription}>
           <div className="grid gap-3">
             {context.handoffs.map(item=><WorkspaceActionLink key={item.title}
@@ -393,7 +420,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       </>}
 
       {view==="wizard"&&<MarketingPackageWizardV61
-        siteId={siteId} step={step} title={title} content={content}
+        siteId={siteId} siteName={siteName} siteIntent={siteIntent} step={step} title={title} content={content}
         busy={busy} brandVersionId={record?.brandVersionId??null}
         currentSuggestion={currentSuggestion}
         purposeOptions={purposeOptions} starter={starter}
@@ -406,6 +433,29 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         onNext={()=>{void next();}}/>}
 
       {view==="detail"&&record&&<>
+        {record.content.plan&&<WorkspacePanel title="Your outreach plan">
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <p><strong>Recipients:</strong> {record.content.plan.recipients.join(", ")||"Not selected"}</p>
+            <p><strong>Beneficiaries:</strong> {record.content.plan.beneficiaries.join(", ")||"Not selected"}</p>
+            <p><strong>Highlights:</strong> {record.content.plan.highlights.map(x=>x.label).join(", ")||"Not selected"}</p>
+            <p><strong>Action:</strong> {record.content.plan.action.replaceAll("-"," ")}</p>
+          </div>
+        </WorkspacePanel>}
+        <WorkspacePanel title="Review material previews" description="Each preview uses the saved Brand and current message. This is not a sent or published campaign.">
+          <div className="flex flex-wrap gap-2">{record.content.formats.map(format=>
+            <Button type="button" key={format} size="sm" variant={activePreviewFormat===format?"default":"outline"}
+              onClick={()=>setPreviewFormat(format)}>{format==="handout"?"Conversation Kit / Handout":format}</Button>)}</div>
+          {activePreviewFormat&&<div className="mt-4">
+            <MarketingMaterialPreviewV61 siteId={siteId} title={record.title} content={record.content}
+              brandVersionId={record.brandVersionId} format={activePreviewFormat}/>
+          </div>}
+          {record.content.plan?.channels.includes("conversation-kit")&&<div className="mt-4 border p-4 text-sm">
+            <h3 className="font-semibold">Conversation Starter Kit</h3>
+            <p className="mt-2">30-second introduction: {record.content.message.slice(0,240)}</p>
+            <p className="mt-2">Questions to ask: What needs matter most? What could we explore together? What would be a useful next step?</p>
+            <p className="mt-2 text-muted-foreground">This kit is for talking points, not verified operational claims.</p>
+          </div>}
+        </WorkspacePanel>
         <WorkspacePanel title={record.title}>
           <dl className="mt-3 space-y-4 text-sm">
             <div><dt className="font-semibold">Purpose</dt><dd className="text-muted-foreground">
@@ -427,14 +477,18 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
                 packageHandoff.href(siteId,record.id)
               }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
           </WorkspacePanel>}
-        <WorkspaceNotice tone="info">Your materials are ready to download.</WorkspaceNotice>
+        <WorkspaceNotice tone="info">
+          {packageReleases.some(item=>item.complete)
+            ?"Generated materials are available below. No sending is implied."
+            :"No complete material release has been generated yet. Save your plan, review the preview, then create materials."}
+        </WorkspaceNotice>
         <MarketingPackageReleaseControlsV61 record={record} versions={packageReleases}
           currentBrand={currentBrand} selectedBrandRevision={selectedBrandRevision}
           busy={busy} releasesLoading={releasesLoading}
           releasesUnavailable={releasesUnavailable}
           onSelectCurrentBrand={() => {void selectCurrentBrand();}}
           onRetryHistory={() => setReleaseRefreshKey(value=>value+1)}
-          onPreview={() => {setTitle(record.title);setContent(record.content);setStep(3);setView("wizard");}}
+          onPreview={() => {setTitle(record.title);setContent(record.content);setStep(5);setView("wizard");}}
           onRelease={() => {void releasePackage();}} />
         <MarketingPackageReleaseHistoryV61
           siteId={siteId} record={record} versions={packageReleases}
@@ -447,10 +501,43 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           onCopyCaption={id=>{void copyCaption(id);}}
           onCloseCompare={()=>setCompare(null)}/>
         <ActionFooter>
-          <Button variant="outline" onClick={()=>{setView("library");setRecord(null);}}>All packages</Button>
+          <Button variant="outline" onClick={()=>{setView("library");setRecord(null);}}>My Outreach</Button>
           <Button variant="outline" disabled={busy} onClick={()=>void duplicate(record)}><Copy aria-hidden="true"/> Duplicate</Button>
-          <Button disabled={busy||record.status==="archived"} onClick={()=>open(record,true)}>Edit package</Button>
+          <Button variant="outline" disabled={busy||record.status==="archived"} onClick={()=>open(record,true)}>Edit plan</Button>
+          <Button disabled={busy} onClick={()=>setView("share")}>Use &amp; Share <ArrowRight aria-hidden="true"/></Button>
         </ActionFooter>
+      </>}
+      {view==="share"&&record&&<>
+        <WorkspacePanel title="Use & Share" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
+          <p className="text-sm text-muted-foreground">
+            {packageReleases.some(x=>x.complete)
+              ?"Generated materials are ready for download. Nothing has been sent."
+              :"Create a complete material release in Outreach Details before downloading."}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {packageReleases.filter(x=>packageReleaseIsDownloadableV61(x)).slice(0,1).map(release=>
+              <Button key={release.id} disabled={busy}
+                onClick={()=>void downloadPackage(release)}>Download Package v{release.releaseNumber}</Button>)}
+            {record.content.plan?.action==="attend-event"&&record.content.purpose==="event-invitation"&&
+              <Button asChild variant="outline"><a href={"/operations/interest-events/new?siteId="+encodeURIComponent(siteId)+"&packageId="+encodeURIComponent(record.id)}>Create Event</a></Button>}
+            <Button variant="outline" onClick={()=>setView("followup")}>Follow Up <ArrowRight aria-hidden="true"/></Button>
+          </div>
+          <WorkspaceNotice tone="info">A selected channel is not evidence of delivery. Email sending, public links and registration require separate authorized destinations.</WorkspaceNotice>
+        </WorkspacePanel>
+        <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
+      </>}
+      {view==="followup"&&record&&<>
+        <WorkspacePanel title="Follow Up" description="Review real inquiries and events through the existing authorized Site services. No inferred opens, sends, or responses.">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <WorkspaceActionLink title="Inquiries & responses" description="Review actual Site intake and authorized learner interest."
+              href={"/admissions/intake?siteId="+encodeURIComponent(siteId)} actionLabel="Review inquiries"/>
+            <WorkspaceActionLink title="Interest Events" description="Review or set up a Program-linked event when eligible."
+              href={"/operations/interest-events?siteId="+encodeURIComponent(siteId)} actionLabel="Review events"/>
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">Outreach-specific response attribution is not inferred from unrelated inquiries.</p>
+        </WorkspacePanel>
+        <ActionFooter><Button variant="outline" onClick={()=>setView("share")}>Back to Use &amp; Share</Button>
+          <Button onClick={()=>setView("detail")}>Review Materials</Button></ActionFooter>
       </>}
       <ActionDialog open={discardDialogOpen} title="Discard unsaved package changes?"
         description="Your unsaved edits will be lost. Previously saved content will remain."
