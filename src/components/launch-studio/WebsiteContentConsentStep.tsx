@@ -53,9 +53,9 @@ export function WebsiteContentConsentStep({
       Choose an option before continuing to Your Content.
     </WorkspaceNotice>}
     {value==="denied"&&hasSavedContent&&<WorkspaceNotice tone="attention">
-      Your previously saved content is preserved for review. Reuse is disabled,
-      and no new source-derived copy will be generated. Existing published
-      versions are not silently deleted.
+      Selecting No clears the current editable website copy so that Step 5
+      starts blank. Previously saved and published revisions remain in history
+      until you explicitly replace them with a new saved revision.
     </WorkspaceNotice>}
     <p className="text-xs leading-5 text-muted-foreground">
       Site-level reuse consent does not grant permission to publish an individual
