@@ -338,7 +338,6 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="other">Other</option>
           </Select></Field>
         </div>}
-        <WorkspaceNotice></WorkspaceNotice>
         <fieldset className="space-y-3 border-t pt-5">
           <legend className="text-sm font-semibold">Organization &amp; Tax-Exempt Status</legend>
           <p className="text-xs leading-5 text-muted-foreground">
@@ -429,13 +428,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
       description="Optional. Tell us what matters to your learning community.">
       <div className="space-y-6">
-        <WorkspaceNotice><strong>How CAN OS will use your answers</strong><p className="mt-2">
-          The answers you provide here, including your written origin story, community need,
-          values and future vision, are used to draft your website and may be used to
-          prepare future outreach materials.
-          Review, change or decline the drafts before sharing them. <strong>Nothing is published automatically.</strong>
-          These answers do not establish Program approval or enrollment authority.
-          Avoid including sensitive details or information about others that you cannot share.</p></WorkspaceNotice>
+        <p className="text-xs text-muted-foreground">Your answers can be used to draft messaging you can review and edit. Avoid sharing private information about others.</p>
         <MultiChoice title="1. Why are you creating this learning community?" hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
         <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
@@ -450,7 +443,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           options={values} selected={story.values} onChange={selected => updateMulti("values", selected)} />
         <MultiChoice title="6. What do you hope learners experience?" hint="Select aspirations, not promised outcomes."
           options={experiences} selected={story.experiences} onChange={selected => updateMulti("experiences", selected)} />
-        <Field label="7. What do you hope this community becomes?" description="">
+        <Field label="7. What do you hope this community becomes?">
           <Textarea rows={4} maxLength={2000} value={story.futureVision}
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
       </div>
