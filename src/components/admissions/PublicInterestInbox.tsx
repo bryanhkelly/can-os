@@ -81,9 +81,9 @@ export function PublicInterestInbox({ initialPage, siteId, programId, availableP
   }
 
   return <section className="mt-8  border bg-card p-5">
-    <h2 className="font-serif text-2xl">Family recruitment and inquiries</h2>
+    <h2 className="font-serif text-2xl">Prospective participants and inquiries</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Track family-initiated requests from pre-opening invitations and published school pages.
+      Track consented Site-wide and Program-specific requests from public websites and pre-opening invitations.
       Follow-up requires the adult's affirmative consent. Once CAN authorizes
       admissions, send a verified-email application invitation or continue reviewed
       registrar intake. An inquiry never proves guardianship or grants school access.
