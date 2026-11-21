@@ -116,7 +116,7 @@ export function WebsiteSiteContentStep({
         Arrange website sections
       </summary>
 
-      {data.canPublish
+      {data.canEdit
         ? <div className="mt-4">
             <SiteContentChannelEditor
               key={data.siteId+":"+data.contentChannelConfig.revision}
@@ -127,8 +127,7 @@ export function WebsiteSiteContentStep({
               onDirtyChange={onContentBlocksDirty}/>
           </div>
         : <WorkspaceNotice tone="attention" className="mt-4">
-            Your current Site assignment does not permit editing website sections.
-            Ask a Site Administrator for the appropriate authorization.
+            You do not have permission to edit this Site's website content.
           </WorkspaceNotice>}
     </details>
   </div>;
