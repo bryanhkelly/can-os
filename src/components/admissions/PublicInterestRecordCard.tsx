@@ -80,7 +80,7 @@ export function PublicInterestRecordCard({
             </p>
             {programChoices?.length&&onAssign&&onSelectProgram
               ? <div className="mt-3 flex flex-wrap items-end gap-2">
-                  <Field label="Authorized Program to invite about">
+                  <Field label="Program to invite about (authorization verified on save)">
                     <Select value={selectedProgramId??""}
                       disabled={busy} onChange={event=>onSelectProgram(event.target.value)}>
                       <option value="">Choose a Program</option>
