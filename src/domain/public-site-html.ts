@@ -42,29 +42,13 @@ export type PublicSitePage = {
   enrollmentOpportunities?: readonly SiteEnrollmentOpportunity[];
 };
 
-/** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */
+/** Synthetic fixture metadata never changes public website behavior.
+ * Template-gallery illustration is an explicit separate design-only mode. */
 export function withIllustrativeLocalPreview(page: PublicSitePage): PublicSitePage {
-  if (!page.demonstration || page.localContent) return page;
-  const sample = createIllustrativeSchoolContent(page.site.name);
-  // Valor is an explicitly fictional, existing reference-school fixture. This
-  // variant exists only for local/private previews; it is neither a CMS write
-  // nor a substitute for approved institution-owned program information.
-  const isValor = page.host === "valorschool.can-os.com" &&
-    page.site.name === "Valor School";
-  return {...page, localContent: isValor ? {...sample,
-    heroHeadline:"Be seen. Think boldly. Build what comes next.",
-    welcomeMessage:"A place where big ideas meet personal attention—and students discover the confidence to make their mark.",
-    localDescription:"At Valor School, ambition has a human scale. Students are encouraged to challenge assumptions, explore meaningful questions, and turn knowledge into action. Thoughtful academic instruction meets a connected community where every voice has room to be heard and every new interest has room to grow.",
-    schoolVision:"We believe education should develop curious minds, courageous character, and the ability to make a positive difference. Our vision is a school where intellectual challenge and genuine belonging strengthen one another.",
-    churchHistory:"Valor grew from a simple conviction: young people deserve an education that takes their ideas seriously and sees their potential beyond a test score. That vision shaped a learning community built around rigorous questions, meaningful relationships, and discovery that reaches beyond the classroom.",
-    communityOutreach:"Learning becomes more powerful when it connects to real people and real places. From neighborhood research and creative problem-solving to service projects and collaborative design, students connect classroom ideas with the communities around them.",
-    localTraditions:"Student exhibitions turn ambitious projects into shared celebrations. Design showcases, arts gatherings, community service days, and school-wide reflections give students opportunities to lead, contribute, and recognize one another's growth.",
-  } : sample};
+  return page;
 }
-
-/** A published synthetic school is a demonstration, never an indexed institution. */
-export function isIndexablePublicSite(page: PublicSitePage): boolean {
-  return page.demonstration !== true;
+export function isIndexablePublicSite(_page: PublicSitePage): boolean {
+  return true;
 }
 
 /** Optional Agent A approved, Program-scoped public calendar contract.
@@ -221,11 +205,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const host = escapePublicHtml(page.host);
   const previewSlug = options?.localPreview && options.localPreviewSlug &&
     isPublicSiteSlug(options.localPreviewSlug) ? options.localPreviewSlug : null;
-  const demo = page.demonstration === true;
+  const demo = options?.templateGallery === true;
   // A fictional school can demonstrate an admissions journey, but cannot submit
   // real inquiries, applications, or enrollment requests.
-  const submissionsEnabled = !demo && (!options?.localPreview ||
-    (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true));
+  const submissionsEnabled = !options?.localPreview ||
+    (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true);
   const inquiryAction = previewSlug
     ? `/published-site/inquiry?site=${encodeURIComponent(previewSlug)}`
     : "/inquiry";
@@ -234,7 +218,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     : "/apply";
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
-  const sampleTemplate = options?.localPreview && page.demonstration ? options.sampleTemplate : undefined;
+  const sampleTemplate = options?.templateGallery ? options.sampleTemplate : undefined;
   const templateId = resolveSiteTemplateId(sampleTemplate ?? local?.branding.templateId);
   const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId, local?.branding.headingFontId, local?.branding.bodyFontId, templateId);
   const displayFont = visual.displayFont;
@@ -264,7 +248,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => sampleForRole(roleForSlot[slot]);
   // The full twelve-scene set is enabled for a hosted fictional school only
   // after the operator verifies all assets and enables the photo-readiness gate.
-  const fullDemoPhotoLibrary = demo && process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED === "true";
+  const fullDemoPhotoLibrary = false;
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
     if(options?.templateGallery || sampleTemplate || fullDemoPhotoLibrary)return sampleMedia(slot);
     const candidate=page.media?.[slot];
