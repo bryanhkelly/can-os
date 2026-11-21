@@ -131,7 +131,7 @@ export function EstablishSiteProfileUnified({
       try { await navigate(); }
       catch (failure) {
         setError(failure instanceof Error ? failure.message :
-          "Your changes were saved, but sign-out failed. Use the Account menu to sign out.");
+          "Your changes were saved, but we could not open your Site Workspace. Try again from the navigation.");
       }
     } catch (cause) {
       setReloadRequired(true);
@@ -216,7 +216,7 @@ export function EstablishSiteProfileUnified({
         </Button>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="ghost" disabled={saving || reloadRequired}
-            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Sign Out</Button>
+            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Exit</Button>
           <Button type="submit" loading={saving} loadingLabel="Saving Site…" disabled={reloadRequired}>
             Save &amp; Continue <ArrowRight aria-hidden="true"/>
           </Button>
