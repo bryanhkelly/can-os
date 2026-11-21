@@ -8,7 +8,7 @@ import {
   siteExperienceGroups,siteExperienceCatalog,siteExperienceById,
   siteExperienceOutcomes,siteExperienceLimit,siteExperienceActivityLimit,
   siteExperienceOutcomeLimit,siteExperienceAudienceNames,siteExperienceProgramNames,
-  suggestedSiteExperiences,describeSiteExperience,
+  suggestedSiteExperiences,describeSiteExperience,validCustomExperienceName,
   type SiteExperienceGroupId,type SiteExperienceId,type SiteExperienceOutcomeId,
   type SiteExperienceAudienceId,type SiteExperienceProgramId,
 } from "@/domain/site-experience-interests";
@@ -28,6 +28,8 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
   const [stage,setStage]=useState<Stage>("choose");
   const [group,setGroup]=useState<SiteExperienceGroupId>("academic");
   const [query,setQuery]=useState("");
+  const [customName,setCustomName]=useState("");
+  const [customError,setCustomError]=useState("");
   const [activeId,setActiveId]=useState<SiteExperienceId|null>(null);
   const selectedIds=draft.experienceIds??[];
   const customNames=draft.customExperiences??[];
@@ -44,6 +46,24 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
     draft.experienceDetails?.find(detail=>detail.id===activeId)??newDetail(activeId,draft);
   const activeTopic=activeId?siteExperienceById.get(activeId):null;
 
+  function addCustomExperience(){
+    const name=customName.trim();
+    if(!validCustomExperienceName(name)){
+      setCustomError("Enter a short plain-text topic name between 2 and 100 characters.");
+      return;
+    }
+    if(count>=siteExperienceLimit){
+      setCustomError("Remove an Experience before adding another.");
+      return;
+    }
+    if(customNames.some(value=>value.toLocaleLowerCase()===name.toLocaleLowerCase())||
+       siteExperienceCatalog.some(topic=>topic.title.toLocaleLowerCase()===name.toLocaleLowerCase())){
+      setCustomError("This topic is already listed. Choose it above or use another name.");
+      return;
+    }
+    setDraft(current=>({...current,customExperiences:[...(current.customExperiences??[]),name]}));
+    setCustomName("");setCustomError("");
+  }
   function newDetail(id:SiteExperienceId,current:SiteProgramsAudiencesV61):SiteExperienceDetail{
     const topic=siteExperienceById.get(id)!;
     return {
@@ -175,6 +195,24 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
           </WorkspaceNotice>}
         </div>
       </div>
+      <details className="border-t pt-4" aria-label="Optional local Experience topic">
+        <summary className="cursor-pointer text-sm font-semibold">Can't find your idea? Add a local topic</summary>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Optional. The curated chips above require no writing. A local topic also counts toward your five.
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="min-w-48 flex-1 space-y-1 text-sm font-medium">
+            Local topic name
+            <Input type="text" maxLength={100} value={customName}
+              disabled={disabled||count>=siteExperienceLimit}
+              placeholder="e.g. Neighborhood history"
+              onChange={event=>{setCustomName(event.target.value);setCustomError("");}}/>
+          </label>
+          <Button variant="outline" disabled={disabled||count>=siteExperienceLimit||!customName.trim()}
+            onClick={addCustomExperience}>Add local topic</Button>
+        </div>
+        {customError&&<p role="alert" className="mt-2 text-xs text-destructive">{customError}</p>}
+      </details>
       {!!customNames.length&&<div className="space-y-2 border-t pt-4">
         <h4 className="text-sm font-semibold">Previously saved local Experiences</h4>
         <p className="text-xs text-muted-foreground">These count toward your five. Existing custom names remain until you remove them.</p>
