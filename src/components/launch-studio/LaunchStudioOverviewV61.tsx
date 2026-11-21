@@ -29,8 +29,8 @@ const stagePresentation: Record<SiteLaunchStageV61, {
 }> = {
   Establish: { icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
   Introduce: { icon: Megaphone, summary: "Create focused outreach plans, share your vision and connect with the community." },
-  Prepare: { icon: ClipboardCheck, summary: "Choose offerings, prepare your team and facilities, and confirm readiness." },
-  Open: { icon: Rocket, summary: "Welcome participants to approved offerings." },
+  Prepare: { icon: ClipboardCheck, summary: "Explore solutions, prepare your team and facilities, and review what is needed to open." },
+  Open: { icon: Rocket, summary: "Open registration for eligible offerings when they are approved and ready." },
 };
 const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }));
 
@@ -53,7 +53,7 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
   </div>;
   return <WorkspaceShell title={mode === "first-visit" ? "Bring your community's vision to life." : `Continue preparing ${site.name}.`}
     eyebrow="Launch Studio / Overview"
-    subtitle="Turn your ideas into experiences your community can enjoy."
+    subtitle="Turn your ideas into meaningful experiences for your community."
     width="wide" rail={rail}>
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 border bg-card p-5">
