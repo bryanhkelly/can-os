@@ -1,5 +1,4 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { createHmac } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { parseInterestPageCursor, makeInterestPageCursor } from "@/domain/public-admissions-interest";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -288,6 +287,7 @@ export const assignPublicSiteInterestToProgram=createServerFn({method:"POST"})
     const actor=await requireAdmissionsIntakeReader();
     if(!actor.scope.programIds.includes(data.programId))
       throw new AuthorizationError("authorized Program selection");
+    const {createHmac}=await import("node:crypto");
     const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
     if(!pepper||pepper.length<32)throw new Error("Interest linkage security is unavailable");
     return db.transaction(async tx=>{
