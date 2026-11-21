@@ -49,7 +49,7 @@ describe("Site identity flows from Establish through Website and Introduce",()=>
       ...base,reuseAllowed:true,identity:church,
     });
     expect(faithSuggestion.content.headline).toContain("faith community");
-    expect(faithSuggestion.content.message).toContain("faith and service");
+    expect(faithSuggestion.content.message).toContain("service and shared purpose");
     expect(faithSuggestion.siteIdentity).toEqual(church);
     const secular=suggestMarketingStarterV61("Hope","site-announcement",{
       ...base,reuseAllowed:true,identity:community,
