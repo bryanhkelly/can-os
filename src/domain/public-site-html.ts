@@ -147,13 +147,6 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     (parent?.admissions.description.canDisplay && parent.admissions.description.value));
   const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
     (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
-  if (page.demonstration && hasStory) {
-    // Full fictional prospectus; these additional routes never grant real
-    // admissions, pricing, schedule or program authority.
-    return ["/", "/about", "/academics", "/student-life", "/school-day",
-      "/admissions", "/tuition", "/families", "/faq", "/contact",
-      "/programs", "/courses", "/classes"];
-  }
   const educational=[
     ...(academic?["/academics","/school-day","/admissions"] as const:[]),
     ...(kinds.program||contentOn("/programs")?["/programs"] as const:[]),
@@ -260,9 +253,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
           !url.search && !url.hash)return candidate;
       }catch{ /* Invalid photo URL: never treat it as approved. */ }
     }
-    if(options?.localPreview)return sampleMedia(slot);
-    const sample=templateDefaultImage(templateId,slot==="hero"?"hero":"story_01");
-    return sample?{...sample,assetId:"template-sample",sourceRevision:"v1"}:null;
+    if(options?.templateGallery)return sampleMedia(slot);
+    return null;
   };
   // Cloudflare receives bandwidth-appropriate responsive variants from its
   // private R2-backed Images binding. Netlify and user-owned media are unchanged.
@@ -751,9 +743,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // The extra two template photography roles are intentionally mounted only
   // in fictional/private preview experiences after the full R2 library passes
   // the twelve-role readiness gate. Never imply these are real school pupils.
-  const includeExtraTemplatePhotoSections=
-    process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED==="true" &&
-    Boolean(options?.templateGallery || options?.localPreview || sampleTemplate || demo);
+  const includeExtraTemplatePhotoSections=options?.templateGallery===true;
   const extraTemplatePhotoSection=(role:import("./template-sample-images").TemplatePhotographyRole,
     placement:"creative"|"portrait",label:string,title:string,summary:string)=>{
     if(!includeExtraTemplatePhotoSections)return "";
