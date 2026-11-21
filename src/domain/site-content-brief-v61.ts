@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { siteIdentityV61Schema } from "./site-identity-v61";
 import { siteHostingV61Schema, siteEnvironmentV61Schema, siteStorySourceV61Schema, siteStoryV61Schema } from "./site-information-v61";
 import { readSiteProgramsAudiencesV61, siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61 } from "./site-launch-preferences";
 import { siteExperienceById, siteExperienceOutcomes, describeSiteExperience } from "./site-experience-interests";
@@ -21,6 +22,7 @@ export const siteContentBriefV61Schema=z.object({
     brandVersionId:z.string().uuid().nullable(),brandRevision:z.number().int().nonnegative().nullable(),
     websiteContentRevision:z.number().int().nonnegative().nullable(),
   }).strict(),
+  identity:siteIdentityV61Schema.nullable(),
   hosting:siteHostingV61Schema.nullable(),
   environment:siteEnvironmentV61Schema.nullable(),
   planning:siteProgramsAudiencesV61Schema.nullable(),
@@ -81,6 +83,7 @@ export function projectSiteContentBriefV61(input:{
     return value.data;
   };
   const {metadata}=input;
+  const identity=parse(siteIdentityV61Schema,metadata.siteIdentityV61,"Site Identity");
   const hosting=parse(siteHostingV61Schema,metadata.siteHostingV61,"Site Hosting");
   const environment=parse(siteEnvironmentV61Schema,metadata.siteEnvironmentV61,"Site Environment");
   const story=parse(siteStorySourceV61Schema,metadata.siteStoryV61,"Site Story");
@@ -107,7 +110,7 @@ export function projectSiteContentBriefV61(input:{
       brandVersionId:input.brandVersionId??null,brandRevision:input.brandRevision??null,
       websiteContentRevision:input.websiteContentRevision??null,
     },
-    hosting,environment,planning,experiences:projectSiteExperienceBriefV61(planning),
+    identity,hosting,environment,planning,experiences:projectSiteExperienceBriefV61(planning),
     story:consent?story?.answers??null:null,leadership,websiteCopy,
     consent:{contentReuseAllowed:consent},
   });
