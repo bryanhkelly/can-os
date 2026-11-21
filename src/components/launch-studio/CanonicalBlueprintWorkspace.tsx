@@ -339,7 +339,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         setMessage(!opened
           ? "Changes were saved, but the latest plan could not be reopened. Reload before editing."
           : saved.revision > detail.revision
-            ? "A new Solution plan revision was saved."
+            ? "Your updated solution plan was saved."
             : "The Solution plan is already up to date.");
       } else {
         const configurationId = crypto.randomUUID();
@@ -363,7 +363,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     } catch (caught) {
       if (attemptedWrite) {
         setReconciliationRequired(true);
-        setError("The save outcome could not be fully verified. Reload the Site to reconcile the latest Solution plan before retrying.");
+        setError("We couldn't confirm whether your changes were saved. Reload the site before trying again.");
       } else {
         setError(normalizeClientError(caught, "The Solution plan could not be saved.").message);
       }
@@ -398,7 +398,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       const opened = await openConfiguration(detail.configurationId, current);
       if (!opened) setReconciliationRequired(true);
       setMessage(opened
-        ? "Current Solution plan submitted for independent review. No Program or enrollment is authorized."
+        ? "Your plan was submitted for review. This does not yet approve any program or registration."
         : "Solution plan submitted, but review status could not be refreshed. Reload before taking another action.");
     } catch (caught) {
       if (attemptedWrite) {
@@ -473,7 +473,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       Choose what to include, describe the support your site can provide, and save a plan.
       Your plan will be reviewed before any activity can be approved to operate.
     </p>
-    {loading && <p className="mt-4" role="status">Loading Blueprint workspace…</p>}
+    {loading && <p className="mt-4" role="status">Loading your solution plan…</p>}
     {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
     {reconciliationRequired && <p className="mt-3 border border-border bg-muted p-3 text-sm" role="status">
       Your last change may have been saved. Reload to check your plan before trying again.
@@ -586,7 +586,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
           <div className="flex flex-wrap gap-3">
             {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || reconciliationRequired || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
-              {busy ? "Saving…" : detail ? "Save new revision" : "Save Solution plan"}
+              {busy ? "Saving…" : detail ? "Save revised plan" : "Save Solution plan"}
             </Button>}
             {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
               onClick={() => { setRevisingFrozen(true); setOperationId(""); setExecutedDeployments(null); }}>
@@ -648,7 +648,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 configurationVersionId={detail.versionId}/>
               <Button type="button" variant="outline" disabled={busy}
                 onClick={() => void openConfiguration(detail.configurationId)}>
-                Refresh review status
+                Check review status
               </Button>
               {review?.latestReview?.decision === "approved" && workspace.canExecute && !revisingFrozen &&
                 <fieldset className="mt-4 border p-4" disabled={busy}>
