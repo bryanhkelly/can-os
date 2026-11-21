@@ -33,6 +33,8 @@ export type MarketingStarterSuggestionV61 = {
   content: MarketingPackageContent;
   sources: readonly string[];
   websiteAlternative: { headline: string; message: string; source: string } | null;
+  /** Consent-gated self-described identity for the operator-reviewed draft step. */
+  siteIdentity?: SiteIdentityV61 | null;
 };
 const priorityLabels = {
   "grades-6-8": "middle school learning",
@@ -79,7 +81,7 @@ export function suggestMarketingStarterV61(
   const content=initialMarketingContent(siteName,purpose);
   // The Site can still write a package manually when it declines reuse.
   if(source.reuseAllowed !== true){
-    return {content:{...content,headline:"",message:"",audiences:[]},sources:[],websiteAlternative:null};
+    return {content:{...content,headline:"",message:"",audiences:[]},sources:[],websiteAlternative:null,siteIdentity:null};
   }
   const sources:string[]=[];
   const name=safeText(siteName,100)||"our learning community";
@@ -172,5 +174,5 @@ export function suggestMarketingStarterV61(
   content.headline=safeText(headline,160);
   content.message=safeText(message,1600);
   const alternative=websiteAlternative(source.websiteCopy);
-  return {content,sources,websiteAlternative:alternative};
+  return {content,sources,websiteAlternative:alternative,siteIdentity:identity};
 }
