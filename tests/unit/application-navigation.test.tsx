@@ -82,6 +82,7 @@ vi.mock("@/modules/enrollment/student-access-handoff.functions",()=>({
 }));
 vi.mock("@/modules/enrollment/public-admissions-interest.functions",()=>({
   listPublicAdmissionsInterests:vi.fn(),setPublicAdmissionsInterestStatus:vi.fn(),
+  assignPublicSiteInterestToProgram:vi.fn(),invitePublicAdmissionsInterestToApply:vi.fn(),
 }));
 vi.mock("@/modules/enrollment/r2-document-upload.functions",()=>({
   beginEnrollmentDocumentUpload:vi.fn(),finishEnrollmentDocumentUpload:vi.fn(),
