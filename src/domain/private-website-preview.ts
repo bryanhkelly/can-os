@@ -30,7 +30,7 @@ export function renderPrivateWebsitePreviewHtml(
   availablePages: readonly string[],
   saved = true,
   kind: "site" | "school" = "school",
-  synthetic = false,
+  _synthetic = false,
 ): string {
   const links = new Set(availablePages.filter(isPublicSitePagePath));
   const siteFirstUrl = (page:PublicSitePath) =>
@@ -47,7 +47,7 @@ export function renderPrivateWebsitePreviewHtml(
     : `/launch/website?siteId=${encodeURIComponent(siteId)}&amp;returnToHub=true&amp;step=review`;
   const returnLabel = kind==="site"?"Return to Launch Studio":"Return to Website &amp; Brand Studio";
   const banner = `<aside class="can-private-preview" role="status">
-  <strong>${synthetic ? "Demonstration website preview" : `Private ${kind === "site" ? "Site" : "school"} website preview`}</strong>
+  <strong>Private ${kind === "site" ? "Site" : "school"} website preview</strong>
   <span>${saved ? "Saved design" : "Unsaved illustrative design"} · not published · sign-in required · Images may be illustrative · Forms disabled</span>
   <a href="${returnHref}">${returnLabel}</a>
   </aside>`;
