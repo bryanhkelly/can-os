@@ -1,8 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getNativeClassTeacherHomework, getNativeClassTeacherAssessments,
-  returnNativeClassPracticeFeedback, getNativeClassTeacherDraftPractice,
-  returnNativeClassDraftPracticeFeedback } from
+  returnNativeClassPracticeFeedback } from
   "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { normalizeClientError } from "@/lib/client-error";
 
 /** Read-only native Class teacher queue. Official grading is a separate
- * verified-grader workflow, not a state change to synthetic homework. */
+ * verified-grader workflow, not a practice feedback mutation. */
 export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
   const client=useQueryClient();
   const [feedback,setFeedback]=useState<Record<string,string>>({});
@@ -26,7 +25,7 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
     const practiceScore=raw?Number(raw):null;
     try{
       await returnNativeClassPracticeFeedback({data:{
-        classId,submissionId,feedback:(feedback[submissionId]??item?.demoFeedback??"").trim(),practiceScore,
+        classId,submissionId,feedback:(feedback[submissionId]??item?.teacherFeedback??"").trim(),practiceScore,
       }});
       setNotice("Practice feedback returned to the learner. No official grade was issued.");
       await client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]});
@@ -43,7 +42,7 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
       <h2 className="font-serif text-2xl">Student homework</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Submissions from learners actively enrolled in your exact Class.
-        Returned and graded labels may represent synthetic practice states,
+        Returned practice feedback is separate from official grading decisions,
         not signed grading decisions.
       </p>
     </div>
@@ -67,8 +66,8 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
           {item.responseText&&<p className="whitespace-pre-wrap rounded-sm bg-muted p-3">
             {item.responseText}
           </p>}
-          {item.demoFeedback&&<p className="text-xs text-muted-foreground">
-            Simulated feedback: {item.demoFeedback}
+          {item.teacherFeedback&&<p className="text-xs text-muted-foreground">
+            Practice feedback: {item.teacherFeedback}
           </p>}
           {item.submittedAt&&<p className="text-xs text-muted-foreground">
             Submitted {new Date(item.submittedAt).toLocaleString()}
@@ -76,10 +75,10 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
           {item.practiceScore!==null&&<p className="text-xs text-muted-foreground">
             Practice score: {item.practiceScore} / {item.practiceScoreMax??10}. Not an official grade.
           </p>}
-          {queue.data.canReturnPracticeFeedback&&item.isSyntheticPractice&&<div className="space-y-3 border-t border-border pt-3">
+          {queue.data.canReturnPracticeFeedback&&item.isPracticeSubmission&&<div className="space-y-3 border-t border-border pt-3">
             <label className="block space-y-1">
               <span className="text-xs font-semibold">Return practice feedback</span>
-              <Textarea rows={3} maxLength={3000} value={feedback[item.id]??item.demoFeedback??""}
+              <Textarea rows={3} maxLength={3000} value={feedback[item.id]??item.teacherFeedback??""}
                 onChange={event=>setFeedback(previous=>({...previous,[item.id]:event.target.value}))}
                 aria-label={"Practice feedback for "+item.studentName+" on "+item.assignmentTitle}/>
             </label>
@@ -90,7 +89,7 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
                 onChange={event=>setScores(previous=>({...previous,[item.id]:event.target.value}))}/>
             </label>
             <Button type="button" size="sm" disabled={!!busy||
-              (feedback[item.id]??item.demoFeedback??"").trim().length<3||
+              (feedback[item.id]??item.teacherFeedback??"").trim().length<3||
               (scores[item.id]!==undefined&&scores[item.id]!==""&&
                 (!Number.isInteger(Number(scores[item.id]))||Number(scores[item.id])<0||Number(scores[item.id])>10))}
               onClick={()=>void returnFeedback(item.id)}>
@@ -109,34 +108,6 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
 }
 
 export function NativeClassTeacherAssessmentPanel({classId}:{classId:string}){
-  const client=useQueryClient();
-  const [feedback,setFeedback]=useState<Record<string,string>>({});
-  const [scores,setScores]=useState<Record<string,string>>({});
-  const [saving,setSaving]=useState<string|null>(null);
-  const [notice,setNotice]=useState("");
-  const [error,setError]=useState("");
-  const practice=useQuery({
-    queryKey:["native-class-teacher-draft-practice",classId],
-    queryFn:()=>getNativeClassTeacherDraftPractice({data:{classId}}),
-    retry:false,
-  });
-  async function returnPracticeFeedback(id:string){
-    if(saving)return;
-    const item=practice.data?.items.find(entry=>entry.id===id);
-    if(!item)return;
-    const text=(feedback[id]??item.teacherFeedback??"").trim();
-    const raw=(scores[id]??(item.practiceScore===null?"":String(item.practiceScore))).trim();
-    const score=raw?Number(raw):null;
-    setSaving(id);setNotice("");setError("");
-    try{
-      await returnNativeClassDraftPracticeFeedback({data:{
-        classId,practiceAttemptId:id,feedback:text,practiceScore:score,
-      }});
-      setNotice("Practice-check feedback saved for the learner. No official grade was issued.");
-      await client.invalidateQueries({queryKey:["native-class-teacher-draft-practice",classId]});
-    }catch(failure){setError(normalizeClientError(failure,"Unable to return practice feedback.").message);}
-    finally{setSaving(null);}
-  }
   const readiness=useQuery({
     queryKey:["native-class-teacher-assessments",classId],
     queryFn:()=>getNativeClassTeacherAssessments({data:{classId}}),
@@ -171,50 +142,5 @@ export function NativeClassTeacherAssessmentPanel({classId}:{classId:string}){
       </ul>
       {readiness.data.partial&&<p className="text-xs">Additional entries require pagination.</p>}
     </>}
-    {practice.data?.items.length ? <section className="mt-5 space-y-3 border-t border-border pt-5"
-      aria-label="Synthetic learner practice responses">
-      <h3 className="font-semibold">Student draft practice responses</h3>
-      <p className="text-xs text-muted-foreground">
-        Private synthetic practice only. These are not published exams, official grades,
-        or credit-bearing results.
-      </p>
-      {practice.data.items.map(item=><details key={item.id} className="border border-border p-3">
-        <summary className="cursor-pointer text-sm font-medium">
-          {item.studentName} · {new Date(item.recordedAt).toLocaleString()}
-        </summary>
-        <ol className="mt-3 space-y-3">
-          {item.answers.map((answer,index)=><li key={index} className="text-sm">
-            <p className="font-medium">{answer.prompt}</p>
-            <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{answer.answer}</p>
-          </li>)}
-        </ol>
-        <div className="mt-4 space-y-3 border-t border-border pt-3">
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold">Practice feedback for {item.studentName}</span>
-            <Textarea rows={3} maxLength={3000}
-              value={feedback[item.id]??item.teacherFeedback??""}
-              onChange={event=>setFeedback(current=>({...current,[item.id]:event.target.value}))}/>
-          </label>
-          <label className="block max-w-28 space-y-1">
-            <span className="text-xs font-semibold">Practice score / 10</span>
-            <Input type="number" min={0} max={10} step={1}
-              value={scores[item.id]??(item.practiceScore===null?"":String(item.practiceScore))}
-              onChange={event=>setScores(current=>({...current,[item.id]:event.target.value}))}/>
-          </label>
-          <Button type="button" size="sm" disabled={!!saving||
-            (feedback[item.id]??item.teacherFeedback??"").trim().length<3||
-            (scores[item.id]!==undefined&&scores[item.id]!==""&&
-              (!Number.isInteger(Number(scores[item.id]))||Number(scores[item.id])<0||Number(scores[item.id])>10))}
-            onClick={()=>void returnPracticeFeedback(item.id)}>
-            {saving===item.id?"Returning…":"Return practice-check feedback"}
-          </Button>
-        </div>
-      </details>)}
-      {notice&&<p role="status" className="text-sm">{notice}</p>}
-      {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
-      {practice.data.partial&&<p className="text-xs text-muted-foreground">
-        Showing the latest 50 practice attempts.
-      </p>}
-    </section> : null}
   </section>;
 }
