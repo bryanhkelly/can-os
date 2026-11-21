@@ -215,6 +215,38 @@ export function suggestedSiteExperiences(
     (!intent.interestIds.length || item.programs.some(id=>intent.interestIds.includes(id))) &&
     (!intent.audienceIds.length || item.audiences.some(id=>intent.audienceIds.includes(id))));
 }
+/**
+ * A small, intentionally diversified recommendation shortlist for Establish.
+ * The broad suggestedSiteExperiences() catalog matcher is too permissive for
+ * "Recommended" badges: it may match most topics for adult/senior Sites.
+ * Recommendations never write preferences or consume one of the five slots.
+ */
+export function recommendedSiteExperiences(
+  intent:Pick<SiteProgramsAudiencesV61,"interestIds"|"audienceIds">,
+):SiteExperienceCategory[]{
+  const preferred:SiteExperienceId[]=[];
+  const add=(...ids:SiteExperienceId[])=>{preferred.push(...ids);};
+  if(intent.interestIds.includes("senior")||intent.audienceIds.includes("older_adults"))
+    add("digital-confidence","healthy-aging","financial-literacy","social-connection",
+      "voting-elections","trips-excursions");
+  if(intent.interestIds.includes("adult")||intent.audienceIds.includes("adults"))
+    add("career-skills","financial-literacy","digital-confidence","voting-elections",
+      "entrepreneurship","wellness-movement");
+  if(intent.interestIds.some(id=>id==="grades-9-12"||id==="grades-6-8")||
+     intent.audienceIds.includes("teens"))
+    add("study-support","robotics","mathematics","coding","career-skills","clubs-leadership");
+  if(intent.interestIds.some(id=>id==="afterschool"||id==="summer")||
+     intent.audienceIds.includes("children"))
+    add("arts-creativity","science-makers","sports-recreation","outdoor-discovery",
+      "study-support","family-learning");
+  add("digital-confidence","financial-literacy","science-makers","arts-creativity",
+    "wellness-movement","community-service","voting-elections","career-skills");
+  const eligible=new Set(suggestedSiteExperiences(intent).map(item=>item.id));
+  const unique=[...new Set(preferred)];
+  return unique.filter(id=>eligible.has(id)).slice(0,7)
+    .flatMap(id=>{const item=siteExperienceById.get(id);return item?[item]:[];});
+}
+
 export function describeSiteExperience(
   topic:SiteExperienceCategory,
   detail?:{activityIds:readonly string[];outcomeIds:readonly SiteExperienceOutcomeId[]},
