@@ -13,8 +13,11 @@ export type CommandContext = {
   capabilities: ReadonlySet<string>;
   scope: AuthorizationScope;
   requestId?: string;
-  /** Set only by verified demo-admin delegation; never grants domain authority. */
+  /** Legacy session-owner reference, retained for backwards-compatible consumers. */
   sessionAccountId?: string;
+  /** Verified server-side operator of this effective identity, for attribution only.
+   * It must never be accepted from an API argument or client cookie field. */
+  impersonatedByAccountId?: string;
 };
 
 export class AuthorizationError extends DomainError {
