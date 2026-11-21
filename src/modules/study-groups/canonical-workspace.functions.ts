@@ -102,7 +102,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
             eq(canonicalClassEnrollments.status,"active"),
             eq(canonicalClasses.state,"active"),
             eq(canonicalClasses.operatingOrganizationId,s.sites.organizationId)))
-      : await db.select({classId:canonicalClasses.id})
+      : await db.select({classId:canonicalClasses.id,siteId:canonicalClasses.siteId})
           .from(canonicalClassStaffAssignments)
           .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassStaffAssignments.classId))
           .innerJoin(s.sites,eq(s.sites.id,canonicalClasses.siteId))
