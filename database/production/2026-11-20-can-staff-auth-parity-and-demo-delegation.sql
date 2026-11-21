@@ -117,10 +117,10 @@ DECLARE body text;
 BEGIN
  SELECT pg_get_functiondef('education_v30.v301_can_staff_session_context(text)'::regprocedure)
  INTO body;
- IF body NOT LIKE '%g.account_id = session_owner.id%'
-  OR body NOT LIKE '%target_account.person_id = g.person_id%'
+ IF body NOT LIKE '%g.account_id=session_owner.id%'
+  OR body NOT LIKE '%target_account.person_id=g.person_id%'
   OR body NOT LIKE '%target_account.email_verified_at IS NOT NULL%'
-  OR body NOT LIKE '%admin_grant.account_id = session_owner.id%'
+  OR body NOT LIKE '%admin_grant.account_id=session_owner.id%'
   OR body LIKE '%riley.teacher@valorschool.demo%'
   OR body LIKE '%person.metadata%'
  THEN RAISE EXCEPTION 'Expected ordinary authorization and isolated admin switch'; END IF;
