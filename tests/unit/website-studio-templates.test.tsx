@@ -182,7 +182,8 @@ describe("Website Studio seven-template contract", () => {
   it("uses semantic choices for all seven templates and ten previewable pages",()=>{
     const html=renderToStaticMarkup(<WebsiteTemplateGallery schoolName="Sample Academy" value="heritage"
       onChange={()=>{}}/>);
-    expect((html.match(/aria-pressed=/g)??[]).length).toBeGreaterThanOrEqual(9);
+    expect((html.match(/type="radio"/g)??[]).length).toBe(siteTemplateCatalog.length);
+    expect((html.match(/aria-pressed=/g)??[]).length).toBe(2); // Viewport toggles only.
     expect(html).toContain("Heritage Academy");
     expect(html).toContain("Community &amp; Faith");
     expect(html).toContain("Modern Learning");
