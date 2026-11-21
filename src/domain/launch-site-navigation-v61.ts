@@ -17,7 +17,7 @@ export const siteLaunchModules = [
   ...prepareStageModulesV61.map(module => ({
     stage: "Prepare" as const, id: module.id, title: module.title,
   })),
-  { stage: "Launch", id: "open", title: "Launch" },
+  { stage: "Launch", id: "open", title: "Opening Checklist" },
 ] as const;
 
 export type SiteLaunchModuleIdV61 = (typeof siteLaunchModules)[number]["id"];
