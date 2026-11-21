@@ -131,7 +131,8 @@ export function MarketingPackageWizardV61({
     const channels=toggle(plan.channels,channel) as OutreachPlanV61["channels"];
     onPatch({plan:{...plan,channels},formats:outreachFormatsV61(channels)});
   };
-  const suggested=composeOutreachDraftV61(siteName||"our learning community",plan,siteIntent);
+  const suggested=composeOutreachDraftV61(
+    siteName||"our learning community",plan,siteIntent,currentSuggestion?.siteIdentity);
   const setStory=(storyAngle:OutreachPlanV61["storyAngle"])=>
     updatePlan({storyAngle});
   const chosenMaterial=activePreviewFormat&&content.formats.includes(activePreviewFormat)
