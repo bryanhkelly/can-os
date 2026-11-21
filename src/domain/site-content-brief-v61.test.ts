@@ -57,6 +57,24 @@ describe("shared Site Content Brief V6.1",()=>{
     expect(JSON.stringify(brief)).not.toContain("Unapproved Leader");
     expect(JSON.stringify(brief)).not.toContain("Private bio");
   });
+  it("projects one Site identity separately from hosting, even before content consent",()=>{
+    const identity={
+      siteType:"school_education",faithOrientation:"faith_based",faithTradition:"christian",
+    };
+    const brief=projectSiteContentBriefV61({...input,
+      metadata:{...input.metadata,siteIdentityV61:identity},
+      websiteContent:{contentReuseConsent:"denied"},
+    });
+    expect(brief.identity).toEqual(identity);
+    expect(brief.hosting).toBeNull();
+    expect(brief.story).toBeNull();
+    expect(brief.websiteCopy).toBeNull();
+  });
+  it("fails closed when stored Site identity is unsupported",()=>{
+    expect(()=>projectSiteContentBriefV61({...input,
+      metadata:{...input.metadata,siteIdentityV61:{siteType:"unsupported"}},
+    })).toThrow(/requires review/);
+  });
   it("rejects invalid saved Story instead of inventing an empty source",()=>{
     expect(()=>projectSiteContentBriefV61({...input,
       metadata:{...input.metadata,siteStoryV61:{bad:"source"}},
