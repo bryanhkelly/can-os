@@ -76,11 +76,13 @@ export function WebsiteSiteContentStep({
     if(field.key==="schoolVision"&&siteKind==="training_workforce")return {...field,
       label:"Our vision for learners",help:"What skills or opportunities do you hope participants can explore?"};
     if(field.key==="churchHistory"&&!churchSite)return {...field,
-      label:"Your faith-based organization\u0027s story",
-      help:"How did your community or mission begin? Include only facts you want visitors to read."};
+      label:faithBased?"Your organization\u0027s faith story":"Previously saved church history",
+      help:faithBased?"How did your community or mission begin? Include only facts you want visitors to read."
+        :"Review this previously saved answer. You can edit or clear it."};
     if(field.key==="denomination"&&!churchSite)return {...field,
-      label:"Faith tradition or affiliation",
-      help:"Describe your Site\u0027s tradition. Only claim formal membership or endorsement when verified."};
+      label:faithBased?"Faith tradition or affiliation":"Previously saved religious affiliation",
+      help:faithBased?"Describe your Site\u0027s tradition. Only claim formal membership or endorsement when verified."
+        :"Review this previously saved answer. You can edit or clear it."};
     if(schoolExperience)return field;
     if(field.key==="heroHeadline")return {...field,
       help:"The first words visitors see. Your saved Site name remains in the header."};
