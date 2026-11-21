@@ -47,12 +47,13 @@ describe("Valor Biology hybrid Classroom Connect P0 contracts",()=>{
     expect(session).toContain("selected.grantId!==row.grant_id");
     expect(session).toContain("selected.sessionId!==row.session_id");
     expect(session).not.toContain("v301_canonical_session_context");
-    const sql=source("database/production/2026-11-20-valor-riley-classroom-connect-authority.sql");
-    expect(sql).toContain("lower(a.email_normalized) NOT LIKE '%.demo'");
-    expect(sql).toContain(fixGrant());
+    const sql=source("database/production/2026-11-20-can-staff-auth-parity-and-demo-delegation.sql");
+    expect(sql).toContain("target_account.person_id=g.person_id");
+    expect(sql).toContain("g.account_id=session_owner.id");
+    expect(sql).toContain("admin_grant.account_id=session_owner.id");
     expect(sql).toContain("s.revoked_at IS NULL");
-    expect(sql).toContain("g.active = true");
-    expect(sql).toContain("other_grant.person_id <> g.person_id");
+    expect(sql).toContain("g.active=true");
+    expect(sql).not.toContain("riley.teacher@valorschool.demo");
   });
   it("does not let Class sessions fall back to the unused native account grant",()=>{
     const operations=source("src/modules/learning/facilitated-learning-operations.server.ts");
@@ -70,4 +71,3 @@ describe("Valor Biology hybrid Classroom Connect P0 contracts",()=>{
     expect(fixture).toContain("Other Valor Class modes");
   });
 });
-function fixGrant(){return LOCAL_DEMO_RILEY_FACILITATOR.grantId;}
