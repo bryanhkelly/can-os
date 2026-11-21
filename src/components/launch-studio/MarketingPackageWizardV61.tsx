@@ -87,7 +87,7 @@ export function MarketingPackageWizardV61({
   const toggle=(current:readonly string[],value:string)=>
     current.includes(value)?current.filter(id=>id!==value):[...current,value];
   const highlightOptions:Highlight[]=[
-    {source:"vision",id:"site-vision",label:"Our learning community",role:"supporting"},
+    {source:"vision",id:"site-vision",label:"Our community",role:"supporting"},
     ...(siteIntent?.interestIds??[]).map(id=>({
       source:"program" as const,id,label:programLabels[id]??id,role:"supporting" as const,
     })),
@@ -147,8 +147,8 @@ export function MarketingPackageWizardV61({
       description="Choose the people receiving your outreach, then the people who will benefit from your work.">
       <div className="mt-5 space-y-5">
         <section className="space-y-3" aria-label="Primary Who">
-          <div><h3 className="text-sm font-semibold">Primary Who · Who are you reaching?</h3>
-            <p className="text-xs text-muted-foreground">Recipients. This does not add contacts or authorize sending.</p></div>
+          <div><h3 className="text-sm font-semibold">Who would you like to reach?</h3>
+            <p className="text-xs text-muted-foreground">Choose who this message is for. You'll decide how to share it later.</p></div>
           <fieldset className="flex flex-wrap gap-2">
             <legend className="text-sm font-medium">Relationship</legend>
             {relationshipOptions.map(item=><SelectionCard key={item.id} kind="radio"
@@ -166,7 +166,7 @@ export function MarketingPackageWizardV61({
         </section>
         <section className="space-y-3 border-t pt-5" aria-label="Secondary Who">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">Secondary Who · Who will benefit?</h3>
+            <h3 className="text-sm font-semibold">Who are you hoping to help?</h3>
             <span className="text-xs text-muted-foreground">Suggested from Establish</span>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -193,7 +193,7 @@ export function MarketingPackageWizardV61({
       </fieldset>
     </WorkspacePanel>}
     {step===2&&<WorkspacePanel title="What do you want to highlight?"
-      description="Choose one primary highlight and up to two supporting highlights from your saved planning information.">
+      description="Choose what you most want people to know. You can add two more things worth sharing.">
       {highlightOptions.length===0?<WorkspaceNotice tone="attention">
         No saved Programs, audiences, or Experiences are available. Add them under Establish →
         Programs &amp; Audiences before selecting a highlight.
@@ -228,7 +228,7 @@ export function MarketingPackageWizardV61({
       </div>}
     </WorkspacePanel>}
     {step===3&&<WorkspacePanel title="What do you want them to do?"
-      description="Choose one primary action. Actual forms, events, and sending remain separately authorized.">
+      description="Choose what you'd like people to do next. You'll set up any event or registration separately.">
       <fieldset className="mt-4 grid gap-3 sm:grid-cols-2">
         <legend className="sr-only">Primary next action</legend>
         {actionOptions.map(item=><SelectionCard key={item.id} kind="radio"
@@ -290,7 +290,7 @@ export function MarketingPackageWizardV61({
             if(alternative)onPatch({
               headline:alternative.headline||content.headline,message:alternative.message,
             });
-          }}>Use saved Website &amp; Brand wording</Button>}
+          }}>Use wording from my website</Button>}
         <div className="border p-4">
           <h3 className="text-sm font-semibold">Included materials</h3>
           <p className="mt-1 text-xs text-muted-foreground">{content.formats.map(id=>formatNames[id]).join(", ")||"Text or share-link copy only. No rendered material selected"}</p>
