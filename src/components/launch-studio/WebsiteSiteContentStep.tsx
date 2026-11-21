@@ -55,41 +55,33 @@ export function WebsiteSiteContentStep({
 
   return <div className="space-y-5">
     <div>
-      <h3 className="font-serif text-2xl">Build your website from what you have already shared.</h3>
+      <h3 className="font-serif text-2xl">Your Content</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         {canReuse
-          ? "Review prepared suggestions from your saved Site information, or write your own copy."
-          : "Your editorial fields start blank. Write your own copy; CAN OS will not prepare suggestions from previously collected Site information."}
+          ? "Edit suggested text or write your own."
+          : "Add the text you want on your website."}
       </p>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">
-        Prepared text is a suggestion, not a verified promise about programs, staff
-        or opening status. CAN OS remains the source of approved academic and admissions facts.
-      </p>
+
     </div>
-    {canReuse&&<p className="text-xs italic leading-5 text-muted-foreground">
-      With your permission, saved Purpose &amp; Story answers can prepare website
-      copy and outreach materials. Review facts and permissions before sharing.
-      Nothing goes live automatically.
-    </p>}
+
     <details className="border border-border p-3" aria-label="Website section source reference">
       <summary className="cursor-pointer text-sm font-semibold">
-        See every homepage section, heading, element and source
+        Where website content comes from
       </summary>
       <p className="mt-2 text-xs text-muted-foreground">
-        The exact saved Site and Brand names are displayed. This reference distinguishes
-        your editable copy from CAN's fixed template text and governed public records.
+        See which sections use your text, template content, or Site information.
       </p>
       <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/" />
     </details>
     {canReuse&&data.siteStoryCopyCandidates.length>0&&
       <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
         <span className="text-sm">
-          {data.siteStoryCopyCandidates.length} source-based drafts available from Site Information.
+          {data.siteStoryCopyCandidates.length} suggestions available.
         </span>
         <Button type="button" variant="outline" disabled={busy||!data.canEdit}
           onClick={()=>setContent(old=>prepareWebsiteCopyFromSiteInformation(
             old,data.siteStoryCopyCandidates))}>
-          Use Site Information in unchanged starter fields
+          Use suggested text
         </Button>
       </div>}
     {canReuse&&data.siteStorySourceChoices&&<div className="border bg-muted/20 p-4 text-sm" role="note">
@@ -108,26 +100,22 @@ export function WebsiteSiteContentStep({
     {primaryFields.map(renderField)}
     {canReuse&&<details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">
-        Review source-attributed church story suggestions (optional)
+        Suggested text (optional)
       </summary>
       <div className="mt-4">
         <ChurchSourceSuggestionReview currentRevision={data.currentRevision}/>
       </div>
     </details>}
     <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">More optional church details</summary>
+      <summary className="cursor-pointer text-sm font-semibold">More details (optional)</summary>
       <div className="mt-4 space-y-5">{additionalFields.map(renderField)}</div>
     </details>
     <WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>
     <details className="border p-4" id="website-content-layout">
       <summary className="cursor-pointer text-sm font-semibold">
-        Arrange Programs, Courses, Classes and website sections
+        Arrange website sections
       </summary>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">
-        These are Site-owned content blocks configured in Launch. Each reads
-        its approved source when available. Layout changes do not approve Programs
-        or open enrollment.
-      </p>
+
       {data.canPublish
         ? <div className="mt-4">
             <SiteContentChannelEditor
