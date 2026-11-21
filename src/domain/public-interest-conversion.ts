@@ -9,7 +9,8 @@ export function assertPublicInterestConversion(input: {
   interest: {
     status: string;
     applicationId: string | null;
-    programId: string;
+    // Site-level interest has no Program and cannot directly become an Application.
+    programId: string | null;
     siteId: string;
     firstName: string;
     lastName: string;
