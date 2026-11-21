@@ -17,7 +17,7 @@ export function launchModuleCompletionV61(site: {
   slug: string;
   timezone: string;
   siteIdentityRevision?: string | null;
-  websiteDraft: { status: "draft" | "published" } | null;
+  websiteDraft: { status: string } | null;
 }, evidence: LaunchOverviewEvidence | null): LaunchModuleCompletion {
   const result: LaunchModuleCompletion = {};
   // The persisted canonical Site record is the saved profile. Older Sites
