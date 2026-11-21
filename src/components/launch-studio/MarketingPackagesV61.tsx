@@ -37,7 +37,7 @@ type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[nu
 type MarketingSuggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
 
 function message(error:unknown) {
-  return error instanceof Error ? error.message : "The package operation could not be completed.";
+  return error instanceof Error ? error.message : "The outreach action could not be completed.";
 }
 
 type MarketingPackagesV61Props = {
@@ -141,7 +141,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const dirty=(view==="wizard" || (view==="detail" && editingFormat!==null)) && (!record || title!==record.title ||
     JSON.stringify(content)!==JSON.stringify(record.content));
   const releaseNavigation=useLaunchUnsavedChanges(()=>dirty||busy,
-    "Leave your Marketing Package? Unsaved changes will be lost.");
+    "Leave this outreach plan? Unsaved changes will be lost.");
 
   function open(recordToOpen:PackageRecord,editing=false) {
     setEditingFormat(null);
@@ -661,7 +661,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         description="Your unsaved edits will be lost. Previously saved content will remain."
         confirmLabel="Discard changes" destructive pending={busy}
         onClose={()=>setDiscardDialogOpen(false)} onConfirm={discardWizard} />
-      <ActionDialog open={Boolean(deleteCandidate)} title="Delete Marketing Package"
+      <ActionDialog open={Boolean(deleteCandidate)} title="Delete outreach plan"
         description="Delete unused drafts only. Packages with generated materials must be archived so their released files remain available. This cannot be undone."
         confirmLabel="Delete package" destructive pending={busy}
         onClose={()=>setDeleteCandidate(null)}
