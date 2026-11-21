@@ -18,7 +18,7 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { WorkspaceNotice, WorkspacePanel, ActionDialog, ActionFooter, PageHeader, PageFrame } from "@/components/workspace";
-import { GuidedSetupShell, GuidedSetupProgress } from "@/components/workflow";
+import { GuidedSetupShell } from "@/components/workflow";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
