@@ -545,7 +545,7 @@ function LocalWebsiteCopyEditor({
             editorialBaseline:old.editorialBaseline??baseline.editorialBaseline};
           if(data.currentRevision===0||old.contentReuseConsent==="denied"){
             for(const field of websiteStarterFieldIds)
-              if(!(withStarter[field]??"").trim())withStarter[field]=baseline[field];
+              if(!(withStarter[field]??"").trim() && typeof baseline[field]==="string")withStarter[field]=baseline[field];
             return prepareWebsiteCopyFromSiteInformation(withStarter,data.siteStoryCopyCandidates);
           }
           return withStarter;
