@@ -48,6 +48,7 @@ const starterFieldSchemas = Object.fromEntries(websiteStarterFieldIds.map(field 
 const siteFontIds = Object.keys(siteFontCatalog) as [SiteFontId, ...SiteFontId[]];
 const localContentSchema = z.object({
   ...localFields,
+  contentReuseConsent: z.enum(["unselected", "granted", "denied"]).optional(),
   leadershipMembers:z.array(z.object({
     id:z.string().regex(/^[a-zA-Z0-9-]{8,64}$/),
     name:z.string().max(120),
