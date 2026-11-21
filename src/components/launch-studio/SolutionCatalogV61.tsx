@@ -126,7 +126,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
     : [];
 
   return <WorkspacePanel title="Available Solutions"
-    description="Browse CAN-published Solutions and configure your Site plan. Definitions are maintained separately by CAN app administrators.">
+    description="Find solutions that fit your community's plans. Explore what's included and what you'll need to get started.">
     {switchError && <div role="alert" className="mt-3 border border-border bg-muted p-3 text-sm">
       <p>{switchError}</p>
       {editorState.reconciliationRequired && <Button type="button" variant="outline"
@@ -139,17 +139,16 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
       <p className="font-semibold">Unable to load Solutions</p>
       <p className="mt-2 text-muted-foreground">{error}</p>
       <p className="mt-2 text-muted-foreground">
-        Your verified Site administrator grant is sufficient for private Solution
-        planning. If the catalog cannot load, check the service connection and
-        try again. Saved Site plans are not changed by a failed read.
+        You can explore and plan solutions for this site. We couldn't load them right now.
+        Try again; your saved plans haven't changed.
       </p>
       <Button type="button" variant="outline" size="sm" className="mt-3"
-        onClick={() => setReload(value => value + 1)}>Retry Program Catalog</Button>
+        onClick={() => setReload(value => value + 1)}>Try again</Button>
     </div>}
     {workspace && <>
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>{templates.length} published {templates.length === 1 ? "Solution" : "Solutions"}</span>
-        <span>{workspace.configurations.length} saved Site {workspace.configurations.length === 1 ? "configuration" : "configurations"}</span>
+        <span>{workspace.configurations.length} saved {workspace.configurations.length === 1 ? "plan" : "plans"}</span>
       </div>
       {templates.length === 0 ? <EmptyState title="No published Solutions"
         description="A Solution must be published and available to this Site before it can be configured." className="mt-4" /> : <>
@@ -189,7 +188,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                   icon={<span className="flex size-9 shrink-0 items-center justify-center bg-muted"><Layers3 aria-hidden="true" className="size-4" /></span>}
                   title={template.title}
                   detail={<>
-                    <span className="block">Version {template.versionNo} · {template.components.length} components</span>
+                    <span className="block">{template.components.length} {template.components.length === 1 ? "part" : "parts"} to explore</span>
                     {academicBlocked && <span className="mt-1 block font-medium">Grades 6–12 academy · authorization required</span>}
                     {matchesProgram && <span className="mt-1 block font-semibold text-primary">Matches a Program selected in Establish</span>}
                     {visionMatches.length > 0 && <span className="mt-1 block font-medium text-primary">
@@ -201,17 +200,17 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
             </div>
             {selected && <article className="border bg-background" aria-label="Selected Solution detail">
               <div className="border-b bg-muted p-5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><BookOpen aria-hidden="true" className="size-4" /> Published Solution model</div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><BookOpen aria-hidden="true" className="size-4" /> About this solution</div>
                 <h3 className="mt-3 font-serif text-2xl">{selected.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">Version {selected.versionNo} · {selected.components.length} components in this published configuration</p>
+                <p className="mt-2 text-sm text-muted-foreground">See what's included and what your site may need to provide.</p>
                 {selected.offeringCode && <p className="mt-2 text-xs text-muted-foreground">
-                  Linked Offering: {selected.offeringCode}. Publication, adoption and learner enrollment must each be authorized independently.
+                  This solution is linked to an offering. You'll complete its requirements before registration can open.
                 </p>}
               </div>
               <div className="space-y-5 p-5">
                 <div>
-                  <h4 className="text-sm font-semibold">Included operating components</h4>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">A required component comes from the published Solution model. It does not mean your Site has met that requirement or received legal approval.</p>
+                  <h4 className="text-sm font-semibold">What's included</h4>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Some parts have requirements you'll need to meet before offering this solution.</p>
                   <div className="mt-3 space-y-2">
                     {selected.components.map(component => <div key={component.id} className="flex flex-wrap items-start justify-between gap-3 border p-3">
                       <div className="min-w-0 flex-1">
@@ -225,10 +224,10 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">{readable(component.requirementMode)} · {readable(component.kind)}</span>
                     </div>)}
-                    {selected.components.length === 0 && <p className="text-sm text-muted-foreground">This Solution does not currently list any operating components.</p>}
+                    {selected.components.length === 0 && <p className="text-sm text-muted-foreground">No setup details are listed for this solution yet.</p>}
                   </div>
                 </div>
-                <p className="text-xs leading-5 text-muted-foreground">Detailed activities, resources, safety requirements and applicability are verified through the governed Solution and Site qualification workflows. This preview does not infer missing requirements.</p>
+                <p className="text-xs leading-5 text-muted-foreground">When you start a plan, you'll see which activities, spaces, staffing, and safety checks apply to your site.</p>
                 {isSchoolYearBlocked(selected) ?
                   <p className="border bg-muted p-3 text-sm text-muted-foreground">
                     This academic school-year Solution is not enabled for the Site.
