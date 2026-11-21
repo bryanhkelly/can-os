@@ -10,8 +10,7 @@ import {
 import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
-import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
-  noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
+import type { SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 
@@ -79,7 +78,6 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
 }) {
   const router = useRouter();
   const [step, setStep] = useState<InternalStep>(0);
-  const schoolYearAvailability = initial.schoolYearAvailability ?? noSchoolYearAvailability;
   const [draft, setDraft] = useState<SiteProgramsAudiencesV61>(() => ({
     interestIds: [...initial.intent.interestIds],
     timingIds: [...initial.intent.timingIds],
@@ -230,20 +228,13 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           </div>}
           {programCatalog && <div className="grid gap-3 sm:grid-cols-2">
             {programs.map(item => {
-              const schoolYearBlocked = !academyReferenceMayBeSelected(item,schoolYearAvailability);
               const selected = draft.programCodes?.includes(item.code) ?? false;
               return <div key={item.code} className="min-w-0 space-y-1">
                 <SelectionCard kind="checkbox"
                   value={item.code} title={item.title}
-                  detail={<>{item.summary}{schoolYearBlocked && <span className="mt-2 block font-medium">
-                    Currently unavailable
-                  </span>}</>}
-                  checked={selected} disabled={disabled || schoolYearBlocked}
+                  detail={item.summary}
+                  checked={selected} disabled={disabled}
                   onChange={checked => toggleProgram(item.code, checked)} />
-                {schoolYearBlocked && selected && <Button type="button" size="sm"
-                    variant="outline" disabled={disabled} onClick={() => toggleProgram(item.code,false)}>
-                    Remove previously selected school-year Program
-                  </Button>}
               </div>;
             })}
           </div>}
@@ -266,20 +257,13 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             <h3 className="text-sm font-semibold">Other learning ideas</h3>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {interests.map(choice => {
-                const schoolYearBlocked = !schoolYearInterestMayBeSelected(choice.id,schoolYearAvailability);
                 const selected = draft.interestIds.includes(choice.id);
                 return <div key={choice.id} className="min-w-0 space-y-1">
                   <SelectionCard kind="checkbox"
                     value={choice.id} title={choice.label}
-                    detail={<>{choice.detail}{schoolYearBlocked && <span className="mt-2 block font-medium">
-                      Currently unavailable
-                    </span>}</>} icon={choice.icon}
-                    checked={selected} disabled={disabled || schoolYearBlocked}
+                    detail={choice.detail} icon={choice.icon}
+                    checked={selected} disabled={disabled}
                     onChange={checked => toggleInterest(choice.id, checked)} />
-                  {schoolYearBlocked && selected && <Button type="button" size="sm"
-                      variant="outline" disabled={disabled} onClick={() => toggleInterest(choice.id,false)}>
-                      Remove previously selected interest
-                    </Button>}
                 </div>;
               })}
             </div>
