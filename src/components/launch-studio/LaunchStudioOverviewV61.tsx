@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
 import { WorkspaceShell, WorkspacePanel, StatusBadge, type StatusTone } from "@/components/workspace";
+import { SiteGuideV61 } from "./SiteGuideV61";
 
 export type LaunchOverviewProps = {
   site: { id: string; name: string; statusLabel: string; statusTone: StatusTone };
@@ -42,10 +43,13 @@ const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }))
  */
 export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, workspaceUrl, completion = {} }: LaunchOverviewProps) {
   const rail = <div className="space-y-4">
-    <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">Share your vision, bring people together, and build a place where your community can thrive.</p>
-      <div className="mt-5 border-t pt-4"><h3 className="text-sm font-semibold">Work at your own pace</h3><p className="mt-2 text-sm text-muted-foreground">You can return to your Site Workspace anytime.</p></div>
-    </WorkspacePanel>
+    <SiteGuideV61 guide={{
+      summary: mode === "first-visit" ? "Your vision begins with a Site, the people you want to serve and the experiences you hope to offer." : `You're continuing the launch plan for ${site.name}.`,
+      highlights: [site.statusLabel],
+      insight: "You can share a private vision before your services are ready. Operational requirements and registration decisions come later.",
+      connection: "Shape informs your website and outreach. Prepare translates intentions into plans; Launch checks each offering's actual readiness.",
+      next: nextAction.description,
+    }} />
     <WorkspacePanel title="Your website, as it grows">
       <p className="text-sm leading-6 text-muted-foreground">Preview your website whenever you like. You can share a private preview with others before you publish it.</p>
       <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Ready for you to view" : "Not available yet"}</div>
