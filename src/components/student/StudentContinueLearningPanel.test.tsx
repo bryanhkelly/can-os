@@ -42,10 +42,17 @@ describe("student learning resumption panel", () => {
         status:"assigned",timeliness:"on_time",assessmentStatus:"published",
         canEdit:true,kind:"due_soon",label:"Due within seven days"}}
       unavailable={false} hasClasses={true}/>);
-    expect(html).toContain("Resume Lesson");
+    expect(html).toContain("Choose Class");
     expect(html).toContain("Assignment needing attention");
     expect(html).toContain("Unit 1 Problem Set");
     expect(html).toContain("Continue assignment");
+  });
+  it("links a canonical enrolled Class even when legacy Section progress is unavailable", () => {
+    const html=renderToStaticMarkup(<StudentContinueLearningPanel
+      resume={null} unavailable={true} hasClasses={true}
+      classes={[{classId:"canonical-algebra-id",title:"Algebra I",status:"active",courseAttemptId:"attempt"}]}/>);
+    expect(html).toContain("Algebra I");
+    expect(html).not.toContain("No enrolled classes are available yet");
   });
   it("preserves a genuine no-enrollment state", () => {
     const html=renderToStaticMarkup(<StudentContinueLearningPanel
