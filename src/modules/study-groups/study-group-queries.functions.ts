@@ -164,6 +164,9 @@ export const listStudentStudyGroupClassmates=createServerFn({method:"GET"})
  });
 type SerializableGroupMetadata = null | boolean | number | string |
   SerializableGroupMetadata[] | { [key: string]: SerializableGroupMetadata };
+const jsonGroupMetadataSchema: z.ZodType<SerializableGroupMetadata> = z.lazy(() =>
+  z.union([z.null(), z.boolean(), z.number().finite(), z.string(),
+    z.array(jsonGroupMetadataSchema), z.record(jsonGroupMetadataSchema)]));
 
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  const actor=await groupActor("student");
@@ -174,7 +177,7 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.obje
  // Database JSON is serializable, but the schema exposes metadata as
  // Record<string, unknown>. Give the transport boundary its actual JSON type.
  const serializableGroup = {...group,
-  metadata: group.metadata as SerializableGroupMetadata};
+  metadata: jsonGroupMetadataSchema.parse(group.metadata)};
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
  if(!permitted)return {group:serializableGroup,memberStatus:membership?.status??null,posts:[],sessions:[]};
