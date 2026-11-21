@@ -108,7 +108,7 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
     expect(wizard).toContain("<GuidedSetupProgress");
-    expect(wizard).toContain('label="Package progress"');
+    expect(wizard).toContain('label="Introduce outreach steps"');
     expect(gallery).toContain("aria-pressed={viewport === size}");
     expect(gallery).toContain('kind="radio" name="site-wireframe"');
     expect(gallery).toContain("<SelectionCard");
