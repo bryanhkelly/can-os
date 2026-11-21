@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
+import type { SiteProgramsAudiencesV61 } from "./site-launch-preferences";
+import { projectSiteExperienceBriefV61 } from "./site-content-brief-v61";
 
 /** Brand-independent source content. No Site theme, media blob or publication claim is stored here. */
 export const marketingPurposeIds = ["site-announcement", "program-interest", "interest-invitation", "event-invitation"] as const;
@@ -61,11 +63,19 @@ export function outreachStepIssueV61(step: typeof outreachStepIdsV61[number],
 
 /** Deterministic editorial starting point until Site Intelligence is integrated.
  * It reflects operator-selected planning interests, never approved offerings. */
-export function composeOutreachDraftV61(siteName: string, plan: OutreachPlanV61) {
+export function composeOutreachDraftV61(
+  siteName: string, plan: OutreachPlanV61, intent?: SiteProgramsAudiencesV61 | null,
+) {
   const focus=plan.highlights.find(item=>item.role==="primary")?.label ??
     "community learning opportunities";
   const supporting=plan.highlights.filter(item=>item.role==="supporting")
     .map(item=>item.label);
+  const featuredExperience=plan.highlights.find(item=>item.role==="primary" &&
+    item.source==="experience");
+  const experience=featuredExperience
+    ? projectSiteExperienceBriefV61(intent??null).find(item=>item.id===featuredExperience.id)
+    : null;
+  const activities=experience?.activities.slice(0,2)??[];
   const beneficiaries=plan.beneficiaries.map(id=>({
     children:"children",teens:"teens",adults:"adults",older_adults:"older adults",
   }[id])).join(" and ");
@@ -96,6 +106,7 @@ export function composeOutreachDraftV61(siteName: string, plan: OutreachPlanV61)
     (supporting.length?", with interests such as "+supporting.join(" and "):"")+
     (beneficiaries?", for "+beneficiaries:"")+
     ". These are proposed opportunities, and details have not been finalized. "+
+    (activities.length?"Possible activities include "+activities.join(" and ")+". ":"")+
     "We'd love to connect with "+recipientText+" to "+angle+
     ". Your ideas and participation can help shape what comes next.";
   return {

@@ -43,6 +43,14 @@ describe("Launch Studio V6.1 Introduce integration",()=>{
       source:"experience",id:"financial-literacy",label:"Financial Literacy",role:"primary",
     }]});
     expect(draft.message).toContain("proposed opportunities");
+    const withActivities=composeOutreachDraftV61("Test Site",{
+      ...plan,highlights:[{source:"experience",id:"financial-literacy",label:"Financial Literacy",role:"primary"}],
+    },{interestIds:["adult"],timingIds:[],audienceIds:["adults"],startingFocus:null,
+      experienceIds:["financial-literacy"],
+      experienceDetails:[{id:"financial-literacy",priority:"featured",
+        activityIds:["creating-a-budget"],outcomeIds:[],
+        audienceIds:["adults"],programIds:["adult"]}]});
+    expect(withActivities.message).toContain("Creating a budget");
     expect(draft.message).not.toMatch(/now enrolling|accredited|approved to operate/i);
     expect(source("src/db/schema/marketing-packages.ts")).toContain("jsonb");
   });

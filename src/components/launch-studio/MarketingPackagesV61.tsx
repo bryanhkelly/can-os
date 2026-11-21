@@ -220,7 +220,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       // The first draft is automatic; subsequent navigation must never
       // silently replace a message the operator has written or approved.
       const nextContent=step===4&&content.plan&&!hasAuthoredCopy
-        ? {...content,...composeOutreachDraftV61(siteName,content.plan)}
+        ? {...content,...composeOutreachDraftV61(siteName,content.plan,siteIntent)}
         : content;
       const saved=await saveCurrent(nextContent);
       setContent(saved.content);
