@@ -105,8 +105,8 @@ export function readSiteProgramsAudiencesV61(raw: unknown): SiteProgramsAudience
     ...(source.programCodes ? { programCodes: source.programCodes } : {}),
     ...(source.startingProgramCode !== undefined
       ? { startingProgramCode: source.startingProgramCode } : {}),
-    experienceIds: source.experienceIds ?? [],
-    customExperiences: source.customExperiences ?? [],
+    ...(source.experienceIds !== undefined ? {experienceIds:source.experienceIds} : {}),
+    ...(source.customExperiences !== undefined ? {customExperiences:source.customExperiences} : {}),
   });
 }
 
@@ -130,7 +130,7 @@ export function applySiteProgramsAudiencesV61(
     ...(plan.programCodes !== undefined ? { programCodes: plan.programCodes } : {}),
     ...(plan.startingProgramCode !== undefined
       ? { startingProgramCode: plan.startingProgramCode } : {}),
-    experienceIds: plan.experienceIds ?? [],
-    customExperiences: plan.customExperiences ?? [],
+    ...(plan.experienceIds !== undefined ? {experienceIds:plan.experienceIds} : {}),
+    ...(plan.customExperiences !== undefined ? {customExperiences:plan.customExperiences} : {}),
   });
 }

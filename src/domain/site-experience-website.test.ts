@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultSiteContentChannelConfig, resolveSiteContentBlocks,
-  siteContentChannelConfigSchema,
+  siteContentChannelConfigSchema, projectMissingSiteExperienceSectionsForPreview,
 } from "./site-content-channels";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "./public-site-html";
 import { publicSitePagePaths } from "./public-site-paths";
@@ -52,6 +52,16 @@ describe("Site Experiences website integration",()=>{
     });
     expect(resolveSiteContentBlocks(disabled,{mode:"private",preferences:intent})
       .some(block=>block.channel==="learning.experiences")).toBe(false);
+    expect(projectMissingSiteExperienceSectionsForPreview(disabled,intent)).toEqual([]);
+  });
+  it("adds private suggestions to older layouts without a parallel data store",()=>{
+    const legacy={...defaultSiteContentChannelConfig,
+      blocks:defaultSiteContentChannelConfig.blocks.filter(block=>
+        block.channel!=="learning.experiences")};
+    const projected=projectMissingSiteExperienceSectionsForPreview(legacy,intent);
+    expect(projected.map(block=>block.page??"/")).toEqual(["/","/experiences"]);
+    expect(projected[0]?.items[0]?.title).toBe("Digital Confidence");
+    expect(projectMissingSiteExperienceSectionsForPreview(legacy,null)).toEqual([]);
   });
   it("keeps page and provenance registries aligned",()=>{
     expect(publicSitePagePaths).toContain("/experiences");

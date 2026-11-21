@@ -8,7 +8,7 @@ import {AuthorizationError} from "@/domain/command-context";
 import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
 import {availablePublicSitePaths,renderPublicSiteHtml} from "@/domain/public-site-html";
-import {safeReadSiteContentChannelConfig,resolveSiteContentBlocks} from "@/domain/site-content-channels";
+import {safeReadSiteContentChannelConfig,resolveSiteContentBlocks,projectMissingSiteExperienceSectionsForPreview} from "@/domain/site-content-channels";
 import {schoolPlanningLocationSchema} from "@/domain/school-stub";
 import {readOptionalSitePublishedClasses} from "@/modules/sites/site-published-classes.server";
 import {siteLaunchPreferencesSchema} from "@/domain/site-launch-preferences";
@@ -114,7 +114,11 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
     site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
     parentInformation:projectApprovedParentInformation({
       site,academicPrograms,offerings,localContent,...parentExtras,
-    }),contentBlocks,enrollmentOpportunities,
+    }),contentBlocks:[
+      ...contentBlocks,
+      ...projectMissingSiteExperienceSectionsForPreview(
+        config,launchPrefs.success?launchPrefs.data:null),
+    ],enrollmentOpportunities,
   };
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.

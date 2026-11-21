@@ -25,7 +25,7 @@ describe("Establish Experiences planning", () => {
     expect(siteLaunchPreferencesSchema.parse(stored).experienceIds).toEqual(adultPlan.experienceIds);
     expect(readSiteProgramsAudiencesV61(stored).customExperiences).toEqual(["Gardening club"]);
     expect(readSiteProgramsAudiencesV61({delivery:"physical",interestIds:["adult"]})
-      .experienceIds).toEqual([]);
+      .experienceIds ?? []).toEqual([]);
   });
   it("keeps experience choices when Program/audience selections change",()=>{
     const saved=applySiteProgramsAudiencesV61(null,adultPlan,"both");

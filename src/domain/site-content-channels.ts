@@ -261,6 +261,22 @@ export function websitePreviewEditorialBlocks(
 }
 
 
+/** Private-only fallback for Sites that saved their website layout before the
+ * Experience channel existed. Explicitly disabled or removed Experience
+ * sections in a newer layout remain under the editor's control. */
+export function projectMissingSiteExperienceSectionsForPreview(
+  config: SiteContentChannelConfig,
+  preferences: SiteLaunchPreferences | null,
+): SiteContentBlockProjection[] {
+  if (!preferences || config.blocks.some(block=>block.channel==="learning.experiences"))
+    return [];
+  const experienceBlocks=defaultSiteContentChannelConfig.blocks.filter(block=>
+    block.channel==="learning.experiences");
+  return resolveSiteContentBlocks({
+    ...defaultSiteContentChannelConfig, blocks:experienceBlocks,
+  },{mode:"private",preferences});
+}
+
 export type SitePublishedClassListing = {
   classId:string;title:string;
   deliveryMode:"self_paced"|"scheduled"|"facilitated"|"hybrid";

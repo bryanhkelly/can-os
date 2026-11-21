@@ -19,7 +19,7 @@ import { organizations, siteAffiliations, sitePublications, sites } from "@/db/s
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
-import { defaultSiteContentChannelConfig, safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks, projectMissingSiteExperienceSectionsForPreview } from "@/domain/site-content-channels";
 import { siteExperienceCatalog } from "@/domain/site-experience-interests";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
@@ -159,18 +159,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // They do not require an adopted Solution or grant registration authority.
   const proposedPrograms = projectPlannedSiteProgramsForPreview(
     preferences.success ? preferences.data : null, baseContentBlocks);
-  // Existing authored layouts remain authoritative, including an explicit
-  // Experience block disabled by the operator. Older Site layouts without
-  // this new channel get a private-only suggested homepage and detail page.
-  const experienceConfigured=contentConfig.blocks.some(block=>
-    block.channel==="learning.experiences");
-  const proposedExperiences=!experienceConfigured && preferences.success
-    ? resolveSiteContentBlocks({
-      ...defaultSiteContentChannelConfig,
-      blocks:defaultSiteContentChannelConfig.blocks.filter(block=>
-        block.channel==="learning.experiences"),
-    },{mode:"private",preferences:preferences.data})
-    : [];
+  const proposedExperiences=projectMissingSiteExperienceSectionsForPreview(
+    contentConfig,preferences.success?preferences.data:null);
   const contentBlocks = [
     ...websitePreviewEditorialBlocks(baseContentBlocks),
     ...proposedPrograms,

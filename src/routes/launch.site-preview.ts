@@ -23,7 +23,7 @@ import { linkPrivateSitePreviewPages } from "@/domain/site-private-preview-navig
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
-import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks, projectMissingSiteExperienceSectionsForPreview } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "@/modules/sites/site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
@@ -171,6 +171,8 @@ export const Route=createFileRoute("/launch/site-preview")({
         page.contentBlocks=[
           ...websitePreviewEditorialBlocks(baseContentBlocks),
           ...proposedPrograms,
+          ...projectMissingSiteExperienceSectionsForPreview(
+            config,parsed.success?parsed.data:null),
         ];
         const availablePages=availablePublicSitePaths(page);
         // Authorized operators can inspect a page before it becomes publicly

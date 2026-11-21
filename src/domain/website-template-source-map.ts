@@ -5,7 +5,7 @@ import type { PublicSiteHomeSections } from "./public-site-templates";
 
 export type WebsiteSourceKind =
   | "site-identity" | "site-copy" | "site-story" | "site-media"
-  | "approved-records" | "site-layout" | "template-copy" | "computed";
+  | "approved-records" | "site-layout" | "site-planning" | "template-copy" | "computed";
 
 export type WebsiteElementSource = {
   element: string;
@@ -263,7 +263,7 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
       field("Experience names, descriptions and intended audiences/Programs",
         "Establish → Programs & Audiences → Experiences",
         "Finite catalog categories and Site-authored ideas. Audience and Program associations are descriptive, not eligibility claims.",
-        "Establish → Programs & Audiences → Experiences","site-story"),
+        "Establish → Programs & Audiences → Experiences","site-planning"),
       sourceLayout("Page block headings, description and placement","The Site-owned learning.experiences channel controls editable section headings, card layout and page placement."),
       derived("No enrollment actions","Planned Experiences cannot create registration links; separately authorized Programs, Courses and Classes are published elsewhere."),
     ],
