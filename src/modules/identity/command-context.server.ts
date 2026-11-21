@@ -1,4 +1,4 @@
-import {and,eq,gt,isNull,inArray} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray,isNotNull} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
@@ -36,7 +36,8 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
-   gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false)))
+   gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false),
+   isNotNull(accessAccounts.emailVerifiedAt)))
   .limit(1);
  if(!session) return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
@@ -62,6 +63,23 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  }
  const activeGrant=grants.find(grant=>grant.id===session.activeGrantId);
  if(!activeGrant)return rejectSession(request,"membership_unavailable");
+ // Demo Admin is the only permitted cross-account switcher. The selected
+ // Person is authenticated through the privileged owner's current session,
+ // but their own account verification, identity and grants remain ordinary.
+ // Invalid/revoked target credentials cannot silently become valid via demo.
+ if(demoAccountSwitching && activeGrant.accountId!==session.accountId){
+  const [target]=await db.select({
+   personId:accessAccounts.personId,
+  }).from(accessAccounts).where(and(
+   eq(accessAccounts.id,activeGrant.accountId),
+   eq(accessAccounts.disabled,false),
+   isNotNull(accessAccounts.emailVerifiedAt),
+  )).limit(1);
+  if(!target || target.personId!==activeGrant.personId)
+   return rejectSession(request,"membership_unavailable");
+  try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
+  catch { return rejectSession(request,"membership_unavailable"); }
+ }
  const context=resolveAccessContext({
   accountId:activeGrant.accountId,
   sessionId:session.id,activeGrantId:session.activeGrantId,
