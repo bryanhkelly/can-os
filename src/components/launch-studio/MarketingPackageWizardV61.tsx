@@ -7,7 +7,7 @@ import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
 import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   composeOutreachDraftV61, initialOutreachPlanV61, marketingAudienceOptions,
-  marketingPurposeOptions, outreachFormatsV61, outreachStepIdsV61,
+  outreachFormatsV61, outreachStepIdsV61,
   type MarketingFormat, type MarketingPackageContent, type OutreachPlanV61,
 } from "@/domain/marketing-package-v61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
@@ -69,15 +69,13 @@ type Highlight=OutreachPlanV61["highlights"][number];
  * by the existing Marketing Package service. No separate marketing CMS. */
 export function MarketingPackageWizardV61({
   siteId,siteName,siteIntent,step,title,content,busy,brandVersionId,currentSuggestion,
-  activePreviewFormat,starter,onTitleChange,onPatch,
+  activePreviewFormat,onTitleChange,onPatch,
   onBack,onSaveExit,onNext,hasSavedPackage,
 }:{
   siteId:string;siteName?:string;siteIntent?:SiteProgramsAudiencesV61|null;
   step:number;title:string;content:MarketingPackageContent;busy:boolean;
   brandVersionId:string|null;currentSuggestion:Suggestion|null;
-  purposeOptions:ReadonlyArray<(typeof marketingPurposeOptions)[number]>;
   activePreviewFormat:MarketingFormat|null;
-  starter:(purpose:MarketingPackageContent["purpose"])=>MarketingPackageContent;
   onTitleChange:(value:string)=>void;onPatch:(value:Partial<MarketingPackageContent>)=>void;
   onBack:()=>void;onSaveExit:()=>void;onNext:()=>void;hasSavedPackage:boolean;
 }){

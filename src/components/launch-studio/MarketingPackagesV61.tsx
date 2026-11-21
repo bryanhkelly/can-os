@@ -452,7 +452,6 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         siteId={siteId} siteName={siteName} siteIntent={siteIntent} step={step} title={title} content={content}
         busy={busy} brandVersionId={record?.brandVersionId??null}
         currentSuggestion={currentSuggestion}
-        purposeOptions={purposeOptions} starter={starter}
         activePreviewFormat={activePreviewFormat}
         hasSavedPackage={Boolean(record)}
         onTitleChange={setTitle} onPatch={patch}
