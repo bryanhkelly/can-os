@@ -255,7 +255,7 @@ export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentI
 export const sitePublishedExperienceCardsSchema=z.array(z.object({
   id:z.string().max(128),title:z.string().max(120),
   description:z.string().max(1200),label:z.string().max(500),
-}).strict()).max(40);
+}).strict()).max(siteExperienceById.size+12);
 export type SitePublishedExperienceCard=z.infer<typeof sitePublishedExperienceCardsSchema>;
 
 export function projectSiteExperienceItems(

@@ -208,13 +208,14 @@ export function EstablishExperiencesV61({draft,setDraft,disabled,programCatalog}
       </WorkspaceNotice>:<div className="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
         <div className="space-y-2">
           <h4 className="text-sm font-semibold">Your selected Experiences</h4>
-          {selectedTopics.map(topic=><button key={topic.id} type="button" disabled={disabled}
+          {selectedTopics.map(topic=><Button key={topic.id} type="button"
+            disabled={disabled} size="sm"
+            variant={activeId===topic.id?"default":"outline"}
             aria-pressed={activeId===topic.id}
             onClick={()=>setActiveId(topic.id)}
-            className={"flex w-full items-center justify-between gap-2 border px-3 py-3 text-left text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary "+
-              (activeId===topic.id?"border-primary bg-primary/10":"border-border bg-card hover:bg-muted")}>
+            className="min-h-12 w-full justify-between whitespace-normal px-3 py-3 text-left">
             {topic.title}{activeId===topic.id&&<Check size={16} aria-hidden="true"/>}
-          </button>)}
+          </Button>)}
           <Button variant="outline" className="w-full" onClick={()=>selectStage("choose")}
             disabled={disabled}><ArrowLeft aria-hidden="true"/> Change topics</Button>
         </div>
