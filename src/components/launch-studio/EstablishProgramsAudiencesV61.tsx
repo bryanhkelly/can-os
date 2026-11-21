@@ -232,16 +232,16 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   const sections = [
     { id: "interests", title: "Programs", description: "What you want to offer",
       status: step === 0 ? "current" as const : "upcoming" as const },
-    { id: "audiences", title: "Audiences", description: "Who you want to reach",
+    { id: "audiences", title: "Audiences", description: "Who you hope to serve",
       status: step === 1 ? "current" as const : "upcoming" as const },
-    { id: "experiences", title: "Experiences", description: "What people could do and enjoy",
+    { id: "experiences", title: "Experiences", description: "What people could learn, do or enjoy",
       status: step === 2 ? "current" as const : "upcoming" as const },
   ];
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
-    <GuidedSetupShell title={step === 0 ? "What would you like to offer?" :
+    <GuidedSetupShell title={step === 0 ? "What would you like to bring to your community?" :
       step === 1 ? "Who do you hope to serve?" : "What experiences interest you?"}
       description={step === 0
-        ? "Choose the Programs and learning ideas you want to explore."
+        ? "Choose the program ideas you want to explore. You will select how to deliver them in Prepare."
         : step === 1 ? "Choose the people you hope to serve."
         : "Imagine what people could learn, do or enjoy. Details and approvals come later in Prepare."}
       steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : id === "audiences" ? 1 : 2)} navigationDisabled={disabled}>
