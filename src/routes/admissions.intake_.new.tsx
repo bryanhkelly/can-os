@@ -80,7 +80,7 @@ function InquiryCreation({ data }: { data: {
       description="This public interest is unavailable in your authorized Site and Program scope."/>}
     {interest && !convertibleInterest && <div role="status" className="mt-5 border p-4 text-sm">
       This public interest is {interest.status}; it cannot be converted again.
-      {interest.applicationId && <Link to="/admissions/intake" search={{ siteId: interest.siteId, programId: interest.programId, application: interest.applicationId }}
+      {interest.applicationId && <Link to="/admissions/intake" search={{ siteId: interest.siteId, programId: interest.programId ?? undefined, application: interest.applicationId }}
         className="ml-2 underline">View linked admissions inquiry</Link>}
     </div>}
     {convertibleInterest && <div className="mt-5 space-y-3 border p-4 text-sm">
