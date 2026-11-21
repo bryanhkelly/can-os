@@ -94,7 +94,8 @@ async function marketingSource(
         .catch(()=>[])
     : [];
   const reuseAllowed=brief.consent.contentReuseAllowed;
-  return {reuseAllowed,story:brief.story,intent:reuseAllowed?intent:null,
+  return {reuseAllowed,story:brief.story,identity:reuseAllowed?brief.identity:null,
+    intent:reuseAllowed?intent:null,
     experiences:reuseAllowed?brief.experiences:[],
     publishedPrograms:reuseAllowed?publishedPrograms:[],websiteCopy:brief.websiteCopy};
 }
