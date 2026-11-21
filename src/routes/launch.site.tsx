@@ -54,7 +54,9 @@ export const Route = createFileRoute("/launch/site")({
       : Promise.resolve(null);
     // Project next steps from real Site-scoped reads. A failed read must never
     // be confused with an empty saved answer or falsely reported as complete.
-    const overview = site ? await (async () => {
+    // Website & Brand redirects to its dedicated route; avoid five overview
+    // reads for a page whose only rendered content is a redirect.
+    const overview = site && deps.module !== "website-brand" ? await (async () => {
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
         measureServerStep("launch.site", "overview-information", () => readSiteInformationV61({ data: { siteId: site.id } })),
         measureServerStep("launch.site", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: site.id } })),
