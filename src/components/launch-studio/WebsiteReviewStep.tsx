@@ -28,33 +28,26 @@ export function WebsiteReviewStep({
   return <div className="space-y-4">
     <div>
       <h3 className="text-lg font-semibold">Review your website</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Preview your pages. Family information and institutional approvals are managed separately.
-      </p>
+
     </div>
     <div className="flex flex-wrap items-center gap-3">
       <Button type="button" disabled={previewPending} onClick={onPreview}
         size="lg">
-        {previewPending?"Generating secure preview...":"Preview unsaved changes"}
+        {previewPending?"Preparing preview...":"Preview changes"}
       </Button>
       <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center border border-primary px-4 py-2 text-sm font-semibold text-primary">
-        {data.currentRevision===0?"Open full-page sample preview":"Open full-page preview"}
+        {data.currentRevision===0?"Open full-page preview":"Open full-page preview"}
       </a>
       {data.currentRevision>0&&<Button type="button" variant="outline" className="min-h-11 border"
         onClick={()=>void navigator.clipboard.writeText(
           new URL(privateWebsitePreviewUrl(data.siteId),window.location.origin).href,
         ).then(()=>onShareMessage("Preview link copied. Reviewers must sign in with their own authorized Site account."))
           .catch(()=>onShareMessage("Copy the address from Open full-page preview; clipboard permission was unavailable."))}>
-        Copy private preview link
+        Copy preview link
       </Button>}
     </div>
-    <p className="text-xs text-muted-foreground">
-      This private full-page link requires CAN OS sign-in; use Share preview for external
-      reviewers. It does not publish a draft.
-      {data.currentRevision>0?" It shows the latest saved revision.":" Until the first save, it shows a sample, not unsaved edits."}
-      {dirty?" You have unsaved edits; save them before sharing the latest design.":""}
-    </p>
+    <p className="text-xs text-muted-foreground">This preview requires sign-in. Use Share preview to send a link to others.</p>
     {data.currentRevision===0&&<p className="border p-3 text-sm" role="status">
       No saved website draft exists yet. Sharing your customized design requires saving.
     </p>}
@@ -66,10 +59,7 @@ export function WebsiteReviewStep({
       ?<div className="flex flex-wrap items-center justify-between gap-3 border p-4">
           <div>
             <p className="text-sm font-semibold">Ready to show your proposed website?</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Share your proposed Site, including planned Programs, without publishing
-              the Site or opening enrollment.
-            </p>
+    
           </div>
           <LaunchPreviewSharing siteId={data.siteId}/>
         </div>
@@ -78,11 +68,11 @@ export function WebsiteReviewStep({
         </p>}
     <WebsiteSourceMappingPanel data={data}/>
     <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
+      <summary className="cursor-pointer text-sm font-semibold">Family information</summary>
       <div className="mt-4"><WebsiteInformationChecklist data={data}/></div>
     </details>
     <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Review website content quality</summary>
+      <summary className="cursor-pointer text-sm font-semibold">Content checks</summary>
       <div className="mt-4"><WebsiteDesignChecklist data={data}/></div>
     </details>
     {!data.canPublish&&<p role="status" className="border p-3 text-sm">
@@ -90,17 +80,14 @@ export function WebsiteReviewStep({
     </p>}
     {allowPublication&&<Button type="button" variant="outline"
       disabled={busy||!data.canPublish||revisionConflict} onClick={onSubmit}>
-      {busy?"Publishing…":"Publish reviewed church-owned content"}
+      {busy?"Publishing…":"Publish website"}
     </Button>}
     {!allowPublication&&<p className="text-sm text-muted-foreground">
-      Launch Studio saves a private draft. Official Site publication belongs in Prepare.
+      Publish your Site in Prepare.
     </p>}
-    <p className="text-xs text-muted-foreground">
-      Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links
-      are unsupported. CAN controls institutional information.
-    </p>
+
     {data.localHistory.length>0&&<details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Version history and rollback</summary>
+      <summary className="cursor-pointer text-sm font-semibold">Version history</summary>
       <ul className="mt-3 space-y-2">
         {data.localHistory.map(version=><li key={version.revision}
           className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
