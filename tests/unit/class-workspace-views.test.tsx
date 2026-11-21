@@ -37,7 +37,8 @@ describe("canonical Class navigation", () => {
     expect(panel).toContain('to="/class/$classId"');
     expect(panel).toContain('params={{classId:resumeClassId}}');
     expect(panel).toContain('search={{view:"learn",tab:"lessons"}}');
-    expect(panel).toContain('getMyStudentClasses');
+    const dashboard = source("src/components/home/StudentHome.tsx");
+    expect(dashboard).toContain('getMyStudentClasses');
     expect(panel).not.toContain('params={{classId:resume.sectionId}}');
   });
 
