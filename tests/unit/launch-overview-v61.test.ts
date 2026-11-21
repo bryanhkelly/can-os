@@ -26,7 +26,7 @@ describe("Launch Overview source-derived next steps", () => {
     expect(nextLaunchAction(id,{...complete,brand:ready({saved:false})}).href)
       .toContain("module=website-brand");
     expect(nextLaunchAction(id,{...complete,marketing:ready({hasPackages:false})}).href)
-      .toContain("module=promote");
+      .toContain("module=create-outreach");
     expect(nextLaunchAction(id,complete).href).toContain("module=program-catalog");
   });
   it("keeps unavailable records distinct from never-saved records", () => {
