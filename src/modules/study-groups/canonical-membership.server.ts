@@ -101,6 +101,7 @@ export async function facilitatedGroup(tx: Tx, actor: Actor, groupId: string) {
   const nativeClassId=canonicalGroupClassId(group);
   if(nativeClassId){
     assertGroupScope(actor,group);
+    if(!group.siteId)throw new AuthorizationError("canonical Class group site");
     const [authorized]=await tx.select({id:canonicalClassStaffAssignments.id})
       .from(canonicalClassStaffAssignments)
       .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassStaffAssignments.classId))
