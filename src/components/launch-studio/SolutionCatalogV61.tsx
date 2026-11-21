@@ -151,7 +151,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
         <span>{workspace.configurations.length} saved {workspace.configurations.length === 1 ? "plan" : "plans"}</span>
       </div>
       {templates.length === 0 ? <EmptyState title="No solutions available yet"
-        description="There are no published solutions available for this site right now. You can continue shaping your program ideas in Establish." className="mt-4" /> : <>
+        description="There are no published solutions available for this site right now. You can continue shaping your program ideas in Shape." className="mt-4" /> : <>
         <FilterBar label="Available Solutions" query={query}
           onQueryChange={value => requestSwitch(() => {
             setQuery(value);
@@ -190,7 +190,7 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                   detail={<>
                     <span className="block">{template.components.length} {template.components.length === 1 ? "part" : "parts"} to explore</span>
                     {academicBlocked && <span className="mt-1 block font-medium">Grades 6–12 academy · authorization required</span>}
-                    {matchesProgram && <span className="mt-1 block font-semibold text-primary">Matches a Program selected in Establish</span>}
+                    {matchesProgram && <span className="mt-1 block font-semibold text-primary">Matches a Program selected in Shape</span>}
                     {visionMatches.length > 0 && <span className="mt-1 block font-medium text-primary">
                       Related to {visionMatches.length} saved {visionMatches.length === 1 ? "interest" : "interests"}
                     </span>}
