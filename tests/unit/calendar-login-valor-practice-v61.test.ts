@@ -37,38 +37,28 @@ describe("V6.1 calendar login and build footer",()=>{
  });
 });
 
-describe("Valor teacher and learner practice-only knowledge checks",()=>{
- it("keeps synthetic draft questions, canonical attempt scope and secure practice writes",()=>{
-   const practice=read("src/modules/classes/native-valor-practice-check.functions.ts");
-   expect(practice).toContain('actor.role!=="student"');
-   expect(practice).toContain("authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId)");
-   expect(practice).toContain("iv.lifecycle='draft'");
-   expect(practice).toContain("public.formative_practice_attempts");
-   expect(practice).toContain("education_v30_secure.formative_practice_responses");
-   expect(practice).toContain("valor_draft_assessment_practice");
-   expect(practice).not.toContain("UPDATE public.assessment_versions");
-   expect(practice).not.toContain("INSERT INTO public.grading_decisions");
+describe("CAN Class practice and knowledge-check parity",()=>{
+ it("uses Enrollment credit mode rather than synthetic Person or Site markers",()=>{
+  const homework=read("src/modules/classes/native-class-homework.functions.ts");
+  expect(homework).toContain('enrollment.creditMode==="not_applicable"');
+  expect(homework).toContain("practiceResponse:true");
+  expect(homework).not.toContain("f1000000-0000-4000-8000-000000000003");
+  expect(homework).not.toContain("p.metadata @>");
  });
- it("only lets the current Class teacher return synthetic practice feedback",()=>{
-   const teacher=read("src/modules/classes/native-class-teacher-homework.functions.ts");
-   expect(teacher).toContain("returnNativeClassDraftPracticeFeedback");
-   expect(teacher).toContain("authorizedTeacher(tx,data.classId)");
-   expect(teacher).toContain("currentClassAuthority(tx,cls.id,now)");
-   expect(teacher).toContain('gs.response @> \'{"synthetic":true,"practiceResponse":true}\'::jsonb');
-   expect(teacher).toContain("education_v30_secure.formative_practice_responses");
-   expect(teacher).toContain("class.knowledge_check.practice_feedback.recorded");
-   expect(teacher).toContain("canRecordOfficialGrade:false");
-   expect(teacher).not.toContain("INSERT INTO public.grading_decisions");
+ it("Class teachers return formative-only feedback through the existing submission",()=>{
+  const teacher=read("src/modules/classes/native-class-teacher-homework.functions.ts");
+  expect(teacher).toContain("returnNativeClassPracticeFeedback");
+  expect(teacher).toContain('gs.response @> \'{"practiceResponse":true}\'::jsonb');
+  expect(teacher).not.toContain("synthetic Valor demonstration only");
+  expect(teacher).not.toContain("returnNativeClassDraftPracticeFeedback");
+  expect(teacher).not.toContain("INSERT INTO public.grading_decisions");
  });
- it("keeps real Jordan submissions marked as synthetic while giving learner returned feedback",()=>{
-   const homework=read("src/modules/classes/native-class-homework.functions.ts");
-   const student=read("src/components/learning/NativeValorDraftPracticePanel.tsx");
-   const teacher=read("src/components/learning/NativeClassTeacherReviewPanels.tsx");
-   expect(homework).toContain("syntheticPractice");
-   expect(homework).toContain("practiceResponse:true");
-   expect(student).toContain("attempt.teacherFeedback");
-   expect(student).toContain("Not an official grade");
-   expect(teacher).toContain("returnNativeClassDraftPracticeFeedback");
-   expect(teacher).toContain("Return practice-check feedback");
+ it("normal learner and teacher use published canonical assessment inventory",()=>{
+  const student=read("src/routes/class_.$classId.tsx");
+  const teacher=read("src/components/learning/NativeClassTeacherReviewPanels.tsx");
+  expect(student).toContain("NativeClassKnowledgeCheckPanel");
+  expect(student).not.toContain("NativeValorDraftPracticePanel");
+  expect(teacher).toContain("getNativeClassTeacherAssessments");
+  expect(teacher).not.toContain("getNativeClassTeacherDraftPractice");
  });
 });
