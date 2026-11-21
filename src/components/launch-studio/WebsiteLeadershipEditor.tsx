@@ -2,7 +2,7 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@/components/ui/choice";
 import {
   siteLocalImageMaxBytes, validateInlinePng,
   type SiteLeader,type SiteLocalContent,
@@ -104,8 +104,8 @@ export function WebsiteLeadershipEditor({content,setContent,disabled}:{
               onChange={event=>update(person.id,{photo:{...person.photo!,altText:event.target.value}})}/>
           </label>
           <Checkbox disabled={disabled} checked={person.photo.rightsConfirmed}
-            onCheckedChange={value=>update(person.id,{photo:{
-              ...person.photo!,rightsConfirmed:value===true,
+            onChange={event=>update(person.id,{photo:{
+              ...person.photo!,rightsConfirmed:event.target.checked,
             }})}>
             I have permission to display this portrait
           </Checkbox>
@@ -113,7 +113,7 @@ export function WebsiteLeadershipEditor({content,setContent,disabled}:{
             onClick={()=>update(person.id,{photo:null})}>Remove portrait</Button>
         </div>}
         <Checkbox disabled={disabled} checked={person.consentConfirmed}
-          onCheckedChange={value=>update(person.id,{consentConfirmed:value===true})}>
+          onChange={event=>update(person.id,{consentConfirmed:event.target.checked})}>
           Permission to publish this person's name, title, biography and profile link is confirmed
         </Checkbox>
       </section>)}
