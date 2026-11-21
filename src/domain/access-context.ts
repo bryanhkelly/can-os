@@ -1,5 +1,4 @@
 import { AuthorizationError, type CommandContext } from "./command-context";
-import { LOCAL_DEMO_RILEY_FACILITATOR } from "./local-demo-access";
 
 /** Claims are resolved from verified DB rows, never from caller-provided roles. */
 export type VerifiedAccessGrant = {
@@ -48,7 +47,7 @@ const baseRoleCapabilities = {
  site_website_editor: ["launch.draft.manage", "site.website.draft.read", "site.website.draft.write", "site.website.local.publish"],
  // First-observer site personnel: report-only capability, NEVER incident.read,
  // counseling access, enrollment editing or automatic emergency dispatch.
- room_facilitator: ["launch.draft.manage", "safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit","communication.send"],
+ room_facilitator: ["learning.room.facilitate"],
  site_staff: ["launch.draft.manage", "safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit","communication.send"],
  site_leader: ["launch.draft.manage", "safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit","communication.send"],
  paraeducator: ["launch.draft.manage", "safeguarding.concern.submit"],
@@ -97,17 +96,6 @@ export function resolveAccessContext(principal: SessionPrincipal, grants: readon
  if ((grant.role === "account_holder" || grant.role === "app_admin") &&
      (grant.organizationId !== null || grant.siteId !== null))
   throw new AuthorizationError("account-only scope");
- // A synthetic classroom-only grant is NOT the broad onsite facilitator
- // appointment. Keep its capabilities exact even though its role name
- // matches an ordinary Site room facilitator. This never grants attendance,
- // pickup release, safeguarding review or academic grading.
- const classroomOnly = grant.id === LOCAL_DEMO_RILEY_FACILITATOR.grantId;
- if(classroomOnly && (grant.accountId!==LOCAL_DEMO_RILEY_FACILITATOR.accountId ||
-     grant.personId!==LOCAL_DEMO_RILEY_FACILITATOR.personId ||
-     grant.role!=="room_facilitator" ||
-     grant.organizationId!==LOCAL_DEMO_RILEY_FACILITATOR.organizationId ||
-     grant.siteId!==LOCAL_DEMO_RILEY_FACILITATOR.siteId))
-  throw new AuthorizationError("exact synthetic classroom membership");
  return {
   accountId: principal.accountId,
   sessionId: principal.sessionId,
@@ -115,8 +103,7 @@ export function resolveAccessContext(principal: SessionPrincipal, grants: readon
   grantSiteId: grant.siteId,
   actorPersonId: grant.personId,
   role: grant.role,
-  capabilities: new Set(classroomOnly
-    ? ["learning.room.facilitate"] : roleCapabilities[grant.role]),
+  capabilities: new Set(roleCapabilities[grant.role]),
   scope: {
    organizationIds: grant.organizationId ? [grant.organizationId] : [],
    siteIds: grant.siteId ? [grant.siteId] : [],
