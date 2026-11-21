@@ -379,6 +379,15 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           href:(id:string,packageId:string)=>"/operations/interest-events/new?siteId="+
             encodeURIComponent(id)+"&packageId="+encodeURIComponent(packageId)} : null;
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
+  const downloadablePackageReleases=packageReleases.filter(packageReleaseIsDownloadableV61);
+  const hasDownloadableMaterials=downloadablePackageReleases.length>0;
+  const materialAvailabilityMessage=releasesUnavailable
+    ? "We couldn't check your generated materials. Retry the history check before downloading or creating another version."
+    : releasesLoading
+      ? "Checking previously generated materials…"
+      : hasDownloadableMaterials
+        ? "Your reviewed materials can be downloaded. Nothing has been sent."
+        : "Your plan is saved, but there are no complete materials to download yet. Review the previews and create materials first.";
   const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Create Outreach":view==="share"?"Use & Share":view==="followup"?"Follow Up":record?.title??"Outreach Details";
   const rail=<div className="space-y-4">
     <WorkspacePanel title="About this step">
@@ -391,7 +400,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             "Highlight the saved Programs and Experiences that matter.",
             "Give people one meaningful next action.","Select your outreach channels.",
             "Choose a story angle, review the message, and save."][step]
-          :"An outreach draft is not a sent message. Releases preserve the exact materials and Brand used."}
+          :"Saving a plan does not send a message. Generated materials keep the Brand and wording used when they were created."}
       </p>
     </WorkspacePanel>
   </div>;
@@ -402,14 +411,13 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       {error&&<p role="alert" className="border border-destructive bg-card p-4 text-sm text-destructive">{error}</p>}
       {notice&&<p role="status" className="border bg-card p-4 text-sm">{notice}</p>}
       {intentUnavailable&&<WorkspaceNotice tone="attention">
-        Saved Programs, Audiences and Experiences could not be verified.
-        Refresh the Site before choosing highlights; empty choices are not assumed.
+        We couldn't load your saved programs, audiences, or experiences. Refresh before choosing what to highlight.
       </WorkspaceNotice>}
       {suggestionsUnavailable&&<WorkspaceNotice tone="attention">
         Suggestions are unavailable. Saved packages are still available.
       </WorkspaceNotice>}
       {brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
-        Save your Site identity in Establish before building branded materials.
+        Save your Site Brand in Establish → Website & Brand before creating materials.
         {" "}<a href={`/launch/site?siteId=${encodeURIComponent(siteId)}&module=website-brand`}
           className="font-semibold underline">Open Website &amp; Brand</a>
       </WorkspaceNotice>}
@@ -437,7 +445,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           </Button>
         </div>
         {!visible.length&&<WorkspacePanel title="No outreach plans yet">
-          <p className="text-sm text-muted-foreground">Start with Who, Message, Highlight, Action, Channels, and Review.</p>
+          <p className="text-sm text-muted-foreground">Choose who to reach, what to say, and how you want to share it.</p>
         </WorkspacePanel>}
         <MarketingPackageLibraryList records={visible} busy={busy}
           onOpen={open} onDuplicate={duplicate} onArchiveToggle={setArchived}
@@ -564,9 +572,13 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
               }>Continue with this package <ArrowRight aria-hidden="true"/></a></Button>}
           </WorkspacePanel>}
         <WorkspaceNotice tone="info">
-          {packageReleases.some(item=>item.complete)
-            ?"Generated materials are available below. No sending is implied."
-            :"No complete material release has been generated yet. Save your plan, review the preview, then create materials."}
+          {releasesUnavailable
+            ?"We couldn't check earlier material versions. Retry the history check before creating more."
+            :releasesLoading
+              ?"Checking earlier material versions…"
+              :hasDownloadableMaterials
+                ?"Your generated materials are available below. Nothing has been sent."
+                :"No complete materials have been generated yet. Review your plan and previews, then create materials."}
         </WorkspaceNotice>
         <MarketingPackageReleaseControlsV61 record={record} versions={packageReleases}
           currentBrand={currentBrand} selectedBrandRevision={selectedBrandRevision}
@@ -596,31 +608,31 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       {view==="share"&&record&&<>
         <WorkspacePanel title="Use & Share" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
           <p className="text-sm text-muted-foreground">
-            {packageReleases.some(x=>x.complete)
-              ?"Generated materials are ready for download. Nothing has been sent."
-              :"Create a complete material release in Outreach Details before downloading."}
+            {materialAvailabilityMessage}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            {packageReleases.filter(x=>packageReleaseIsDownloadableV61(x)).slice(0,1).map(release=>
+            {downloadablePackageReleases.slice(0,1).map(release=>
               <Button key={release.id} disabled={busy}
                 onClick={()=>void downloadPackage(release)}>Download Package v{release.releaseNumber}</Button>)}
             {record.content.plan?.action==="attend-event"&&record.content.purpose==="event-invitation"&&
               <Button asChild variant="outline"><a href={"/operations/interest-events/new?siteId="+encodeURIComponent(siteId)+"&packageId="+encodeURIComponent(record.id)}>Create Event</a></Button>}
             <Button variant="outline" onClick={()=>setView("followup")}>Follow Up <ArrowRight aria-hidden="true"/></Button>
           </div>
-          <WorkspaceNotice tone="info">Your materials are ready to use. Choose a sending or sharing option when you're ready; selecting a format does not send anything.</WorkspaceNotice>
+          {hasDownloadableMaterials&&<WorkspaceNotice tone="info">
+            These files are ready to download. Sharing or sending them requires a separate action.
+          </WorkspaceNotice>}
         </WorkspacePanel>
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
       {view==="followup"&&record&&<>
-        <WorkspacePanel title="Follow Up" description="See inquiries and events connected to your site. We won't guess whether someone opened or responded to a message.">
+        <WorkspacePanel title="Follow Up" description="Review inquiries and interest events for your site. These may include activity unrelated to this outreach plan.">
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <WorkspaceActionLink title="Inquiries & responses" description="Review actual Site intake and authorized learner interest."
+            <WorkspaceActionLink title="Inquiries & responses" description="See inquiries and recorded interest for this site."
               href={"/admissions/intake?siteId="+encodeURIComponent(siteId)} actionLabel="Review inquiries"/>
             <WorkspaceActionLink title="Interest Events" description="Review or set up a Program-linked event when eligible."
               href={"/operations/interest-events?siteId="+encodeURIComponent(siteId)} actionLabel="Review events"/>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">Only replies and interest recorded for this outreach will appear in its results.</p>
+          <p className="mt-4 text-sm text-muted-foreground">These links open site-wide records. Responses are associated with this outreach only when that connection has been recorded.</p>
         </WorkspacePanel>
         <ActionFooter><Button variant="outline" onClick={()=>setView("share")}>Back to Use &amp; Share</Button>
           <Button onClick={()=>setView("detail")}>Review Materials</Button></ActionFooter>
