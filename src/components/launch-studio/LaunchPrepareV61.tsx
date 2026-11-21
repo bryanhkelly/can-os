@@ -66,7 +66,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     siteProvides: "Facilities and equipment information.",
     status: "governed",
     handoffs: [
-      { title: "Learning Environment", detail: "Update learning environment details.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=site-information" },
+      { title: "How people participate", detail: "Update where and how people take part.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=site-information" },
       { title: "Site qualification", detail: "View qualification details.", href: () => "/canonical/lab/site-qualification" },
       { title: "Opening requirements", detail: "Review required documents.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
     ],
