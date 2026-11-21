@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StudentExperience } from "@/components/student/StudentExperience";
+import { StudentContinueLearningPanel } from "@/components/student/StudentContinueLearningPanel";
 import { LiveQuickWins } from "@/components/student/LiveQuickWins";
 import { Route } from "@/routes/student.assignments";
 import { Route as ExperiencesRoute } from "@/routes/student.experiences";
@@ -66,6 +67,30 @@ vi.mock("@/modules/student-experience/school-experiences.functions", () => ({
 }));
 
 describe("Student Today summary navigation", () => {
+  it("opens Algebra using its canonical Class ID from the blue dashboard action", () => {
+    const classId = "f1000000-0000-4000-8000-000000000123";
+    const html = renderToStaticMarkup(<StudentContinueLearningPanel
+      resume={{sectionId:"legacy-section",title:"Algebra I",lesson:{id:"lesson",title:"Variables"},completed:2,total:10}}
+      unavailable={false} hasClasses
+      classes={[{classId,title:"Algebra I · CAN Standard",status:"active",courseAttemptId:"attempt"}]}
+    />);
+    expect(html).toContain('href="/class/' + classId + '?view=learn&amp;tab=lessons"');
+    expect(html).not.toContain("legacy-section?view=learn");
+  });
+
+  it("does not guess a Class ID when two canonical Classes have the same title", () => {
+    const html = renderToStaticMarkup(<StudentContinueLearningPanel
+      resume={{sectionId:"legacy-section",title:"Algebra I",lesson:null,completed:0,total:1}}
+      unavailable={false} hasClasses
+      classes={[
+        {classId:"class-one",title:"Algebra I",status:"active",courseAttemptId:"attempt-one"},
+        {classId:"class-two",title:"Algebra I",status:"active",courseAttemptId:"attempt-two"},
+      ]}
+    />);
+    expect(html).toContain("Choose Class");
+    expect(html).toContain('href="/class"');
+  });
+
   it("renders refined dashboard shortcuts and keeps canonical destinations", () => {
     const html = renderToStaticMarkup(<StudentExperience liveData={{
       student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
