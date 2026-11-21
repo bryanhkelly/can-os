@@ -45,7 +45,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   }
   if (evidence.information.value.identitySaved === false || !evidence.information.value.hostingSaved || !evidence.information.value.environmentSaved) {
     return { title: "Complete Site Information",
-      description: "Describe your Site identity, hosting and learning environment."
+      description: "Describe your Site identity, hosting and learning environment.",
       href: route("site-information") };
   }
   if (evidence.programs.state === "unavailable") {
@@ -70,7 +70,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
       href: route("website-brand") };
   }
   if (evidence.marketing.state === "unavailable") {
-    return { title: "Review Introduce",
+    return { title: "Review Share",
       description: "We couldn't load your saved outreach plans. Try again before editing or creating materials.",
       href: route("create-outreach") };
   }
