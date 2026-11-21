@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 const previewLabels: Record<PublicSitePath, string> = {
-  "/": "Home", "/about": "About us", "/academics": "Academics",
+  "/": "Home", "/about": "About us", "/leadership": "Leadership", "/academics": "Academics",
   "/school-day": "Learning model", "/student-life": "Student life",
   "/families": "Families", "/admissions": "Admissions", "/tuition": "Tuition & aid",
   "/faq": "FAQs", "/contact": "Contact", "/programs": "Programs",
