@@ -59,7 +59,7 @@ describe("Launch Studio V6.1 editorial contract", () => {
     const text = source("src/components/launch-studio/WebsiteSiteContentStep.tsx");
     expect(text).toContain("const faithFields=fields.filter");
     expect(text).toContain("const showFaithFields=faithBased||hasSavedFaithContent");
-    expect(text).toContain("Faith and community information (optional)");
+    expect(text).toContain("Faith and values (optional)");
     expect(text).toContain("Previously saved faith information");
     expect(text).toContain("{faithFields.map(renderField)}");
     expect(text).toContain("canReuse&&churchSite&&");
