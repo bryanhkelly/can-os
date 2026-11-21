@@ -484,7 +484,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             <p><strong>Action:</strong> {record.content.plan.action.replaceAll("-"," ")}</p>
           </div>
         </WorkspacePanel>}
-        <WorkspacePanel title="Review material previews" description="Each preview uses the saved Brand and current message. This is not a sent or published campaign.">
+        <WorkspacePanel title="Review material previews" description="See how your materials look with your saved brand and message. Nothing has been sent or published.">
           <div className="flex flex-wrap gap-2">{record.content.formats.map(format=>
             <Button type="button" key={format} size="sm" variant={activePreviewFormat===format?"default":"outline"}
               disabled={Boolean(editingFormat&&editingFormat!==format)}
@@ -549,7 +549,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
               {record.content.audiences.map(id=>marketingAudienceOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
             <div><dt className="font-semibold">Headline</dt><dd className="text-muted-foreground">{record.content.headline}</dd></div>
             <div><dt className="font-semibold">Message</dt><dd className="whitespace-pre-wrap text-muted-foreground">{record.content.message}</dd></div>
-            <div><dt className="font-semibold">Preferred collateral</dt><dd className="text-muted-foreground">
+            <div><dt className="font-semibold">Materials</dt><dd className="text-muted-foreground">
               {record.content.formats.map(id=>marketingFormatOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
           </dl>
         </WorkspacePanel>
@@ -607,19 +607,19 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
               <Button asChild variant="outline"><a href={"/operations/interest-events/new?siteId="+encodeURIComponent(siteId)+"&packageId="+encodeURIComponent(record.id)}>Create Event</a></Button>}
             <Button variant="outline" onClick={()=>setView("followup")}>Follow Up <ArrowRight aria-hidden="true"/></Button>
           </div>
-          <WorkspaceNotice tone="info">A selected channel is not evidence of delivery. Email sending, public links and registration require separate authorized destinations.</WorkspaceNotice>
+          <WorkspaceNotice tone="info">Your materials are ready to use. Choose a sending or sharing option when you're ready; selecting a format does not send anything.</WorkspaceNotice>
         </WorkspacePanel>
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
       {view==="followup"&&record&&<>
-        <WorkspacePanel title="Follow Up" description="Review real inquiries and events through the existing authorized Site services. No inferred opens, sends, or responses.">
+        <WorkspacePanel title="Follow Up" description="See inquiries and events connected to your site. We won't guess whether someone opened or responded to a message.">
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <WorkspaceActionLink title="Inquiries & responses" description="Review actual Site intake and authorized learner interest."
               href={"/admissions/intake?siteId="+encodeURIComponent(siteId)} actionLabel="Review inquiries"/>
             <WorkspaceActionLink title="Interest Events" description="Review or set up a Program-linked event when eligible."
               href={"/operations/interest-events?siteId="+encodeURIComponent(siteId)} actionLabel="Review events"/>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">Outreach-specific response attribution is not inferred from unrelated inquiries.</p>
+          <p className="mt-4 text-sm text-muted-foreground">Only replies and interest recorded for this outreach will appear in its results.</p>
         </WorkspacePanel>
         <ActionFooter><Button variant="outline" onClick={()=>setView("share")}>Back to Use &amp; Share</Button>
           <Button onClick={()=>setView("detail")}>Review Materials</Button></ActionFooter>
