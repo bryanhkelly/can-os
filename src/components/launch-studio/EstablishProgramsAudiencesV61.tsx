@@ -50,9 +50,6 @@ const audienceChoices = [
   { id: "adults", label: "Adults", detail: "Career skills and enrichment" },
   { id: "older_adults", label: "Older adults", detail: "Lifelong learning and community" },
 ] as const;
-const timingLabels: Record<TimingId, string> = {
-  weekdays: "Weekdays", weekends: "Weekends", daytime: "Daytime", evenings: "Evenings",
-};
 
 const guidance = [
   {
@@ -62,30 +59,12 @@ const guidance = [
   },
   {
     why: "Choose who you hope to serve.",
-    tip: "",
     next: "Save your choices and continue.",
   },
 ] as const;
 
 export function ProgramsAudiencesV61Guidance({ step }: { step: InternalStep }) {
   return <LaunchGuidancePanels guidance={guidance[step]} />;
-}
-
-function SummaryRow({ label, value, onEdit }: {
-  label: string; value: string; onEdit?: () => void;
-}) {
-  return <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-t py-3 text-sm sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
-    <strong>{label}</strong>
-    <span className="col-span-2 row-start-2 min-w-0 break-words text-muted-foreground sm:col-span-1 sm:col-start-2 sm:row-start-1">
-      {value}
-    </span>
-    {onEdit && <Button size="sm" variant="ghost" className="col-start-2 row-start-1 text-primary sm:col-start-3"
-      onClick={onEdit} aria-label={"Edit " + label}>Edit</Button>}
-  </div>;
-}
-
-function labels<T extends string>(ids: readonly T[], options: readonly { id: T; label: string }[]) {
-  return ids.length ? ids.map(id => options.find(item => item.id === id)?.label ?? id).join(" · ") : "Not selected yet";
 }
 
 export function EstablishProgramsAudiencesV61({ siteId, initial,
