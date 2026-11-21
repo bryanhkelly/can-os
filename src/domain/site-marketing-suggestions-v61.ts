@@ -124,8 +124,8 @@ export function suggestMarketingStarterV61(
   if(experience)sources.push("Establish · Experiences");
   const mission=emphasis ? "shaped by "+emphasis
     : approach ? "focused on "+approach
-    : identity?.faithOrientation==="faith_based" ? "inspired by faith and service"
-    : "rooted in community";
+    : identity?.faithOrientation==="faith_based" ? "inspired by service and shared purpose"
+    : "with a shared vision";
   const aspiration=outcome ? " We hope participants experience "+outcome+"."
     : approach ? " We hope to create space for "+approach+".":"";
   const experienceLine=experience?.activities.length
@@ -157,8 +157,8 @@ export function suggestMarketingStarterV61(
     case "interest-invitation":
       if(sources.length){
         headline="Help shape what comes next at "+name+".";
-        message="We're listening to families, neighbors and future learners as we explore a community "+
-          (mission==="rooted in community"?"learning experience": "learning experience "+mission)+
+        message="We're listening to community members and future participants as we explore a new "+
+          communityKind+" "+mission+
           "."+focusLine+experienceLine+" Your perspective can help shape our next steps.";
       }
       break;
