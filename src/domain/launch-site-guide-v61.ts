@@ -11,6 +11,7 @@ type SiteInformationInputs = {
   delivery: "physical" | "digital" | "both" | "";
   values: SiteStoryV61["values"];
   networkChoice: "independent" | "request";
+  planning?: SiteProgramsAudiencesV61 | null;
 };
 
 const audienceNames: Record<SiteProgramsAudiencesV61["audienceIds"][number], string> = {
@@ -56,14 +57,22 @@ export function siteInformationGuideV61(step: 0 | 1 | 2 | 3, input: SiteInformat
     insight: "A network may offer resources, shared programming or support. Ask what participants gain and what commitments the relationship requires.",
     connection: "Any network connection or approval is a separate decision from Site setup.",
   };
+  const plannedAudience = input.planning?.audienceIds[0];
+  const plannedProgram = input.planning?.interestIds[0];
+  const storyExample = plannedAudience || plannedProgram
+    ? `You might say: We hope to bring ${plannedProgram ? interestNames[plannedProgram].toLowerCase() : "meaningful"} experiences to ${plannedAudience ? audienceNames[plannedAudience].toLowerCase() : "our community"}, guided by ${input.values[0] ? values[input.values[0]].toLowerCase() : "our shared purpose"}. Make this your own.`
+    : null;
   return {
     summary: kind ? `You're shaping the story of your ${kind.toLowerCase()}.` : "You're shaping the story of your community.",
-    highlights: input.values.slice(0, 3).map(value => values[value]),
-    insight: input.siteType === "church_community"
+    highlights: [
+      ...input.values.slice(0, 2).map(value => values[value]),
+      ...(plannedAudience ? [audienceNames[plannedAudience]] : []),
+    ],
+    insight: storyExample ?? (input.siteType === "church_community"
       ? "Try a concrete line such as: We hope to bring neighbors together through learning and service. Keep planned activities clearly described as future possibilities."
       : input.siteType === "training_workforce"
         ? "Try a specific line such as: We hope to help adults build practical digital skills for daily life and work. Adapt it to your actual vision."
-        : "A useful story names the people, a real need and a hoped-for experience. Try: We hope to bring our community together through practical learning and connection.",
+        : "A useful story names the people, a real need and a hoped-for experience. Try: We hope to bring our community together through practical learning and connection."),
     connection: "With your permission, these answers can inform editable website and outreach suggestions. They will not be published automatically.",
   };
 }
