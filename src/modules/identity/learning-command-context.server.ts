@@ -5,14 +5,15 @@ import { getCanonicalCommandContext, getCanonicalSessionRow } from "./canonical-
 import { getCommandContext } from "./command-context.server";
 
 /**
- * A delegated/demo-admin actor is not the learner whose Person owns learning
- * evidence. A real current account and nondelegated CAN Person are mandatory.
+ * The server-resolved active CAN Person owns learning evidence. The trusted
+ * demo-admin account switch may act as that Person; an ordinary account may
+ * never choose a Person through client-supplied parameters.
  */
 async function getDirectCANLearningContext(request: Request): Promise<CommandContext & {
   sessionId?: string;
 }> {
   const actor = await getCommandContext(request);
-  if (!actor.actorPersonId || actor.sessionAccountId)
+  if (!actor.actorPersonId)
     throw new AuthorizationError("direct CAN Person learning session");
   return actor;
 }
