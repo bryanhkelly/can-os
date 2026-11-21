@@ -11,7 +11,8 @@ export async function measureServerStep<T>(
   step: string,
   operation: () => Promise<T>,
 ): Promise<T> {
-  if (process.env.CAN_PERF_TRACE !== "1") return operation();
+  // Router loaders can also execute during client-side navigation.
+  if (typeof process === "undefined" || process.env.CAN_PERF_TRACE !== "1") return operation();
   const startedAt = Date.now();
   let status: "ok" | "error" = "ok";
   try {
