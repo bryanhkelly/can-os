@@ -63,8 +63,8 @@ describe("Launch readiness read-only presentation components", () => {
     const html = renderToStaticMarkup(
       <SolutionPlansReadinessV61 siteId={siteId} solutions={{state:"ready",value:solutions}}/>);
     expect(html).toContain("Saturday Digital Skills");
-    expect(html).toContain("View published Solution requirements");
-    expect(html).toContain("These are not verified Site readiness.");
+    expect(html).toContain("View what this solution needs");
+    expect(html).toContain("Complete the necessary checks before offering this solution.");
     expect(html).toContain("solutionPlanId=plan-1");
     expect(html).toContain("siteId=" + siteId);
     expect(html).toContain("Continue plan");
