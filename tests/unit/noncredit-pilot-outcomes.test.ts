@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
-  countDistinctNoncreditLearners,
+  countDistinctNoncreditLearners,NONCREDIT_PILOT_COUNT_DEFINITIONS,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 const sample: PilotParticipantFact={
@@ -11,6 +11,15 @@ const sample: PilotParticipantFact={
  baselineFraction:0.4,finalFraction:0.8,
 };
 describe("noncredit pilot reporting",()=>{
+ it("defines distinct stable source contracts for all existing pilot count cards",()=>{
+  const keys=NONCREDIT_PILOT_COUNT_DEFINITIONS.map(item=>item.key);
+  expect(new Set(keys).size).toBe(keys.length);
+  expect(keys).toContain("distinctLearners");
+  expect(keys).toContain("confirmedNoncreditCompletions");
+  expect(NONCREDIT_PILOT_COUNT_DEFINITIONS.every(item=>
+    !!item.source&&!!item.denominator&&!!item.timeBasis&&!!item.rule)).toBe(true);
+ });
+
  it("distinguishes engagement, passing and confirmed completion",()=>{
   const s=summarizeNoncreditPilot([sample]);
   expect(s).toMatchObject({registrations:1,engagedParticipants:1,
