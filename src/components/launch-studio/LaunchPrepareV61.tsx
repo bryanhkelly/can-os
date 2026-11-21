@@ -181,18 +181,9 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
   return <WorkspaceShell width="wide" title={definition.title}
     eyebrow="Launch Studio / Prepare"
     subtitle={definition.subtitle}
-    rail={<div className="space-y-4">
-      <WorkspacePanel title="Your next step">
-        <p className="text-sm font-semibold leading-6">{plan.question}</p>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{plan.decision}</p>
-      </WorkspacePanel>
-      <WorkspacePanel title="Responsibilities">
-        <h3 className="text-sm font-semibold">CAN provides</h3>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{plan.canSupplies}</p>
-        <h3 className="mt-4 border-t pt-4 text-sm font-semibold">Your Site provides</h3>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{plan.siteProvides}</p>
-      </WorkspacePanel>
-    </div>}>
+    rail={<WorkspacePanel title="Next">
+      <p className="text-sm leading-6 text-muted-foreground">{plan.question}</p>
+    </WorkspacePanel>}>
     <div className="mt-6 space-y-5">
       {module === "program-catalog" && <>
         <WorkspacePanel title="Your interests"
