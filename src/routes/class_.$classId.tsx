@@ -99,8 +99,10 @@ function OneClassWorkspace(){
   const {classId}=Route.useParams();
   const search=Route.useSearch();
   const workspace=useQuery({
-    queryKey:["native-unified-class",classId,search.view,search.tab,search.lesson,search.session],
-    queryFn:()=>getNativeClassWorkspace({data:{classId,...search}}),retry:false,
+    // Lesson and Session are URL-local selection, not authorization scope.
+    // Omitting them avoids refetching the entire Class when navigating inside it.
+    queryKey:["native-unified-class",classId,search.view,search.tab],
+    queryFn:()=>getNativeClassWorkspace({data:{classId,view:search.view,tab:search.tab}}),retry:false,
   });
   if(workspace.isPending)return <WorkspaceShell width="wide" eyebrow="CAN OS · Class" title="Opening Class">
     <p role="status" className="mt-5 border border-border bg-card p-5 text-sm">
@@ -115,7 +117,13 @@ function OneClassWorkspace(){
       Return to Classes
     </Link>
   </WorkspaceShell>;
-  const data=workspace.data;
+  // Preserve the selected URL items for the view without a new server read.
+  // The server still verifies the exact Person/Class relationship on a fresh
+  // workspace request, and never uses these IDs to grant access.
+  const data={...workspace.data,
+    selectedLessonId:search.lesson??null,
+    selectedSessionId:search.session??null,
+  };
   if(data.view==="learn"){
     if(!data.learner) return null;
     return <LearnerClass key={data.learner.classEnrollmentId} workspace={data}/>;
