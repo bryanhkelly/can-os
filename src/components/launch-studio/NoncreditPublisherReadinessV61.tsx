@@ -10,17 +10,16 @@ export function NoncreditPublisherReadinessV61({ siteId,noncredit }: {
 }) {
   return <section className="border bg-background p-4"
         aria-label="Independently authorized noncredit enrollment releases">
-        <h3 className="text-sm font-semibold">Noncredit Offering enrollment</h3>
+        <h3 className="text-sm font-semibold">Registration for noncredit learning</h3>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          The existing publisher service alone determines candidate availability and issued
-          enrollment releases. A candidate is not an active registration.
+          See which noncredit learning opportunities may be ready for registration.
+          Each offering needs its own final checks before people can sign up.
         </p>
         {noncredit.state==="loading" && <p role="status" className="mt-2 text-sm">
-          Checking authorized noncredit Offering records…
+          Checking noncredit registration options…
         </p>}
         {noncredit.state==="unavailable" && <WorkspaceNotice tone="attention" className="mt-3">
-          Current noncredit enrollment authority could not be verified for this account.
-          This does not mean an Offering is approved or unavailable.
+          We couldn't check noncredit registration right now. Try again before making plans.
         </WorkspaceNotice>}
         {noncredit.state==="ready" && (() => {
           const candidates=noncredit.value.candidates.filter(item=>
@@ -28,7 +27,7 @@ export function NoncreditPublisherReadinessV61({ siteId,noncredit }: {
           const releases=noncredit.value.published.filter(item=>item.siteId===siteId);
           return <div className="mt-3 space-y-4">
             <p className="text-xs text-muted-foreground">
-              {plural(candidates.length, "publisher candidate")} · {plural(releases.length, "recorded enrollment release")}
+              {plural(candidates.length, "possible offering")} · {plural(releases.length, "registration listing")}
             </p>
             {releases.length>0 && <ul className="space-y-2">
               {releases.map(item=><li key={item.id}
@@ -42,18 +41,17 @@ export function NoncreditPublisherReadinessV61({ siteId,noncredit }: {
                 item.trainingVersionId,item.courseVersionId].join(":")} className="border p-3">
                 <p className="text-sm font-medium">{item.trainingTitle}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Authorized provider candidate. Final enrollment publication still requires
-                  the receiving service to validate current release, capacity and consent.
+                  This opportunity may be eligible for registration. Capacity, permissions,
+                  and final approval must be confirmed before people can sign up.
                 </p>
               </li>)}
             </ul>}
             {!releases.length && !candidates.length && <p className="text-sm text-muted-foreground">
-              No noncredit publisher candidates or issued enrollment releases for this Site.
-              Other academic and Class enrollment systems are independent.
+              No noncredit registration options are listed for this site yet. Other types of classes may still be available.
             </p>}
             <Button asChild variant="outline" size="sm">
               <Link to="/programs/noncredit/enrollment" search={{publicSiteId:siteId}}>
-                Manage independently authorized noncredit enrollment
+                Manage noncredit registration
               </Link>
             </Button>
           </div>;
