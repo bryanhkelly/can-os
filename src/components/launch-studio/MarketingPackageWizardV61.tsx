@@ -251,8 +251,8 @@ export function MarketingPackageWizardV61({
         require an authorized destination. Conversation Kit includes a printable overview.
       </WorkspaceNotice></div>
     </WorkspacePanel>}
-    {step===5&&<WorkspacePanel title="Review & create"
-      description="Choose your story angle, review the draft message, and create coordinated materials. Nothing is sent or published.">
+    {step===5&&<WorkspacePanel title="Review & save"
+      description="Choose your story angle and review your message. Save this outreach plan first, then create coordinated materials in the next step. Nothing is sent or published.">
       <div className="mt-4 space-y-5">
         <div className="grid gap-3 border bg-muted/20 p-3 text-sm sm:grid-cols-2">
           <p><strong>Recipients:</strong> {plan.recipients.join(", ")||"None selected"}</p>
