@@ -22,9 +22,9 @@ import { NativeClassTeacherHomeworkPanel, NativeClassTeacherAssessmentPanel } fr
   "@/components/learning/NativeClassTeacherReviewPanels";
 import { NativeClassDiscussionPanel } from "@/components/learning/NativeClassDiscussionPanel";
 import { NativeClassLessonContentPanel } from "@/components/learning/NativeClassLessonContentPanel";
-import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
+
 import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
-import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
+
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
@@ -37,6 +37,18 @@ import {
 } from "@/modules/classes/class-staff.functions";
 import { classViews, classTabs, type ClassView } from "@/domain/class-views";
 import { normalizeClientError } from "@/lib/client-error";
+
+/** Administration-only panels are loaded on demand rather than added to
+ * every learner and teacher Class navigation bundle. Each panel performs
+ * its existing server-side authorization checks when it is mounted. */
+const NativeClassAssessmentReviewPanel=lazy(async()=>{
+  const module=await import("@/components/learning/NativeClassAssessmentReviewPanel");
+  return {default:module.NativeClassAssessmentReviewPanel};
+});
+const NativeClassSurveyCampaignPanel=lazy(async()=>{
+  const module=await import("@/components/learning/NativeClassSurveyCampaignPanel");
+  return {default:module.NativeClassSurveyCampaignPanel};
+});
 
 /** Reuse the exact source-backed WS6 report inside the native Class,
  * loading its heavier analytics module only for authorized report views. */
@@ -561,8 +573,10 @@ function ManagingClass({workspace}:{workspace:Workspace}){
               </li>)}
             </ul>
           </section>
-          <NativeClassAssessmentReviewPanel classId={workspace.classId}/>
-          <NativeClassSurveyCampaignPanel classId={workspace.classId}/>
+          <Suspense fallback={<p role="status" className="border border-border bg-card p-4 text-sm">Loading Class administrative tools…</p>}>
+            <NativeClassAssessmentReviewPanel classId={workspace.classId}/>
+            <NativeClassSurveyCampaignPanel classId={workspace.classId}/>
+          </Suspense>
           <div className="mt-6 border-t border-border pt-5">
             <h3 className="text-base font-semibold">Assign an existing adult learner</h3>
             <p className="mt-2 text-sm text-muted-foreground">
