@@ -19,6 +19,21 @@ describe("Site Information V6.1 planning source", () => {
     })).toEqual({ hostingMode: "same", separateHostName: "", separateHostType: "" });
   });
 
+  it("preserves responsible-organization nonprofit details when the host mode changes", () => {
+    const original = siteHostingV61Schema.parse({
+      hostingMode: "same", separateHostName: "Previous host",
+      separateHostType: "church", nonprofitStatus: "qualifying_church",
+      nonprofitSubject: "responsible", nonprofitOrganizationName: "Community Church",
+      nonprofitEin: "12-3456789",
+    });
+    expect(cleanSiteHostingV61(original)).toEqual({
+      ...original, separateHostName: "", separateHostType: "",
+    });
+    expect(cleanSiteHostingV61({ ...original, hostingMode: "undecided" }))
+      .toMatchObject({ nonprofitStatus: "qualifying_church",
+        nonprofitSubject: "responsible", nonprofitEin: "12-3456789" });
+  });
+
   it("allows an undecided host but requires physical-space intent for on-site delivery", () => {
     expect(siteHostingV61Schema.safeParse({
       hostingMode: "undecided", separateHostName: "", separateHostType: "",

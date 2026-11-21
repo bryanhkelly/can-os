@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { GuidedSetupShell } from "@/components/workflow";
 import { ActionFooter, SelectionCard, WorkspaceNotice } from "@/components/workspace";
 import {
-  siteProgramsAudiencesV61SaveSchema, type SiteProgramsAudiencesV61,
+  reconcileSiteExperienceAssociationsV61, siteProgramsAudiencesV61SaveSchema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
 import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
@@ -146,9 +146,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       const interestIds = checked
         ? [...new Set([...current.interestIds, id])]
         : current.interestIds.filter(value => value !== id);
-      return { ...current, interestIds,
+      return reconcileSiteExperienceAssociationsV61({ ...current, interestIds,
         startingFocus: current.startingFocus && !interestIds.includes(current.startingFocus)
-          ? null : current.startingFocus };
+          ? null : current.startingFocus });
     });
   }
   function toggleProgram(code: string, checked: boolean) {
@@ -156,9 +156,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       const programCodes = checked
         ? [...new Set([...(current.programCodes ?? []), code])]
         : (current.programCodes ?? []).filter(item => item !== code);
-      return { ...current, programCodes,
+      return reconcileSiteExperienceAssociationsV61({ ...current, programCodes,
         startingProgramCode: current.startingProgramCode && !programCodes.includes(current.startingProgramCode)
-          ? null : current.startingProgramCode ?? null };
+          ? null : current.startingProgramCode ?? null });
     });
   }
   function toggleTiming(id: TimingId, checked: boolean) {
@@ -166,8 +166,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       ? [...new Set([...current.timingIds, id])] : current.timingIds.filter(value => value !== id) }));
   }
   function toggleAudience(id: AudienceId, checked: boolean) {
-    setDraft(current => ({ ...current, audienceIds: checked
-      ? [...new Set([...current.audienceIds, id])] : current.audienceIds.filter(value => value !== id) }));
+    setDraft(current => reconcileSiteExperienceAssociationsV61({ ...current,
+      audienceIds: checked ? [...new Set([...current.audienceIds, id])]
+        : current.audienceIds.filter(value => value !== id) }));
   }
 
   async function save(exit: boolean) {

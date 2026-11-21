@@ -73,8 +73,11 @@ export const siteStorySourceV61Schema = z.object({
 }).strict();
 
 export function cleanSiteHostingV61(value: SiteHostingV61): SiteHostingV61 {
+  // Host-specific answers become inapplicable when the host is the responsible
+  // organization. The tax/status answers belong to the selected subject and
+  // must not be silently erased when switching hosting modes.
   return value.hostingMode === "different" ? value
-    : { hostingMode: value.hostingMode, separateHostName: "", separateHostType: "" };
+    : { ...value, separateHostName: "", separateHostType: "" };
 }
 export function cleanSiteEnvironmentV61(value: SiteEnvironmentV61): SiteEnvironmentV61 {
   return value.delivery === "digital" ? { delivery: "digital", physicalSpaceArrangement: "" } : value;

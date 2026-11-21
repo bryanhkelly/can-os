@@ -6,7 +6,7 @@ import {
 } from "./site-experience-interests";
 import {
   applySiteProgramsAudiencesV61,readSiteProgramsAudiencesV61,
-  siteProgramsAudiencesV61SaveSchema,snapshotSiteExperienceVision,
+  reconcileSiteExperienceAssociationsV61,siteProgramsAudiencesV61SaveSchema,snapshotSiteExperienceVision,
 } from "./site-launch-preferences";
 import { defaultSiteContentChannelConfig,resolveSiteContentBlocks,projectSiteExperienceItems } from "./site-content-channels";
 
@@ -95,6 +95,19 @@ describe("Site Experience Catalog v2",()=>{
     }).success).toBe(false);
     expect(siteProgramsAudiencesV61SaveSchema.safeParse({
       ...plan,experienceDetails:[{...plan.experienceDetails[0],activityIds:["unlisted-activity"]}],
+    }).success).toBe(false);
+  });
+  it("reconciles and validates Experience associations on an explicit Site plan edit",()=>{
+    const changed={...plan,interestIds:[] as Array<"adult">,
+      audienceIds:[] as Array<"adults">,programCodes:[]};
+    expect(siteProgramsAudiencesV61SaveSchema.safeParse(changed).success).toBe(false);
+    const cleaned=reconcileSiteExperienceAssociationsV61(changed);
+    expect(cleaned.experienceDetails?.[0]).toMatchObject({
+      audienceIds:[],programIds:[],programCodes:[],
+    });
+    expect(siteProgramsAudiencesV61SaveSchema.safeParse(cleaned).success).toBe(true);
+    expect(siteProgramsAudiencesV61SaveSchema.safeParse({
+      ...plan,programCodes:[],
     }).success).toBe(false);
   });
   it("generates wording from real chips instead of a generic category description",()=>{

@@ -141,10 +141,40 @@ export type SiteProgramsAudiencesV61 = z.infer<typeof siteProgramsAudiencesV61Sc
 /** New writes enforce five total, while old Site plans remain readable until edited. */
 export const siteProgramsAudiencesV61SaveSchema=siteProgramsAudiencesV61Schema.superRefine(
   (value,ctx)=>{
+  for (const [index, detail] of (value.experienceDetails ?? []).entries()) {
+    if (detail.audienceIds.some(id => !value.audienceIds.includes(id)))
+      ctx.addIssue({ code: "custom", path: ["experienceDetails", index, "audienceIds"],
+        message: "Experience audiences must be selected for this Site." });
+    if (detail.programIds.some(id => !value.interestIds.includes(id)))
+      ctx.addIssue({ code: "custom", path: ["experienceDetails", index, "programIds"],
+        message: "Experience Program interests must be selected for this Site." });
+    if (detail.programCodes?.some(code => !value.programCodes?.includes(code)))
+      ctx.addIssue({ code: "custom", path: ["experienceDetails", index, "programCodes"],
+        message: "Experience published Program references must be selected for this Site." });
+  }
     if((value.experienceIds?.length??0)+(value.customExperiences?.length??0)>siteExperienceLimit)
       ctx.addIssue({code:"custom",path:["experienceIds"],
         message:"Choose up to five Experiences total, including custom Experiences."});
   });
+
+/** Preserve legacy read compatibility, but remove references to withdrawn
+ * Program/Audience selections from an explicit new planning draft. */
+export function reconcileSiteExperienceAssociationsV61(
+  draft: SiteProgramsAudiencesV61,
+): SiteProgramsAudiencesV61 {
+  const audiences = new Set(draft.audienceIds);
+  const programs = new Set(draft.interestIds);
+  const published = new Set(draft.programCodes ?? []);
+  return { ...draft,
+    experienceDetails: draft.experienceDetails?.map(detail => ({
+      ...detail,
+      audienceIds: detail.audienceIds.filter(id => audiences.has(id)),
+      programIds: detail.programIds.filter(id => programs.has(id)),
+      ...(detail.programCodes !== undefined
+        ? { programCodes: detail.programCodes.filter(code => published.has(code)) } : {}),
+    })),
+  };
+}
 
 export function emptySiteProgramsAudiencesV61(): SiteProgramsAudiencesV61 {
   return { interestIds: [], timingIds: [], audienceIds: [], startingFocus: null };

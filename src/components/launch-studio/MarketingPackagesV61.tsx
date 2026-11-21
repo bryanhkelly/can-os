@@ -73,6 +73,9 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     formats:outreachFormatsV61(initialOutreachPlanV61().channels),
   }));
   const [step,setStep]=useState(0);
+  // Saved/duplicated copy is presumed operator-authored. Only a brand-new
+  // guided plan receives an automatic first draft when entering Review.
+  const [hasAuthoredCopy,setHasAuthoredCopy]=useState(false);
   const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("email");
   const [editingFormat,setEditingFormat]=useState<MarketingFormat|null>(null);
   const [showArchived,setShowArchived]=useState(false);
@@ -141,6 +144,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       ...initialOutreachPlanV61(siteIntent?.audienceIds??[]),
       recipients:recordToOpen.content.audiences,
     }});
+    setHasAuthoredCopy(true);
     setStep(0);setView(editing?"wizard":"detail");setError("");setNotice("");
     setReleases([]);setPackageReleases([]);setReleasesLoading(!editing);
     setReleasesUnavailable(false);
@@ -152,9 +156,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     setContent({...starter(context.defaultPurpose),
       plan:initialOutreachPlanV61(siteIntent?.audienceIds??[]),
       formats:outreachFormatsV61(initialOutreachPlanV61().channels)});
+    setHasAuthoredCopy(false);
     setStep(0);setView("wizard");setError("");setNotice("");
   }
   function patch(value:Partial<MarketingPackageContent>) {
+    if ("headline" in value || "message" in value || "callToAction" in value)
+      setHasAuthoredCopy(true);
     setContent(current=>({...current,...value}));setError("");
   }
 
@@ -210,7 +217,9 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         setStep(1);setNotice("Outreach draft saved.");
         return;
       }
-      const nextContent=step===4&&content.plan
+      // The first draft is automatic; subsequent navigation must never
+      // silently replace a message the operator has written or approved.
+      const nextContent=step===4&&content.plan&&!hasAuthoredCopy
         ? {...content,...composeOutreachDraftV61(siteName,content.plan)}
         : content;
       const saved=await saveCurrent(nextContent);
@@ -246,6 +255,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     await run(async()=>{
       const copied=await duplicateSiteMarketingPackageV61({data:{siteId,packageId:selected.id}});
       updateList(copied);setTitle(copied.title);setContent(copied.content);
+      setHasAuthoredCopy(true);
       setStep(0);setView("wizard");
       setNotice("A separate editable draft was created.");
     });

@@ -125,9 +125,9 @@ export function MarketingPackageWizardV61({
       focus==="feedback"?"program-interest":
       focus==="invitation"?"event-invitation":
       focus==="recruiting"?"interest-invitation":"site-announcement";
-    const suggested=starter(purpose);
-    onPatch({...suggested,plan:{...plan,messageFocus:focus},
-      audiences:content.audiences,formats:content.formats});
+    // Focus is a planning choice. Existing edited copy must remain intact
+    // until the user explicitly chooses "Use suggestion" in Review.
+    onPatch({purpose,plan:{...plan,messageFocus:focus}});
   };
   const setChannels=(channel:OutreachPlanV61["channels"][number])=>{
     const channels=toggle(plan.channels,channel) as OutreachPlanV61["channels"];
