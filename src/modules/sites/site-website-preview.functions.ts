@@ -25,7 +25,7 @@ export const getPartnerWebsitePreviewView = createServerFn({ method: "GET" })
 
 import {
   siteLocalContentLimits, siteLocalImageConsentStates, siteLocalImageMaxBase64Length,
-  siteLocalThemes, normalizeSiteLocalContent, websiteStarterFieldIds, siteLocalImagePublicationGaps,
+  siteLocalThemes, normalizeSiteLocalContent, websiteStarterFieldIds, safeSiteWebsitePreviewContent,
 } from "@/domain/site-local-content";
 import { publishPartnerLocalContent } from "./site-local-content.server";
 
@@ -102,10 +102,7 @@ export const previewChurchWebsiteDraft = createServerFn({ method: "POST" })
     if (data.siteId && actor.grantSiteId !== data.siteId) throw new AuthorizationError("intended church website Site");
     const content = normalizeSiteLocalContent(data.content, { allowIncompleteImage: true });
     // Unapproved artwork stays in the editor but is never projected into a preview page.
-    const safeContent = { ...content, branding: { ...content.branding,
-      heroImage: siteLocalImagePublicationGaps(content.branding.heroImage).length ? null : content.branding.heroImage,
-      logoImage: siteLocalImagePublicationGaps(content.branding.logoImage ?? null).length ? null : content.branding.logoImage,
-    } };
+    const safeContent = safeSiteWebsitePreviewContent(content);
     const preview = await getPartnerWebsitePreview(actor, safeContent);
     return { previewHtml: preview.previewHtml, previewPages: preview.previewPages };
   });
