@@ -127,7 +127,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Only use images you have permission to share.</p>
             <WebsiteArtworkField field="heroImage" value={content.branding.heroImage}
-              disabled={busy || !data.canEdit} onSelect={selectArtwork}
+              disabled={busy || !data.canPublish} onSelect={selectArtwork}
               onChange={next=>setContent(old=>({...old,branding:{...old.branding,heroImage:next}}))}/>
             <DisclosureSection title="Import photos from a Site folder (optional)">
               <SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
