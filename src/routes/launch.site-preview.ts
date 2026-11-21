@@ -15,8 +15,6 @@ import { readSavedBrandVersion } from "@/modules/sites/site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
-import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
-import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { projectSiteFundingPublicContext } from "@/domain/site-funding-public";
 import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
@@ -84,13 +82,8 @@ export const Route=createFileRoute("/launch/site-preview")({
           readSavedBrandVersion(site.id),
         ]);
         const stored=history[0]?.content ?? published?.content;
-        // First-visit Website & Brand and the Launch topbar must derive their
-        // unsaved starter from the same private Site Story editorial projection.
-        // A returning Site's saved website revision always wins; no source
-        // suggestion silently overwrites a saved operator edit.
-        const sourceStory=siteStorySourceV61Schema.safeParse(site.metadata.siteStoryV61);
-        const storyCandidates=sourceStory.success
-          ?suggestWebsiteCopyFromStory(sourceStory.data.answers,site.name):[];
+        // An unsaved Site preview starts without reusing private Story information.
+        // Consent and editorial generation belong to Website & Brand Step 4.
         const copy:SiteLocalContent=stored
           ?normalizeSiteLocalContent(stored,{allowIncompleteImage:true})
           :{...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
