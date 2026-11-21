@@ -49,7 +49,7 @@ const scoped = (siteId: string) => encodeURIComponent(siteId);
 /** These destinations are existing authorized operations, not new task stores. */
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {
-    question: "Which published Solutions support the programs your community wants to offer?",
+    question: "Which solutions could help bring your program ideas to life?",
     decision: "Choose a Solution, then set up its requirements.",
     canSupplies: "Available Solutions and setup guidance.",
     siteProvides: "Site details, staffing and supporting documents.",
@@ -59,7 +59,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "facilities-resources": {
-    question: "Can your Site safely and reliably support each proposed learning experience?",
+    question: "What spaces, equipment, and support will your experiences need?",
     decision: "Review rooms, capacity, internet access, devices and equipment.",
     canSupplies: "Requirements and review tools.",
     siteProvides: "Facilities and equipment information.",
@@ -71,7 +71,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "invite-team": {
-    question: "Who will supervise, support and operate the experiences at this Site?",
+    question: "Who will help bring these experiences to life?",
     decision: "Invite your team and assign the roles needed for each Solution.",
     canSupplies: "Invitations, roles and permissions.",
     siteProvides: "Team members and qualifications.",
@@ -82,7 +82,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "schedules-capacity": {
-    question: "When will each experience run, and how many learners can it support?",
+    question: "When could people participate, and how many places will be available?",
     decision: "Set dates, times, rooms and learner capacity.",
     canSupplies: "Class calendars and schedules.",
     siteProvides: "Available rooms, staff and capacity.",
@@ -95,7 +95,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "funding-enrollment": {
-    question: "How will your Site fund its learning experiences and prepare admissions?",
+    question: "How will you fund your programs and help people join?",
     decision: "Set funding, pricing, admissions and capacity. Enrollment opens later for approved offerings.",
     canSupplies: "Admissions and enrollment tools.",
     siteProvides: "Funding, pricing and admissions policies.",
@@ -108,7 +108,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "opening-compliance": {
-    question: "What must be independently verified before you can operate or enroll learners?",
+    question: "What needs to be ready before you can welcome participants?",
     decision: "Review applicable requirements and submit any missing documentation.",
     canSupplies: "Opening checks and reviews.",
     siteProvides: "Safety, training, insurance and facility documents.",
@@ -120,10 +120,10 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     ],
   },
   "publish-site": {
-    question: "Is the public-facing Site website reviewed and ready to go live?",
-    decision: "Review the Site identity, published local copy, licensed imagery, approved claims and live hosting. Record explicit Site publication separately from Offering releases and enrollment.",
-    canSupplies: "The canonical Site publisher, review checks, audit history, and public-host reachability verification.",
-    siteProvides: "Accurate public information, photo rights and consent, responsible publication authority, and an explicit decision reason.",
+    question: "Ready to share your website with the world?",
+    decision: "Review your site's identity, website text, photos, permissions, and hosting. Publishing your website doesn't open registration.",
+    canSupplies: "Website review, publication records, and a way to check whether your site is live.",
+    siteProvides: "Accurate website information, permission to use images, and a reason for your decision.",
     status: "governed",
     handoffs: [
       { title: "Edit Website & Brand", detail: "Return to Establish to revise and save the Site website without automatically publishing it.", href: id => "/launch/website?siteId=" + scoped(id) + "&returnToHub=true" },
@@ -253,7 +253,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
         <LaunchReadinessPanelV61 key={siteId + ":" + module} siteId={siteId} context="prepare" />}
       {module!=="opening-compliance"&&module!=="funding-enrollment"&&
         <WorkspaceActionLink title="Review full readiness"
-          description="Inspect Site-scoped evidence, required approvals and remaining preparation."
+          description="Check what you've completed and what still needs attention."
           href={"/launch/site?siteId="+scoped(siteId)+"&module=opening-compliance"}
           actionLabel="Review readiness"/>}
       <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}
