@@ -28,13 +28,10 @@ export function StudentContinueLearningPanel({
   const resumeClassId = enrolledClasses.length === 1
     ? enrolledClasses[0]?.classId ?? null : null;
   return <DashboardPanel id="continue-learning" title="Continue Learning"
-          action={resume && resumeClassId?<Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons"}} className={textLink}>Open Class →</Link>:
-            {enrolledClasses.length > 0 && <nav aria-label="Your enrolled Classes" className="mt-4 space-y-2">
-              {enrolledClasses.map(item => <Link key={item.classId} to="/class/$classId"
-                params={{classId:item.classId}} search={{view:"learn",tab:"lessons"}}
-                className="student-resume-action">{item.title} →</Link>)}
-            </nav>}
-            <Link to="/class" className={textLink}>View my classes →</Link>}>
+          action={resume && resumeClassId
+            ? <Link to="/class/$classId" params={{classId:resumeClassId}}
+                search={{view:"learn",tab:"lessons"}} className={textLink}>Open Class →</Link>
+            : <Link to="/class" className={textLink}>View my classes →</Link>}>
           {resume ? <div className="student-resume-grid">
             <div>
               <div className="flex items-start gap-3">
