@@ -4,7 +4,7 @@ import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
-import { isDemoAccountEmail, isApprovedDemoGrant } from "@/domain/local-demo-access";
+import { isDemoAccountEmail, isApprovedDemoGrant, LOCAL_DEMO_RILEY_FACILITATOR } from "@/domain/local-demo-access";
 import {
   canonicalClasses, canonicalClassStaffAssignments,
 } from "@/db/canonical-v301";
@@ -93,7 +93,8 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
           isNotNull(accessAccounts.emailVerifiedAt),
         )).for("share").limit(2);
       if(staffGrants.length!==1 || (isDemoAccountEmail(staffGrants[0]!.email) &&
-         !isApprovedDemoGrant({...staffGrants[0]!,id:staffGrants[0]!.grantId},staffGrants[0]!.email)))
+         (staffGrants[0]!.grantId!==LOCAL_DEMO_RILEY_FACILITATOR.grantId ||
+          !isApprovedDemoGrant({...staffGrants[0]!,id:staffGrants[0]!.grantId},staffGrants[0]!.email))))
         throw new AuthorizationError("current verified CAN room-facilitator grant at exact Site");
       const [prior]=await tx.select({
         id:canonicalClassStaffAssignments.id,
