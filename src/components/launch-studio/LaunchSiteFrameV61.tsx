@@ -47,7 +47,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
             <Menu className="size-4" />
           </Button>
           <strong className="text-sm">Launch Studio</strong>
-          <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Site setup</span>
+          <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Shape, share and launch</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-4">
           {previewAvailable && active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
