@@ -1,11 +1,11 @@
-# Introduce V6.1: atomic Marketing Package Releases
+# Share V6.1: atomic Marketing Package Releases
 
 Branch: feature/launch-studio-v61-clean-cutover-20261118
 
 ## Product invariant
 
-Establish (Site Story, Program intent, audiences and saved canonical Brand) precedes
-Introduce. The Brand version must exist before creating a Marketing Package. An
+Shape (Site Story, Program intent, audiences and saved canonical Brand) precedes
+Share. The Brand version must exist before creating a Marketing Package. An
 operator may edit that Package repeatedly, but **Release Package** is a single
 atomic operation for every selected output format. Formats are not individually
 versioned or independently generated in the Launch Studio UI.
@@ -19,8 +19,8 @@ previously released snapshot.
 
 ## User journey
 
-1. Establish and save the Site Brand.
-2. Introduce: create or edit a Marketing Package using saved Site Story,
+1. Shape and save the Site Brand.
+2. Share: create or edit a Marketing Package using saved Site Story,
    Programs & Audiences, and canonical Brand.
 3. Preview selected formats. The preview is read-only and does not publish,
    generate or send anything.
@@ -52,7 +52,7 @@ remain downloadable as earlier standalone material; the immutable artifact
 table is not rewritten or destructively backfilled.
 
 The source release endpoint now releases the entire Package and replaces the
-single-format generator entry point in the Introduce UI. Existing frozen
+single-format generator entry point in the Share UI. Existing frozen
 artifact read/rights-withdrawal checks are reused.
 
 ## ZIP and distribution
