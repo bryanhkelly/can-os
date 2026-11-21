@@ -111,7 +111,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     <PageFrame width="wide" className="launch-studio-page">
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
         <div className="min-w-0">
-          <PageHeader eyebrow="Establish / Website & Brand"
+          <PageHeader eyebrow="Shape / Website & Brand"
             title={data.host?["Brand Identity","Choose a Layout","Visual Identity",
               "Use Site Information","Your Content","Review"][step]:"Prepare your private website address"}
             subtitle="Design your Site website." />
