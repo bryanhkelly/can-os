@@ -91,6 +91,25 @@ describe("Launch Studio V6.1 editorial contract", () => {
     expect(wizard).not.toContain("create coordinated materials. Nothing is sent");
   });
 
+  it("uses one four-stage language framework without changing canonical module routes", () => {
+    const navigation = source("src/domain/launch-site-navigation-v61.ts");
+    const overview = source("src/components/launch-studio/LaunchStudioOverviewV61.tsx");
+    const route = source("src/routes/launch.site.tsx");
+    const outreach = source("src/domain/launch-introduce-v61.ts");
+    const website = source("src/routes/site-website.tsx");
+    expect(navigation).toContain('["Shape", "Share", "Prepare", "Launch"]');
+    expect(navigation).toContain('stage: "Shape", id: "site-profile"');
+    expect(navigation).toContain('stage: "Share", id: "create-outreach"');
+    expect(navigation).toContain('stage: "Launch", id: "open", title: "Launch"');
+    expect(overview).toContain("Your path to launch");
+    expect(overview).toContain("Shape your vision. Share your story. Prepare to deliver. Launch when ready.");
+    expect(route).toContain('eyebrow="Shape / Site Profile"');
+    expect(route).toContain('eyebrow="Shape / Programs & Audiences"');
+    expect(outreach).toContain('eyebrow:"Share / Create Outreach"');
+    expect(website).toContain('eyebrow="Shape / Website & Brand"');
+    expect(route).toContain('module: z.enum(siteLaunchModules.map(item=>item.id)');
+  });
+
   it("keeps publication and registration decisions separate", () => {
     const copy = source("src/components/launch-studio/LaunchSitePublicationPanel.tsx");
     const readiness = source("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
