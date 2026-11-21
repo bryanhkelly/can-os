@@ -296,7 +296,7 @@ describe("V6.1 Prepare to Open", () => {
     expect(safety).not.toContain('aria-label="Prepare modules"');
     expect(safety).toContain("settings/school/compliance?siteId=");
     const publish = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="publish-site" />);
-    expect(publish).toContain("Publish your Site website");
+    expect(publish).toContain("Publish your website");
     expect(publish).not.toContain("Review Launch requirements");
     expect(publish).not.toContain('aria-label="Prepare module navigation"');
     expect(publish).toContain("Sharing a private preview is different from publishing your website");
