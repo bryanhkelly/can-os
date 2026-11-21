@@ -1,6 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { BookOpen, Clock3, FileText } from "lucide-react";
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { DashboardProgress } from "@/components/workspace/dashboard-widgets";
@@ -12,22 +10,17 @@ import type { LearningResume } from "./student-dashboard-data";
  * self-reported progress, teacher-reviewed work, and earned credit.
  */
 export function StudentContinueLearningPanel({
-  resume, unavailable, nextWork, hasClasses,
+  resume, unavailable, nextWork, hasClasses, classes = [],
 }: {
   resume: LearningResume | null;
   unavailable: boolean;
   nextWork?: StudentSuccessStep;
   hasClasses: boolean;
+  classes?: { classId: string; title: string; status: string; courseAttemptId: string | null }[];
 }) {
   const textLink = "student-dashboard-link";
-  const studentClasses = useQuery({
-    queryKey: ["native-my-student-classes"],
-    queryFn: () => getMyStudentClasses(),
-    retry: false,
-  });
-  const enrolledClasses = studentClasses.data?.kind === "student"
-    ? studentClasses.data.classes.filter(item => item.status === "active" && !!item.courseAttemptId)
-    : [];
+  const enrolledClasses = classes.filter(item =>
+    item.status === "active" && !!item.courseAttemptId);
   // Never pass a legacy section ID to the canonical Class detail route.
   const normalizedTitle = (title: string) => title.toLowerCase()
     .split(/\s+[·|–]\s+/)[0].replace(/[^a-z0-9]+/g, " ").trim();
