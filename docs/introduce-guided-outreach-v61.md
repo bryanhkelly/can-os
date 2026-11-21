@@ -29,8 +29,10 @@ releases, generation previews, old-package compatibility, audit metadata and dow
 remain owned by the original Marketing Package services.
 
 After the guided plan, the existing package Details now includes a source summary,
-material previews and a simple in-page Conversation Starter Kit. The operator can
-create immutable materials, use/download them, and navigate to existing governed
+material previews and a simple in-page Conversation Starter Kit. The operator can refine the overall message or one format at a time (email, social,
+flyer, handout), with the same protected-claims screening on every override.
+Format-specific previews use the same renderer and immutable releases retain the exact
+chosen copy. The operator can create immutable materials, use/download them, and navigate to existing governed
 Site inquiry and Program-linked Interest Event workspaces. Nothing is automatically
 sent, registered, published, or counted as a response.
 
