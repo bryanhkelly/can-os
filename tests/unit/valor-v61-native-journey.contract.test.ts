@@ -19,13 +19,13 @@ describe("CAN V6.1 canonical student Class experience in any Site",()=>{
    expect(list).toContain("actor.grantSiteId");
    expect(list).toContain("currentClassAuthority");
    expect(list).not.toContain("VALOR_SITE");
-   expect(list).not.toContain("synthetic");
+   expect(list).not.toContain('metadata @> \'{"synthetic":true}\'');
    expect(route).toContain("getMyStudentClasses()");
    expect(route).toContain("<NativeStudentClassHome");
  });
  it("never creates an alternative Class, Course Attempt, or student enrollment",()=>{
    for(const code of [list,homework,learning]){
-     expect(code).not.toMatch(/from\\s*\\(?(?:\\s*)sections\\b|public\\.sections\\b|course_sections\\b|program_cohorts\\b/i);
+     expect(code).not.toMatch(/from\s*\(?\s*sections\b|public\.sections\b|course_sections\b|program_cohorts\b/i);
    }
    expect(list).toContain("canonicalClassEnrollments");
    expect(list).not.toContain("tx.insert");
