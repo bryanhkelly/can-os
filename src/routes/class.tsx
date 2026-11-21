@@ -18,9 +18,9 @@ import {
 import { getMyNativeClassInvitations } from "@/modules/classes/native-class-invitations.functions";
 import { getMyNativeClassApprovals } from "@/modules/classes/native-class-approvals.functions";
 import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
-import { getValorStudentClasses } from "@/modules/classes/native-valor-demo-student.functions";
+import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { getMyNativeTeachingClasses } from "@/modules/classes/native-class-teacher-home.functions";
-import { ValorStudentClassHome } from "@/components/learning/ValorStudentClassHome";
+import { NativeStudentClassHome } from "@/components/learning/NativeStudentClassHome";
 
 /** Load privileged Class management composition only when requested,
  * keeping the public Class directory and enrollment entry lightweight. */
@@ -114,14 +114,14 @@ function ClassHome(){
  * discovery and its independent session-recovery flow stay unchanged. */
 function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
   const student=useQuery({
-    queryKey:["native-valor-student-classes"],
-    queryFn:()=>getValorStudentClasses(),retry:false,
+    queryKey:["native-my-student-classes"],
+    queryFn:()=>getMyStudentClasses(),retry:false,
   });
   if(student.isPending)return <WorkspaceShell width="wide" eyebrow="CAN OS"
     title="My Classes">
     <p role="status" className="mt-5 text-sm">Checking your Class membership…</p>
   </WorkspaceShell>;
-  if(student.data?.kind==="student")return <ValorStudentClassHome
+  if(student.data?.kind==="student")return <NativeStudentClassHome
     classes={student.data.classes} navigation={navigation}/>;
   return <NativeTeacherOrAdultClasses navigation={navigation}/>;
 }
