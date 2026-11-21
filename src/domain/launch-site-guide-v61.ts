@@ -1,15 +1,15 @@
 import type { SiteIdentityV61Draft } from "./site-identity-v61";
-import { siteIdentityEditorialContextV61 } from "./site-identity-v61";
+import { siteIdentityTypeOptionsV61 } from "./site-identity-v61";
 import type { SiteHostingV61, SiteStoryV61 } from "./site-information-v61";
 import type { SiteProgramsAudiencesV61 } from "./site-launch-preferences";
 import { siteExperienceById } from "./site-experience-interests";
 import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
 
 type SiteInformationInputs = {
-  identity: SiteIdentityV61Draft;
-  host: SiteHostingV61;
+  siteType: SiteIdentityV61Draft["siteType"];
+  hostingMode: SiteHostingV61["hostingMode"];
   delivery: "physical" | "digital" | "both" | "";
-  story: SiteStoryV61;
+  values: SiteStoryV61["values"];
   networkChoice: "independent" | "request";
 };
 
@@ -28,13 +28,13 @@ const values: Record<SiteStoryV61["values"][number], string> = {
 
 /** Visible draft choices only. No personal narratives or third-party identity are echoed. */
 export function siteInformationGuideV61(step: 0 | 1 | 2 | 3, input: SiteInformationInputs): SiteGuideContentV61 {
-  const kind = input.identity.siteType ? siteIdentityEditorialContextV61(input.identity).label : null;
+  const kind = siteIdentityTypeOptionsV61.find(option => option.value === input.siteType)?.label ?? null;
   if (step === 0) return {
     summary: "A Site can have its own identity even when another organization hosts or operates it.",
-    highlights: [kind, input.host.hostingMode === "same" ? "Hosted by your organization" :
-      input.host.hostingMode === "different" ? "Different host planned" : null]
+    highlights: [kind, input.hostingMode === "same" ? "Hosted by your organization" :
+      input.hostingMode === "different" ? "Different host planned" : null]
       .filter((value): value is string => Boolean(value)),
-    insight: input.host.hostingMode === "different"
+    insight: input.hostingMode === "different"
       ? "Describe the Site itself first. A hosting organization's name or legal status does not determine the Site's identity."
       : "Think about how a participant would describe this Site in one sentence. It may differ from the organization responsible for it.",
     connection: "This identity helps tailor your website prompts and outreach. It does not establish accreditation, affiliation or approval.",
@@ -58,10 +58,10 @@ export function siteInformationGuideV61(step: 0 | 1 | 2 | 3, input: SiteInformat
   };
   return {
     summary: kind ? `You're shaping the story of your ${kind.toLowerCase()}.` : "You're shaping the story of your community.",
-    highlights: input.story.values.slice(0, 3).map(value => values[value]),
-    insight: input.identity.siteType === "church_community"
+    highlights: input.values.slice(0, 3).map(value => values[value]),
+    insight: input.siteType === "church_community"
       ? "Share a concrete example of how your community hopes to serve people, without treating a future program as already available."
-      : input.identity.siteType === "training_workforce"
+      : input.siteType === "training_workforce"
         ? "Name the skills or opportunities you hope to create and why they matter to the people you serve."
         : "A useful story connects a real community need to your purpose and what participants could experience.",
     connection: "With your permission, these answers can inform editable website and outreach suggestions. They will not be published automatically.",
