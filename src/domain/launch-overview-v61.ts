@@ -69,12 +69,12 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   if (evidence.marketing.state === "unavailable") {
     return { title: "Review Introduce",
       description: "Saved Marketing Packages could not be verified. No outreach status is inferred.",
-      href: route("promote") };
+      href: route("create-outreach") };
   }
   if (!evidence.marketing.value.hasPackages) {
-    return { title: "Prepare a Marketing Package",
-      description: "Use your saved Site Brand and Story to introduce your learning community.",
-      href: route("promote") };
+    return { title: "Create an Outreach Plan",
+      description: "Create a focused outreach plan using your saved Site Brand and Story.",
+      href: route("create-outreach") };
   }
   if (evidence.solutions?.state === "unavailable") {
     return { title: "Review Program Catalog",
