@@ -163,20 +163,20 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
   defaultTitle: string; defaultEyebrow: string; defaultDescription: string;
 }> = {
   "site.setup": {
-    label: "Site setup facts", privateOnly: true,
-    description: "Private Site identity, planning location, time zone and selected delivery mode.",
+    label: "Site setup facts", privateOnly: false,
+    description: "Saved Site identity, location, time zone and selected delivery model.",
     defaultTitle: "About our learning community", defaultEyebrow: "Our Site",
     defaultDescription: "Here is how our learning community is taking shape.",
   },
   "site.network": {
-    label: "Network affiliation status", privateOnly: true,
-    description: "Private affiliation status from network review. Never a public brand endorsement.",
+    label: "Network affiliation status", privateOnly: false,
+    description: "Current affiliation status from Site network records, with pending and revoked states labeled accurately.",
     defaultTitle: "Community and partnerships", defaultEyebrow: "Our connections",
     defaultDescription: "Our community partnerships and affiliations.",
   },
   "learning.interests": {
-    label: "Proposed learning programs", privateOnly: true,
-    description: "Private plans selected in Launch Studio. Never publish these as offerings.",
+    label: "Proposed learning programs", privateOnly: false,
+    description: "Proposed plans selected in Launch Studio. They are descriptive, not authorized Offerings."
     defaultTitle: "Programs you are exploring", defaultEyebrow: "Your learning community",
     defaultDescription: "These are planning interests, not approved offerings or enrollment opportunities.",
   },
