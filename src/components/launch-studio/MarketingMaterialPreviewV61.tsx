@@ -70,7 +70,7 @@ export function MarketingMaterialPreviewV61({siteId,title,brandVersionId,format,
       {!pending&&preview?.state==="missing-brand"&&
         <div className="max-w-sm space-y-3 text-center">
           <p className="font-semibold">Save your Site Brand first</p>
-          <p className="text-sm text-muted-foreground">Select colors, typography and a logo in Establish before previewing branded materials.</p>
+          <p className="text-sm text-muted-foreground">Select colors, typography and a logo in Shape before previewing branded materials.</p>
           <a href={"/launch/website?siteId="+encodeURIComponent(siteId)+"&returnToHub=true"}
             className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
             Open Website &amp; Brand
