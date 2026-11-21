@@ -27,16 +27,16 @@ type Destination = {
 const scope = (siteId: string) => encodeURIComponent(siteId);
 export const launchModuleDestinationsV61: Record<DestinationModuleId, Destination> = {
   open: {
-    subtitle: "Enable Enrollment only for Offerings independently authorized to receive learners.",
-    intro: "Funding and admissions are prepared before opening. Publishing the Site website does not enable enrollment. Each Offering must have an approved operating model, required safeguards, capacity and a receiving Program before its registration may be activated.",
+    subtitle: "Open enrollment for approved offerings.",
+    intro: "Check your offerings and complete any remaining requirements before opening enrollment.",
     state: "governed",
-    note: "Enable Enrollment is an independent action in the authorized receiving service, not a Site-wide toggle. Publishing the website or completing Prepare never activates registration.",
+    note: "Enrollment is enabled separately for each approved offering.",
     links: [
-      { label: "Review readiness and opening authority", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Independent approval and operational requirements" },
-      { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Official website publication and independent HTTPS reachability" },
-      { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Approved receiving Programs and capacity, not automatic enrollment" },
-      { label: "Manage eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Enable enrollment only for independently approved noncredit releases" },
-      { label: "Open your Site workspace", path: id => `/sites/${scope(id)}`, detail: "Existing Site operations, subject to active membership" },
+      { label: "Review readiness and opening authority", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Check opening requirements" },
+      { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Review Site publication" },
+      { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Review Programs and available seats" },
+      { label: "Manage eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Manage approved noncredit registration" },
+      { label: "Open your Site workspace", path: id => `/sites/${scope(id)}`, detail: "Go to your Site Workspace" },
     ],
   },
 };
@@ -54,13 +54,13 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
     rail={<LaunchGuidancePanels guidance={{ why: destination.intro, next: destination.note }} />}>
     <div className="mt-5 space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <StatusBadge tone="info">Independently governed workflow</StatusBadge>
-        <span className="text-xs text-muted-foreground">Your Site remains the same; no new Site is created.</span>
+        <StatusBadge tone="info">Enrollment setup</StatusBadge>
+        <span className="text-xs text-muted-foreground"></span>
       </div>
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
       <WorkspacePanel title={module === "open" ? "Enable Enrollment" : "Continue with existing capabilities"}
         description={module === "open"
-          ? "Review readiness, then use each Offering’s authorized registration workspace to enable enrollment independently."
+          ? "Check readiness, then open registration for each eligible offering."
           : "Open the existing authorized workspace, retaining the selected Site where that destination supports it."}>
         <div className="grid gap-3">
           {destination.links.map(item => <WorkspaceActionLink key={item.label}
@@ -69,7 +69,7 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
         </div>
       </WorkspacePanel>
       <WorkspaceNotice tone="info"><CircleAlert aria-hidden="true" className="mr-2 inline size-4"/>
-        Permission checks and real operating requirements are enforced by each destination.
+        
       </WorkspaceNotice>
     </div>
   </WorkspaceShell>;
