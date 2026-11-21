@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
 import {
   siteIdentityV61Schema, siteIdentityTypeOptionsV61, siteFaithTraditionOptionsV61,
-  isFaithBasedSiteIdentityV61, type SiteIdentityV61, type SiteIdentityV61Draft,
+  isFaithBasedSiteIdentityV61, siteIdentityEditorialContextV61,
+  type SiteIdentityV61, type SiteIdentityV61Draft,
 } from "@/domain/site-identity-v61";
 import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
@@ -176,6 +177,9 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     ? { delivery: "digital", physicalSpaceArrangement: "" } : environment) !== savedEnvironment;
   const storyDirty = snapshot(normalizeStory(story)) !== savedStory;
   const dirty = identityDirty || hostDirty || environmentDirty || storyDirty;
+  const identityContext=siteIdentityEditorialContextV61(identity);
+  const storyDistinctives=distinctives.filter(([id])=>id!=="faith" ||
+    isFaithBasedSiteIdentityV61(identity) || story.distinctives.includes("faith"));
   const releaseNavigation = useLaunchUnsavedChanges(dirty,
     "Leave Site Information? Unsaved answers will be lost.");
   function selectStep(next: Step) {
@@ -526,16 +530,16 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       </div>
     </WorkspacePanel>}
     {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
-      description="Optional. Tell us what matters to your learning community.">
+      description={identityContext.storyPrompt}>
       <div className="space-y-6">
         <p className="text-xs text-muted-foreground">Your answers can help shape your website and outreach. You'll review any suggested wording before using it. Please don't share private details about others.</p>
-        <MultiChoice title="1. Why are you creating this learning community?" hint="Choose up to three motivations. Optional."
+        <MultiChoice title={"1. Why are you creating this "+identityContext.kind+"?"} hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
         <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
           <Textarea rows={3} maxLength={1000} value={story.communityNeed}
             onChange={event => setStory(current => ({ ...current, communityNeed: event.target.value }))} /></Field>
         <MultiChoice title="3. What makes your approach distinctive?" hint="Choose up to three."
-          options={distinctives} selected={story.distinctives} onChange={selected => updateMulti("distinctives", selected)} />
+          options={storyDistinctives} selected={story.distinctives} onChange={selected => updateMulti("distinctives", selected)} />
         <Field label="4. How did your vision begin?" >
           <Textarea rows={3} maxLength={2000} value={story.foundingStory}
             onChange={event => setStory(current => ({ ...current, foundingStory: event.target.value }))} /></Field>
