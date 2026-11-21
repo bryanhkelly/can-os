@@ -7,6 +7,7 @@ import { launchSiteLifecycleLabel, nextLaunchAction } from "@/domain/launch-over
 import { launchModuleCompletionV61 } from "@/domain/launch-module-completion-v61";
 import { signOutOfWorkspace } from "@/components/shell/workspace-sign-out";
 import { safeLoader } from "@/lib/safe-loader";
+import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/launch/site")({
   validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
   loaderDeps: ({ search }) => ({ siteId: search.siteId, module: search.module }),
   loader: ({ deps }) => safeLoader(async () => {
-    const options = await listLaunchOptions();
+    const options = await measureServerStep("launch.site", "site-options", () => listLaunchOptions());
     const site = deps.siteId
       ? options.sites.find(candidate => candidate.id === deps.siteId)
       : options.sites.length === 1 ? options.sites[0] : null;
@@ -55,11 +56,11 @@ export const Route = createFileRoute("/launch/site")({
     // be confused with an empty saved answer or falsely reported as complete.
     const overview = site ? await (async () => {
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
-        readSiteInformationV61({ data: { siteId: site.id } }),
-        readSiteProgramsAudiencesV61({ data: { siteId: site.id } }),
-        readSiteBrandVersionView({ data: { siteId: site.id } }),
-        listSiteMarketingPackagesV61({ data: { siteId: site.id } }),
-        readCanonicalBlueprintWorkspace({ data: { siteId: site.id } }),
+        measureServerStep("launch.site", "overview-information", () => readSiteInformationV61({ data: { siteId: site.id } })),
+        measureServerStep("launch.site", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: site.id } })),
+        measureServerStep("launch.site", "overview-brand", () => readSiteBrandVersionView({ data: { siteId: site.id } })),
+        measureServerStep("launch.site", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: site.id } })),
+        measureServerStep("launch.site", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: site.id } })),
       ]);
       if (info.status === "fulfilled") informationRead = info.value;
       if (programs.status === "fulfilled") programsRead = programs.value;
