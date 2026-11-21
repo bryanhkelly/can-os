@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { siteExperienceIds } from "./site-experience-interests";
 
 /** Legacy eight-code vocabulary is retained for existing private Site records. */
 export const siteLaunchInterestIds = [
@@ -14,6 +15,11 @@ export const sitePlanningTimingIds = ["weekdays", "weekends", "daytime", "evenin
 export const sitePlanningAudienceIds = ["children", "teens", "adults", "older_adults"] as const;
 
 const distinct = <T extends string>(values: T[]) => new Set(values).size === values.length;
+const customExperiences = z.array(z.string().trim().min(2).max(100)
+  .refine(value => !/[<>\\u0000-\\u001f]/.test(value),
+    "Experience names must be plain text")).max(12)
+  .refine(values => new Set(values.map(value => value.toLocaleLowerCase())).size === values.length,
+    "Choose each custom Experience once");
 
 /**
  * The SAME Site-owned metadata.launchPreferences record used by Site Information
@@ -35,6 +41,9 @@ export const siteLaunchPreferencesSchema = z.object({
   programCodes: z.array(z.string().trim().min(3).max(128)).max(30)
     .refine(distinct, "Choose each Program once").optional(),
   startingProgramCode: z.string().trim().min(3).max(128).nullable().optional(),
+  experienceIds: z.array(z.enum(siteExperienceIds)).max(siteExperienceIds.length)
+    .refine(distinct, "Choose each Experience once").optional(),
+  customExperiences: customExperiences.optional(),
 }).strict().superRefine((value, ctx) => {
   if (value.startingProgramCode && !value.programCodes?.includes(value.startingProgramCode))
     ctx.addIssue({ code: "custom", path: ["startingProgramCode"],
@@ -57,6 +66,9 @@ export const siteProgramsAudiencesV61Schema = z.object({
   programCodes: z.array(z.string().trim().min(3).max(128)).max(30)
     .refine(distinct, "Choose each Program once").optional(),
   startingProgramCode: z.string().trim().min(3).max(128).nullable().optional(),
+  experienceIds: z.array(z.enum(siteExperienceIds)).max(siteExperienceIds.length)
+    .refine(distinct, "Choose each Experience once").optional(),
+  customExperiences: customExperiences.optional(),
 }).strict().superRefine((value, ctx) => {
   if (value.startingProgramCode && !value.programCodes?.includes(value.startingProgramCode))
     ctx.addIssue({ code: "custom", path: ["startingProgramCode"],
@@ -93,6 +105,8 @@ export function readSiteProgramsAudiencesV61(raw: unknown): SiteProgramsAudience
     ...(source.programCodes ? { programCodes: source.programCodes } : {}),
     ...(source.startingProgramCode !== undefined
       ? { startingProgramCode: source.startingProgramCode } : {}),
+    experienceIds: source.experienceIds ?? [],
+    customExperiences: source.customExperiences ?? [],
   });
 }
 
@@ -116,5 +130,7 @@ export function applySiteProgramsAudiencesV61(
     ...(plan.programCodes !== undefined ? { programCodes: plan.programCodes } : {}),
     ...(plan.startingProgramCode !== undefined
       ? { startingProgramCode: plan.startingProgramCode } : {}),
+    experienceIds: plan.experienceIds ?? [],
+    customExperiences: plan.customExperiences ?? [],
   });
 }

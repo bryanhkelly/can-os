@@ -241,16 +241,16 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
   </WorkspaceShell>;
 }
 
-/** Local two-step state changes only the shared guidance rail, not the Launch sidebar. */
+/** Three internal steps share the guidance rail, not the Launch sidebar. */
 function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: {
   siteId: string;
   initial: ProgramsAudiencesV61Initial;
   onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
-  const [step, setStep] = useState<0 | 1>(0);
+  const [step, setStep] = useState<0 | 1 | 2>(0);
   return <WorkspaceShell title="What could your community learn?"
     eyebrow="Establish / Programs & Audiences"
-    subtitle="Choose what you hope to offer and who you hope to serve. Saved intentions can shape your private website and guide preparation."
+    subtitle="Choose your Programs, audiences and Experiences. Your vision can shape website content before Solutions are approved."
     width="wide" rail={<ProgramsAudiencesV61Guidance step={step} />}>
     <EstablishProgramsAudiencesV61 key={siteId + ":" + initial.revision}
       siteId={siteId} initial={initial} onInternalStepChange={setStep}
