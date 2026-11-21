@@ -131,6 +131,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     local.schoolVision, local.leadershipWelcome, local.localTraditions, local.denomination,
     local.statementOfFaith, local.spiritualFormation, local.branding?.heroImage].some(Boolean));
   const hasReviewedPeople = Boolean(page.parentInformation?.people.length);
+  const hasLeadership = Boolean(local?.leadershipMembers?.some(member=>member.consentConfirmed));
   const academic = Boolean(page.academicPrograms?.length);
   const opportunities=page.enrollmentOpportunities??projectSiteEnrollmentOpportunities({
     academicPrograms:page.academicPrograms,enrichment:page.offerings,
@@ -158,6 +159,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     ...(tuition?["/tuition"] as const:[]),
     ...(services?["/families"] as const:[]),
     ...(faq?["/faq"] as const:[]),...(contact?["/contact"] as const:[]),
+    ...(hasLeadership?["/leadership"] as const:[]),
   ];
   const profile=resolveSiteExperienceProfile(opportunities);
   return profile==="school" || profile==="mixed"
@@ -287,7 +289,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ' alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
   });
   const pageLabels: Record<PublicSitePath, string> = {
-    "/": "Home", "/about": "About", "/academics": "Academics",
+    "/": "Home", "/about": "About", "/leadership": "Leadership", "/academics": "Academics",
     "/student-life": "Student life", "/school-day": "Learning model",
     "/admissions": "Admissions", "/tuition": "Tuition & aid", "/families": "Families",
     "/faq": "FAQs", "/contact": "Contact",
@@ -868,6 +870,30 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     contact: reviewedContact || reviewedAddress ? contactSection : "",
     channelsClosing: contentChannelAt("closing"),
   });
+  const leadershipProfiles=(local?.leadershipMembers??[])
+    .filter(person=>person.consentConfirmed)
+    .map(person=>{
+      const linkedin=person.linkedinUrl&&/^https:\/\/(?:www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]{3,100}\/??$/.test(person.linkedinUrl)
+        ? `<p><a class="text-action" rel="noopener noreferrer" target="_blank" href="${escapePublicHtml(person.linkedinUrl)}">View LinkedIn profile</a></p>`
+        : "";
+      const image=person.photo && !siteLocalImagePublicationGaps(person.photo).length
+        ? `<img class="leadership-photo" src="${escapePublicHtml(person.photo.dataUrl)}"
+          alt="${escapePublicHtml(person.photo.altText)}" loading="lazy" decoding="async"/>`
+        : "";
+      return `<article class="card leadership-person">${image}
+        <h3>${escapePublicHtml(person.name)}</h3>
+        <p class="tag">${escapePublicHtml(person.title)}</p>
+        ${person.biography?`<p>${escapePublicHtml(person.biography)}</p>`:""}
+        ${linkedin}</article>`;
+    }).join("");
+  const leadershipSection=leadershipProfiles?
+    `<section class="editorial-section" aria-label="Leadership team">
+      <div class="section-heading"><p class="tag">Our people</p>
+        <h2>Meet our leadership</h2>
+        <p>Get to know the people serving our community.</p>
+      </div>
+      <div class="grid leadership-grid">${leadershipProfiles}</div>
+    </section>`:"";
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
     "/programs": composePublicSiteInterior(templateId,
@@ -885,6 +911,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         "Browse public Classes and their learning formats. Enrollment depends on each Class Offering's approved terms."),
       renderOpportunityDirectory("class","Explore Classes",
         "Class availability and registration methods are rechecked at the enrollment service.")),
+    "/leadership": composePublicSiteInterior(templateId,
+      secondaryHero("Our people","Leadership","Meet the people who guide our learning community."),
+      leadershipSection),
     "/about": composePublicSiteInterior(templateId,
       secondaryHero("Our community",profile==="school"
         ?"A school shaped by purpose and the people around it.":experienceCopy.storyTitle,
@@ -1062,6 +1091,9 @@ ${publicSiteTemplateCss}
   .template-photo-extra img{max-width:100%;max-height:380px}}
 ${sevenSchoolCss}
 .school-logo{display:inline-block;width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:12px}.brand{overflow-wrap:anywhere}
+.leadership-grid{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.leadership-person{min-width:0}.leadership-person .tag{margin:10px 0}
+.leadership-photo{display:block;aspect-ratio:4/5;max-height:340px;width:100%;object-fit:cover;margin-bottom:16px}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
