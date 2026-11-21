@@ -27,7 +27,7 @@ export function BlueprintReferencesPicker({
       if(!available.length)return null;
       return <fieldset key={component.id} className="border p-4" disabled={disabled}>
         <legend className="px-2 font-semibold">
-          {readableBlueprintKey(component.key)} · curated references
+          {readableBlueprintKey(component.key)} · available resources
         </legend>
         <div className="mt-2 grid max-h-52 gap-3 overflow-y-auto sm:grid-cols-2">
           {available.map(reference=><Label key={reference.versionId} className="flex items-start gap-3 text-sm">
