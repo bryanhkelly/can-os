@@ -108,7 +108,7 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
     expect(wizard).toContain("<GuidedSetupProgress");
-    expect(wizard).toContain('label="Introduce outreach steps"');
+    expect(wizard).toContain('label="Share outreach steps"');
     expect(gallery).toContain("aria-pressed={viewport === size}");
     expect(gallery).toContain('kind="radio" name="site-wireframe"');
     expect(gallery).toContain("<SelectionCard");
@@ -142,6 +142,6 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     const prepare = read("src/components/launch-studio/LaunchPrepareV61.tsx");
     expect(diagnostics("src/components/launch-studio/LaunchPrepareV61.tsx").parseErrors).toEqual([]);
     expect(prepare).toContain('"funding-enrollment": {');
-    expect(prepare).toContain('question: "How will your Site fund its learning experiences and prepare admissions?",');
+    expect(prepare).toContain('question: "How will you fund your programs and help people join?",');
   });
 });
