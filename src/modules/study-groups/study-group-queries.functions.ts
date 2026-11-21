@@ -162,19 +162,26 @@ export const listStudentStudyGroupClassmates=createServerFn({method:"GET"})
    ne(s.people.id,actor.actorPersonId!)))
   .orderBy(asc(s.people.legalFirstName),asc(s.people.legalLastName));
  });
+type SerializableGroupMetadata = null | boolean | number | string |
+  SerializableGroupMetadata[] | { [key: string]: SerializableGroupMetadata };
+
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  const actor=await groupActor("student");
  const {db,s}=await context();
  const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,metadata:s.studyGroups.metadata,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt,timezone:s.sites.timezone}).from(s.studyGroups).innerJoin(s.sites,eq(s.sites.id,s.studyGroups.siteId)).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
  if(!group||group.status!=="active")throw new AuthorizationError("active study group required");
  await eligibleStudent(db,actor.actorPersonId!,group,actor.scope.programIds??[]);
+ // Database JSON is serializable, but the schema exposes metadata as
+ // Record<string, unknown>. Give the transport boundary its actual JSON type.
+ const serializableGroup = {...group,
+  metadata: group.metadata as SerializableGroupMetadata};
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
- if(!permitted)return {group,memberStatus:membership?.status??null,posts:[],sessions:[]};
+ if(!permitted)return {group:serializableGroup,memberStatus:membership?.status??null,posts:[],sessions:[]};
  const [posts,sessions]=await Promise.all([
  db.select({id:s.studyGroupPosts.id,body:s.studyGroupPosts.body,createdAt:s.studyGroupPosts.createdAt,parentPostId:s.studyGroupPosts.parentPostId}).from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.hidden,false))).orderBy(desc(s.studyGroupPosts.createdAt)).limit(100),
  db.select({id:s.studyGroupSessions.id,title:s.studyGroupSessions.title,agenda:s.studyGroupSessions.agenda,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt,cancelled:sql<boolean>`coalesce(${s.calendarEvents.metadata}->>'cancelled','false') = 'true'`}).from(s.studyGroupSessions).leftJoin(s.calendarEvents,and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,s.studyGroupSessions.id))).where(eq(s.studyGroupSessions.groupId,data.groupId)).orderBy(s.studyGroupSessions.startsAt).limit(50)]);
- return {group,memberStatus:membership?.status??null,posts,sessions};
+ return {group:serializableGroup,memberStatus:membership?.status??null,posts,sessions};
 });
 
 export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{const actor=await groupActor("teacher");
