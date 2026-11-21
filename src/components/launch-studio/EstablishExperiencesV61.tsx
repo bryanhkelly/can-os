@@ -141,12 +141,12 @@ export function EstablishExperiencesV61({
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
       <div className="space-y-1">
         <h3 className="font-serif text-2xl">
-          {stage==="choose"?"Explore experience topics":"Make these Experiences yours"}
+          {stage==="choose"?"What would you love to bring to your community?":"Make these Experiences yours"}
         </h3>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           {stage==="choose"
-            ?"Every topic is visible. Choose up to five priorities, then personalize only those choices."
-            :"Focus on your selected priorities. Choose activities, desired outcomes and intended audiences."}
+            ?"Explore the possibilities and choose up to five experiences that reflect your vision."
+            :"Tell us what people might do, what you hope they'll gain, and who you'd like to reach."}
         </p>
       </div>
       <div className="min-w-20 border border-primary/20 bg-accent px-4 py-2 text-center"
@@ -163,7 +163,7 @@ export function EstablishExperiencesV61({
           <span className="text-xs text-muted-foreground">Remove one to make room for another.</span>
         </div>
         {count===0
-          ? <p className="text-sm text-muted-foreground">Choose up to five topics below. Nothing is selected automatically.</p>
+          ? <p className="text-sm text-muted-foreground">Choose up to five topics that inspire you. You can change them anytime.</p>
           : <div className="flex flex-wrap gap-2">
             {selectedTopics.map(topic=><Button key={topic.id} type="button"
               size="sm" variant="default" aria-label={"Remove "+topic.title}
@@ -181,7 +181,7 @@ export function EstablishExperiencesV61({
         <div className="space-y-1">
           <h4 className="font-serif text-lg">Explore all {siteExperienceCatalog.length} topics</h4>
           <p className="text-xs leading-5 text-muted-foreground">
-            Twelve groups, all expanded. Suggested topics are outlined and marked with a star, not preselected.
+            Browse the ideas below. Stars highlight experiences that may be a good fit for your community.
           </p>
         </div>
         <label className="flex items-center gap-2">
@@ -243,7 +243,7 @@ export function EstablishExperiencesV61({
         No topics match that search. Try another phrase or clear the search.
       </WorkspaceNotice>}
       <details className="border-t border-border pt-4" aria-label="Optional local Experience topic">
-        <summary className="cursor-pointer text-sm font-semibold">Can't find your idea? Add a local topic</summary>
+        <summary className="cursor-pointer text-sm font-semibold">Have something else in mind? Add your idea</summary>
         <p className="mt-2 text-xs text-muted-foreground">
           Optional. A local idea counts toward your five, and needs no narrative description.
         </p>
@@ -256,7 +256,7 @@ export function EstablishExperiencesV61({
               onChange={event=>{setCustomName(event.target.value);setCustomError("");}}/>
           </label>
           <Button variant="outline" disabled={disabled||count>=siteExperienceLimit||!customName.trim()}
-            onClick={addCustomExperience}>Add local topic</Button>
+            onClick={addCustomExperience}>Add my idea</Button>
         </div>
         {customError&&<p role="alert" className="mt-2 text-xs text-destructive">{customError}</p>}
       </details>
@@ -427,7 +427,7 @@ export function EstablishExperiencesV61({
               Program associations are optional; you can select Program interests on the first step.
             </p>}
             {!!draft.programCodes?.length&&<div className="space-y-2 pt-2">
-              <p className="text-xs font-semibold">Published Program ideas</p>
+              <p className="text-xs font-semibold">Programs to explore</p>
               <div className="flex flex-wrap gap-2">
                 {draft.programCodes.map(code=>{
                   const active=detail?.programCodes?.includes(code)??false;
