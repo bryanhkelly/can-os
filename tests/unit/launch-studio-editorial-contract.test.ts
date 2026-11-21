@@ -66,6 +66,31 @@ describe("Launch Studio V6.1 editorial contract", () => {
     expect(text).toContain("Tell your story");
   });
 
+  it("keeps Solution planning approachable without changing review authority", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const picker = source("src/components/launch-studio/BlueprintComponentPicker.tsx");
+    const prepare = source("src/components/launch-studio/LaunchPrepareV61.tsx");
+    expect(editor).toContain("Make this solution work for your community");
+    expect(editor).toContain("Name your plan");
+    expect(editor).toContain("Connect your approved plan");
+    expect(editor).not.toContain(">Create planning Deployment<");
+    expect(picker).toContain("What this solution includes");
+    expect(prepare).toContain("Programs you want to explore");
+    expect(prepare).not.toContain("existing governed commands");
+  });
+
+  it("keeps outreach messages accurate when materials have not been created", () => {
+    const editor = source("src/components/launch-studio/MarketingPackagesV61.tsx");
+    const wizard = source("src/components/launch-studio/MarketingPackageWizardV61.tsx");
+    expect(editor).toContain("const hasDownloadableMaterials=downloadablePackageReleases.length>0");
+    expect(editor).toContain("const materialAvailabilityMessage=releasesUnavailable");
+    expect(editor).toContain("These links open site-wide records");
+    expect(editor).not.toContain("Only replies and interest recorded for this outreach will appear in its results");
+    expect(wizard).toContain("Review & save");
+    expect(wizard).toContain("Save this outreach plan first");
+    expect(wizard).not.toContain("create coordinated materials. Nothing is sent");
+  });
+
   it("keeps publication and registration decisions separate", () => {
     const copy = source("src/components/launch-studio/LaunchSitePublicationPanel.tsx");
     const readiness = source("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
