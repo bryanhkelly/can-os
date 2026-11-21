@@ -38,8 +38,8 @@ export function MarketingPackageReleaseControlsV61({
   });
   const packageUpToDate = Boolean(latestPackageRelease?.complete && packageChanges.length === 0);
 
-  return <WorkspacePanel title="Package release"
-          description="Release every selected format together. A Package Release is a frozen set; edits never change an earlier download or email.">
+  return <WorkspacePanel title="Create Materials"
+          description="Create all selected materials together. Every generated version is preserved, even when you edit the working plan.">
           <div className="space-y-4">
             <p className="text-sm">Selected identity:
               <strong>{record.brandVersionId
@@ -61,24 +61,24 @@ export function MarketingPackageReleaseControlsV61({
                 onClick={onRetryHistory}>Retry history</Button>
             </WorkspaceNotice>}
             {!releasesLoading&&latestPackageRelease&&<div className="space-y-2 border bg-muted/25 p-4">
-              <p className="text-sm font-semibold">Latest generated: Package Release v{latestPackageRelease.releaseNumber}</p>
+              <p className="text-sm font-semibold">Latest generated: Materials v{latestPackageRelease.releaseNumber}</p>
               {packageChanges.length
                 ? <p className="text-sm">Updates available: {packageChanges.map(change=>changeLabels[change]??change).join(", ")}. Preview and release an updated Package when ready.</p>
                 : <p className="text-sm text-muted-foreground">The working Package matches the latest generated release. Reuse that release instead of creating a duplicate.</p>}
             </div>}
             {!releasesLoading&&!latestPackageRelease&&
-              <p className="text-sm text-muted-foreground">This Package has no grouped release yet. Your first release will contain every selected format.</p>}
+              <p className="text-sm text-muted-foreground">No materials have been created for this outreach yet. Select supported formats to generate them together.</p>}
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
                 onClick={onPreview}>
-                Preview Package
+                Preview Materials
               </Button>
               <Button type="button" disabled={busy||releasesLoading||releasesUnavailable||record.status==="archived"||!record.brandVersionId||packageUpToDate||!record.content.formats.length}
                 onClick={onRelease}>
-                {latestPackageRelease?"Release Updated Package":"Release Package"}
+                {latestPackageRelease?"Create Updated Materials":"Create Materials"}
               </Button>
             </div>
-            <WorkspaceNotice tone="info">Release creates all selected formats atomically. It does not publish the website,
+            <WorkspaceNotice tone="info">Creating materials does not publish the website,
               send email, update scheduled communications, or change earlier Package Releases.</WorkspaceNotice>
           </div>
         </WorkspacePanel>;
