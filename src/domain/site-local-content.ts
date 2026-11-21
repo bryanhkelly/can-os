@@ -390,6 +390,24 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   return result;
 }
 
+/** Private previews show drafted words but never publish unchecked artwork,
+ * including portraits attached to a not-yet-approved Leadership profile. */
+export function safeSiteWebsitePreviewContent(content:SiteLocalContent):SiteLocalContent {
+  const safe=(photo:SiteLocalImage|null|undefined)=>
+    photo&&!siteLocalImagePublicationGaps(photo).length?photo:null;
+  return {
+    ...content,branding:{
+      ...content.branding,
+      heroImage:safe(content.branding.heroImage),
+      ...(content.branding.logoImage!==undefined
+        ?{logoImage:safe(content.branding.logoImage)}:{}),
+    },
+    ...(content.leadershipMembers?{leadershipMembers:content.leadershipMembers.map(person=>({
+      ...person,photo:safe(person.photo),
+    }))}:{}),
+  };
+}
+
 export function classifySiteLocalContent(content: SiteLocalContent): SiteLocalContentDecision {
   const flaggedFields: SiteLocalTextField[] = [];
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
