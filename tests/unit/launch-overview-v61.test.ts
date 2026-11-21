@@ -17,6 +17,14 @@ describe("Launch Overview source-derived next steps", () => {
     expect(launchSiteLifecycleLabel("closed")).toBe("Closed Site");
     expect(launchSiteLifecycleLabel(null)).toBe("Lifecycle not recorded");
   });
+  it("requires an explicit saved identity before marking Site Information complete",()=>{
+    const siteId="00000000-0000-4000-8000-000000000001";
+    const missing={...complete,information:ready({
+      identitySaved:false,hostingSaved:true,environmentSaved:true,
+    })};
+    expect(nextLaunchAction(siteId,missing).href).toContain("module=site-information");
+    expect(nextLaunchAction(siteId,missing).description).toContain("identity");
+  });
   it("resumes the first actual missing saved module", () => {
     const id="00000000-0000-4000-8000-000000000001";
     expect(nextLaunchAction(id,{...complete,information:ready({hostingSaved:false,environmentSaved:false})}).href)
