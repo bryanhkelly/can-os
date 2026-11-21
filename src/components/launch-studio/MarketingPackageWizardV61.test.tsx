@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { initialMarketingContent, initialOutreachPlanV61, marketingPurposeOptions } from "@/domain/marketing-package-v61";
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
+import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 
 const content = {
   ...initialMarketingContent("Test Learning Site","site-announcement"),
@@ -12,7 +13,7 @@ const props = {
   siteName:"Test Learning Site",siteIntent:{
     interestIds:["adult","senior"],timingIds:[],audienceIds:["adults","older_adults"],
     startingFocus:"adult",experienceIds:["financial-literacy"],
-  } as const,
+  } as SiteProgramsAudiencesV61,
   step:0,title:"Community introduction",content,
   busy:false,brandVersionId:null,currentSuggestion:null,
   purposeOptions:marketingPurposeOptions,activePreviewFormat:null,
@@ -37,7 +38,7 @@ describe("Introduce V6.1 guided outreach editor",()=>{
     expect(html).toContain("Adult Learning");
     expect(html).toContain("Financial Literacy");
     expect(html).toContain("From Establish");
-    expect(html).toContain("Make primary");
+    expect(html).toContain("Choose one primary highlight");
   });
   it("makes the operator choose material channels without falsely sending",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={4}/>);
