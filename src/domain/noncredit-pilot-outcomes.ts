@@ -70,6 +70,52 @@ export type PilotOutcomeSummary = {
   averageImprovementPercentagePoints:number|null;
 };
 
+/**
+ * Stable metric definitions for the current private noncredit pilot read model.
+ * These prepare a future shared Insights registry without creating new
+ * enrollment authorities, participant states or public reporting rights.
+ */
+export const NONCREDIT_PILOT_COUNT_DEFINITIONS = [
+  {key:"distinctLearners",label:"Unique learners",
+    source:"noncredit_registrations + approved Site release claims",
+    denominator:"Distinct canonical Person IDs",timeBasis:"registered_at",
+    rule:"Deduplicated across the provider's authorized Site releases and training versions."},
+  {key:"registrations",label:"Training registrations",
+    source:"noncredit_registrations + noncredit_self_enrollment_claims",
+    denominator:"Registration IDs",timeBasis:"registered_at",
+    rule:"Registrations include repeat registrations by the same Person."},
+  {key:"engagedParticipants",label:"Engaged registrations",
+    source:"learner_lesson_progress + noncredit_participation_events + assessment attempts",
+    denominator:"Registration IDs",timeBasis:"registration cohort with observed activity",
+    rule:"A completed lesson, submitted check or participation event; not verified attendance."},
+  {key:"lessonsMarkedComplete",label:"Lessons marked complete",
+    source:"learner_lesson_progress",denominator:"Completed lesson records",
+    timeBasis:"registration cohort with observed progress",
+    rule:"Sum of completed lessons; not verified Program completion."},
+  {key:"knowledgeCheckSubmissions",label:"Registrations with a knowledge check",
+    source:"assessment_execution_attempts",denominator:"Registration IDs",
+    timeBasis:"registration cohort with assessment submission",
+    rule:"A registration with a submitted knowledge check; not a credential."},
+  {key:"knowledgeCheckPasses",label:"Passed final knowledge checks",
+    source:"assessment_execution_results",denominator:"Registration IDs",
+    timeBasis:"registration cohort with finalized assessment",
+    rule:"Passing finalized result; not academic credit."},
+  {key:"surveyRespondents",label:"Registrations with feedback",
+    source:"survey_campaigns + survey_invitations + survey_responses",
+    denominator:"Attributable registration IDs",
+    timeBasis:"registration cohort with verified survey response",
+    rule:"Identified response must match Person, Offering, Deployment and operator without ambiguous retakes."},
+  {key:"confirmedNoncreditCompletions",label:"Confirmed completions",
+    source:"noncredit_completion_decisions",denominator:"Registration IDs",
+    timeBasis:"registration cohort with current governing decision",
+    rule:"Latest authoritative, unsuperseded completed decision only."},
+  {key:"pairedKnowledgeChecks",label:"Paired before/after checks",
+    source:"assessment_execution_results",
+    denominator:"Registration IDs with valid diagnostic pairs",
+    timeBasis:"registration cohort with comparable assessment pair",
+    rule:"Valid baseline and final checks for the same registration; denominator for measured learning change."},
+] as const;
+
 export function summarizeNoncreditPilot(facts:readonly PilotParticipantFact[]):PilotOutcomeSummary {
   const seen=new Set<string>();
   const totals:PilotOutcomeSummary={

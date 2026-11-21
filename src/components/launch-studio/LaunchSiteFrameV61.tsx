@@ -22,7 +22,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
   const [drawer, setDrawer] = useState(false);
   const stagePanelBaseId = useId();
   const navigationDrawerId = useId();
-  const activeStage = siteLaunchModules.find(item => item.id === active)?.stage ?? "Establish";
+  const activeStage = siteLaunchModules.find(item => item.id === active)?.stage ?? "Shape";
   // Derive active-stage expansion immediately on navigation. A prior manual
   // collapse only applies while its corresponding module remains active.
   const [stageChoice, setStageChoice] = useState<{ active?: string; stage: string }>({
@@ -47,7 +47,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
             <Menu className="size-4" />
           </Button>
           <strong className="text-sm">Launch Studio</strong>
-          <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Site setup</span>
+          <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Shape, share and launch</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-4">
           {previewAvailable && active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
@@ -56,7 +56,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
               <Globe2 className="size-4"/> Preview Website
             </a>
           </Button> : <Button type="button" variant="ghost" size="sm" disabled
-            title="Save a website draft in Website & Brand to enable private preview."
+            title="Save a draft in Shape → Website & Brand to enable a private preview."
             className="min-h-11"><Globe2 className="size-4"/> Preview unavailable</Button>}
           <div className="border-l border-border pl-3"><LaunchAccountControls /></div>
         </div>

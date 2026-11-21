@@ -10,7 +10,7 @@ const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const iso = z.string().datetime({ offset: true });
 const snapshotPages = z.record(z.string(), z.string().max(1_500_000))
   .refine(pages => Object.keys(pages).length > 0
-    && Object.keys(pages).length <= 14
+    && Object.keys(pages).length <= publicSitePagePaths.length
     && Object.keys(pages).every(isPublicSitePagePath)
     && typeof pages["/"] === "string", "Valid website preview pages are required");
 
@@ -28,7 +28,7 @@ export const sitePreviewShareSchema = z.object({
   /** V2: immutable R2 snapshot descriptor, never a public object URL. */
   snapshotKey:z.string().regex(/^site-website-preview-snapshots\/v2\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.json$/).optional(),
   snapshotDigest:digest.optional(),
-  snapshotPaths:z.array(z.enum(publicSitePagePaths)).min(1).max(14).optional(),
+  snapshotPaths:z.array(z.enum(publicSitePagePaths)).min(1).max(publicSitePagePaths.length).optional(),
 }).strict().superRefine((value,ctx)=>{
   const legacy=!!value.pages;
   const v2=!!value.snapshotKey&&!!value.snapshotDigest&&!!value.snapshotPaths;

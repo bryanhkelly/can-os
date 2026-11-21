@@ -5,11 +5,13 @@ import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { launchSiteLifecycleLabel, nextLaunchAction } from "@/domain/launch-overview-v61";
 import { launchModuleCompletionV61 } from "@/domain/launch-module-completion-v61";
-import { signOutOfWorkspace } from "@/components/shell/workspace-sign-out";
 import { safeLoader } from "@/lib/safe-loader";
+import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
+import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
+import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { EstablishSiteProfileUnified, EstablishSiteProfileGuidance } from "@/components/launch-studio/EstablishSiteProfileUnified";
 import { EstablishSiteInformationV61, SiteInformationV61Guidance, type SiteInformationV61Initial } from "@/components/launch-studio/EstablishSiteInformationV61";
@@ -37,23 +39,49 @@ export const Route = createFileRoute("/launch/site")({
   validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
   loaderDeps: ({ search }) => ({ siteId: search.siteId, module: search.module }),
   loader: ({ deps }) => safeLoader(async () => {
-    const options = await listLaunchOptions();
+    const options = await measureServerStep("launch.site", "site-options", () => listLaunchOptions());
     const site = deps.siteId
       ? options.sites.find(candidate => candidate.id === deps.siteId)
       : options.sites.length === 1 ? options.sites[0] : null;
+    // Reuse overview reads for the active module. Previously these same
+    // authorized server functions were called a second time on each navigation.
+    let informationRead: Awaited<ReturnType<typeof readSiteInformationV61>> | undefined;
+    let programsRead: Awaited<ReturnType<typeof readSiteProgramsAudiencesV61>> | undefined;
+    let marketingRead: Awaited<ReturnType<typeof listSiteMarketingPackagesV61>> | undefined;
+    // Suggestions are independent of overview readiness. Start their read
+    // concurrently instead of placing it behind the five overview reads.
+    const suggestionsRead = site && isIntroduceModuleV61(deps.module)
+      ? readSiteMarketingSuggestionsV61({ data: { siteId: site.id } }).catch(() => null)
+      : Promise.resolve(null);
     // Project next steps from real Site-scoped reads. A failed read must never
     // be confused with an empty saved answer or falsely reported as complete.
-    const overview = site ? await (async () => {
+    // Website & Brand redirects to its dedicated route; avoid five overview
+    // reads for a page whose only rendered content is a redirect.
+    const overview = site && deps.module !== "website-brand" ? await (async () => {
+      // Sidebar completion needs Site, planning and Brand facts. The expensive
+      // Blueprint workspace and Marketing list are only needed for Overview
+      // (or Share itself). Their own modules load canonical detail.
+      const isOverview = !deps.module;
+      const loadMarketing = isOverview || isIntroduceModuleV61(deps.module);
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
-        readSiteInformationV61({ data: { siteId: site.id } }),
-        readSiteProgramsAudiencesV61({ data: { siteId: site.id } }),
-        readSiteBrandVersionView({ data: { siteId: site.id } }),
-        listSiteMarketingPackagesV61({ data: { siteId: site.id } }),
-        readCanonicalBlueprintWorkspace({ data: { siteId: site.id } }),
+        measureServerStep("launch.site", "overview-information", () => readSiteInformationV61({ data: { siteId: site.id } })),
+        measureServerStep("launch.site", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: site.id } })),
+        measureServerStep("launch.site", "overview-brand", () => readSiteBrandVersionView({ data: { siteId: site.id } })),
+        loadMarketing
+          ? measureServerStep("launch.site", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: site.id } }))
+          : Promise.resolve(null),
+        isOverview
+          ? measureServerStep("launch.site", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: site.id } }))
+          : Promise.resolve(null),
       ]);
+      if (info.status === "fulfilled") informationRead = info.value;
+      if (programs.status === "fulfilled") programsRead = programs.value;
+      if (marketing.status === "fulfilled" && marketing.value !== null)
+        marketingRead = marketing.value;
       return {
         information: info.status === "fulfilled"
           ? { state: "ready" as const, value: {
+              identitySaved: info.value.identitySaved,
               hostingSaved: info.value.hostingSaved,
               environmentSaved: info.value.environmentSaved,
             } } : { state: "unavailable" as const },
@@ -63,11 +91,11 @@ export const Route = createFileRoute("/launch/site")({
         brand: brand.status === "fulfilled"
           ? { state: "ready" as const, value: { saved: !!brand.value.current } }
           : { state: "unavailable" as const },
-        marketing: marketing.status === "fulfilled"
+        marketing: marketing.status === "fulfilled" && marketing.value !== null
           ? { state: "ready" as const, value: {
               hasPackages: marketing.value.some(item => item.status !== "archived"),
             } } : { state: "unavailable" as const },
-        solutions: solutionPlans.status === "fulfilled" &&
+        solutions: solutionPlans.status === "fulfilled" && solutionPlans.value !== null &&
             solutionPlans.value.siteId === site.id
           ? { state: "ready" as const, value: {
               plans: solutionPlans.value.configurations.map(plan => ({
@@ -77,6 +105,7 @@ export const Route = createFileRoute("/launch/site")({
             } }
           : { state: "unavailable" as const },
         websiteDraftAvailable: Boolean(site.websiteDraft),
+        websiteContentSaved: site.websiteContentSaved === true,
       };
     })() : null;
     return {
@@ -84,24 +113,27 @@ export const Route = createFileRoute("/launch/site")({
       site: site ?? null,
       organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name})),
+      siteGuidePlanning: site && deps.module === "site-information" ? programsRead?.intent ?? null : null,
       siteInformation: site && deps.module === "site-information"
-        ? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
-      // All three Introduce modules use the same authorized Site package store
-      // and the same editorial projection of saved Establish information.
+        ? informationRead ?? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
+      // Both Share modules use the same authorized Site package store
+      // and the same editorial projection of saved Shape information.
       // Failure of optional suggestions must not hide already saved packages.
       marketingPackages: site && isIntroduceModuleV61(deps.module)
-        ? await listSiteMarketingPackagesV61({ data: { siteId: site.id } })
+        ? marketingRead ?? await listSiteMarketingPackagesV61({ data: { siteId: site.id } })
             .catch(() => null) : null,
       marketingSuggestions: site && isIntroduceModuleV61(deps.module)
-        ? await readSiteMarketingSuggestionsV61({ data: { siteId: site.id } })
-            .catch(() => null) : null,
+        ? await suggestionsRead : null,
+      introduceIntent: site && isIntroduceModuleV61(deps.module) ? programsRead?.intent ?? null : null,
+      introduceIntentUnavailable: Boolean(site && isIntroduceModuleV61(deps.module) && !programsRead),
+      introduceSiteRevision: site && isIntroduceModuleV61(deps.module) ? programsRead?.revision??null : null,
       programsAudiences: site && deps.module === "programs-audiences"
-        ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
-      // Establish preferences are optional context for catalog discovery. The
+        ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
+      // Shape preferences are optional context for catalog discovery. The
       // separately authorized catalog must remain navigable if this read is
       // unavailable or its data needs repair. Never pretend it loaded empty.
       prepareIntent: site && deps.module === "program-catalog"
-        ? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } })
+        ? await Promise.resolve(programsRead ?? readSiteProgramsAudiencesV61({ data: { siteId: site.id } }))
             .then(result => ({
               kind: "ready" as const, intent: result.intent, delivery: result.delivery,
               schoolYearAvailability: result.schoolYearAvailability,
@@ -120,7 +152,7 @@ function SiteLaunchPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  const { site, sites, organizations, siteInformation, programsAudiences, marketingPackages, marketingSuggestions, prepareIntent, overview, error } = outcome.data;
+  const { site, sites, organizations, siteInformation, siteGuidePlanning, programsAudiences, marketingPackages, marketingSuggestions, introduceIntent, introduceIntentUnavailable, introduceSiteRevision, prepareIntent, overview, error } = outcome.data;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -137,29 +169,31 @@ function SiteLaunchPage() {
     completion={launchModuleCompletionV61(site, overview)}
     previewAvailable={Boolean(site.websiteDraft)}>
     {selected?.id === "site-profile" ? <WorkspaceShell title="Site Profile"
-      eyebrow="Establish / Site Profile"
+      eyebrow="Shape / Site Profile"
       subtitle="Confirm your Site identity and add contact or location details when available."
       width="wide" rail={<EstablishSiteProfileGuidance />}>
       <EstablishSiteProfileUnified key={`${site.id}:${site.updatedAt}`}
         site={site} organizations={organizations}
         onBackToOverview={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })}
-        onSaveAndExit={signOutOfWorkspace}
+        onSaveAndExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
         onContinueToSiteInformation={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })} />
     </WorkspaceShell> : selected?.id === "site-information" && siteInformation ? <SiteInformationBody
-      site={site} initial={siteInformation} organizations={organizations}
+      key={site.id} site={site} initial={siteInformation} organizations={organizations} guidePlanning={siteGuidePlanning}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-profile" } })}
-      onExit={signOutOfWorkspace}
+      onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "programs-audiences" } })} />
     : selected?.id === "programs-audiences" && programsAudiences ? <ProgramsAudiencesBody
-      siteId={site.id} initial={programsAudiences}
+      key={site.id} siteId={site.id} initial={programsAudiences}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })}
-      onExit={signOutOfWorkspace}
+      onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
     : selected && isIntroduceModuleV61(selected.id) && marketingPackages ? <MarketingPackagesV61
       key={site.id + ":" + selected.id} module={selected.id}
-      siteId={site.id} siteName={site.name} initial={marketingPackages}
+      siteId={site.id} siteName={site.name} siteIntent={introduceIntent}
+      intentUnavailable={introduceIntentUnavailable} siteRevision={introduceSiteRevision}
+      initial={marketingPackages}
       suggestions={marketingSuggestions} suggestionsUnavailable={!marketingSuggestions}
       onExit={() => void navigate({ to: "/launch/site", search: { siteId: site.id } })} />
     : selected && isIntroduceModuleV61(selected.id) ? <WorkspaceShell
@@ -172,7 +206,7 @@ function SiteLaunchPage() {
       </p>
       <a href={base + "&module=" + selected.id}
         className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
-        Retry this Introduce module
+        Retry this Share step
       </a>
     </WorkspaceShell>
     : selected && isPrepareModuleV61(selected.id) ? <LaunchPrepareV61 key={site.id}
@@ -207,38 +241,41 @@ function SiteLaunchPage() {
 }
 
 /** Owns guidance state without adding another shell or left-navigation step. */
-function SiteInformationBody({ site, initial, organizations, onBack, onExit, onContinue }: {
+function SiteInformationBody({ site, initial, organizations, guidePlanning, onBack, onExit, onContinue }: {
   site: { id: string; organizationId: string };
   initial: SiteInformationV61Initial;
+  guidePlanning?: SiteProgramsAudiencesV61 | null;
   organizations: Array<{ id: string; name: string }>;
   onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
   const organization = organizations.find(item => item.id === site.organizationId);
-  return <WorkspaceShell title="Site Information" eyebrow="Establish / Site Information"
-    subtitle="Shape your learning environment and introduce the community behind your Site."
-    width="wide" rail={<SiteInformationV61Guidance step={step} />}>
+  return <WorkspaceShell title="Site Information" eyebrow="Shape / Site Information"
+    subtitle="Tell us about your community, how people will take part and what inspires you."
+    width="wide" rail={<SiteInformationV61Guidance step={step} guide={guide} />}>
     <EstablishSiteInformationV61 key={site.id + ":" + initial.revision}
       siteId={site.id} responsibleOrganizationName={organization?.name ?? null}
-      initial={initial} onInternalStepChange={setStep}
+      initial={initial} guidePlanning={guidePlanning} onInternalStepChange={setStep} onGuideChange={setGuide}
       onBackToSiteProfile={onBack} onSaveAndExit={onExit}
       onContinueToPrograms={onContinue} />
   </WorkspaceShell>;
 }
 
-/** Local two-step state changes only the shared guidance rail, not the Launch sidebar. */
+/** Three internal steps share the guidance rail, not the Launch sidebar. */
 function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: {
   siteId: string;
   initial: ProgramsAudiencesV61Initial;
   onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
-  const [step, setStep] = useState<0 | 1>(0);
-  return <WorkspaceShell title="What could your community learn?"
-    eyebrow="Establish / Programs & Audiences"
-    subtitle="Choose what you hope to offer and who you hope to serve. Saved intentions can shape your private website and guide preparation."
-    width="wide" rail={<ProgramsAudiencesV61Guidance step={step} />}>
+  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
+  return <WorkspaceShell title="What would you like to bring to your community?"
+    eyebrow="Shape / Programs & Audiences"
+    subtitle="Explore what you want to offer, who you hope to serve and the experiences that bring your vision to life."
+    width="wide" rail={<ProgramsAudiencesV61Guidance step={step} guide={guide} />}>
     <EstablishProgramsAudiencesV61 key={siteId + ":" + initial.revision}
-      siteId={siteId} initial={initial} onInternalStepChange={setStep}
+      siteId={siteId} initial={initial} onInternalStepChange={setStep} onGuideChange={setGuide}
       onBackToSiteInformation={onBack} onSaveAndExit={onExit}
       onContinueToWebsiteBrand={onContinue} />
   </WorkspaceShell>;

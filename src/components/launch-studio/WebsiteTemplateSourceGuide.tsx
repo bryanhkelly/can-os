@@ -12,6 +12,7 @@ const fieldSourceNames:Record<WebsiteElementSource["kind"],string>={
   "site-media":"Reviewed Site imagery",
   "approved-records":"Approved data",
   "site-layout":"Editable section configuration",
+  "site-planning":"Saved planning intentions",
   "template-copy":"Fixed template text",
   "computed":"Computed from eligibility",
 };

@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { Radio } from "@/components/ui/choice";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { SelectionCard, WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
@@ -86,13 +86,13 @@ function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
       <h2 className="mt-2 font-serif text-2xl">Who is learning?</h2>
       <p className="mt-2 text-sm text-muted-foreground">A single entry point adapts the questions and authorization to the person enrolling. Enrollment is not submitted from this internal preview.</p>
       <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        {audienceOptions.map(option => <Button variant="ghost" type="button" key={option.id}
-          aria-pressed={audience === option.id} onClick={() => setAudience(option.id)}
-          className={"border p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary " +
-            (audience === option.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40")}>
-          <span className="block text-base font-semibold">{option.title}</span>
-          <span className="mt-2 block text-sm leading-6 text-muted-foreground">{option.description}</span>
-        </Button>)}
+        {audienceOptions.map(option => <SelectionCard key={option.id}
+          kind="radio" name="enrollment-lab-audience" value={option.id}
+          checked={audience === option.id}
+          onChange={checked => { if (checked) setAudience(option.id); }}
+          title={option.title} detail={option.description}
+          className="min-h-20" />)}
+
       </div>
     </section>
     {audience === "guardian" ? <section className="mt-5 border border-border bg-card p-5">

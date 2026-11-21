@@ -3,6 +3,7 @@ import { Pool } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import * as schema from "@/db/schema";
 import { canonicalOperationsUrlValid } from "@/domain/canonical-operations-connection";
+import { measureServerStep } from "@/lib/performance/measure-server-step";
 
 /**
  * Cloudflare Workers cannot share live WebSocket Pool clients across fetch
@@ -63,13 +64,16 @@ export async function withRequestDatabase<T>(
   };
   return requestDatabase.run(scoped, async () => {
     try {
-      return await operation();
+      // Measures the entire authorized operation, not individual SQL statements.
+      // Logging is strictly opt-in and never includes connection details.
+      return await measureServerStep("db.request", "operation", operation);
     } finally {
       scoped.closed = true;
       try {
-        await Promise.allSettled([...scoped.resources.values()].map(resource => resource.close()));
+        await measureServerStep("db.request", "restricted-cleanup", () =>
+          Promise.allSettled([...scoped.resources.values()].map(resource => resource.close())).then(() => undefined));
       } finally {
-        await scoped.pool.end();
+        await measureServerStep("db.request", "pool-close", () => scoped.pool.end());
       }
     }
   });

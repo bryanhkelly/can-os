@@ -11,7 +11,7 @@ export function SolutionPlansReadinessV61({ siteId,solutions }: {
         <h3 className="text-sm font-semibold">Solution plans</h3>
         {solutions.state==="loading" && <p role="status" className="mt-2 text-sm">Loading Solution plans…</p>}
         {solutions.state==="unavailable" && <WorkspaceNotice tone="attention" className="mt-3">
-          Solution planning records are unavailable or your current account cannot view them. No status is inferred.
+          We couldn't load your solution plans. Try again, or ask a site administrator to check your access.
         </WorkspaceNotice>}
         {solutions.state==="ready" && (solutions.value.configurations.length
           ? <ul className="mt-3 space-y-2">{solutions.value.configurations.map(plan=>{
@@ -23,16 +23,16 @@ export function SolutionPlansReadinessV61({ siteId,solutions }: {
                   <p className="text-sm font-medium">{plan.name}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {model ? model.title + " · v" + model.versionNo + " · " : ""}
-                    Saved revision {plan.revision}
+                    Saved version {plan.revision}
                   </p>
                   {model ? <>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {model.components.filter(item => item.requirementMode === "required").length}
-                      {" "}required components in the published Solution. These are not verified Site readiness.
+                      {" "}required setup steps. Complete the necessary checks before offering this solution.
                     </p>
                     <details className="mt-2 text-xs">
                       <summary className="cursor-pointer font-medium text-primary">
-                        View published Solution requirements
+                        View what this solution needs
                       </summary>
                       <ul className="mt-2 space-y-2">
                         {model.components.map(component => <li key={component.id}
@@ -50,7 +50,7 @@ export function SolutionPlansReadinessV61({ siteId,solutions }: {
                       </ul>
                     </details>
                   </> : <p className="mt-1 text-xs text-muted-foreground">
-                    This saved Solution version is not available for preview. Review the plan for details.
+                    We couldn't show this solution version. Open your saved plan to see its details.
                   </p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -65,7 +65,7 @@ export function SolutionPlansReadinessV61({ siteId,solutions }: {
               </li>;
             })}</ul>
           : <p className="mt-2 text-sm text-muted-foreground">
-              No saved Solution plans for this Site.{" "}
+              You haven't saved a solution plan yet.{" "}
               <Link to="/launch/site" search={{siteId, module:"program-catalog"}}
                 className="font-semibold text-primary underline">Open Program Catalog</Link> to begin.
             </p>)}

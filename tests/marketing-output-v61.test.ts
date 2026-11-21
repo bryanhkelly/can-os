@@ -40,6 +40,21 @@ describe("Introduce format-specific graphic rendering",()=>{
     expect(actual.body).toContain("…");
     expect(actual.plainText).toContain(unsafe.message);
   });
+  it("isolates per-format copy while keeping the same Site Brand",()=>{
+    const authored={...content,materialOverrides:{
+      email:{headline:"A partnership conversation",message:"For email partners only."},
+      social:{headline:"Join the conversation",message:"For social only."},
+    }};
+    const email=renderSiteMarketingArtifact({format:"email",brand,content:authored,websiteUrl:null});
+    const social=renderSiteMarketingArtifact({format:"social",brand,content:authored,websiteUrl:null});
+    const flyer=renderSiteMarketingArtifact({format:"flyer",brand,content:authored,websiteUrl:null});
+    expect(email.body).toContain("A partnership conversation");
+    expect(email.body).toContain("For email partners only.");
+    expect(email.body).not.toContain("For social only.");
+    expect(social.plainText).toContain("For social only.");
+    expect(social.plainText).not.toContain("For email partners only.");
+    expect(flyer.body).not.toContain("For email partners only.");
+  });
   it("does not invent a CTA URL for a not-yet-published Site",()=>{
     const output=renderSiteMarketingArtifact({format:"email",brand,content,websiteUrl:null});
     expect(output.body).not.toContain('href="http');

@@ -52,7 +52,7 @@ export function MarketingPackageReleaseHistoryV61({
                     Saved content revision {version.packageRevision} · Brand preserved with this release
                   </p>
                   {!version.complete&&<WorkspaceNotice tone="attention">This historical release is incomplete.
-                    Download the available original files individually; do not treat it as a full Package.</WorkspaceNotice>}
+                    You can still download the available files individually, but this set is incomplete.</WorkspaceNotice>}
                   {version.outputs.some(item=>item.withdrawnAt)&&<WorkspaceNotice tone="attention">
                     At least one material was withdrawn. The full Package is unavailable, but unaffected
                     original files may still be downloaded individually.</WorkspaceNotice>}
@@ -117,7 +117,7 @@ export function MarketingPackageReleaseHistoryV61({
                         className="h-[34rem] w-full border bg-white"/>}
                 </div>
                 <div className="min-w-0 space-y-2">
-                  <p className="text-sm font-semibold">Current saved Package preview</p>
+                  <p className="text-sm font-semibold">Your current materials</p>
                   {record.content.formats.includes(compare.format)
                     ? <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
                         brandVersionId={record.brandVersionId}

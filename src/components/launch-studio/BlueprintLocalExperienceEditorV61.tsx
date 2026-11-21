@@ -40,7 +40,7 @@ export function BlueprintLocalExperienceEditorV61({
     <legend className="px-2 font-semibold">Propose a local experience</legend>
     <p className="mb-3 text-sm text-muted-foreground">
       Describe a club, activity, community project, or experience unique to your Site.
-      A proposal is not an approved activity.
+      You can plan this now. It must be reviewed before it can be offered.
     </p>
     <div className="grid gap-3 sm:grid-cols-3">
       <Label className="text-sm" htmlFor="canonical-local-component">
@@ -68,7 +68,7 @@ export function BlueprintLocalExperienceEditorV61({
       disabled={!categories.some(component => component.id === categoryId) ||
         title.trim().length < 2 || experiences.length >= 200}
       onClick={onAdd}>
-      Add to private Blueprint draft
+      Add to my plan
     </Button>
     {experiences.length > 0 && <ul className="mt-4 space-y-2 text-sm">
       {experiences.map((item,index) => <li key={index}

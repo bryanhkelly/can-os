@@ -2,14 +2,18 @@ import { z } from "zod";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
-import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch-preferences";
+import { siteLaunchInterestIds, type SiteLaunchPreferences, type SitePublishedExperienceSnapshot } from "./site-launch-preferences";
+import {
+  siteExperienceById, siteExperienceAudienceNames, siteExperienceProgramNames,
+  describeSiteExperience,
+} from "./site-experience-interests";
 import { projectSiteEnrollmentOpportunities } from "./site-enrollment-opportunities";
 
 /** A Site owns placement and presentation. A channel only references a
  * separately authorized data source; the editor cannot write Program facts,
  * create an Offering or manufacture an enrollment link. */
 export const siteContentChannelIds = [
-  "learning.interests", "learning.academics",
+  "learning.interests", "learning.experiences", "learning.academics",
   "learning.enrichment", "learning.noncredit",
   "site.setup", "site.network", "learning.classes", "learning.opportunities",
 ] as const;
@@ -26,7 +30,7 @@ export const siteContentBlockSchema = z.object({
   placement: z.enum(["learning", "community", "closing"]),
   layout: z.enum(["cards", "list", "featured"]),
   /** Optional means legacy V1/V2 blocks remain valid and default to home. */
-  page: z.enum(["/", "/programs", "/courses", "/classes", "/academics", "/student-life"]).optional(),
+  page: z.enum(["/", "/programs", "/experiences", "/courses", "/classes", "/academics", "/student-life"]).optional(),
   targetKinds: z.array(z.enum(["school", "program", "course", "class"])).max(4).optional(),
   sort: z.enum(["source", "title", "upcoming"]).optional(),
   limit: z.number().int().min(1).max(40).optional(),
@@ -62,7 +66,7 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     placement: "community", layout: "list", enabled: true,
     eyebrow: "Your Site",
     title: "About our learning community",
-    description: "Learn about our location, learning plans and how we are preparing to serve families.",
+    description: "Learn about our location, learning plans and how we are preparing to serve our community.",
   }, {
     id: "site-network", channel: "site.network",
     placement: "closing", layout: "list", enabled: true,
@@ -75,6 +79,16 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     eyebrow: "Your learning community",
     title: "Programs you are exploring",
     description: "These are planning interests, not approved offerings or enrollment opportunities.",
+  }, {
+    id: "planning-experiences-home", channel: "learning.experiences",
+    placement: "learning", layout: "cards", enabled: true,
+    eyebrow: "Your learning community", title: "Experiences we are exploring",
+    description: "Ideas for learning and connection. Activities and dates have not been confirmed.",
+  }, {
+    id: "planning-experiences-page", channel: "learning.experiences",
+    page: "/experiences", placement: "learning", layout: "cards", enabled: true,
+    eyebrow: "Discover possibilities", title: "Imagine what you could experience",
+    description: "These are proposed ideas, not scheduled or approved offerings.",
   }, {
     id: "public-classes", channel: "learning.classes",
     placement: "learning", layout: "cards", enabled: true,
@@ -180,6 +194,12 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
     defaultTitle: "Programs you are exploring", defaultEyebrow: "Your learning community",
     defaultDescription: "These are planning interests, not approved offerings or enrollment opportunities.",
   },
+  "learning.experiences": {
+    label: "Planned Experiences", privateOnly: false,
+    description: "Experiences selected in Establish, organized by intended Programs and audiences. No Solution, schedule or enrollment is implied.",
+    defaultTitle: "Experiences we are exploring", defaultEyebrow: "Discover possibilities",
+    defaultDescription: "Explore ideas for learning, creativity and community connection. Details are still being planned.",
+  },
   "learning.academics": {
     label: "Reviewed academic programs", privateOnly: false,
     description: "Pulls reviewed academic marketing records, not unapproved school drafts.",
@@ -230,6 +250,41 @@ export type SiteContentItem = {
 };
 export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentItem[]};
 
+/** Publish the exact rendered Experience cards so future catalog edits cannot
+ * silently change text on an already published website. */
+export const sitePublishedExperienceCardsSchema=z.array(z.object({
+  id:z.string().max(128),title:z.string().max(120),
+  description:z.string().max(1200),label:z.string().max(500),
+}).strict()).max(siteExperienceById.size+12);
+export type SitePublishedExperienceCard=z.infer<typeof sitePublishedExperienceCardsSchema>;
+
+export function projectSiteExperienceItems(
+  vision:Pick<SiteLaunchPreferences,"experienceIds"|"customExperiences"|"experienceDetails"|"interestIds"|"audienceIds">|SitePublishedExperienceSnapshot|null,
+):SiteContentItem[]{
+  const audiences=new Set(vision?.audienceIds??[]);
+  const programs=new Set(vision?.interestIds??[]);
+  const details=new Map((vision?.experienceDetails??[]).map(item=>[item.id,item] as const));
+  const items:SiteContentItem[]=(vision?.experienceIds??[]).flatMap(id=>{
+    const topic=siteExperienceById.get(id);
+    if(!topic)return [];
+    const detail=details.get(id);
+    const audienceLabels=(detail?.audienceIds??topic.audiences.filter(value=>audiences.has(value)))
+      .map(value=>siteExperienceAudienceNames[value]);
+    const programLabels=(detail?.programIds??topic.programs.filter(value=>programs.has(value)))
+      .map(value=>siteExperienceProgramNames[value]);
+    const scope=[...programLabels,...audienceLabels].join(" · ");
+    const status=detail?.priority==="featured"?"Featured planning idea":
+      detail?.priority==="exploring"?"Exploring":"Planned Experience";
+    return [{id:topic.id,title:topic.title,description:describeSiteExperience(topic,detail),
+      label:status+(scope?" · "+scope:"")}];
+  });
+  items.push(...(vision?.customExperiences??[]).map((title,index)=>({
+    id:"custom-"+index,title,description:"A local experience our community is considering.",
+    label:"Proposed local Experience",
+  })));
+  return items;
+}
+
 /** Preserve the Site's own configured setup and network sections.
  * The separate, canonical planning-program projection avoids duplicate
  * "learning.interests" cards; no Site or network facts are suppressed.
@@ -242,6 +297,22 @@ export function websitePreviewEditorialBlocks(
 }
 
 
+/** Private-only fallback for Sites that saved their website layout before the
+ * Experience channel existed. Explicitly disabled or removed Experience
+ * sections in a newer layout remain under the editor's control. */
+export function projectMissingSiteExperienceSectionsForPreview(
+  config: SiteContentChannelConfig,
+  preferences: SiteLaunchPreferences | null,
+): SiteContentBlockProjection[] {
+  if (!preferences || config.blocks.some(block=>block.channel==="learning.experiences"))
+    return [];
+  const experienceBlocks=defaultSiteContentChannelConfig.blocks.filter(block=>
+    block.channel==="learning.experiences");
+  return resolveSiteContentBlocks({
+    ...defaultSiteContentChannelConfig, blocks:experienceBlocks,
+  },{mode:"private",preferences});
+}
+
 export type SitePublishedClassListing = {
   classId:string;title:string;
   deliveryMode:"self_paced"|"scheduled"|"facilitated"|"hybrid";
@@ -252,6 +323,9 @@ export type SiteContentChannelFeeds = {
   /** The Site, not the preview route, resolves its channel sources. */
   mode: "private" | "public";
   preferences?: SiteLaunchPreferences | null;
+  /** Website-published snapshot; live Site edits do not alter public Experience copy. */
+  publishedExperiences?: SitePublishedExperienceSnapshot | null;
+  publishedExperienceCards?: readonly SitePublishedExperienceCard[] | null;
   siteSetup?: {
     name: string; organizationName: string; city?: string | null;
     state?: string | null; timezone?: string | null;
@@ -331,6 +405,12 @@ export function resolveSiteContentBlocks(
           label: "Proposed · not enrolling",
         }));
         break;
+      case "learning.experiences": {
+        items=feeds.mode==="public"
+          ? [...(feeds.publishedExperienceCards??[])]
+          : projectSiteExperienceItems(feeds.preferences??null);
+        break;
+      }
       case "learning.academics":
         items = (feeds.academicPrograms ?? []).map(program => ({
           id: program.programId, title: program.title, description: program.summary,
@@ -412,7 +492,13 @@ export function resolveSiteContentBlocks(
       const second=b.startsAt ? Date.parse(b.startsAt) : Number.POSITIVE_INFINITY;
       return first-second || a.title.localeCompare(b.title);
     });
-    items=items.slice(0,block.limit??12);
-    return items.length ? [{...block, items}] : [];
+    items=items.slice(0,block.limit??(block.channel==="learning.experiences"?40:12));
+    // Upcast the legacy school-only default *only in the private projection*.
+    // Authored section wording remains the Site operator's choice.
+    const description = feeds.mode === "private" && block.channel === "site.setup" &&
+      block.description === "Learn about our location, learning plans and how we are preparing to serve families."
+      ? "Learn about our location, learning plans and how we are preparing to serve our community."
+      : block.description;
+    return items.length ? [{...block, description, items}] : [];
   });
 }

@@ -21,6 +21,7 @@ import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
 import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
 import { requiresClassSessionAgenda } from "@/domain/native-class-session-agenda";
+import { measureServerStep } from "@/lib/performance/measure-server-step";
 
 const uuid = z.string().uuid();
 const scope = z.object({
@@ -110,9 +111,9 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
-    const actor=await getCanonicalCommandContext(getRequest());
+    const actor=await measureServerStep("class.workspace","identity",()=>getCanonicalCommandContext(getRequest()));
     if(!actor.actorPersonId!)throw new AuthorizationError("verified Class member");
-    return db.transaction(async tx=>{
+    return measureServerStep("class.workspace","transaction",()=>db.transaction(async tx=>{
       const [instance]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,data.classId)).limit(1);
       if(!instance)throw new AuthorizationError("available Class");
@@ -475,5 +476,5 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         selectedLessonId:data.lesson??null,
         selectedSessionId:data.session??null,
       };
-    });
+    }));
   });

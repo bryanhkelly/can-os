@@ -150,7 +150,7 @@ describe("read-only church partner website", () => {
       "approvedAcademicCount", "approvedEnrichmentCount", "approvedPhotoCount", "canPrepareWebsite", "canPublish",
       "contentChannelConfig", "currentBrandConfiguration", "currentBrandRevision", "currentBrandVersionId", "currentRevision", "demonstration", "draftStorageReady", "editingContent", "host", "localContentStatus",
       "localHistory", "mediaUploadsEnabled", "organizationName", "parentInformation", "previewHtml", "previewPages",
-      "publicInformationReadiness", "siteId", "siteInformation", "siteName",
+      "publicInformationReadiness", "siteExperienceProfile", "siteId", "siteInformation", "siteName",
       "siteStoryCopyCandidates", "siteStoryRecommendation", "siteStoryRevision", "siteStorySourceChoices",
       "sourceMapping", "status",
     ]);

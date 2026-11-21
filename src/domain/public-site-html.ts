@@ -3,6 +3,7 @@ import type { SiteContentBlockProjection } from "./site-content-channels";
 import type { SiteEnrollmentOpportunity } from "./site-enrollment-opportunities";
 import { projectSiteEnrollmentOpportunities, enrollmentOpportunityKinds } from "./site-enrollment-opportunities";
 import { resolveSiteExperienceProfile, siteExperienceCopy } from "./site-website-experience";
+import type { SiteLaunchPreferences } from "./site-launch-preferences";
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
@@ -43,6 +44,8 @@ export type PublicSitePage = {
   contentBlocks?: readonly SiteContentBlockProjection[];
   /** Already approved, read-only discovery; never a second enrollment ledger. */
   enrollmentOpportunities?: readonly SiteEnrollmentOpportunity[];
+  /** Private preview only. Never pass unapproved planning intent to public page routes. */
+  planningPreferences?: SiteLaunchPreferences | null;
 };
 
 /** Synthetic fixture metadata never changes public website behavior.
@@ -143,6 +146,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const kinds=enrollmentOpportunityKinds(opportunities);
   const contentOn=(path:string)=>Boolean(page.contentBlocks?.some(block=>
     block.page===path && block.items.length>0));
+  const hasExperienceContent=Boolean(page.contentBlocks?.some(block=>
+    block.channel==="learning.experiences" && block.items.length>0));
   const parent = page.parentInformation;
   // Costs and funding belong on a prelaunch Site even before tuition is finalized.
   const tuition = true;
@@ -158,6 +163,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const educational=[
     ...(academic?["/academics","/school-day","/admissions"] as const:[]),
     ...(kinds.program||contentOn("/programs")?["/programs"] as const:[]),
+    ...(hasExperienceContent||contentOn("/experiences")?["/experiences"] as const:[]),
     ...(kinds.course||contentOn("/courses")?["/courses"] as const:[]),
     ...(kinds.class||contentOn("/classes")?["/classes"] as const:[]),
     ...(page.offerings.length||kinds.program||contentOn("/student-life")?["/student-life"] as const:[]),
@@ -168,7 +174,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     ...(faq?["/faq"] as const:[]),...(contact?["/contact"] as const:[]),
     ...(hasLeadership?["/leadership"] as const:[]),
   ];
-  const profile=resolveSiteExperienceProfile(opportunities);
+  const profile=resolveSiteExperienceProfile(opportunities,page.planningPreferences??null);
   return profile==="school" || profile==="mixed"
     ? ["/",...(hasStory||hasReviewedPeople?["/about"] as const:[]),...educational,...extra]
     : ["/",...educational,...(hasStory||hasReviewedPeople?["/about"] as const:[]),...extra];
@@ -197,7 +203,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     academicPrograms:page.academicPrograms,enrichment:page.offerings,
     noncredit:page.noncreditReleases,enrollmentOrigin:page.enrollmentAppOrigin,
   });
-  const profile=resolveSiteExperienceProfile(opportunities);
+  const profile=resolveSiteExperienceProfile(opportunities,page.planningPreferences??null);
   const experienceCopy=siteExperienceCopy[profile];
   const privateDraftPages=options?.localPreview===true && options.privateDraftPages===true;
   if (!availablePaths.includes(path) && !privateDraftPages)
@@ -229,7 +235,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const localItems = local ? [
     ["Our story", local.churchHistory],
     ["Serving our community", local.communityOutreach],
-    ["Why we started a school", local.schoolVision],
+    [profile==="school"?"Why we started a school":"Our learning vision", local.schoolVision],
     ["A welcome from our leadership", local.leadershipWelcome],
     ["Local traditions", local.localTraditions],
     ["Our community", local.localDescription],
@@ -301,7 +307,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/student-life": "Student life", "/school-day": "Learning model",
     "/admissions": "Admissions", "/tuition": profile==="school"||profile==="mixed" ? "Tuition & funding" : "Fees & funding", "/families": "Families",
     "/faq": "FAQs", "/contact": "Contact",
-    "/programs": "Programs", "/courses": "Courses", "/classes": "Classes",
+    "/programs": "Programs", "/experiences": "Experiences",
+    "/courses": "Courses", "/classes": "Classes",
   };
   const navigationLink = (destination: PublicSitePath) =>
     `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`;
@@ -423,6 +430,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     availablePaths.includes(experienceCopy.heroExplorePath) ? experienceCopy.heroExplorePath :
     availablePaths.includes("/classes") ? "/classes" :
     availablePaths.includes("/programs") ? "/programs" :
+    availablePaths.includes("/experiences") ? "/experiences" :
     availablePaths.includes("/courses") ? "/courses" :
     availablePaths.includes("/academics") ? "/academics" :
     availablePaths.includes("/contact") ? "/contact" : "/";
@@ -431,6 +439,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     navigationCtaPath==="/classes"?"Explore Classes":
     navigationCtaPath==="/courses"?"Explore Courses":
     navigationCtaPath==="/programs"?"Explore Programs":
+    navigationCtaPath==="/experiences"?"Explore Experiences":
     navigationCtaPath==="/academics"?"Explore Academics":
     navigationCtaPath==="/contact"?"Contact":"Home";
   const firstAcademicProgram = page.academicPrograms?.[0];
@@ -494,7 +503,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     actions:
       (availablePaths.includes(experienceCopy.heroExplorePath)
         ? '<a class="hero-button" href="'+experienceCopy.heroExplorePath+'">'+experienceCopy.heroExplore+'</a>'
-        : availablePaths.includes("/classes")?'<a class="hero-button" href="/classes">Explore Classes</a>':"") +
+        : navigationCtaPath!=="/" && navigationCtaPath!=="/contact"
+          ? '<a class="hero-button" href="'+navigationCtaPath+'">'+navigationCtaLabel+'</a>' : "") +
       (firstInquiryHref && submissionsEnabled
         ? '<a class="hero-text-link" href="' + firstInquiryHref + '">Request information</a>' : "") +
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
@@ -819,6 +829,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // This navigation is shared by all schools and never fabricates availability.
   const exploreLinks = [
     { path: "/programs", label:"Programs",description:"Explore authorized community and enrichment Programs." },
+    { path: "/experiences", label:"Experiences",
+      description:"See activities and learning experiences the Site is exploring; these are not confirmed offers." },
     { path: "/courses", label:"Courses",description:"Find approved public Courses and their enrollment status." },
     { path: "/classes", label:"Classes",description:"Discover published scheduled Classes and Sessions." },
     { path: "/academics", label: "Academics", description: demo ? "Explore purposeful, connected learning." : "Discover our published learning programs." },
@@ -847,6 +859,18 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       .map(renderSiteContentChannelBlock).join("");
   const pageBlocks=(route:PublicSitePath)=>contentBlocks
     .filter(block=>block.page===route).map(renderSiteContentChannelBlock).join("");
+  // A Site with only a homepage Experience channel still has a full page.
+  // Never infer an enrollment link or an approved Offering from this projection.
+  const experiencePageBlocks=contentBlocks.filter(block=>block.page==="/experiences");
+  const hasDedicatedExperiences=experiencePageBlocks.some(block=>
+    block.channel==="learning.experiences");
+  const experiencesPageContent=[
+    ...(!hasDedicatedExperiences
+      ? contentBlocks.filter(block=>block.channel==="learning.experiences")
+          .map(block=>({...block,page:"/experiences" as const}))
+      : []),
+    ...experiencePageBlocks,
+  ].map(renderSiteContentChannelBlock).join("");
   const renderOpportunityDirectory=(kind:"program"|"course"|"class",
     title:string,description:string):string=>{
     const route=kind==="program"?"/programs":kind==="course"?"/courses":"/classes";
@@ -891,7 +915,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const homePage = composePublicSiteHome(templateId, {
     hero,
     vision: local?.schoolVision
-      ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping students discover who they are and what they can become.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
+      ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">${escapePublicHtml(experienceCopy.visionTitle)}</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
     story: homeStory,
     explore: exploreSection,
     academics: hasContentChannel("learning.academics") ? "" : programOverview || (demo ? demoAcademicCards : ""),
@@ -937,10 +961,16 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
     "/programs": composePublicSiteInterior(templateId,
-      secondaryHero("Community programs","Programs for every stage of learning",
-        "Explore independently published enrichment and community Programs. Check each Program for its current registration options."),
+      secondaryHero("Community programs",profile==="older-adult"?"Programs for older adults":
+        profile==="training"?"Adult learning programs":profile==="lifelong"?"Programs for adult learners":
+        "Programs for every stage of learning",
+        "Explore current Programs and proposed learning interests. Only independently authorized offerings can accept registration."),
       renderOpportunityDirectory("program","Discover Programs",
         "Learn more about current Programs. Registration is handled through an approved Program workflow.")),
+    "/experiences": composePublicSiteInterior(templateId,
+      secondaryHero("Discover possibilities","Experiences we are exploring",
+        "See the activities, interests and connections we hope to develop. These are planning ideas, not confirmed or enrollable offerings."),
+      experiencesPageContent),
     "/courses": composePublicSiteInterior(templateId,
       secondaryHero("Independent learning","Courses to explore",
         "Discover published Courses and register only when an independently approved enrollment release is available."),
@@ -982,8 +1012,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <article class="card"><h3>Take part</h3><p>Find meaningful opportunities to contribute to community experiences and share in the life of the school.</p></article></div></section>` : ""), communityDetailSection),
     "/faq": composePublicSiteInterior(templateId, secondaryHero("Common questions", "The questions that matter most.",
       demo ? "Explore how learning, connection, and family partnership can work together." : "Only reviewed public information appears here."), faqSection),
-    "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", "Start a conversation about your child's education",
-      demo ? "See how a family can take the next step in learning about a school." : "Find the contact and inquiry options currently published by this school."), (demo ? `<section class="editorial-section"><p class="tag">Let's connect</p><h2>A good school conversation starts with a good question.</h2>
+    "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", experienceCopy.contactTitle,
+      demo ? "See how a family can take the next step in learning about a school." : "Find the contact and inquiry options currently published by this Site."), (demo ? `<section class="editorial-section"><p class="tag">Let's connect</p><h2>A good school conversation starts with a good question.</h2>
       <p>Want to know more about academics, student life, or how the learning model works? Explore the school story and answers to common family questions.</p>
       <a class="text-action" href="/faq">Explore family questions →</a></section>` : contactSection + academicSection) +
       (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : "")),

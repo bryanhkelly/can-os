@@ -275,7 +275,7 @@ describe("transactional church-local publication", () => {
 });
 
 
-describe("Site publication is independent from Establish website saves", () => {
+describe("Site publication is independent from Shape website saves", () => {
   it("keeps Site publication unchanged when a Site Admin saves reviewed local copy", async () => {
     state.rows.push([{siteId:"site-a",updatedAt:new Date("2026-11-06T00:00:00Z")}], []);
     await expect(publishPartnerLocalContent({...actor, role:"site_admin"}, {

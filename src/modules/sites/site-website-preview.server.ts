@@ -2,6 +2,7 @@ import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { projectPlannedSiteProgramsForPreview } from "@/domain/site-program-preview";
+import { resolveSiteExperienceProfile } from "@/domain/site-website-experience";
 import { suggestWebsiteCopyFromStory } from "@/domain/site-website-story-suggestions";
 import { eq, sql } from "drizzle-orm";
 import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
@@ -18,7 +19,8 @@ import { organizations, siteAffiliations, sitePublications, sites } from "@/db/s
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
-import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks, projectMissingSiteExperienceSectionsForPreview } from "@/domain/site-content-channels";
+import { projectSiteContentBriefV61 } from "@/domain/site-content-brief-v61";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
@@ -63,16 +65,29 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   `);
   const draftStorageReady = draftConstraint.rows.some(row =>
     typeof row.definition === "string" && row.definition.includes("'draft'"));
-  const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
+  const [siteConfiguration] = await db.select({
+    metadata:sites.metadata,address:sites.address,timezone:sites.timezone,updatedAt:sites.updatedAt,
+  })
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
   const siteStorySource=siteStorySourceV61Schema.safeParse(siteConfiguration?.metadata?.siteStoryV61);
-  const storyCandidates=siteStorySource.success
-    ? suggestWebsiteCopyFromStory(siteStorySource.data.answers,site.name) : [];
   const savedBrand=await readSavedBrandVersion(site.id);
   const latestContent = history[0]?.content ?? local?.content;
   const rawEditingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
+  if(!siteConfiguration)throw new Error("Canonical Site configuration is unavailable.");
+  const siteBrief=projectSiteContentBriefV61({
+    siteId:site.id,siteName:site.name,timezone:siteConfiguration.timezone,
+    siteRevision:siteConfiguration.updatedAt.toISOString(),
+    metadata:siteConfiguration.metadata,
+    websiteContent:rawEditingContent,
+    websiteContentRevision:history[0]?.revision??null,
+    brandVersionId:savedBrand?.version.id??null,brandRevision:savedBrand?.version.revision??null,
+  });
+  // Website suggestions share the same explicit consented Story projection
+  // used for Introduce. Raw private answers remain editable in Site Information.
+  const storyCandidates=siteBrief.story
+    ? suggestWebsiteCopyFromStory(siteBrief.story,site.name):[];
   // The saved identity comes ONLY from site_brand_versions. Website history
   // stores the structural wireframe, not colors, logo, fonts or direction.
   const editingContent:SiteLocalContent|null=rawEditingContent && savedBrand
@@ -121,6 +136,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const publishedContentConfig = readPublishedSiteContentChannelConfig(
     siteConfiguration?.metadata?.publishedWebsiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
+  const planningPreferences = preferences.success ? preferences.data : null;
+  const siteExperienceProfile = resolveSiteExperienceProfile(enrollmentOpportunities, planningPreferences);
   const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
   const sourceIdentityReviews = publicIdentityReviewStatuses(
     site.id, siteConfiguration?.address ?? null, siteConfiguration?.metadata ?? null);
@@ -155,16 +172,23 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // They do not require an adopted Solution or grant registration authority.
   const proposedPrograms = projectPlannedSiteProgramsForPreview(
     preferences.success ? preferences.data : null, baseContentBlocks);
+  const proposedExperiences=projectMissingSiteExperienceSectionsForPreview(
+    contentConfig,preferences.success?preferences.data:null);
   const contentBlocks = [
     ...websitePreviewEditorialBlocks(baseContentBlocks),
     ...proposedPrograms,
+    ...proposedExperiences,
   ];
+  // Website & Brand and Introduce consume the same structured Site Brief.
+  const plannedExperienceNames=siteBrief.experiences.map(item=>item.title);
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     siteFunding:projectSiteFundingPublicContext(siteConfiguration?.metadata?.siteHostingV61),
     host, site: { name: displaySiteName, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media, contentBlocks, enrollmentOpportunities,
+    // Private planning context shapes editorial tone, never authorization.
+    planningPreferences,
     ...(noncreditReleases.length ? {
       noncreditReleases,
       enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
@@ -181,6 +205,16 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     currentBrandConfiguration:savedBrand?.version.configuration??null,
     siteStoryRecommendation:siteStorySource.success ? recommendBrandDirection(siteStorySource.data.answers) : null,
     siteStoryCopyCandidates:storyCandidates,
+    // Saved Site identity guides private editorial prompts, never public authorization.
+    siteIdentity:siteBrief.identity,
+    siteExperienceProfile,
+    plannedExperienceNames,
+    // Curated, clearly proposed draft phrasing. The content editor must
+    // request consent before applying this to an unedited welcome field.
+    suggestedExperienceWelcome: plannedExperienceNames.length
+      ? "We are exploring experiences such as " +
+        plannedExperienceNames.slice(0,2).map(name=>name.slice(0,48)).join(" and ") +
+        ". Activities and schedules will be confirmed separately." : null,
     siteStorySourceChoices:siteStorySource.success ? {
       motivations:siteStorySource.data.answers.motivations,
       distinctives:siteStorySource.data.answers.distinctives,

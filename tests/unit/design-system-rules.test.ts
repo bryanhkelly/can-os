@@ -90,3 +90,32 @@ tester.run("no-native-feature-tables", plugin.rules["no-native-feature-tables"],
     { code: 'const view = <table><thead><tr><th>Site</th></tr></thead></table>;', errors: [{ messageId: "table" }] },
   ],
 });
+
+tester.run("no-custom-guided-selections", plugin.rules["no-custom-guided-selections"], {
+  valid: [
+    'const card = <fieldset><SelectionCard kind="radio" title="Hosted" checked onChange={() => {}} /></fieldset>;',
+    'const nav = <GuidedSetupProgress steps={steps} />;',
+    'const toolbar = <div><Button aria-pressed={enabled} className="text-left">Preview</Button></div>;',
+    'const action = <fieldset><Button variant="outline">Add option</Button></fieldset>;',
+    'const sidebar = <nav aria-label="Launch steps"><ol><li><Button aria-current="step">Site</Button></li></ol></nav>;',
+    'const pages = <nav><Button aria-current={current ? "page" : undefined}>Page</Button></nav>;',
+  ],
+  invalid: [
+    {
+      code: 'const card = <fieldset><Button aria-pressed={selected} className="min-h-32 flex-col">Brand direction</Button></fieldset>;',
+      errors: [{ messageId: "choice" }],
+    },
+    {
+      code: 'const nav = <nav><Button aria-current={active ? "step" : undefined}>Step 1</Button></nav>;',
+      errors: [{ messageId: "step" }],
+    },
+    {
+      code: 'const nav = <ol><li><Button aria-current="step">Start</Button></li></ol>;',
+      errors: [{ messageId: "step" }],
+    },
+    {
+      code: 'const cards = <div role="group"><Button aria-pressed={active} className="min-h-20">Solution A</Button></div>;',
+      errors: [{ messageId: "choice" }],
+    },
+  ],
+});

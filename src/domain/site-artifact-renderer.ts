@@ -73,7 +73,8 @@ export function renderSiteMarketingArtifact(input:{
   format:MarketingFormat;brand:ResolvedSiteBrand;content:MarketingPackageContent;websiteUrl:string|null;
   qrSvg?:string;
 }):RenderedMarketingAsset{
-  const {format,brand,content,websiteUrl}=input;
+  const {format,brand,websiteUrl}=input;
+  const content={...input.content,...input.content.materialOverrides?.[format]};
   if(format==="flyer"||format==="handout"||format==="social")
     return printable(format,brand,content,websiteUrl);
   if(format==="qr-card"){

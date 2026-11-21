@@ -74,3 +74,22 @@ export const PassiveMarketingPackageProgress: Story = {
     await expect(within(progress).queryByRole("button")).not.toBeInTheDocument();
   },
 };
+
+/** Six steps use the same presentation as two-step and four-step modules. */
+export const SixWebsiteBrandSteps: Story = {
+  render: () => <GuidedSetupProgress label="Website & Brand steps" steps={[
+    { id: "brand", title: "Brand Identity", description: "Choose an editorial direction", status: "complete" },
+    { id: "wireframe", title: "Choose Wireframe", description: "Choose a structure", status: "current" },
+    { id: "visual", title: "Visual Identity", description: "Colors, fonts and imagery", status: "upcoming" },
+    { id: "consent", title: "Content Consent", description: "Approve information reuse", status: "upcoming" },
+    { id: "content", title: "Your Content", description: "Edit website content", status: "upcoming" },
+    { id: "review", title: "Review & Finish", description: "Review private draft", status: "upcoming" },
+  ]} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const progress = canvas.getByRole("list", { name: "Website & Brand steps" });
+    await expect(progress.querySelectorAll("li")).toHaveLength(6);
+    await expect(progress.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+    await expect(within(progress).queryByRole("button")).not.toBeInTheDocument();
+  },
+};

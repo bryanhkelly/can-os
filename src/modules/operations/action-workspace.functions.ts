@@ -20,6 +20,7 @@ import { gradeResponseActionType } from "@/domain/grade-response-policy";
 import { prioritizeSchoolActions,schoolActionBacklog } from "@/domain/operations-action-triage";
 import { currentSiteDirectorPersonId } from "./site-local-delegation.server";
 import { assertLocalDelegationIssuer } from "@/domain/site-local-delegation-policy";
+import { measureServerStep } from "@/lib/performance/measure-server-step";
 
 async function operator() {
  const actor=await getCommandContext(getRequest());
@@ -32,22 +33,24 @@ async function operator() {
 export const getOperationsActions=createServerFn({method:"GET"})
  .validator((value:unknown)=>operationsSelectionSchema.parse(value))
  .handler(async({data})=>{
- const actor=await operator();
- const scoped=await resolveOperationsSelection(actor,data);
+ const actor=await measureServerStep("operations.actions","identity",()=>operator());
+ const scoped=await measureServerStep("operations.actions","scope",()=>resolveOperationsSelection(actor,data));
  const allowedPrograms=scoped.programIds.length ? or(isNull(actions.programId),inArray(actions.programId,scoped.programIds)) : isNull(actions.programId);
- const records=await db.select({
+ const records=await measureServerStep("operations.actions","active-records",()=>db.select({
   id:actions.id,title:actions.title,description:actions.description,type:actions.type,
   siteId:actions.siteId,programId:actions.programId,ownerPersonId:actions.ownerPersonId,
   ownerFirstName:people.legalFirstName,ownerLastName:people.legalLastName,
   status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt,
   metadata:actions.metadata
  }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
-   asc(actions.dueAt),desc(actions.createdAt)).limit(250);
- const coverageGapOwners=new Map<string,string|null>();
- for(const record of records){
-  if(record.type==="onsite_coverage_gap"&&record.programId&&!coverageGapOwners.has(record.programId))
-   coverageGapOwners.set(record.programId,await currentSiteDirectorPersonId(db,record.programId));
- }
+   asc(actions.dueAt),desc(actions.createdAt)).limit(250));
+ // Resolve distinct coverage owners concurrently instead of performing one
+ // sequential database read per matching Program.
+ const coverageProgramIds=[...new Set(records.filter(record=>
+  record.type==="onsite_coverage_gap"&&record.programId).map(record=>record.programId!))];
+ const coverageGapOwners=new Map(await measureServerStep("operations.actions","coverage-owners",()=>Promise.all(coverageProgramIds.map(async programId=>
+  [programId,await currentSiteDirectorPersonId(db,programId)] as const))));
+ const recordsById=new Map(records.map(record=>[record.id,record]));
  const items=dedupeQueue(records.map(record=>({
   id:record.id,kind:"action" as const,
   title:record.type==="support_referral"?"Restricted student support referral":record.title,
@@ -69,7 +72,7 @@ export const getOperationsActions=createServerFn({method:"GET"})
   needsResponse:record.status==="open",
  })));
  const scopedItems=prioritizeSchoolActions(items.map(item=>{
-  const record=records.find(record=>record.id===item.id);
+  const record=recordsById.get(item.id);
   return {...item,type:record?.type??"operations",programId:record?.programId??null,
    siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
    eligibleOwnerPersonId:record?.type==="onsite_coverage_gap"&&record.programId
@@ -82,10 +85,12 @@ export const getOperationsActions=createServerFn({method:"GET"})
    enrollmentChangeKind:record?.type==="guardian_enrollment_change_request"&&
      (record.metadata.kind==="withdrawal"||record.metadata.kind==="transfer")?record.metadata.kind:null};
  }));
- const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor","site_leader"])));
- const [siteChoices,programChoices]=await Promise.all([
-  db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!)),
-  scoped.programIds.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,scoped.programIds),isNotNull(programs.siteId))) : Promise.resolve([]),
+ // These three reads only depend on the already-verified operator scope.
+ // Fetch concurrently rather than serializing assignees before site/program choices.
+ const [assignees,siteChoices,programChoices]=await Promise.all([
+  measureServerStep("operations.actions","assignees",()=>db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor","site_leader"])))),
+  measureServerStep("operations.actions","site-choices",()=>db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!))),
+  measureServerStep("operations.actions","program-choices",()=>scoped.programIds.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,scoped.programIds),isNotNull(programs.siteId))) : Promise.resolve([])),
  ]);
  return {items:scopedItems,assignees,sites:siteChoices,programs:programChoices,selected:data,summary:{...notificationSummary(items),...schoolActionBacklog(scopedItems)}};
 });

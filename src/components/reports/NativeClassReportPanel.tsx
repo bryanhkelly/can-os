@@ -7,6 +7,7 @@ import {useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {getNativeClassReport} from "@/modules/reporting/native-class-report.functions";
 import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
+import {reportingCsvRow} from "@/domain/reporting-csv";
 
 function datePlus(value:string,days:number){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return "";
@@ -14,20 +15,22 @@ function datePlus(value:string,days:number){
   d.setUTCDate(d.getUTCDate()+days);
   return d.toISOString().slice(0,10);
 }
-function csvCell(value:string|number|null){
-  const text=value===null?"Unavailable":String(value);
-  return '"'+text.replaceAll('"','""')+'"';
-}
 function exportReport(report:NonNullable<ReturnType<typeof useClassReport>["data"]>){
-  // Aggregates and definitions only. Never export personal enrollment records.
-  const lines=[
-    ["Metric","Value","Source","Denominator","Rule","Time basis","Period start (UTC)","Period end exclusive (UTC)","As of","Contract"].join(","),
+  // Stable metric keys, availability and source lineage for future Insights reuse.
+  // Aggregates only; never export individual learners from this route.
+  const rows:(string|number|null)[][]=[
+    ["Metric key","Metric","Value","Evidence availability","Source","Denominator","Rule",
+      "Time basis","Period start (UTC)","Period end exclusive (UTC)","As of",
+      "Contract","Data classification"],
     ...report.definitions.map(def=>[
-      def.label,report.metrics[def.key],def.source,def.denominator,def.rule,def.timeBasis,
+      def.key,def.label,report.metrics[def.key],
+      report.metrics[def.key]===null?"unavailable":"available",
+      def.source,def.denominator,def.rule,def.timeBasis,
       report.period.from,report.period.to,report.asOf,report.contractVersion,
-    ].map(v=>csvCell(v)).join(",")),
+      "PRIVATE OPERATOR EVIDENCE - NOT APPROVED FOR PUBLICATION",
+    ]),
   ];
-  const file=new Blob([lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const file=new Blob([rows.map(reportingCsvRow).join("\r\n")],{type:"text/csv;charset=utf-8"});
   const url=URL.createObjectURL(file);
   const link=document.createElement("a");
   link.href=url;link.download="can-os-class-evidence-"+report.classId+"-"+report.period.from.slice(0,10)+".csv";
@@ -101,6 +104,11 @@ export function NativeClassReportPanel({classId}:{classId:string}){
         As of {new Date(data.asOf).toLocaleString()} · Contract {data.contractVersion}
         {" · "}Exact authorized delivery Site only. Not approved for external publication.
       </p>
+      {data.definitions.some(def=>data.metrics[def.key]===null)&&
+        <p role="status" className="border border-border bg-card p-3 text-sm text-muted-foreground">
+          Unavailable metrics are not zero. Their underlying authoritative evidence or
+          governed decision source is not yet reportable.
+        </p>}
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.definitions.map(def=>{
           const value=data.metrics[def.key];

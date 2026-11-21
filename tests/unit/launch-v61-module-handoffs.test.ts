@@ -38,7 +38,7 @@ describe("V6.1 Launch Studio module integration", () => {
   });
 
   it("routes Introduce through one Site-scoped package service, not duplicate placeholder destinations", () => {
-    for (const module of ["promote", "recruit", "interest-events"]) {
+    for (const module of ["create-outreach", "my-outreach"]) {
       expect(introduce).toContain(module);
     }
     expect(route).toContain("isIntroduceModuleV61(deps.module)");
@@ -69,8 +69,8 @@ describe("V6.1 Launch Studio module integration", () => {
   });
 
   it("keeps outreach preparation distinct from enrollment authorization", () => {
-    expect(introduce).toContain("No contacts, submissions");
-    expect(introduce).toContain("not yet a pre-Program Site-wide event builder");
+    expect(introduce).toContain("single existing");
+    expect(introduce).toContain("Marketing Package");
     expect(destinations).toContain('state: "governed"');
     expect(destinations).toContain("Permission checks");
   });

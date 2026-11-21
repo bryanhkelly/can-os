@@ -5,6 +5,7 @@
  */
 import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, Globe2, HardHat, Info, ShieldCheck, Users, Wallet, type LucideIcon } from "lucide-react";
 import { prepareStageModulesV61, type PrepareStageModuleIdV61 } from "@/domain/launch-prepare-v61";
+import { SiteGuideV61 } from "./SiteGuideV61";
 import { Link } from "@tanstack/react-router";
 import { WorkspaceActionLink, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { SolutionCatalogV61 } from "./SolutionCatalogV61";
@@ -49,86 +50,118 @@ const scoped = (siteId: string) => encodeURIComponent(siteId);
 /** These destinations are existing authorized operations, not new task stores. */
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {
-    question: "Which published Solutions support the programs your community wants to offer?",
-    decision: "Select a CAN-published Solution aligned with your Site vision and configure its operating requirements here in Prepare. Enrollable Classes remain independently authorized.",
-    canSupplies: "CAN-administered, versioned Solution definitions, published learning products, eligibility guidance and authorized configuration workflows.",
-    siteProvides: "A selected operating model, physical capabilities, staff coverage, local constraints and evidence.",
+    question: "Which solutions could help bring your program ideas to life?",
+    decision: "Choose a Solution, then set up its requirements.",
+    canSupplies: "Available Solutions and setup guidance.",
+    siteProvides: "Site details, staffing and supporting documents.",
     status: "governed",
     handoffs: [
-      { title: "Manage authorized Classes", detail: "Configure actual Classes only where the existing Course and Site gates allow it.", href: id => "/class?view=manage&siteId=" + scoped(id) },
+      { title: "Manage Classes", detail: "View and set up available Classes.", href: id => "/class?view=manage&siteId=" + scoped(id) },
     ],
   },
   "facilities-resources": {
-    question: "Can your Site safely and reliably support each proposed learning experience?",
-    decision: "Review room use, accessible capacity, connectivity, learner devices, specialized equipment and any unmet needs against the selected operating model.",
-    canSupplies: "Site qualification observations, requirement evidence and independently reviewed program-fit records.",
-    siteProvides: "Accurate facility information, equipment inventory, accessibility details, and requested proof.",
+    question: "What spaces, equipment, and support will your experiences need?",
+    decision: "Review rooms, capacity, internet access, devices and equipment.",
+    canSupplies: "Requirements and review tools.",
+    siteProvides: "Facilities and equipment information.",
     status: "governed",
     handoffs: [
-      { title: "Review Learning Environment", detail: "Update the existing Site-owned learning environment and delivery information.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=site-information" },
-      { title: "Inspect qualification evidence", detail: "Open the authorized canonical qualification inspection, where available.", href: () => "/canonical/lab/site-qualification" },
-      { title: "Review opening requirements", detail: "Required safeguards and evidence remain governed by the actual opening process.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
+      { title: "How people participate", detail: "Update where and how people take part.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=site-information" },
+      { title: "Site qualification", detail: "View qualification details.", href: () => "/canonical/lab/site-qualification" },
+      { title: "Opening requirements", detail: "Review required documents.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
     ],
   },
   "invite-team": {
-    question: "Who will supervise, support and operate the experiences at this Site?",
-    decision: "Identify required positions per Solution, invite people to the exact Site, and resolve appointments, training and safeguarding separately.",
-    canSupplies: "Scoped staff invitations, access control and the appropriate academic or operational role workflows.",
-    siteProvides: "Named people, assignment coverage, local supervision, and evidence of qualifications where required.",
+    question: "Who will help bring these experiences to life?",
+    decision: "Invite your team and assign the roles needed for each Solution.",
+    canSupplies: "Invitations, roles and permissions.",
+    siteProvides: "Team members and qualifications.",
     status: "operational",
     handoffs: [
-      { title: "Invite a team member", detail: "Send an authorized invitation without creating an unverified role grant.", href: id => "/admin/invite?siteId=" + scoped(id) },
-      { title: "Review Site access", detail: "Inspect current members and active permissions for your Site.", href: id => "/admin?siteId=" + scoped(id) },
+      { title: "Invite a team member", detail: "Invite someone to your Site.", href: id => "/admin/invite?siteId=" + scoped(id) },
+      { title: "Review Site access", detail: "View team members and permissions.", href: id => "/admin?siteId=" + scoped(id) },
     ],
   },
   "schedules-capacity": {
-    question: "When will each experience run, and how many learners can it support?",
-    decision: "Use the actual academic calendar and Class configuration for dates, operating days, time of day, frequency, holidays, session pattern and attendance capacity.",
-    canSupplies: "School-year planning, Class scheduling, calendars and admission seat pools under their existing authority.",
-    siteProvides: "Operating availability, usable rooms, staffing coverage and reliable capacity commitments.",
+    question: "When could people participate, and how many places will be available?",
+    decision: "Plan dates, times, rooms and available places.",
+    canSupplies: "Class calendars and schedules.",
+    siteProvides: "Available rooms, staff and capacity.",
     status: "operational",
     handoffs: [
-      { title: "Configure school years", detail: "Use the authorized academic term and school-year workspace.", href: () => "/operations/school-years" },
-      { title: "Configure Class sessions", detail: "Schedule actual Classes in the native Class workspace.", href: id => "/class?view=manage&siteId=" + scoped(id) },
-      { title: "Review seat capacity", detail: "Program and school-year capacities are independently recorded.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
-      { title: "View calendar", detail: "See scheduled activities in the shared calendar.", href: () => "/calendar" },
+      { title: "Set up school years (for schools)", detail: "Manage academic terms when your program uses them.", href: () => "/operations/school-years" },
+      { title: "Schedule Classes", detail: "Set up class sessions when relevant.", href: id => "/class?view=manage&siteId=" + scoped(id) },
+      { title: "Review seat capacity", detail: "Review available seats.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
+      { title: "View calendar", detail: "View upcoming activities.", href: () => "/calendar" },
     ],
   },
   "funding-enrollment": {
-    question: "How will your Site fund its learning experiences and prepare admissions?",
-    decision: "Document funding sources, tuition and pricing, admissions policies and seat capacity. Prepare the receiving Program and application process here. Actual registration is enabled independently in Open, only for authorized Offerings.",
-    canSupplies: "Authorized admissions setup, application invitations, eligibility records and capacity management where supported.",
-    siteProvides: "An approved budget, documented funding, pricing and admissions decisions, and responsible staff.",
+    question: "How will you fund your programs and help people join?",
+    decision: "Review funding, participation costs, registration and places available. Registration opens separately for approved offerings.",
+    canSupplies: "Admissions and enrollment tools.",
+    siteProvides: "Funding, pricing and participation policies.",
     status: "governed",
     handoffs: [
-      { title: "Review admissions", detail: "View authorized applications and the Program-specific admissions pipeline.", href: id => "/admissions?siteId=" + scoped(id) },
-      { title: "Prepare admissions capacity", detail: "Configure and verify seat pools without activating registration.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
-      { title: "Manage Class Offerings and enrollment", detail: "Publish authorized Class registration terms and inspect enrollment communication status in the Class workspace.", href: id => "/class?view=manage&siteId=" + scoped(id) },
-      { title: "Publish approved noncredit Course registration", detail: "Use the existing noncredit release publisher. Course registration does not automatically create a Class enrollment.", href: () => "/programs/noncredit/enrollment" },
+      { title: "Review school admissions", detail: "View applications when your program uses school admissions.", href: id => "/admissions?siteId=" + scoped(id) },
+      { title: "Review admissions capacity", detail: "Check available places when using school admissions.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
+      { title: "Manage Class registration", detail: "Manage registration for eligible Classes.", href: id => "/class?view=manage&siteId=" + scoped(id) },
+      { title: "Manage noncredit registration", detail: "Set up registration for approved noncredit offerings.", href: () => "/programs/noncredit/enrollment" },
     ],
   },
   "opening-compliance": {
-    question: "What must be independently verified before you can operate or enroll learners?",
-    decision: "Review requirements for the specific Site, jurisdiction and selected Offerings. Submit evidence through the responsible workflows; never mark a step completed merely by visiting it.",
-    canSupplies: "Institutional opening checks, governed evidence review and separate authorization decisions.",
-    siteProvides: "Accurate safeguarding information, training, insurance, facilities and required documentation.",
+    question: "What needs to be ready before you can welcome participants?",
+    decision: "Review applicable requirements and submit any missing documentation.",
+    canSupplies: "Opening checks and reviews.",
+    siteProvides: "Safety, training, insurance and facility documents.",
     status: "governed",
     handoffs: [
-      { title: "Review opening and compliance", detail: "Resolve real opening blockers in the institutional preparation workflow.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
-      { title: "Review Site qualification", detail: "Inspect recorded facility and program-fit evidence, where authorized.", href: () => "/canonical/lab/site-qualification" },
-      { title: "Return to Solution planning", detail: "Verify the selected operating model, not just the intended Program.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=program-catalog" },
+      { title: "Review opening requirements", detail: "See any outstanding requirements.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
+      { title: "Review Site qualification", detail: "Review Site qualification.", href: () => "/canonical/lab/site-qualification" },
+      { title: "Return to Solution planning", detail: "Review your selected Solution.", href: id => "/launch/site?siteId=" + scoped(id) + "&module=program-catalog" },
     ],
   },
   "publish-site": {
-    question: "Is the public-facing Site website reviewed and ready to go live?",
-    decision: "Review the Site identity, published local copy, licensed imagery, approved claims and live hosting. Record explicit Site publication separately from Offering releases and enrollment.",
-    canSupplies: "The canonical Site publisher, review checks, audit history, and public-host reachability verification.",
-    siteProvides: "Accurate public information, photo rights and consent, responsible publication authority, and an explicit decision reason.",
+    question: "Is your website ready for visitors?",
+    decision: "Review your site's identity, website text, photos, permissions, and hosting. Publishing your website doesn't open registration.",
+    canSupplies: "Website review, publication records, and a way to check whether your site is live.",
+    siteProvides: "Accurate website information, permission to use images, and a reason for your decision.",
     status: "governed",
     handoffs: [
-      { title: "Edit Website & Brand", detail: "Return to Establish to revise and save the Site website without automatically publishing it.", href: id => "/launch/website?siteId=" + scoped(id) + "&returnToHub=true" },
-      { title: "Review full publishing details", detail: "See the existing institutional publication and approved content workflows.", href: id => "/sites/" + scoped(id) + "/publish" },
+      { title: "Edit Website & Brand", detail: "Update your website draft without publishing it.", href: id => "/launch/website?siteId=" + scoped(id) + "&returnToHub=true" },
+      { title: "Review website publication", detail: "Check whether your website is published and what needs review.", href: id => "/sites/" + scoped(id) + "/publish" },
     ],
+  },
+};
+
+/** Decisions to consider, not an inferred compliance or approval status. */
+const prepareGuideInsights: Record<PrepareModuleIdV61, { insight: string; connection: string }> = {
+  "program-catalog": {
+    insight: "A Solution is the way you deliver a Program. Compare the people, space, equipment and supervision it actually requires, not just the title.",
+    connection: "A selected Solution creates a plan to prepare and review. It does not yet authorize an offering.",
+  },
+  "facilities-resources": {
+    insight: "Think through the real activities, not just the room name: accessibility, internet access, equipment, capacity and any specialized materials may matter.",
+    connection: "Facilities can be checked against your selected Solution's needs before you schedule participants.",
+  },
+  "invite-team": {
+    insight: "Separate who leads the experience, who facilitates it locally, and who handles administration. One person may hold more than one role, but each role has its own requirements.",
+    connection: "Staff assignments and qualifications help determine whether a planned Solution can operate.",
+  },
+  "schedules-capacity": {
+    insight: "Start with the actual space, staff availability and session format. A large interested audience does not automatically mean those seats exist.",
+    connection: "Your dates and capacity feed operational planning; they do not publish a class or open registration.",
+  },
+  "funding-enrollment": {
+    insight: "Consider what participants can afford, who may pay on their behalf, and whether a funding source has actually been confirmed.",
+    connection: "Fees, funding and registration configuration are separate from the approval to accept participants.",
+  },
+  "opening-compliance": {
+    insight: "Start with the needs of each selected Solution. General Site setup is not enough to verify safety, staffing or an offering's specific requirements.",
+    connection: "The readiness workspaces show the records and decisions that actually govern launch.",
+  },
+  "publish-site": {
+    insight: "Read the website as a first-time visitor. Could someone mistake a planned experience or unverified affiliation for an approved service?",
+    connection: "A private preview can be shared before publication. Publishing the website does not open registration.",
   },
 };
 
@@ -140,6 +173,14 @@ const intentTitles: Record<SiteProgramsAudiencesV61["interestIds"][number], stri
   adult: "Adult Learning",
   senior: "Older Adults",
 };
+
+function displaySelectedProgram(code:string, available?:readonly BlueprintReferenceCatalogItem[]):string {
+  const published=available?.find(item=>item.code===code)?.title;
+  if(published)return published;
+  const name=code.split(".").at(-1)?.replaceAll("_"," ").trim();
+  if(!name)return "Selected program";
+  return name.replace(/\b[a-z]/g,letter=>letter.toUpperCase()).replace(/\bAi\b/g,"AI");
+}
 
 function PrepareModuleHandoffs({ siteId, handoffs, secondary = false }: {
   siteId: string; handoffs: readonly Handoff[]; secondary?: boolean;
@@ -157,12 +198,11 @@ function PrepareModuleHandoffs({ siteId, handoffs, secondary = false }: {
       Advanced operations and complete records
     </summary>
     <p className="my-3 text-xs text-muted-foreground">
-      These actions open the existing authorized workspaces for advanced work.
+      Open additional tools.
     </p>
     {links}
   </details>;
-  return <WorkspacePanel title="Continue in the authorized workspace"
-    description="These actions use the existing business records, permissions and verification gates.">
+  return <WorkspacePanel title="Additional tools">
     {links}
   </WorkspacePanel>;
 }
@@ -179,39 +219,35 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
 }) {
   const definition = prepareModulesV61.find(item => item.id === module)!; // Module navigation is owned by LaunchSiteFrame.
   const plan = modulePlans[module];
-  const Icon = definition.icon;
   return <WorkspaceShell width="wide" title={definition.title}
     eyebrow="Launch Studio / Prepare"
     subtitle={definition.subtitle}
-    rail={<div className="space-y-4">
-      <WorkspacePanel title="The decision to make">
-        <p className="text-sm font-semibold leading-6">{plan.question}</p>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{plan.decision}</p>
-      </WorkspacePanel>
-      <WorkspacePanel title="Shared responsibilities">
-        <h3 className="text-sm font-semibold">What CAN provides</h3>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{plan.canSupplies}</p>
-        <h3 className="mt-4 border-t pt-4 text-sm font-semibold">What the local Site provides</h3>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{plan.siteProvides}</p>
-      </WorkspacePanel>
-      <p className="text-xs leading-5 text-muted-foreground">Planning progress, operational readiness and legal authorization are separate. No status on this page grants approval.</p>
-    </div>}>
+    rail={<SiteGuideV61 guide={{
+      summary: plan.question,
+      highlights: module === "program-catalog"
+        ? (intent?.interestIds ?? []).slice(0, 3).map(id => intentTitles[id])
+        : [],
+      insight: prepareGuideInsights[module].insight,
+      connection: prepareGuideInsights[module].connection,
+    }} />}>
     <div className="mt-6 space-y-5">
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon aria-hidden="true" className="size-4" />
-        {plan.status === "governed"
-          ? "Independent review is required for the applicable decisions"
-          : "Complete the required actions in the existing authorized workspaces"}
-      </p>
       {module === "program-catalog" && <>
-        <WorkspacePanel title="Begin with your vision"
-          description="Your interests from Establish guide discovery, not automatic qualification.">
+        <WorkspacePanel title="Your interests"
+          description="Your saved program ideas and areas of interest from Shape.">
           {intentUnavailable && <WorkspaceNotice tone="attention">
-            Saved Programs & Audiences could not be loaded. You can still browse the published catalog,
-            but return to Establish to review your preferences before planning a Solution.
+            We couldn't load your saved program ideas. You can still explore solutions, but return to Shape to check your selections before making a plan.
           </WorkspaceNotice>}
-          {intent && intent.interestIds.length > 0 ? <>
-            <p className="text-xs font-medium text-muted-foreground">What you said you want to offer</p>
+          {intent && (intent.interestIds.length > 0 || (intent.programCodes?.length??0)>0) ? <>
+            {(intent.programCodes?.length??0)>0&&<>
+              <p className="text-xs font-medium text-muted-foreground">Programs you want to explore</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {intent.programCodes?.map(code => <span key={code} className="border bg-muted px-3 py-2 text-xs font-medium">
+                  {displaySelectedProgram(code,schoolYearAcademyPrograms)}
+                </span>)}
+              </div>
+            </>}
+            {intent.interestIds.length>0&&<>
+            <p className="text-xs font-medium text-muted-foreground">Other areas of interest</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {intent.interestIds.map(id => {
                 const blocked = !schoolYearAvailability ||
@@ -226,19 +262,19 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
               })}
             </div>
             {intent.startingFocus && <p className="mt-3 text-sm">Starting focus: <strong>{intentTitles[intent.startingFocus]}</strong></p>}
-          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You have not saved any learning interests. You can explore the catalog now and add your vision later.</p>}
+            </>}
+          </> : !intentUnavailable && <p className="text-sm text-muted-foreground">You haven't chosen any program ideas yet. Explore the catalog or return to Shape to add them.</p>}
           <Link to="/launch/site" search={{siteId, module:"programs-audiences"}}
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary underline">
             Review Programs &amp; Audiences <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         </WorkspacePanel>
-        <WorkspacePanel title="From Program to Solution to Offering"
-          description="These are different decisions, with different verification responsibilities.">
+        <WorkspacePanel title="How offerings work">
           <div className="grid gap-3 md:grid-cols-3">
             {[
-              ["Program", "Your high-level intention, captured in Establish."],
-              ["Solution", "The packaged operating configuration: roles, rooms, activities, equipment, schedules, safety and evidence."],
-              ["Offering", "The approved, configured experience learners may enroll in, when separately authorized."],
+              ["Program", "Your broad idea of what you want to offer."],
+              ["Solution", "A specific way to deliver it, including people, space, equipment and safety needs."],
+              ["Offering", "What participants can join when the necessary approvals and registration are in place."],
             ].map(([name, detail], i) => <div key={name} className="border bg-background p-4">
               <p className="text-xs font-semibold text-muted-foreground">0{i + 1}</p>
               <h3 className="mt-2 font-semibold">{name}</h3>
@@ -251,8 +287,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
           schoolYearAcademyPrograms={schoolYearAcademyPrograms}
           initialPlanId={solutionPlanId} />
         <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
-          CAN administers the published Solution definition. Site operators configure their own plan with the existing governed commands.
-          Discovery and planning never grant Site qualification, publication or enrollment authority.
+          Choosing a solution is a planning step, not permission to offer it yet. You'll see its specific requirements as you prepare.
         </WorkspaceNotice>
       </>}
       {module === "publish-site" && <LaunchSitePublicationPanel key={siteId} siteId={siteId} />}
@@ -260,22 +295,30 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
       {module === "invite-team" && <PrepareTeamV61 key={siteId} siteId={siteId} />}
       {module === "schedules-capacity" && <PrepareSchedulesV61 key={siteId} siteId={siteId} />}
       {(module === "funding-enrollment" || module === "opening-compliance") && <WorkspacePanel title="What to prepare"
-        description="Use requirements from the chosen Solution and applicable jurisdiction, rather than a generic checklist.">
+        description="Requirements depend on the Solution and location.">
         <div className="flex gap-3">
           <ClipboardCheck aria-hidden="true" className="mt-1 size-5 shrink-0 text-primary" />
           <div className="text-sm leading-6">
             <p>{plan.decision}</p>
-            <p className="mt-2 text-muted-foreground">Current readiness results must be read from the linked authorized operational records. This page does not claim that any requirement has passed.</p>
           </div>
         </div>
       </WorkspacePanel>}
-      <LaunchReadinessPanelV61 key={siteId + ":" + module} siteId={siteId} context="prepare" />
+      {(module==="opening-compliance"||module==="funding-enrollment") &&
+        <LaunchReadinessPanelV61 key={siteId + ":" + module} siteId={siteId} context="prepare" />}
+      {module!=="opening-compliance"&&module!=="funding-enrollment"&&
+        <WorkspaceActionLink title="Review full readiness"
+          description="Check what you've completed and what still needs attention."
+          href={"/launch/site?siteId="+scoped(siteId)+"&module=opening-compliance"}
+          actionLabel="Review readiness"/>}
       <PrepareModuleHandoffs siteId={siteId} handoffs={plan.handoffs}
         secondary={module === "facilities-resources" || module === "invite-team" ||
           module === "schedules-capacity"} />
-      <WorkspaceNotice tone="info"><Info aria-hidden="true" className="mr-2 inline size-4" />
-        A shared preview is not Site publication. Publishing the Site is not approval to operate, publish an Offering, or enroll learners.
-      </WorkspaceNotice>
+      {module==="publish-site"&&<WorkspaceNotice tone="info">
+        Sharing a private preview is different from publishing your website. Publishing does not open registration.
+      </WorkspaceNotice>}
+      {module==="funding-enrollment"&&<WorkspaceNotice tone="info">
+        Saving registration settings does not open enrollment. Each offering needs its own approval and publication steps.
+      </WorkspaceNotice>}
     </div>
   </WorkspaceShell>;
 }

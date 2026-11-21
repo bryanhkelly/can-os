@@ -200,8 +200,8 @@ describe("V6.1 Prepare to Open", () => {
     expect(catalog).toContain("setResumeConfigurationId(saved.plan.configurationId)");
     expect(readiness).toContain("SolutionPlansReadinessV61");
     expect(solutionView).toContain("solutionPlanId:plan.configurationId");
-    expect(solutionView).toContain("View published Solution requirements");
-    expect(solutionView).toContain("These are not verified Site readiness.");
+    expect(solutionView).toContain("View what this solution needs");
+    expect(solutionView).toContain("Complete the necessary checks before offering this solution.");
     expect(solutionView).toContain("Continue plan");
     expect(solutionView).toContain("Review plan");
   });
@@ -234,7 +234,7 @@ describe("V6.1 Prepare to Open", () => {
     expect(html).toContain("Launch Studio / Prepare");
     expect(html).toContain("siteId=" + siteId + "&amp;module=site-information");
     expect(html).toContain("/canonical/lab/site-qualification");
-    expect(html).toContain("This page does not claim that any requirement has passed.");
+    expect(html).toContain("Review full readiness");
     expect(html).not.toContain("100%");
   });
 
@@ -243,42 +243,51 @@ describe("V6.1 Prepare to Open", () => {
       intent={{ interestIds: ["summer", "afterschool"], timingIds: ["weekdays"], audienceIds: ["children"], startingFocus: "summer" }} />);
     expect(html).toContain("Summer");
     expect(html).toContain("After-School");
-    expect(html).toContain("From Program to Solution to Offering");
+    expect(html).toContain("How offerings work");
     expect(html).not.toContain("Browse available Offerings");
     expect(html).toContain("Available Solutions");
-    expect(html).toContain("CAN administers the published Solution definition");
+    expect(html).toContain("Choosing a solution is a planning step");
     expect(html).not.toContain("Explore published learning products");
     expect(html).toContain("Available Solutions");
     expect(html).not.toContain("/canonical/blueprints?siteId=" + siteId);
     expect(html).not.toContain("Approved for enrollment");
   });
 
+  it("shows selected Programs even when there are no broad learning interests", () => {
+    const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="program-catalog"
+      intent={{interestIds:[],programCodes:["can.program.ai_digital_skills"],
+        timingIds:[],audienceIds:[],startingFocus:null}} />);
+    expect(html).toContain("Programs you want to explore");
+    expect(html).toContain("AI Digital Skills");
+    expect(html).not.toContain("You haven&#x27;t chosen any program ideas yet");
+  });
+
   it("keeps catalog exploration available when Establish preferences are unavailable", () => {
     const html = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="program-catalog"
       intentUnavailable />);
-    expect(html).toContain("Saved Programs &amp; Audiences could not be loaded");
+    expect(html).toContain("We couldn&#x27;t load your saved program ideas");
     expect(html).toContain("Available Solutions");
     expect(html).not.toContain("You have not saved any learning interests");
   });
 
   it("prepares admissions in Prepare and enables enrollment only through Open authority", () => {
     expect(prepareModulesV61.find(module => module.id === "funding-enrollment")?.title)
-      .toBe("Funding & Admissions Setup");
+      .toBe("Funding & Registration");
     const prepare = renderToStaticMarkup(
       <LaunchPrepareV61 siteId={siteId} module="funding-enrollment" />,
     );
-    expect(prepare).toContain("Funding &amp; Admissions Setup");
-    expect(prepare).toContain("Prepare admissions capacity");
-    expect(prepare).toContain("registration is enabled independently in Open");
+    expect(prepare).toContain("Funding &amp; Registration");
+    expect(prepare).toContain("Review admissions capacity");
+    expect(prepare).toContain("Saving registration settings does not open enrollment");
     expect(prepare).not.toContain("Enable Enrollment");
 
-    expect(launchModuleDestinationsV61.open.note).toContain("not a Site-wide toggle");
+    expect(launchModuleDestinationsV61.open.note).toContain("own registration settings");
     const open = renderToStaticMarkup(
-      <LaunchModuleDestinationV61 module="open" title="Open" stage="Open" siteId={siteId} />,
+      <LaunchModuleDestinationV61 module="open" title="Opening Checklist" stage="Launch" siteId={siteId} />,
     );
-    expect(open).toContain("Enable Enrollment");
+    expect(open).toContain("Opening Checklist");
     expect(open).toContain("/programs/noncredit/enrollment?publicSiteId=" + siteId);
-    expect(open).toContain("only for independently approved noncredit releases");
+    expect(open).toContain("approved noncredit registration");
   });
 
   it("keeps Site publication an explicit Prepare decision, separate from enrollment", () => {
@@ -287,10 +296,10 @@ describe("V6.1 Prepare to Open", () => {
     expect(safety).not.toContain('aria-label="Prepare modules"');
     expect(safety).toContain("settings/school/compliance?siteId=");
     const publish = renderToStaticMarkup(<LaunchPrepareV61 siteId={siteId} module="publish-site" />);
-    expect(publish).toContain("Publish your Site website");
+    expect(publish).toContain("Publish your website");
     expect(publish).not.toContain("Review Launch requirements");
     expect(publish).not.toContain('aria-label="Prepare module navigation"');
-    expect(publish).toContain("A shared preview is not Site publication");
+    expect(publish).toContain("Sharing a private preview is different from publishing your website");
     expect(publish).not.toContain("Activate enrollment");
   });
 });

@@ -10,7 +10,7 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { siteEnvironmentV61Schema } from "@/domain/site-information-v61";
 import {
   applySiteProgramsAudiencesV61, readSiteProgramsAudiencesV61 as normalizeSiteProgramsAudiencesV61,
-  siteLaunchPreferencesSchema, siteProgramsAudiencesV61Schema,
+  siteLaunchPreferencesSchema, siteProgramsAudiencesV61SaveSchema,
 } from "@/domain/site-launch-preferences";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
@@ -65,7 +65,7 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     siteId: siteIdSchema,
     expectedRevision: expectedRevisionSchema,
-    intent: siteProgramsAudiencesV61Schema,
+    intent: siteProgramsAudiencesV61SaveSchema,
   }).strict().parse(value))
   .handler(async ({ data }) => {
     const actor = await authorizedRegistrar("program.launch.start");

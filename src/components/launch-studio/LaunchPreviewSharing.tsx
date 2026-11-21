@@ -165,7 +165,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
               {activeShares.map(share => <div key={share.id}
                 className="flex flex-wrap items-center justify-between gap-3 border p-3">
                 <div>
-                  <p className="text-sm font-medium">Website revision {share.sourceRevision || "starter"}</p>
+                  <p className="text-sm font-medium">Website version {share.sourceRevision || "starter"}</p>
                   <p className="text-xs text-muted-foreground">
                     Created {new Date(share.createdAt).toLocaleDateString()} ·
                     {share.expiresAt ? " Expires " + new Date(share.expiresAt).toLocaleDateString() : " No expiration"}

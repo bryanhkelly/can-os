@@ -12,6 +12,12 @@ export const siteHostingV61Schema = z.object({
   hostingMode: z.enum(["same", "different", "undecided"]),
   separateHostName: z.string().trim().max(160),
   separateHostType: z.union([z.enum(["church", "community_nonprofit", "education_provider", "other"]), z.literal("")]),
+  /** Optional editorial reference, never evidence of affiliation or approval.
+   * Not fetched as part of a Site Information save. */
+  hostWebsiteUrl: z.union([
+    z.literal(""),
+    z.string().trim().url().max(2048).regex(/^https:\/\//,"Use a public HTTPS website URL"),
+  ]).optional(),
   /** Self-reported status of the responsible organization, host or fiscal sponsor.
    * This alone never grants a public verified 501(c)(3) claim. Optional for legacy Sites. */
   nonprofitStatus: z.enum(siteTaxStatusV61Values).optional(),
@@ -58,7 +64,7 @@ export const emptySiteStoryV61 = (): SiteStoryV61 => ({
   values: [], experiences: [], futureVision: "",
 });
 export const emptySiteHostingV61 = (): SiteHostingV61 => ({
-  hostingMode: "undecided", separateHostName: "", separateHostType: "",
+  hostingMode: "undecided", separateHostName: "", separateHostType: "",hostWebsiteUrl:"",
   nonprofitStatus: "not_provided", nonprofitSubject: "responsible",
   nonprofitOrganizationName: "", nonprofitEin: "",
 });
@@ -73,8 +79,11 @@ export const siteStorySourceV61Schema = z.object({
 }).strict();
 
 export function cleanSiteHostingV61(value: SiteHostingV61): SiteHostingV61 {
+  // Host-specific answers become inapplicable when the host is the responsible
+  // organization. The tax/status answers belong to the selected subject and
+  // must not be silently erased when switching hosting modes.
   return value.hostingMode === "different" ? value
-    : { hostingMode: value.hostingMode, separateHostName: "", separateHostType: "" };
+    : { ...value, separateHostName: "", separateHostType: "" };
 }
 export function cleanSiteEnvironmentV61(value: SiteEnvironmentV61): SiteEnvironmentV61 {
   return value.delivery === "digital" ? { delivery: "digital", physicalSpaceArrangement: "" } : value;

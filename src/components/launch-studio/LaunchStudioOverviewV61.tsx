@@ -5,12 +5,13 @@
  * navigation via the shared module registry. Render this under a Site-scoped
  * route only after the server has verified active Site access.
  */
-import { ArrowRight, BookOpen, Building2, CheckCircle2, ClipboardCheck, Globe, Info, Megaphone, Rocket, Users } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ClipboardCheck, Globe, Rocket, Send, Shapes, Users, type LucideIcon } from "lucide-react";
 import { completedLaunchStageV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { Button } from "@/components/ui/button";
 export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
-import { WorkspaceShell, WorkspacePanel, WorkspaceNotice, StatusBadge, type StatusTone } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, type StatusTone } from "@/components/workspace";
+import { SiteGuideV61 } from "./SiteGuideV61";
 
 export type LaunchOverviewProps = {
   site: { id: string; name: string; statusLabel: string; statusTone: StatusTone };
@@ -24,13 +25,13 @@ export type LaunchOverviewProps = {
 };
 
 const stagePresentation: Record<SiteLaunchStageV61, {
-  icon: typeof Building2;
+  icon: LucideIcon;
   summary: string;
 }> = {
-  Establish: { icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
-  Introduce: { icon: Megaphone, summary: "Promote your community, connect with prospective learners and host events." },
-  Prepare: { icon: ClipboardCheck, summary: "Select Solutions, verify facilities, people, safeguards and funding, then explicitly publish the public Site website." },
-  Open: { icon: Rocket, summary: "Enable Enrollment only for independently approved, enrollable Offerings." },
+  Shape: { icon: Shapes, summary: "Define your community, who you hope to serve, and what you want to offer." },
+  Share: { icon: Send, summary: "Tell your story, invite ideas, and build community interest." },
+  Prepare: { icon: ClipboardCheck, summary: "Choose how to deliver your programs and get the right people and resources in place." },
+  Launch: { icon: Rocket, summary: "Welcome participants when each offering is ready and approved." },
 };
 const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }));
 
@@ -42,30 +43,29 @@ const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }))
  */
 export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, workspaceUrl, completion = {} }: LaunchOverviewProps) {
   const rail = <div className="space-y-4">
-    <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">Launch Studio takes your Site from an initial identity to planned programs, community outreach and verified operational readiness.</p>
-      <div className="mt-5 border-t pt-4"><h3 className="text-sm font-semibold">Work at your own pace</h3><p className="mt-2 text-sm text-muted-foreground">The same Site capabilities remain in your permanent workspace.</p></div>
-    </WorkspacePanel>
-    <WorkspacePanel title="Your website, as it grows">
-      <p className="text-sm leading-6 text-muted-foreground">Preview the latest saved website from the shared top bar. Create a revocable, unlisted share link to show a proposed Site before approval. Official publication is a separate Prepare step.</p>
-      <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Available to your authorized account" : "Not available yet"}</div>
+    <SiteGuideV61 guide={{
+      summary: mode === "first-visit" ? "Your vision begins with a Site, the people you want to serve and the experiences you hope to offer." : `You're continuing the launch plan for ${site.name}.`,
+      highlights: [site.statusLabel],
+      insight: "You can share a private vision before your services are ready. Operational requirements and registration decisions come later.",
+      connection: "Shape informs your website and outreach. Prepare translates intentions into plans; Launch checks each offering's actual readiness.",
+      next: nextAction.description,
+    }} />
+    <WorkspacePanel title="Your website preview">
+      <p className="text-sm leading-6 text-muted-foreground">Preview your saved website before publishing. You can also invite others to review a private preview link.</p>
+      <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Available" : "Save a website draft to enable preview"}</div>
     </WorkspacePanel>
   </div>;
-  return <WorkspaceShell title={mode === "first-visit" ? "Bring your learning community to life." : `Continue preparing ${site.name}.`}
+  return <WorkspaceShell title={mode === "first-visit" ? "Bring your community's vision to life." : `Continue preparing ${site.name}.`}
     eyebrow="Launch Studio / Overview"
-    subtitle="CAN OS brings learning experiences, community outreach and daily Site operations together."
+    subtitle="Shape your vision. Share your story. Prepare to deliver. Launch when ready."
     width="wide" rail={rail}>
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 border bg-card p-5">
-        <div><h2 className="text-lg font-semibold">{site.name}</h2><p className="mt-1 text-xs text-muted-foreground">Current Site context</p></div>
+        <h2 className="text-lg font-semibold">{site.name}</h2>
         <StatusBadge tone={site.statusTone}>{site.statusLabel}</StatusBadge>
       </div>
-      <WorkspacePanel title="One Site. Many possibilities." description="You can add programs as your learning community grows.">
-        <p className="text-sm leading-6 text-muted-foreground">Start with the Site you established. Explore your programs, build a web presence, and prepare to welcome learners without recreating the Site.</p>
-      </WorkspacePanel>
       <section aria-labelledby="launch-stage-heading">
-        <h2 id="launch-stage-heading" className="mb-2 text-lg font-semibold">Your path to opening</h2>
-        <p className="mb-4 text-sm text-muted-foreground">Four stages, with optional internal steps in longer modules.</p>
+        <h2 id="launch-stage-heading" className="mb-2 text-lg font-semibold">Your path to launch</h2>
         <div className="grid gap-3 sm:grid-cols-2">{stages.map((stage, index) => {
           const Icon = stage.icon;
           return <article key={stage.id} className="border bg-card p-5">
@@ -79,18 +79,17 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
           </article>;
         })}</div>
       </section>
-      <WorkspacePanel title="What CAN OS enables">
+      <WorkspacePanel title="Your work, connected">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div><BookOpen className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Learning experiences</h3><p className="mt-1 text-xs text-muted-foreground">Programs, Courses, Classes and schedules</p></div>
-          <div><Users className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Community connection</h3><p className="mt-1 text-xs text-muted-foreground">Websites, communications and engagement</p></div>
-          <div><Globe className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Daily operations</h3><p className="mt-1 text-xs text-muted-foreground">Teams, attendance and reporting</p></div>
+          <div><BookOpen className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Programs &amp; experiences</h3><p className="mt-1 text-xs text-muted-foreground">Plan classes, workshops, activities and gatherings</p></div>
+          <div><Users className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Outreach &amp; relationships</h3><p className="mt-1 text-xs text-muted-foreground">Share your website, tell your story and invite interest</p></div>
+          <div><Globe className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">People &amp; operations</h3><p className="mt-1 text-xs text-muted-foreground">Prepare staffing, schedules and readiness</p></div>
         </div>
       </WorkspacePanel>
       <div className="flex flex-wrap items-center justify-between gap-4 bg-accent p-5">
         <div><h2 className="text-sm font-semibold">{mode === "first-visit" ? "Ready to begin?" : "Continue where you left off"}</h2><p className="mt-1 text-xs text-muted-foreground">{nextAction.description}</p></div>
         <Button asChild><a href={nextAction.href}>{nextAction.title} <ArrowRight aria-hidden="true"/></a></Button>
       </div>
-      <WorkspaceNotice tone="info"><Info aria-hidden="true" className="inline size-4"/> Configuration, website publication, Site qualification, and enrollment authorization are separate decisions.</WorkspaceNotice>
       <div className="text-right"><Button asChild variant="outline"><a href={workspaceUrl}>Open Site Workspace</a></Button></div>
     </div>
   </WorkspaceShell>;

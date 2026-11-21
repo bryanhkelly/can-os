@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   initialMarketingContent, marketingPackageContentSchema, marketingStepIssue,
   marketingPurposeIds, marketingAudienceOptions, marketingFormatOptions,
+  marketingPackageClaimsRequireReview,
 } from "../src/domain/marketing-package-v61";
 
 describe("V6.1 Marketing Packages", () => {
@@ -27,6 +28,16 @@ describe("V6.1 Marketing Packages", () => {
     expect(marketingStepIssue("messages","Welcome",{...draft,headline:""})).toBe("Add both a headline and a message.");
     expect(marketingStepIssue("assets","Welcome",{...draft,formats:[]})).toBe("Select at least one format.");
     expect(marketingStepIssue("menu","Welcome",draft)).toBe(null);
+  });
+  it("protects material-specific edits with the same claim scanner",()=>{
+    const draft=initialMarketingContent("Barton","site-announcement");
+    const changed=marketingPackageContentSchema.parse({
+      ...draft,materialOverrides:{email:{headline:"New opportunity"}},
+    });
+    expect(changed.materialOverrides?.email?.headline).toBe("New opportunity");
+    expect(marketingPackageClaimsRequireReview("Barton",{
+      ...draft,materialOverrides:{email:{message:"Accredited school now enrolling"}},
+    })).toBe(true);
   });
   it("does not accept unverified recipient lists, CTA URLs or brand overrides", () => {
     const draft=initialMarketingContent("Barton","site-announcement");

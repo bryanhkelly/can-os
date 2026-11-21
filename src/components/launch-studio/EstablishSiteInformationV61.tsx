@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
+import {
+  siteIdentityV61Schema, siteIdentityTypeOptionsV61, siteFaithTraditionOptionsV61,
+  isFaithBasedSiteIdentityV61, siteIdentityEditorialContextV61,
+  type SiteIdentityV61, type SiteIdentityV61Draft,
+} from "@/domain/site-identity-v61";
 import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   cleanSiteEnvironmentV61, cleanSiteHostingV61,
@@ -16,6 +21,9 @@ import {
 import { saveSiteInformationV61 } from "@/modules/programs/site-information-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
+import { siteInformationGuideV61 } from "@/domain/launch-site-guide-v61";
+import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import type { SiteGuideContentV61 } from "./SiteGuideV61";
 import { GuidedSetupShell } from "@/components/workflow";
 
 type Step = 0 | 1 | 2 | 3;
@@ -25,6 +33,8 @@ type MultiKey = "motivations" | "distinctives" | "values" | "experiences";
 export type SiteInformationV61Initial = {
   siteId: string;
   revision: string;
+  identity: SiteIdentityV61Draft;
+  identitySaved: boolean;
   host: SiteHostingV61;
   hostingSaved: boolean;
   environment: EnvironmentDraft;
@@ -34,47 +44,47 @@ export type SiteInformationV61Initial = {
 };
 
 const steps = [
-  { title: "Hosting & Organization", description: "Who supports your Site" },
-  { title: "Learning Environment", description: "How learning will happen" },
+  { title: "Hosting & Organization", description: "Your Site identity and who supports it" },
+  { title: "How People Participate", description: "Where and how your activities take place" },
   { title: "Network Affiliation", description: "Optional connections" },
   { title: "Purpose & Story", description: "Why this community exists" },
 ] as const;
 
 export const siteInformationV61Guidance = [
   {
-    why: "The organization responsible for your Site may differ from the organization hosting its activities.",
-    tip: "Naming a host is private planning information, not a verified legal relationship.",
-    next: "Choose the learning environments your Site may support.",
+    why: "Describe your Site, then choose who will host its activities.",
+    tip: "Your Site identity is different from the identity of its hosting organization.",
+    next: "Choose how people will participate.",
   },
   {
-    why: "In-person and online delivery have different needs. Your choice tailors later preparation.",
-    tip: "A delivery preference is not a timetable, facility approval, or approved offering.",
-    next: "Decide whether to explore network affiliation.",
+    why: "Choose how people will participate.",
+    tip: "Schedules and facilities come later.",
+    next: "Choose a network affiliation, if applicable.",
   },
   {
-    why: "Networks may provide resources, but membership and shared access require separate review.",
-    tip: "You can continue independently. An affiliation request is never sent by clicking Continue.",
-    next: "Share why your learning community exists.",
+    why: "You can explore a network or continue independently.",
+    tip: "No request is sent until you submit one.",
+    next: "Tell us about your community.",
   },
   {
-    why: "Your private answers guide suggested About Us, mission, vision and outreach messaging.",
-    tip: "You can review and revise every suggestion. Nothing is published automatically.",
-    next: "Continue to Programs & Audiences, where you can state your broad Program intent.",
+    why: "Your answers help shape your community's story.",
+    tip: "You can edit these answers later.",
+    next: "Choose your Programs and audiences next.",
   },
 ] as const;
 
-export function SiteInformationV61Guidance({ step }: { step: Step }) {
-  return <LaunchGuidancePanels guidance={siteInformationV61Guidance[step]} />;
+export function SiteInformationV61Guidance({ step, guide }: { step: Step; guide?: SiteGuideContentV61 | null }) {
+  return <LaunchGuidancePanels guidance={siteInformationV61Guidance[step]} guide={guide} />;
 }
 
 const motivations = [
-  ["access", "Expand access to educational opportunities"],
+  ["access", "Make opportunities accessible to more people"],
   ["belonging", "Build a supportive, welcoming community"],
-  ["personalized", "Offer more personalized learning"],
+  ["personalized", "Offer experiences that respond to individual needs"],
   ["practical", "Develop practical and career skills"],
   ["alternative", "Give families more choices"],
   ["creative", "Provide enrichment and creative opportunities"],
-  ["character", "Develop character, leadership and service"],
+  ["character", "Encourage character, leadership and service"],
   ["need", "Address an unmet community need"],
 ] as const;
 const distinctives = [
@@ -126,7 +136,7 @@ function isEmptyStory(story: SiteStoryV61): boolean {
 function snapshot(value: unknown) { return JSON.stringify(value); }
 
 export function EstablishSiteInformationV61({ siteId, responsibleOrganizationName, initial,
-  onBackToSiteProfile, onSaveAndExit, onContinueToPrograms, onInternalStepChange,
+  onBackToSiteProfile, onSaveAndExit, onContinueToPrograms, onInternalStepChange, onGuideChange, guidePlanning,
 }: {
   siteId: string;
   responsibleOrganizationName: string | null;
@@ -135,19 +145,30 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   onSaveAndExit: () => Promise<void>;
   onContinueToPrograms: () => void;
   onInternalStepChange?: (step: Step) => void;
+  onGuideChange?: (guide: SiteGuideContentV61) => void;
+  guidePlanning?: SiteProgramsAudiencesV61 | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
+  const [identity, setIdentity] = useState<SiteIdentityV61Draft>(initial.identity);
+  const [identitySaved, setIdentitySaved] = useState(initial.identitySaved);
   const [host, setHost] = useState(initial.host);
   const [environment, setEnvironment] = useState<EnvironmentDraft>(initial.environment);
   const [story, setStory] = useState(initial.story);
   const [hostSaved, setHostSaved] = useState(initial.hostingSaved);
   const [environmentSaved, setEnvironmentSaved] = useState(initial.environmentSaved);
   const [storySaved, setStorySaved] = useState(initial.storyRevision !== null);
+  const [savedIdentity, setSavedIdentity] = useState(snapshot(initial.identity));
   const [savedHost, setSavedHost] = useState(snapshot(cleanSiteHostingV61(initial.host)));
   const [savedEnvironment, setSavedEnvironment] = useState(snapshot(initial.environment));
   const [savedStory, setSavedStory] = useState(snapshot(normalizeStory(initial.story)));
   const [networkChoice, setNetworkChoice] = useState<"independent" | "request">("independent");
+  // The rail follows live structured selections without reading free-text story fields.
+  const liveGuide = useMemo(() => siteInformationGuideV61(step, {
+    siteType: identity.siteType, hostingMode: host.hostingMode,
+    delivery: environment.delivery, values: story.values, networkChoice, planning: guidePlanning,
+  }), [step, identity.siteType, host.hostingMode, environment.delivery, story.values, networkChoice, guidePlanning]);
+  useEffect(() => { onGuideChange?.(liveGuide); }, [liveGuide, onGuideChange]);
   const [busy, setBusy] = useState(false);
   const [reloadRequired, setReloadRequired] = useState(false);
   const [error, setError] = useState("");
@@ -161,11 +182,15 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     panelRef.current?.focus();
   }, [step]);
 
+  const identityDirty = snapshot(identity) !== savedIdentity;
   const hostDirty = snapshot(cleanSiteHostingV61(host)) !== savedHost;
   const environmentDirty = snapshot(environment.delivery === "digital"
     ? { delivery: "digital", physicalSpaceArrangement: "" } : environment) !== savedEnvironment;
   const storyDirty = snapshot(normalizeStory(story)) !== savedStory;
-  const dirty = hostDirty || environmentDirty || storyDirty;
+  const dirty = identityDirty || hostDirty || environmentDirty || storyDirty;
+  const identityContext=siteIdentityEditorialContextV61(identity);
+  const storyDistinctives=distinctives.filter(([id])=>id!=="faith" ||
+    isFaithBasedSiteIdentityV61(identity) || story.distinctives.includes("faith"));
   const releaseNavigation = useLaunchUnsavedChanges(dirty,
     "Leave Site Information? Unsaved answers will be lost.");
   function selectStep(next: Step) {
@@ -174,9 +199,11 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   function updateMulti(key: MultiKey, selected: string[]) {
     setStory(current => ({ ...current, [key]: selected }));
   }
-  async function persist(section: "hosting" | "environment" | "story",
-    draft: SiteHostingV61 | SiteEnvironmentV61 | SiteStoryV61) {
-    const data = section === "hosting"
+  async function persist(section: "identity" | "hosting" | "environment" | "story",
+    draft: SiteIdentityV61 | SiteHostingV61 | SiteEnvironmentV61 | SiteStoryV61) {
+    const data = section === "identity"
+      ? { siteId, expectedRevision: revision.current, section, identity: draft as SiteIdentityV61 }
+      : section === "hosting"
       ? { siteId, expectedRevision: revision.current, section, host: draft as SiteHostingV61 }
       : section === "environment"
         ? { siteId, expectedRevision: revision.current, section, environment: draft as SiteEnvironmentV61 }
@@ -187,6 +214,20 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     const result = await saveSiteInformationV61({ data });
     if (!result.revision) throw new Error("Save returned no Site revision. Reload before retrying.");
     revision.current = result.revision;
+  }
+  async function saveIdentity(required: boolean) {
+    if (!required && !identityDirty) return;
+    if (identitySaved && !identityDirty) return;
+    if (!identity.siteType) {selectStep(0);throw new Error("Choose what kind of Site you are building.");}
+    const validated = siteIdentityV61Schema.safeParse(identity);
+    if (!validated.success) {
+      selectStep(0);
+      throw new Error(validated.error.issues[0]?.message ?? "Choose your Site identity.");
+    }
+    await persist("identity", validated.data);
+    setIdentity(validated.data);
+    setIdentitySaved(true);
+    setSavedIdentity(snapshot(validated.data));
   }
   async function saveHosting(required: boolean) {
     if (!required && !hostDirty) return;
@@ -228,8 +269,17 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
     try {
       // Validate every section we intend to write before starting sequential commits.
       // A missing required answer must not leave a partial database update.
-      const checkingHost = mode === "next" && step === 3 ||
+      const checkingIdentity = mode === "next" && (step === 0 || step === 3) ||
+        mode === "exit" && (step === 0 || identityDirty);
+      const checkingHost = mode === "next" && (step === 0 || step === 3) ||
         mode === "exit" && (step === 0 || hostDirty);
+      if (checkingIdentity) {
+        if (!identity.siteType) {selectStep(0);throw new Error("Choose what kind of Site you are building.");}
+        const checked = siteIdentityV61Schema.safeParse(identity);
+        if (!checked.success) {
+          selectStep(0); throw new Error(checked.error.issues[0]?.message ?? "Choose your Site identity.");
+        }
+      }
       const checkingEnvironment = mode === "next" && step === 3 ||
         mode === "exit" && (step === 1 || environmentDirty);
       if (checkingHost) {
@@ -251,15 +301,18 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       // Saving multiple sections is sequential, with Site revision threading.
       // A failed later section must never be retried blindly.
       if (mode === "exit") {
+        if (step === 0 || identityDirty) await saveIdentity(step === 0);
         if (step === 0 || hostDirty) await saveHosting(step === 0);
         if (step === 1 || environmentDirty) await saveEnvironment(step === 1);
         if (step === 3 || storyDirty) await saveStory(step === 3);
       } else if (step === 0) {
+        await saveIdentity(true);
         await saveHosting(true);
       } else if (step === 1) {
         await saveEnvironment(true);
       } else if (step === 3) {
         // Finishing out of order must still save and validate required earlier answers.
+        await saveIdentity(true);
         await saveHosting(true);
         await saveEnvironment(true);
         await saveStory(true);
@@ -273,7 +326,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           try { await onSaveAndExit(); }
           catch (failure) {
             setError(failure instanceof Error ? failure.message :
-              "Changes saved, but sign-out failed. Use the Account menu to sign out.");
+              "Your changes were saved, but we could not open your Site Workspace. Try again from the navigation.");
           }
         }
         else onContinueToPrograms();
@@ -287,7 +340,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   }
 
   const progressSteps = steps.map((item, index) => {
-    const saved = index === 0 ? hostSaved && !hostDirty :
+    const saved = index === 0 ? identitySaved && !identityDirty && hostSaved && !hostDirty :
       index === 1 ? environmentSaved && !environmentDirty :
       index === 3 ? storySaved && !storyDirty : false;
     return {
@@ -301,22 +354,74 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
 
   return <section aria-label="Site Information" className="min-w-0 space-y-5">
     <GuidedSetupShell title="Site Information"
-      description="Establish how your Site is hosted and the story behind your community."
+      description="Tell us about your community, how people will take part and what inspires you."
       steps={progressSteps} progressLabel="Site Information sections"
       onStepChange={id => selectStep(Number(id) as Step)}
       navigationDisabled={busy || reloadRequired}>
       <div ref={panelRef} role="region" tabIndex={-1} aria-label={steps[step].title}
         className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
     {step === 0 && <WorkspacePanel id="site-information-step-0" title="Hosting & Organization"
-      description="Who is responsible for your Site, and who hosts its activities?">
+      description="First describe the Site you are creating. Then tell us who is responsible for it and where activities will be hosted.">
       <div className="space-y-5">
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-semibold">What kind of organization or community are you building?</legend>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Describe this Site, not the organization providing its space. Your answer helps tailor
+            Tell Your Story and outreach. It does not establish recognition or affiliation.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {siteIdentityTypeOptionsV61.map(option =>
+              <SelectionCard key={option.value} kind="radio" name="site-identity"
+                checked={identity.siteType===option.value} title={option.label}
+                onChange={() => setIdentity(current => ({
+                  ...current,siteType:option.value,
+                  faithOrientation:option.value==="church_community"||option.value==="faith_based_org"
+                    ? "faith_based" : current.siteType==="church_community"||current.siteType==="faith_based_org"
+                      ? "undecided" : current.faithOrientation,
+                  faithTradition:option.value==="church_community"||option.value==="faith_based_org"
+                    ? current.faithTradition : "",
+                }))} />)}
+          </div>
+        </fieldset>
+        {identity.siteType && <fieldset className="space-y-3 border-t pt-5">
+          <legend className="text-sm font-semibold">Is faith part of this Site's identity?</legend>
+          {identity.siteType==="church_community"||identity.siteType==="faith_based_org" ? (
+            <p className="text-sm text-muted-foreground">
+              Yes. Faith is central to the Site type you selected.
+            </p>
+          ) : <div className="grid gap-2 sm:grid-cols-3">
+            {([
+              ["faith_based","Yes, faith-based"],
+              ["not_faith_based","No, not faith-based"],
+              ["undecided","Still deciding"],
+            ] as const).map(([value,label]) =>
+              <SelectionCard key={value} kind="radio" name="site-faith"
+                checked={identity.faithOrientation===value} title={label}
+                onChange={() => setIdentity(current=>({...current,
+                  faithOrientation:value,faithTradition:value==="faith_based"?current.faithTradition:"",
+                }))}/>)}
+          </div>}
+          {isFaithBasedSiteIdentityV61(identity) && <Field label="Faith tradition (optional)">
+            <Select value={identity.faithTradition}
+              onChange={event=>setIdentity(current=>({...current,
+                faithTradition:event.target.value as SiteIdentityV61["faithTradition"],
+              }))}>
+              <option value="">Not specified</option>
+              {siteFaithTraditionOptionsV61.map(option=>
+                <option key={option.value} value={option.value}>{option.label}</option>)}
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This is self-described and does not establish membership in a denomination or network.
+            </p>
+          </Field>}
+        </fieldset>}
         <div className="border bg-muted/30 p-4">
           <p className="text-xs text-muted-foreground">Responsible organization · Site Profile (read-only)</p>
           <p className="mt-1 font-semibold">{responsibleOrganizationName ?? "Organization unavailable. Refresh your Site."}</p>
-          <p className="mt-2 text-xs text-muted-foreground">Changing the responsible organization requires its own authorized process.</p>
+          
         </div>
         <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">Who hosts your learning space or activities?</legend>
+          <legend className="text-sm font-semibold">Who will host your activities or programs?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
             <SelectionCard kind="radio" name="site-host" checked={host.hostingMode === "same"} title="Your organization"
               detail="Your organization hosts its own activities" onChange={() => setHost(current => ({ ...current, hostingMode: "same" }))} />
@@ -338,13 +443,23 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="other">Other</option>
           </Select></Field>
         </div>}
-        <WorkspaceNotice>A self-reported host does not create a verified organizational relationship, ownership or authorization.</WorkspaceNotice>
+        {host.hostingMode!=="undecided"&&<Field label="Hosting organization website (optional)">
+          <Input inputMode="url" maxLength={2048}
+            placeholder="https://www.example.org"
+            value={host.hostWebsiteUrl??""}
+            onChange={event=>setHost(current=>({
+              ...current,hostWebsiteUrl:event.target.value,
+            }))}/>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Add a website to help us understand your organization and suggest content for you to review.
+            Saving the URL does not retrieve or publish anything.
+          </p>
+        </Field>}
         <fieldset className="space-y-3 border-t pt-5">
           <legend className="text-sm font-semibold">Organization &amp; Tax-Exempt Status</legend>
           <p className="text-xs leading-5 text-muted-foreground">
-            This helps CAN OS prepare accurate organization and funding information.
-            Self-reported status is private until reviewed; it does not establish
-            nonprofit recognition or make tuition tax-deductible.
+            This helps us understand your organization for planning and funding.
+            Self-reported status is private until reviewed. It does not verify nonprofit recognition or tax-deductibility.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Which organization does this status describe?">
@@ -386,17 +501,17 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         </fieldset>
       </div>
     </WorkspacePanel>}
-    {step === 1 && <WorkspacePanel id="site-information-step-1" title="Learning Environment"
-      description="Choose how learners may participate. Specific Solutions and requirements come later.">
+    {step === 1 && <WorkspacePanel id="site-information-step-1" title="How People Participate"
+      description="Will people join in person, online or both?">
       <div className="space-y-5">
         <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">How will learners participate?</legend>
+          <legend className="text-sm font-semibold">How will people participate?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
-            <SelectionCard kind="radio" name="site-delivery" title="In person" detail="At a physical learning location"
+            <SelectionCard kind="radio" name="site-delivery" title="In person" detail="At a physical location"
               checked={environment.delivery === "physical"} onChange={() => setEnvironment(current => ({ ...current, delivery: "physical" }))} />
-            <SelectionCard kind="radio" name="site-delivery" title="Online" detail="Participate remotely"
+            <SelectionCard kind="radio" name="site-delivery" title="Online" detail="Join from anywhere with an internet connection"
               checked={environment.delivery === "digital"} onChange={() => setEnvironment(current => ({ ...current, delivery: "digital" }))} />
-            <SelectionCard kind="radio" name="site-delivery" title="Both" detail="In-person and online learning"
+            <SelectionCard kind="radio" name="site-delivery" title="Both" detail="In person and online"
               checked={environment.delivery === "both"} onChange={() => setEnvironment(current => ({ ...current, delivery: "both" }))} />
           </div>
         </fieldset>
@@ -409,11 +524,11 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="planned">Still looking for a location</option>
           </Select>
         </Field>}
-        <WorkspaceNotice>Your Site address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
+        <WorkspaceNotice>Your address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
     {step === 2 && <WorkspacePanel id="site-information-step-2" title="Network Affiliation"
-      description="Optional. You can operate independently while you establish your Site.">
+      description="Optional. Select a network or continue independently.">
       <div className="space-y-5">
         <fieldset className="space-y-3"><legend className="text-sm font-semibold">Would you like to explore network affiliation?</legend>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -424,41 +539,29 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
           </div>
         </fieldset>
         {networkChoice === "request" && <SiteAffiliationPanel siteId={siteId} />}
-        <WorkspaceNotice>Only eligible denomination network requests are currently supported. Submitting a request is a separate explicit action and does not grant membership, private access or enrollment authority.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
     {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
-      description="Optional. Tell us what matters to your learning community.">
+      description={identityContext.storyPrompt}>
       <div className="space-y-6">
-        <WorkspaceNotice><strong>How CAN OS will use your answers</strong><p className="mt-2">
-          The answers you provide here, including your written origin story, community need,
-          values and future vision, are used to draft your website and may be used to
-          prepare future outreach materials.
-          Review, change or decline the drafts before sharing them. <strong>Nothing is published automatically.</strong>
-          These answers do not establish Program approval or enrollment authority.
-          Avoid including sensitive details or information about others that you cannot share.</p></WorkspaceNotice>
-        <MultiChoice title="1. Why are you creating this learning community?" hint="Choose up to three motivations. Optional."
+        <p className="text-xs text-muted-foreground">Your answers can help shape your website and outreach. You'll review any suggested wording before using it. Please don't share private details about others.</p>
+        <MultiChoice title="1. What inspires this work?" hint="Choose up to three motivations. Optional."
           options={motivations} selected={story.motivations} max={3} onChange={selected => updateMulti("motivations", selected)} />
-        <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. No identifiable student details.">
+        <Field label="2. What need are you hoping to address?" description="Describe the challenge or opportunity. Please leave out private information about participants.">
           <Textarea rows={3} maxLength={1000} value={story.communityNeed}
             onChange={event => setStory(current => ({ ...current, communityNeed: event.target.value }))} /></Field>
-        <MultiChoice title="3. What makes your approach distinctive?" hint="Select aspirations, not unverified claims."
-          options={distinctives} selected={story.distinctives} onChange={selected => updateMulti("distinctives", selected)} />
-        <Field label="4. How did your vision begin?" description="Your origin story, in your own words.">
+        <MultiChoice title="3. What makes your approach distinctive?" hint="Choose up to three."
+          options={storyDistinctives} selected={story.distinctives} onChange={selected => updateMulti("distinctives", selected)} />
+        <Field label="4. How did your vision begin?" >
           <Textarea rows={3} maxLength={2000} value={story.foundingStory}
             onChange={event => setStory(current => ({ ...current, foundingStory: event.target.value }))} /></Field>
         <MultiChoice title="5. What values matter most?" hint="Select what you want reflected in your messaging."
           options={values} selected={story.values} onChange={selected => updateMulti("values", selected)} />
-        <MultiChoice title="6. What do you hope learners experience?" hint="Select aspirations, not promised outcomes."
+        <MultiChoice title="6. What do you hope participants experience?" hint="Select aspirations, not promised outcomes."
           options={experiences} selected={story.experiences} onChange={selected => updateMulti("experiences", selected)} />
-        <Field label="7. What do you hope this community becomes?" description="Your long-term vision. Optional.">
+        <Field label="7. What do you hope to build over time?">
           <Textarea rows={4} maxLength={2000} value={story.futureVision}
             onChange={event => setStory(current => ({ ...current, futureVision: event.target.value }))} /></Field>
-        <p className="text-xs italic leading-5 text-muted-foreground">
-          By saving these optional answers, you authorize CAN OS to use them to prepare editable
-          website and promotional drafts. The original answers remain in Site Information.
-          You decide which wording appears in a shareable website preview or official publication.
-        </p>
       </div>
     </WorkspacePanel>}
     </div>
@@ -477,7 +580,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       }}><ArrowLeft className="size-4" />{step === 0 ? "Back to Site Profile" : "Previous step"}</Button>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="ghost" disabled={busy || reloadRequired} onClick={() => void act("exit")}>
-          Save & Sign Out</Button>
+          Save & Exit</Button>
         <Button type="button" disabled={reloadRequired} loading={busy}
           loadingLabel="Saving Site Information…" onClick={() => void act("next")}>
           {step === 3 ? "Finish Site Information" : "Save & Continue"}<ArrowRight aria-hidden="true" className="size-4" />

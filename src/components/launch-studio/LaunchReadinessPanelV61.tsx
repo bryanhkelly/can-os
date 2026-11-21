@@ -7,6 +7,8 @@ import { readLaunchSitePublication } from "@/modules/sites/launch-site-publicati
 import { getNoncreditEnrollmentPublisher } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
 import { readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { projectProgramOfferingJourneys } from "@/domain/program-offering-journey-v61";
+import { projectSiteSolutionPreparationV61 } from "@/domain/site-solution-preparation-v61";
+import { SolutionPreparationSummaryV61 } from "./SolutionPreparationSummaryV61";
 
 /** Existing authorities own every status. This is a read-only cross-workflow
  * projection, not a new readiness checklist, approval or enrollment toggle. */
@@ -15,7 +17,6 @@ import type {
   LaunchReadinessPublication, LaunchReadinessNoncredit, LaunchReadinessIntent,
 } from "./launch-readiness-types-v61";
 import { ProgramOfferingJourneyReadinessV61 } from "./ProgramOfferingJourneyReadinessV61";
-import { SolutionPlansReadinessV61 } from "./SolutionPlansReadinessV61";
 import { ProgramRequirementsReadinessV61 } from "./ProgramRequirementsReadinessV61";
 import { SitePublicationReadinessV61 } from "./SitePublicationReadinessV61";
 import { NoncreditPublisherReadinessV61 } from "./NoncreditPublisherReadinessV61";
@@ -88,11 +89,19 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
           : {}),
       })
     : null;
-  return <WorkspacePanel title={context==="open" ? "Saved readiness and receiving Programs" : "Readiness from existing workspaces"}
-    description="Each status comes from its owning workflow. A saved plan, completed requirement, website or Program status never grants Offering-level enrollment authorization.">
+  const solutionPreparation=solutions.state==="ready"
+    ? projectSiteSolutionPreparationV61({
+        siteId,templates:solutions.value.templates,
+        configurations:solutions.value.configurations,
+        ...(context==="open"&&noncredit.state==="ready"
+          ? {candidates:noncredit.value.candidates,releases:noncredit.value.published}:{}),
+      })
+    : null;
+  return <WorkspacePanel title={context==="open" ? "Your opening checklist" : "Your preparation checklist"}
+    description="See what's ready and what still needs attention. Registration opens separately for each approved offering.">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-xs text-muted-foreground">
-        {pending ? "Reading current authorized records…" : "Latest requested Site-scoped records"}
+        {pending ? "Checking your latest progress…" : "Your current preparation status"}
       </p>
       <Button type="button" size="sm" variant="outline"
         onClick={()=>setReload(value=>value+1)}>Refresh readiness</Button>
@@ -101,15 +110,21 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
       <ProgramOfferingJourneyReadinessV61 siteId={siteId} context={context}
         savedIntent={savedIntent} solutions={solutions} noncredit={noncredit}
         pilotJourneys={pilotJourneys} />
-      <SolutionPlansReadinessV61 siteId={siteId} solutions={solutions} />
+      {solutionPreparation!==null
+        ? <SolutionPreparationSummaryV61 siteId={siteId} plans={solutionPreparation}
+            open={context==="open"}/>
+        : <p role="status" className="border p-3 text-sm">
+            Solution information is {solutions.state==="loading"?"loading":"unavailable"}.
+            Try refreshing to check the latest requirements.
+          </p>}
       <ProgramRequirementsReadinessV61 programs={programs} />
       <SitePublicationReadinessV61 publication={publication} />
       {context==="open" && <NoncreditPublisherReadinessV61 siteId={siteId} noncredit={noncredit}/>}
     </div>
     <p className="mt-4 text-xs leading-5 text-muted-foreground">
       {context==="open"
-        ? "Each Offering must be authorized to enroll in its receiving service. Nothing here activates a Class, admission or enrollment."
-        : "Use these records to identify next work. Facilities, staff, jurisdiction and safeguarding remain independently governed."}
+        ? "Each offering must be approved before people can register. This checklist doesn't open registration."
+        : "Use this checklist to see what's next. Some activities need additional facilities, staff, safety, or local approvals."}
     </p>
   </WorkspacePanel>;
 }

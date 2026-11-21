@@ -22,9 +22,9 @@ import { NativeClassTeacherHomeworkPanel, NativeClassTeacherAssessmentPanel } fr
   "@/components/learning/NativeClassTeacherReviewPanels";
 import { NativeClassDiscussionPanel } from "@/components/learning/NativeClassDiscussionPanel";
 import { NativeClassLessonContentPanel } from "@/components/learning/NativeClassLessonContentPanel";
-import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
+
 import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
-import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
+
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
@@ -37,6 +37,18 @@ import {
 } from "@/modules/classes/class-staff.functions";
 import { classViews, classTabs, type ClassView } from "@/domain/class-views";
 import { normalizeClientError } from "@/lib/client-error";
+
+/** Administration-only panels are loaded on demand rather than added to
+ * every learner and teacher Class navigation bundle. Each panel performs
+ * its existing server-side authorization checks when it is mounted. */
+const NativeClassAssessmentReviewPanel=lazy(async()=>{
+  const module=await import("@/components/learning/NativeClassAssessmentReviewPanel");
+  return {default:module.NativeClassAssessmentReviewPanel};
+});
+const NativeClassSurveyCampaignPanel=lazy(async()=>{
+  const module=await import("@/components/learning/NativeClassSurveyCampaignPanel");
+  return {default:module.NativeClassSurveyCampaignPanel};
+});
 
 /** Reuse the exact source-backed WS6 report inside the native Class,
  * loading its heavier analytics module only for authorized report views. */
@@ -99,8 +111,10 @@ function OneClassWorkspace(){
   const {classId}=Route.useParams();
   const search=Route.useSearch();
   const workspace=useQuery({
-    queryKey:["native-unified-class",classId,search.view,search.tab,search.lesson,search.session],
-    queryFn:()=>getNativeClassWorkspace({data:{classId,...search}}),retry:false,
+    // Lesson and Session are URL-local selection, not authorization scope.
+    // Omitting them avoids refetching the entire Class when navigating inside it.
+    queryKey:["native-unified-class",classId,search.view,search.tab],
+    queryFn:()=>getNativeClassWorkspace({data:{classId,view:search.view,tab:search.tab}}),retry:false,
   });
   if(workspace.isPending)return <WorkspaceShell width="wide" eyebrow="CAN OS · Class" title="Opening Class">
     <p role="status" className="mt-5 border border-border bg-card p-5 text-sm">
@@ -115,7 +129,13 @@ function OneClassWorkspace(){
       Return to Classes
     </Link>
   </WorkspaceShell>;
-  const data=workspace.data;
+  // Preserve the selected URL items for the view without a new server read.
+  // The server still verifies the exact Person/Class relationship on a fresh
+  // workspace request, and never uses these IDs to grant access.
+  const data={...workspace.data,
+    selectedLessonId:search.lesson??null,
+    selectedSessionId:search.session??null,
+  };
   if(data.view==="learn"){
     if(!data.learner) return null;
     return <LearnerClass key={data.learner.classEnrollmentId} workspace={data}/>;
@@ -553,8 +573,10 @@ function ManagingClass({workspace}:{workspace:Workspace}){
               </li>)}
             </ul>
           </section>
-          <NativeClassAssessmentReviewPanel classId={workspace.classId}/>
-          <NativeClassSurveyCampaignPanel classId={workspace.classId}/>
+          <Suspense fallback={<p role="status" className="border border-border bg-card p-4 text-sm">Loading Class administrative tools…</p>}>
+            <NativeClassAssessmentReviewPanel classId={workspace.classId}/>
+            <NativeClassSurveyCampaignPanel classId={workspace.classId}/>
+          </Suspense>
           <div className="mt-6 border-t border-border pt-5">
             <h3 className="text-base font-semibold">Assign an existing adult learner</h3>
             <p className="mt-2 text-sm text-muted-foreground">

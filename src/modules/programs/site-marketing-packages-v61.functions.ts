@@ -6,8 +6,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { sites, siteMarketingPackages } from "@/db/schema";
-import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
-import { readSiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import { projectSiteContentBriefV61 } from "@/domain/site-content-brief-v61";
 import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { suggestMarketingStarterV61, type MarketingStarterSourcesV61 } from "@/domain/site-marketing-suggestions-v61";
@@ -52,31 +51,38 @@ async function authorizedSite(
   const actor = await getCommandContext(getRequest());
   const [site] = await executor.select({
     id: sites.id, organizationId: sites.organizationId, name: sites.name, metadata: sites.metadata,
+    timezone: sites.timezone, updatedAt: sites.updatedAt, currentBrandVersionId: sites.currentBrandVersionId,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
   assertSiteSetupScope(actor, site, capability);
   return { actor, site };
 }
 
 /**
- * Authorized projection of previously saved Establish information.
+ * Authorized projection of previously saved Shape information.
  * Only purpose-specific editorial suggestions leave the server; raw private
  * Story answers are never added to package metadata, audit or analytics.
  */
 type MarketingSourceTx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 async function marketingSource(
-  site:{id:string;metadata:typeof sites.$inferSelect.metadata},
+  site:{id:string;name:string;timezone:string;updatedAt:Date;
+    currentBrandVersionId:string|null;metadata:typeof sites.$inferSelect.metadata},
   reader:MarketingSourceTx,
 ):Promise<MarketingStarterSourcesV61>{
-  const source=site.metadata.siteStoryV61;
-  const story=source == null ? null : siteStorySourceV61Schema.parse(source).answers;
-  const plan=site.metadata.launchPreferences;
-  const intent=plan == null ? null : readSiteProgramsAudiencesV61(plan);
-  const [savedWebsite]=await reader.select({content:siteLocalContentVersions.content})
+  const [savedWebsite]=await reader.select({
+    content:siteLocalContentVersions.content,revision:siteLocalContentVersions.revision,
+  })
     .from(siteLocalContentVersions).where(eq(siteLocalContentVersions.siteId,site.id))
     .orderBy(desc(siteLocalContentVersions.revision)).limit(1);
   const copy=savedWebsite
     ? normalizeSiteLocalContent(savedWebsite.content,{allowIncompleteImage:true})
     : null;
+  const brief=projectSiteContentBriefV61({
+    siteId:site.id,siteName:site.name,siteRevision:site.updatedAt.toISOString(),
+    timezone:site.timezone,metadata:site.metadata,
+    brandVersionId:site.currentBrandVersionId,
+    websiteContent:copy,websiteContentRevision:savedWebsite?.revision??null,
+  });
+  const intent=brief.planning;
   // A saved Program code represents intent, not a commissioned Solution.
   // Only active published catalog names are suitable for editorial suggestions.
   // Catalog unavailability does not prevent safe, generic Site outreach.
@@ -87,12 +93,11 @@ async function marketingSource(
           .map(item=>({code:item.code,title:item.title})))
         .catch(()=>[])
     : [];
-  const reuseAllowed=copy?.contentReuseConsent === "granted";
-  return {reuseAllowed,story:reuseAllowed?story:null,intent:reuseAllowed?intent:null,
-    publishedPrograms:reuseAllowed?publishedPrograms:[],websiteCopy:reuseAllowed&&copy
-    ? {heroHeadline:copy.heroHeadline,welcomeMessage:copy.welcomeMessage,
-        schoolVision:copy.schoolVision,communityOutreach:copy.communityOutreach}
-    : null};
+  const reuseAllowed=brief.consent.contentReuseAllowed;
+  return {reuseAllowed,story:brief.story,identity:reuseAllowed?brief.identity:null,
+    intent:reuseAllowed?intent:null,
+    experiences:reuseAllowed?brief.experiences:[],
+    publishedPrograms:reuseAllowed?publishedPrograms:[],websiteCopy:brief.websiteCopy};
 }
 
 export const readSiteMarketingSuggestionsV61=createServerFn({method:"GET"})
@@ -131,7 +136,7 @@ export const createSiteMarketingPackageV61 = createServerFn({method:"POST"})
     const [currentBrand]=await tx.select({id:sites.currentBrandVersionId}).from(sites)
       .where(eq(sites.id,site.id)).limit(1);
     if(!currentBrand?.id)
-      throw new DomainError("UNAVAILABLE","Save your Site identity in Establish → Website & Brand before creating Marketing Packages.");
+      throw new DomainError("UNAVAILABLE","Save your Site Brand in Shape → Website & Brand before creating outreach materials.");
     const [created]=await tx.insert(siteMarketingPackages).values({
       siteId:site.id,organizationId:site.organizationId,
       createdByPersonId:actor.actorPersonId!,title:data.title,

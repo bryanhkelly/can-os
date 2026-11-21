@@ -71,7 +71,7 @@ function ResourceEditor({value,onChange,disabled}:{
       </Label>
     </div>
     <div className="border-t pt-4">
-      <h4 className="font-semibold">Devices available for learners</h4>
+      <h4 className="font-semibold">Devices available for participants</h4>
       <p className="mt-1 text-xs text-muted-foreground">
         Record device type and quantity, not private device identifiers.
         Counts are self-reported; managed device registration is separate.
@@ -242,13 +242,13 @@ export function LaunchSiteFacilitiesWorkspaceV61({siteId}: {siteId:string}){
   const [adding,setAdding]=useState(false);
   const refresh=async()=>{await query.refetch({throwOnError:true});};
   return <WorkspacePanel title="Physical spaces, capacity & equipment"
-    description="Manage the Site's existing physical-space inventory. These are self-reported operating details, not regulatory verification.">
+    description="Tell us about your rooms, spaces, equipment, and accessibility. Any required inspections or approvals happen separately.">
     {query.isPending && <p role="status" className="mt-3">Loading physical spaces…</p>}
     {query.isError && <div role="alert" className="mt-3 space-y-2">
-      <p>Site spaces could not be loaded. No room readiness has been inferred.</p>
+      <p>We couldn't load your saved rooms. Try again before changing your plan.</p>
       <Button variant="outline" onClick={()=>void query.refetch()}>Retry</Button>
     </div>}
-    {query.data && query.data.siteId!==siteId && <p role="alert">Facility Site identity mismatch.</p>}
+    {query.data && query.data.siteId!==siteId && <p role="alert">These rooms belong to a different site. Reload before continuing.</p>}
     {query.data?.siteId===siteId && <>
       {query.data.spaces.length===0 && <p className="mt-3 text-sm text-muted-foreground">
         No physical spaces are registered at this Site.

@@ -28,9 +28,10 @@ const base = {
 };
 
 function buttonFor(html: string, label: string) {
-  const index = html.indexOf(label);
-  if(index < 0) throw new Error("Missing button: " + label);
-  return html.slice(html.lastIndexOf("<button",index), html.indexOf("</button>",index)+9);
+  const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [])
+    .find(candidate => candidate.includes(label));
+  if(!button) throw new Error("Missing button: " + label);
+  return button;
 }
 
 describe("V6.1 immutable Marketing Package release controls", () => {
@@ -38,17 +39,17 @@ describe("V6.1 immutable Marketing Package release controls", () => {
     const html = renderToStaticMarkup(<MarketingPackageReleaseControlsV61 {...base}
       record={{...record,brandVersionId:null}} currentBrand={null} selectedBrandRevision={null}/>);
     expect(html).toContain("No saved Brand selected");
-    expect(buttonFor(html,"Release Package")).toContain('disabled=""');
-    expect(html).toContain("Preview Package");
+    expect(buttonFor(html,"Create Materials")).toContain('disabled=""');
+    expect(html).toContain("Preview Materials");
   });
 
   it("allows a first release only when prerequisites are available", () => {
     const html = renderToStaticMarkup(<MarketingPackageReleaseControlsV61 {...base}/>);
-    expect(html).toContain("no grouped release yet");
-    expect(buttonFor(html,"Release Package")).not.toContain('disabled=""');
+    expect(html).toContain("No materials have been created for this outreach yet");
+    expect(buttonFor(html,"Create Materials")).not.toContain('disabled=""');
     const unavailable = renderToStaticMarkup(<MarketingPackageReleaseControlsV61 {...base}
       releasesUnavailable/>);
-    expect(buttonFor(unavailable,"Release Package")).toContain('disabled=""');
+    expect(buttonFor(unavailable,"Create Materials")).toContain('disabled=""');
     expect(unavailable).toContain("Retry history");
   });
 
@@ -64,19 +65,19 @@ describe("V6.1 immutable Marketing Package release controls", () => {
     } as unknown as MarketingPackageV61Release;
     const html = renderToStaticMarkup(<MarketingPackageReleaseControlsV61 {...base}
       versions={[release]}/>);
-    expect(html).toContain("working Package matches the latest generated release");
-    expect(buttonFor(html,"Release Updated Package")).toContain('disabled=""');
+    expect(html).toContain("Your materials are up to date");
+    expect(buttonFor(html,"Create Updated Materials")).toContain('disabled=""');
 
     const changed = renderToStaticMarkup(<MarketingPackageReleaseControlsV61 {...base}
       versions={[release]} record={{...record,title:"Updated neighborhood launch"}}/>);
     expect(changed).toContain("Updates available");
-    expect(buttonFor(changed,"Release Updated Package")).not.toContain('disabled=""');
+    expect(buttonFor(changed,"Create Updated Materials")).not.toContain('disabled=""');
   });
 
   it("protects archived packages from release and new Brand selection", () => {
     const html = renderToStaticMarkup(<MarketingPackageReleaseControlsV61 {...base}
       record={{...record,status:"archived"}} currentBrand={{id:"new-brand",revision:4}}/>);
-    expect(buttonFor(html,"Release Package")).toContain('disabled=""');
+    expect(buttonFor(html,"Create Materials")).toContain('disabled=""');
     expect(buttonFor(html,"Use newer Brand")).toContain('disabled=""');
   });
 });

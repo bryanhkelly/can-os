@@ -79,7 +79,12 @@ export async function loadHomeDashboard(role: string, search: HomeSearch) {
 
 export const Route = createFileRoute("/home")({
   validateSearch: (search: Record<string, unknown>) => homeSearchSchema.parse(search),
-  loaderDeps: ({ search }) => search,
+  // gradeAction is a presentation-only selection for the already loaded
+  // teacher dashboard. Do not reload all dashboard data when it changes.
+  loaderDeps: ({ search }) => {
+    const { gradeAction: _gradeAction, ...dataSelection } = search;
+    return dataSelection;
+  },
   loader: async ({ context, deps, location }) => {
     const { session, error } = await context.queryClient.fetchQuery(workspaceSessionQueryOptions());
     if (session && !session.authenticated) {

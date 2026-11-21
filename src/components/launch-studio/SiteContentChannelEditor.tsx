@@ -127,7 +127,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
           These controls cannot create, approve, publish, or enroll in a Program.
         </p>
       </div>
-      <span className="border px-3 py-2 text-xs text-muted-foreground">Configuration revision {revision}</span>
+      <span className="border px-3 py-2 text-xs text-muted-foreground">Saved layout v{revision}</span>
     </div>
     <div className="mt-5 space-y-4">
       {blocks.map(block=>{
@@ -135,7 +135,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
         return <fieldset key={block.id} className="border p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold">{info.label}</legend>
           <p className="mb-4 text-xs text-muted-foreground">{info.description}
-            {["site.setup","site.network","learning.interests"].includes(block.channel)
+            {["site.setup","site.network","learning.interests","learning.experiences"].includes(block.channel)
               ? " This saved Site information can appear when its website section is published. It does not authorize operations or enrollment."
               : " Eligible connected records appear according to their own publication and access rules."}
           </p>
@@ -148,6 +148,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
               onChange={e=>editBlock(block.id,{page:e.target.value as SiteContentBlock["page"]})}>
               <option value="/">Homepage</option>
               <option value="/programs">Programs page</option>
+              <option value="/experiences">Experiences page</option>
               <option value="/courses">Courses page</option>
               <option value="/classes">Classes page</option>
               <option value="/academics">Academics page</option>
@@ -187,7 +188,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
               </Select>
             </Field>
             <Field label="Maximum items">
-              <Select value={String(block.limit??12)}
+              <Select value={String(block.limit??(block.channel==="learning.experiences"?40:12))}
                 onChange={e=>editBlock(block.id,{limit:Number(e.target.value)})}>
                 <option value="3">3</option>
                 <option value="6">6</option>
@@ -232,7 +233,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
       <Button variant="outline" disabled={!addChannel} onClick={addBlock}><Plus/> Add block</Button>
     </div>}
     {error&&<p role="alert" className="mt-4 border border-destructive p-3 text-sm text-destructive">{error}</p>}
-    {saved&&<p role="status" className="mt-4 text-sm text-success">Saved as a private Site configuration. The preview has been refreshed. Publish separately to update the public website.</p>}
+    {saved&&<p role="status" className="mt-4 text-sm text-success">Your changes are saved, and your private preview is updated. Publish the website when you're ready for visitors to see them.</p>}
     {published&&<p role="status" className="mt-4 text-sm text-success">Website content block settings published. This does not approve Programs or make a Site publicly reachable.</p>}
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
       <p className="max-w-xl text-xs leading-5 text-muted-foreground">

@@ -1,109 +1,41 @@
 import type { MarketingPurpose } from "./marketing-package-v61";
 
-/**
- * Three Introduce destinations, one existing Site-scoped Marketing Package
- * source. This is presentation and navigation configuration, not persisted
- * campaign, contact, enrollment, event, or Brand state.
- */
-export const introduceModuleIdsV61 = ["promote", "recruit", "interest-events"] as const;
-export type IntroduceModuleV61 = (typeof introduceModuleIdsV61)[number];
-
-type IntroduceHandoff = {
-  title: string;
-  description: string;
-  href: (siteId: string) => string;
+/** One Outreach Plan surface and one library. Both reuse the single existing
+ * Site-scoped, Brand-pinned Marketing Package lifecycle. */
+export const introduceModuleIdsV61=["create-outreach","my-outreach"] as const;
+export type IntroduceModuleV61=typeof introduceModuleIdsV61[number];
+type Handoff={title:string;description:string;href:(siteId:string)=>string};
+type Config={
+  title:string;eyebrow:string;subtitle:string;libraryTitle:string;
+  libraryDescription:string;guidance:string;defaultPurpose:MarketingPurpose;
+  purposes:readonly MarketingPurpose[];handoffDescription:string;
+  handoffs:readonly Handoff[];
 };
-
-type IntroduceConfig = {
-  title: string;
-  eyebrow: string;
-  subtitle: string;
-  libraryTitle: string;
-  libraryDescription: string;
-  guidance: string;
-  defaultPurpose: MarketingPurpose;
-  purposes: readonly MarketingPurpose[];
-  handoffDescription: string;
-  handoffs: readonly IntroduceHandoff[];
-  /** Optional handoff for one reviewed, saved, active Package. Navigation
-   * carries a reference to the canonical record, not a copy of its message. */
-  packageHandoff?: Omit<IntroduceHandoff,"href"> & {
-    purpose: MarketingPurpose;
-    href: (siteId:string,packageId:string)=>string;
-  };
-};
-
-const scoped = (siteId: string) => encodeURIComponent(siteId);
-
-export const introduceModuleConfigV61: Record<IntroduceModuleV61, IntroduceConfig> = {
-  promote: {
-    title: "Promote",
-    eyebrow: "Introduce / Promote",
-    subtitle: "Create reviewed messages and branded materials for your learning community.",
-    libraryTitle: "Marketing Packages",
-    libraryDescription: "Build reusable announcements, program ideas and invitations from your saved Site information.",
-    guidance: "Uses the Site's saved Purpose & Story, Programs & Audiences and the selected immutable Brand version. Review the copy before generating any material.",
-    defaultPurpose: "site-announcement",
-    purposes: ["site-announcement", "program-interest", "interest-invitation", "event-invitation"],
-    handoffDescription: "Use the same packages in the other Introduce modules, without copying or recreating them.",
-    handoffs: [
-      { title: "Recruit Families / Learners",
-        description: "Prepare interest outreach with the same saved Site identity and messages.",
-        href: id => `/launch/site?siteId=${scoped(id)}&module=recruit` },
-      { title: "Interest Events",
-        description: "Prepare event invitations and continue to the authorized event workspace.",
-        href: id => `/launch/site?siteId=${scoped(id)}&module=interest-events` },
-    ],
+const encode=(id:string)=>encodeURIComponent(id);
+export const introduceModuleConfigV61:Record<IntroduceModuleV61,Config>={
+  "create-outreach":{
+    title:"Create Outreach",eyebrow:"Share / Create Outreach",
+    subtitle:"Tell the right people about your vision and invite a meaningful next step.",
+    libraryTitle:"Create Outreach",libraryDescription:"Start a guided outreach plan.",
+    guidance:"Build on what you've shared about your community, then shape a message people will care about.",
+    defaultPurpose:"site-announcement",
+    purposes:["site-announcement","program-interest","interest-invitation","event-invitation"],
+    handoffDescription:"Return to your saved outreach plans.",
+    handoffs:[{title:"My Outreach",description:"Review drafts, materials, and follow-up.",
+      href:id=>"/launch/site?siteId="+encode(id)+"&module=my-outreach"}],
   },
-  recruit: {
-    title: "Recruit Families / Learners",
-    eyebrow: "Introduce / Recruit Families / Learners",
-    subtitle: "Invite people into the conversation before applications and enrollment.",
-    libraryTitle: "Recruitment Messages & Materials",
-    libraryDescription: "Prepare interest invitations and planned-program messages using the existing Site Marketing Packages.",
-    guidance: "Marketing Packages are editable communication drafts. Published prelaunch Sites can collect voluntary interest through the public website; admissions and enrollment remain independently authorized.",
-    defaultPurpose: "interest-invitation",
-    purposes: ["interest-invitation", "program-interest"],
-    handoffDescription: "Site-wide interest requests use the existing canonical admissions inbox and follow-up Actions. Program-specific invitations remain independently authorized.",
-    handoffs: [
-      { title: "Review website interest and follow-up",
-        description: "View Site-wide interest-list and information requests alongside Program inquiries in the existing registrar inbox.",
-        href: id => `/admissions/intake?siteId=${scoped(id)}` },
-      { title: "Invite families to express interest",
-        description: "Use the existing consent-aware preopening interest workflow when an eligible Program exists.",
-        href: id => `/admissions/invite-families?siteId=${scoped(id)}&purpose=interest` },
-    ],
-    packageHandoff: {
-      purpose: "interest-invitation",
-      title: "Invite families with this saved message",
-      description: "Reuse the package headline and introduction in the existing consent-aware outreach form. Recipient contacts and delivery consent are never copied from a Marketing Package.",
-      href: (siteId,packageId)=>`/admissions/invite-families?siteId=${scoped(siteId)}&purpose=interest&packageId=${scoped(packageId)}`,
-    },
-  },
-  "interest-events": {
-    title: "Interest Events",
-    eyebrow: "Introduce / Interest Events",
-    subtitle: "Prepare event invitations and manage real information sessions or open houses.",
-    libraryTitle: "Event Messages & Materials",
-    libraryDescription: "Create event invitation collateral using the same saved Site Brand and planning information.",
-    guidance: "Invitation wording is a private draft until reviewed and distributed. It does not create an event, invent a date, or register attendees.",
-    defaultPurpose: "event-invitation",
-    purposes: ["event-invitation"],
-    handoffDescription: "The existing event service supports authorized, Program-linked events and registrations. It is not yet a pre-Program Site-wide event builder.",
-    handoffs: [
-      { title: "Manage Interest Events",
-        description: "Create or manage verified events for this Site in the existing workspace.",
-        href: id => `/operations/interest-events?siteId=${scoped(id)}` },
-    ],
-    packageHandoff: {
-      purpose: "event-invitation",
-      title: "Create an Interest Event",
-      description: "Use the saved invitation headline as a starting title. Confirm the Program, date, time, location and description in the separately authorized event workspace.",
-      href: (siteId,packageId)=>`/operations/interest-events/new?siteId=${scoped(siteId)}&packageId=${scoped(packageId)}`,
-    },
+  "my-outreach":{
+    title:"My Outreach",eyebrow:"Share / My Outreach",
+    subtitle:"Review your saved plans and materials. Sending and publishing happen separately.",
+    libraryTitle:"My Outreach",libraryDescription:"Open, revise, duplicate, or archive an outreach plan.",
+    guidance:"Find your outreach plans and earlier materials here. You can revisit or update them whenever you need.",
+    defaultPurpose:"site-announcement",
+    purposes:["site-announcement","program-interest","interest-invitation","event-invitation"],
+    handoffDescription:"Start another outreach plan.",
+    handoffs:[{title:"Create Outreach",description:"Create a new six-step outreach plan.",
+      href:id=>"/launch/site?siteId="+encode(id)+"&module=create-outreach"}],
   },
 };
-
-export function isIntroduceModuleV61(value: string | undefined): value is IntroduceModuleV61 {
-  return value === "promote" || value === "recruit" || value === "interest-events";
+export function isIntroduceModuleV61(value:string|undefined):value is IntroduceModuleV61{
+  return value==="create-outreach"||value==="my-outreach";
 }

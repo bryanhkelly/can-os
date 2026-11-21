@@ -1,11 +1,12 @@
+import { SiteGuideV61 } from "./SiteGuideV61";
 /**
- * CAN OS V6.1 · Establish / Site Profile.
+ * CAN OS V6.1 · Shape / Site Profile.
  * One presentation, one canonical Site, three existing governed commands.
  * The commands are deliberately sequential and not an atomic transaction.
  */
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LaunchSiteAddressFields } from "@/components/operations/LaunchSiteAddressFields";
 import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
-import { ActionFooter, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { saveSiteProfileSequentially, SiteProfileSaveError } from "./site-profile-persistence";
 import {
@@ -130,7 +131,7 @@ export function EstablishSiteProfileUnified({
       try { await navigate(); }
       catch (failure) {
         setError(failure instanceof Error ? failure.message :
-          "Your changes were saved, but sign-out failed. Use the Account menu to sign out.");
+          "Your changes were saved, but we could not open your Site Workspace. Try again from the navigation.");
       }
     } catch (cause) {
       setReloadRequired(true);
@@ -156,19 +157,10 @@ export function EstablishSiteProfileUnified({
   }
 
   return <section aria-label="Site Profile" className="min-w-0 space-y-4">
-    <WorkspaceNotice tone="info">
-      <strong>Your Site already exists.</strong> Confirm its identity and add contact or location
-      details when available. This form does not approve your Site, publish its website or open enrollment.
-    </WorkspaceNotice>
-    <div className="flex flex-wrap gap-2" aria-label="Setup requirements">
-      <StatusBadge tone="info">Identity on file</StatusBadge>
-      <StatusBadge tone="neutral">Contact optional</StatusBadge>
-      <StatusBadge tone="neutral">Physical address optional</StatusBadge>
-    </div>
     <form className="space-y-4" onSubmit={submit} noValidate aria-busy={saving}>
-      <WorkspacePanel title="Site identity" description="Confirm the information you provided when creating this Site.">
+      <WorkspacePanel title="Your site">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Site name" required description="Your website's public branding is configured later.">
+          <Field label="Site name" required>
             <Input value={name} minLength={2} maxLength={160} disabled={saving || reloadRequired}
               onChange={event => setName(event.target.value)} />
           </Field>
@@ -179,24 +171,21 @@ export function EstablishSiteProfileUnified({
           <div>
             <dt className="text-xs font-semibold text-muted-foreground">Responsible organization</dt>
             <dd className="mt-1 font-medium">{organization?.name ?? "Organization unavailable"}</dd>
-            <p className="mt-1 text-xs text-muted-foreground">Read-only. Host relationships belong in Site Information.</p>
           </div>
           <div>
             <dt className="text-xs font-semibold text-muted-foreground">Verified administrator</dt>
             <dd className="mt-1 font-medium">{administrator?.name ?? "Administrator identity unavailable in this view"}</dd>
             {administrator && <dd className="mt-1 break-all text-xs text-muted-foreground">{administrator.email}</dd>}
-            <p className="mt-1 text-xs text-muted-foreground">Account access and Site contact are separate.</p>
           </div>
         </dl>
       </WorkspacePanel>
-      <WorkspacePanel title="Site contact (optional)"
-        description="Private contact information, not automatically published to the Site website.">
+      <WorkspacePanel title="Site contact (optional)">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Contact name or office" description="Required if any contact information is entered.">
+          <Field label="Contact name or office">
             <Input value={contact.displayName} maxLength={160} disabled={saving || reloadRequired}
               onChange={event => setContact(current => ({...current, displayName: event.target.value}))} />
           </Field>
-          <Field label="Contact email" description="May differ from the administrator login email.">
+          <Field label="Contact email">
             <Input type="email" value={contact.email} maxLength={254} disabled={saving || reloadRequired}
               onChange={event => setContact(current => ({...current, email: event.target.value}))} />
           </Field>
@@ -204,28 +193,17 @@ export function EstablishSiteProfileUnified({
             <Input type="tel" value={contact.phone} maxLength={40} disabled={saving || reloadRequired}
               onChange={event => setContact(current => ({...current, phone: event.target.value}))} />
           </Field>
-          <p className="border-l-2 bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">
-            Publishing contact details requires a separate website review.
-          </p>
         </div>
       </WorkspacePanel>
-      <WorkspacePanel title="Physical location (optional)"
-        description="Provide an address if you have identified your learning location.">
+      <WorkspacePanel title="Physical location (optional)">
         <Label className="flex min-h-11 items-start gap-3 text-sm">
           <Checkbox checked={hasAddress} disabled={saving || reloadRequired}
             onChange={event => toggleAddress(event.target.checked)} />
-          <span><strong>Add a physical address</strong>
-            <span className="mt-1 block text-xs text-muted-foreground">
-              {original.hasAddress
-                ? "You can edit or remove this address before operational approval."
-                : "You can continue without an address. Later program requirements may need one."}
-            </span>
-          </span>
+          <span><strong>Add a physical address</strong></span>
         </Label>
         {hasAddress && <div className="mt-5 space-y-5 border-t pt-5">
           <LaunchSiteAddressFields address={address} onChange={setAddress}
             disabled={saving || reloadRequired} />
-          <p className="text-xs text-muted-foreground">Before operational approval, you can edit Site details without providing a reason. Approved locations use a separate amendment process.</p>
         </div>}
       </WorkspacePanel>
       {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
@@ -238,7 +216,7 @@ export function EstablishSiteProfileUnified({
         </Button>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="ghost" disabled={saving || reloadRequired}
-            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Sign Out</Button>
+            onClick={() => void saveAndNavigate(onSaveAndExit)}>Save &amp; Exit</Button>
           <Button type="submit" loading={saving} loadingLabel="Saving Site…" disabled={reloadRequired}>
             Save &amp; Continue <ArrowRight aria-hidden="true"/>
           </Button>
@@ -248,31 +226,12 @@ export function EstablishSiteProfileUnified({
   </section>;
 }
 
-/** The right rail is composed by the Launch Site route, not by the form. */
+/** Keep the companion rail focused on the next setup section. */
 export function EstablishSiteProfileGuidance() {
-  return <div className="space-y-4">
-    <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">
-        Your Site identity connects the learning community, programs, website and operational workspace.
-        You only create the Site once.
-      </p>
-      <p className="mt-4 border-t pt-4 text-sm leading-6 text-muted-foreground">
-        Contact and location can be added later. Profile completion does not mean opening approval.
-      </p>
-    </WorkspacePanel>
-    <WorkspacePanel title="What comes next?">
-      <p className="text-sm leading-6 text-muted-foreground">
-        Site Information covers hosting and organization, learning environment and network affiliation.
-      </p>
-    </WorkspacePanel>
-    <WorkspacePanel title="Preview Website">
-      <p className="text-sm leading-6 text-muted-foreground">
-        Use Preview Website in the top bar for the saved, private design. Previewing does not publish or enable enrollment.
-      </p>
-    </WorkspacePanel>
-    <div className="flex items-start gap-2 border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">
-      <ShieldCheck className="size-4 shrink-0" aria-hidden="true"/>
-      Opening approval and enrollment release are separate decisions.
-    </div>
-  </div>;
+  return <SiteGuideV61 guide={{
+    summary: "A Site is the community or program you are shaping. It may have a different name from the organization responsible for it.",
+    insight: "Choose a name people will recognize. Include a physical address or contact details only when they are useful for this Site.",
+    connection: "Your Site profile anchors the website, outreach, operations and future offerings without deciding what is approved to run.",
+    next: "In Site Information, describe the Site's identity, its host and how people will participate.",
+  }} />;
 }

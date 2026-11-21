@@ -1,4 +1,5 @@
 import type { SiteTemplateId } from "./site-theme";
+import type { SiteExperienceProfile } from "./site-website-experience";
 
 /** Seven distinct, finite layout systems. All consume the same approved school content.
  * No dynamic HTML, CSS, remote fonts or untrusted source styles enter this catalog. */
@@ -73,8 +74,8 @@ export type PublicSiteChrome = {
   mobile: string;
   main: string;
   footer: string;
-  /** Content profile is derived from approved Offerings, never Site intent. */
-  profile?: "school"|"community"|"training"|"mixed";
+  /** Site presentation profile; proposed audience can shape private preview only. */
+  profile?: SiteExperienceProfile;
 };
 export function composePublicSiteChrome(template: SiteTemplateId, p: PublicSiteChrome): string {
   const profile=p.profile??"school";

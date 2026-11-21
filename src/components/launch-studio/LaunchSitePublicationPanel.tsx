@@ -170,45 +170,44 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
     }
   }
 
-  return <WorkspacePanel title="Publish your Site website"
-    description="This is the official public Site decision. Your shared preview, website publication and learner enrollment are independent.">
+  return <WorkspacePanel title="Publish your website"
+    description="Review your website and make sure its words, photos, and important details are ready. Publishing your website is separate from opening registration.">
     {loading || (publicationSnapshot !== null && publicationSnapshot.siteId !== siteId)
-      ? <p role="status" className="text-sm text-muted-foreground">Checking your Site publication authorization…</p>
+      ? <p role="status" className="text-sm text-muted-foreground">Checking your website's publication status…</p>
       : state ? <div className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3 border bg-background p-4">
           <div className="min-w-0">
             <p className="text-sm font-semibold">{state.siteName}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {state.address ? state.address.host : "No official website address reserved"}
+              {state.address ? state.address.host : "Website address not yet chosen"}
             </p>
           </div>
           <StatusBadge tone={state.address?.status === "published" ? "info" : "neutral"}>
-            {state.address?.status === "published" ? "Publication recorded" : "Not published"}
+            {state.address?.status === "published" ? "Published" : "Not published"}
           </StatusBadge>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="border p-3">
             <p className="text-xs font-semibold">Website content</p>
-            <p className="mt-2 text-sm">{state.reviewedLocalContentAvailable ? "Approved local revision available" : "No approved local revision"}</p>
+            <p className="mt-2 text-sm">{state.reviewedLocalContentAvailable ? "Reviewed content ready" : "Website content needs review"}</p>
           </div>
           <div className="border p-3">
-            <p className="text-xs font-semibold">Reviewed learning listings</p>
+            <p className="text-xs font-semibold">Approved program listings</p>
             <p className="mt-2 text-sm">{state.approvedAcademicCount} academic · {state.approvedEnrichmentCount} enrichment</p>
           </div>
           <div className="border p-3">
             <p className="text-xs font-semibold">Public hosting</p>
-            <p className="mt-2 text-sm">{state.hostingConfigured ? "Configured · verify reachability" : "Not enabled in this deployment"}</p>
+            <p className="mt-2 text-sm">{state.hostingConfigured ? "Set up · check whether it's live" : "Not available yet"}</p>
           </div>
         </div>
         {state.latestWebsiteStatus === "draft" && <section className="space-y-3 border p-4"
           aria-label="Approve saved website copy">
           <div>
-            <h3 className="text-sm font-semibold">Review the latest website copy</h3>
+            <h3 className="text-sm font-semibold">Review your website content</h3>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Website revision {state.latestWebsiteRevision} is still private.
-              Review its claims, image rights, consent, and exact saved wording before submitting
-              it through the existing protected-claim screening workflow.
-              Approving local copy does not publish the Site.
+              Your latest website draft is still private. Check the wording, photos,
+              permissions, and any claims that need independent review before approving it.
+              This step reviews the content; it doesn't publish your website.
             </p>
           </div>
           {state.canReviewWebsiteCopy ? <>
@@ -216,8 +215,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
               <Checkbox id="site-copy-reviewed" checked={copyReviewed}
                 onChange={event => setCopyReviewed(event.currentTarget.checked)} />
               <Label htmlFor="site-copy-reviewed" className="text-sm leading-6">
-                I inspected the latest saved website content and confirmed it is appropriate
-                for public review, including images and required consent.
+                I've reviewed the website wording, images, and permissions and am ready
+                to submit this version for public review.
               </Label>
             </div>
             <Button disabled={busy || !copyReviewed}
@@ -229,9 +228,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
           </WorkspaceNotice>}
         </section>}
         {state.latestWebsiteStatus === "review_required" && <WorkspaceNotice tone="attention">
-          The newest website revision contains protected institutional claims awaiting independent
-          review. Revise the copy in Website & Brand or complete the existing institutional review.
-          Do not publish the Site based on an unresolved draft.
+          Some statements in your latest website draft need independent review.
+          Update them in Website & Brand or complete that review before publishing.
         </WorkspaceNotice>}
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="outline">
@@ -243,12 +241,12 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
           </Button>
         </div>
         {!state.address ? <WorkspaceNotice tone="attention">
-          Reserve the Site website address in Website & Brand before requesting official publication.
+          Choose your website address in Website & Brand before publishing.
         </WorkspaceNotice> : <>
           {state.address.status === "published" ? <>
             <WorkspaceNotice tone="info">
-              The public Site publication is recorded. This alone does not prove that the hostname is live,
-              authorize institutional claims, approve an Offering or enable registration.
+              Your website is marked as published. Check that visitors can reach it below.
+              Program approvals and registration are handled separately.
             </WorkspaceNotice>
             <div className="flex flex-wrap items-center gap-3">
               <Button variant="outline" disabled={checking || busy} onClick={() => void checkLive()}>
@@ -260,20 +258,18 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
               {reachability && <p role="status" className="text-sm text-muted-foreground">
                 {reachability === "live" ? "Public HTTPS website is reachable."
                   : reachability === "hosting_disabled" ? "Website hosting is disabled."
-                  : reachability === "not_published" ? "Site publication is not active."
+                  : reachability === "not_published" ? "Website publication is not active."
                   : "Public HTTPS reachability could not be verified."}
               </p>}
             </div>
           </> : (state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required")
           ? <WorkspaceNotice tone="attention">
-            Finish reviewing or resolving the latest Site website revision before publishing
-            the public Site. Existing approved listings remain separate from website copy.
+            Finish reviewing your latest website draft before publishing.
           </WorkspaceNotice> : !state.publishingPrerequisitesPresent ? <WorkspaceNotice tone="attention">
-            Official publication requires reviewed Site-owned content or at least one independently
-            eligible academic or enrichment listing. Your design can still be privately previewed.
+            Your website needs reviewed content or an eligible approved listing before it can be published.
+            You can keep working on your private preview.
           </WorkspaceNotice> : <WorkspaceNotice tone="info">
-            Publication requires an explicit review and recorded decision. It never publishes unpublished
-            programs, establishes accreditation or turns on enrollment.
+            Review and confirm your decision to publish. Programs and registration need separate approval.
           </WorkspaceNotice>}
           {state.canPublishSite ? <div className="border-t pt-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
@@ -289,22 +285,22 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                   including consent and any required independent approval.
                 </Label>
               </div>}
-              <Field label="Decision reason" description="10–500 characters. This is recorded with the publication audit.">
+              <Field label="Decision reason" description="Explain why you're publishing, updating, or unpublishing this website (10–500 characters).">
                 <Textarea value={reason} onChange={event => setReason(event.target.value)}
                   maxLength={500} rows={3} placeholder="Document what was reviewed and why this decision is appropriate." />
               </Field>
               {state.address.status==="published" && state.canRepublish && <div className="space-y-3 border bg-card p-4">
                 <p className="text-sm font-semibold">A newer Site Brand or website revision is available</p>
                 <p className="text-xs leading-5 text-muted-foreground">
-                  The live website keeps its pinned version until you deliberately republish.
-                  The latest saved version needs an explicit review and approval.
-                  This does not open enrollment.
+                  Your live website stays unchanged until you approve and publish the newer version.
+                  Review the latest changes before publishing.
+                  Registration opens separately for each approved offering.
                 </p>
                 <Button type="button" disabled={busy||!reviewed||reason.trim().length<10 ||
                   !state.publishingPrerequisitesPresent ||
                   state.latestWebsiteStatus==="draft"||state.latestWebsiteStatus==="review_required"}
                   onClick={()=>void change("republish")}>
-                  {busy?"Saving decision…":"Republish updated Site"}
+                  {busy?"Saving decision…":"Republish updated website"}
                 </Button>
               </div>}
               <Button disabled={busy || reason.trim().length < 10 ||
@@ -313,16 +309,16 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
                    state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required"))}
                 variant={state.address.status === "published" ? "outline" : "default"}
                 onClick={() => void change(state.address!.status === "published" ? "unpublish" : "publish")}>
-                {busy ? "Saving decision…" : state.address.status === "published" ? "Unpublish Site" : "Publish Site website"}
+                {busy ? "Saving decision…" : state.address.status === "published" ? "Unpublish website" : "Publish website"}
               </Button>
             </div>
           </div> : <WorkspaceNotice tone="attention">
-            Only the separately appointed Site publisher can make the official
-            publication decision. Your website editing permission does not grant it.
+            An authorized site publisher must approve the
+            publication decision. You can still prepare the website for their review.
           </WorkspaceNotice>}
         </>}
       </div> : <WorkspaceNotice tone="attention">
-        {error ?? "The Site publication information could not be retrieved."}
+        {error ?? "We couldn't check your website's publication status."}
         <div className="mt-3"><Button variant="outline" onClick={() => void load()}>Try again</Button></div>
       </WorkspaceNotice>}
     {state && error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}

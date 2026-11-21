@@ -1,4 +1,4 @@
-import { WorkspacePanel } from "@/components/workspace";
+import { SiteGuideV61, type SiteGuideContentV61 } from "./SiteGuideV61";
 
 export type LaunchGuidance = {
   why: string;
@@ -6,15 +6,13 @@ export type LaunchGuidance = {
   next: string;
 };
 
-/** Consistent, data-driven V6.1 guidance rail for Launch Studio modules. */
-export function LaunchGuidancePanels({ guidance }: { guidance: LaunchGuidance }) {
-  return <div className="space-y-4">
-    <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">{guidance.why}</p>
-      {guidance.tip && <p className="mt-3 text-sm leading-6 text-muted-foreground">{guidance.tip}</p>}
-    </WorkspacePanel>
-    <WorkspacePanel title="What comes next">
-      <p className="text-sm leading-6 text-muted-foreground">{guidance.next}</p>
-    </WorkspacePanel>
-  </div>;
+/** One shared companion panel for Launch Studio steps. Live screen context
+ * replaces default guidance only when it is actually available. */
+export function LaunchGuidancePanels({ guidance, guide }: {
+  guidance: LaunchGuidance;
+  guide?: SiteGuideContentV61 | null;
+}) {
+  return <SiteGuideV61 guide={guide ?? {
+    summary: guidance.why, insight: guidance.tip, next: guidance.next,
+  }} />;
 }

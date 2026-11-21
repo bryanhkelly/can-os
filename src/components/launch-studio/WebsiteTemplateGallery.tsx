@@ -3,6 +3,7 @@ import { siteTemplateCatalog } from "@/domain/public-site-templates";
 import type { SiteTemplateId, SitePaletteId, SiteTypographyId, SiteFontId } from "@/domain/site-theme";
 import { publicSitePagePaths, type PublicSitePath } from "@/domain/public-site-paths";
 import { Button } from "@/components/ui/button";
+import { SelectionCard } from "@/components/workspace";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -66,34 +67,29 @@ export function WebsiteTemplateGallery({value,onChange,disabled=false}:{
   const [viewport,setViewport]=useState<"desktop"|"mobile">("desktop");
   const chosen=siteTemplateCatalog.find(item=>item.id===value)??siteTemplateCatalog[0]!;
   return <fieldset disabled={disabled} className="min-w-0">
-    <legend className="text-sm font-semibold">Choose your website wireframe</legend>
-    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-      Compare only structure, whitespace, hierarchy and page rhythm. Colors,
-      photographs, typography and your wording are added in the next steps.
-    </p>
+    <legend className="text-sm font-semibold">Choose a layout</legend>
+
     <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
       <div role="group" aria-label="Website wireframe choices" className="space-y-2">
-        {siteTemplateCatalog.map(item=><Button key={item.id} type="button"
-          variant="outline" aria-pressed={item.id===value} disabled={disabled}
-          onClick={()=>onChange(item.id)}
-          className={cn("h-auto w-full items-start gap-3 whitespace-normal border p-2 text-left",
-            item.id===value?"border-primary ring-2 ring-primary/40":"border-border")}>
-          <span className="w-24 shrink-0">
-            <Structure id={item.id} page="/" viewport="desktop" thumbnail/>
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold">{item.name}</span>
-            <span className="mt-1 block text-xs text-muted-foreground">{item.character}</span>
-            {item.id===value&&<span className="mt-2 block text-xs font-semibold">Selected</span>}
-          </span>
-        </Button>)}
+        {siteTemplateCatalog.map(item=><SelectionCard key={item.id}
+          kind="radio" name="site-wireframe" value={item.id}
+          checked={item.id===value} disabled={disabled}
+          onChange={checked=>{if(checked)onChange(item.id);}}
+          icon={<span className="block w-24 shrink-0"><Structure id={item.id} page="/" viewport="desktop" thumbnail/></span>}
+          title={item.name}
+          detail={<>
+            <span className="block">{item.character}</span>
+            {item.id===value&&<span className="mt-1 block font-semibold text-primary">Selected</span>}
+          </>}
+          className="w-full" />)}
+
       </div>
       <section className="min-w-0 space-y-3 border border-border bg-card p-4"
         aria-label="Selected full-size grayscale wireframe" aria-live="polite">
         <h3 className="font-serif text-xl font-semibold">{chosen.name}</h3>
         <div className="flex flex-wrap items-end gap-3">
           <Label className="grid gap-1 text-xs font-semibold">
-            Page structure
+            Preview page
             <Select aria-label="Preview page structure" value={page}
               onChange={event=>setPage(event.target.value as PublicSitePath)}>
               {publicSitePagePaths.map(path=><option key={path} value={path}>
@@ -112,10 +108,7 @@ export function WebsiteTemplateGallery({value,onChange,disabled=false}:{
         <div className={cn("mx-auto w-full",viewport==="mobile"?"max-w-64":"max-w-3xl")}>
           <Structure id={value} page={page} viewport={viewport}/>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Layout only. Continue to Visual Identity and Your Content to see the
-          actual website with your saved branding, words and images.
-        </p>
+
       </section>
     </div>
   </fieldset>;

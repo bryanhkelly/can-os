@@ -693,3 +693,40 @@ These are not a claim that fresh branch screenshot approval has passed.
 This PR provides the **complete shared design foundation and reusable implementation templates**, not a claim that every route has been migrated. Product-wide route migration must proceed through the checklist in `docs/design-system-v6-1-migration.md`, with business flows owned by their existing services.
 
 Avoid representing the cross-route template inventory as completed functionality. See `docs/design-system.md` for existing component architecture and the original source-of-truth conventions.
+
+## Canonical multi-step and selectable-card contract (November 21, 2026)
+
+Internal guided workflows use `GuidedSetupShell` and its `GuidedSetupProgress`
+presentation for two, four, six or other step counts. The hosting page,
+Program interests, website branding, and Marketing Package flows must not
+create local button-based step rows. The global Launch Studio journey sidebar
+is a **different navigation level** and retains its own navigation semantics.
+
+All single- and multiple-choice **cards** use `SelectionCard` from
+`src/components/workspace/selection-card.tsx`, with `kind="radio"` for one
+choice and `kind="checkbox"` for multiple choices. Layout, marker placement,
+selected/neutral/disabled surfaces, focus and typography are owned by that
+component. Feature modules provide only title, supporting detail, optional
+illustration, selection state and authorized change handlers. `compact`
+affects density, not the underlying layout. Inactive-but-previously-selected
+choices must still be visible, with their authorization restrictions and a
+separately guarded removal operation where permitted.
+
+This applies to Site Information, Programs & Audiences, Brand Identity,
+website wireframes, visual identity palettes, published Solution selection,
+school-model selection, enrollment lab audience selection and pickup
+authorization choices. Normal tab/view/preview toggles and record lists are
+not form choice cards and must not be converted merely because they use
+`aria-pressed`.
+
+`can-os-design/no-custom-guided-selections` now errors on ad hoc
+internal-step buttons and card-like pressed buttons in production JSX.
+Its unit tests distinguish proper global journey navigation and
+small toolbar toggles. Shared card state examples are maintained in
+`selection-card.stories.tsx` and two-, four-, and six-step progress examples
+are maintained in `LaunchV61StepNavigation.stories.tsx`.
+
+Verification requires **all** of source/lint, TypeScript, focused
+unit/Storybook interaction tests, and visual inspection on desktop/mobile
+(including active, disabled, checked, keyboard focus and overflow states).
+A green source/lint result alone is not a completed visual audit.

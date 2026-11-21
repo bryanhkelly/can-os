@@ -42,6 +42,26 @@ describe("canonical Class navigation", () => {
     expect(panel).not.toContain('params={{classId:resume.sectionId}}');
   });
 
+  it("loads administration-only review and survey tools on demand", () => {
+    const route = source("src/routes/class_.$classId.tsx");
+    expect(route).toContain('await import("@/components/learning/NativeClassAssessmentReviewPanel")');
+    expect(route).toContain('await import("@/components/learning/NativeClassSurveyCampaignPanel")');
+    expect(route).not.toContain('import { NativeClassSurveyCampaignPanel }');
+    expect(route).not.toContain('import { NativeClassAssessmentReviewPanel }');
+    expect(route).toContain('Loading Class administrative tools');
+  });
+
+  it("does not reload the Class workspace for lesson/session-only navigation", () => {
+    const route = source("src/routes/class_.$classId.tsx");
+    const server = source("src/modules/classes/native-class-workspace.functions.ts");
+    expect(route).toContain('queryKey:["native-unified-class",classId,search.view,search.tab]');
+    expect(route).toContain('queryFn:()=>getNativeClassWorkspace({data:{classId,view:search.view,tab:search.tab}})');
+    expect(route).toContain('selectedLessonId:search.lesson??null');
+    expect(route).toContain('selectedSessionId:search.session??null');
+    expect(server).toContain('selectedLessonId:data.lesson??null');
+    expect(server).toContain('selectedSessionId:data.session??null');
+  });
+
   it("keeps learner and operator commands behind the Class authority service", () => {
     const workspace = source("src/modules/classes/native-class-workspace.functions.ts");
     expect(workspace).toContain("getCanonicalCommandContext");

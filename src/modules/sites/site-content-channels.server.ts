@@ -4,7 +4,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { sites } from "@/db/schema";
 import { readSiteContentChannelConfig, planSiteContentChannelSave,
   requireSavedSiteContentChannelDraft, safeReadSiteContentChannelConfig,
-  type SiteContentBlock } from "@/domain/site-content-channels";
+  type SiteContentBlock, projectSiteExperienceItems, sitePublishedExperienceCardsSchema } from "@/domain/site-content-channels";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
@@ -12,6 +12,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { getRequest } from "@tanstack/react-start/server";
+import { siteLaunchPreferencesSchema, snapshotSiteExperienceVision } from "@/domain/site-launch-preferences";
 
 /** School setup users and exact-Site Website Studio editors share one
  * presentation document. Neither access path grants Program approvals or
@@ -97,10 +98,20 @@ export async function publishAuthorizedSiteContentChannels(input: {
       throw new Error("Website channel revision has changed. Reload before publishing.");
     const published = site.metadata.publishedWebsiteContentChannels == null ? null :
       safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
-    if (published && published.revision === draft.revision)
+    const intent=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+    const experienceSnapshot=snapshotSiteExperienceVision(intent.success?intent.data:null);
+    const experienceCards=sitePublishedExperienceCardsSchema.parse(
+      projectSiteExperienceItems(experienceSnapshot));
+    const previousExperience=site.metadata.publishedSiteExperiencePreferencesV2;
+    const previousCards=site.metadata.publishedSiteExperienceCardsV2;
+    if (published && published.revision === draft.revision &&
+        JSON.stringify(previousExperience)===JSON.stringify(experienceSnapshot) &&
+        JSON.stringify(previousCards)===JSON.stringify(experienceCards))
       return {siteId: site.id, publishedRevision: draft.revision, changed: false};
     const [updated] = await tx.update(sites).set({
-      metadata: {...site.metadata, publishedWebsiteContentChannels: draft},
+      metadata: {...site.metadata, publishedWebsiteContentChannels: draft,
+        publishedSiteExperiencePreferencesV2:experienceSnapshot,
+        publishedSiteExperienceCardsV2:experienceCards},
       updatedAt: new Date(),
     }).where(eq(sites.id, site.id)).returning({id: sites.id});
     if (!updated) throw new Error("Unable to publish Site content channel settings");

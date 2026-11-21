@@ -1,0 +1,40 @@
+name: Performance Branch Verification
+
+on:
+  push:
+    branches: [release-11212026]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact branch commit
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check build source syntax
+        run: npm run check:build-source-syntax
+      - name: Verify local imports and exports
+        run: npm run check:local-import-exports
+      - name: Build and typecheck
+        run: npm run build
+      - name: Build Cloudflare target
+        run: npm run build:cloudflare
+      - name: Performance regression tests
+        run: npx vitest run tests/unit/performance-server-step.test.ts tests/unit/performance-data-loading-contracts.test.ts tests/unit/class-workspace-views.test.tsx
+      - name: Lint and V6.1 coverage
+        run: npm run lint

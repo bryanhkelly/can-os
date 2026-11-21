@@ -37,11 +37,11 @@ describe("Launch readiness read-only presentation components", () => {
       <SitePublicationReadinessV61 publication={unavailable}/>
       <NoncreditPublisherReadinessV61 siteId={siteId} noncredit={loading}/>
     </>);
-    expect(html).toContain("No pilot status is inferred from unavailable records.");
+    expect(html).toContain("We couldn't check the latest details for your programs.");
     expect(html).toContain("Loading Solution plans");
-    expect(html).toContain("Program launch requirements could not be verified");
-    expect(html).toContain("Site publication cannot be verified");
-    expect(html).toContain("Checking authorized noncredit Offering records");
+    expect(html).toContain("We couldn't check the latest program requirements");
+    expect(html).toContain("We couldn't check your website's publication status");
+    expect(html).toContain("Checking noncredit registration options");
     expect(html).not.toContain("Approved to enroll");
   });
 
@@ -63,8 +63,8 @@ describe("Launch readiness read-only presentation components", () => {
     const html = renderToStaticMarkup(
       <SolutionPlansReadinessV61 siteId={siteId} solutions={{state:"ready",value:solutions}}/>);
     expect(html).toContain("Saturday Digital Skills");
-    expect(html).toContain("View published Solution requirements");
-    expect(html).toContain("These are not verified Site readiness.");
+    expect(html).toContain("View what this solution needs");
+    expect(html).toContain("Complete the necessary checks before offering this solution.");
     expect(html).toContain("solutionPlanId=plan-1");
     expect(html).toContain("siteId=" + siteId);
     expect(html).toContain("Continue plan");
@@ -82,10 +82,10 @@ describe("Launch readiness read-only presentation components", () => {
     const html = renderToStaticMarkup(<ProgramOfferingJourneyReadinessV61
       siteId={siteId} context="prepare" savedIntent={{state:"ready",value:intent}}
       solutions={loading} noncredit={loading} pilotJourneys={journeys}/>);
-    expect(html).toContain("Learning product not published");
-    expect(html).toContain("No published matching Solution");
-    expect(html).toContain("Provider authorization not verified here");
-    expect(html).toContain("Configure Solution");
+    expect(html).toContain("Content not yet published");
+    expect(html).toContain("Choose a solution");
+    expect(html).toContain("Check registration requirements");
+    expect(html).toContain("Plan this solution");
     expect(html).toContain("siteId=" + siteId);
   });
 
@@ -104,12 +104,12 @@ describe("Launch readiness read-only presentation components", () => {
       <SitePublicationReadinessV61 publication={{state:"ready",value:publication}}/>
       <NoncreditPublisherReadinessV61 siteId={siteId} noncredit={{state:"ready",value:noncredit}}/>
     </>);
-    expect(html).toContain("1 blocking requirement not complete");
+    expect(html).toContain("1 required step not complete");
     expect(html).toContain("Safeguarding");
-    expect(html).toContain("Publication recorded; reachability unverified");
+    expect(html).toContain("Published · check that your website is live");
     expect(html).toContain("academy.example");
-    expect(html).toContain("1 publisher candidate");
-    expect(html).toContain("1 recorded enrollment release");
-    expect(html).toContain("Final enrollment publication still requires");
+    expect(html).toContain("1 possible offering");
+    expect(html).toContain("1 registration listing");
+    expect(html).toContain("Capacity, permissions");
   });
 });

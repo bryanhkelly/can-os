@@ -82,14 +82,36 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(frame).not.toContain('href="#launch-help"');
   });
 
+  it("uses the shared internal-step and choice-card controls throughout Launch Studio", () => {
+    const website = read("src/routes/site-website.tsx");
+    const workflow = read("src/components/workflow/index.ts");
+    expect(website).toContain("<GuidedSetupShell");
+    expect(website).not.toContain('<nav aria-label="Website & Brand steps"');
+    expect(workflow).toContain("GuidedSetupProgress");
+    for (const path of [
+      "src/components/launch-studio/EstablishSiteInformationV61.tsx",
+      "src/components/launch-studio/EstablishProgramsAudiencesV61.tsx",
+      "src/components/launch-studio/WebsiteBrandIdentityStep.tsx",
+      "src/components/launch-studio/WebsiteTemplateGallery.tsx",
+      "src/components/launch-studio/WebsiteVisualIdentityStep.tsx",
+      "src/components/launch-studio/SolutionCatalogV61.tsx",
+      "src/components/operations/LaunchSchoolModelPicker.tsx",
+      "src/components/operations/OnsitePickupPanel.tsx",
+      "src/routes/canonical.lab.enrollment.tsx",
+    ]) {
+      expect(read(path), path).toContain("<SelectionCard");
+    }
+    expect(read("src/components/workspace/selection-card.tsx")).not.toContain('layout?: "horizontal" | "vertical"');
+  });
+
   it("reuses internal-step visuals and exposes selectable preview states", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
     expect(wizard).toContain("<GuidedSetupProgress");
-    expect(wizard).toContain('label="Package progress"');
-    expect(gallery).toContain("aria-pressed={viewport === size}");
-    expect(gallery).toContain("aria-pressed:border-primary");
-    expect(gallery).toContain("aria-pressed:bg-accent");
+    expect(wizard).toContain('label="Share outreach steps"');
+    expect(gallery).toContain("aria-pressed={viewport===size}");
+    expect(gallery).toContain('kind="radio" name="site-wireframe"');
+    expect(gallery).toContain("<SelectionCard");
   });
 
   it("keeps the Launch Studio navigation drawer accessible and aligned", () => {
@@ -120,6 +142,6 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     const prepare = read("src/components/launch-studio/LaunchPrepareV61.tsx");
     expect(diagnostics("src/components/launch-studio/LaunchPrepareV61.tsx").parseErrors).toEqual([]);
     expect(prepare).toContain('"funding-enrollment": {');
-    expect(prepare).toContain('question: "How will your Site fund its learning experiences and prepare admissions?",');
+    expect(prepare).toContain('question: "How will you fund your programs and help people join?",');
   });
 });

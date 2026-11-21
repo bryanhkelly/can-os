@@ -152,7 +152,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         }
       })
       .catch(caught => {
-        if (!cancelled) setError(normalizeClientError(caught, "Blueprint planning could not load.").message);
+        if (!cancelled) setError(normalizeClientError(caught, "Solution planning could not load.").message);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -339,7 +339,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         setMessage(!opened
           ? "Changes were saved, but the latest plan could not be reopened. Reload before editing."
           : saved.revision > detail.revision
-            ? "A new Solution plan revision was saved."
+            ? "Your updated solution plan was saved."
             : "The Solution plan is already up to date.");
       } else {
         const configurationId = crypto.randomUUID();
@@ -363,7 +363,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
     } catch (caught) {
       if (attemptedWrite) {
         setReconciliationRequired(true);
-        setError("The save outcome could not be fully verified. Reload the Site to reconcile the latest Solution plan before retrying.");
+        setError("We couldn't confirm whether your changes were saved. Reload the site before trying again.");
       } else {
         setError(normalizeClientError(caught, "The Solution plan could not be saved.").message);
       }
@@ -398,7 +398,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       const opened = await openConfiguration(detail.configurationId, current);
       if (!opened) setReconciliationRequired(true);
       setMessage(opened
-        ? "Current Solution plan submitted for independent review. No Program or enrollment is authorized."
+        ? "Your plan was submitted for review. This does not yet approve any program or registration."
         : "Solution plan submitted, but review status could not be refreshed. Reload before taking another action.");
     } catch (caught) {
       if (attemptedWrite) {
@@ -427,11 +427,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
       } });
       setExecutedDeployments(result.deploymentIds);
       setMessage(result.created
-        ? "Approved Blueprint executed as a planning-only Operation and Deployment record."
-        : "Existing Blueprint execution was reused. No additional Deployment was created.");
+        ? "Approved plan linked for planning only. No registration or opening approval is implied."
+        : "An existing planning link was reused. No duplicate was created.");
     } catch (caught) {
       setError(normalizeClientError(caught,
-        "The approved Blueprint could not be executed for this Operation.").message);
+        "We could not connect this approved plan to the selected operation.").message);
     } finally {
       setBusy(false);
     }
@@ -467,16 +467,16 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
 
   return <section className="mt-6 border bg-card p-6" aria-labelledby="canonical-blueprint-title">
     <h2 id="canonical-blueprint-title" className="font-serif text-2xl">
-      {embedded ? "Configure selected Solution" : "Configure your Solution"}
+      {embedded ? "Make this solution work for your community" : "Plan how this solution will work"}
     </h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      CAN defines and publishes the Blueprint. Your Site selects its available components
-      and saves an implementation plan. Independent approval and enrollment authorization are separate.
+      Choose what to include, describe the support your site can provide, and save a plan.
+      Your plan will be reviewed before any activity can be approved to operate.
     </p>
-    {loading && <p className="mt-4" role="status">Loading Blueprint workspace…</p>}
+    {loading && <p className="mt-4" role="status">Loading your solution plan…</p>}
     {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
     {reconciliationRequired && <p className="mt-3 border border-border bg-muted p-3 text-sm" role="status">
-      The server may have recorded your last action. Reload before creating or updating another Solution plan.
+      Your last change may have been saved. Reload to check your plan before trying again.
     </p>}
     {message && <p className="mt-4 text-sm" role="status">{message}</p>}
     {!loading && !workspace && <Button type="button" variant="outline"
@@ -496,13 +496,12 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         </div>
       </div>}
       {workspace.templates.length === 0 && <p role="status" className="mt-5 border p-4 text-sm">
-        No published Blueprint recipes are available yet. CAN must publish a starter recipe
-        before this Site can begin configuration.
+        No solutions are ready for planning here yet. A solution must be published before you can start a plan.
       </p>}
       {workspace.templates.length > 0 && <div className="mt-5 space-y-4">
         <div className="flex flex-wrap gap-3">
           <Label htmlFor="canonical-blueprint-template" className="min-w-52 flex-1 text-sm">
-            CAN-published Solution
+            Selected solution
             <Select id="canonical-blueprint-template" className="mt-2"
               value={templateId} disabled={busy || Boolean(detail) || (embedded && Boolean(initialBlueprintVersionId))}
               onChange={event => {
@@ -510,7 +509,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                   item.blueprintVersionId === event.currentTarget.value);
                 if (template) chooseTemplate(template);
               }}>
-              <option value="">Choose a recipe</option>
+              <option value="">Choose a solution</option>
               {workspace.templates.map(template =>
                 <option key={template.blueprintVersionId} value={template.blueprintVersionId}>
                   {template.title} (v{template.versionNo})
@@ -518,7 +517,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
             </Select>
           </Label>
           <Label htmlFor="canonical-blueprint-name" className="min-w-52 flex-1 text-sm">
-            Configuration name
+            Name your plan
             <Input id="canonical-blueprint-name" className="mt-2" maxLength={120}
               value={name} disabled={busy || Boolean(detail)}
               onChange={event => setName(event.currentTarget.value)}
@@ -528,7 +527,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
         {selectedTemplate && <>
           <div className="flex flex-wrap gap-3">
             <Label htmlFor="canonical-blueprint-identity" className="min-w-52 flex-1 text-sm">
-              Educational identity
+              Learning approach for this solution
               <Select id="canonical-blueprint-identity" className="mt-2"
                 value={editorialIdentity} disabled={editingDisabled}
                 onChange={event => setEditorialIdentity(
@@ -539,7 +538,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
               </Select>
             </Label>
             <Label htmlFor="canonical-blueprint-affiliation" className="min-w-52 flex-1 text-sm">
-              Religious affiliation (optional)
+              Faith affiliation for this solution (optional)
               <Select id="canonical-blueprint-affiliation" className="mt-2"
                 value={religiousAffiliationCode} disabled={editingDisabled}
                 onChange={event => setReligiousAffiliationCode(event.currentTarget.value)}>
@@ -549,6 +548,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
               </Select>
             </Label>
           </div>
+          <p className="text-xs leading-5 text-muted-foreground">
+            These choices describe this solution plan, not your Site identity. Change the Site type in Establish → Site Information. Faith affiliation here is self-described and does not verify network membership.
+          </p>
           <BlueprintComponentPicker
             components={selectedTemplate.components}
             selected={selectedComponents} disabled={editingDisabled}
@@ -587,11 +589,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
           <div className="flex flex-wrap gap-3">
             {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || reconciliationRequired || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
-              {busy ? "Saving…" : detail ? "Save new revision" : "Save Solution plan"}
+              {busy ? "Saving…" : detail ? "Save revised plan" : "Save Solution plan"}
             </Button>}
             {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy || reconciliationRequired}
               onClick={() => { setRevisingFrozen(true); setOperationId(""); setExecutedDeployments(null); }}>
-              Revise submitted Blueprint
+              Make changes to submitted plan
             </Button>}
             {detail && revisingFrozen && <Button type="button" variant="outline" disabled={busy}
               onClick={() => void openConfiguration(detail.configurationId)}>
@@ -637,10 +639,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
           </div>
           {detail && <div className="text-sm text-muted-foreground">
             <p>Revision {detail.revision} · {detail.lifecycle === "frozen"
-              ? "Submitted for independent review" : "Private planning draft"}</p>
+              ? "Submitted for review" : "Saved draft"}</p>
             {detail.lifecycle === "frozen" && <>
               <p className="mt-1">
-                Latest independent review:{" "}
+                Review decision:{" "}
                 {review?.latestReview
                   ? <StatusBadge tone={review.latestReview.decision === "approved" ? "success" : review.latestReview.decision === "rejected" ? "danger" : "attention"}>{readable(review.latestReview.decision)}</StatusBadge>
                   : <StatusBadge>Pending or unavailable</StatusBadge>}
@@ -649,40 +651,38 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
                 configurationVersionId={detail.versionId}/>
               <Button type="button" variant="outline" disabled={busy}
                 onClick={() => void openConfiguration(detail.configurationId)}>
-                Refresh review status
+                Check review status
               </Button>
               {review?.latestReview?.decision === "approved" && workspace.canExecute && !revisingFrozen &&
                 <fieldset className="mt-4 border p-4" disabled={busy}>
-                  <legend className="px-2 font-semibold">Create a planning Deployment</legend>
+                  <legend className="px-2 font-semibold">Connect your approved plan</legend>
                   <p className="mb-3">
-                    Independent review is complete. Select an Operation your Organization
-                    currently operates. This does not authorize a school to open,
-                    enroll learners, or begin instruction.
+                    Your plan has been reviewed. Choose an authorized operation to connect it to.
+                    This records your planning choice; it does not open programs or registration.
                   </p>
                   {workspace.operations.length > 0 ? <>
                     <Label htmlFor="canonical-blueprint-operation" className="block">
-                      Authorized Operation
+                      Organization operation
                       <Select id="canonical-blueprint-operation" className="mt-2"
                         value={operationId}
                         onChange={event => setOperationId(event.currentTarget.value)}>
-                        <option value="">Choose an Operation</option>
+                        <option value="">Choose an authorized operation</option>
                         {workspace.operations.map(operation =>
                           <option key={operation.id} value={operation.id}>{operation.name}</option>)}
                       </Select>
                     </Label>
                     <Button type="button" className="mt-3" disabled={busy || !operationId}
                       onClick={() => void createPlanningDeployment()}>
-                      {busy ? "Recording planning Deployment…" : "Create planning Deployment"}
+                      {busy ? "Saving planning link…" : "Connect approved plan"}
                     </Button>
                     {executedDeployments && <p className="mt-3" role="status">
-                      Planning Deployments created or reused: {executedDeployments.length}.
+                      Planning links recorded or reused: {executedDeployments.length}.
                       {executedDeployments.length > 0
-                        ? ` References: ${executedDeployments.join(", ")}`
-                        : " This Blueprint contains no published Offering adoption intents."}
+                        ? ` Record IDs: ${executedDeployments.join(", ")}`
+                        : " No published offerings were selected for this plan."}
                     </p>}
                   </> : <p>
-                    No Operation has an active operator relationship with your Organization.
-                    Configure an Operation before executing the approved Blueprint.
+                    There is no eligible operation to connect yet. Set up an authorized operation before continuing.
                   </p>}
                 </fieldset>}
             </>}

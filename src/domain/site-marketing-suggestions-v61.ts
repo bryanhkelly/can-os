@@ -1,12 +1,14 @@
 import type { SiteStoryV61 } from "./site-information-v61";
+import { siteIdentityEditorialContextV61, type SiteIdentityV61 } from "./site-identity-v61";
 import type { SiteProgramsAudiencesV61 } from "./site-launch-preferences";
+import type { SiteContentExperienceV61 } from "./site-content-brief-v61";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
 import {
   initialMarketingContent, type MarketingPackageContent, type MarketingPurpose,
 } from "./marketing-package-v61";
 
 /**
- * Editorial starter only. Sources are privately recorded in Establish and are
+ * Editorial starter only. Sources are privately recorded in Shape and are
  * NOT factual approval to operate, publish courses or invite enrollment.
  * Free-form founding/needs narratives are never copied automatically.
  */
@@ -14,7 +16,10 @@ export type MarketingStarterSourcesV61 = {
   /** No prior Site content is reused in marketing unless explicitly authorized. */
   reuseAllowed?: boolean;
   story: SiteStoryV61 | null;
+  /** Site identity is self-described and used only for operator-reviewed drafts. */
+  identity?: SiteIdentityV61 | null;
   intent: SiteProgramsAudiencesV61 | null;
+  experiences?: readonly SiteContentExperienceV61[];
   /** Active published CAN Program titles; no Solution requirements or approvals. */
   publishedPrograms?: readonly {code:string;title:string}[];
   websiteCopy: {
@@ -28,6 +33,8 @@ export type MarketingStarterSuggestionV61 = {
   content: MarketingPackageContent;
   sources: readonly string[];
   websiteAlternative: { headline: string; message: string; source: string } | null;
+  /** Consent-gated self-described identity for the operator-reviewed draft step. */
+  siteIdentity?: SiteIdentityV61 | null;
 };
 const priorityLabels = {
   "grades-6-8": "middle school learning",
@@ -74,13 +81,15 @@ export function suggestMarketingStarterV61(
   const content=initialMarketingContent(siteName,purpose);
   // The Site can still write a package manually when it declines reuse.
   if(source.reuseAllowed !== true){
-    return {content:{...content,headline:"",message:"",audiences:[]},sources:[],websiteAlternative:null};
+    return {content:{...content,headline:"",message:"",audiences:[]},sources:[],websiteAlternative:null,siteIdentity:null};
   }
   const sources:string[]=[];
   const name=safeText(siteName,100)||"our learning community";
   const story=source.story;
+  const identity=source.identity??null;
+  const communityKind=siteIdentityEditorialContextV61(identity).kind;
   const intent=source.intent;
-  // Establish names intended learners, not recipient contacts. Preselect a
+  // Shape names intended learners, not recipient contacts. Preselect a
   // suggested communication audience without importing personal information.
   const audienceFromPlan={
     children:"families",teens:"students",adults:"adult-learners",
@@ -97,21 +106,32 @@ export function suggestMarketingStarterV61(
     program.code===intent?.startingProgramCode)??selectedPrograms[0];
   const priority=intent?.startingFocus ?? intent?.interestIds[0] ?? null;
   const fallbackFocus=priority ? priorityLabels[priority] : "";
-  const focus=preferredProgram ? safeText(preferredProgram.title,90) : fallbackFocus;
+  const experience=source.experiences?.find(item=>item.priority==="featured") ??
+    source.experiences?.[0];
+  const focus=preferredProgram ? safeText(preferredProgram.title,90)
+    : experience ? safeText(experience.title,90) : fallbackFocus;
   const secondFocus=preferredProgram
     ? selectedPrograms.filter(program=>program.code!==preferredProgram.code)
       .slice(0,1).map(program=>safeText(program.title,90)).join("")
     : intent?.interestIds.filter(id=>id!==priority)
       .slice(0,1).map(id=>priorityLabels[id]).join("")??"";
-  const emphasis=story ? phrase(story.values.length?story.values:story.motivations) : "";
+  const emphasis=story ? phrase(story.motivations) : "";
   const approach=story ? phrase(story.distinctives) : "";
   const outcome=story ? phrase(story.experiences) : "";
+  if(identity)sources.push("Site Information · Site identity");
   if(emphasis||approach||outcome)sources.push("Site Information · Purpose & Story");
-  if(focus)sources.push("Establish · Programs & Audiences");
+  if(focus)sources.push("Shape · Programs & Audiences");
+  if(experience)sources.push("Shape · Experiences");
   const mission=emphasis ? "shaped by "+emphasis
-    : approach ? "focused on "+approach : "rooted in community";
-  const experience=outcome ? " We hope learners experience "+outcome+"."
+    : approach ? "focused on "+approach
+    : identity?.faithOrientation==="faith_based" ? "inspired by service and shared purpose"
+    : "with a shared vision";
+  const aspiration=outcome ? " We hope participants experience "+outcome+"."
     : approach ? " We hope to create space for "+approach+".":"";
+  const experienceLine=experience?.activities.length
+    ? " Proposed activities could include "+
+      experience.activities.slice(0,2).map(item=>safeText(item,75)).join(" and ")+"."
+    : "";
   const focusLine=focus
     ? " Our early interests include "+focus+(secondFocus?" and "+secondFocus:"")+
       "; offerings and dates are still being planned." : "";
@@ -120,9 +140,9 @@ export function suggestMarketingStarterV61(
   switch(purpose){
     case "site-announcement":
       if(sources.length){
-        headline="A learning community "+mission+" is taking shape.";
-        message="At "+name+", we are exploring a new learning community "+mission+
-          "."+experience+focusLine+
+        headline="A "+communityKind+" "+mission+" is taking shape.";
+        message="At "+name+", we are exploring a new "+communityKind+" "+mission+
+          "."+aspiration+focusLine+experienceLine+
           " We'd love to hear what matters to the people we hope to serve.";
       }
       break;
@@ -130,16 +150,16 @@ export function suggestMarketingStarterV61(
       if(focus){
         headline="Exploring "+focus+" for our community.";
         message=name+" is exploring "+focus+" and gathering input before any offerings are finalized."+
-          (emphasis?" Our vision is "+emphasis+".":"")+
+          (emphasis?" Our vision is "+emphasis+".":"")+experienceLine+
           " Tell us which learning experiences would be meaningful to you.";
       }
       break;
     case "interest-invitation":
       if(sources.length){
         headline="Help shape what comes next at "+name+".";
-        message="We're listening to families, neighbors and future learners as we explore a community "+
-          (mission==="rooted in community"?"learning experience": "learning experience "+mission)+
-          "."+focusLine+" Your perspective can help shape our next steps.";
+        message="We're listening to community members and future participants as we explore a new "+
+          communityKind+" "+mission+
+          "."+focusLine+experienceLine+" Your perspective can help shape our next steps.";
       }
       break;
     case "event-invitation":
@@ -154,5 +174,5 @@ export function suggestMarketingStarterV61(
   content.headline=safeText(headline,160);
   content.message=safeText(message,1600);
   const alternative=websiteAlternative(source.websiteCopy);
-  return {content,sources,websiteAlternative:alternative};
+  return {content,sources,websiteAlternative:alternative,siteIdentity:identity};
 }

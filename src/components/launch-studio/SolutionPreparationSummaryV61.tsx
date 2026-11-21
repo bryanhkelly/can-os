@@ -1,0 +1,66 @@
+import { Link } from "@tanstack/react-router";
+import { StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import type { SolutionPreparationViewV61 } from "@/domain/site-solution-preparation-v61";
+
+/** Same saved-plan summary for Prepare and Open; all statuses are read-only. */
+export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
+  siteId:string;plans:readonly SolutionPreparationViewV61[];open?:boolean;
+}){
+  return <section className="border bg-background p-4" aria-label="Solution preparation summary">
+    <h3 className="text-sm font-semibold">Your solution plans</h3>
+    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+      These are the solutions you're preparing. Each one may need staff, spaces,
+      schedules, and approvals before it can be offered.
+    </p>
+    {!plans.length?<p className="mt-3 text-sm text-muted-foreground">
+      No solution plans saved yet. Explore the Program Catalog to begin.
+    </p>:<div className="mt-4 space-y-3">{plans.map(plan=>
+      <article key={plan.configurationId} className="border p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{plan.name}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {plan.template??"Solution details unavailable"}
+              {plan.templateVersion!==null?" · v"+plan.templateVersion:""}
+              {" · Saved version "+plan.revision}
+            </p>
+          </div>
+          <StatusBadge tone={plan.nextAction==="resolve-template"?"attention":"neutral"}>
+            {plan.nextAction==="resolve-template"?"Check solution version":
+              plan.lifecycle==="frozen"?"Submitted for review":"Saved draft"}
+          </StatusBadge>
+        </div>
+        <p className="mt-3 text-sm">
+          {plan.requiredComponents.length} required {plan.requiredComponents.length===1?"part":"parts"} to prepare
+          {plan.componentReviewNeeded>0
+            ?" · "+plan.componentReviewNeeded+" need independent review":""}.
+        </p>
+        {plan.requiredComponents.length>0&&<details className="mt-2 text-sm">
+          <summary className="cursor-pointer font-medium text-primary">View requirements</summary>
+          <ul className="mt-2 space-y-2">{plan.requiredComponents.map(component=>
+            <li key={component.key} className="border-l-2 pl-3">
+              <strong className="capitalize">{component.key.replaceAll("_"," ")}</strong>
+              {component.independentReview&&<span className="text-muted-foreground">
+                {" · Separate review required"}</span>}
+              {component.description&&<p className="text-xs text-muted-foreground">{component.description}</p>}
+            </li>)}</ul>
+        </details>}
+        {open&&<div className="mt-3 space-y-1 text-xs text-muted-foreground">
+          <p>Learning offering published: {plan.publishedProduct?"Yes":"Not confirmed"}</p>
+          <p>Registration options: {plan.publisherCandidateCount===null?"Could not be checked":
+            plan.publisherCandidateCount>0?"Potential option available":"None confirmed yet"}</p>
+          <p>Active noncredit registrations: {plan.openRegistrationCount===null?"Unavailable":
+            plan.openRegistrationCount}</p>
+          <p>Complete all required approvals before opening registration.</p>
+        </div>}
+        <Link to="/launch/site" search={{siteId,module:"program-catalog",
+          solutionPlanId:plan.configurationId}}
+          className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+          {plan.nextAction==="continue-plan"?"Continue this Solution":"Review this Solution"}
+        </Link>
+      </article>)}</div>}
+    <WorkspaceNotice tone="info" className="mt-3">
+      Your plan shows what may be needed. Complete the appropriate reviews before you begin offering it or accepting registration.
+    </WorkspaceNotice>
+  </section>;
+}

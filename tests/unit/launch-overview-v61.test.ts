@@ -7,7 +7,7 @@ const complete:LaunchOverviewEvidence = {
   programs:ready({saved:true}),
   brand:ready({saved:true}),
   marketing:ready({hasPackages:true}),
-  websiteDraftAvailable:true,
+  websiteDraftAvailable:true,websiteContentSaved:true,
 };
 
 describe("Launch Overview source-derived next steps", () => {
@@ -16,6 +16,14 @@ describe("Launch Overview source-derived next steps", () => {
     expect(launchSiteLifecycleLabel("active")).toBe("Active Site");
     expect(launchSiteLifecycleLabel("closed")).toBe("Closed Site");
     expect(launchSiteLifecycleLabel(null)).toBe("Lifecycle not recorded");
+  });
+  it("requires an explicit saved identity before marking Site Information complete",()=>{
+    const siteId="00000000-0000-4000-8000-000000000001";
+    const missing={...complete,information:ready({
+      identitySaved:false,hostingSaved:true,environmentSaved:true,
+    })};
+    expect(nextLaunchAction(siteId,missing).href).toContain("module=site-information");
+    expect(nextLaunchAction(siteId,missing).description).toContain("identity");
   });
   it("resumes the first actual missing saved module", () => {
     const id="00000000-0000-4000-8000-000000000001";
@@ -26,7 +34,7 @@ describe("Launch Overview source-derived next steps", () => {
     expect(nextLaunchAction(id,{...complete,brand:ready({saved:false})}).href)
       .toContain("module=website-brand");
     expect(nextLaunchAction(id,{...complete,marketing:ready({hasPackages:false})}).href)
-      .toContain("module=promote");
+      .toContain("module=create-outreach");
     expect(nextLaunchAction(id,complete).href).toContain("module=program-catalog");
   });
   it("keeps unavailable records distinct from never-saved records", () => {
@@ -34,7 +42,7 @@ describe("Launch Overview source-derived next steps", () => {
       const result=nextLaunchAction("site",{
         ...complete,[section]:{state:"unavailable" as const},
       });
-      expect(result.description.toLowerCase()).toMatch(/verify|verified|unavailable/);
+      expect(result.description.toLowerCase()).toMatch(/couldn.t load|couldn.t check/);
       expect(result.title).toMatch(/Review/);
     }
   });
@@ -52,7 +60,7 @@ describe("Launch Overview source-derived next steps", () => {
       ...complete, solutions: ready({plans:[{configurationId:id,lifecycle:"frozen"}]}),
     });
     expect(frozen.title).toBe("Review Submitted Solution");
-    expect(frozen.description).toContain("independent approval");
+    expect(frozen.description).toContain("review decision");
     expect(frozen.href).toContain("solutionPlanId="+id);
   });
 
@@ -68,7 +76,7 @@ describe("Launch Overview source-derived next steps", () => {
       ...complete, solutions: {state:"unavailable"},
     });
     expect(unavailable.title).toBe("Review Program Catalog");
-    expect(unavailable.description).toContain("could not be verified");
+    expect(unavailable.description).toContain("couldn't load");
   });
 
   it("never recommends resuming configuration for a closed Site", () => {
@@ -76,6 +84,10 @@ describe("Launch Overview source-derived next steps", () => {
     expect(action.title).toBe("Review Closed Site");
     expect(action.href).toBe("/sites/closed-site");
     expect(action.description).toContain("closed");
+  });
+  it("does not equate a reserved address and Brand with saved website copy",()=>{
+    expect(nextLaunchAction("site",{...complete,websiteContentSaved:false}).href)
+      .toContain("module=website-brand");
   });
   it("does not treat a missing website draft as publication readiness", () => {
     expect(nextLaunchAction("site",{...complete,websiteDraftAvailable:false}).href)

@@ -1,13 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
-import { Select } from "@/components/ui/select";
 import { GuidedSetupShell } from "@/components/workflow";
-import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, SelectionCard, WorkspaceNotice } from "@/components/workspace";
 import {
-  siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61,
+  reconcileSiteExperienceAssociationsV61, siteProgramsAudiencesV61SaveSchema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
 import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
@@ -15,10 +13,12 @@ import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference
 import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
   noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
-import { chooseStartingIdeaV61, selectedStartingIdeaV61 } from "@/domain/site-program-intent-focus-v61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
+import { programsAudiencesGuideV61 } from "@/domain/launch-site-guide-v61";
+import type { SiteGuideContentV61 } from "./SiteGuideV61";
+import { EstablishExperiencesV61, type ExperiencesStageV61 } from "./EstablishExperiencesV61";
 
-type InternalStep = 0 | 1;
+type InternalStep = 0 | 1 | 2;
 type InterestId = SiteProgramsAudiencesV61["interestIds"][number];
 type TimingId = SiteProgramsAudiencesV61["timingIds"][number];
 type AudienceId = SiteProgramsAudiencesV61["audienceIds"][number];
@@ -53,46 +53,30 @@ const audienceChoices = [
   { id: "adults", label: "Adults", detail: "Career skills and enrichment" },
   { id: "older_adults", label: "Older adults", detail: "Lifelong learning and community" },
 ] as const;
-const timingLabels: Record<TimingId, string> = {
-  weekdays: "Weekdays", weekends: "Weekends", daytime: "Daytime", evenings: "Evenings",
-};
 
 const guidance = [
   {
-    why: "Share the types of learning your Site hopes to offer. CAN OS can use saved intentions to guide future setup and private website copy.",
-    tip: "Choose weekdays, weekends, daytime and evenings independently. Exact calendars and class schedules come later.",
-    next: "Identify the learner groups you hope to serve.",
+    why: "Choose the learning experiences you want to offer.",
+    tip: "Select any days and times that interest you.",
+    next: "Choose your audiences next.",
   },
   {
-    why: "Knowing your audiences helps shape your messaging without imposing age, admission or guardian-approval rules.",
-    tip: "These are private plans, not approved Programs or enrollment eligibility.",
-    next: "Save your choices, then continue to Website & Brand.",
+    why: "Choose who you hope to serve.",
+    next: "Choose the experiences that bring your vision to life.",
+  },
+  {
+    why: "Explore possible experiences across the Programs and audiences you chose.",
+    tip: "These are planning interests, not confirmed services or enrollment offers.",
+    next: "Save your choices and continue to Website & Brand.",
   },
 ] as const;
 
-export function ProgramsAudiencesV61Guidance({ step }: { step: InternalStep }) {
-  return <LaunchGuidancePanels guidance={guidance[step]} />;
-}
-
-function SummaryRow({ label, value, onEdit }: {
-  label: string; value: string; onEdit?: () => void;
-}) {
-  return <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-t py-3 text-sm sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
-    <strong>{label}</strong>
-    <span className="col-span-2 row-start-2 min-w-0 break-words text-muted-foreground sm:col-span-1 sm:col-start-2 sm:row-start-1">
-      {value}
-    </span>
-    {onEdit && <Button size="sm" variant="ghost" className="col-start-2 row-start-1 text-primary sm:col-start-3"
-      onClick={onEdit} aria-label={"Edit " + label}>Edit</Button>}
-  </div>;
-}
-
-function labels<T extends string>(ids: readonly T[], options: readonly { id: T; label: string }[]) {
-  return ids.length ? ids.map(id => options.find(item => item.id === id)?.label ?? id).join(" · ") : "Not selected yet";
+export function ProgramsAudiencesV61Guidance({ step, guide }: { step: InternalStep; guide?: SiteGuideContentV61 | null }) {
+  return <LaunchGuidancePanels guidance={guidance[step]} guide={guide} />;
 }
 
 export function EstablishProgramsAudiencesV61({ siteId, initial,
-  onBackToSiteInformation, onSaveAndExit, onContinueToWebsiteBrand, onInternalStepChange,
+  onBackToSiteInformation, onSaveAndExit, onContinueToWebsiteBrand, onInternalStepChange, onGuideChange,
 }: {
   siteId: string;
   initial: ProgramsAudiencesV61Initial;
@@ -100,9 +84,11 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   onSaveAndExit: () => Promise<void>;
   onContinueToWebsiteBrand: () => void;
   onInternalStepChange?: (step: InternalStep) => void;
+  onGuideChange?: (guide: SiteGuideContentV61) => void;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<InternalStep>(0);
+  const [experienceStage,setExperienceStage]=useState<ExperiencesStageV61>("choose");
   const schoolYearAvailability = initial.schoolYearAvailability ?? noSchoolYearAvailability;
   const [draft, setDraft] = useState<SiteProgramsAudiencesV61>(() => ({
     interestIds: [...initial.intent.interestIds],
@@ -113,6 +99,15 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       ? { programCodes: [...initial.intent.programCodes] } : {}),
     ...(initial.intent.startingProgramCode !== undefined
       ? { startingProgramCode: initial.intent.startingProgramCode } : {}),
+    ...(initial.intent.experienceIds !== undefined
+      ? { experienceIds: [...initial.intent.experienceIds] } : {}),
+    ...(initial.intent.customExperiences !== undefined
+      ? { customExperiences: [...initial.intent.customExperiences] } : {}),
+    ...(initial.intent.experienceDetails !== undefined
+      ? { experienceDetails: initial.intent.experienceDetails.map(detail=>({
+        ...detail,activityIds:[...detail.activityIds],outcomeIds:[...detail.outcomeIds],
+        audienceIds:[...detail.audienceIds],programIds:[...detail.programIds],
+      })) } : {}),
   }));
   const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(initial.intent));
   const [busy, setBusy] = useState(false);
@@ -121,11 +116,18 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
   const [programCatalog, setProgramCatalog] = useState<BlueprintReferenceCatalogItem[] | null>(null);
   const [catalogError, setCatalogError] = useState("");
   const [catalogReload, setCatalogReload] = useState(0);
+  // A live, read-only reflection of this screen's draft choices. No additional
+  // queries, persistence or approval claims are introduced by the rail.
+  const liveGuide = useMemo(() => programsAudiencesGuideV61(
+    step, draft, programCatalog ?? [], experienceStage,
+  ), [step, draft, programCatalog, experienceStage]);
+  useEffect(() => { onGuideChange?.(liveGuide); }, [liveGuide, onGuideChange]);
   const revision = useRef(initial.revision);
   const saving = useRef(false);
   const panel = useRef<HTMLDivElement>(null);
   const firstStepRender = useRef(true);
   const dirty = JSON.stringify(draft) !== savedSnapshot;
+  const selectedExperienceCount=(draft.experienceIds?.length??0)+(draft.customExperiences?.length??0);
   const releaseNavigation = useLaunchUnsavedChanges(() => dirty || saving.current,
     "Leave Programs & Audiences? Unsaved Site planning choices will be lost.");
   useEffect(() => {
@@ -153,9 +155,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       const interestIds = checked
         ? [...new Set([...current.interestIds, id])]
         : current.interestIds.filter(value => value !== id);
-      return { ...current, interestIds,
+      return reconcileSiteExperienceAssociationsV61({ ...current, interestIds,
         startingFocus: current.startingFocus && !interestIds.includes(current.startingFocus)
-          ? null : current.startingFocus };
+          ? null : current.startingFocus });
     });
   }
   function toggleProgram(code: string, checked: boolean) {
@@ -163,9 +165,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       const programCodes = checked
         ? [...new Set([...(current.programCodes ?? []), code])]
         : (current.programCodes ?? []).filter(item => item !== code);
-      return { ...current, programCodes,
+      return reconcileSiteExperienceAssociationsV61({ ...current, programCodes,
         startingProgramCode: current.startingProgramCode && !programCodes.includes(current.startingProgramCode)
-          ? null : current.startingProgramCode ?? null };
+          ? null : current.startingProgramCode ?? null });
     });
   }
   function toggleTiming(id: TimingId, checked: boolean) {
@@ -173,13 +175,14 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       ? [...new Set([...current.timingIds, id])] : current.timingIds.filter(value => value !== id) }));
   }
   function toggleAudience(id: AudienceId, checked: boolean) {
-    setDraft(current => ({ ...current, audienceIds: checked
-      ? [...new Set([...current.audienceIds, id])] : current.audienceIds.filter(value => value !== id) }));
+    setDraft(current => reconcileSiteExperienceAssociationsV61({ ...current,
+      audienceIds: checked ? [...new Set([...current.audienceIds, id])]
+        : current.audienceIds.filter(value => value !== id) }));
   }
 
   async function save(exit: boolean) {
     if (saving.current || reloadRequired) return;
-    const checked = siteProgramsAudiencesV61Schema.safeParse(draft);
+    const checked = siteProgramsAudiencesV61SaveSchema.safeParse(draft);
     if (!checked.success) {
       setError(checked.error.issues[0]?.message ?? "Review your planning choices.");
       return;
@@ -204,7 +207,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         try { await onSaveAndExit(); }
         catch (failure) {
           setError(failure instanceof Error ? failure.message :
-            "Changes saved, but sign-out failed. Use the Account menu to sign out.");
+            "Your changes were saved, but we could not open your Site Workspace. Try again from the navigation.");
         }
       }
       else onContinueToWebsiteBrand();
@@ -218,9 +221,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     }
   }
 
-  const options = interests.filter(item => draft.interestIds.includes(item.id));
   const programs = programCatalog ?? [];
-  const chosenPrograms = programs.filter(item => draft.programCodes?.includes(item.code));
   // Preserve historical selections until the operator removes them explicitly.
   // A retired entry is absent from the active catalog, so it cannot render
   // through the regular published Program choices.
@@ -229,35 +230,30 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     : [];
   const disabled = busy || reloadRequired;
   const sections = [
-    { id: "interests", title: "Program Interests", description: "What you want to offer",
+    { id: "interests", title: "Programs", description: "What you want to offer",
       status: step === 0 ? "current" as const : "upcoming" as const },
-    { id: "audiences", title: "Your Audiences", description: "Who you want to reach",
+    { id: "audiences", title: "Audiences", description: "Who you hope to serve",
       status: step === 1 ? "current" as const : "upcoming" as const },
+    { id: "experiences", title: "Experiences", description: "What people could learn, do or enjoy",
+      status: step === 2 ? "current" as const : "upcoming" as const },
   ];
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
-    <GuidedSetupShell title={step === 0 ? "What would you like to offer?" : "Who do you hope to serve?"}
+    <GuidedSetupShell title={step === 0 ? "What would you like to bring to your community?" :
+      step === 1 ? "Who do you hope to serve?" : "What experiences interest you?"}
       description={step === 0
-        ? "Choose the Programs and learning ideas you hope to offer. Delivery details come later."
-        : "Choose intended audiences and check your choices below. There is no separate review step."}
-      steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : 1)} navigationDisabled={disabled}>
-      <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : "Your Audiences"}
+        ? "Choose the program ideas you want to explore. You will select how to deliver them in Prepare."
+        : step === 1 ? "Choose the people you hope to serve."
+        : "Imagine what people could learn, do or enjoy. Details and approvals come later in Prepare."}
+      steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : id === "audiences" ? 1 : 2)} navigationDisabled={disabled}>
+      <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : step === 1 ? "Your Audiences" : "Experiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
         <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold">Which Programs or learning ideas are you considering?</legend>
+          <legend className="text-sm font-semibold">What kinds of programs are you thinking about offering?</legend>
           <p className="text-xs leading-5 text-muted-foreground">
-            Start with the big idea. You'll select how to deliver it, including staff,
-            facilities and other requirements, when you choose a Solution in Prepare.
+            Select what interests you. You'll choose the details in Prepare.
           </p>
-          <h3 className="text-sm font-semibold">Published Program ideas</h3>
-          {(!schoolYearAvailability["grades-6-8"] || !schoolYearAvailability["grades-9-12"]) &&
-            <WorkspaceNotice tone="attention">
-              Grades 6–12 school-year academy choices are disabled until this Site has
-              independently verified school-opening authorization. After-school, summer,
-              Saturday, adult learning and other community Programs remain available for
-              private planning. A published Program or an existing demo Class does not
-              authorize enrollment.
-            </WorkspaceNotice>}
+          <h3 className="text-sm font-semibold">Programs to explore</h3>
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
           {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
             <p>{catalogError}</p>
@@ -268,10 +264,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               const schoolYearBlocked = !academyReferenceMayBeSelected(item,schoolYearAvailability);
               const selected = draft.programCodes?.includes(item.code) ?? false;
               return <div key={item.code} className="min-w-0 space-y-1">
-                <SelectionCard kind="checkbox" layout="vertical"
+                <SelectionCard kind="checkbox"
                   value={item.code} title={item.title}
                   detail={<>{item.summary}{schoolYearBlocked && <span className="mt-2 block font-medium">
-                    School-year authorization required · not currently selectable
+                    Currently unavailable
                   </span>}</>}
                   checked={selected} disabled={disabled || schoolYearBlocked}
                   onChange={checked => toggleProgram(item.code, checked)} />
@@ -282,11 +278,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               </div>;
             })}
           </div>}
-          {programCatalog && programs.length === 0 && <p className="text-sm text-muted-foreground">No published Program references are available to plan.</p>}
+          {programCatalog && programs.length === 0 && <p className="text-sm text-muted-foreground">No Programs available.</p>}
           {unavailablePrograms.length > 0 && <WorkspaceNotice tone="attention">
-            <p>These previously selected Programs are no longer in the published catalog.
-              They remain saved until you choose to remove them. You can remove a reference
-              without changing any independent Solution plan or Offering.</p>
+            <p>These saved Programs are no longer available. Remove any you no longer need.</p>
             <ul className="mt-3 space-y-2" aria-label="Unavailable selected Programs">
               {unavailablePrograms.map(code => <li key={code}
                 className="flex flex-wrap items-center justify-between gap-3 border bg-background p-3">
@@ -300,19 +294,16 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
             </ul>
           </WorkspaceNotice>}
           <div className="space-y-3 border-t pt-4">
-            <h3 className="text-sm font-semibold">Other learning ideas</h3>
-            <p className="text-xs text-muted-foreground">
-              You can also describe broad learning interests without selecting a published Program.
-            </p>
+            <h3 className="text-sm font-semibold">Your other ideas</h3>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {interests.map(choice => {
                 const schoolYearBlocked = !schoolYearInterestMayBeSelected(choice.id,schoolYearAvailability);
                 const selected = draft.interestIds.includes(choice.id);
                 return <div key={choice.id} className="min-w-0 space-y-1">
-                  <SelectionCard kind="checkbox" layout="vertical"
+                  <SelectionCard kind="checkbox"
                     value={choice.id} title={choice.label}
                     detail={<>{choice.detail}{schoolYearBlocked && <span className="mt-2 block font-medium">
-                      School-year authorization required · unavailable for this Site
+                      Currently unavailable
                     </span>}</>} icon={choice.icon}
                     checked={selected} disabled={disabled || schoolYearBlocked}
                     onChange={checked => toggleInterest(choice.id, checked)} />
@@ -327,7 +318,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         </fieldset>
         <section aria-labelledby="pa-timing-title" className="space-y-3 border-t pt-5">
           <h3 id="pa-timing-title" className="text-sm font-semibold">When might you offer learning? <span className="font-normal text-muted-foreground">(optional)</span></h3>
-          <p className="text-xs leading-5 text-muted-foreground">Choose days and time of day independently. Daytime can mean a regular day school or a daytime older-adult program. Exact class schedules come later in Prepare.</p>
+          <p className="text-xs leading-5 text-muted-foreground">Select the days and times you're considering.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {[{ title: "Days", options: days }, { title: "Time of day", options: times }].map(group =>
               <fieldset key={group.title} className="min-w-0 border p-3">
@@ -340,30 +331,10 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
                 </div>
               </fieldset>)}
           </div>
-          <p className="text-xs text-muted-foreground">These are private preferences, not days, hours or dates booked for a Class.</p>
         </section>
-        <section className="space-y-3 border bg-muted/25 p-4" aria-labelledby="pa-focus-heading">
-          <h3 id="pa-focus-heading" className="text-sm font-semibold">One starting idea (optional)</h3>
-          <Field label="Which idea would you begin with?"
-            description="Choose one selected Program or broad learning idea. You can decide the Solution later.">
-            <Select value={selectedStartingIdeaV61(draft)} disabled={disabled}
-              onChange={event => setDraft(current => chooseStartingIdeaV61(current,event.target.value))}>
-              <option value="">I'll decide later</option>
-              {chosenPrograms.map(item =>
-                <option key={item.code} value={"program:"+item.code}
-                  disabled={!academyReferenceMayBeSelected(item,schoolYearAvailability)}>{item.title}</option>)}
-              {options.map(item =>
-                <option key={item.id} value={"interest:"+item.id}
-                  disabled={!schoolYearInterestMayBeSelected(item.id,schoolYearAvailability)}>{item.label}</option>)}
-            </Select>
-          </Field>
-        </section>
-        <WorkspaceNotice>These are private planning interests, not approved Programs, Courses, Classes or enrollments. Adopt real offerings later in <strong>Prepare → Program Catalog</strong>.</WorkspaceNotice>
-        <p className="text-xs text-muted-foreground">{(draft.programCodes ?? []).length} published Program ideas and {draft.interestIds.length} other learning interests selected. You can update your plans later in the Site Workspace.</p>
-      </> : <>
+      </> : step === 1 ? <>
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
-          <p className="text-xs text-muted-foreground">Select any learner groups you may welcome.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {audienceChoices.map(choice => <SelectionCard key={choice.id} kind="checkbox"
               value={choice.id} title={choice.label} detail={choice.detail} className="min-h-24"
@@ -371,26 +342,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
               onChange={checked => toggleAudience(choice.id, checked)} />)}
           </div>
         </fieldset>
-        <WorkspaceNotice><strong>Audience is not enrollment eligibility.</strong> Age restrictions, guardian consent and safeguarding are determined by authorized offerings, not these selections.</WorkspaceNotice>
-        <section className="space-y-3 border bg-muted/20 p-4" aria-labelledby="pa-summary">
-          <h3 id="pa-summary" className="text-sm font-semibold">Your selections so far</h3>
-          <p className="text-xs text-muted-foreground">A compact reference within this step, not a separate review screen.</p>
-          <SummaryRow label="Learning interests" value={labels(draft.interestIds, interests)} onEdit={() => selectStep(0)} />
-          <SummaryRow label="Proposed Programs" value={
-            (draft.programCodes ?? []).length ? (draft.programCodes ?? [])
-              .map(code => programs.find(item => item.code === code)?.title ?? code).join(" · ") : "Not selected yet"
-          } onEdit={() => selectStep(0)} />
-          <SummaryRow label="Days & times"
-            value={draft.timingIds.length ? draft.timingIds.map(id => timingLabels[id]).join(" · ") : "Not selected yet"}
-            onEdit={() => selectStep(0)} />
-          <SummaryRow label="Starting idea" value={
-            (draft.startingProgramCode
-              ? programs.find(item => item.code === draft.startingProgramCode)?.title
-                ?? draft.startingProgramCode
-              : options.find(item => item.id === draft.startingFocus)?.label) ?? "Not selected"}
-            onEdit={() => selectStep(0)} />
-          <SummaryRow label="Intended audiences" value={labels(draft.audienceIds, audienceChoices)} />
-        </section>
+      </> : <>
+        <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled}
+          programCatalog={programs} stage={experienceStage} onStageChange={setExperienceStage}/>
       </>}
       </div>
     </GuidedSetupShell>
@@ -406,16 +360,31 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
     </>}
     <footer aria-label="Programs & Audiences actions">
       <ActionFooter layout="step">
-      <Button variant="outline" disabled={busy} onClick={() => step === 0 ? onBackToSiteInformation() : selectStep(0)}>
-        <ArrowLeft aria-hidden="true" />{step === 0 ? "Back to Site Information" : "Previous step"}
+      <Button variant="outline" disabled={busy} onClick={() => {
+        if(step===2&&experienceStage==="personalize")setExperienceStage("choose");
+        else if(step===0)onBackToSiteInformation();
+        else selectStep((step-1) as InternalStep);
+      }}>
+        <ArrowLeft aria-hidden="true"/>
+        {step===2&&experienceStage==="personalize"?"Back to Explore Topics":
+          step===0?"Back to Site Information":"Previous step"}
       </Button>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Sign Out</Button>
-        {step === 0
-          ? <Button disabled={disabled} onClick={() => selectStep(1)}>Continue to Audiences <ArrowRight aria-hidden="true" /></Button>
-          : <Button loading={busy} disabled={disabled} onClick={() => void save(false)}>
-            Save & Continue <ArrowRight aria-hidden="true" />
-          </Button>}
+        <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Exit</Button>
+        {step!==2
+          ? <Button disabled={disabled} onClick={() => selectStep((step+1) as InternalStep)}>
+              Continue to {step===0?"Audiences":"Experiences"} <ArrowRight aria-hidden="true"/>
+            </Button>
+          : experienceStage==="choose"&&selectedExperienceCount>0
+            ? <Button disabled={disabled||selectedExperienceCount>5}
+                onClick={()=>setExperienceStage("personalize")}>
+                Make these Experiences yours <ArrowRight aria-hidden="true"/>
+              </Button>
+            : <Button loading={busy} disabled={disabled||selectedExperienceCount>5}
+                onClick={()=>void save(false)}>
+                {experienceStage==="choose"?"Save & Continue without Experiences":"Save & Continue to Website & Brand"}
+                <ArrowRight aria-hidden="true"/>
+              </Button>}
       </div>
       </ActionFooter>
     </footer>

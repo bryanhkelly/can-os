@@ -25,6 +25,9 @@ import { LoaderFailure } from "@/lib/loader-failure";
  */
 export async function loadStudentToday() {
   const today = await getMyStudentToday();
+  // The native Class index is independent of the older Section lesson resume
+  // projection. Begin it early instead of waiting for all Section probes.
+  const classesPromise = safeLoader(() => getMyStudentClasses())();
   const [assignmentResult, supportResult, grades, community] = await Promise.all([
     safeLoader(async () => {
       const view = await getAssignments();
@@ -67,36 +70,43 @@ export async function loadStudentToday() {
       lesson: { id: string; title: string; estimatedMinutes?: number } | null;
       completed: number; total: number;
     } | null = null;
-    for (const section of candidates) {
-      // A single unpublished or temporarily unavailable class must not block
-      // every other enrolled class. The canonical class reader checks access.
-      const result = await safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))();
-      if (!result.ok || !result.data.curriculumAccess.available) continue;
-      const workspace = result.data;
-      const content = workspace.content;
-      if (!content) continue;
-      const lessons = content.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
-      if (!lessons.length) continue;
-      const steps = deriveClassNextSteps({
-        lessonIds: lessons.map(lesson => lesson.id),
-        completedLessonIds: workspace.progress.filter(item => item.completedAt !== null).map(item => item.lessonId),
-        assessments: [],
-      });
-      const nextLesson = lessons.find(item => item.id === steps.nextLessonId);
-      const projected = {
-        sectionId: section.sectionId,
-        title: workspace.section.title,
-        lesson: nextLesson ? { id: nextLesson.id, title: nextLesson.title, estimatedMinutes: nextLesson.estimatedMinutes } : null,
-        completed: steps.selfReportedCompleted,
-        total: steps.totalPublishedLessons,
-      };
-      if (nextLesson) return projected;
-      completedFallback ??= projected;
+    // Bound fan-out to three authorized reads at a time. Preserve ordered
+    // selection: the preferred urgent-work Section still wins whenever it has
+    // a next lesson, and completed fallbacks still use the earliest candidate.
+    for (let offset = 0; offset < candidates.length; offset += 3) {
+      const batch = candidates.slice(offset, offset + 3);
+      const results = await Promise.all(batch.map(section =>
+        safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))()));
+      for (let index = 0; index < batch.length; index++) {
+        const section = batch[index]!;
+        const result = results[index]!;
+        if (!result.ok || !result.data.curriculumAccess.available) continue;
+        const workspace = result.data;
+        const content = workspace.content;
+        if (!content) continue;
+        const lessons = content.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
+        if (!lessons.length) continue;
+        const steps = deriveClassNextSteps({
+          lessonIds: lessons.map(lesson => lesson.id),
+          completedLessonIds: workspace.progress.filter(item => item.completedAt !== null).map(item => item.lessonId),
+          assessments: [],
+        });
+        const nextLesson = lessons.find(item => item.id === steps.nextLessonId);
+        const projected = {
+          sectionId: section.sectionId,
+          title: workspace.section.title,
+          lesson: nextLesson ? { id: nextLesson.id, title: nextLesson.title, estimatedMinutes: nextLesson.estimatedMinutes } : null,
+          completed: steps.selfReportedCompleted,
+          total: steps.totalPublishedLessons,
+        };
+        if (nextLesson) return projected;
+        completedFallback ??= projected;
+      }
     }
     if (!completedFallback && candidates.length) throw new DataUnavailableError();
     return completedFallback;
   })();
-  const classes = await safeLoader(() => getMyStudentClasses())();
+  const classes = await classesPromise;
   const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community, classes };
   return { today, success, support, dashboard };
 }

@@ -7,16 +7,11 @@ import {StatCard} from "@/components/workspace";
 import {useQuery} from "@tanstack/react-query";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
 import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
+import {reportingCsvRow} from "@/domain/reporting-csv";
 
-/** Source-safe CSV for private operator use. Protect spreadsheets from
- * formula injection in user-/publisher-authored titles and display names. */
-function csvCell(value:string|number|null){
-  const raw=value===null?"Unavailable":String(value);
-  const safe=/^\s*[=+\-@]/.test(raw)?"'"+raw:raw;
-  return '"'+safe.replaceAll('"','""')+'"';
-}
+/** Private operator CSV shares the formula-safe serializer with Class reports. */
 function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filename:string){
-  const source=rows.map(row=>row.map(csvCell).join(",")).join("\r\n");
+  const source=rows.map(reportingCsvRow).join("\r\n");
   const blob=new Blob([source],{type:"text/csv;charset=utf-8"});
   const url=URL.createObjectURL(blob);
   const link=document.createElement("a");

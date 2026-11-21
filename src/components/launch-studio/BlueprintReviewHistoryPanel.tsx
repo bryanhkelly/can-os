@@ -25,9 +25,9 @@ export function BlueprintReviewHistoryPanel({ configurationVersionId }: {
       Recorded decisions for this exact submitted version. Review approval does
       not authorize enrollment, operating a Site or publishing Offerings.
     </p>
-    {history.isPending && <p role="status" className="text-sm">Loading authorized review history…</p>}
+    {history.isPending && <p role="status" className="text-sm">Loading plan review history…</p>}
     {history.isError && <div role="alert" className="space-y-2 text-sm">
-      <p>Review history is unavailable under the current authorization.</p>
+      <p>We couldn't show this review history with your current access.</p>
       <Button type="button" variant="outline" size="sm"
         onClick={() => void history.refetch()}>Retry review history</Button>
     </div>}

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { liveCloudflarePhotoEnv } from "@/platform/photography/cloudflare-runtime.server";
-import { isPublicSitePagePath, type PublicSitePath } from "@/domain/public-site-paths";
+import { isPublicSitePagePath, publicSitePagePaths, type PublicSitePath } from "@/domain/public-site-paths";
 
 /** Immutable, private Cloudflare R2 snapshots; the same CAN OS bucket already
  * bound at deployment, under a separate scoped prefix. No public object URLs.
@@ -18,7 +18,7 @@ export function sitePreviewSnapshotDigest(text:string){
 }
 export function encodeSitePreviewSnapshot(pages:Partial<Record<PublicSitePath,string>>){
   const keys=Object.keys(pages);
-  if(!keys.length||keys.length>14||!keys.includes("/")||
+  if(!keys.length||keys.length>publicSitePagePaths.length||!keys.includes("/")||
     keys.some(key=>!isPublicSitePagePath(key)||typeof pages[key as PublicSitePath]!=="string"))
     throw new Error("Invalid preview pages");
   const text=JSON.stringify({version:2,pages});
@@ -53,7 +53,7 @@ export async function readSitePreviewSnapshot(key:string,digest:string):
   try {
     const document=JSON.parse(text) as {version?:number;pages?:Record<string,unknown>};
     if(document.version!==2 || !document.pages ||
-      Object.keys(document.pages).length>14 || !document.pages["/"])return null;
+      Object.keys(document.pages).length>publicSitePagePaths.length || !document.pages["/"])return null;
     if(Object.entries(document.pages).some(([path,html])=>
       !isPublicSitePagePath(path)||typeof html!=="string"))return null;
     return document.pages as Partial<Record<PublicSitePath,string>>;

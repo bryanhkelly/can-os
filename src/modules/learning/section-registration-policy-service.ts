@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   sectionPrerequisites,
   sectionRegistrationPolicies,
@@ -44,10 +44,20 @@ export async function getSectionRegistrationPolicy(
         .where(eq(sectionPrerequisites.sectionId, sectionId))
     : [];
 
+  return effectivePolicy(row, prerequisites.map((p: { code: string }) => p.code));
+}
+
+/** Normalizes current saved rules and pre-migration fallback identically. */
+function effectivePolicy(row: {
+  policy: typeof sectionRegistrationPolicies.$inferSelect | null;
+  sectionMetadata: typeof sections.$inferSelect["metadata"];
+  startsOn: string;
+  endsOn: string;
+}, prerequisites: string[]): EffectiveRegistrationPolicy {
   if (row.policy) {
     return {
       enrollmentCapacity: row.policy.enrollmentCapacity,
-      prerequisites: prerequisites.map((p: { code: string }) => p.code),
+      prerequisites,
       addDropEndsOn: row.policy.addDropEndsOn,
       withdrawalEndsOn: row.policy.withdrawalEndsOn,
       credits: Number(row.policy.credits),
@@ -78,6 +88,43 @@ export async function getSectionRegistrationPolicy(
     approvalMode: "registrar",
   };
 }
+
+/**
+ * Read policies for an already authorized list of Section IDs.
+ * Exactly two bounded queries replace 1-2 queries per catalog Section.
+ * Caller must establish Site/Program access before providing IDs.
+ */
+export async function getSectionRegistrationPolicies(
+  sectionIds: readonly string[],
+): Promise<Map<string, EffectiveRegistrationPolicy>> {
+  const unique = [...new Set(sectionIds)];
+  const result = new Map<string, EffectiveRegistrationPolicy>();
+  if (!unique.length) return result;
+  const [rows, prerequisites] = await Promise.all([
+    db.select({
+      id: sections.id,
+      policy: sectionRegistrationPolicies,
+      sectionMetadata: sections.metadata,
+      startsOn: terms.startsOn,
+      endsOn: terms.endsOn,
+    }).from(sections)
+      .innerJoin(terms, eq(terms.id, sections.termId))
+      .leftJoin(sectionRegistrationPolicies, eq(sectionRegistrationPolicies.sectionId, sections.id))
+      .where(inArray(sections.id, unique)),
+    db.select({sectionId:sectionPrerequisites.sectionId, code:sectionPrerequisites.prerequisiteCourseCode})
+      .from(sectionPrerequisites).where(inArray(sectionPrerequisites.sectionId, unique)),
+  ]);
+  const prerequisitesById = new Map<string, string[]>();
+  for (const item of prerequisites) {
+    const codes = prerequisitesById.get(item.sectionId) ?? [];
+    codes.push(item.code);
+    prerequisitesById.set(item.sectionId, codes);
+  }
+  for (const row of rows) result.set(row.id, effectivePolicy(row, prerequisitesById.get(row.id) ?? []));
+  if (result.size !== unique.length) throw new Error("Section not found");
+  return result;
+}
+
 
 export async function replaceSectionRegistrationPolicy(
   executor: any,

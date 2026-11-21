@@ -16,7 +16,7 @@ export const Route = createFileRoute("/launch/")({
 function LaunchIndex() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
-  return <WorkspaceShell title="Launch Studio" eyebrow="Site setup"
+  return <WorkspaceShell title="Launch Studio" eyebrow="Shape · Share · Prepare · Launch"
     subtitle="Choose an authorized Site to continue preparing it, or establish a new Site.">
     <div className="mt-6 space-y-3">{outcome.data.map(site => <a key={site.id}
       href={"/launch/site?siteId="+encodeURIComponent(site.id)}

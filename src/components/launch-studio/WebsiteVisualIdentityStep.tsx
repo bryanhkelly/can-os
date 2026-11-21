@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { DisclosureSection } from "@/components/workspace/disclosure-section";
+import { SelectionCard } from "@/components/workspace";
 import { WebsiteArtworkField } from "./WebsiteArtworkField";
 import { SchoolBrandPreview } from "./SchoolBrandPreview";
 import { SchoolMediaFolderManager } from "@/components/operations/SchoolMediaFolderManager";
@@ -23,16 +24,13 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
   return <div className="space-y-4">
         <div>
           <h3 className="font-serif text-2xl font-semibold">Create your visual identity</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Expand colors, typography, wordmark and imagery independently. Your chosen wireframe
-            and website text remain unchanged when you adjust a visual option.
-          </p>
+
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border bg-card p-4">
           <div>
             <p className="text-sm font-semibold">Suggested starting style</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Use the palette and type pairing curated for {schoolBrandDesigns[content.branding.templateId ?? "heritage"].name}.
+              Colors and fonts for {schoolBrandDesigns[content.branding.templateId ?? "heritage"].name}.
             </p>
           </div>
           <Button type="button" variant="outline" disabled={busy || !data.canEdit}
@@ -42,25 +40,25 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
                 typographyId:design.recommendedTypography,headingFontId:undefined,bodyFontId:undefined}};
             })}>Apply suggested style</Button>
         </div>
-        <DisclosureSection title="Colors" description="All thirteen curated and contrast-checked palettes" defaultOpen>
+        <DisclosureSection title="Colors" defaultOpen>
           <fieldset disabled={busy || !data.canEdit}>
             <legend className="sr-only">Choose a color palette</legend>
             <div role="group" aria-label="Site color palettes" className="grid grid-cols-2 gap-3 md:grid-cols-3">
               {sitePaletteIds.map(id=>{
                 const palette=resolveSiteTheme(id,content.branding.typographyId);
                 const current=(content.branding.paletteId ?? "signature")===id;
-                return <Button type="button" variant="outline" aria-pressed={current} key={id}
-                  onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
-                  className="h-auto min-h-16 w-full flex-col items-stretch gap-1 whitespace-normal border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
-                  <span className="mb-2 flex h-5 overflow-hidden" aria-hidden="true">
+                return <SelectionCard key={id} kind="radio" name="site-color-palette"
+                  value={id} checked={current}
+                  onChange={checked=>{if(checked)setContent(old=>({...old,branding:{...old.branding,paletteId:id}}));}}
+                  title={id==="signature"?"CAN Signature":id.startsWith("brand-")
+                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"Site")+" palette":id}
+                  icon={<span className="flex h-5 w-20 shrink-0 overflow-hidden" aria-hidden="true">
                     <span className="flex-1" style={{backgroundColor:palette.ink}}/>
                     <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
                     <span className="flex-1" style={{backgroundColor:palette.accent}}/>
                     <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
-                  </span>
-                  {id==="signature"?"CAN Signature":id.startsWith("brand-")
-                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"Site")+" palette":id}
-                </Button>;
+                  </span>}
+                  className="h-full min-h-16 capitalize" />;
               })}
             </div>
             {brandDirection && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
@@ -70,16 +68,14 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
                 Apply suggested palette
               </Button>
             </div>}
-            <p className="mt-4 text-xs text-muted-foreground">
-              Custom colors are not available in this editor yet. Choose a validated palette above.
-            </p>
+
           </fieldset>
         </DisclosureSection>
-        <DisclosureSection title="Typography" description="Actual rendered font stacks and pairing choices" defaultOpen>
+        <DisclosureSection title="Typography" defaultOpen>
           <fieldset disabled={busy || !data.canEdit} className="space-y-4">
             <legend className="sr-only">Choose typography</legend>
             <Label className="block text-sm">
-              <span className="font-medium">Curated typography pairing</span>
+              <span className="font-medium">Font pairing</span>
               <Select value={content.branding.typographyId ?? "editorial"}
                 onChange={event=>setContent(old=>({...old,branding:{...old.branding,
                   typographyId:event.target.value as SiteTypographyId,headingFontId:undefined,bodyFontId:undefined}}))}
@@ -97,7 +93,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
                   value={content.branding[key] ?? ""}
                   onChange={event=>setContent(old=>({...old,branding:{...old.branding,
                     [key]:event.target.value?event.target.value as SiteFontId:undefined}}))}>
-                  <option value="">Use pairing default</option>
+                  <option value="">Use default</option>
                   {Object.entries(siteFontCatalog).map(([id,font])=><option key={id} value={id}>{font.label}</option>)}
                 </Select>
               </Label>)}
@@ -110,7 +106,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
                 const fontFamily=key==="headingFontId"?theme.displayFont:theme.bodyFont;
                 return <div key={key} className="min-w-0 border bg-background p-3">
                   <p className="text-xs font-semibold text-muted-foreground">
-                    {key==="headingFontId"?"Heading":"Body"} · {chosen?siteFontCatalog[chosen].label:"Curated pairing"}
+                    {key==="headingFontId"?"Heading":"Body"} · {chosen?siteFontCatalog[chosen].label:"Default pairing"}
                   </p>
                   <p className="mt-3 break-words text-2xl" style={{fontFamily}}>Learn with purpose.</p>
                   <p className="mt-2 break-words text-sm" style={{fontFamily}}>Every Site has a story worth sharing.</p>
@@ -119,7 +115,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
             </div>
           </fieldset>
         </DisclosureSection>
-        <DisclosureSection title="Wordmark & Logo" description="Preview the Site wordmark and upload approved logo artwork">
+        <DisclosureSection title="Wordmark & Logo">
           <div className="space-y-4">
             <SchoolBrandPreview siteId={data.siteId} schoolName={data.siteName} branding={content.branding}/>
             <WebsiteArtworkField field="logoImage" value={content.branding.logoImage ?? null}
@@ -127,12 +123,9 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
               onChange={next=>setContent(old=>({...old,branding:{...old.branding,logoImage:next}}))}/>
           </div>
         </DisclosureSection>
-        <DisclosureSection title="Imagery" description="Site-owned artwork, privacy rights and approved media">
+        <DisclosureSection title="Imagery">
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Template gallery samples are fictional. They will never be added to your real Site's photo library.
-              Uploaded artwork stays out of all previews until the rights and consent checks pass.
-            </p>
+            <p className="text-sm text-muted-foreground">Only use images you have permission to share.</p>
             <WebsiteArtworkField field="heroImage" value={content.branding.heroImage}
               disabled={busy || !data.canPublish} onSelect={selectArtwork}
               onChange={next=>setContent(old=>({...old,branding:{...old.branding,heroImage:next}}))}/>

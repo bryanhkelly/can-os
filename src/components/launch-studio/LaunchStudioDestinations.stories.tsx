@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { LaunchModuleDestinationV61 } from "./LaunchModuleDestinationV61";
 
 /**
- * Governed Open handoff fixture only. Introduce now uses the real shared
+ * Governed Launch handoff fixture only. Share now uses the real shared
  * MarketingPackagesV61 route and should not be portrayed as a placeholder.
  */
 const meta = {
@@ -12,8 +12,8 @@ const meta = {
   args: {
     siteId: "00000000-0000-4000-8000-000000000001",
     module: "open",
-    title: "Open",
-    stage: "Open",
+    title: "Opening Checklist",
+    stage: "Launch",
   },
 } satisfies Meta<typeof LaunchModuleDestinationV61>;
 export default meta;
@@ -21,6 +21,6 @@ type Story = StoryObj<typeof meta>;
 
 export const FinalGate: Story = {
   args: {
-    module: "open", title: "Open", stage: "Open",
+    module: "open", title: "Opening Checklist", stage: "Launch",
   },
 };
