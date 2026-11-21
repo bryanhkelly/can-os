@@ -130,13 +130,13 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
         actor.role === "room_facilitator") {
       return resolveCanonicalSiteStaffFromCan(actor, request);
     }
-    // CAN school students already have one directly authenticated Person and
-    // exact Site grant. Native Class participation uses that same identity,
-    // never a second adult-only credential or the demo-admin persona switch.
-    // Course Attempt and Class Enrollment authorizers still verify the exact
-    // Person, Site, Course and active participation on each request.
+    // CAN school students use their server-resolved active Person and exact
+    // Site grant. A trusted admin account-switch session may act as that
+    // student; its active Person is still validated against the enrollment.
+    // Course Attempt and Class Enrollment authorizers independently verify
+    // Person, Site, Course and active participation on every request.
     if (actor.role === "student") {
-      if (!actor.actorPersonId || actor.sessionAccountId ||
+      if (!actor.actorPersonId ||
           !actor.grantSiteId || actor.scope.siteIds?.length !== 1 ||
           actor.scope.organizationIds?.length !== 1 ||
           !actor.capabilities.has("student:read")) {
