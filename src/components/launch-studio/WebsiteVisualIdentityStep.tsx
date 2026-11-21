@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { DisclosureSection } from "@/components/workspace/disclosure-section";
+import { SelectionCard } from "@/components/workspace";
 import { WebsiteArtworkField } from "./WebsiteArtworkField";
 import { SchoolBrandPreview } from "./SchoolBrandPreview";
 import { SchoolMediaFolderManager } from "@/components/operations/SchoolMediaFolderManager";
@@ -49,18 +50,18 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
               {sitePaletteIds.map(id=>{
                 const palette=resolveSiteTheme(id,content.branding.typographyId);
                 const current=(content.branding.paletteId ?? "signature")===id;
-                return <Button type="button" variant="outline" aria-pressed={current} key={id}
-                  onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
-                  className="h-auto min-h-16 w-full flex-col items-stretch gap-1 whitespace-normal border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
-                  <span className="mb-2 flex h-5 overflow-hidden" aria-hidden="true">
+                return <SelectionCard key={id} kind="radio" name="site-color-palette"
+                  value={id} checked={current}
+                  onChange={checked=>{if(checked)setContent(old=>({...old,branding:{...old.branding,paletteId:id}}));}}
+                  title={id==="signature"?"CAN Signature":id.startsWith("brand-")
+                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"Site")+" palette":id}
+                  icon={<span className="flex h-5 w-20 shrink-0 overflow-hidden" aria-hidden="true">
                     <span className="flex-1" style={{backgroundColor:palette.ink}}/>
                     <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
                     <span className="flex-1" style={{backgroundColor:palette.accent}}/>
                     <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
-                  </span>
-                  {id==="signature"?"CAN Signature":id.startsWith("brand-")
-                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"Site")+" palette":id}
-                </Button>;
+                  </span>}
+                  className="h-full min-h-16 capitalize" />;
               })}
             </div>
             {brandDirection && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
