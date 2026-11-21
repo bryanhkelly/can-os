@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions, communicationThreads, programPublications, programs, publicAdmissionsInterests,
@@ -10,7 +10,7 @@ import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { familyInvitationBatchMetadataSchema, isFamilyInvitationExpired } from "@/domain/family-invitations";
 import { invitedFamilyInterestInput, type InvitedFamilyInterestInput } from "@/domain/family-recruitment-interest";
-import { publicAdmissionsInterestInput, publicInterestMessage, publicInterestRateLimitKeys, type PublicInterestRoute, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
+import { publicAdmissionsInterestInput, publicSiteInterestInput, publicSiteInterestMessage, publicInterestMessage, publicInterestRateLimitKeys, type PublicInterestRoute, type PublicAdmissionsInterestInput, type PublicSiteInterestInput } from "@/domain/public-admissions-interest";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -204,6 +204,93 @@ export async function recordPublicAdmissionsInterest(
         programId: input.programId },
       after: { status: "new", source: "published_site" },
       context: { anonymous: true },
+    });
+  });
+}
+
+/**
+ * Level 1 Site interest is stored in the SAME canonical admissions-interest
+ * inbox and follow-up Actions as published Program interest. A Site may
+ * collect voluntary contact requests without creating or publishing a
+ * Program. This never reserves a seat or creates a family/student record.
+ */
+export async function recordPublicSiteInterest(
+  slug:string,input:PublicSiteInterestInput,
+):Promise<void>{
+  if(!isPublicSiteSlug(slug))throw new Error("This Site is not accepting inquiries");
+  const data=publicSiteInterestInput.parse(input);
+  if(data.website.trim())return; // Honeypot.
+  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+  if(!pepper||pepper.length<32)throw new Error("Inquiry security is unavailable");
+  await db.transaction(async tx=>{
+    const [site]=await tx.select({
+      siteId:sites.id,organizationId:sites.organizationId,
+    }).from(sitePublications).innerJoin(sites,eq(sites.id,sitePublications.siteId))
+      .where(and(eq(sitePublications.slug,slug),
+        eq(sitePublications.status,"published"),
+        isNotNull(sitePublications.publishedAt)))
+      .for("share",{of:sitePublications}).limit(1);
+    if(!site)throw new Error("Site inquiries are unavailable");
+    const emailDigest=createHmac("sha256",pepper)
+      .update(site.siteId).update(":site:")
+      .update(data.interestKind).update(":")
+      .update(data.email).digest("hex");
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${emailDigest}))`);
+    const cutoff=new Date(Date.now()-24*60*60*1000);
+    const [recent]=await tx.select({id:publicAdmissionsInterests.id})
+      .from(publicAdmissionsInterests).where(and(
+        eq(publicAdmissionsInterests.siteId,site.siteId),
+        isNull(publicAdmissionsInterests.programId),
+        eq(publicAdmissionsInterests.emailDigest,emailDigest),
+        gt(publicAdmissionsInterests.createdAt,cutoff),
+      )).orderBy(desc(publicAdmissionsInterests.createdAt)).limit(1);
+    if(recent)return; // Do not disclose duplicate state.
+    const [created]=await tx.insert(publicAdmissionsInterests).values({
+      requestId:data.requestId,siteId:site.siteId,programId:null,
+      contactFirstName:data.firstName,contactLastName:data.lastName,
+      contactEmail:data.email,emailDigest,
+      message:publicSiteInterestMessage(data),
+      source:"published_site_general",contactConsentAt:new Date(),status:"new",
+    }).onConflictDoNothing().returning({id:publicAdmissionsInterests.id});
+    if(!created)return;
+    const [followup]=await tx.insert(actions).values({
+      type:"public_admissions_interest_followup",
+      subjectType:"public_admissions_interest",subjectId:created.id,
+      title:data.interestKind==="tuition_updates"?
+        "Follow up on Site tuition and funding interest":
+        data.interestKind==="interest_list"?
+        "Follow up on Site interest-list signup":"Follow up on Site information request",
+      organizationId:site.organizationId,siteId:site.siteId,
+      programId:null,status:"open",priority:"normal",
+      metadata:{source:"published_site_general",kind:data.interestKind},
+    }).returning({id:actions.id});
+    if(!followup)throw new Error("Unable to create Site interest follow-up");
+    await emitEvent(tx,{
+      eventType:EventTypes.ActionCreated,aggregateType:"action",
+      aggregateId:followup.id,siteId:site.siteId,
+      organizationId:site.organizationId,
+      payload:{type:"public_admissions_interest_followup",subjectId:created.id},
+    });
+    await writeAudit(tx,{
+      action:"admissions.public_interest.followup_created",
+      resourceType:"action",resourceId:followup.id,actorPersonId:null,
+      scope:{organizationId:site.organizationId,siteId:site.siteId},
+      after:{subjectType:"public_admissions_interest",subjectId:created.id,status:"open"},
+      context:{anonymous:true},
+    });
+    // Audit and events never contain visitor names, email, message or EIN.
+    await emitEvent(tx,{
+      eventType:EventTypes.PublicAdmissionsInterestReceived,
+      aggregateType:"public_admissions_interest",aggregateId:created.id,
+      siteId:site.siteId,organizationId:site.organizationId,
+      payload:{source:"published_site_general",kind:data.interestKind,status:"new"},
+    });
+    await writeAudit(tx,{
+      action:"admissions.public_site_interest.receive",
+      resourceType:"public_admissions_interest",resourceId:created.id,actorPersonId:null,
+      scope:{organizationId:site.organizationId,siteId:site.siteId},
+      after:{status:"new",source:"published_site_general",kind:data.interestKind},
+      context:{anonymous:true},
     });
   });
 }
