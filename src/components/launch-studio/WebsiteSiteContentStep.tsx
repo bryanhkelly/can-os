@@ -9,6 +9,7 @@ import { WebsiteTemplateSourceGuide } from "./WebsiteTemplateSourceGuide";
 import { WebsiteLeadershipEditor } from "./WebsiteLeadershipEditor";
 import {
   restoreOriginalWebsiteField, websiteStarterFieldIds,
+  createSiteWebsiteEditorialBaseline, refreshSiteWebsiteSuggestedCopy,
   type SiteLocalContent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
@@ -41,9 +42,28 @@ export function WebsiteSiteContentStep({
   onContentBlocksSaved:()=>void;onContentBlocksDirty:(dirty:boolean)=>void;
 }){
   const canReuse=content.contentReuseConsent === "granted";
+  const schoolExperience=data.siteExperienceProfile==="school";
+  const fields=contentFields.map(field=>{
+    if(schoolExperience)return field;
+    if(field.key==="heroHeadline")return {...field,
+      help:"The first words visitors see. Your saved Site name remains in the header."};
+    if(field.key==="welcomeMessage")return {...field,
+      label:"Welcome to learners",help:"Introduce the people and community you hope to serve."};
+    if(field.key==="schoolVision")return {...field,
+      help:"What might participants learn or experience here?",
+      shownOn:"Homepage Vision and About → Our learning vision; may supply the community-story fallback."};
+    if(field.key==="leadershipWelcome")return {...field,
+      help:"Optional words approved by your host or Site leader for visitors."};
+    return field;
+  });
+  const expectedCopy=createSiteWebsiteEditorialBaseline(data.siteName,data.siteExperienceProfile).fields;
+  const originalCopy=content.editorialBaseline?.fields;
+  const refreshable=canReuse&&originalCopy
+    ? websiteStarterFieldIds.filter(field=>content[field]===originalCopy[field] &&
+        content[field]!==expectedCopy[field]) : [];
   const primaryFields=websiteStarterFieldIds.map(key=>
-    contentFields.find(field=>field.key===key)!);
-  const additionalFields=contentFields.filter(field=>
+    fields.find(field=>field.key===key)!);
+  const additionalFields=fields.filter(field=>
     ["churchHistory","leadershipWelcome","localTraditions","denomination",
       "statementOfFaith","spiritualFormation"].includes(field.key));
   const renderField=(field:WebsiteCopyFieldSpec)=>
@@ -73,6 +93,20 @@ export function WebsiteSiteContentStep({
       </p>
       <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/" />
     </details>
+    {refreshable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border border-border p-4" role="status">
+      <div>
+        <p className="text-sm font-semibold">Program and audience suggestions have changed</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {refreshable.length} untouched suggested fields can be updated for the current Site plan.
+          Your own wording, approved offerings and saved website versions stay unchanged.
+        </p>
+      </div>
+      <Button type="button" variant="outline" disabled={busy||!data.canEdit}
+        onClick={()=>setContent(old=>refreshSiteWebsiteSuggestedCopy(
+          old,data.siteName,data.siteExperienceProfile))}>
+        Refresh suggested wording
+      </Button>
+    </div>}
     {canReuse&&data.siteStoryCopyCandidates.length>0&&
       <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
         <span className="text-sm">
