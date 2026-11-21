@@ -43,6 +43,18 @@ The existing `projectSiteContentBriefV61` projection exposes `identity` to the a
 
 Old Sites with no saved identity retain all their records and receive an unclassified default, never a guessed religious identity. The Site Information step asks for a classification at the next edit. Identity changes update the Site revision so existing outreach plans can indicate that their source context changed. No new database table, duplicated content store, or operating authorization is introduced.
 
+## Truthful state and source language
+
+Keep **saved outreach plans**, **working material previews**, and **complete downloadable material releases** distinct. The review step saves a plan; creation of coordinated materials is a later action. Do not tell users that materials are ready unless a complete downloadable release is known. If release history cannot be loaded, say so rather than treating it as empty.
+
+Follow Up links currently open Site-wide inquiries and interest-event records. Do not imply responses were tied to a specific outreach unless actual attribution exists. Saving a plan, choosing a format, generating materials, sending communications, publishing the website, and opening registration are separate actions.
+
+Never say suggested website text came from "the latest Site plan" if a particular refresh only derives wording from the saved Site name and broad learning profile. Label the specific source used. Site type guides website prompts and outreach drafting, while Program and audience interests guide suggested learning focus.
+
+The Program Catalog's Establish context includes both broad interest IDs and selected Program codes. Showing an empty interest state when Program codes exist is incorrect. Published Program names are preferable to raw internal codes.
+
+Keep approval warnings next to publication, review and registration decisions. Ordinary preparation and editing pages should focus on what the person can accomplish next.
+
 ## Safety and trust
 
 Preserve actual approvals, content and image consent, publisher authority, and readiness requirements. Be explicit when a decision matters. A shareable preview is not public publication, website publication does not open program registration, and saving a plan does not approve an offering. Do not make these warnings the dominant text of every step.
