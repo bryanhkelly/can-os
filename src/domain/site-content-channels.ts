@@ -176,7 +176,7 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
   },
   "learning.interests": {
     label: "Proposed learning programs", privateOnly: false,
-    description: "Proposed plans selected in Launch Studio. They are descriptive, not authorized Offerings."
+    description: "Proposed plans selected in Launch Studio. They are descriptive, not authorized Offerings.",
     defaultTitle: "Programs you are exploring", defaultEyebrow: "Your learning community",
     defaultDescription: "These are planning interests, not approved offerings or enrollment opportunities.",
   },
