@@ -130,6 +130,32 @@ describe("public demo session isolation", () => {
       launchSiteId:LOCAL_DEMO_ADMIN.siteId,
     });
   });
+  it("allows any verified, correctly scoped Valor demo Person without a fixed ID", async () => {
+    const newStudent = {
+      ...studentGrant, id:"new-verified-grant", accountId:"new-can-account",
+      personId:"new-canonical-person", email:"verified-new@valorschool.demo",
+      emailVerifiedAt:new Date("2026-11-20T12:00:00Z"),
+    };
+    state.rows=[[newStudent]];
+    expect(await readSessionGrants(newStudent.accountId,newStudent.email)).toEqual({
+      grants:[newStudent],demoAccountSwitching:false,
+    });
+  });
+  it("rejects disabled, unverified and wrong-Site demo memberships", async () => {
+    const base={
+      ...studentGrant,id:"new-verified-grant",accountId:"new-can-account",
+      personId:"new-canonical-person",email:"verified-new@valorschool.demo",
+      emailVerifiedAt:new Date("2026-11-20T12:00:00Z"),
+    };
+    for(const invalid of [
+      {emailVerifiedAt:null},{siteId:"another-site"},
+      {organizationId:"other-organization"},{email:"other@example.test"},
+    ]){
+      const candidate={...base,...invalid};
+      state.rows=[[candidate]];
+      expect((await readSessionGrants(base.accountId,base.email)).grants).toEqual([]);
+    }
+  });
   it("does not grant code access to arbitrary demo-domain identities", async () => {
     state.rows = [[{ ...studentGrant, accountId: "new-account" }]];
     expect(await readSessionGrants("new-account", "new.family@valorschool.demo"))
