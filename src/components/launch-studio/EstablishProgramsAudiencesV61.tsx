@@ -207,7 +207,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
         try { await onSaveAndExit(); }
         catch (failure) {
           setError(failure instanceof Error ? failure.message :
-            "Changes saved, but sign-out failed. Use the Account menu to sign out.");
+            "Your changes were saved, but we could not open your Site Workspace. Try again from the navigation.");
         }
       }
       else onContinueToWebsiteBrand();
@@ -370,7 +370,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
           step===0?"Back to Site Information":"Previous step"}
       </Button>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Sign Out</Button>
+        <Button variant="ghost" disabled={disabled} onClick={() => void save(true)}>Save & Exit</Button>
         {step!==2
           ? <Button disabled={disabled} onClick={() => selectStep((step+1) as InternalStep)}>
               Continue to {step===0?"Audiences":"Experiences"} <ArrowRight aria-hidden="true"/>
