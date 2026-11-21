@@ -5,6 +5,8 @@ import { WorkspaceShell } from "@/components/workspace";
 import { workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import { optionalSearchString, siteProgramSelectionSchema } from "@/lib/route-search";
 import { isValidDateOnly } from "@/modules/calendar/timezone";
+import { ProfileHome, loadProfileHome } from "./profiles";
+import { SafeguardingHome, loadSafeguardingHome } from "./safeguarding";
 
 const StudentHome = lazy(() => import("@/components/home/StudentHome").then(module => ({ default: module.StudentHome })));
 const TeacherHome = lazy(() => import("@/components/home/TeacherHome").then(module => ({ default: module.TeacherHome })));
@@ -12,8 +14,6 @@ const FamilyHome = lazy(() => import("@/components/home/GuardianHome").then(modu
 const OperationsHome = lazy(() => import("@/components/home/OperationsHome").then(module => ({ default: module.OperationsHome })));
 const SiteDayHome = lazy(() => import("@/components/operations/SiteDayPage").then(module => ({ default: module.SiteDayPage })));
 const CoachHome = lazy(() => import("@/components/home/CoachHome").then(module => ({ default: module.CoachPage })));
-const ProfileHome = lazy(() => import("./profiles").then(module => ({ default: module.ProfileHome })));
-const SafeguardingHome = lazy(() => import("./safeguarding").then(module => ({ default: module.SafeguardingHome })));
 const WebsiteHome = lazy(() => import("./site-website").then(module => ({ default: module.WebsiteHome })));
 const NetworkHome = lazy(() => import("@/components/home/NetworkHome").then(module => ({ default: module.NetworkHome })));
 const StewardHome = lazy(() => import("@/components/home/StewardHome").then(module => ({ default: module.CANPartnerDesk })));
@@ -51,10 +51,10 @@ export async function loadHomeDashboard(role: string, search: HomeSearch) {
         siteId: search.siteId, programId: search.programId,
       }) } as const;
     case "paraeducator":
-      return { kind: "profile", outcome: await (await import("./profiles")).loadProfileHome(search.person) } as const;
+      return { kind: "profile", outcome: await loadProfileHome(search.person) } as const;
     case "safeguarding_responder":
     case "safeguarding_lead":
-      return { kind: "safeguarding", outcome: await (await import("./safeguarding")).loadSafeguardingHome() } as const;
+      return { kind: "safeguarding", outcome: await loadSafeguardingHome() } as const;
     case "site_website_editor":
       return { kind: "website", outcome: await (await import("./site-website")).loadWebsiteHome(search.siteId) } as const;
     case "network_admin":
