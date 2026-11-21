@@ -207,8 +207,18 @@ export async function readSessionGrants(accountId: string, email: string, reader
     };
   }
 
+  // The original fixed accounts retain their controlled demo login bindings.
+  // Additional verified users of the same Site use their own CAN grants.
+  // This exception belongs solely to demo authentication, not domain services.
+  const fixed = LOCAL_DEMO_ACCOUNTS.some(account =>
+    account.accountId === accountId && account.email === normalizedEmail);
   const grants = ownGrants.filter(grant =>
-    isApprovedDemoGrant(grant, normalizedEmail),
+    fixed ? isApprovedDemoGrant(grant, normalizedEmail) :
+      normalizedEmail.endsWith("@valorschool.demo") &&
+      grant.email === normalizedEmail &&
+      grant.emailVerifiedAt !== null &&
+      grant.organizationId === LOCAL_DEMO_ADMIN.organizationId &&
+      grant.siteId === LOCAL_DEMO_ADMIN.siteId,
   );
   return { grants, demoAccountSwitching: false };
 }
