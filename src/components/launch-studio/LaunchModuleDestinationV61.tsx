@@ -3,7 +3,7 @@
  * honest planned states instead of a shared "not connected" placeholder.
  * These links do not grant Site, Program, Blueprint or publication authority.
  */
-import { StatusBadge, WorkspaceActionLink, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { WorkspaceActionLink, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import type { siteLaunchModules } from "./LaunchStudioOverviewV61";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import { LaunchReadinessPanelV61 } from "./LaunchReadinessPanelV61";
@@ -52,9 +52,6 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
     subtitle={destination.subtitle} width="wide"
     rail={<LaunchGuidancePanels guidance={{ why: destination.intro, next: destination.note }} />}>
     <div className="mt-5 space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <StatusBadge tone="neutral">Opening checklist</StatusBadge>
-      </div>
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
       <WorkspacePanel title={module === "open" ? "Welcome participants" : "Your next steps"}
         description={module === "open"
