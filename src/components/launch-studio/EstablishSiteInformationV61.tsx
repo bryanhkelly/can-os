@@ -44,7 +44,7 @@ export type SiteInformationV61Initial = {
 
 const steps = [
   { title: "Hosting & Organization", description: "Your Site identity and who supports it" },
-  { title: "Learning Environment", description: "Where and how people participate" },
+  { title: "How People Participate", description: "Where and how your activities take place" },
   { title: "Network Affiliation", description: "Optional connections" },
   { title: "Purpose & Story", description: "Why this community exists" },
 ] as const;
@@ -352,7 +352,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
 
   return <section aria-label="Site Information" className="min-w-0 space-y-5">
     <GuidedSetupShell title="Site Information"
-      description="Describe your site, how people will participate, and the story behind your vision."
+      description="Tell us about your community, how people will take part and what inspires you."
       steps={progressSteps} progressLabel="Site Information sections"
       onStepChange={id => selectStep(Number(id) as Step)}
       navigationDisabled={busy || reloadRequired}>
@@ -499,17 +499,17 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         </fieldset>
       </div>
     </WorkspacePanel>}
-    {step === 1 && <WorkspacePanel id="site-information-step-1" title="Learning Environment"
-      description="How will people participate?">
+    {step === 1 && <WorkspacePanel id="site-information-step-1" title="How People Participate"
+      description="Will people join in person, online or both?">
       <div className="space-y-5">
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold">How will people participate?</legend>
           <div className="grid gap-2 lg:grid-cols-3">
-            <SelectionCard kind="radio" name="site-delivery" title="In person" detail="At a physical learning location"
+            <SelectionCard kind="radio" name="site-delivery" title="In person" detail="At a physical location"
               checked={environment.delivery === "physical"} onChange={() => setEnvironment(current => ({ ...current, delivery: "physical" }))} />
-            <SelectionCard kind="radio" name="site-delivery" title="Online" detail="Participate remotely"
+            <SelectionCard kind="radio" name="site-delivery" title="Online" detail="Join from anywhere with an internet connection"
               checked={environment.delivery === "digital"} onChange={() => setEnvironment(current => ({ ...current, delivery: "digital" }))} />
-            <SelectionCard kind="radio" name="site-delivery" title="Both" detail="In-person and online learning"
+            <SelectionCard kind="radio" name="site-delivery" title="Both" detail="In person and online"
               checked={environment.delivery === "both"} onChange={() => setEnvironment(current => ({ ...current, delivery: "both" }))} />
           </div>
         </fieldset>
