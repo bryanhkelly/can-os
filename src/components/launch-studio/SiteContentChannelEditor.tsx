@@ -127,7 +127,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
           These controls cannot create, approve, publish, or enroll in a Program.
         </p>
       </div>
-      <span className="border px-3 py-2 text-xs text-muted-foreground">Configuration revision {revision}</span>
+      <span className="border px-3 py-2 text-xs text-muted-foreground">Saved layout v{revision}</span>
     </div>
     <div className="mt-5 space-y-4">
       {blocks.map(block=>{
@@ -233,7 +233,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
       <Button variant="outline" disabled={!addChannel} onClick={addBlock}><Plus/> Add block</Button>
     </div>}
     {error&&<p role="alert" className="mt-4 border border-destructive p-3 text-sm text-destructive">{error}</p>}
-    {saved&&<p role="status" className="mt-4 text-sm text-success">Saved as a private Site configuration. The preview has been refreshed. Publish separately to update the public website.</p>}
+    {saved&&<p role="status" className="mt-4 text-sm text-success">Your changes are saved, and your private preview is updated. Publish the website when you're ready for visitors to see them.</p>}
     {published&&<p role="status" className="mt-4 text-sm text-success">Website content block settings published. This does not approve Programs or make a Site publicly reachable.</p>}
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
       <p className="max-w-xl text-xs leading-5 text-muted-foreground">
