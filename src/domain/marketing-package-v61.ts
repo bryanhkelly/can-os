@@ -31,7 +31,7 @@ export const outreachPlanSchemaV61 = z.object({
   action: z.enum(["learn-more","express-interest","share-feedback","attend-event","schedule-conversation"]),
   channels: z.array(z.enum(["email","social","print","text","share-link","conversation-kit"])).max(6),
   storyAngle: z.enum(["impact","opportunity","partnership"]),
-  /** Establish source observed when the outreach plan was created.
+  /** Shape source observed when the outreach plan was created.
    * Revisions warn operators; previously generated materials stay immutable. */
   sourceSiteRevision:z.string().datetime({offset:true}).optional(),
 }).strict();
