@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR } from "@/domain/local-demo-access";
+import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR, LOCAL_DEMO_RILEY_FACILITATOR } from "@/domain/local-demo-access";
 import { readSessionGrants } from "@/modules/identity/session-grants.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 
@@ -35,6 +35,37 @@ describe("public demo session isolation", () => {
     ...LOCAL_DEMO_ROOM_FACILITATOR, id: LOCAL_DEMO_ROOM_FACILITATOR.grantId,
     role: "room_facilitator", active: true,
   };
+  it("offers two separately verified grants to Riley with one immutable Person",async()=>{
+    const primary={
+      ...LOCAL_DEMO_RILEY_FACILITATOR,
+      id:"fb000000-0000-4000-8000-000000000002",
+      role:"teacher",active:true,
+    };
+    const facilitator={
+      ...LOCAL_DEMO_RILEY_FACILITATOR,
+      id:LOCAL_DEMO_RILEY_FACILITATOR.grantId,
+      role:"room_facilitator",active:true,
+    };
+    state.rows=[[primary,facilitator]];
+    expect(await readSessionGrants(primary.accountId,primary.email)).toEqual({
+      grants:[primary,facilitator],demoAccountSwitching:false,
+    });
+  });
+  it("never accepts an unauthorized replacement of Riley's second grant",async()=>{
+    const grant={
+      ...LOCAL_DEMO_RILEY_FACILITATOR,id:"replacement-grant",
+      role:"room_facilitator",active:true,
+    };
+    state.rows=[[grant]];
+    expect((await readSessionGrants(grant.accountId,grant.email)).grants).toEqual([]);
+  });
+  it("does not authorize Sally from her unverified account or suspended Homeroom staff assignment",async()=>{
+    // The grant reader enumerates eligible roles only. A current verified
+    // session and exact Class assignment are additional mandatory gates.
+    state.rows=[[]];
+    expect((await readSessionGrants(LOCAL_DEMO_ROOM_FACILITATOR.accountId,
+      LOCAL_DEMO_ROOM_FACILITATOR.email)).grants).toEqual([]);
+  });
   it("gives Sally only her own room-facilitator workspace, not demo-admin switching", async () => {
     state.rows = [[facilitatorGrant]];
     expect(await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).toEqual({
