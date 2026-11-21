@@ -13,21 +13,21 @@ export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
       schedules, and approvals before it can be offered.
     </p>
     {!plans.length?<p className="mt-3 text-sm text-muted-foreground">
-      No saved Solution plans yet. Start with Program Catalog.
+      No solution plans saved yet. Explore the Program Catalog to begin.
     </p>:<div className="mt-4 space-y-3">{plans.map(plan=>
       <article key={plan.configurationId} className="border p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold">{plan.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {plan.template??"Saved template unavailable"}
+              {plan.template??"Solution details unavailable"}
               {plan.templateVersion!==null?" · v"+plan.templateVersion:""}
               {" · Saved version "+plan.revision}
             </p>
           </div>
           <StatusBadge tone={plan.nextAction==="resolve-template"?"attention":"neutral"}>
-            {plan.nextAction==="resolve-template"?"Review source version":
-              plan.lifecycle==="frozen"?"Submitted for review":"Private plan"}
+            {plan.nextAction==="resolve-template"?"Check solution version":
+              plan.lifecycle==="frozen"?"Submitted for review":"Saved draft"}
           </StatusBadge>
         </div>
         <p className="mt-3 text-sm">
@@ -41,14 +41,14 @@ export function SolutionPreparationSummaryV61({siteId,plans,open=false}:{
             <li key={component.key} className="border-l-2 pl-3">
               <strong className="capitalize">{component.key.replaceAll("_"," ")}</strong>
               {component.independentReview&&<span className="text-muted-foreground">
-                {" · Independent review required"}</span>}
+                {" · Separate review required"}</span>}
               {component.description&&<p className="text-xs text-muted-foreground">{component.description}</p>}
             </li>)}</ul>
         </details>}
         {open&&<div className="mt-3 space-y-1 text-xs text-muted-foreground">
-          <p>Learning content published: {plan.publishedProduct?"Present":"Not verified as published"}</p>
-          <p>Registration setup: {plan.publisherCandidateCount===null?"Unavailable":
-            plan.publisherCandidateCount>0?"Candidate visible":"No eligible candidate returned"}</p>
+          <p>Learning offering published: {plan.publishedProduct?"Yes":"Not confirmed"}</p>
+          <p>Registration options: {plan.publisherCandidateCount===null?"Could not be checked":
+            plan.publisherCandidateCount>0?"Potential option available":"None confirmed yet"}</p>
           <p>Active noncredit registrations: {plan.openRegistrationCount===null?"Unavailable":
             plan.openRegistrationCount}</p>
           <p>Complete all required approvals before opening registration.</p>
