@@ -11,6 +11,7 @@ import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
+import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { EstablishSiteProfileUnified, EstablishSiteProfileGuidance } from "@/components/launch-studio/EstablishSiteProfileUnified";
 import { EstablishSiteInformationV61, SiteInformationV61Guidance, type SiteInformationV61Initial } from "@/components/launch-studio/EstablishSiteInformationV61";
@@ -176,12 +177,12 @@ function SiteLaunchPage() {
         onSaveAndExit={signOutOfWorkspace}
         onContinueToSiteInformation={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })} />
     </WorkspaceShell> : selected?.id === "site-information" && siteInformation ? <SiteInformationBody
-      site={site} initial={siteInformation} organizations={organizations}
+      key={site.id} site={site} initial={siteInformation} organizations={organizations}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-profile" } })}
       onExit={signOutOfWorkspace}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "programs-audiences" } })} />
     : selected?.id === "programs-audiences" && programsAudiences ? <ProgramsAudiencesBody
-      siteId={site.id} initial={programsAudiences}
+      key={site.id} siteId={site.id} initial={programsAudiences}
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })}
       onExit={signOutOfWorkspace}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
@@ -246,13 +247,14 @@ function SiteInformationBody({ site, initial, organizations, onBack, onExit, onC
   onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
   const organization = organizations.find(item => item.id === site.organizationId);
   return <WorkspaceShell title="Site Information" eyebrow="Shape / Site Information"
     subtitle="Shape your learning environment and introduce the community behind your Site."
-    width="wide" rail={<SiteInformationV61Guidance step={step} />}>
+    width="wide" rail={<SiteInformationV61Guidance step={step} guide={guide} />}>
     <EstablishSiteInformationV61 key={site.id + ":" + initial.revision}
       siteId={site.id} responsibleOrganizationName={organization?.name ?? null}
-      initial={initial} onInternalStepChange={setStep}
+      initial={initial} onInternalStepChange={setStep} onGuideChange={setGuide}
       onBackToSiteProfile={onBack} onSaveAndExit={onExit}
       onContinueToPrograms={onContinue} />
   </WorkspaceShell>;
@@ -265,12 +267,13 @@ function ProgramsAudiencesBody({ siteId, initial, onBack, onExit, onContinue }: 
   onBack: () => void; onExit: () => Promise<void>; onContinue: () => void;
 }) {
   const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
   return <WorkspaceShell title="What could your community learn?"
     eyebrow="Shape / Programs & Audiences"
     subtitle="Choose your Programs, audiences and Experiences. Your vision can shape website content before Solutions are approved."
-    width="wide" rail={<ProgramsAudiencesV61Guidance step={step} />}>
+    width="wide" rail={<ProgramsAudiencesV61Guidance step={step} guide={guide} />}>
     <EstablishProgramsAudiencesV61 key={siteId + ":" + initial.revision}
-      siteId={siteId} initial={initial} onInternalStepChange={setStep}
+      siteId={siteId} initial={initial} onInternalStepChange={setStep} onGuideChange={setGuide}
       onBackToSiteInformation={onBack} onSaveAndExit={onExit}
       onContinueToWebsiteBrand={onContinue} />
   </WorkspaceShell>;
