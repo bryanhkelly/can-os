@@ -548,6 +548,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false,
               </Select>
             </Label>
           </div>
+          <p className="text-xs leading-5 text-muted-foreground">
+            These choices describe this solution plan, not your Site identity. Change the Site type in Establish → Site Information. Faith affiliation here is self-described and does not verify network membership.
+          </p>
           <BlueprintComponentPicker
             components={selectedTemplate.components}
             selected={selectedComponents} disabled={editingDisabled}
