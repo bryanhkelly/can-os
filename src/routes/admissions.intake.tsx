@@ -6,7 +6,7 @@ import type { AdmissionsDecision } from "@/components/admissions/AdmissionsDecis
 import type { GuardianVerification } from "@/components/admissions/AdmissionsGuardianActions";
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,redirect,useRouter} from "@tanstack/react-router";
-import {getAdmissionsStageCounts,listAdmissionsIntake,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {getAdmissionsStageCounts,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceShell} from "@/components/workspace";
@@ -27,12 +27,13 @@ const intakeSearchSchema=siteProgramSelectionSchema.extend({
  interest:optionalSearchString,
 });
 const load=async(selection:{interest?:string;siteId?:string;programId?:string;page?:number;studentPage?:number;search?:string;application?:string})=>{
- const [records,publicInterests,stageCounts]=await Promise.all([
+ const [records,publicInterests,stageCounts,programs]=await Promise.all([
   listAdmissionsIntake({data:{siteId:selection.siteId,programId:selection.programId,page:selection.page??1,search:selection.application?undefined:selection.search,applicationId:selection.application}}),
   listPublicAdmissionsInterests({data:{siteId:selection.siteId,programId:selection.programId}}),
   getAdmissionsStageCounts({data:{siteId:selection.siteId,programId:selection.programId,search:selection.search}}),
+  listAdmissionsIntakePrograms(),
  ]);
- return {records,publicInterests,stageCounts};
+ return {records,publicInterests,stageCounts,programs};
 };
 export const Route=createFileRoute("/admissions/intake")({
  validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string;page?:number;studentPage?:number;search?:string}=>intakeSearchSchema.parse(search),
@@ -110,7 +111,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className={buttonVariants({ variant: "outline" })}>Offers & enrollment →</Link>}>
   <div className="mt-5"><CreateAction><Link to="/admissions/intake/new" search={{siteId:selected.siteId,programId:selected.programId}}>New inquiry</Link></CreateAction></div>
   <MutationFeedback state={mutation} pendingMessage="Saving admissions records..." className="mt-5"/>
-  <PublicInterestInbox initialPage={data.publicInterests}
+  <PublicInterestInbox initialPage={data.publicInterests} availablePrograms={data.programs}
     siteId={selected.siteId} programId={selected.programId}/>
   <AdmissionsPipelineSummary counts={data.stageCounts}/>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
