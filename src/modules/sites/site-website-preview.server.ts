@@ -20,8 +20,8 @@ import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks, websitePreviewEditorialBlocks, projectMissingSiteExperienceSectionsForPreview } from "@/domain/site-content-channels";
-import { projectSiteExperienceBriefV61 } from "@/domain/site-content-brief-v61";
-import { readSiteProgramsAudiencesV61,siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
+import { projectSiteContentBriefV61 } from "@/domain/site-content-brief-v61";
+import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { emptySiteLocalContent, normalizeSiteLocalContent, safeSiteWebsitePreviewContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
@@ -65,16 +65,29 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   `);
   const draftStorageReady = draftConstraint.rows.some(row =>
     typeof row.definition === "string" && row.definition.includes("'draft'"));
-  const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
+  const [siteConfiguration] = await db.select({
+    metadata:sites.metadata,address:sites.address,timezone:sites.timezone,updatedAt:sites.updatedAt,
+  })
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
   const siteStorySource=siteStorySourceV61Schema.safeParse(siteConfiguration?.metadata?.siteStoryV61);
-  const storyCandidates=siteStorySource.success
-    ? suggestWebsiteCopyFromStory(siteStorySource.data.answers,site.name) : [];
   const savedBrand=await readSavedBrandVersion(site.id);
   const latestContent = history[0]?.content ?? local?.content;
   const rawEditingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
+  if(!siteConfiguration)throw new Error("Canonical Site configuration is unavailable.");
+  const siteBrief=projectSiteContentBriefV61({
+    siteId:site.id,siteName:site.name,timezone:siteConfiguration.timezone,
+    siteRevision:siteConfiguration.updatedAt.toISOString(),
+    metadata:siteConfiguration.metadata,
+    websiteContent:rawEditingContent,
+    websiteContentRevision:history[0]?.revision??null,
+    brandVersionId:savedBrand?.version.id??null,brandRevision:savedBrand?.version.revision??null,
+  });
+  // Website suggestions share the same explicit consented Story projection
+  // used for Introduce. Raw private answers remain editable in Site Information.
+  const storyCandidates=siteBrief.story
+    ? suggestWebsiteCopyFromStory(siteBrief.story,site.name):[];
   // The saved identity comes ONLY from site_brand_versions. Website history
   // stores the structural wireframe, not colors, logo, fonts or direction.
   const editingContent:SiteLocalContent|null=rawEditingContent && savedBrand
@@ -166,11 +179,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ...proposedPrograms,
     ...proposedExperiences,
   ];
-  // The same typed Experience projection serves Website & Brand and Introduce.
-  const plannedExperienceNames=preferences.success
-    ? projectSiteExperienceBriefV61(
-        readSiteProgramsAudiencesV61(preferences.data)).map(item=>item.title)
-    : [];
+  // Website & Brand and Introduce consume the same structured Site Brief.
+  const plannedExperienceNames=siteBrief.experiences.map(item=>item.title);
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     siteFunding:projectSiteFundingPublicContext(siteConfiguration?.metadata?.siteHostingV61),
