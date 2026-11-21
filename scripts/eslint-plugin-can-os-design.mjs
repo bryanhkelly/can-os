@@ -326,7 +326,7 @@ const noCustomGuidedSelections = {
       const className = attr(opening, "className");
       if (!className) return false;
       const source = context.sourceCode.getText(className);
-      return /(?:min-h-(?:16|20|24|28|32)|flex-col|items-start\\s+gap-3)/.test(source);
+      return /(?:min-h-(?:16|20|24|28|32)|flex-col|items-start.*gap-3)/.test(source);
     }
     return {
       JSXOpeningElement(node) {
