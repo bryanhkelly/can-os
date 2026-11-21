@@ -457,6 +457,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         <WorkspacePanel title="Review material previews" description="Each preview uses the saved Brand and current message. This is not a sent or published campaign.">
           <div className="flex flex-wrap gap-2">{record.content.formats.map(format=>
             <Button type="button" key={format} size="sm" variant={activePreviewFormat===format?"default":"outline"}
+              disabled={Boolean(editingFormat&&editingFormat!==format)}
               onClick={()=>setPreviewFormat(format)}>{format==="handout"?"Conversation Kit / Handout":format}</Button>)}</div>
           {activePreviewFormat&&<div className="mt-4">
             <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
@@ -465,12 +466,14 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           </div>}
           <div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" variant="outline"
-              disabled={busy||record.status==="archived"} onClick={()=>{
+              disabled={busy||record.status==="archived"||Boolean(editingFormat)} onClick={()=>{
                 setTitle(record.title);setContent(record.content);setStep(5);setView("wizard");
               }}>Edit overall message</Button>
             {activePreviewFormat&&<Button type="button" variant="outline"
-              disabled={busy||record.status==="archived"} onClick={()=>setEditingFormat(
-                current=>current===activePreviewFormat?null:activePreviewFormat)}>
+              disabled={busy||record.status==="archived"} onClick={()=>{
+                if(editingFormat===activePreviewFormat){setContent(record.content);setEditingFormat(null);}
+                else setEditingFormat(activePreviewFormat);
+              }}>
                 {editingFormat===activePreviewFormat?"Close material editor":"Customize this material"}
               </Button>}
           </div>
@@ -553,10 +556,10 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           onCopyCaption={id=>{void copyCaption(id);}}
           onCloseCompare={()=>setCompare(null)}/>
         <ActionFooter>
-          <Button variant="outline" onClick={()=>{setView("library");setRecord(null);}}>My Outreach</Button>
+          <Button variant="outline" disabled={Boolean(editingFormat)} onClick={()=>{setView("library");setRecord(null);}}>My Outreach</Button>
           <Button variant="outline" disabled={busy} onClick={()=>void duplicate(record)}><Copy aria-hidden="true"/> Duplicate</Button>
-          <Button variant="outline" disabled={busy||record.status==="archived"} onClick={()=>open(record,true)}>Edit plan</Button>
-          <Button disabled={busy} onClick={()=>setView("share")}>Use &amp; Share <ArrowRight aria-hidden="true"/></Button>
+          <Button variant="outline" disabled={busy||record.status==="archived"||Boolean(editingFormat)} onClick={()=>open(record,true)}>Edit plan</Button>
+          <Button disabled={busy||Boolean(editingFormat)} onClick={()=>setView("share")}>Use &amp; Share <ArrowRight aria-hidden="true"/></Button>
         </ActionFooter>
       </>}
       {view==="share"&&record&&<>
