@@ -23,10 +23,10 @@ export function StudentContinueLearningPanel({
     item.status === "active" && !!item.courseAttemptId);
   // Never pass a legacy section ID to the canonical Class detail route.
   const normalizedTitle = (title: string) => title.toLowerCase()
-    .split(/\s+[·|–]\s+/)[0].replace(/[^a-z0-9]+/g, " ").trim();
+    .split(/\s+[·|–]\s+/)[0]?.replace(/[^a-z0-9]+/g, " ").trim() ?? "";
   const matchingClasses = resume ? enrolledClasses.filter(item =>
     normalizedTitle(item.title) === normalizedTitle(resume.title)) : [];
-  const resumeClassId = matchingClasses.length === 1 ? matchingClasses[0].classId : null;
+  const resumeClassId = matchingClasses.length === 1 ? matchingClasses[0]?.classId ?? null : null;
   return <DashboardPanel id="continue-learning" title="Continue Learning"
           action={resume && resumeClassId?<Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons"}} className={textLink}>Open Class →</Link>:
             <Link to="/class" className={textLink}>View my classes →</Link>}>
