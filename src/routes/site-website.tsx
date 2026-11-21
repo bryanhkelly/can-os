@@ -1,6 +1,7 @@
 import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
+import { WebsiteContentConsentStep } from "@/components/launch-studio/WebsiteContentConsentStep";
 import { type SiteBrandConfiguration } from "@/domain/site-brand";
 import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
@@ -21,7 +22,7 @@ import { GuidedSetupShell } from "@/components/workflow";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
-import {
+import { emptySiteLocalContent, createSchoolWebsiteStarterContent, siteLocalContentLimits, websiteStarterFieldIds, type SiteLocalTextField,
   prepareWebsiteEditorContent, siteLocalImageMaxBytes,
   siteLocalImagePublicationGaps, type SiteLocalContent,
 } from "@/domain/site-local-content";
@@ -33,7 +34,7 @@ import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteE
 import {siteProgramSelectionSchema} from "@/lib/route-search";
 import { z } from "zod";
 
-export const websiteStudioStepIds = ["brand", "wireframe", "visual", "content", "review"] as const;
+export const websiteStudioStepIds = ["brand", "wireframe", "visual", "consent", "content", "review"] as const;
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
   // an invalid Site and open the editor under a different active membership.
@@ -100,8 +101,8 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   const data = outcome.data;
   const steps = [
     {id:"brand",title:"Brand Identity"}, {id:"wireframe",title:"Choose Wireframe"},
-    {id:"visual",title:"Visual Identity"}, {id:"content",title:"Your Content"},
-    {id:"review",title:"Review & Finish"},
+    {id:"visual",title:"Visual Identity"}, {id:"consent",title:"Content Consent"},
+    {id:"content",title:"Your Content"}, {id:"review",title:"Review & Finish"},
   ];
   if (studio) return <LaunchSiteFrame
     site={{id:data.siteId,name:data.siteName}} active="website-brand"
@@ -112,7 +113,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
         <div className="min-w-0">
           <PageHeader eyebrow="Establish / Website & Brand"
             title={data.host?["Choose your Brand Identity","Choose your Wireframe","Design your Visual Identity",
-              "Tell Your Story","Review & Finish"][step]:"Prepare your private website address"}
+              "Content Consent","Your Content","Review & Finish"][step]:"Prepare your private website address"}
             subtitle="One Site-owned, revisioned private website. Draft changes never open enrollment, approve a Site or publish content." />
           {data.host && <nav aria-label="Website & Brand steps" className="mt-5 flex min-w-0 gap-2 overflow-x-auto border-y py-3">
             {steps.map((item,index)=><Button key={item.id} type="button"
@@ -164,10 +165,11 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     subtitle={data.organizationName + " · a Site website and reusable communications"} actions={returnToLaunch}>
     <GuidedSetupShell
       title="Build your Site website and brand together"
-      description="Choose Brand Identity, a grayscale wireframe, visual identity and your content before saving a private draft."
+      description="Choose a wireframe, establish your Brand, decide on content reuse, then review and save your website."
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Choose your editorial direction":index===1?"Choose a structure":
-          index===2?"Colors, fonts and rights-cleared media":index===3?"Edit website content":"Review private draft",
+          index===2?"Colors, fonts and rights-cleared media":index===3?"Consent to reuse Site information":
+            index===4?"Edit website content":"Review private draft",
         status:step===index?"current":"upcoming",
       })) : [
         { id: "address", title: "Site address", description: "Prepare a private website address", status: "current" },
@@ -244,12 +246,12 @@ function LocalWebsiteCopyEditor({
 }) {
   const router = useRouter();
   const [editor, setEditor] = useState(() => {
-    const starter = prepareWebsiteEditorContent(data.editingContent, data.siteName);
-    // Source-derived copy is an editable, unsaved first draft, never an
-    // automatic update of an already saved website revision.
-    const initial = data.currentRevision === 0
-      ? prepareWebsiteCopyFromSiteInformation(starter,data.siteStoryCopyCandidates) : starter;
-    return { content: initial, saved: starter, revision: data.currentRevision, siteId: data.siteId };
+    // Do not auto-generate from Site Information before the user grants consent.
+    // A new Site starts with blank editorial fields while preserving visual defaults.
+    const starter = data.editingContent
+      ? prepareWebsiteEditorContent(data.editingContent, data.siteName)
+      : {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
+    return { content: starter, saved: starter, revision: data.currentRevision, siteId: data.siteId };
   });
   const [brandDisplayName,setBrandDisplayName]=useState(
     data.currentBrandConfiguration?.displayName??data.siteName);
@@ -292,14 +294,18 @@ function LocalWebsiteCopyEditor({
       // A loader refresh (including media changes) must never overwrite authored copy.
       if (previous.siteId === data.siteId &&
           JSON.stringify(previous.content) !== JSON.stringify(previous.saved)) return previous;
-      const latest = prepareWebsiteEditorContent(data.editingContent, data.siteName);
+      const latest = data.editingContent
+        ? prepareWebsiteEditorContent(data.editingContent, data.siteName)
+        : {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
       return { content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId };
     });
   }, [data.siteId, data.currentRevision, data.editingContent, data.siteName,
       data.currentBrandVersionId]);
 
   function loadLatestRevision() {
-    const latest = prepareWebsiteEditorContent(data.editingContent, data.siteName);
+    const latest = data.editingContent
+      ? prepareWebsiteEditorContent(data.editingContent, data.siteName)
+      : {...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding}};
     setEditor({ content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId });
     setBrandDisplayName(data.currentBrandConfiguration?.displayName??data.siteName);
     brandPointerRef.current=data.currentBrandVersionId;
@@ -521,14 +527,39 @@ function LocalWebsiteCopyEditor({
         <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps Site copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
       </div>}
 
-      {step===3&&<WebsiteSiteContentStep data={data} content={content}
+      {step===3&&<WebsiteContentConsentStep
+        value={content.contentReuseConsent??"unselected"}
+        onChange={choice=>setContent(old=>{
+          if(choice==="denied"){
+            // First-time Sites start blank. Never silently erase saved historic copy.
+            if(data.currentRevision>0)return {...old,contentReuseConsent:"denied"};
+            const cleared={...old,contentReuseConsent:"denied" as const,
+              editorialBaseline:undefined,leadershipMembers:[]};
+            for(const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[])
+              cleared[field]="";
+            return cleared;
+          }
+          if(old.contentReuseConsent==="granted")return old;
+          const baseline=createSchoolWebsiteStarterContent(data.siteName);
+          const withStarter={...old,contentReuseConsent:"granted" as const,
+            editorialBaseline:old.editorialBaseline??baseline.editorialBaseline};
+          if(data.currentRevision===0){
+            for(const field of websiteStarterFieldIds)
+              if(!(withStarter[field]??"").trim())withStarter[field]=baseline[field];
+            return prepareWebsiteCopyFromSiteInformation(withStarter,data.siteStoryCopyCandidates);
+          }
+          return withStarter;
+        })}
+        disabled={busy||!data.canEdit}
+        hasSavedContent={data.currentRevision>0}/>}
+      {step===4&&<WebsiteSiteContentStep data={data} content={content}
         setContent={setContent} busy={busy} allowPublication={allowPublication}
         onContentBlocksSaved={()=>{void router.invalidate();}}
         onContentBlocksDirty={setContentBlocksDirty}/>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
         setContent={setContent} onSelectArtwork={selectArtwork}/>}
-      {step===4&&<WebsiteReviewStep
+      {step===5&&<WebsiteReviewStep
         data={data} content={content} draftPreview={draftPreview}
         dirty={dirty} editorRevision={editor.revision}
         revisionConflict={revisionConflict} busy={busy}
@@ -563,8 +594,9 @@ function LocalWebsiteCopyEditor({
           <Button variant="ghost" type="button"
             disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
             onClick={()=>void saveDraft("exit")}>Save & Sign Out</Button>
-          {step < 4 ? <Button type="button"
-            onClick={()=>onStepChange(Math.min(4,step+1))}>Continue</Button>
+          {step < 5 ? <Button type="button"
+            disabled={step===3 && (content.contentReuseConsent??"unselected")==="unselected"}
+            onClick={()=>onStepChange(Math.min(5,step+1))}>Continue</Button>
             : <Button type="button" disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
               loading={busy} loadingLabel="Saving private draft…"
               onClick={()=>void saveDraft("stay")}>Save private draft & finish</Button>}
