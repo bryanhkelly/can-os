@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { siteExperienceIds, validCustomExperienceName } from "./site-experience-interests";
+import { siteExperienceIds, siteExperienceById, siteExperienceOutcomeIds,
+  siteExperienceLimit, siteExperienceActivityLimit, siteExperienceOutcomeLimit,
+  validCustomExperienceName } from "./site-experience-interests";
 
 /** Legacy eight-code vocabulary is retained for existing private Site records. */
 export const siteLaunchInterestIds = [
@@ -26,6 +28,36 @@ const customExperiences = z.array(z.string().trim().refine(
  * and the private website preview. The optional V2 fields let old stored records
  * and old readers coexist until a registrar explicitly saves a normalized plan.
  */
+
+/** Topic selections remain planning intent, never authorization to operate. */
+export const siteExperienceDetailSchema=z.object({
+  id:z.enum(siteExperienceIds),
+  activityIds:z.array(z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/))
+    .max(siteExperienceActivityLimit).refine(distinct,"Choose each activity once"),
+  outcomeIds:z.array(z.enum(siteExperienceOutcomeIds))
+    .max(siteExperienceOutcomeLimit).refine(distinct,"Choose each outcome once"),
+  audienceIds:z.array(z.enum(sitePlanningAudienceIds)).max(4)
+    .refine(distinct,"Choose each audience once"),
+  programIds:z.array(z.enum(sitePlanningInterestIds)).max(6)
+    .refine(distinct,"Choose each Program once"),
+  priority:z.enum(["featured","planned","exploring"]),
+}).strict().superRefine((value,ctx)=>{
+  const topic=siteExperienceById.get(value.id);
+  if(!topic || value.activityIds.some(id=>!topic.activities.some(option=>option.id===id)))
+    ctx.addIssue({code:"custom",path:["activityIds"],
+      message:"Choose activities listed for this Experience topic."});
+});
+export type SiteExperienceDetail=z.infer<typeof siteExperienceDetailSchema>;
+const experienceDetailsSchema=z.array(siteExperienceDetailSchema).max(siteExperienceLimit)
+  .refine(values=>distinct(values.map(value=>value.id)),"Choose each Experience once");
+function validateExperienceMembership(value:{
+  experienceIds?:readonly string[];experienceDetails?:readonly SiteExperienceDetail[];
+},ctx:z.RefinementCtx){
+  if(value.experienceDetails?.some(detail=>!value.experienceIds?.includes(detail.id)))
+    ctx.addIssue({code:"custom",path:["experienceDetails"],
+      message:"Experience details must match selected topics."});
+}
+
 export const siteLaunchPreferencesSchema = z.object({
   delivery: z.enum(["physical", "digital", "both"]),
   interestIds: z.array(z.enum(siteLaunchInterestIds)).max(8)
@@ -44,7 +76,9 @@ export const siteLaunchPreferencesSchema = z.object({
   experienceIds: z.array(z.enum(siteExperienceIds)).max(siteExperienceIds.length)
     .refine(distinct, "Choose each Experience once").optional(),
   customExperiences: customExperiences.optional(),
+  experienceDetails: experienceDetailsSchema.optional(),
 }).strict().superRefine((value, ctx) => {
+  validateExperienceMembership(value,ctx);
   if (value.startingProgramCode && !value.programCodes?.includes(value.startingProgramCode))
     ctx.addIssue({ code: "custom", path: ["startingProgramCode"],
       message: "Starting Program must be selected." });
@@ -69,7 +103,9 @@ export const siteProgramsAudiencesV61Schema = z.object({
   experienceIds: z.array(z.enum(siteExperienceIds)).max(siteExperienceIds.length)
     .refine(distinct, "Choose each Experience once").optional(),
   customExperiences: customExperiences.optional(),
+  experienceDetails: experienceDetailsSchema.optional(),
 }).strict().superRefine((value, ctx) => {
+  validateExperienceMembership(value,ctx);
   if (value.startingProgramCode && !value.programCodes?.includes(value.startingProgramCode))
     ctx.addIssue({ code: "custom", path: ["startingProgramCode"],
       message: "Choose a selected Program for your starting focus." });
@@ -78,6 +114,14 @@ export const siteProgramsAudiencesV61Schema = z.object({
       message: "Choose a selected learning interest for your starting focus." });
 });
 export type SiteProgramsAudiencesV61 = z.infer<typeof siteProgramsAudiencesV61Schema>;
+
+/** New writes enforce five total, while old Site plans remain readable until edited. */
+export const siteProgramsAudiencesV61SaveSchema=siteProgramsAudiencesV61Schema.superRefine(
+  (value,ctx)=>{
+    if((value.experienceIds?.length??0)+(value.customExperiences?.length??0)>siteExperienceLimit)
+      ctx.addIssue({code:"custom",path:["experienceIds"],
+        message:"Choose up to five Experiences total, including custom Experiences."});
+  });
 
 export function emptySiteProgramsAudiencesV61(): SiteProgramsAudiencesV61 {
   return { interestIds: [], timingIds: [], audienceIds: [], startingFocus: null };
@@ -107,6 +151,7 @@ export function readSiteProgramsAudiencesV61(raw: unknown): SiteProgramsAudience
       ? { startingProgramCode: source.startingProgramCode } : {}),
     ...(source.experienceIds !== undefined ? {experienceIds:source.experienceIds} : {}),
     ...(source.customExperiences !== undefined ? {customExperiences:source.customExperiences} : {}),
+    ...(source.experienceDetails !== undefined ? {experienceDetails:source.experienceDetails} : {}),
   });
 }
 
@@ -120,7 +165,7 @@ export function applySiteProgramsAudiencesV61(
   // remains a fallback for Sites created before that module existed.
   const delivery = authoritativeDelivery ?? old?.delivery;
   if (!delivery) throw new Error("Save Learning Environment in Site Information before choosing Programs & Audiences.");
-  const plan = siteProgramsAudiencesV61Schema.parse(draft);
+  const plan = siteProgramsAudiencesV61SaveSchema.parse(draft);
   return siteLaunchPreferencesSchema.parse({
     delivery, planningVersion: 2,
     interestIds: plan.interestIds,
@@ -132,5 +177,6 @@ export function applySiteProgramsAudiencesV61(
       ? { startingProgramCode: plan.startingProgramCode } : {}),
     ...(plan.experienceIds !== undefined ? {experienceIds:plan.experienceIds} : {}),
     ...(plan.customExperiences !== undefined ? {customExperiences:plan.customExperiences} : {}),
+    ...(plan.experienceDetails !== undefined ? {experienceDetails:plan.experienceDetails} : {}),
   });
 }
