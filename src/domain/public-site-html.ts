@@ -149,8 +149,9 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
   const faq = Boolean(academic || tuition ||
     (parent?.admissions.description.canDisplay && parent.admissions.description.value));
-  const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
-    (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
+  // Site-level prelaunch inquiries do not require a published academic Program.
+  // The public form itself is available only on a published Site origin.
+  const contact = true;
   const educational=[
     ...(academic?["/academics","/school-day","/admissions"] as const:[]),
     ...(kinds.program||contentOn("/programs")?["/programs"] as const:[]),
@@ -435,6 +436,37 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
       : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
     : null;
+  const generalInquiryHref=availablePaths.includes("/contact")?"/contact#site-interest":null;
+  const siteInterestId=submissionsEnabled?options?.makeRequestId?.():undefined;
+  // A Site may gather adult interest before any individual Program is approved.
+  // Reuse the existing rate-limited public inquiry endpoint and canonical inbox.
+  const siteInterestForm=siteInterestId?`<form id="site-interest" action="${inquiryAction}" method="post" class="inquiry-form">
+    <h3>Stay connected with our community</h3>
+    <p class="availability">Get updates about future programs, tuition and funding.
+      Signing up does not create an application, reserve a seat or establish
+      enrollment priority.</p>
+    <input type="hidden" name="requestId" value="${escapePublicHtml(siteInterestId)}"/>
+    <label>First name<input name="firstName" autocomplete="given-name" maxlength="80" required/></label>
+    <label>Last name<input name="lastName" autocomplete="family-name" maxlength="80" required/></label>
+    <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required/></label>
+    <label>What would you like to hear about?
+      <select name="interestKind" required>
+        <option value="interest_list">Future program updates</option>
+        <option value="information">General information</option>
+        <option value="tuition_updates">Tuition and funding information</option>
+      </select>
+    </label>
+    <label>Question (optional; please do not include student information)
+      <textarea name="message" maxlength="400" rows="2"></textarea>
+    </label>
+    <div aria-hidden="true" class="bot-field"><label>Website
+      <input name="website" tabindex="-1" autocomplete="off"/></label></div>
+    <label class="consent"><input type="checkbox" name="contactConsent" value="yes" required/>
+      I agree to receive follow-up about this Site. This is an interest request,
+      not an application or enrollment.
+    </label>
+    <button type="submit">Join the interest list</button>
+  </form>`:"";
   // Keep the locally authored copy while using the shared template composition
   // and current photo delivery path.
   const hero = composePublicSiteHero(templateId, {
@@ -523,17 +555,15 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ${reviewedAddress ? `<div><h3>Published location</h3><p>${reviewedAddress}</p>
         <p class="availability">A published address is not confirmation that the site is open for visits.</p></div>` : ""}
       </div>` : ""}
-    <p>${options?.localPreview
-      ? submissionsEnabled
-        ? "Use the request-information form on a published program to contact the school. This is not an application or enrollment request."
-        : "This local preview is read-only. Request-information forms are available in the development server."
-      : academicCards
-        ? "For academic program questions, use the request-information form for a published program below."
+    <p>${siteInterestForm
+      ? "Sign up for future updates or request information. There is no application or reserved enrollment place."
+      : options?.localPreview
+        ? "This preview is read-only. Public interest forms become available after Site publication."
         : reviewedContact
           ? "Use the Site's published contact information for current next steps."
-          : "No public inquiry channel is currently available. This Site has not published a verified contact method."}
-    ${!options?.localPreview && academicCards
-      ? "An inquiry does not guarantee admission or enrollment." : ""}</p></section>`;
+          : "A public contact method is not yet available."}</p>
+    ${siteInterestForm}
+  </section>`;
   const approvedSchedules = ((page.parentInformation as
     (PublicParentSchoolProfile & {programSchedules?: ApprovedProgramSchedule[]}) | undefined)
     ?.programSchedules ?? []);
@@ -665,11 +695,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <h3>Public and community funding</h3>
     <p>Depending on the specific program and applicable requirements, funding may include family payments, eligible public education support, grants, charitable contributions and community sponsorships. No funding eligibility or award is guaranteed.</p>
     ${nonprofitStatusNote?`<h3>Organization status</h3><p>${escapePublicHtml(nonprofitStatusNote)}</p>`:""}
-    ${availablePaths.includes("/academics")
-      ? '<p class="public-next-step"><a href="/academics">Choose a program to request tuition and assistance details →</a></p>'
-      : availablePaths.includes("/contact")
-        ? '<p class="public-next-step"><a href="/contact">Request current tuition information →</a></p>'
-        : ""}</section>`;
+    ${availablePaths.includes("/contact")
+      ? '<p class="public-next-step"><a href="/contact#site-interest">Request tuition and funding updates →</a></p>'
+      : ""}</section>`;
   const serviceCards = parent?.services.filter(item => item.description.canDisplay && item.description.value)
     .map(item => `<article class="card"><h3>${escapePublicHtml(item.category.replace(/_/g, " "))}</h3>
       <p>${verifiedText(item.description)}</p></article>`).join("") ?? "";
@@ -877,7 +905,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <h2>Find the learning opportunity that fits your family.</h2>
       <p>The right educational environment can make a lasting difference. Explore available programs, ask questions, and decide what fits your family.</p>
       <a href="/academics" class="hero-button">Explore available programs</a></section>` : "",
-    contact: reviewedContact || reviewedAddress ? contactSection : "",
+    contact: siteInterestForm || reviewedContact || reviewedAddress ? contactSection : "",
     channelsClosing: contentChannelAt("closing"),
   });
   const leadershipProfiles=(local?.leadershipMembers??[])
