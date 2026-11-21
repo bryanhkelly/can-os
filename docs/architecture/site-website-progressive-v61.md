@@ -68,8 +68,12 @@ authorizes tuition collection, child enrollment, operation or accreditation.
   marked contacted, or closed in the shared admissions inbox. This requires
   migration 0099 before serving write requests.
 - Site-level interest is explicitly **not** a seat waitlist or application.
-  Linking a consented Site prospect to an authorized Program for verified
-  application outreach is a further workflow, not automatic enrollment.
+  A registrar may explicitly link a consenting Site prospect to an
+  admissions-authorized Program, updating the same canonical interest and
+  Action rather than copying the lead. The authorization is rechecked on
+  the server. The normal verified-email invitation then remains a separate
+  authorized action, and no application, guardian identity or enrollment
+  is created by the link.
 - Events, location directories, recurring schedules and per-Program routes must
   come from approved system records. They need supported public projection
   contracts and routing, not manual Site page fields or fabricated starter data.
