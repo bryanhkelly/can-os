@@ -101,10 +101,11 @@ export async function writeAudit(
   // A generic CommandContext (e.g., system mutations) has no account/session
   // and must not fabricate an identity or let contextExtras override one.
   const session = context as CommandContext & Partial<Pick<AccessContext,
-    "accountId" | "sessionAccountId" | "sessionId" | "grantId" | "role">>;
+    "accountId" | "sessionAccountId" | "impersonatedByAccountId" | "sessionId" | "grantId" | "role">>;
   const authenticatedAttribution = {
     ...(session.accountId ? { accountId: session.accountId } : {}),
-    ...(session.sessionAccountId ? { sessionAccountId: session.sessionAccountId } : {}),
+    ...((session.impersonatedByAccountId ?? session.sessionAccountId)
+      ? { sessionAccountId: session.impersonatedByAccountId ?? session.sessionAccountId } : {}),
     ...(session.sessionId ? { sessionId: session.sessionId } : {}),
     ...(session.grantId ? { grantId: session.grantId } : {}),
     ...(session.role ? { role: session.role } : {}),
