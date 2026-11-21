@@ -77,10 +77,8 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
     approved.map(program=>program.programId),siteFlags?.metadata??null);
   const approvedPrograms=withVerifiedPublicApplications(approved,parentExtras.admissions);
   const offerings=enrichment.map(toPublicSiteEnrichment);
-  const localContent=local?.content??{
-    ...emptySiteLocalContent,welcomeMessage:`Welcome to ${school.programName}.`,
-    localDescription:`Our church is preparing a local learning community. Contact the church to learn more about plans for ${school.programName}.`,
-  };
+  // Only the explicit Website & Brand consent step may generate narrative copy.
+  const localContent=local?.content??emptySiteLocalContent;
   const site={name:school.siteName,organizationName:school.organizationName};
   const academicPrograms=[...approvedPrograms,...planning];
   const config=safeReadSiteContentChannelConfig(siteFlags?.metadata?.websiteContentChannels);
