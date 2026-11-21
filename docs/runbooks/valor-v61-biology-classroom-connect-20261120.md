@@ -45,6 +45,43 @@ The protected canonical Class workflow still requires an approved current
 facilitator Class staff assignment, an authorized published agenda, rights-cleared
 media and an eligible future session. These are not fixture-specific exceptions.
 
+## November 20 V6.1 real/synthetic parity cutover
+
+**Implemented in the feature branch (not independently build-tested):**
+- All ordinary CAN Site staff use one active CAN session projection. The prior
+  Riley-only SQL function was removed and replaced in Neon main by
+  `database/production/2026-11-20-can-staff-auth-parity-and-demo-delegation.sql`.
+  The only special selection is authenticated Demo Admin switching; effective
+  grant/Person/Site/Organization validation is the same after switching.
+- `src/domain/access-context.ts` assigns classroom-only facilitation rights to
+  **every** room_facilitator, not a specific Riley grant. Physical attendance,
+  pickup release and safeguarding remain separate Site staff capabilities.
+- The Sally institutional fixture was reconciled by
+  `scripts/recovery/valor-v61-standard-facilitator-capability-reconcile-20261120.sql`.
+  Her email remains unverified and her staff assignment stays suspended.
+- `src/modules/classes/native-class-student-home.functions.ts` and
+  `NativeStudentClassHome.tsx` replace the Valor-only Class home. They read
+  ordinary Site Classes and Enrollment status, but do not create synthetic
+  student registrations. Student enrollment/guardian consent is owned by
+  normal governed enrollment services.
+- `NativeClassLessonContentPanel` is content-driven, regardless of a Course's
+  provenance marker. Prior synthetic-specific draft practice endpoints and
+  UI were retired rather than exposing unpublished assessment forms to
+  real students. Existing records were not dropped.
+- Practice-only Class homework is now inferred from Enrollment credit mode,
+  and assigned teachers can return formative feedback through the standard
+  submission. The staff read still requires an approved Class teacher role.
+- New regression contracts cover equivalent real/synthetic permissions and
+  trusted Admin impersonation. They are **committed but not executed**.
+
+**Remaining acceptance work:** A current Site manager must approve Riley's
+separate Biology facilitator Class assignment through the normal service.
+An eligible future Session, published agenda and authorized shared video
+are still missing. Authenticated direct and impersonated Riley/Jordan browser
+testing, TypeScript, architecture and build verification remain required.
+Netlify deploy-preview failures observed on November 20 are explicitly
+`Skipped due to account builds usage exceeded`, not build results.
+
 ## Code owners
 
 - Role allowlist and selection: `src/domain/local-demo-access.ts`, `src/modules/identity/session-grants.server.ts`, existing CAN session switcher
