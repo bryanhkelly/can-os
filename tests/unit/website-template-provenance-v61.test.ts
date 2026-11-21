@@ -86,12 +86,14 @@ describe("Website & Brand template source provenance",()=>{
     expect(websiteChromeSources.some(item=>item.details.includes("Demo"))).toBe(true);
   });
 
-  it("places provenance beside the wireframe and in the actual content editor, never in published HTML",()=>{
+  it("keeps wireframe selection free of sample content and makes source guidance available in Your Content",()=>{
     const gallery=read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
     const editor=read("src/components/launch-studio/WebsiteSiteContentStep.tsx");
     const guide=read("src/components/launch-studio/WebsiteTemplateSourceGuide.tsx");
     const renderer=read("src/domain/public-site-html.ts");
-    expect(gallery).toContain('<WebsiteTemplateSourceGuide template={value} page={previewPage}/>');
+    expect(gallery).not.toContain("WebsiteTemplateSourceGuide");
+    expect(gallery).not.toContain("renderPublicSiteHtml");
+    expect(gallery).not.toContain("<iframe");
     expect(editor).toContain('<WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/" />');
     for(const phrase of ["Data source:","Where it changes:","When shown:","Fixed template text"])
       expect(guide).toContain(phrase);
