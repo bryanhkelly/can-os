@@ -1,14 +1,17 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState } from "@/components/workspace";
 import { getNoncreditPilotOutcomes } from "@/modules/learning/noncredit-pilot-outcomes.functions";
+import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
 type Report=Awaited<ReturnType<typeof getNoncreditPilotOutcomes>>;
 
 const count=(n:number)=>n.toLocaleString("en-US");
 
 /** Reusable, provider-only learning-outcomes panel, using Design System 6.1. */
 export function NoncreditPilotOutcomesPanel(){
+  const [showDefinitions,setShowDefinitions]=useState(false);
   const query=useQuery<Report>({
     queryKey:["noncredit-pilot-outcomes"],
     queryFn:()=>getNoncreditPilotOutcomes({data:{}}),
@@ -27,7 +30,7 @@ export function NoncreditPilotOutcomesPanel(){
           registrations. Learning, feedback and completion are tracked per registration.
         </p>
         {report&&<p className="text-xs text-muted-foreground">
-          Reporting period: {report.from.slice(0,10)} through {report.to.slice(0,10)} (UTC).
+          Reporting window (UTC): {report.from.slice(0,10)} inclusive to {report.to.slice(0,10)} exclusive.
         </p>}
       </div>
       <Button type="button" size="sm" variant="outline" disabled={query.isFetching}
@@ -43,21 +46,15 @@ export function NoncreditPilotOutcomesPanel(){
       description="Publish approved training and an enrollment release. Results appear here after learners register and participate."/>}
     {summary&&summary.registrations>0&&<>
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-        {([
-          ["Unique learners",report.distinctLearners],
-          ["Training registrations",summary.registrations],
-          ["Engaged registrations",summary.engagedParticipants],
-          ["Lessons marked complete",summary.lessonsMarkedComplete],
-          ["Registrations with a knowledge check",summary.knowledgeCheckSubmissions],
-          ["Passed final knowledge checks",summary.knowledgeCheckPasses],
-          ["Registrations with feedback",summary.surveyRespondents],
-          ["Confirmed completions",summary.confirmedNoncreditCompletions],
-          ["Paired before/after checks",summary.pairedKnowledgeChecks],
-        ] as const).map(([label,value])=>
-          <div key={label} className="border border-border bg-card p-4">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
+        {NONCREDIT_PILOT_COUNT_DEFINITIONS.map(def=>{
+          const value=def.key==="distinctLearners"
+            ?report!.distinctLearners
+            :summary[def.key];
+          return <div key={def.key} className="border border-border bg-card p-4">
+            <dt className="text-xs text-muted-foreground">{def.label}</dt>
             <dd className="mt-2 text-2xl font-semibold tabular-nums">{count(value)}</dd>
-          </div>)}
+          </div>;
+        })}
       </dl>
       <div className="border border-border bg-card p-4">
         <h3 className="font-semibold">Demonstrated learning improvement</h3>
@@ -71,6 +68,31 @@ export function NoncreditPilotOutcomesPanel(){
           proof of verified participation minutes.
         </p>
       </div>
+      <section className="border border-border bg-card p-4">
+        <Button type="button" variant="ghost" aria-expanded={showDefinitions}
+          onClick={()=>setShowDefinitions(v=>!v)}
+          className="flex w-full justify-between gap-4 px-0 text-left">
+          Metric definitions and evidence sources
+          <span aria-hidden="true">{showDefinitions?"−":"+"}</span>
+        </Button>
+        {showDefinitions&&<Table scrollLabel="Pilot metric definitions" aria-label="Pilot metric definitions"
+          className="mt-3 w-full min-w-[36rem] text-left text-sm">
+          <TableCaption className="sr-only">Pilot metric definitions and authoritative sources</TableCaption>
+          <TableHeader className="border-b border-border">
+            <TableRow>
+              <TableHead scope="col" className="p-3">Metric</TableHead>
+              <TableHead scope="col" className="p-3">Source</TableHead>
+              <TableHead scope="col" className="p-3">Counting rule</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>{NONCREDIT_PILOT_COUNT_DEFINITIONS.map(def=>
+            <TableRow key={def.key} className="border-b last:border-b-0">
+              <TableRowHead className="p-3">{def.label}</TableRowHead>
+              <TableCell className="p-3 font-mono text-xs">{def.source}</TableCell>
+              <TableCell className="p-3">{def.denominator}. {def.rule} {def.timeBasis}.</TableCell>
+            </TableRow>)}</TableBody>
+        </Table>}
+      </section>
       {!!report?.byTraining.length&&<div className="border border-border bg-card">
         <Table scrollLabel="Training participation and outcome counts" aria-label="Training participation and outcome counts" className="w-full text-left text-sm"><TableCaption className="sr-only">Training participation and outcome counts</TableCaption>
           <TableHeader className="border-b bg-muted/40 text-xs text-muted-foreground">
