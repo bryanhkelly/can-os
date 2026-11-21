@@ -30,7 +30,7 @@ const stagePresentation: Record<SiteLaunchStageV61, {
   Establish: { icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
   Introduce: { icon: Megaphone, summary: "Create focused outreach plans, share your vision and connect with the community." },
   Prepare: { icon: ClipboardCheck, summary: "Choose offerings, prepare your team and facilities, and confirm readiness." },
-  Open: { icon: Rocket, summary: "Open enrollment for approved offerings." },
+  Open: { icon: Rocket, summary: "Welcome participants to approved offerings." },
 };
 const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }));
 
@@ -43,17 +43,17 @@ const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }))
 export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, workspaceUrl, completion = {} }: LaunchOverviewProps) {
   const rail = <div className="space-y-4">
     <WorkspacePanel title="Why this matters">
-      <p className="text-sm leading-6 text-muted-foreground">Set up your Site, invite your community, and prepare to open.</p>
+      <p className="text-sm leading-6 text-muted-foreground">Share your vision, bring people together, and build a place where your community can thrive.</p>
       <div className="mt-5 border-t pt-4"><h3 className="text-sm font-semibold">Work at your own pace</h3><p className="mt-2 text-sm text-muted-foreground">You can return to your Site Workspace anytime.</p></div>
     </WorkspacePanel>
     <WorkspacePanel title="Your website, as it grows">
-      <p className="text-sm leading-6 text-muted-foreground">Preview the latest saved website from the shared top bar. Create a revocable, unlisted share link to show a proposed Site before approval. Official publication is a separate Prepare step.</p>
-      <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Available to your authorized account" : "Not available yet"}</div>
+      <p className="text-sm leading-6 text-muted-foreground">Preview your website whenever you like. You can share a private preview with others before you publish it.</p>
+      <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Ready for you to view" : "Not available yet"}</div>
     </WorkspacePanel>
   </div>;
-  return <WorkspaceShell title={mode === "first-visit" ? "Bring your learning community to life." : `Continue preparing ${site.name}.`}
+  return <WorkspaceShell title={mode === "first-visit" ? "Bring your community's vision to life." : `Continue preparing ${site.name}.`}
     eyebrow="Launch Studio / Overview"
-    subtitle="Set up and open your learning community."
+    subtitle="Turn your ideas into experiences your community can enjoy."
     width="wide" rail={rail}>
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 border bg-card p-5">
@@ -77,7 +77,7 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
       </section>
       <WorkspacePanel title="Your tools">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div><BookOpen className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Learning experiences</h3><p className="mt-1 text-xs text-muted-foreground">Programs, Courses, Classes and schedules</p></div>
+          <div><BookOpen className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Learning experiences</h3><p className="mt-1 text-xs text-muted-foreground">Programs, activities, classes, and schedules</p></div>
           <div><Users className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Community connection</h3><p className="mt-1 text-xs text-muted-foreground">Websites, communications and engagement</p></div>
           <div><Globe className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Daily operations</h3><p className="mt-1 text-xs text-muted-foreground">Teams, attendance and reporting</p></div>
         </div>
