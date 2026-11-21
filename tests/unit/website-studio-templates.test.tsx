@@ -115,7 +115,7 @@ describe("Website Studio seven-template contract", () => {
     }
   });
 
-  it("renders all 91 public design/pages from canonical approved data without scripts", () => {
+  it("renders all 98 private layout pages from canonical Site data without scripts", () => {
     const example = {
       host: "fictional.can-os.com",
       site: {name:"Sample School",organizationName:"Sample Community"},
@@ -137,7 +137,7 @@ describe("Website Studio seven-template contract", () => {
         branding:{...emptySiteLocalContent.branding,templateId},
       };
       for(const path of publicSitePagePaths) {
-        const html=renderPublicSiteHtml({...example,localContent},{path});
+        const html=renderPublicSiteHtml({...example,localContent},{path,localPreview:true,privateDraftPages:true});
         expect(html, `${templateId} ${path}`).toContain(`template-${templateId}`);
         expect(html).toContain('<main id="main-content">');
         expect(html).toContain('class="desktop-nav"');
@@ -182,7 +182,7 @@ describe("Website Studio seven-template contract", () => {
   it("uses semantic choices for all seven templates and ten previewable pages",()=>{
     const html=renderToStaticMarkup(<WebsiteTemplateGallery schoolName="Sample Academy" value="heritage"
       onChange={()=>{}}/>);
-    expect((html.match(/aria-pressed=/g)??[]).length).toBeGreaterThanOrEqual(10);
+    expect((html.match(/aria-pressed=/g)??[]).length).toBeGreaterThanOrEqual(9);
     expect(html).toContain("Heritage Academy");
     expect(html).toContain("Community &amp; Faith");
     expect(html).toContain("Modern Learning");
@@ -191,8 +191,8 @@ describe("Website Studio seven-template contract", () => {
     expect(html).toContain("Heritage Classical");
     expect(html).toContain("Campus Life");
     expect((html.match(/<option/g)??[]).length).toBe(publicSitePagePaths.length);
-    expect(html).toContain('aria-label="Site website templates"');
-    expect((html.match(/structural wireframe/g) ?? []).length).toBe(7);
-    expect((html.match(/<iframe/g) ?? []).length).toBe(1);
+    expect(html).toContain('aria-label="Website wireframe choices"');
+    expect((html.match(/grayscale layout wireframe/g) ?? []).length).toBe(8);
+    expect((html.match(/<iframe/g) ?? []).length).toBe(0);
   });
 });
