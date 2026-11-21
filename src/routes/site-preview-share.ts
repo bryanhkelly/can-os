@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sites } from "@/db/schema";
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
+import { readSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
 import {
   activePreviewShare, previewShareUnavailable, readSitePreviewShares,
   renderSharedSitePreview, sitePreviewShareHeaders, validPreviewShareToken,
@@ -37,10 +38,18 @@ export const Route = createFileRoute("/site-preview-share")({
         }).from(sites).where(eq(sites.id, siteIds[0]!)).limit(1);
         if (!site || site.lifecycleStatus === "closed") return unavailable();
         const share = activePreviewShare(readSitePreviewShares(site.metadata), tokens[0]!, new Date());
-        const html = share?.pages[page];
-        if (!share || !html) return unavailable();
+        if (!share) return unavailable();
+        // V1 links keep their original immutable HTML in metadata. V2 links
+        // fetch an integrity-checked private R2 revision after the same
+        // revocation/expiration check. Neither format issues live actions.
+        const pages=share.pages??(
+          share.snapshotKey&&share.snapshotDigest
+            ? await readSitePreviewSnapshot(share.snapshotKey,share.snapshotDigest)
+            : null);
+        const html=pages?.[page];
+        if (!pages || !html) return unavailable();
         return new Response(
-          renderSharedSitePreview(html, siteIds[0]!, tokens[0]!, Object.keys(share.pages), share.synthetic===true),
+          renderSharedSitePreview(html, siteIds[0]!, tokens[0]!, Object.keys(pages)),
           { status: 200, headers: sitePreviewShareHeaders },
         );
       } catch (error) {
