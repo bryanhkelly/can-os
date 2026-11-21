@@ -17,7 +17,7 @@ export const siteHostingV61Schema = z.object({
   nonprofitStatus: z.enum(siteTaxStatusV61Values).optional(),
   nonprofitSubject: z.enum(["responsible", "host", "sponsor"]).optional(),
   nonprofitOrganizationName: z.string().trim().max(160).optional(),
-  nonprofitEin: z.union([z.literal(""), z.string().regex(/^\\d{2}-?\\d{7}$/, "Enter a nine-digit EIN")]).optional(),
+  nonprofitEin: z.union([z.literal(""), z.string().regex(/^\d{2}-?\d{7}$/, "Enter a nine-digit EIN")]).optional(),
 }).strict().superRefine((host, ctx) => {
   if (host.hostingMode !== "different") return;
   if (host.separateHostName.length < 2) ctx.addIssue({
