@@ -694,6 +694,13 @@
       "when": 1795136000000,
       "tag": "0098_blueprint_journal_client_privilege_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1795136100000,
+      "tag": "0099_site_level_public_interest",
+      "breakpoints": true
     }
   ]
 }
