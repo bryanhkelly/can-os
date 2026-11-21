@@ -39,19 +39,18 @@ export function WebsiteContentConsentStep({
         <input className="mt-1 size-4 accent-primary" type="radio" name="website-content-reuse"
           checked={value==="denied"} onChange={()=>onChange("denied")} />
         <span className="space-y-1">
-          <span className="block font-semibold">No, I'll write my own content</span>
+          <span className="block font-semibold">No, don't reuse my saved information</span>
           <span className="block text-sm text-muted-foreground">
-            Start with a blank page and write my own website and outreach content.
+            Don't draw on my earlier answers for suggestions. Choosing this option also clears the current website draft's text and leadership entries. Saved versions remain available.
           </span>
         </span>
       </label>
     </fieldset>
     {value==="unselected"&&<WorkspaceNotice tone="attention">
-      Choose an option before continuing to Your Content.
+      Choose whether to reuse your saved information before continuing.
     </WorkspaceNotice>}
     {value==="denied"&&hasSavedContent&&<WorkspaceNotice tone="attention">
-      Choosing No clears the text in your current website draft. Earlier saved
-      versions will still be available.
+      Your current website draft text and leadership entries will be cleared. Previously saved versions remain available, and nothing changes publicly until you save and publish separately.
     </WorkspaceNotice>}
     <p className="text-xs leading-5 text-muted-foreground">
       You still need permission to publish someone's photo, biography, or personal
