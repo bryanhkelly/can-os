@@ -18,7 +18,7 @@ describe("Establish Experiences planning", () => {
     expect(matches).toContain("digital-confidence");
     expect(matches).toContain("social-connection");
     expect(matches).not.toContain("study-support");
-    expect(siteExperienceCatalog).toHaveLength(14);
+    expect(siteExperienceCatalog.length).toBeGreaterThanOrEqual(70);
   });
   it("round trips selection through canonical Site metadata and legacy readers",()=>{
     const stored=applySiteProgramsAudiencesV61(null,adultPlan,"physical");

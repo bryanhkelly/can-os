@@ -369,7 +369,7 @@ export function EstablishExperiencesV61({draft,setDraft,disabled}:Props){
           Explore more topics
         </Button>
       </div>
-      <WorkspaceNotice tone="neutral">
+      <WorkspaceNotice tone="info">
         Save & Continue below to carry this vision into Website & Brand.
         Choosing an Experience does not approve a Solution, publish a program
         or open enrollment.

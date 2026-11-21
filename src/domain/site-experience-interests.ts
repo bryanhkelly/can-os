@@ -222,7 +222,7 @@ export function describeSiteExperience(
   const actions=topic.activities.filter(item=>detail?.activityIds.includes(item.id)).map(item=>item.label);
   const outcomes=siteExperienceOutcomes.filter(item=>detail?.outcomeIds.includes(item.id)).map(item=>item.copy);
   if(!actions.length&&!outcomes.length)return topic.description;
-  const actionText=actions.length?"We are exploring "+actions.join(", ").replace(/, ([^,]*)$/," and $1").toLowerCase()+". ":"";
+  const actionText=actions.length?"We are exploring activities such as "+actions.join(", ").replace(/, ([^,]*)$/," and $1")+". ":"";
   const outcomeText=outcomes.length?"Our hope is to help participants "+
     outcomes.join(", ").replace(/, ([^,]*)$/," and $1")+".":"";
   return (actionText+outcomeText).trim();
