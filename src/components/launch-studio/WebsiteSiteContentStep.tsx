@@ -52,7 +52,29 @@ export function WebsiteSiteContentStep({
   const identityContext=siteIdentityEditorialContextV61(data.siteIdentity);
   const faithBased=isFaithBasedSiteIdentityV61(data.siteIdentity);
   const churchSite=isChurchSiteIdentityV61(data.siteIdentity);
+  const siteKind=data.siteIdentity?.siteType;
   const fields=contentFields.map(field=>{
+    if(field.key==="localDescription"&&siteKind==="church_community")return {...field,
+      label:"Our church and community story",
+      help:"Share the story of your congregation, its purpose, and the community you hope to serve. Describe plans as plans."};
+    if(field.key==="localDescription"&&siteKind==="faith_based_org")return {...field,
+      label:"Our mission and story",
+      help:"Share what inspires your work, whom you serve, and how faith shapes your mission."};
+    if(field.key==="localDescription"&&siteKind==="community_nonprofit")return {...field,
+      label:"Our community story",
+      help:"Share what matters locally, who you hope to serve, and the change you want to support."};
+    if(field.key==="localDescription"&&siteKind==="training_workforce")return {...field,
+      label:"Our training mission",
+      help:"Explain which skills and opportunities you hope to make more accessible. Avoid promising outcomes or jobs."};
+    if(field.key==="localDescription"&&siteKind==="school_education")return {...field,
+      label:"Our school story",
+      help:"Describe your educational vision and what makes your approach distinctive. Only mention programs that are confirmed."};
+    if(field.key==="welcomeMessage"&&churchSite)return {...field,
+      label:"A welcome to our faith community",help:"Introduce your congregation and what visitors might find here."};
+    if(field.key==="schoolVision"&&siteKind==="church_community")return {...field,
+      label:"Our hope for the community",help:"What do you hope people will learn, experience, and contribute?"};
+    if(field.key==="schoolVision"&&siteKind==="training_workforce")return {...field,
+      label:"Our vision for learners",help:"What skills or opportunities do you hope participants can explore?"};
     if(field.key==="churchHistory"&&!churchSite)return {...field,
       label:"Your faith-based organization\u0027s story",
       help:"How did your community or mission begin? Include only facts you want visitors to read."};
@@ -146,9 +168,9 @@ export function WebsiteSiteContentStep({
     </div>}
     {refreshable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border border-border p-4" role="status">
       <div>
-        <p className="text-sm font-semibold">You have new ideas for your website</p>
+        <p className="text-sm font-semibold">Updated starter wording is available</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          We can update {refreshable.length} suggested sections from your latest plan.
+          We have {refreshable.length} updated starter suggestions for your site name and learning focus.
           Your own words and earlier saved versions won't change.
         </p>
       </div>
@@ -192,12 +214,12 @@ export function WebsiteSiteContentStep({
       </div>
     </details>}
     <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">More details (optional)</summary>
+      <summary className="cursor-pointer text-sm font-semibold">Leadership and local traditions (optional)</summary>
       <div className="mt-4 space-y-5">{additionalFields.map(renderField)}</div>
     </details>
     {showFaithFields&&<details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">
-        {faithBased ? "Faith and community information (optional)" : "Previously saved faith information"}
+        {faithBased ? (churchSite ? "Your church and faith information" : "Faith and values (optional)") : "Previously saved faith information"}
       </summary>
       <p className="mt-2 text-xs text-muted-foreground">
         {faithBased ? "Use only descriptions that reflect your Site. Formal affiliations are reviewed separately."
