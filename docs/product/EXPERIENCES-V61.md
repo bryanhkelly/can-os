@@ -6,11 +6,10 @@
 
 ## Three V6.1 pages
 
-1. **Explore topics.** Show all 78 topic chips on one scrollable page. A short, optional recommended row sits above twelve permanently expanded group sections; each topic appears exactly once. Recommended chips are visually identified but never automatically selected. A live selected-chips summary lets operators remove choices without hunting through groups. The hard five-topic limit includes legacy custom choices. Search filters the catalog without clearing selections.
-2. **Make them yours.** For each selected topic choose up to four predefined activity chips, up to three outcomes, associated selected audiences and Programs, and one Featured / Planned / Exploring status. No narrative writing is required.
-3. **Review vision.** Show generated planning-stage website copy, selected scope, priority, and an Edit choices action. Operators proceed through the existing Save & Continue action.
+1. **Explore all topics.** All 78 topic chips appear exactly once, in twelve always-visible category panels with a distinct wayfinding icon for each. Recommended topics appear highlighted and starred *inside their category*, not in a second navigation menu, and are never auto-selected. Selected blue chips stay visible in a removable summary row. At five, unselected chips disable until one is removed. Search does not clear selections.
+2. **Make them yours.** Only the selected Experiences appear in the five-topic strip and expandable cards. For each topic choose up to four activities and three outcomes, associate audiences and Programs, and set Featured / Planned / Exploring using a compact status chip in the *left side of each card's header*. Generated website copy previews inline. There is no separate Review step.
 
-All three are internal views of the canonical V6.1 GuidedSetupShell Establish step. They are not competing top-level routes.
+Both are internal views of the canonical V6.1 GuidedSetupShell Establish / Programs & Audiences / Experiences step. The owning ActionFooter shows the Make These Experiences Yours action on Explore and Save & Continue to Website & Brand after personalization. Operators with no choices may skip Experiences. The outer step navigation stays unchanged.
 
 ## Source of truth and website behavior
 

@@ -248,9 +248,9 @@ export function recommendedSiteExperiences(
 }
 
 /**
- * Each of the 78 topic chips appears exactly once on the first Establish page.
+ * Each of the 78 topic chips appears exactly once within its group on Explore.
  * Group headings organize scrolling content, never hide it behind a menu.
- * Recommendations are labeled but never auto-select or consume capacity.
+ * Recommendations identify some of those chips, never auto-selecting them.
  */
 export function discoverSiteExperienceTopics(
   intent:Pick<SiteProgramsAudiencesV61,"interestIds"|"audienceIds">,
@@ -264,14 +264,12 @@ export function discoverSiteExperienceTopics(
       ...topic.activities.map(activity=>activity.label),
     ].some(label=>label.toLocaleLowerCase().includes(search));
   const recommended=recommendedSiteExperiences(intent).filter(matches);
-  // Reserve *all* recommended topics, including those filtered out by search,
-  // so the same topic never appears in a group and the recommended row.
-  const recommendedIds=new Set(recommendedSiteExperiences(intent).map(topic=>topic.id));
+  // Recommendations are metadata for the very same topic chips inside their
+  // primary group, not a separate duplicate row or navigation destination.
   const groups=siteExperienceGroups.map(group=>({
     ...group,
     topics:siteExperienceCatalog.filter(topic=>
-      topic.groupIds[0]===group.id &&
-      !recommendedIds.has(topic.id) && matches(topic)),
+      topic.groupIds[0]===group.id && matches(topic)),
   })).filter(group=>group.topics.length>0);
   return {recommended,groups};
 }

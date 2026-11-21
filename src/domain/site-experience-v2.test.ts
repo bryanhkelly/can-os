@@ -49,17 +49,18 @@ describe("Site Experience Catalog v2",()=>{
     expect(suggested.length).toBeLessThanOrEqual(7);
     expect(suggested.map(item=>item.id)).toContain("financial-literacy");
     const {recommended,groups}=discoverSiteExperienceTopics(plan);
-    const all=[...recommended,...groups.flatMap(group=>group.topics)];
+    const all=groups.flatMap(group=>group.topics);
     expect(all).toHaveLength(siteExperienceCatalog.length);
     expect(new Set(all.map(item=>item.id)).size).toBe(all.length);
     expect(groups).toHaveLength(siteExperienceGroups.length);
+    expect(recommended.every(topic=>all.some(item=>item.id===topic.id))).toBe(true);
     // All 78 choices are available even when no audience or Program is selected.
     const empty=discoverSiteExperienceTopics({interestIds:[],audienceIds:[]});
-    const every=[...empty.recommended,...empty.groups.flatMap(group=>group.topics)];
+    const every=empty.groups.flatMap(group=>group.topics);
     expect(new Set(every.map(item=>item.id)).size).toBe(siteExperienceCatalog.length);
     // Search filters visible chips; selected Site choices remain independent.
     const search=discoverSiteExperienceTopics(plan,"Robotics");
-    expect([...search.recommended,...search.groups.flatMap(group=>group.topics)]
+    expect(search.groups.flatMap(group=>group.topics)
       .some(topic=>topic.id==="robotics")).toBe(true);
     expect(plan.experienceIds).toEqual(["voting-elections","financial-literacy","robotics"]);
   });

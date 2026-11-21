@@ -13,7 +13,8 @@ import {
   siteExperienceGroups, siteExperienceCatalog, siteExperienceById,
   siteExperienceOutcomes, siteExperienceLimit, siteExperienceActivityLimit,
   siteExperienceOutcomeLimit, siteExperienceAudienceNames, siteExperienceProgramNames,
-  recommendedSiteExperiences, describeSiteExperience, validCustomExperienceName,
+  recommendedSiteExperiences, discoverSiteExperienceTopics,
+  describeSiteExperience, validCustomExperienceName,
   type SiteExperienceGroupId, type SiteExperienceId, type SiteExperienceOutcomeId,
   type SiteExperienceAudienceId, type SiteExperienceProgramId,
 } from "@/domain/site-experience-interests";
@@ -65,16 +66,7 @@ export function EstablishExperiencesV61({
     return topic?[topic]:[];
   });
   const recommendedIds=new Set(recommendedSiteExperiences(draft).map(topic=>topic.id));
-  const search=query.trim().toLocaleLowerCase();
-  const matches=(topic:typeof siteExperienceCatalog[number])=>
-    !search||[topic.title,
-      ...topic.groupIds.flatMap(id=>siteExperienceGroups.filter(group=>group.id===id)
-        .map(group=>group.title)),
-      ...topic.activities.map(activity=>activity.label),
-    ].some(label=>label.toLocaleLowerCase().includes(search));
-  const groups=siteExperienceGroups.map(group=>({
-    ...group,topics:siteExperienceCatalog.filter(topic=>topic.groupIds[0]===group.id&&matches(topic)),
-  })).filter(group=>group.topics.length>0);
+  const {groups}=discoverSiteExperienceTopics(draft,query);
   const currentId=activeId==="none"?null:
     activeId&&selectedIds.includes(activeId)?activeId:selectedIds[0]??null;
 
