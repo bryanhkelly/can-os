@@ -302,11 +302,13 @@ const interior:Partial<Record<PublicSitePath,WebsiteSectionSource[]>>={
     ],
   }],
   "/tuition":[{
-    key:"tuition-page",title:"Tuition / Financial support",description:"Publicly reviewed tuition and assistance details.",
-    appearsWhen:"Approved tuition or financial-aid statements exist or an illustrative layout is requested.",
+    key:"tuition-page",title:"Tuition / Fees / Funding",description:"Always-available prelaunch funding guidance enriched by current verified financial records.",
+    appearsWhen:"Every public or private Site website; no approved tuition amount is required for truthful funding boilerplate.",
     elements:[
-      template("Page heading and explanatory text","Default eyebrow: 'Planning your education'. H1: 'Plan with confidence'. Supporting copy remains renderer-owned until verified tuition text is available."),
-      approved("Tuition, assistance and fees","Verified tuition/financial-aid projections","Private fee assumptions and possible ESA funding are not presented as official prices."),
+      template("Page heading and explanatory text","Default eyebrow: 'Costs & support'. H1: 'Plan with confidence'. The text adapts to school versus community-program context."),
+      template("Prelaunch tuition and assistance guidance","Universal boilerplate explains that costs and funding are being determined; it does not promise scholarship awards, tax deductibility or government eligibility."),
+      approved("Confirmed tuition, assistance and fees","Verified tuition/financial-aid projections","Approved current costs and support terms replace prelaunch boilerplate automatically."),
+      field("Organization status disclosure","Hosting & Organization · self-reported tax status","A non-verified organizational status is clearly labeled as self-reported or pending; EIN is never included.","Establish → Site Information → Hosting & Organization","site-identity"),
     ],
   }],
   "/families":[{
