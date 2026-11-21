@@ -85,7 +85,7 @@ describe("V6.1 current Launch Studio presentation contract", () => {
   it("uses the shared internal-step and choice-card controls throughout Launch Studio", () => {
     const website = read("src/routes/site-website.tsx");
     const workflow = read("src/components/workflow/index.ts");
-    expect(website).toContain("<GuidedSetupProgress");
+    expect(website).toContain("<GuidedSetupShell");
     expect(website).not.toContain('<nav aria-label="Website & Brand steps"');
     expect(workflow).toContain("GuidedSetupProgress");
     for (const path of [
