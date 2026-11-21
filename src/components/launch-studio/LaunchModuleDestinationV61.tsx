@@ -32,7 +32,7 @@ export const launchModuleDestinationsV61: Record<DestinationModuleId, Destinatio
     note: "Each approved offering has its own registration settings.",
     links: [
       { label: "Review opening requirements", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Check opening requirements" },
-      { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Review Site publication" },
+      { label: "Review website publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Review website publication" },
       { label: "Review admissions and seats", path: id => `/admissions/capacity?siteId=${scope(id)}`, detail: "Review available seats for programs using admissions" },
       { label: "Manage eligible noncredit registration", path: id => `/programs/noncredit/enrollment?publicSiteId=${scope(id)}`, detail: "Manage approved noncredit registration" },
       { label: "Open your Site workspace", path: id => `/sites/${scope(id)}`, detail: "Go to your Site Workspace" },
