@@ -22,6 +22,30 @@ export const publicAdmissionsInterestInput = z.object({
 
 export type PublicAdmissionsInterestInput = z.infer<typeof publicAdmissionsInterestInput>;
 
+/** Public, adult-initiated interest in a Site before any Program publication.
+ * Uses the existing canonical admissions-interest record and follow-up action;
+ * it does not create a child, household, enrollment, or Program waitlist. */
+export const publicSiteInterestKinds = ["information", "interest_list", "tuition_updates"] as const;
+export const publicSiteInterestInput = publicAdmissionsInterestInput
+  .omit({programId:true,purpose:true})
+  .extend({
+    interestKind:z.enum(publicSiteInterestKinds),
+  }).strict();
+export type PublicSiteInterestInput = z.infer<typeof publicSiteInterestInput>;
+
+export function publicSiteInterestMessage(input:PublicSiteInterestInput):string {
+  const kind={
+    information:"General Site information request",
+    interest_list:"Site interest list (no admission or seat priority)",
+    tuition_updates:"Tuition and funding updates",
+  }[input.interestKind];
+  return (kind+(input.message?" | "+input.message:"")).slice(0,500);
+}
+
+export function parsePublicSiteInterest(params:URLSearchParams):PublicSiteInterestInput {
+  return publicSiteInterestInput.parse(Object.fromEntries(params.entries()));
+}
+
 /** Preserve purpose inside the existing scoped lead record. No tour, calendar
  * booking, second CRM or new child/household record is created. */
 export function publicInterestMessage(input:PublicAdmissionsInterestInput):string {
