@@ -163,7 +163,7 @@ export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
       sourcePackageRevision:pkg.revision,requestId:data.requestId,
       releaseNumber,formats:[...content.formats],contentSnapshot:{title:pkg.title,...content},
       createdByPersonId:actor.actorPersonId!,
-    }).returning({id:siteMarketingPackageReleases.id});
+    }).returning({id:siteMarketingPackageReleases.id,createdAt:siteMarketingPackageReleases.createdAt});
     if(!parent)throw new DomainError("UNAVAILABLE","Could not create Package Release.");
     await tx.insert(siteArtifactReleases).values(outputs.map(output=>({
       siteId:site.id,packageId:pkg.id,packageReleaseId:parent.id,
@@ -183,7 +183,7 @@ export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
     await emitReportableChange(tx,{
       eventType:EventTypes.SiteMarketingPackageReleased,
       sourceId:parent.id,sourceVersion:String(releaseNumber),
-      actorPersonId:actor.actorPersonId,occurredAt:new Date(),
+      actorPersonId:actor.actorPersonId,occurredAt:parent.createdAt,
       dimensions:{organizationId:site.organizationId,siteId:site.id},
       // Released collateral is not evidence of sending, delivery, or audience reach.
       payload:{packageId:pkg.id,packageRevision:pkg.revision,brandVersionId:brand.version.id,

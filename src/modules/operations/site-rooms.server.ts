@@ -102,11 +102,13 @@ async function createRoomRecord(tx: Parameters<Parameters<typeof db.transaction>
       eq(siteRooms.siteId, school.siteId), sql`lower(btrim(${siteRooms.name})) = lower(${input.name})`,
     )).limit(1);
     if (duplicate) throw new DomainError("SITE_ROOM_NAME_CONFLICT", "A room with this name already exists at this Site. Use the saved room.");
-    await tx.insert(siteRooms).values({ id: input.roomId, siteId: school.siteId,
-      name: input.name, capacity: input.capacity });
+    const [created] = await tx.insert(siteRooms).values({ id: input.roomId, siteId: school.siteId,
+      name: input.name, capacity: input.capacity })
+      .returning({createdAt: siteRooms.createdAt});
+    if (!created) throw new Error("Site room insert did not return its source timestamp");
     const eventId = await emitReportableChange(tx, { eventType: EventTypes.SiteRoomCreated,
       sourceId: input.roomId, sourceVersion: "1",
-      actorPersonId: actor.actorPersonId, occurredAt: new Date(),
+      actorPersonId: actor.actorPersonId, occurredAt: created.createdAt,
       dimensions: { organizationId: school.organizationId, siteId: school.siteId,
         ...(school.programId ? { programId: school.programId } : {}) },
       payload: { capacity: input.capacity } });

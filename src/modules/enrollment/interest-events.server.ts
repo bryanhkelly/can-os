@@ -352,7 +352,7 @@ export async function createInterestEvent(
       status: "published",
       invitationTokenDigest: invitationToken ? accessTokenDigest(eventId, invitationToken) : null,
       createdByPersonId: context.actorPersonId!,
-    }).returning({ id: interestEvents.id });
+    }).returning({ id: interestEvents.id, createdAt: interestEvents.createdAt });
     if (!created) throw new Error("Unable to create interest event");
 
     const projection = await createProjectionIfAbsent(tx, {
@@ -371,7 +371,7 @@ export async function createInterestEvent(
     await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventCreated,
       sourceId: created.id, sourceVersion: "1",
-      actorPersonId: context.actorPersonId, occurredAt: new Date(),
+      actorPersonId: context.actorPersonId, occurredAt: created.createdAt,
       dimensions: { organizationId: program.organizationId, siteId: program.siteId,
         programId: program.id },
       payload: { calendarEventId: projection.id, kind: data.kind, visibility: data.visibility },
@@ -564,7 +564,7 @@ export async function registerInterestEvent(
       eventId: event.id,
       publicInterestId,
       status: "registered",
-    }).returning({ id: interestEventRegistrations.id });
+    }).returning({ id: interestEventRegistrations.id, createdAt: interestEventRegistrations.createdAt });
     if (!registration) throw new Error("Unable to save event RSVP");
 
     const now = new Date();
@@ -580,7 +580,7 @@ export async function registerInterestEvent(
 
     await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventRegistrationCreated,
-      sourceId: registration.id, sourceVersion: "1", occurredAt: now,
+      sourceId: registration.id, sourceVersion: "1", occurredAt: registration.createdAt,
       dimensions: { organizationId: event.organizationId, siteId: event.siteId,
         programId: event.programId },
       payload: { eventId: event.id, publicInterestId,
