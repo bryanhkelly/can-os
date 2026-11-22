@@ -256,7 +256,7 @@ export const sitePublishedExperienceCardsSchema=z.array(z.object({
   id:z.string().max(128),title:z.string().max(120),
   description:z.string().max(1200),label:z.string().max(500),
 }).strict()).max(siteExperienceById.size+12);
-export type SitePublishedExperienceCard=z.infer<typeof sitePublishedExperienceCardsSchema>;
+export type SitePublishedExperienceCard=z.infer<typeof sitePublishedExperienceCardsSchema>[number];
 
 export function projectSiteExperienceItems(
   vision:Pick<SiteLaunchPreferences,"experienceIds"|"customExperiences"|"experienceDetails"|"interestIds"|"audienceIds">|SitePublishedExperienceSnapshot|null,
