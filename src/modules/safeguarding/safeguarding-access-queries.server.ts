@@ -43,14 +43,15 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  */
 export function currentSafeguardingGrantPredicate(actor: AccessContext) {
   const organizations = actor.scope.organizationIds ?? [];
-  if (!actor.actorPersonId || organizations.length !== 1)
+  const organizationId = organizations.length === 1 ? organizations[0] : undefined;
+  if (!actor.actorPersonId || !organizationId)
     throw new AuthorizationError("verified scoped safeguarding actor");
   return and(
     eq(accountPersonGrants.id, actor.grantId),
     eq(accountPersonGrants.accountId, actor.accountId),
     eq(accountPersonGrants.personId, actor.actorPersonId),
     eq(accountPersonGrants.role, actor.role),
-    eq(accountPersonGrants.organizationId, organizations[0]),
+    eq(accountPersonGrants.organizationId, organizationId),
     actor.grantSiteId
       ? eq(accountPersonGrants.siteId, actor.grantSiteId)
       : isNull(accountPersonGrants.siteId),
