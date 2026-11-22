@@ -8,7 +8,7 @@
  * node scripts/acceptance/check-reporting-source-projection-schema.mjs
  *
  * No database is modified or migration applied. An application role with
- * BYPASSRLS remains a security exception requiring separate operational review.
+ * BYPASSRLS is prohibited; activation requires reviewed service-role membership.
  */
 import assert from "node:assert/strict";
 import { neon } from "@neondatabase/serverless";
@@ -60,19 +60,33 @@ for (const name of [
   "reporting_source_retry_idx",
 ]) assert(names.has(name),"Required reporting projection index missing: "+name);
 
+// The application login must inherit the explicitly reviewed NOLOGIN service
+// capability, not bypass RLS or silently read an empty table through FORCE RLS.
+const [access]=await query`
+  SELECT pg_has_role(current_user, 'can_reporting_service', 'USAGE') AS service_member,
+    (SELECT rolbypassrls OR rolsuper FROM pg_roles WHERE rolname=current_user) AS bypass_rls,
+    has_table_privilege(current_user,
+      'public.reporting_source_event_receipts', 'SELECT,INSERT,UPDATE') AS receipt_privileges
+`;
+assert.equal(access?.bypass_rls,false,
+  "Runtime reporting login must not bypass forced RLS");
+assert.equal(access?.service_member,true,
+  "Reviewed can_reporting_service membership is required before enabling reporting");
+assert.equal(access?.receipt_privileges,true,
+  "Runtime reporting login lacks receipt read/write privileges");
 const [meta]=await query`
   SELECT (SELECT count(*)::int FROM public.reporting_source_event_receipts) AS receipts,
          (SELECT count(*)::int FROM public.reporting_source_event_receipts
             WHERE status='accepted') AS accepted,
          (SELECT count(*)::int FROM public.reporting_source_event_receipts
-            WHERE status='legacy') AS legacy,
-         (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user) AS bypass_rls
+            WHERE status='legacy') AS legacy
 `;
 console.log(JSON.stringify({
   project:connection.project,branch:connection.branch,role:connection.current_role,
   migration:"0100_reporting_source_event_receipts",indexes:[...names].sort(),
   receiptCounts:{total:meta.receipts,accepted:meta.accepted,legacy:meta.legacy},
-  ownerBypassesRls:meta.bypass_rls,
+  serviceRoleInherited:access.service_member,
+  ownerBypassesRls:access.bypass_rls,
   schemaReady:true,
   reminder:"A passing read-only schema check is not a role-isolation or rollout certification",
 },null,2));
