@@ -35,7 +35,8 @@ export const reportingSourceSnapshotEvents = pgTable("reporting_source_snapshot_
   payloadFingerprint: text("payload_fingerprint").notNull(),
   sourceVersion: text("source_version").notNull(),
 }, table => [
-  primaryKey({columns:[table.snapshotId,table.eventId]}),
+  primaryKey({name:"reporting_source_snapshot_events_pk",
+    columns:[table.snapshotId,table.eventId]}),
   index("reporting_snapshot_events_source_idx").on(table.eventId),
   check("reporting_snapshot_events_digest_ck",sql`${table.payloadFingerprint} ~ '^[0-9a-f]{64}$'`),
   check("reporting_snapshot_events_version_ck",sql`char_length(${table.sourceVersion}) BETWEEN 1 AND 128`),
