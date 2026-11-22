@@ -14,10 +14,23 @@ treated as a signed-out state.
 
 ## Build identity
 
-The `/access` form footer shows the first 12 characters of the existing
-`__CAN_SOURCE_REVISION__` Vite-embedded Git SHA. Full SHA appears as a
-tooltip. If provenance was not embedded, it says `unavailable` instead
-of inventing a build number.
+The `/access` form footer retains the first 12 characters of the
+Vite-embedded Git SHA and displays the build target and UTC build timestamp.
+Its reusable, collapsed `BuildDiagnosticsFooter` also shows the full Git SHA,
+browser hostname and a checked-on-demand comparison against the independent
+`/release-fingerprint` server revision. Copy diagnostics includes only these
+public release identifiers. A failed/invalid server probe is shown as
+unavailable, not silently assumed to match. The check runs only on expansion,
+not on every anonymous login render.
+
+Both Vite configurations embed `__CAN_SOURCE_REVISION__`,
+`__CAN_BUILD_TIMESTAMP__` and `__CAN_BUILD_TARGET__`. These are build
+metadata, not proof of the active Neon project/branch, database credentials,
+deployment promotion or operating authorization. Public diagnostics must
+never expose database endpoints/branches, account details, or URL query
+parameters; resolving the active database binding remains a separate
+authenticated infrastructure investigation. If provenance was not embedded,
+the footer says `unavailable` instead of inventing a build number.
 
 ## Valor draft assessments and teaching feedback
 
