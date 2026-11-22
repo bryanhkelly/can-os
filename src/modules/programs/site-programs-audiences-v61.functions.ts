@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { sites } from "@/db/schema";
+import { programs, sites } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
@@ -31,6 +31,31 @@ async function authorizedRegistrar(capability: "program.read" | "program.launch.
     throw new AuthorizationError("verified Site planning registrar");
   return actor;
 }
+
+/**
+ * Canonical "what exists" reader for every authorized Site, including legacy
+ * and synthetic fixtures. This intentionally does not inspect launchPreferences,
+ * marketing publication, or Program catalog adoption.
+ */
+export const readExistingSiteProgramsV61 = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({ siteId: siteIdSchema }).strict().parse(value))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const actor = await authorizedRegistrar("program.read");
+    const [site] = await db.select().from(sites)
+      .where(eq(sites.id, data.siteId)).limit(1);
+    assertSiteSetupScope(actor, site, "program.read");
+    const records = await db.select({
+      id: programs.id,
+      name: programs.name,
+      type: programs.type,
+      status: programs.status,
+      gradeRange: programs.gradeRange,
+      deliveryModel: programs.deliveryModel,
+    }).from(programs).where(eq(programs.siteId, site.id))
+      .orderBy(asc(programs.name), asc(programs.id));
+    return { siteId: site.id, programs: records };
+  });
 
 /** One exact Site, private intent only. Nothing grants Program adoption or enrollment. */
 export const readSiteProgramsAudiencesV61 = createServerFn({ method: "GET" })
