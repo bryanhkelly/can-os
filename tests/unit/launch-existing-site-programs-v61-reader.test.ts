@@ -15,7 +15,8 @@ const state = vi.hoisted(() => ({
     capabilities: Set<string>;
     scope: { organizationIds: string[]; siteIds: string[]; programIds?: string[] };
   },
-  site: { id: siteId, organizationId: orgId },
+  site: { id: "00000000-0000-4000-8000-000000000121",
+    organizationId: "00000000-0000-4000-8000-000000000122" },
   programs: [] as ExistingSiteProgramV61[],
   where: [] as unknown[],
   programQueries: 0,
