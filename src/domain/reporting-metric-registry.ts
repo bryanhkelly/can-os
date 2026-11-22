@@ -68,8 +68,12 @@ export function requireMetricContract(
   metricKey: string,
   definitionVersion: string,
 ): SourceMetricContract {
-  const metric = registry.find(row => row.metricKey === metricKey &&
+  const candidates = registry.filter(row => row.metricKey === metricKey &&
     row.definitionVersion === definitionVersion);
+  if (candidates.length > 1) {
+    throw new Error("Conflicting metric definitions share a key and version");
+  }
+  const metric = candidates[0];
   if (!metric) throw new Error("Unknown metric definition or version");
   return metric;
 }

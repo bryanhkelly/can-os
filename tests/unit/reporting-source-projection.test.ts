@@ -64,6 +64,12 @@ describe("authorized source projection",()=>{
       ...first,payload:{...first.payload,siteId:otherSite,reporting:copied},
     }],scope,period)).toThrow("outside");
   });
+  it("does not count out-of-scope legacy events",()=>{
+    const first=roomEvent(),{reporting:_reporting,...legacy}=first.payload;
+    expect(()=>projectAuthorizedSourceEvents([{
+      ...first,payload:{...legacy,siteId:otherSite},
+    }],scope,period)).toThrow("Out-of-scope");
+  });
   it("makes incomplete legacy coverage explicit instead of reporting zero",()=>{
     const first=roomEvent(),{reporting:_reporting,...legacy}=first.payload;
     const result=projectAuthorizedSourceEvents([{...first,payload:legacy}],scope,period);

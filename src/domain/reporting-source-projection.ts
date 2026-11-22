@@ -80,6 +80,15 @@ export function projectAuthorizedSourceEvents(
     if (!Object.hasOwn(REPORTABLE_EVENT_CATALOG, event.eventType)) {
       throw new Error("Unexpected reporting event type in selected source stream");
     }
+    // Check current authority even for historic events that predate the
+    // reporting envelope. A legacy event must not bypass Site authorization.
+    const rowOrganization = event.payload.organizationId;
+    const rowSite = event.payload.siteId;
+    if (typeof rowOrganization !== "string" || typeof rowSite !== "string" ||
+        !proof.verifiedOrganizationIds.has(rowOrganization) ||
+        !proof.verifiedSiteIds.has(rowSite)) {
+      throw new Error("Out-of-scope or unattributed source event cannot be reported");
+    }
     const reporting = event.payload.reporting;
     // Old operational records remain evidence, but they cannot be counted
     // as normalized events until backfilled and reconciled.
