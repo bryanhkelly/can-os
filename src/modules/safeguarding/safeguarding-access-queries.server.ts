@@ -34,40 +34,11 @@ export async function loadPolicyAndResponders(siteId: string) {
 }
 
 
-export async function loadIncidentAndAssignment(actor: AccessContext, incidentId: string, capability: string) {
-  const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
-  if (!incident) throw new AuthorizationError("safeguarding case resource");
-  const [assignment] = await db.select().from(safeguardingCaseAssignments).where(and(
-    eq(safeguardingCaseAssignments.incidentId, incidentId),
-    eq(safeguardingCaseAssignments.personId, actor.actorPersonId!),
-    isNull(safeguardingCaseAssignments.revokedAt),
-  )).limit(1);
-  assertSafeguardingCaseAccess(actor, incident, assignment, capability);
-  return { incident, assignment: assignment! };
-}
-
-
-export async function authorizeEvidenceOrExternalReporter(
-  actor: AccessContext,
-  incidentId: string,
-  capability: "safeguarding.evidence.add" | "safeguarding.external_report.record",
-): Promise<SafeguardingCaseResource> {
-  const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
-  if (!incident) throw new AuthorizationError("safeguarding case resource");
-  if (incident.reporterPersonId === actor.actorPersonId) {
-    assertSafeguardingReporterRelationship(actor, incident);
-    return incident;
-  }
-  await loadIncidentAndAssignment(actor, incidentId, capability);
-  return incident;
-}
-
-
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Lock the actor's verified Person grant through the business write. This
  * prevents concurrent role/grant revocation from racing with the mutation. */
-async function lockLiveMutationGrant(tx: Tx, actor: AccessContext): Promise<void> {
+export async function lockCurrentSafeguardingGrant(tx: Tx, actor: AccessContext): Promise<void> {
   if (!actor.actorPersonId) throw new AuthorizationError("verified safeguarding actor");
   const [grant] = await tx.select({ id: accountPersonGrants.id })
     .from(accountPersonGrants).where(and(
@@ -91,7 +62,7 @@ export async function loadIncidentAndAssignmentForMutation(
   const [incident] = await tx.select().from(incidents)
     .where(eq(incidents.id, incidentId)).for("update").limit(1);
   if (!incident) throw new AuthorizationError("safeguarding case resource");
-  await lockLiveMutationGrant(tx, actor);
+  await lockCurrentSafeguardingGrant(tx, actor);
   const [assignment] = await tx.select().from(safeguardingCaseAssignments).where(and(
     eq(safeguardingCaseAssignments.incidentId, incidentId),
     eq(safeguardingCaseAssignments.personId, actor.actorPersonId!),
@@ -112,7 +83,7 @@ export async function authorizeEvidenceOrExternalReporterForMutation(
   const [incident] = await tx.select().from(incidents)
     .where(eq(incidents.id, incidentId)).for("update").limit(1);
   if (!incident) throw new AuthorizationError("safeguarding case resource");
-  await lockLiveMutationGrant(tx, actor);
+  await lockCurrentSafeguardingGrant(tx, actor);
   if (incident.reporterPersonId === actor.actorPersonId) {
     assertSafeguardingReporterRelationship(actor, incident);
     return incident;

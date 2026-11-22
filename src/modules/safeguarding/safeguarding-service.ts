@@ -1,5 +1,5 @@
 import { currentSafeguardingFallbacks } from "./safeguarding-routing.server";
-import { loadSite, loadPolicyAndResponders, loadIncidentAndAssignmentForMutation, authorizeEvidenceOrExternalReporterForMutation } from "./safeguarding-access-queries.server";
+import { loadSite, loadPolicyAndResponders, loadIncidentAndAssignmentForMutation, authorizeEvidenceOrExternalReporterForMutation, lockCurrentSafeguardingGrant } from "./safeguarding-access-queries.server";
 import { personDisplayName } from "@/domain/person-name";
 import { db } from "@/db/client";
 import {
@@ -101,6 +101,7 @@ export async function saveSafeguardingSiteConfiguration(
   }
   const now = new Date();
   await db.transaction(async (tx) => {
+    await lockCurrentSafeguardingGrant(tx, actor);
     await tx.insert(safeguardingSitePolicies).values({
       siteId: site.id,
       jurisdictionId: input.jurisdictionId,
@@ -249,6 +250,7 @@ export async function submitSafeguardingConcern(
   const incidentNumber = `SG-${now.toISOString().slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}`;
   try {
     return await db.transaction(async (tx) => {
+      await lockCurrentSafeguardingGrant(tx, actor);
       const [incident] = await tx.insert(incidents).values({
         incidentNumber,
         type: "safeguarding_concern",
@@ -716,6 +718,7 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
       throw new Error("This restricted case changed; reload before claiming");
     assertOrganizationScope(actor,current.organizationId);
     assertSiteScope(actor,current.siteId);
+    await lockCurrentSafeguardingGrant(tx, actor);
     // The fallback appointment is a mutable authorization relationship. Hold
     // its row through the case write, just as with named case assignments.
     const [lockedConfig]=await tx.select({

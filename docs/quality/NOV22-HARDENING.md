@@ -11,7 +11,10 @@ These changes are implementation work, not executed acceptance evidence.
   authorization transaction; even unique-constraint race recovery rechecks
   current permission and the original payload.
 - Overdue takeover additionally locks the current named fallback roster
-  appointment. Historical case readers remain independent of these writes.
+  appointment. Policy saves and concern intake also lock the active actor
+  membership through their transactions. The two obsolete pre-transaction
+  authorization helpers are retired to prevent unsafe future reuse.
+  Historical case readers remain independent of these writes.
 - Unit tests exercise lock order, withdrawn assignment, inactive Person
   grant and sibling-Site rejection. Real two-connection concurrent PostgreSQL
   verification remains necessary before declaring the race fully certified.
