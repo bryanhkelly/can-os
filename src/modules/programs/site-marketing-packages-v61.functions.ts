@@ -18,7 +18,7 @@ import {
 } from "@/domain/marketing-package-v61";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
-import { emitReportableEvent } from "@/platform/reportable-event";
+import { emitReportableChange } from "@/platform/reportable-event";
 
 const uuid = z.string().uuid();
 const siteInput = z.object({ siteId: uuid }).strict();
@@ -151,13 +151,12 @@ export const createSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityId:created.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{purpose:data.purpose,revision:created.revision},
     });
-    await emitReportableEvent(tx,{
-      eventType:EventTypes.SiteMarketingPackageCreated,aggregateType:"site_marketing_package",
-      aggregateId:created.id,actorPersonId:actor.actorPersonId,
-      occurredAt:created.createdAt,
-      source:{kind:"site_marketing_package",id:created.id,version:String(created.revision)},
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageCreated,
+      sourceId:created.id,sourceVersion:String(created.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:created.createdAt,
       dimensions:{organizationId:site.organizationId,siteId:site.id},
-      evidenceClass:"operational_record",payload:{revision:created.revision},
+      payload:{revision:created.revision},
     });
     return toView(created);
   }));
@@ -182,13 +181,11 @@ export const saveSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityId:current.id,scope:{siteId:site.id,organizationId:site.organizationId},
       before:{revision:current.revision},after:{revision:saved.revision},
     });
-    await emitReportableEvent(tx,{
-      eventType:EventTypes.SiteMarketingPackageUpdated,aggregateType:"site_marketing_package",
-      aggregateId:saved.id,actorPersonId:actor.actorPersonId,
-      occurredAt:saved.updatedAt,
-      source:{kind:"site_marketing_package",id:saved.id,version:String(saved.revision)},
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageUpdated,
+      sourceId:saved.id,sourceVersion:String(saved.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:saved.updatedAt,
       dimensions:{organizationId:site.organizationId,siteId:site.id},
-      evidenceClass:"operational_record",
       payload:{revision:saved.revision,previousRevision:current.revision},
     });
     return toView(saved);

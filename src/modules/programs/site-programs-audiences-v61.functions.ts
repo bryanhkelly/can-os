@@ -19,7 +19,7 @@ import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint
 import { readSiteSchoolYearAvailability } from "./site-school-year-availability.server";
 import { isSchoolYearAcademyReference, newlyRestrictedSiteIntent } from "@/domain/site-program-access-v61";
 import { writeAudit } from "@/platform/mutation";
-import { emitReportableEvent } from "@/platform/reportable-event";
+import { emitReportableChange } from "@/platform/reportable-event";
 
 const siteIdSchema = z.string().uuid();
 const expectedRevisionSchema = z.string().datetime({ offset: true });
@@ -124,14 +124,11 @@ export const saveSiteProgramsAudiencesV61 = createServerFn({ method: "POST" })
         before: { preferences: old ?? null },
         after: { preferences, selfReported: true, publicApproved: false },
       });
-      await emitReportableEvent(tx, {
+      await emitReportableChange(tx, {
         eventType: EventTypes.SiteInformationUpdated,
-        aggregateType: "site", aggregateId: site.id,
-        actorPersonId: actor.actorPersonId,
-        occurredAt: updated.updatedAt,
-        source: { kind: "site", id: site.id, version: updated.updatedAt.toISOString() },
+        sourceId: site.id, sourceVersion: updated.updatedAt.toISOString(),
+        actorPersonId: actor.actorPersonId, occurredAt: updated.updatedAt,
         dimensions: { organizationId: site.organizationId, siteId: site.id },
-        evidenceClass: "operational_record",
         payload: { section: "programs_audiences", revision: updated.updatedAt.toISOString(),
           selfReported: true, publicApproved: false },
       });
