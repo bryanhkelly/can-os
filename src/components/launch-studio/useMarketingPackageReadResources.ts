@@ -48,7 +48,8 @@ export function useMarketingPackageReadResources(
     if((view!=="detail"&&view!=="share"&&view!=="followup")||!packageId)return;
     let live=true;
     setReleasesLoading(true);setReleasesUnavailable(false);
-    setReleases([]);setPackageReleases([]);setCompare(null);
+    // Comparison previews are controller-owned and reset when opening a package.
+    setReleases([]);setPackageReleases([]);
     setSelectedBrandRevision(null);
     void Promise.all([
       listSiteMarketingReleases({data:{siteId,packageId}}),

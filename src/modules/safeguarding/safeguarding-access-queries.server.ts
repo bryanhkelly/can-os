@@ -1,9 +1,9 @@
 import { db } from "@/db/client";
-import { accountPersonGrants, incidents, people, safeguardingCaseAssignments, safeguardingSitePolicies, safeguardingSiteResponders, sites } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, incidents, people, safeguardingCaseAssignments, safeguardingSitePolicies, safeguardingSiteResponders, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertSafeguardingCaseAccess, assertSafeguardingReporterRelationship, type SafeguardingCaseResource } from "@/domain/safeguarding-case-access";
 import { assertOrganizationScope, assertSiteScope, AuthorizationError } from "@/domain/command-context";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
 /** Verified, current Site and restricted case readers. All service commands
  * still authorize separately inside their own transactions on every mutation.
@@ -36,19 +36,44 @@ export async function loadPolicyAndResponders(siteId: string) {
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** Lock the actor's verified Person grant through the business write. This
- * prevents concurrent role/grant revocation from racing with the mutation. */
+/** Exact current grant, account and Person admission predicate. The actor's
+ * original membership Site is authoritative, never an expanded Site scope.
+ * If an operator transfers the grant to another Site or Organization during
+ * an active session, the old context must fail closed at mutation time.
+ */
+export function currentSafeguardingGrantPredicate(actor: AccessContext) {
+  const organizations = actor.scope.organizationIds ?? [];
+  if (!actor.actorPersonId || organizations.length !== 1)
+    throw new AuthorizationError("verified scoped safeguarding actor");
+  return and(
+    eq(accountPersonGrants.id, actor.grantId),
+    eq(accountPersonGrants.accountId, actor.accountId),
+    eq(accountPersonGrants.personId, actor.actorPersonId),
+    eq(accountPersonGrants.role, actor.role),
+    eq(accountPersonGrants.organizationId, organizations[0]),
+    actor.grantSiteId
+      ? eq(accountPersonGrants.siteId, actor.grantSiteId)
+      : isNull(accountPersonGrants.siteId),
+    eq(accountPersonGrants.active, true),
+    eq(accessAccounts.personId, actor.actorPersonId),
+    eq(accessAccounts.disabled, false),
+    isNotNull(accessAccounts.emailVerifiedAt),
+    eq(people.active, true),
+  )!;
+}
+
+/** Lock the current grant AND the linked account/Person through audit and
+ * event commit. Disabling the account, deactivating the Person, transferring
+ * the membership, or revoking the grant cannot race with this write.
+ */
 export async function lockCurrentSafeguardingGrant(tx: Tx, actor: AccessContext): Promise<void> {
-  if (!actor.actorPersonId) throw new AuthorizationError("verified safeguarding actor");
   const [grant] = await tx.select({ id: accountPersonGrants.id })
-    .from(accountPersonGrants).where(and(
-      eq(accountPersonGrants.id, actor.grantId),
-      eq(accountPersonGrants.accountId, actor.accountId),
-      eq(accountPersonGrants.personId, actor.actorPersonId),
-      eq(accountPersonGrants.role, actor.role),
-      eq(accountPersonGrants.active, true),
-    )).for("share").limit(1);
-  if (!grant) throw new AuthorizationError("current safeguarding grant");
+    .from(accountPersonGrants)
+    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
+    .innerJoin(people, eq(people.id, accountPersonGrants.personId))
+    .where(currentSafeguardingGrantPredicate(actor))
+    .for("share", { of: [accountPersonGrants, accessAccounts, people] }).limit(1);
+  if (!grant) throw new AuthorizationError("current safeguarding grant and verified account");
 }
 
 /** Mutation authorization is deliberately revalidated after acquiring the
