@@ -1,10 +1,11 @@
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
+import { marketingEditorReducer, type MarketingEditorView, type MarketingEditorState } from "./marketing-package-editor-state";
 import { SiteGuideV61 } from "./SiteGuideV61";
 import { MarketingPackageReleaseHistoryV61 } from "./MarketingPackageReleaseHistoryV61";
 import { MarketingPackageLibraryList } from "./MarketingPackageLibraryList";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState, type SetStateAction } from "react";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 import { useRouter } from "@tanstack/react-router";
@@ -70,20 +71,25 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     ({...initialOutreachPlanV61(beneficiaries),
       ...(siteRevision?{sourceSiteRevision:siteRevision}:{})});
   const [packages,setPackages]=useState(initial);
-  const [view,setView]=useState<"library"|"wizard"|"detail"|"share"|"followup">(module==="create-outreach"?"wizard":"library");
-  const [record,setRecord]=useState<PackageRecord|null>(null);
-  const [title,setTitle]=useState(siteName+" outreach");
-  const [content,setContent]=useState<MarketingPackageContent>(()=>({
-    ...starter(context.defaultPurpose),
-    plan:newPlan(siteIntent?.audienceIds??[]),
-    formats:outreachFormatsV61(initialOutreachPlanV61().channels),
-  }));
-  const [step,setStep]=useState(0);
-  // Saved/duplicated copy is presumed operator-authored. Only a brand-new
-  // guided plan receives an automatic first draft when entering Review.
-  const [hasAuthoredCopy,setHasAuthoredCopy]=useState(false);
-  const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("email");
-  const [editingFormat,setEditingFormat]=useState<MarketingFormat|null>(null);
+  const [editor,dispatchEditor]=useReducer(marketingEditorReducer, {
+    view: module==="create-outreach" ? "wizard" : "library",
+    record:null,
+    title:siteName+" outreach",
+    content:{
+      ...starter(context.defaultPurpose),
+      plan:newPlan(siteIntent?.audienceIds??[]),
+      formats:outreachFormatsV61(initialOutreachPlanV61().channels),
+    },
+    step:0,hasAuthoredCopy:false,previewFormat:"email",editingFormat:null,
+  } satisfies MarketingEditorState);
+  const {view,record,title,content,step,hasAuthoredCopy,previewFormat,editingFormat}=editor;
+  const setView=(update:SetStateAction<MarketingEditorView>)=>dispatchEditor({type:"view",update});
+  const setRecord=(update:SetStateAction<PackageRecord|null>)=>dispatchEditor({type:"record",update});
+  const setTitle=(update:SetStateAction<string>)=>dispatchEditor({type:"title",update});
+  const setContent=(update:SetStateAction<MarketingPackageContent>)=>dispatchEditor({type:"content",update});
+  const setStep=(update:SetStateAction<number>)=>dispatchEditor({type:"step",update});
+  const setPreviewFormat=(update:SetStateAction<MarketingFormat>)=>dispatchEditor({type:"previewFormat",update});
+  const setEditingFormat=(update:SetStateAction<MarketingFormat|null>)=>dispatchEditor({type:"editingFormat",update});
   const [showArchived,setShowArchived]=useState(false);
   const [busy,setBusy]=useState(false);
   const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
@@ -144,31 +150,28 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     "Leave this outreach plan? Unsaved changes will be lost.");
 
   function open(recordToOpen:PackageRecord,editing=false) {
-    setEditingFormat(null);
-    setRecord(recordToOpen);setTitle(recordToOpen.title);
-    setContent({...recordToOpen.content,plan:recordToOpen.content.plan??{
-      ...newPlan(siteIntent?.audienceIds??[]),
-      recipients:recordToOpen.content.audiences,
+    dispatchEditor({type:"open",record:recordToOpen,editing,content:{
+      ...recordToOpen.content,plan:recordToOpen.content.plan??{
+        ...newPlan(siteIntent?.audienceIds??[]),
+        recipients:recordToOpen.content.audiences,
+      },
     }});
-    setHasAuthoredCopy(true);
-    setStep(0);setView(editing?"wizard":"detail");setError("");setNotice("");
+    setError("");setNotice("");
     setReleases([]);setPackageReleases([]);setReleasesLoading(!editing);
     setReleasesUnavailable(false);
     setReleaseRequestId(crypto.randomUUID());setCompare(null);
   }
   function start() {
-    setEditingFormat(null);
-    setRecord(null);setTitle(siteName+" outreach");
-    setContent({...starter(context.defaultPurpose),
+    dispatchEditor({type:"start",title:siteName+" outreach",content:{
+      ...starter(context.defaultPurpose),
       plan:newPlan(siteIntent?.audienceIds??[]),
-      formats:outreachFormatsV61(initialOutreachPlanV61().channels)});
-    setHasAuthoredCopy(false);
-    setStep(0);setView("wizard");setError("");setNotice("");
+      formats:outreachFormatsV61(initialOutreachPlanV61().channels),
+    }});
+    setError("");setNotice("");
   }
   function patch(value:Partial<MarketingPackageContent>) {
-    if ("headline" in value || "message" in value || "callToAction" in value)
-      setHasAuthoredCopy(true);
-    setContent(current=>({...current,...value}));setError("");
+    dispatchEditor({type:"patch",patch:value});
+    setError("");
   }
 
   async function run(action:()=>Promise<void>) {
@@ -252,7 +255,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   }
   function discardWizard() {
     setDiscardDialogOpen(false);
-    setRecord(null);setView("library");setError("");setNotice("");
+    dispatchEditor({type:"discard"});setError("");setNotice("");
   }
   function leaveWizard() {
     if (dirty) { setDiscardDialogOpen(true); return; }
@@ -261,9 +264,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   async function duplicate(selected:PackageRecord) {
     await run(async()=>{
       const copied=await duplicateSiteMarketingPackageV61({data:{siteId,packageId:selected.id}});
-      updateList(copied);setTitle(copied.title);setContent(copied.content);
-      setHasAuthoredCopy(true);
-      setStep(0);setView("wizard");
+      updateList(copied);dispatchEditor({type:"duplicate",record:copied});
       setNotice("A separate editable draft was created.");
     });
   }

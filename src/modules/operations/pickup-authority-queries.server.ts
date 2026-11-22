@@ -11,6 +11,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { assertOnsitePickupScope } from "@/domain/onsite-pickup-access";
+import { assertProgramSchoolScope } from "@/domain/pickup-authorization-scope";
 import { notifyMany } from "@/platform/mutation";
 import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegation } from "./site-local-delegation.server";
 import { requireCurrentSectionFacilitator } from "./site-section-facilitators.server";
@@ -21,15 +22,6 @@ type Target = { studentProfileId: string; programId: string; householdId: string
 /** Shared, transaction-scoped pickup authority and evidence readers.
  * Never cache a caller's verified grant or a student's live custody state.
  */
-export function assertProgramSchoolScope(actor: AccessContext, row: {
-  organizationId: string; siteId: string | null; programId: string;
-}) {
-  if (!row.siteId || !actor.scope.organizationIds?.includes(row.organizationId) ||
-      !actor.scope.siteIds?.includes(row.siteId) ||
-      !actor.scope.programIds?.includes(row.programId))
-    throw new AuthorizationError("pickup organization, site and program scope");
-}
-
 /** Verified guardian + current Enrollment + same canonical Household. */
 export async function guardianStudent(tx: Tx, actor: AccessContext, target: Target) {
   const guardianHousehold = alias(householdMemberships, "pickup_guardian_household");
