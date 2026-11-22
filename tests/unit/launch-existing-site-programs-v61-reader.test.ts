@@ -92,7 +92,7 @@ describe("Launch Studio existing Program reader", () => {
     expect(state.programQueries).toBe(1);
     const query = new PgDialect().sqlToQuery(state.where.at(-1) as SQL);
     expect(query.params).toContain(siteId);
-    expect(query.params).not.toContain(orgId);
+    expect(query.params).toContain(orgId);
   });
 
   it("limits registrar reads to explicitly assigned Program IDs", async () => {
@@ -101,7 +101,7 @@ describe("Launch Studio existing Program reader", () => {
     const result = await readExistingSiteProgramsV61({ data: { siteId } });
     expect(result.visibility).toBe("assigned");
     const query = new PgDialect().sqlToQuery(state.where.at(-1) as SQL);
-    expect(query.params).toEqual([siteId, programId]);
+    expect(query.params).toEqual([siteId, orgId, programId]);
   });
 
   it("does not query sibling Programs when a registrar has no Program grants", async () => {
