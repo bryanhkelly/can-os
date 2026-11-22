@@ -120,8 +120,9 @@ export const siteExperienceOutcomes = [
   {id:"credentials",label:"Explore credentials",copy:"explore future credentials"},
 ] as const;
 export type SiteExperienceOutcomeId = typeof siteExperienceOutcomes[number]["id"];
-export const siteExperienceOutcomeIds = siteExperienceOutcomes.map(item=>item.id)
-  as [SiteExperienceOutcomeId,...SiteExperienceOutcomeId[]];
+export const siteExperienceOutcomeIds = siteExperienceOutcomes.map(item=>item.id) as [
+  SiteExperienceOutcomeId, ...SiteExperienceOutcomeId[],
+];
 const outcomesByGroup: Record<SiteExperienceGroupId,readonly SiteExperienceOutcomeId[]> = {
   academic:["knowledge","confidence","credentials"],stem:["knowledge","creativity","confidence"],
   digital:["independence","confidence","safety"],money:["financial","confidence","independence"],
