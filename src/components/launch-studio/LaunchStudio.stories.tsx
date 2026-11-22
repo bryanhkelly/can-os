@@ -89,7 +89,7 @@ function SchoolDetails({ needsJurisdictionReview = false }: { needsJurisdictionR
     sites:[{id:"site",organizationId:"org",name:"Example Academy Campus",slug:"example-campus",
       timezone:"America/Chicago",updatedAt:"2026-11-05T00:00:00Z",planningLocation:null,
       address:{street1:"100 Example Lane",city:"Example City",state:needsJurisdictionReview?"CA":"TX",postalCode:"75001",country:"US"},
-      addressStatus:"church_supplied",lifecycleStatus:"planning",sitePhysicalAddressRevision:null,siteIdentityRevision:null,contactDraft:null,siteInformationDraft:null,websiteDraft:null}],
+      addressStatus:"church_supplied",lifecycleStatus:"planning",sitePhysicalAddressRevision:null,siteIdentityRevision:null,contactDraft:null,siteInformationDraft:null,websiteDraft:null,websiteContentSaved:false}],
   };
   return <LaunchStudioChrome><LaunchStudioShell role="School setup" subject="Example Academy"
     title="Your school, your foundation." steps={steps} currentId="details" onStepChange={()=>{}}>
