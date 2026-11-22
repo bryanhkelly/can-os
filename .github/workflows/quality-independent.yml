@@ -4,8 +4,10 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+  # Release branches already run this gate through their PR to main.
+  # Avoid duplicate push + PR jobs for each commit on release-11212026.
   push:
-    branches: [main, release-11212026]
+    branches: [main]
 
 permissions:
   contents: read
