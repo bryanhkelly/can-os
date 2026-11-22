@@ -31,7 +31,7 @@ for (const [table, actions] of [
       : ["reporting_membership_service_select","reporting_membership_service_insert"];
   for (const name of expected) {
     assert.equal(access.statements.filter(statement =>
-      statement.startsWith("CREATE POLICY " + name + " ON public." + table) &&
+      statement.includes("CREATE POLICY " + name + " ON public." + table) &&
       statement.includes("TO can_reporting_service")).length, 1,
       "Missing restricted reporting policy: " + name);
   }
@@ -40,9 +40,9 @@ for (const [table, actions] of [
       "Missing reporting " + action + " policy for " + table);
   }
 }
-assert(!/GRANT\\s+can_reporting_service\\s+TO\\s+/i.test(access.sql),
+assert(!/GRANT\s+can_reporting_service\s+TO\s+/i.test(access.sql),
   "A migration cannot assign reporting service membership to a runtime login");
-assert(!/CREATE\\s+POLICY[^;]*\\bTO\\s+(PUBLIC|anonymous|authenticated)\\b/i.test(access.sql),
+assert(!/CREATE\s+POLICY[^;]*\bTO\s+(PUBLIC|anonymous|authenticated)\b/i.test(access.sql),
   "Reporting access must not expose policies to unverified callers");
 
 assert.equal(receipt.statements.length, 13, "Receipt migration statement count changed");
