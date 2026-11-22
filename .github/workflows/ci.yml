@@ -33,6 +33,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Validate reporting migrations before dependency installation
+        run: npm run verify:reporting:sql
+
       - name: Validate committed Drizzle snapshot chain
         run: node scripts/check-drizzle-snapshot-chain.mjs
 

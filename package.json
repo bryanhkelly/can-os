@@ -6,8 +6,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "assets:prepare": "node scripts/prepare-template-images.mjs",
-    "prebuild": "npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && npm run assets:prepare",
-    "prebuild:cloudflare": "npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
+    "prebuild": "npm run verify:reporting:sql && npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && npm run assets:prepare",
+    "prebuild:cloudflare": "npm run verify:reporting:sql && npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
     "postbuild": "npm run typecheck",
     "postbuild:cloudflare": "npm run typecheck",
     "prebuild-storybook": "npm run assets:prepare",
@@ -128,7 +128,8 @@
     "test:local-import-exports": "node --test scripts/acceptance/check-local-import-exports.test.mjs",
     "verify:reporting:projection-schema": "node scripts/acceptance/check-reporting-source-projection-schema.mjs",
     "verify:reporting:sql": "node scripts/acceptance/check-reporting-migration-sql.mjs",
-    "verify:reporting:snapshot-schema": "node scripts/acceptance/check-reporting-source-snapshot-schema.mjs"
+    "verify:reporting:snapshot-schema": "node scripts/acceptance/check-reporting-source-snapshot-schema.mjs",
+    "test:reporting:foundation": "vitest run tests/unit/reporting-source-contract.test.ts tests/unit/reportable-event-catalog.test.ts tests/unit/reporting-source-projection.test.ts tests/unit/reporting-source-owner-policy.test.ts tests/unit/reporting-source-coverage-policy.test.ts tests/unit/reporting-source-receipt-policy.test.ts tests/unit/reporting-source-retry-policy.test.ts tests/unit/reporting-metric-registry.test.ts tests/unit/reporting-snapshot-manifest.test.ts tests/unit/reporting-architecture-coverage.test.ts tests/unit/site-setup-scope.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

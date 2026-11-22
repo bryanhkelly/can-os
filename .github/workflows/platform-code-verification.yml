@@ -29,6 +29,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Validate reporting SQL migrations
+        run: npm run verify:reporting:sql
+      - name: Test reporting contracts and reusable architecture
+        run: npm run test:reporting:foundation
       - name: Parse all runtime and build source before bundling
         run: npm run check:build-source-syntax
       - name: Reject missing named exports from local project modules
