@@ -134,7 +134,8 @@
     "check:test-import-exports": "node scripts/acceptance/check-local-import-exports.mjs --include-tests",
     "test:migration-safety": "node --test scripts/lib/sql-only-migration-ledger.test.mjs scripts/acceptance/guard-drizzle-generation.test.mjs scripts/acceptance/guard-drizzle-push.test.mjs",
     "check:lint-regressions": "node scripts/acceptance/check-eslint-new-warnings.mjs",
-    "test:lint-regressions": "node --test scripts/lib/diff-added-lines.test.mjs"
+    "test:lint-regressions": "node --test scripts/lib/diff-added-lines.test.mjs",
+    "test:quality:p2": "vitest run tests/unit/marketing-package-editor-state.test.ts tests/unit/pickup-authorization-scope.test.ts tests/unit/public-site-styles.test.ts tests/unit/public-site-html.test.ts tests/unit/marketing-package-session-scope.test.tsx"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
