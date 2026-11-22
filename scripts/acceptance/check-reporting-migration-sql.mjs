@@ -13,6 +13,38 @@ function statementsFor(path) {
 }
 const receipt = statementsFor("drizzle/0100_reporting_source_event_receipts.sql");
 const snapshots = statementsFor("drizzle/0101_reporting_source_private_snapshots.sql");
+const access = statementsFor("drizzle/0102_reporting_source_service_access.sql");
+assert.equal(access.statements.length, 11, "Reporting access migration statement count changed");
+assert.match(access.statements[0], /CREATE ROLE can_reporting_service NOLOGIN/);
+assert.match(access.statements[0], /rolcanlogin OR rolbypassrls OR rolsuper OR rolcreaterole/);
+assert.match(access.sql, /GRANT USAGE ON SCHEMA public TO can_reporting_service/);
+for (const [table, actions] of [
+  ["reporting_source_event_receipts", ["SELECT","INSERT","UPDATE"]],
+  ["reporting_source_snapshots", ["SELECT","INSERT"]],
+  ["reporting_source_snapshot_events", ["SELECT","INSERT"]],
+]) {
+  const expected = table === "reporting_source_event_receipts"
+    ? ["reporting_receipts_service_select","reporting_receipts_service_insert",
+       "reporting_receipts_service_retry"]
+    : table === "reporting_source_snapshots"
+      ? ["reporting_snapshots_service_select","reporting_snapshots_service_insert"]
+      : ["reporting_membership_service_select","reporting_membership_service_insert"];
+  for (const name of expected) {
+    assert.equal(access.statements.filter(statement =>
+      statement.startsWith("CREATE POLICY " + name + " ON public." + table) &&
+      statement.includes("TO can_reporting_service")).length, 1,
+      "Missing restricted reporting policy: " + name);
+  }
+  for (const action of actions) {
+    assert(access.sql.includes("FOR " + action + " TO can_reporting_service"),
+      "Missing reporting " + action + " policy for " + table);
+  }
+}
+assert(!/GRANT\\s+can_reporting_service\\s+TO\\s+/i.test(access.sql),
+  "A migration cannot assign reporting service membership to a runtime login");
+assert(!/CREATE\\s+POLICY[^;]*\\bTO\\s+(PUBLIC|anonymous|authenticated)\\b/i.test(access.sql),
+  "Reporting access must not expose policies to unverified callers");
+
 assert.equal(receipt.statements.length, 13, "Receipt migration statement count changed");
 assert.equal(snapshots.statements.length, 13, "Snapshot migration statement count changed");
 const create = receipt.statements[0];
@@ -68,7 +100,8 @@ for(const character of normalized) {
 assert.equal(depth,0,"Unbalanced receipt CREATE TABLE parentheses");
 const journal=JSON.parse(readFileSync("drizzle/meta/_journal.json","utf8"));
 for(const [idx,tag] of [[100,"0100_reporting_source_event_receipts"],
-  [101,"0101_reporting_source_private_snapshots"]]) {
+  [101,"0101_reporting_source_private_snapshots"],
+  [102,"0102_reporting_source_service_access"]]) {
   assert.equal(journal.entries.filter(row=>row.idx===idx&&row.tag===tag).length,1,
     "Missing reporting migration journal entry: "+tag);
 }
