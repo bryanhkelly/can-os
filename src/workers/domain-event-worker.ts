@@ -75,6 +75,7 @@ for (const eventType of [
   EventTypes.SectionCreditConfigured,
   EventTypes.ActionDeadlineChanged,
   EventTypes.SiteCreated,
+  EventTypes.SiteInformationUpdated,
   // Marketing Package lifecycle measures preparation, never delivery or reach.
   EventTypes.SiteMarketingPackageCreated,
   EventTypes.SiteMarketingPackageUpdated,
