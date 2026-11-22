@@ -40,7 +40,8 @@ export const Route = createFileRoute("/launch/site")({
     // Read actual Site Programs independently of optional planning/catalog data.
     const existingProgramsRead = site && (!deps.module || deps.module === "programs-audiences")
       ? readExistingSiteProgramsV61({ data: { siteId: site.id } })
-          .then(value => ({ state: "ready" as const, programs: value.programs }))
+          .then(value => ({ state: "ready" as const, programs: value.programs,
+            visibility: value.visibility }))
           .catch(() => ({ state: "unavailable" as const }))
       : Promise.resolve(null);
     // Reuse overview reads for the active module. Previously these same
