@@ -17,7 +17,7 @@ import { publicSiteHost } from "@/domain/public-site-address";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readSavedBrandVersion } from "@/modules/sites/site-brand.server";
 import { writeAudit } from "@/platform/mutation";
-import { emitReportableEvent } from "@/platform/reportable-event";
+import { emitReportableChange } from "@/platform/reportable-event";
 import { EventTypes } from "@/domain/event-types";
 
 const uuid=z.string().uuid();
@@ -180,13 +180,11 @@ export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
       after:{packageId:pkg.id,releaseId:parent.id,releaseNumber,
         packageRevision:pkg.revision,brandVersionId:brand.version.id,
         formats:content.formats,outputChecksums:outputs.map(o=>o.checksum)}});
-    await emitReportableEvent(tx,{
+    await emitReportableChange(tx,{
       eventType:EventTypes.SiteMarketingPackageReleased,
-      aggregateType:"site_marketing_package_release",aggregateId:parent.id,
+      sourceId:parent.id,sourceVersion:String(releaseNumber),
       actorPersonId:actor.actorPersonId,occurredAt:new Date(),
-      source:{kind:"site_marketing_package_release",id:parent.id,version:String(releaseNumber)},
       dimensions:{organizationId:site.organizationId,siteId:site.id},
-      evidenceClass:"operational_record",
       // Released collateral is not evidence of sending, delivery, or audience reach.
       payload:{packageId:pkg.id,packageRevision:pkg.revision,brandVersionId:brand.version.id,
         formats:content.formats},

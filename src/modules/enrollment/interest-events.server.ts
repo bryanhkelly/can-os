@@ -42,7 +42,7 @@ import {
 import { EventTypes } from "@/domain/event-types";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
 import { writeAudit } from "@/platform/mutation";
-import { emitReportableEvent } from "@/platform/reportable-event";
+import { emitReportableChange } from "@/platform/reportable-event";
 import { readPublishedSiteCatalog } from "@/modules/sites/site-public-catalog.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -368,16 +368,12 @@ export async function createInterestEvent(
       metadata: { kind: data.kind, visibility: data.visibility },
       createdByPersonId: context.actorPersonId,
     });
-    await emitReportableEvent(tx, {
+    await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventCreated,
-      aggregateType: "interest_event",
-      aggregateId: created.id,
-      actorPersonId: context.actorPersonId,
-      occurredAt: new Date(),
-      source: { kind: "interest_event", id: created.id, version: "1" },
+      sourceId: created.id, sourceVersion: "1",
+      actorPersonId: context.actorPersonId, occurredAt: new Date(),
       dimensions: { organizationId: program.organizationId, siteId: program.siteId,
         programId: program.id },
-      evidenceClass: "operational_record",
       payload: { calendarEventId: projection.id, kind: data.kind, visibility: data.visibility },
     });
     await writeAudit(tx, context, {
@@ -582,15 +578,11 @@ export async function registerInterestEvent(
       interestEventEmailDeliveries.kind,
     ] });
 
-    await emitReportableEvent(tx, {
+    await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventRegistrationCreated,
-      aggregateType: "interest_event_registration",
-      aggregateId: registration.id,
-      occurredAt: now,
-      source: { kind: "interest_event_registration", id: registration.id, version: "1" },
+      sourceId: registration.id, sourceVersion: "1", occurredAt: now,
       dimensions: { organizationId: event.organizationId, siteId: event.siteId,
         programId: event.programId },
-      evidenceClass: "operational_record",
       payload: { eventId: event.id, publicInterestId,
         emailDeliveriesQueued: emailSchedule.map(item => item.kind) },
     });
@@ -667,17 +659,12 @@ export async function recordInterestEventAttendance(
       interestEventEmailDeliveries.registrationId,
       interestEventEmailDeliveries.kind,
     ] });
-    await emitReportableEvent(tx, {
+    await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventAttendanceRecorded,
-      aggregateType: "interest_event_registration",
-      aggregateId: record.registrationId,
-      actorPersonId: context.actorPersonId,
-      occurredAt: now,
-      source: { kind: "interest_event_registration", id: record.registrationId,
-        version: now.toISOString() },
+      sourceId: record.registrationId, sourceVersion: now.toISOString(),
+      actorPersonId: context.actorPersonId, occurredAt: now,
       dimensions: { organizationId: record.organizationId, siteId: record.siteId,
         programId: record.programId },
-      evidenceClass: "operational_record",
       payload: { eventId: record.eventId, attendanceStatus: data.attendanceStatus },
     });
     await writeAudit(tx, context, {
