@@ -14,8 +14,12 @@ deployment readiness.
 | Source event catalog | `src/domain/reportable-event-catalog.ts` | One event schema and allowlist for each reportable operation |
 | Source event emission | `src/platform/reportable-event.ts` | `emitReportableChange` derives all common source semantics |
 | Event journal and worker | Existing `src/platform/mutation.ts`, `public.domain_events` and worker | One transactional outbox; no shadow event table |
-| Source projection | `src/domain/reporting-source-projection.ts` | Deterministic validation and deduplication on existing events |
-| Source quality endpoint | `src/modules/operations/site-reporting-coverage.functions.ts` | Current exact Site grant, aggregate-only response, bounded period |
+| Source projection | `src/domain/reporting-source-projection.ts` | Deterministic event validation, bounded in-memory reconciliation |
+| Durable projection receipts | `src/db/schema/reporting-source-event-receipts.ts` | One receipt per outbox event; unique accepted source revision |
+| Ownership validation | `src/modules/insights/reporting-source-ownership.server.ts` | Independently verify the canonical source owner for every event |
+| Replay and retries | `src/modules/insights/reporting-source-receipts.server.ts` | Automatic historical replay, advisory locking, bounded retries and quality diagnostics |
+| Projection rollout | `reporting-projection-rollout.server.ts` | Explicit opt-in after migration 0100 and preflight |
+| Source quality endpoint | `src/modules/operations/site-reporting-coverage.functions.ts` | Thin private API delegating to `site-reporting-source-query.server.ts`; whole-Site grant and server-side aggregates |
 | Class and noncredit metrics | Existing domain metrics and `reporting-metric-registry.ts` | Namespaced, versioned adapter; no duplicate calculation writer |
 | Measurement Plans | `measurement-plan-contract.ts` | Inherit metric versions; require matching source ownership |
 | Existing operational Insights | `src/modules/operations/insights.functions.ts` | Preserve action/teacher insight workflows; do not replace |
@@ -49,16 +53,25 @@ integration and domain ownership review.
    and Site scope; membership/affiliation is never an access grant.
 4. A source revision key is a consumer deduplication key, **not** a SQL uniqueness
    guarantee. The existing outbox has at-least-once semantics.
-5. The current source projection deduplicates repeated deliveries and rejects
-   conflicting source revisions. The production persisted projection/checkpoint
-   and database uniqueness scheme still need implementation and load tests.
+5. Migration 0100 defines durable per-event receipts with unique accepted
+   source-revision keys, fingerprints, scope indexes, forced RLS, and a trigger
+   preventing mutation of final receipts. The migration is committed but has
+   **not** been applied or runtime-tested.
+   The worker and independent replay both persist receipts, including historical
+   events the previous pass-through worker had already acknowledged.
+   Retry-pending errors remain visible and are retried with bounded backoff.
+   Per-row durability does not imply source-to-outcome reconciliation.
 6. A query with legacy non-normalized source events marks source normalization
    incomplete. A normalized event stream does **not** establish that all module
    lifecycle transitions have been instrumented.
-7. Event counts, document releases and room capacity are not learner reach,
+7. Site-owned rooms never carry a borrowed Program ownership dimension.
+   Whole-Site reports require authorization over all attached Programs for
+   Site-scoped grants. Every normalized event is cross-checked against its
+   canonical Site/Program/source owner.
+8. Event counts, document releases and room capacity are not learner reach,
    attendance, completion, funded outcomes or causal impact. Calculated metrics
    must use authoritative domain-owned readers and recorded denominators.
-8. Corrections, revocations, and published point-in-time snapshots require a
+9. Corrections, revocations, and published point-in-time snapshots require a
    governed historical read model before external publication is enabled.
 
 ## Required acceptance gates
@@ -74,19 +87,41 @@ integration and domain ownership review.
 - Correction lineage, timestamp and published snapshot reproducibility
 - Report completeness not inferred from missing or uninstrumented sources
 
+## Activation and migration sequencing
+
+1. Review `drizzle/0100_reporting_source_event_receipts.sql` and branch
+   migration journal. Apply ONLY through the approved deployment migration
+   workflow. No production changes were made during this implementation.
+2. With `CAN_REPORTING_PROJECTION_PREFLIGHT=1`,
+   `CAN_EXPECTED_NEON_BRANCH_ID=<exact target branch id>` and the target
+   `DATABASE_URL`, run `npm run verify:reporting:projection-schema`.
+   It is read-only. Check FKs, indexes, forced RLS, the immutability trigger,
+   and verify that the runtime DB role's elevated privileges are understood.
+3. Validate exact-SHA build/typecheck, the new unit suites and the
+   two-Site authorization and reconciliation fixture.
+4. Only then set `CAN_REPORTING_SOURCE_PROJECTION_ENABLED=1` in the target
+   application deployment. When disabled, existing outbox events still complete
+   normally and are eligible for historical replay after activation.
+5. Inspect scheduled-job `reportingReplayed`, source completeness and
+   retry-pending counts. A `source_normalized` result is NOT a certificate that
+   every operational lifecycle is instrumented.
+
 ## Build status
 
-Source modifications and focused unit-test files have been committed, but GitHub
-Actions jobs associated with recent branch commits have failed before executing
-test steps. There is no successful exact-SHA full build, lint, database
-integration, or deployment validation. Treat the release as **unverified**,
-not production certified. No new reporting migrations were applied here.
+The release branch contains code, SQL migration 0100, schema, unit-test files,
+and a read-only migration acceptance script. GitHub Actions jobs for inspected
+branch commits failed with no executed test steps. There is no verified
+exact-SHA typecheck, complete unit suite, role-isolation test, database migration
+integration, or Cloudflare deployment certification. Migration 0100 has not been
+applied. The projection flag remains opt-in and must not be enabled before
+successful preflight and acceptance.
 
 ## Next implementation slice
 
-Ratify an indexed, incrementally refreshed reporting projection in the canonical
-`public` schema with durable idempotent checkpoints and correction lineage,
-after confirming real Neon schema and access grants. Then connect the existing
-authoritative enrollment, noncredit and Classroom Connect sources and their
-measurement requirements. Only after those gates should central Insights charts
-or funder impact publication depend on these projections.
+Validate migration 0100, transaction rollback/replay under concurrent workers,
+and the source-scoped read-model acceptance suite. Then attach the existing
+authoritative enrollment, noncredit and Classroom Connect evidence and govern
+Measurement Plan activation. Source-event receipts are intentionally not yet a
+full metric calculator, materialized participant dataset, or auditable impact
+publication lifecycle. Only after those gates should charts or sponsor impact
+reports depend on these projections.

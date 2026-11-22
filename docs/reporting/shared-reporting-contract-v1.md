@@ -41,15 +41,20 @@ reporting service independently revalidates current effective permissions and
 source evidence before exposing any data. Missing Person/Site/decision must
 remain unavailable or a reconciliation exception, never a made-up ID or zero.
 
-The existing worker must explicitly register new event types before they are
-emitted, or they will accumulate as pending unhandled events.
+The existing worker registers governed events through the shared event
+catalog. With reporting projection rollout disabled, events continue to be
+processed through the original outbox. After migration 0100 and preflight,
+the enabled worker persists durable receipts, and scheduled replay processes
+older events already marked complete. Neither outcome grants read access.
 
 ## Next integration phase
 
-Persist approved measurement-version bindings only after confirming canonical
-Solution / Initiative version ownership, migration order and RLS. Build
-historical reporting projections and privacy-safe telemetry using those
-contracts; then add V6.1 Insights UI and reusable contextual views.
+Validate migration 0100 and its operational replay under test first.
+Then persist approved measurement-version bindings after confirming canonical
+Solution / Initiative ownership and authorization. The existing metrics adapter
+reuses source-owned Class and noncredit definitions, but it is not yet a
+platform-wide calculation engine. Build privacy-safe telemetry separately;
+then add V6.1 Insights UI and reusable contextual views.
 
 Acceptance still requires exact-SHA build, typecheck, unit tests, role-isolation
 tests and database checks. Source commits do not prove a production deployment.
