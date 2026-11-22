@@ -173,6 +173,12 @@ export function validateReportableEvent(
       event.evidenceClass !== "operational_record") {
     throw new Error("Event type, authoritative source and evidence class disagree");
   }
+  // A Program caller may be authorized to edit a shared Site resource,
+  // but that does not make the resource Program-owned.
+  const requiredDimensions: readonly string[] = spec.requiredDimensions;
+  if (!requiredDimensions.includes("programId") && event.dimensions.programId != null) {
+    throw new Error("Site-owned reporting source cannot be attributed to an operating Program");
+  }
   for (const name of spec.requiredDimensions) {
     if (typeof event.dimensions[name] !== "string" || !event.dimensions[name]) {
       throw new Error("Required reporting dimension is missing: " + name);

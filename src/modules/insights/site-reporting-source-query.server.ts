@@ -88,5 +88,5 @@ export async function readSiteReportingSourceCoverage(
       // Even a complete projection stream is NOT proof of full module
       // instrumentation, Person reconciliation, or verified training outcomes.
     };
-  });
+  }, { isolationLevel: "repeatable read", accessMode: "read only" });
 }

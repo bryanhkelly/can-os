@@ -27,6 +27,12 @@ describe("governed event catalog", () => {
     expect(() => validateReportableEvent({...input, source:{...input.source,kind:"class"}}))
       .toThrow("disagree");
   });
+  it("rejects a Program context masquerading as ownership of Site rooms", () => {
+    expect(() => validateReportableEvent({
+      ...input,dimensions:{...input.dimensions,
+        programId:"44444444-4444-4444-8444-444444444444"},
+    })).toThrow("Site-owned");
+  });
   it("rejects omitted dimensions and unexpected sensitive fields", () => {
     expect(() => validateReportableEvent({...input, dimensions:{organizationId:org}}))
       .toThrow("dimension");

@@ -52,10 +52,15 @@ export async function runScheduledJobs(): Promise<{
   const reportingReplayed = reportingProjectionEnabled()
     ? await replayReportingSourceReceipts(50)
         .then(result => ({enabled:true,serviceFailed:false,...result}))
-        .catch(() => ({
-          enabled:true,serviceFailed:true,processed:0,accepted:0,
-          duplicate:0,legacy:0,retryPending:0,
-        }))
+        .catch(() => {
+          // Only the fixed failure category is logged. Never print raw
+          // source payloads or database errors in scheduled-job output.
+          console.error("reporting_projection_replay_unavailable");
+          return {
+            enabled:true,serviceFailed:true,processed:0,accepted:0,
+            duplicate:0,legacy:0,retryPending:0,
+          };
+        })
     : {enabled:false,serviceFailed:false,processed:0,accepted:0,
         duplicate:0,legacy:0,retryPending:0};
   const classParticipantEmails = await processClassParticipantDeliveries();
