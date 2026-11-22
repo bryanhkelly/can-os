@@ -50,9 +50,26 @@ for(const trigger of ["guard_reporting_source_snapshot_mutation",
  "guard_reporting_source_snapshot_membership_mutation"]) {
  assert(triggerNames.has(trigger),"Missing immutability trigger: "+trigger);
 }
+const [access]=await query`
+ SELECT pg_has_role(current_user,'can_reporting_service','USAGE') AS service_member,
+   (SELECT rolbypassrls OR rolsuper FROM pg_roles WHERE rolname=current_user) AS bypass_rls,
+   has_table_privilege(current_user,'public.reporting_source_snapshots',
+     'SELECT,INSERT') AS snapshot_privileges,
+   has_table_privilege(current_user,'public.reporting_source_snapshot_events',
+     'SELECT,INSERT') AS membership_privileges
+`;
+assert.equal(access?.bypass_rls,false,
+  "Runtime snapshot login must not bypass forced RLS");
+assert.equal(access?.service_member,true,
+  "Reviewed can_reporting_service membership is required before enabling snapshots");
+assert.equal(access?.snapshot_privileges,true,
+  "Runtime snapshot login lacks read/insert privileges");
+assert.equal(access?.membership_privileges,true,
+  "Runtime snapshot membership login lacks read/insert privileges");
 console.log(JSON.stringify({
  project:connection.project,branch:connection.branch,
  snapshotTables:rows.map(row=>row.name),
- forcedRls:true,immutabilityTriggers:[...triggerNames],
+ forcedRls:true,serviceRoleInherited:access.service_member,
+ immutabilityTriggers:[...triggerNames],
  caveat:"Read-only schema preflight, not integration or authorization certification",
 },null,2));
