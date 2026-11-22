@@ -18,9 +18,8 @@ export type AccessEmailSender = (message: OneTimeAccessMessage) => Promise<void>
 /**
  * True only in the isolated synthetic sandbox: the test runtime whose access
  * mail is delivered to a local file outbox instead of an external provider.
- * writeTestAccessMail additionally enforces `.test` recipients there. This is
- * never true in development or production, where demo-tenant public
- * applications remain fully suppressed.
+ * writeTestAccessMail additionally enforces `.test` recipients there. This
+ * transport safeguard is independent of Site provenance and admissions policy.
  */
 export function isSyntheticSandboxMailRuntime(
  env:{NODE_ENV?:string;APP_ENV?:string;CAN_ACCESS_MAIL_OUTBOX_DIR?:string}=process.env,
