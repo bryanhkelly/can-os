@@ -22,7 +22,7 @@ export const readSiteContentBriefV61=createServerFn({method:"GET"})
       throw new AuthorizationError("Site Content Brief registrar access");
     return db.transaction(async tx=>{
       const [site]=await tx.select({
-        id:sites.id,name:sites.name,timezone:sites.timezone,
+        id:sites.id,organizationId:sites.organizationId,name:sites.name,timezone:sites.timezone,
         updatedAt:sites.updatedAt,metadata:sites.metadata,
         currentBrandVersionId:sites.currentBrandVersionId,
       }).from(sites).where(eq(sites.id,data.siteId)).limit(1);
