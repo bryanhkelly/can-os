@@ -65,13 +65,18 @@ export function siteInformationGuideV61(step: 0 | 1 | 2 | 3, input: SiteInformat
   };
   const plannedAudience = input.planning?.audienceIds[0];
   const plannedProgram = input.planning?.interestIds[0];
+  const firstValue = input.values[0];
+  const firstValueLabel = firstValue ? values[firstValue] : null;
   const storyExample = plannedAudience || plannedProgram
-    ? `You might say: We hope to bring ${plannedProgram ? storyIdeas[plannedProgram] : "meaningful experiences"} to ${plannedAudience ? audienceNames[plannedAudience].toLowerCase() : "our community"}, ${input.values[0] ? "guided by a commitment to " + values[input.values[0]].toLowerCase() : "guided by our shared purpose"}. Make this your own.`
+    ? `You might say: We hope to bring ${plannedProgram ? storyIdeas[plannedProgram] : "meaningful experiences"} to ${plannedAudience ? audienceNames[plannedAudience].toLowerCase() : "our community"}, ${firstValueLabel ? "guided by a commitment to " + firstValueLabel.toLowerCase() : "guided by our shared purpose"}. Make this your own.`
     : null;
   return {
     summary: kind ? `You're shaping the story of your ${kind.toLowerCase()}.` : "You're shaping the story of your community.",
     highlights: [
-      ...input.values.slice(0, 2).map(value => values[value]),
+      ...input.values.slice(0, 2).flatMap(value => {
+        const label = values[value];
+        return label ? [label] : [];
+      }),
       ...(plannedAudience ? [audienceNames[plannedAudience]] : []),
     ],
     insight: storyExample ?? (input.siteType === "church_community"
