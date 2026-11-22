@@ -2,10 +2,11 @@ import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
 import { marketingEditorReducer, type MarketingEditorView, type MarketingEditorState } from "./marketing-package-editor-state";
 import { SiteGuideV61 } from "./SiteGuideV61";
 import { MarketingPackageReleaseHistoryV61 } from "./MarketingPackageReleaseHistoryV61";
+import { useMarketingPackageReadResources } from "./useMarketingPackageReadResources";
+import { marketingPackageArchiveFiles } from "./marketing-package-archive-files";
 import { MarketingPackageLibraryList } from "./MarketingPackageLibraryList";
-import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
-import { useEffect, useReducer, useState, type SetStateAction } from "react";
+import { useReducer, useState, type SetStateAction } from "react";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 import { useRouter } from "@tanstack/react-router";
@@ -96,55 +97,14 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const [discardDialogOpen,setDiscardDialogOpen]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
-  const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
-  const [packageReleases,setPackageReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingPackageReleases>>>([]);
-  const [releasesLoading,setReleasesLoading]=useState(false);
-  const [releasesUnavailable,setReleasesUnavailable]=useState(false);
-  const [releaseRefreshKey,setReleaseRefreshKey]=useState(0);
+  const {
+    releases,setReleases,packageReleases,setPackageReleases,
+    releasesLoading,setReleasesLoading,releasesUnavailable,setReleasesUnavailable,
+    setReleaseRefreshKey,currentBrand,brandReadiness,setBrandRefreshKey,
+    selectedBrandRevision,
+  }=useMarketingPackageReadResources(siteId,view,record,setError);
   const [releaseRequestId,setReleaseRequestId]=useState(()=>crypto.randomUUID());
   const [compare,setCompare]=useState<{id:string;format:MarketingFormat;mimeType:string;body:string;releaseNumber:number}|null>(null);
-  const [currentBrand,setCurrentBrand]=useState<{id:string;revision:number}|null>(null);
-  const [brandReadiness,setBrandReadiness]=useState<"loading"|"available"|"missing"|"unavailable">("loading");
-  const [brandRefreshKey,setBrandRefreshKey]=useState(0);
-  const [selectedBrandRevision,setSelectedBrandRevision]=useState<number|null>(null);
-  // Shared prerequisite for Create Outreach and My Outreach. Brand edits
-  // stay in Shape; a Marketing Package only selects an immutable version.
-  useEffect(()=>{
-    let live=true;
-    setBrandReadiness("loading");
-    setCurrentBrand(null);
-    void readSiteBrandVersionView({data:{siteId}})
-      .then(brand=>{
-        if(!live)return;
-        const version=brand.current?.version;
-        setCurrentBrand(version?{id:version.id,revision:version.revision}:null);
-        setBrandReadiness(version?"available":"missing");
-      })
-      .catch(()=>{if(live)setBrandReadiness("unavailable");});
-    return ()=>{live=false;};
-  },[siteId,brandRefreshKey]);
-  useEffect(()=>{
-    if((view!=="detail"&&view!=="share"&&view!=="followup")||!record)return;
-    let live=true;
-    setReleasesLoading(true);setReleasesUnavailable(false);
-    setReleases([]);setPackageReleases([]);setCompare(null);
-    setSelectedBrandRevision(null);
-    void Promise.all([
-      listSiteMarketingReleases({data:{siteId,packageId:record.id}}),
-      listSiteMarketingPackageReleases({data:{siteId,packageId:record.id}}),
-      record.brandVersionId
-        ? readSiteBrandVersionView({data:{siteId,versionId:record.brandVersionId}})
-        : Promise.resolve(null),
-    ]).then(([records,packageVersions,selected])=>{
-      if(live){setReleases(records);setPackageReleases(packageVersions);setReleasesLoading(false);
-        setReleasesUnavailable(false);
-        // Current Brand has one owner above; history resolves only the
-        // exact immutable Brand version pinned to the selected Package.
-        setSelectedBrandRevision(selected?.current?.version.revision??null);}
-    }).catch(error=>{if(live){setError(message(error));setReleasesLoading(false);
-      setReleasesUnavailable(true);}});
-    return ()=>{live=false;};
-  },[view,record?.id,record?.brandVersionId,siteId,releaseRefreshKey]);
   const dirty=(view==="wizard" || (view==="detail" && editingFormat!==null)) && (!record || title!==record.title ||
     JSON.stringify(content)!==JSON.stringify(record.content));
   const releaseNavigation=useLaunchUnsavedChanges(()=>dirty||busy,
@@ -319,21 +279,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     await run(async()=>{
       const outputs=await Promise.all(release.outputs.map(item=>
         getSiteMarketingReleaseOutput({data:{siteId,releaseId:item.id}})));
-      const files=outputs.map((output,index)=>({
-        name:release.outputs[index]!.format+"."+output.fileName.split(".").at(-1),
-        body:output.content,
-      }));
-      for(let index=0;index<outputs.length;index++){
-        const output=outputs[index]!;
-        if(release.outputs[index]?.format==="social"&&output.plainText)
-          files.push({name:"social-caption.txt",body:output.plainText});
-      }
-      files.push({name:"package-manifest.json",body:JSON.stringify({
-        packageReleaseId:release.id,releaseNumber:release.releaseNumber,
-        brandVersionId:release.brandVersionId,sourcePackageRevision:release.packageRevision,
-        createdAt:release.createdAt,formats:release.formats,
-        outputs:release.outputs.map(x=>({id:x.id,format:x.format,templateVersion:x.templateVersion,sha256:x.checksum})),
-      },null,2)});
+      const files=marketingPackageArchiveFiles(release,outputs);
       downloadMarketingPackageZip(release.title,release.releaseNumber,files);
       setNotice("Downloaded the complete, original Package Release v"+release.releaseNumber+".");
     });

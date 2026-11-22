@@ -51,8 +51,15 @@ These changes are implementation work, not executed acceptance evidence.
 - Release-history loading fetches only the immutable Brand version attached
   to a selected package. The previous redundant current-Brand request and
   stale cross-package selected revision were removed.
-- Async cancellation is enforced through effect cleanup. Separate component
-  composition for release commands remains a larger P2 follow-up.
+- Async cancellation is enforced through effect cleanup. The resource-loader
+  effects now live in a reusable Site-scoped React hook, separate from the
+  working editor's command orchestration and presentation.
+- Immutable ZIP manifests and output lists are assembled by a pure, tested
+  helper before invoking the browser download. No materials are regenerated.
+- A stale editor-session test expected the retired implicit `promote` mode;
+  it now checks the canonical `create-outreach` default while retaining the
+  explicit module-switch tests. Larger command-controller extraction remains
+  a follow-up.
 
 ## Independent CI
 

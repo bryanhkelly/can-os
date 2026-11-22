@@ -16,7 +16,7 @@ describe("Marketing Package editor session isolation", () => {
     const second = MarketingPackagesV61({ ...props, siteName: "Updated Site" });
     expect(isValidElement(first)).toBe(true);
     expect(first.type).toBe(second.type);
-    expect(first.key).toBe("site-one:promote");
+    expect(first.key).toBe("site-one:create-outreach");
     expect(first.key).toBe(second.key);
   });
 
@@ -24,7 +24,7 @@ describe("Marketing Package editor session isolation", () => {
     const previous = MarketingPackagesV61(props);
     const next = MarketingPackagesV61({ ...props, siteId: "site-two", siteName: "Other Site" });
     expect(previous.type).toBe(next.type);
-    expect(next.key).toBe("site-two:promote");
+    expect(next.key).toBe("site-two:create-outreach");
     expect(next.key).not.toBe(previous.key);
   });
 
