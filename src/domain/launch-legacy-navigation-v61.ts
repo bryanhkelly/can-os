@@ -10,7 +10,7 @@ const moduleForLegacyStep = {
   school: "site-information",
   academics: "program-catalog",
   website: "website-brand",
-  families: "recruit",
+  families: "create-outreach",
   readiness: "opening-compliance",
   next: "open",
 } as const satisfies Record<(typeof schoolLaunchSteps)[number], SiteLaunchModuleIdV61 | undefined>;
