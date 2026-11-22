@@ -21,7 +21,8 @@ import { EstablishProgramsAudiencesV61, ProgramsAudiencesV61Guidance,
 import { readExistingSiteProgramsV61, readSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
 import type { ExistingSiteProgramsStateV61 } from "@/domain/site-existing-programs-v61";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, WorkspaceNotice } from "@/components/workspace";
+import { ExistingSiteProgramsV61 } from "@/components/launch-studio/ExistingSiteProgramsV61";
 import { LaunchModuleDestinationV61, isDestinationModuleV61 } from "@/components/launch-studio/LaunchModuleDestinationV61";
 import { LaunchPrepareV61, isPrepareModuleV61 } from "@/components/launch-studio/LaunchPrepareV61";
 import { MarketingPackagesV61 } from "@/components/launch-studio/MarketingPackagesV61";
@@ -130,7 +131,8 @@ export const Route = createFileRoute("/launch/site")({
       introduceIntentUnavailable: Boolean(site && isIntroduceModuleV61(deps.module) && !programsRead),
       introduceSiteRevision: site && isIntroduceModuleV61(deps.module) ? programsRead?.revision??null : null,
       programsAudiences: site && deps.module === "programs-audiences"
-        ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } }) : null,
+        ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } })
+            .catch(() => null) : null,
       // Shape preferences are optional context for catalog discovery. The
       // separately authorized catalog must remain navigable if this read is
       // unavailable or its data needs repair. Never pretend it loaded empty.
@@ -190,6 +192,22 @@ function SiteLaunchPage() {
       onBack={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "site-information" } })}
       onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
       onContinue={() => void navigate({ to: "/launch/site", search: { siteId: site.id, module: "website-brand" } })} />
+    : selected?.id === "programs-audiences" ? <WorkspaceShell
+      title="Programs & Audiences" eyebrow="Shape / Programs & Audiences"
+      subtitle="Existing Programs are separate from your saved planning choices." width="wide">
+      <div className="mt-6 space-y-4">
+        <ExistingSiteProgramsV61 siteId={site.id}
+          result={existingPrograms ?? { state: "unavailable" }}/>
+        <WorkspaceNotice tone="attention">
+          Your saved Program planning answers could not be loaded. No changes were made.
+          Reload before adding new ideas.
+        </WorkspaceNotice>
+        <a href={base + "&module=programs-audiences"}
+          className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+          Reload Programs & Audiences
+        </a>
+      </div>
+    </WorkspaceShell>
     : selected?.id === "website-brand" ? <Navigate
       to="/launch/website" search={{ siteId: site.id, returnToHub: true }} replace />
     : selected && isIntroduceModuleV61(selected.id) && marketingPackages ? <MarketingPackagesV61
