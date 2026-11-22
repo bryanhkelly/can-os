@@ -31,6 +31,7 @@ export async function emitReportableEvent(
     source: event.source,
     dimensions: event.dimensions,
     evidenceClass: event.evidenceClass,
+    eventSchemaVersion: REPORTABLE_EVENT_CATALOG[event.eventType].schemaVersion,
     occurredAt: event.occurredAt.toISOString(),
     correctsEventId: event.correctsEventId ?? null,
   });

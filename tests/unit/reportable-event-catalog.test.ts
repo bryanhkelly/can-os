@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { EventTypes } from "@/domain/event-types";
-import { validateReportableEvent } from "@/domain/reportable-event-catalog";
+import { normalizeHistoricalReportablePayload, validateReportableEvent,
+  REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { emitReportableChange, emitReportableEvent } from "@/platform/reportable-event";
 
 const org = "11111111-1111-4111-8111-111111111111";
@@ -19,6 +20,24 @@ const input = {
 };
 
 describe("governed event catalog", () => {
+  it("registers one explicit schema version per event", () => {
+    expect(Object.values(REPORTABLE_EVENT_CATALOG).every(spec =>
+      spec.schemaVersion === 1)).toBe(true);
+  });
+  it("upcasts an explicitly versioned historical room event without copying its name", () => {
+    expect(normalizeHistoricalReportablePayload({
+      ...input, schemaVersion: 0,
+      payload: {name: "Legacy Hall", capacity:24},
+    })).toEqual({capacity:24});
+  });
+  it("fails closed for unsupported or unversioned unknown historical payloads", () => {
+    expect(() => normalizeHistoricalReportablePayload({
+      ...input,schemaVersion:3,
+    })).toThrow("Unsupported historical");
+    expect(() => normalizeHistoricalReportablePayload({
+      ...input,payload:{name:"Legacy Hall",capacity:24},
+    })).toThrow();
+  });
   it("accepts a matching authoritative event", () => {
     expect(validateReportableEvent(input)).toEqual(payload);
   });

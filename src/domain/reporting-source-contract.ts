@@ -38,6 +38,8 @@ export const reportingSourceInputSchema = z.object({
   occurredAt: dateTime,
   dimensions: reportingDimensionsSchema,
   evidenceClass: z.enum(["operational_record", "engagement_observation"]),
+  /** Event-specific payload schema version; omitted means original v1. */
+  eventSchemaVersion: z.number().int().nonnegative().optional(),
   /** Corrections refer to an actual earlier authoritative event, if known. */
   correctsEventId: uuid.nullable().optional(),
 }).strict();
@@ -62,6 +64,8 @@ export function buildReportingSourceEnvelope(input: ReportingSourceInput) {
     occurredAt: new Date(data.occurredAt).toISOString(),
     dimensions: data.dimensions,
     evidenceClass: data.evidenceClass,
+    ...(data.eventSchemaVersion === undefined ? {} :
+      { eventSchemaVersion: data.eventSchemaVersion }),
     correctsEventId: data.correctsEventId ?? null,
     dedupKey: reportingSourceDedupKey(data),
   };

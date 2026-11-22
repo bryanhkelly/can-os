@@ -4,7 +4,7 @@ import {
   REPORTING_SOURCE_CONTRACT_VERSION, reportingSourceInputSchema,
   buildReportingSourceEnvelope,
 } from "@/domain/reporting-source-contract";
-import { validateReportableEvent, REPORTABLE_EVENT_CATALOG, type ReportableEventType,
+import { normalizeHistoricalReportablePayload, REPORTABLE_EVENT_CATALOG, type ReportableEventType,
   type ReportableSourceKind } from "@/domain/reportable-event-catalog";
 import type { ReportingScopeProof } from "@/domain/participation-rollups";
 
@@ -24,6 +24,7 @@ const envelopeSchema = z.object({
   occurredAt: iso,
   dimensions: reportingSourceInputSchema.shape.dimensions,
   evidenceClass: reportingSourceInputSchema.shape.evidenceClass,
+  eventSchemaVersion: z.number().int().nonnegative().optional(),
   correctsEventId: uuid.nullable(),
   dedupKey: z.string().min(1).max(512),
 }).strict();
@@ -118,6 +119,7 @@ export function projectAuthorizedSourceEvents(
       occurredAt: meta.occurredAt,
       dimensions: meta.dimensions,
       evidenceClass: meta.evidenceClass,
+      eventSchemaVersion: meta.eventSchemaVersion,
       correctsEventId: meta.correctsEventId,
     });
     if (canonicalJson(meta) !== canonicalJson(normalized) ||
@@ -139,13 +141,14 @@ export function projectAuthorizedSourceEvents(
     }
     const { reporting: _reporting, organizationId: _org,
       siteId: _site, programId: _program, ...body } = event.payload;
-    validateReportableEvent({
+    normalizeHistoricalReportablePayload({
       eventType: event.eventType,
       aggregateType: event.aggregateType,
       aggregateId: event.aggregateId,
       source: meta.source,
       dimensions: meta.dimensions,
       evidenceClass: meta.evidenceClass,
+      schemaVersion: meta.eventSchemaVersion,
       payload: body,
     });
     const signature = reportingEventSignature(event);

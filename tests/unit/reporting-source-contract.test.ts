@@ -22,6 +22,7 @@ describe("reusable reporting source contract",()=>{
     const b=buildReportingSourceEnvelope(sample);
     expect(a).toEqual(b);
     expect(a.contractVersion).toBe("1.0.0");
+    expect(a.eventSchemaVersion).toBeUndefined();
     expect(a.dimensions.siteId).toBe(site);
     expect(a.occurredAt).toBe("2026-11-22T00:00:00.000Z");
     expect(a.dedupKey).toBe(reportingSourceDedupKey(sample));
@@ -36,6 +37,11 @@ describe("reusable reporting source contract",()=>{
     expect(reportingSourceInputSchema.safeParse({
       ...sample,dimensions:{...sample.dimensions,personEmail:"private@example.com"},
     }).success).toBe(false);
+  });
+  it("retains the explicit event payload version and stable source deduplication",()=>{
+    const v=buildReportingSourceEnvelope({...sample,eventSchemaVersion:1});
+    expect(v.eventSchemaVersion).toBe(1);
+    expect(v.dedupKey).toBe(reportingSourceDedupKey(sample));
   });
   it("keeps scheduled time separate from authoritative occurrence",()=>{
     const x=buildReportingSourceEnvelope(sample);
