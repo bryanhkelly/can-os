@@ -20,7 +20,8 @@ export type ExistingSiteProgramV61 = {
 };
 
 export type ExistingSiteProgramsStateV61 =
-  | { state: "ready"; programs: readonly ExistingSiteProgramV61[] }
+  | { state: "ready"; programs: readonly ExistingSiteProgramV61[];
+      visibility?: "whole_site" | "assigned" }
   | { state: "unavailable" };
 
 const statusLabels: Record<ExistingSiteProgramV61["status"], string> = {
