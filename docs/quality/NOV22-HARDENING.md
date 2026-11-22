@@ -80,3 +80,49 @@ steps and recorded a successful conclusion for the exact commit.
 
 Do not merge, migrate a live database or claim production acceptance until
 TypeScript, lint, tests, browser and disposable-database checks have run.
+
+## Release follow-up: 0102 reporting access, correction integrity and Worker isolation
+
+- Added immutable SQL-only migration `0102_reporting_source_service_access`, including
+  a `NOLOGIN` `can_reporting_service` capability, explicit SELECT/INSERT
+  policies on private reporting tables, and restricted retry UPDATE on receipts.
+  No migration grants this role to an application login. Anonymous,
+  authenticated and PUBLIC retain no reporting table privileges.
+- `FORCE ROW LEVEL SECURITY` remains enabled. The service role has broad
+  internal reporting visibility, **not per-Site SQL tenant isolation**.
+  Site and Organization authorization must continue to be enforced by
+  the reporting service layer for every user request. Do not expose the
+  service capability to a client-facing database session.
+- Deployment prerequisite: on an isolated Neon branch, review the login
+  identity returned by `current_user`, verify that it cannot bypass RLS,
+  and explicitly approve its inherited `can_reporting_service` membership.
+  A DBA must make that grant outside the SQL migration. Do not grant the
+  role to `neondb_owner` reflexively, and do not enable reporting flags
+  until the exact runtime login passes both read-only schema preflights.
+  Production migration and role grants require a separate approved plan.
+- The migration ledger includes the Git blob checksum for 0102. The
+  disposable Postgres acceptance now checks the seven policies, minimal
+  privileges, no publicly accessible tables, and service-role SELECT
+  queries under actual RLS. A successful disposable run does not certify
+  Neon ownership, permissions, or business-row isolation.
+- Reporting corrections now verify normalized prior source identity and
+  both envelope-level and outbox-level Organization/Site/Program scope.
+  A legacy predecessor without normalized evidence is rejected rather
+  than silently reattributed. Unit tests cover cross-Site injection,
+  invalid Program claims, missing history and time conflicts.
+- Cloudflare WebSocket pools must remain inside the request-scoped database
+  lifecycle. Missing Worker rate-limit bindings now fail HTTP 503 rather
+  than falling through the Node ingress; direct unscoped Worker database
+  access throws. Node/Netlify still uses its intentional lazy pool.
+- Generated website CSS includes a regression assertion against the
+  literal `/n` typo; it also checks for actual line breaks. This is
+  separate from the full source syntax, route and import/export gates.
+
+### Remaining verification gates
+
+**No build/test success is implied by these commits.** Run application and
+Cloudflare builds, full TypeScript, lint, unit tests, disposable Postgres
+migration acceptance, and real Neon role/tenant authorization checks on
+the exact release commit before promoting PR #359. CI runners previously
+returned zero executed steps; that infrastructure failure is independent
+of source correctness.
