@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { domainEvents } from "./work";
 import { organizations, programs, sites } from "./organizations";
 
@@ -11,7 +11,7 @@ import { organizations, programs, sites } from "./organizations";
 export const reportingSourceEventReceipts = pgTable("reporting_source_event_receipts", {
   eventId: uuid("event_id").primaryKey().references(() => domainEvents.id, { onDelete: "restrict" }),
   eventType: text("event_type").notNull(),
-  status: text("status").$type<"accepted" | "duplicate" | "legacy">().notNull(),
+  status: text("status").$type<"accepted" | "duplicate" | "legacy" | "retry_pending">().notNull(),
   sourceKind: text("source_kind"),
   sourceId: uuid("source_id"),
   sourceVersion: text("source_version"),
@@ -24,6 +24,8 @@ export const reportingSourceEventReceipts = pgTable("reporting_source_event_rece
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   projectedAt: timestamp("projected_at", { withTimezone: true }).notNull().defaultNow(),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
 }, table => [
   uniqueIndex("reporting_source_canonical_revision_uq").on(table.dedupKey)
     .where(sql`${table.status} = 'accepted'`),
@@ -34,8 +36,9 @@ export const reportingSourceEventReceipts = pgTable("reporting_source_event_rece
     .on(table.programId, table.occurredAt)
     .where(sql`${table.status} = 'accepted' AND ${table.programId} IS NOT NULL`),
   index("reporting_source_correction_idx").on(table.correctionOfEventId),
+  index("reporting_source_retry_idx").on(table.status,table.nextAttemptAt),
   check("reporting_source_receipt_status_ck",
-    sql`${table.status} IN ('accepted','duplicate','legacy')`),
+    sql`${table.status} IN ('accepted','duplicate','legacy','retry_pending')`),
   check("reporting_source_receipt_data_ck", sql`(
     (${table.status} IN ('accepted','duplicate')
       AND ${table.sourceKind} IS NOT NULL
@@ -46,7 +49,14 @@ export const reportingSourceEventReceipts = pgTable("reporting_source_event_rece
       AND ${table.organizationId} IS NOT NULL
       AND ${table.siteId} IS NOT NULL)
     OR
-    (${table.status} = 'legacy' AND ${table.dedupKey} IS NULL
+    (${table.status} IN ('legacy','retry_pending')
+      AND ${table.dedupKey} IS NULL
       AND ${table.payloadFingerprint} IS NULL)
+  )`),
+  check("reporting_source_retry_state_ck",sql`(
+    (${table.status} = 'retry_pending' AND ${table.attempts} > 0
+      AND ${table.nextAttemptAt} IS NOT NULL)
+    OR
+    (${table.status} <> 'retry_pending' AND ${table.nextAttemptAt} IS NULL)
   )`),
 ]);

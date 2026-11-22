@@ -50,6 +50,7 @@ for (const name of [
   "reporting_source_site_period_idx",
   "reporting_source_program_period_idx",
   "reporting_source_correction_idx",
+  "reporting_source_retry_idx",
 ]) assert(names.has(name),"Required reporting projection index missing: "+name);
 
 const [meta]=await query`

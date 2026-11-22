@@ -14,10 +14,12 @@ describe("durable source completeness states",()=>{
       {eventType:"SiteRoomCreated",status:"accepted",count:2},
       {eventType:"SiteRoomCreated",status:"duplicate",count:3},
       {eventType:"SiteRoomCreated",status:"legacy",count:1},
+      {eventType:"SiteRoomCreated",status:"retry_pending",count:2},
     ],1,0);
     expect(result.observedCounts).toEqual({SiteRoomCreated:2});
     expect(result.sourceCoverage).toMatchObject({
-      status:"source_unreconciled",legacyEvents:1,duplicateEvents:3,unprojectedEvents:1,
+      status:"source_unreconciled",legacyEvents:1,duplicateEvents:3,
+      retryPendingEvents:2,unprojectedEvents:1,
     });
   });
   it("flags unresolved corrections instead of certifying a complete series",()=>{

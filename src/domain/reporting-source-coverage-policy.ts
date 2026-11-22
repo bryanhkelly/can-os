@@ -2,7 +2,7 @@ import type { ReportableEventType } from "@/domain/reportable-event-catalog";
 
 export type ReportingSourceGroup = {
   eventType: string;
-  status: "accepted" | "duplicate" | "legacy";
+  status: "accepted" | "duplicate" | "legacy" | "retry_pending";
   count: number;
 };
 
@@ -17,6 +17,7 @@ export function summarizeReportingSourceCoverage(
     status: "no_source_evidence" | "source_unreconciled" | "source_normalized";
     legacyEvents: number;
     duplicateEvents: number;
+    retryPendingEvents: number;
     unprojectedEvents: number;
     unresolvedCorrections: number;
     lifecycleCompletenessVerified: false;
@@ -26,7 +27,7 @@ export function summarizeReportingSourceCoverage(
     throw new Error("Invalid source reconciliation count");
   }
   const observedCounts: Partial<Record<ReportableEventType, number>> = {};
-  let observedEvents = 0, legacyEvents = 0, duplicateEvents = 0;
+  let observedEvents = 0, legacyEvents = 0, duplicateEvents = 0, retryPendingEvents = 0;
   for (const row of rows) {
     if (!Number.isSafeInteger(row.count) || row.count < 0) {
       throw new Error("Invalid reporting group count");
@@ -37,16 +38,18 @@ export function summarizeReportingSourceCoverage(
       observedEvents += row.count;
     } else if (row.status === "legacy") legacyEvents += row.count;
     else if (row.status === "duplicate") duplicateEvents += row.count;
+    else if (row.status === "retry_pending") retryPendingEvents += row.count;
     else throw new Error("Unrecognized reporting receipt state");
   }
-  const hasAny = observedEvents + legacyEvents + duplicateEvents + unprojected > 0;
+  const hasAny = observedEvents + legacyEvents + duplicateEvents +
+    retryPendingEvents + unprojected > 0;
   const status = !hasAny ? "no_source_evidence" :
-    legacyEvents || unprojected || unresolvedCorrections ?
+    legacyEvents || unprojected || retryPendingEvents || unresolvedCorrections ?
       "source_unreconciled" : "source_normalized";
   return {
     observedCounts, observedEvents,
     sourceCoverage: {
-      status, legacyEvents, duplicateEvents, unprojectedEvents: unprojected,
+      status, legacyEvents, duplicateEvents, retryPendingEvents, unprojectedEvents: unprojected,
       unresolvedCorrections, lifecycleCompletenessVerified: false,
     },
   };

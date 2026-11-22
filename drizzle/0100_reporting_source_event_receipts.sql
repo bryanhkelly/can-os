@@ -19,8 +19,10 @@ CREATE TABLE IF NOT EXISTS "public"."reporting_source_event_receipts" (
   "occurred_at" timestamptz NOT NULL,
   "recorded_at" timestamptz NOT NULL,
   "projected_at" timestamptz NOT NULL DEFAULT now(),
+  "attempts" integer NOT NULL DEFAULT 0,
+  "next_attempt_at" timestamptz,
   CONSTRAINT "reporting_source_receipt_status_ck"
-    CHECK ("status" IN ('accepted','duplicate','legacy')),
+    CHECK ("status" IN ('accepted','duplicate','legacy','retry_pending')),
   CONSTRAINT "reporting_source_receipt_data_ck" CHECK (
     ("status" IN ('accepted','duplicate')
       AND "source_kind" IS NOT NULL AND "source_id" IS NOT NULL
@@ -28,8 +30,13 @@ CREATE TABLE IF NOT EXISTS "public"."reporting_source_event_receipts" (
       AND "payload_fingerprint" IS NOT NULL AND "organization_id" IS NOT NULL
       AND "site_id" IS NOT NULL)
     OR
-    ("status" = 'legacy' AND "dedup_key" IS NULL
+    ("status" IN ('legacy','retry_pending') AND "dedup_key" IS NULL
       AND "payload_fingerprint" IS NULL)
+  ),
+  CONSTRAINT "reporting_source_retry_state_ck" CHECK (
+    ("status" = 'retry_pending' AND "attempts" > 0 AND "next_attempt_at" IS NOT NULL)
+    OR
+    ("status" <> 'retry_pending' AND "next_attempt_at" IS NULL)
   )
 );
 --> statement-breakpoint
@@ -48,6 +55,9 @@ CREATE INDEX IF NOT EXISTS "reporting_source_program_period_idx"
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "reporting_source_correction_idx"
   ON "public"."reporting_source_event_receipts" ("correction_of_event_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "reporting_source_retry_idx"
+  ON "public"."reporting_source_event_receipts" ("status", "next_attempt_at");
 --> statement-breakpoint
 -- Never expose internal receipts through a direct client role.
 ALTER TABLE "public"."reporting_source_event_receipts" ENABLE ROW LEVEL SECURITY;
