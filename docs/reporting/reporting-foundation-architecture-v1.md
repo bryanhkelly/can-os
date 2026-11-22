@@ -20,7 +20,7 @@ deployment readiness.
 | Replay and retries | `src/modules/insights/reporting-source-receipts.server.ts` | Automatic historical replay, advisory locking, bounded retries and quality diagnostics |
 | Projection rollout | `reporting-projection-rollout.server.ts` | Independent feature gates for source receipts (0100) and private snapshots (0101) |
 | Private snapshot manifest | `src/domain/reporting-snapshot-manifest.ts` | Canonically ordered, SHA-256-identified accepted source membership |
-| Private snapshot service | `src/modules/insights/reporting-source-snapshots.server.ts` | Current-grant capture and read-time manifest reconciliation |
+| Private snapshot service | `src/modules/insights/reporting-source-snapshots.server.ts` | Whole-Site write grant, same-transaction quality verification and read-time manifest reconciliation |
 | Coverage inventory | `src/domain/reporting-instrumentation-coverage.ts` | Explicit source ownership and uninstrumented lifecycle gaps |
 | Source quality endpoint | `src/modules/operations/site-reporting-coverage.functions.ts` | Thin private API delegating to `site-reporting-source-query.server.ts`; whole-Site grant and server-side aggregates |
 | Class and noncredit metrics | Existing domain metrics and `reporting-metric-registry.ts` | Namespaced, versioned adapter; no duplicate calculation writer |
@@ -80,7 +80,12 @@ integration and domain ownership review.
    must use authoritative domain-owned readers and recorded denominators.
 9. Private point-in-time source snapshots now have migration 0101 and explicit
    event membership. They freeze the exact accepted receipt identifiers,
-   fingerprints and cutoff. They are NOT approved/published impact reports.
+   fingerprints and cutoff. Creation requires `program.launch.start` as well
+   as authority over all attached Site Programs; a read-only grant cannot write
+   one. Creation checks source quality in the SAME repeatable-read transaction,
+   rejecting legacy, retry-pending, dead-letter, missing and unresolved
+   correction evidence. Cutoff comparisons include the predecessor's recorded
+   and projected times. They are NOT approved/published impact reports.
    Corrections and fresh grant checks still apply to future report generation.
 10. Publication, network disclosures, revoked grants and official report
     approvals still require separate governed reporting infrastructure.
@@ -100,9 +105,13 @@ integration and domain ownership review.
 
 ## Activation and migration sequencing
 
-1. Run `npm run verify:reporting:sql`. It checks source structure for
-   migrations 0100 and 0101, and now runs in prebuild and Cloudflare prebuild.
-   This is **not a PostgreSQL SQL parser** or database integration test.
+1. Run `npm run db:check:journal` and `npm run verify:reporting:sql`.
+   The journal verifier explicitly validates generated snapshots through 0086
+   and individually registered SQL-only migrations 0087 through 0101. It
+   never invents missing JSON snapshots or certifies `drizzle-kit` model
+   parity. The reporting SQL gate checks source structure for 0100/0101
+   and runs in prebuild and Cloudflare prebuild. Neither is a PostgreSQL SQL
+   parser or database integration test.
 2. Apply 0100 to a specifically chosen validation database branch through an
    approved migration workflow. Run the read-only
    `npm run verify:reporting:projection-schema` with explicit target project,
@@ -128,7 +137,10 @@ No migration was applied during this code change. Production main is untouched.
 The release branch contains source changes, migrations 0100/0101, schema,
 contract tests, source-level migration validation and read-only preflight scripts.
 Source-level checks were independently repeated against the GitHub file content,
-but there has been no successful full exact-SHA TypeScript compilation,
+and the journal checker was executed against the actual 11 generated snapshots,
+the exact journal, migration 0081 content and repository-listed SQL migration
+existence. This verified its snapshot/SQL-only boundary logic, not SQL content
+across all historical migrations. There has been no successful full exact-SHA TypeScript compilation,
 complete unit suite, isolated Neon migration run, application-role isolation
 test or Cloudflare certification. GitHub Actions verification jobs inspected
 so far failed with zero executed steps. Neither migration is applied and

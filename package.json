@@ -129,7 +129,7 @@
     "verify:reporting:projection-schema": "node scripts/acceptance/check-reporting-source-projection-schema.mjs",
     "verify:reporting:sql": "node scripts/acceptance/check-reporting-migration-sql.mjs",
     "verify:reporting:snapshot-schema": "node scripts/acceptance/check-reporting-source-snapshot-schema.mjs",
-    "test:reporting:foundation": "vitest run tests/unit/reporting-source-contract.test.ts tests/unit/reportable-event-catalog.test.ts tests/unit/reporting-source-projection.test.ts tests/unit/reporting-source-owner-policy.test.ts tests/unit/reporting-source-coverage-policy.test.ts tests/unit/reporting-source-receipt-policy.test.ts tests/unit/reporting-source-retry-policy.test.ts tests/unit/reporting-metric-registry.test.ts tests/unit/reporting-snapshot-manifest.test.ts tests/unit/reporting-architecture-coverage.test.ts tests/unit/site-setup-scope.test.ts tests/unit/reporting-instrumentation-coverage.test.ts"
+    "test:reporting:foundation": "vitest run tests/unit/reporting-source-contract.test.ts tests/unit/reportable-event-catalog.test.ts tests/unit/reporting-source-projection.test.ts tests/unit/reporting-source-owner-policy.test.ts tests/unit/reporting-source-coverage-policy.test.ts tests/unit/reporting-source-receipt-policy.test.ts tests/unit/reporting-source-retry-policy.test.ts tests/unit/reporting-metric-registry.test.ts tests/unit/reporting-snapshot-manifest.test.ts tests/unit/reporting-architecture-coverage.test.ts tests/unit/site-setup-scope.test.ts tests/unit/reporting-instrumentation-coverage.test.ts tests/unit/reporting-snapshot-readiness.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

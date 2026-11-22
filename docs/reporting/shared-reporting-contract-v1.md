@@ -76,3 +76,18 @@ tests and database checks. Source commits do not prove a production deployment.
 - Before either feature is enabled: apply the exact migrations to the chosen
   Neon branch, run both schema preflights, execute real integration scenarios
   and verify the application role. No database changes were performed here.
+
+## Validation caveat: mixed migration history
+
+The committed Drizzle journal includes generated JSON snapshots through 0086
+but SQL-only migrations from 0087 through 0101. The chain checker now enforces
+this distinction using an explicit reviewed allowlist. This repair does **not**
+provide generated Drizzle model snapshots for the SQL-only suffix, and does
+not prove `drizzle-kit check`, `drizzle-kit generate` or PostgreSQL execution.
+Do not remove independent migration parity and build verification gates.
+
+Private snapshot capture requires both full Site grant coverage and
+`program.launch.start` to write, and validates normalized, nonempty
+source evidence within the same repeatable-read transaction. Historic correction
+predecessors must be accepted and visible within the same cutoff. A successful
+source snapshot does NOT mean official participants or funded outcomes are verified.
