@@ -63,6 +63,12 @@ export async function runScheduledJobs(): Promise<{
         })
     : {enabled:false,serviceFailed:false,processed:0,accepted:0,
         duplicate:0,legacy:0,retryPending:0,deadLettered:0};
+  if (reportingReplayed.deadLettered > 0) {
+    // Fixed category and aggregate count only. No source IDs or payload data.
+    console.error("reporting_source_dead_lettered", {
+      newDeadLetters: reportingReplayed.deadLettered,
+    });
+  }
   const classParticipantEmails = await processClassParticipantDeliveries();
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();
