@@ -21,7 +21,7 @@ CREATE TABLE "public"."reporting_source_event_receipts" (
   "attempts" integer NOT NULL DEFAULT 0,
   "next_attempt_at" timestamptz,
   CONSTRAINT "reporting_source_receipt_status_ck"
-    CHECK ("status" IN ('accepted','duplicate','legacy','retry_pending')),
+    CHECK ("status" IN ('accepted','duplicate','legacy','retry_pending','dead_letter')),
   CONSTRAINT "reporting_source_receipt_data_ck" CHECK (
     ("status" IN ('accepted','duplicate')
       AND "source_kind" IS NOT NULL AND "source_id" IS NOT NULL
@@ -29,7 +29,7 @@ CREATE TABLE "public"."reporting_source_event_receipts" (
       AND "payload_fingerprint" IS NOT NULL AND "organization_id" IS NOT NULL
       AND "site_id" IS NOT NULL)
     OR
-    ("status" IN ('legacy','retry_pending')
+    ("status" IN ('legacy','retry_pending','dead_letter')
       AND "dedup_key" IS NULL AND "payload_fingerprint" IS NULL)
   ),
   CONSTRAINT "reporting_source_receipt_identity_ck" CHECK (

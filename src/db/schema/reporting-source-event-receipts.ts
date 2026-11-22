@@ -11,7 +11,7 @@ import { organizations, programs, sites } from "./organizations";
 export const reportingSourceEventReceipts = pgTable("reporting_source_event_receipts", {
   eventId: uuid("event_id").primaryKey().references(() => domainEvents.id, { onDelete: "restrict" }),
   eventType: text("event_type").notNull(),
-  status: text("status").$type<"accepted" | "duplicate" | "legacy" | "retry_pending">().notNull(),
+  status: text("status").$type<"accepted" | "duplicate" | "legacy" | "retry_pending" | "dead_letter">().notNull(),
   sourceKind: text("source_kind"),
   sourceId: uuid("source_id"),
   sourceVersion: text("source_version"),
@@ -38,7 +38,7 @@ export const reportingSourceEventReceipts = pgTable("reporting_source_event_rece
   index("reporting_source_correction_idx").on(table.correctionOfEventId),
   index("reporting_source_retry_idx").on(table.status,table.nextAttemptAt),
   check("reporting_source_receipt_status_ck",
-    sql`${table.status} IN ('accepted','duplicate','legacy','retry_pending')`),
+    sql`${table.status} IN ('accepted','duplicate','legacy','retry_pending','dead_letter')`),
   check("reporting_source_receipt_data_ck", sql`(
     (${table.status} IN ('accepted','duplicate')
       AND ${table.sourceKind} IS NOT NULL
@@ -49,7 +49,7 @@ export const reportingSourceEventReceipts = pgTable("reporting_source_event_rece
       AND ${table.organizationId} IS NOT NULL
       AND ${table.siteId} IS NOT NULL)
     OR
-    (${table.status} IN ('legacy','retry_pending')
+    (${table.status} IN ('legacy','retry_pending','dead_letter')
       AND ${table.dedupKey} IS NULL
       AND ${table.payloadFingerprint} IS NULL)
   )`),

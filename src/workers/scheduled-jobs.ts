@@ -24,7 +24,7 @@ export async function runScheduledJobs(): Promise<{
   safeguardingUnroutable: number;
   missing: number;
   processed: number;
-  reportingReplayed: {enabled:boolean;processed:number;accepted:number;duplicate:number;legacy:number;retryPending:number;serviceFailed:boolean};
+  reportingReplayed: {enabled:boolean;processed:number;accepted:number;duplicate:number;legacy:number;retryPending:number;deadLettered:number;serviceFailed:boolean};
   reminders: number;
   deliveries: number;
   schoolFamilyDeliveries: number;
@@ -58,11 +58,11 @@ export async function runScheduledJobs(): Promise<{
           console.error("reporting_projection_replay_unavailable");
           return {
             enabled:true,serviceFailed:true,processed:0,accepted:0,
-            duplicate:0,legacy:0,retryPending:0,
+            duplicate:0,legacy:0,retryPending:0,deadLettered:0,
           };
         })
     : {enabled:false,serviceFailed:false,processed:0,accepted:0,
-        duplicate:0,legacy:0,retryPending:0};
+        duplicate:0,legacy:0,retryPending:0,deadLettered:0};
   const classParticipantEmails = await processClassParticipantDeliveries();
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();

@@ -7,7 +7,8 @@ import {
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { projectAuthorizedSourceEvents, reportingEventSignature } from "@/domain/reporting-source-projection";
 import { determineSourceReceiptDisposition } from "@/domain/reporting-source-receipt-policy";
-import { reportingProjectionRetryDelayMs } from "@/domain/reporting-source-retry-policy";
+import { reportingProjectionFailureState,
+  reportingProjectionRetryDelayMs } from "@/domain/reporting-source-retry-policy";
 import { assertReportingSourceOwnership } from "@/modules/insights/reporting-source-ownership.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -188,15 +189,15 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
  */
 export async function markReportingSourceRetryPending(
   eventId: string, now = new Date(),
-): Promise<void> {
-  await db.transaction(async (tx: Tx) => {
+): Promise<"retry_pending" | "dead_letter" | "already_final"> {
+  return db.transaction(async (tx: Tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${eventId}, 0))`);
     const [event] = await tx.select().from(domainEvents)
       .where(eq(domainEvents.id,eventId)).limit(1);
     if (!event) throw new Error("Cannot retry a missing canonical domain event");
     const [prior] = await tx.select().from(reportingSourceEventReceipts)
       .where(eq(reportingSourceEventReceipts.eventId,eventId)).limit(1);
-    if (prior && prior.status !== "retry_pending") return;
+    if (prior && prior.status !== "retry_pending") return "already_final";
     const org = typeof event.payload.organizationId === "string"
       ? event.payload.organizationId : null;
     const siteId = typeof event.payload.siteId === "string"
@@ -204,11 +205,14 @@ export async function markReportingSourceRetryPending(
     const [site] = org && siteId ? await tx.select({id:sites.id}).from(sites)
       .where(and(eq(sites.id,siteId),eq(sites.organizationId,org))).limit(1) : [];
     const attempts=(prior?.attempts ?? 0)+1;
+    const status = reportingProjectionFailureState(attempts);
     const row: ReceiptInsert = {
       eventId:event.id, eventType:event.eventType,
-      status:"retry_pending", occurredAt:event.occurredAt, recordedAt:event.createdAt,
+      status, occurredAt:event.occurredAt, recordedAt:event.createdAt,
       organizationId:site ? org : null, siteId:site ? siteId : null,
-      attempts, nextAttemptAt:new Date(now.getTime()+reportingProjectionRetryDelayMs(attempts)),
+      attempts, nextAttemptAt:status === "retry_pending"
+        ? new Date(now.getTime()+reportingProjectionRetryDelayMs(attempts))
+        : null,
     };
     if (prior) {
       await tx.update(reportingSourceEventReceipts).set(row)
@@ -216,6 +220,7 @@ export async function markReportingSourceRetryPending(
     } else {
       await tx.insert(reportingSourceEventReceipts).values(row);
     }
+    return status;
   });
 }
 
@@ -229,7 +234,7 @@ export async function markReportingSourceRetryPending(
  */
 export async function replayReportingSourceReceipts(limit = 50): Promise<{
   processed: number; accepted: number; duplicate: number; legacy: number;
-  retryPending: number;
+  retryPending: number; deadLettered: number;
 }> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
     throw new Error("Reporting replay batch must be between 1 and 200");
@@ -248,7 +253,7 @@ export async function replayReportingSourceReceipts(limit = 50): Promise<{
     ))
     .orderBy(asc(domainEvents.createdAt), asc(domainEvents.id))
     .limit(limit);
-  let accepted = 0, duplicate = 0, legacy = 0, retryPending = 0;
+  let accepted = 0, duplicate = 0, legacy = 0, retryPending = 0, deadLettered = 0;
   for (const record of missing) {
     try {
       const result = await persistReportingSourceReceipt(record.id);
@@ -257,9 +262,10 @@ export async function replayReportingSourceReceipts(limit = 50): Promise<{
       else legacy++;
     } catch {
       // No raw exception, source payload or personal record enters retry logs.
-      await markReportingSourceRetryPending(record.id);
-      retryPending++;
+      const result = await markReportingSourceRetryPending(record.id);
+      if (result === "dead_letter") deadLettered++;
+      else if (result === "retry_pending") retryPending++;
     }
   }
-  return { processed: missing.length, accepted, duplicate, legacy, retryPending };
+  return { processed: missing.length, accepted, duplicate, legacy, retryPending, deadLettered };
 }

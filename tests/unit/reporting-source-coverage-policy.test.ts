@@ -22,6 +22,21 @@ describe("durable source completeness states",()=>{
       retryPendingEvents:2,unprojectedEvents:1,
     });
   });
+  it("quarantines dead letters in quality reports without calling them outcomes",()=>{
+    const r=summarizeReportingSourceCoverage([
+      {eventType:"SiteRoomCreated",status:"dead_letter",count:1},
+    ],0,0);
+    expect(r.sourceCoverage).toMatchObject({
+      status:"source_unreconciled",deadLetterEvents:1,
+    });
+    expect(r.observedEvents).toBe(0);
+  });
+  it("rejects duplicate-only windows as complete source evidence",()=>{
+    const r=summarizeReportingSourceCoverage([
+      {eventType:"SiteRoomCreated",status:"duplicate",count:2},
+    ],0,0);
+    expect(r.sourceCoverage.status).toBe("source_unreconciled");
+  });
   it("flags unresolved corrections instead of certifying a complete series",()=>{
     const r=summarizeReportingSourceCoverage([
       {eventType:"InterestEventCreated",status:"accepted",count:1},
