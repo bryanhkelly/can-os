@@ -117,8 +117,24 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
       asOf: LAST_RECORDED_TIME,
     });
     const source = projected.events[0];
-    if (!source || projected.coverage.status !== "normalized") {
+    // A correction may reference a source event from an earlier period.
+    // The one-row validator cannot see that history, and it must not reject
+    // a valid correction merely because its predecessor is outside the batch.
+    if (!source || projected.coverage.status === "legacy_detected") {
       throw new Error("Source event failed normalized evidence verification");
+    }
+    if (source.correctionOfEventId) {
+      const [priorSource] = await tx.select({
+        aggregateId:domainEvents.aggregateId,
+        aggregateType:domainEvents.aggregateType,
+        occurredAt:domainEvents.occurredAt,
+      }).from(domainEvents)
+        .where(eq(domainEvents.id, source.correctionOfEventId)).limit(1);
+      if (!priorSource || priorSource.aggregateId !== event.aggregateId ||
+          priorSource.aggregateType !== event.aggregateType ||
+          priorSource.occurredAt > event.occurredAt) {
+        throw new Error("Correction references an unrelated or future canonical source");
+      }
     }
 
     await assertReportingSourceOwnership(tx, {
