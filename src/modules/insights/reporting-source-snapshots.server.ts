@@ -14,6 +14,8 @@ import { writeAudit } from "@/platform/mutation";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadAuthorizedSiteReportingScope } from "@/modules/insights/site-reporting-source-scope.server";
 import { reportingSnapshotsEnabled } from "@/modules/insights/reporting-projection-rollout.server";
+import { querySiteReportingSourceCoverageInTx } from "@/modules/insights/site-reporting-source-query.server";
+import { assertSnapshotSourceReadiness } from "@/domain/reporting-snapshot-readiness";
 
 const MAX_SOURCES = 2_000;
 const MAX_PERIOD = 90 * 86_400_000;
@@ -51,6 +53,10 @@ export const createReportingSourceSnapshot = createServerFn({method:"POST"})
     if (!actor.actorPersonId) throw new Error("Authenticated snapshot author required");
     return db.transaction(async tx => {
       const site=await loadAuthorizedSiteReportingScope(tx,actor,data.siteId);
+      const coverage=await querySiteReportingSourceCoverageInTx(tx,actor,{
+        siteId:site.id,from:data.from,to:data.to,
+      },asOf);
+      assertSnapshotSourceReadiness(coverage);
       const rows=await tx.select({
         eventId:reportingSourceEventReceipts.eventId,
         payloadFingerprint:reportingSourceEventReceipts.payloadFingerprint,
@@ -71,6 +77,9 @@ export const createReportingSourceSnapshot = createServerFn({method:"POST"})
       }
       if (rows.length>MAX_SOURCES) {
         throw new Error("Source snapshot exceeds the bounded interactive limit");
+      }
+      if (coverage.observedEvents!==rows.length) {
+        throw new Error("Source snapshot membership does not reconcile with coverage");
       }
       const sources=rows.map(row=>{
         if (!row.payloadFingerprint || !row.sourceVersion) {

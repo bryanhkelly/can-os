@@ -16,19 +16,22 @@ import { reportingProjectionEnabled } from "@/modules/insights/reporting-project
 export type SourceCoverageSelection = {siteId:string;from:string;to:string};
 const MAX_PERIOD_MS = 90 * 86_400_000;
 
-export async function readSiteReportingSourceCoverage(
-  actor: AccessContext, selection: SourceCoverageSelection,
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Same-transaction quality proof for a source snapshot or embedded Insights. */
+export async function querySiteReportingSourceCoverageInTx(
+  tx: Tx, actor: AccessContext, selection: SourceCoverageSelection, asOf: Date,
 ) {
   if (!reportingProjectionEnabled()) {
     throw new Error("Reporting source projections are not activated");
   }
-  const from = new Date(selection.from), to = new Date(selection.to), asOf = new Date();
+  const from = new Date(selection.from), to = new Date(selection.to);
   if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) ||
+      !Number.isFinite(asOf.getTime()) ||
       to <= from || to > asOf || to.getTime() - from.getTime() > MAX_PERIOD_MS) {
     throw new Error("Source coverage requires a closed, positive UTC window up to 90 days");
   }
-  return db.transaction(async tx => {
-    const site = await loadAuthorizedSiteReportingScope(tx, actor, selection.siteId);
+  const site = await loadAuthorizedSiteReportingScope(tx, actor, selection.siteId);
 
     const scoped = and(
       eq(reportingSourceEventReceipts.organizationId, site.organizationId),
@@ -36,6 +39,7 @@ export async function readSiteReportingSourceCoverage(
       gte(reportingSourceEventReceipts.occurredAt, from),
       lt(reportingSourceEventReceipts.occurredAt, to),
       lte(reportingSourceEventReceipts.recordedAt, asOf),
+      lte(reportingSourceEventReceipts.projectedAt, asOf),
     );
     const groupRows = await tx.select({
       eventType: reportingSourceEventReceipts.eventType,
@@ -50,7 +54,8 @@ export async function readSiteReportingSourceCoverage(
     const [pending] = await tx.select({
       count: sql<number>`count(*)::integer`,
     }).from(domainEvents).leftJoin(reportingSourceEventReceipts,
-      eq(reportingSourceEventReceipts.eventId, domainEvents.id))
+      and(eq(reportingSourceEventReceipts.eventId, domainEvents.id),
+        lte(reportingSourceEventReceipts.projectedAt, asOf)))
       .where(and(
         inArray(domainEvents.eventType, Object.keys(REPORTABLE_EVENT_CATALOG)),
         gte(domainEvents.occurredAt, from), lt(domainEvents.occurredAt, to),
@@ -93,5 +98,13 @@ export async function readSiteReportingSourceCoverage(
       // Even a complete projection stream is NOT proof of full module
       // instrumentation, Person reconciliation, or verified training outcomes.
     };
-  }, { isolationLevel: "repeatable read", accessMode: "read only" });
+}
+
+export async function readSiteReportingSourceCoverage(
+  actor: AccessContext, selection: SourceCoverageSelection,
+) {
+  const asOf = new Date();
+  return db.transaction(tx =>
+    querySiteReportingSourceCoverageInTx(tx, actor, selection, asOf),
+    { isolationLevel: "repeatable read", accessMode: "read only" });
 }
