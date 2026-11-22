@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
-import { assertWholeSiteReportingScope, assertSiteLocationProgramScope, assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
+import { assertWholeSiteSnapshotAuthoringScope, assertWholeSiteReportingScope,
+  assertSiteLocationProgramScope, assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 
 const site={id:"site-one",organizationId:"church-one"};
 const actor:AccessContext={
@@ -56,6 +57,17 @@ describe("Agent S verified Site and Program access",()=>{
     expect(()=>assertWholeSiteReportingScope(orgWide,{
       id:"sibling",organizationId:"other-organization",
     },[])).toThrow();
+  });
+  it("requires write capability to seal a private source snapshot",()=>{
+    expect(()=>assertWholeSiteSnapshotAuthoringScope(actor,site,["program-one"]))
+      .not.toThrow();
+    const reader={...actor,capabilities:new Set(["program.read"])};
+    expect(()=>assertWholeSiteReportingScope(reader,site,["program-one"]))
+      .not.toThrow();
+    expect(()=>assertWholeSiteSnapshotAuthoringScope(reader,site,["program-one"]))
+      .toThrow();
+    expect(()=>assertWholeSiteSnapshotAuthoringScope(actor,site,["program-one","sibling"]))
+      .toThrow("every attached Program");
   });
   it("honors organization-wide registrar grant without conferring CAN institutional approvals",()=>{
     const orgWide={...actor,role:"registrar",grantSiteId:null,

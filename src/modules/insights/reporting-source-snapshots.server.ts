@@ -52,7 +52,8 @@ export const createReportingSourceSnapshot = createServerFn({method:"POST"})
     }
     if (!actor.actorPersonId) throw new Error("Authenticated snapshot author required");
     return db.transaction(async tx => {
-      const site=await loadAuthorizedSiteReportingScope(tx,actor,data.siteId);
+      const site=await loadAuthorizedSiteReportingScope(tx,actor,data.siteId,
+        "snapshot_write");
       const coverage=await querySiteReportingSourceCoverageInTx(tx,actor,{
         siteId:site.id,from:data.from,to:data.to,
       },asOf);

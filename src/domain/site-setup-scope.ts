@@ -54,3 +54,17 @@ export function assertWholeSiteReportingScope(
     }
   }
 }
+
+/**
+ * Capturing a durable source snapshot is an audited mutation. A read-only
+ * reporting grant is not sufficient to author one. The operating grant must
+ * authorize the entire Site and the existing launch/write capability.
+ */
+export function assertWholeSiteSnapshotAuthoringScope(
+  actor: AccessContext,
+  site: {id:string;organizationId:string}|null|undefined,
+  attachedProgramIds: readonly string[],
+): void {
+  assertWholeSiteReportingScope(actor,site,attachedProgramIds);
+  assertSiteSetupScope(actor,site,"program.launch.start");
+}
