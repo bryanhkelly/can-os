@@ -65,8 +65,12 @@ for (const name of [
 const [access]=await query`
   SELECT pg_has_role(current_user, 'can_reporting_service', 'USAGE') AS service_member,
     (SELECT rolbypassrls OR rolsuper FROM pg_roles WHERE rolname=current_user) AS bypass_rls,
-    has_table_privilege(current_user,
-      'public.reporting_source_event_receipts', 'SELECT,INSERT,UPDATE') AS receipt_privileges
+    (has_table_privilege(current_user,
+      'public.reporting_source_event_receipts', 'SELECT')
+    AND has_table_privilege(current_user,
+      'public.reporting_source_event_receipts', 'INSERT')
+    AND has_table_privilege(current_user,
+      'public.reporting_source_event_receipts', 'UPDATE')) AS receipt_privileges
 `;
 assert.equal(access?.bypass_rls,false,
   "Runtime reporting login must not bypass forced RLS");
