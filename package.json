@@ -126,7 +126,8 @@
     "architecture:inventory": "node scripts/report-component-architecture.mjs",
     "check:local-import-exports": "node scripts/acceptance/check-local-import-exports.mjs",
     "test:local-import-exports": "node --test scripts/acceptance/check-local-import-exports.test.mjs",
-    "verify:reporting:projection-schema": "node scripts/acceptance/check-reporting-source-projection-schema.mjs"
+    "verify:reporting:projection-schema": "node scripts/acceptance/check-reporting-source-projection-schema.mjs",
+    "verify:reporting:sql": "node scripts/acceptance/check-reporting-migration-sql.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
