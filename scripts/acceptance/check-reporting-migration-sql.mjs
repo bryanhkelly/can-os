@@ -72,4 +72,29 @@ for(const [idx,tag] of [[100,"0100_reporting_source_event_receipts"],
   assert.equal(journal.entries.filter(row=>row.idx===idx&&row.tag===tag).length,1,
     "Missing reporting migration journal entry: "+tag);
 }
+
+/**
+ * Compare named DB constraints and immutable membership keys with the Drizzle
+ * model and read-only preflight. A SQL-only migration can be valid while the
+ * TypeScript model or acceptance gate still targets a different schema.
+ * Source syntax and TypeScript are checked separately after npm ci.
+ */
+const receiptModel=readFileSync("src/db/schema/reporting-source-event-receipts.ts","utf8");
+const snapshotModel=readFileSync("src/db/schema/reporting-source-snapshots.ts","utf8");
+const snapshotPreflight=readFileSync("scripts/acceptance/check-reporting-source-snapshot-schema.mjs","utf8");
+const modelCheckNames=source=>[...source.matchAll(/\\bcheck\\(\\s*"([^"]+)"/g)]
+  .map(match=>match[1]).sort();
+const sqlCheckNames=source=>[...source.matchAll(/CONSTRAINT\\s+"([^"]+)"\\s+CHECK\\s*\\(/g)]
+  .map(match=>match[1]).sort();
+assert.deepEqual(modelCheckNames(receiptModel),sqlCheckNames(receipt.sql),
+  "Reporting receipt Drizzle CHECK constraints disagree with migration 0100");
+assert.deepEqual(modelCheckNames(snapshotModel),sqlCheckNames(snapshots.sql),
+  "Reporting snapshot Drizzle CHECK constraints disagree with migration 0101");
+const memberPk=snapshotModel.match(/primaryKey\\(\\{\\s*name:\\s*"([^"]+)"/)?.[1];
+assert(memberPk,"Composite source snapshot primary key must have a stable explicit name");
+assert(snapshots.sql.includes('CONSTRAINT "'+memberPk+'" PRIMARY KEY'),
+  "Snapshot model primary key name differs from SQL migration");
+assert(snapshotPreflight.includes('"'+memberPk+'"'),
+  "Read-only snapshot preflight expects a different primary key name");
+
 console.log("Reporting migration source structure passes. PostgreSQL execution still required.");
