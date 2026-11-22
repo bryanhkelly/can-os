@@ -141,6 +141,8 @@ export const REPORTABLE_EVENT_CATALOG = {
 } as const;
 
 export type ReportableEventType = keyof typeof REPORTABLE_EVENT_CATALOG;
+export type ReportableSourceKind =
+  (typeof REPORTABLE_EVENT_CATALOG)[ReportableEventType]["sourceKind"];
 export type ReportableEventInput = {
   [T in ReportableEventType]: {
     eventType: T;

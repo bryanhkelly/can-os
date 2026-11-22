@@ -11,13 +11,9 @@ import {
   type RequestedReportingScope,
 } from "@/domain/reporting-source-owner-policy";
 import { EventTypes } from "@/domain/event-types";
-import type { ReportableEventType } from "@/domain/reportable-event-catalog";
+import type { ReportableEventType, ReportableSourceKind } from "@/domain/reportable-event-catalog";
 
 type Reader = Pick<typeof db, "select">;
-type SourceKind = "site" | "site_room" | "site_marketing_package" |
-  "site_marketing_package_release" | "site_artifact_release" |
-  "interest_event" | "interest_event_registration";
-
 /**
  * Validate the actual source's owner, not merely a claimed Site relationship
  * inside a trusted-looking event. A deleted draft is verified against its
@@ -27,7 +23,7 @@ export async function assertReportingSourceOwnership(
   reader: Reader,
   event: {
     eventType: ReportableEventType;
-    sourceKind: SourceKind;
+    sourceKind: ReportableSourceKind;
     sourceId: string;
     scope: RequestedReportingScope;
   },

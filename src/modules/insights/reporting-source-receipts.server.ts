@@ -123,10 +123,10 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
 
     await assertReportingSourceOwnership(tx, {
       eventType: source.eventType,
-      sourceKind: source.sourceKind as Parameters<typeof assertReportingSourceOwnership>[1]["sourceKind"],
+      sourceKind: source.sourceKind,
       sourceId: source.sourceId,
       scope: {
-        organizationId: source.organizationId, siteId: source.siteId!,
+        organizationId: source.organizationId, siteId: source.siteId,
         programId: source.programId,
       },
     });

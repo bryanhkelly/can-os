@@ -4,7 +4,8 @@ import {
   REPORTING_SOURCE_CONTRACT_VERSION, reportingSourceInputSchema,
   buildReportingSourceEnvelope,
 } from "@/domain/reporting-source-contract";
-import { validateReportableEvent, REPORTABLE_EVENT_CATALOG, type ReportableEventType } from "@/domain/reportable-event-catalog";
+import { validateReportableEvent, REPORTABLE_EVENT_CATALOG, type ReportableEventType,
+  type ReportableSourceKind } from "@/domain/reportable-event-catalog";
 import type { ReportingScopeProof } from "@/domain/participation-rollups";
 
 /**
@@ -52,12 +53,12 @@ export type ProjectedSourceEvent = {
   eventId: string;
   dedupKey: string;
   eventType: ReportableEventType;
-  sourceKind: string;
+  sourceKind: ReportableSourceKind;
   sourceId: string;
   sourceVersion: string;
   occurredAt: string;
   organizationId: string;
-  siteId: string | null;
+  siteId: string;
   programId: string | null;
   correctionOfEventId: string | null;
 };
@@ -166,7 +167,7 @@ export function projectAuthorizedSourceEvents(
     projected.push({
       eventId: event.id, dedupKey: meta.dedupKey,
       eventType: event.eventType as ReportableEventType,
-      sourceKind: meta.source.kind, sourceId: meta.source.id,
+      sourceKind: meta.source.kind as ReportableSourceKind, sourceId: meta.source.id,
       sourceVersion: meta.source.version, occurredAt: meta.occurredAt,
       organizationId: org, siteId: site,
       programId: meta.dimensions.programId ?? null,
