@@ -24,15 +24,19 @@ if (parsed.errors.length) {
 
 const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
 const checker = program.getTypeChecker();
-const srcRoot = resolve(root, "src") + sep;
-const testsRoot = resolve(root, "tests") + sep;
+// Cover every first-party TS/JS module admitted by the selected tsconfig,
+// including root Vite/Drizzle/Playwright configs and .storybook. Previously
+// only src/ (and tests/ in full mode) were scanned, allowing broken local
+// named exports in build-tool configs to escape until the bundler ran.
+const projectRoot = resolve(root) + sep;
+const ignoredPrefix = projectRoot + "node_modules" + sep;
 const exportCache = new Map();
 let checked = 0;
 const failures = [];
 
 for (const file of program.getSourceFiles()) {
-  if (file.isDeclarationFile || !(file.fileName.startsWith(srcRoot) ||
-    (includeTests && file.fileName.startsWith(testsRoot)))) continue;
+  if (file.isDeclarationFile || !file.fileName.startsWith(projectRoot) ||
+    file.fileName.startsWith(ignoredPrefix)) continue;
   for (const statement of file.statements) {
     if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
     const specifier = statement.moduleSpecifier;
