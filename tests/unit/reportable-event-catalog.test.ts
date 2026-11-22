@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { EventTypes } from "@/domain/event-types";
 import { validateReportableEvent } from "@/domain/reportable-event-catalog";
-import { emitReportableEvent } from "@/platform/reportable-event";
+import { emitReportableChange, emitReportableEvent } from "@/platform/reportable-event";
 
 const org = "11111111-1111-4111-8111-111111111111";
 const site = "22222222-2222-4222-8222-222222222222";
@@ -38,6 +38,22 @@ describe("governed event catalog", () => {
     await expect(emitReportableEvent({insert} as never,
       {...input,payload:{...payload,email:"private@example.org"}} as never)).rejects.toThrow();
     expect(insert).not.toHaveBeenCalled();
+  });
+  it("derives aggregate and source kinds from one shared catalog", async () => {
+    const returning=vi.fn(async ()=>[{id:"44444444-4444-4444-8444-444444444444"}]);
+    const values=vi.fn((_row:Record<string,unknown>)=>({returning}));
+    const insert=vi.fn(()=>({values}));
+    await emitReportableChange({insert} as never,{
+      eventType:EventTypes.SiteRoomCreated,sourceId:room,sourceVersion:"1",
+      occurredAt:input.occurredAt,dimensions:input.dimensions,payload,
+    });
+    const event=values.mock.calls[0]?.[0] as Record<string,unknown>;
+    expect(event.aggregateType).toBe("site_room");
+    expect(event.aggregateId).toBe(room);
+    expect(event.payload).toMatchObject({
+      reporting:{source:{kind:"site_room",id:room},evidenceClass:"operational_record"},
+    });
+    expect(insert).toHaveBeenCalledTimes(1);
   });
   it("passes exactly one source-linked event to the canonical outbox writer", async () => {
     const returning = vi.fn(async () => [{id:"44444444-4444-4444-8444-444444444444"}]);

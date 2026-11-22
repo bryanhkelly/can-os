@@ -35,7 +35,7 @@ describe("authorized source projection",()=>{
     const event=roomEvent();
     const result=projectAuthorizedSourceEvents([event,event],scope,period);
     expect(result.observedCounts).toEqual({[EventTypes.SiteRoomCreated]:1});
-    expect(result.coverage).toMatchObject({status:"normalized",duplicateDeliveries:1});
+    expect(result.coverage).toMatchObject({status:"normalized",duplicateDeliveries:1,lifecycleCompletenessVerified:false});
     expect(result.events[0]?.sourceId).toBe(room);
   });
   it("deduplicates distinct event IDs with identical source versions",()=>{
