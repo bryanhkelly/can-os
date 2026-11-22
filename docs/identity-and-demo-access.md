@@ -4,7 +4,7 @@
 
 Valor is an ordinary canonical Organization/Site tenant, not a separate workflow engine. Account/person grants no longer carry `is_synthetic`. Historical migrations and optional fixture provenance metadata remain historical evidence, not authorization. Ordinary accounts retain one-time email links via Resend, which is a transport provider, not session authority. Restricted Valor accounts and explicitly provisioned public `.demo` school accounts use the shared-code paths described below.
 
-**Valor is a fully operating demonstration school.** Its single academic Program is `active` with a published, current marketing snapshot, so its public site presents an operating school with applications open. Valor never carries `launching` Programs or in-progress program-launch journeys; school-launch workflows are demonstrated on the separate Barton demo tenant (`demo-barton`, provisioned in a guarded synthetic test fixture), which stays mid-launch. Test fixtures mirror this split: the launch-wizard fixture in `scripts/seeds/new-experiences-v1.sql` seeds a Barton fixture tenant, never a launching Program inside Valor.
+**Valor exercises the same institutional gates as an ordinary Site.** Its Hybrid High School Program is `active` and has a published academic marketing snapshot, but that alone never opens applications. The public Apply action requires the same currently approved admissions, school-year capacity, and jurisdiction evidence as every other Site. As of November 22, 2026, the Neon `main` data does not include the school-specific jurisdiction legal-review Action needed for that intake gate. Valor also contains separately configured enrichment and summer Programs; their presence does not authorize school admissions. Synthetic provenance is for fixtures and test access, not operational eligibility.
 
 ## Required boundaries
 
@@ -17,7 +17,7 @@ Valor is an ordinary canonical Organization/Site tenant, not a separate workflow
 7. **Authorization**: one server-only `getCommandContext(request)` and `withAuth(capability, resourceResolver)` boundary for reads and writes. Validate relationship to each resource, not just capabilities.
 8. **Data protection**: prohibit real person, medical, legal, payment and student records until authentication, scoping, auditing and privacy review are complete. In shared public demo, explicitly label all synthetic data and expect visitors' changes to be visible to others.
 9. **Audit**: log effective account/person/grant/role, session owner when delegated, resource, action, correlation ID, timestamp and outcome on consequential mutations; enforce append-only history at DB level. A shared demo code does not identify the individual human visitor.
-10. **Demo identity access**: the approved `@valorschool.demo` accounts sign in with `000000` locally or on Netlify production, without demo-access flags. These shared accounts are intentionally public and must remain confined to Valor's synthetic tenant; they do not identify the human visitor. The database must already contain their active canonical grants, and `CAN_ACCESS_TOKEN_PEPPER` must be configured to issue sessions. Operator provisioning still requires literal `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and development/test mode. `CAN_DEMO_WRITES_ENABLED` is retired; domain authorization, business invariants and transactional evidence apply to every tenant. External email/SMS is suppressed for Valor; R2 retains separate tenant-classified deployment switches.
+10. **Demo identity access**: the approved `@valorschool.demo` accounts sign in with `000000` locally or on Netlify production, without demo-access flags. These shared accounts are intentionally public and must remain confined to Valor's synthetic tenant; they do not identify the human visitor. The database must already contain their active canonical grants, and `CAN_ACCESS_TOKEN_PEPPER` must be configured to issue sessions. Operator provisioning still requires literal `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and development/test mode. `CAN_DEMO_WRITES_ENABLED` is retired; domain authorization, business invariants and transactional evidence apply to every tenant. Public family application starts and registrar family invitations now use normal Site checks regardless of provenance. Other tenant-classified notification channels and R2 still retain separate deployment controls.
 11. **Future authentication**: interface `verifyIdentityCredential(request): Promise<{ accountId: string } | null>` is replaceable by a future auth provider. Services depend on account/person/context, never on Resend or provider-specific claims.
 
 When a protected page detects a missing or expired session, sign-in preserves that
@@ -105,13 +105,15 @@ setup (preferred name, pronouns and interests). The student may skip setup and
 continue to the learning workspace; student legal identity, grade, enrollment
 and access are not editable through this self-profile.
 
-Registry-aware notification rules suppress general external email/SMS for
-these schools; authorized staff invitations may use ordinary Resend passwordless
-email to real recipients. R2 keeps its separate deployment gates. Public family
-email-verification and outreach still reject demo source organizations rather
-than inventing delivered mail. This bootstrap does not imply shared-code guardian/student provisioning
-or acceptance of the entire school lifecycle. All contents must remain
-synthetic, and shared accounts do not identify individual human visitors.
+Public family email-verification and authorized registrar family outreach no
+longer check demo tenant classification. They use the same current published
+destination, eligible intake, recipient verification, consent and cooldown
+requirements as ordinary Sites. Test-runtime file outbox delivery remains
+restricted to `.test` recipients. General notification and SMS delivery still
+have separate demo-tenant rules pending a broader communications review; R2
+retains independent deployment gates. No site provenance flag confers school
+approval, shared-code guardian/student provisioning or enrollment authority.
+Shared demo identities do not identify an individual human visitor.
 
 Deployment requires [migration 0061](../drizzle/0061_demo_school_tenants.sql)
 before serving this code, including for the identity registry queries used by
