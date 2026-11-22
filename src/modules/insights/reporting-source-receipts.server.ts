@@ -10,6 +10,7 @@ import { determineSourceReceiptDisposition } from "@/domain/reporting-source-rec
 import { reportingProjectionFailureState,
   reportingProjectionRetryDelayMs } from "@/domain/reporting-source-retry-policy";
 import { assertReportingSourceOwnership } from "@/modules/insights/reporting-source-ownership.server";
+import { assertReportingCorrectionLineage } from "@/domain/reporting-correction-lineage";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ReceiptInsert = typeof reportingSourceEventReceipts.$inferInsert;
@@ -126,16 +127,24 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
     }
     if (source.correctionOfEventId) {
       const [priorSource] = await tx.select({
-        aggregateId:domainEvents.aggregateId,
-        aggregateType:domainEvents.aggregateType,
-        occurredAt:domainEvents.occurredAt,
+        aggregateId: domainEvents.aggregateId,
+        aggregateType: domainEvents.aggregateType,
+        occurredAt: domainEvents.occurredAt,
+        payload: domainEvents.payload,
       }).from(domainEvents)
         .where(eq(domainEvents.id, source.correctionOfEventId)).limit(1);
-      if (!priorSource || priorSource.aggregateId !== event.aggregateId ||
-          priorSource.aggregateType !== event.aggregateType ||
-          priorSource.occurredAt > event.occurredAt) {
-        throw new Error("Correction references an unrelated or future canonical source");
-      }
+      assertReportingCorrectionLineage({
+        aggregateId: event.aggregateId,
+        aggregateType: event.aggregateType,
+        occurredAt: event.occurredAt,
+        sourceKind: source.sourceKind,
+        sourceId: source.sourceId,
+        scope: {
+          organizationId: source.organizationId,
+          siteId: source.siteId,
+          programId: source.programId,
+        },
+      }, priorSource ?? null);
     }
 
     await assertReportingSourceOwnership(tx, {
