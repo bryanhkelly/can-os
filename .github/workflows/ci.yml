@@ -90,15 +90,12 @@ jobs:
       - name: Validate migration integrity
         run: npx drizzle-kit check
 
-      - name: Validate incremental migration generation
-        run: |
-          npm run db:generate
-          echo "Drizzle migration generation succeeded from committed history."
-          if [ -n "$(git status --porcelain -- drizzle/)" ]; then
-            echo "::error::Drizzle generated uncommitted migration changes. Commit generated SQL and snapshots before merging."
-            git status --short -- drizzle/
-            exit 1
-          fi
+      # Generated snapshots stop at 0086; 0087+ are reviewed SQL-only.
+      # Running drizzle-kit generate on this baseline can output duplicate
+      # migrations and does NOT establish model parity. Keep the existing
+      # journal/SQL guards and test this explicit fail-closed policy.
+      - name: Test Drizzle generation safety guard
+        run: node --test scripts/acceptance/guard-drizzle-generation.test.mjs
 
       # Retain fixture coverage as a hard CI gate without hiding the results
       # of typecheck, lint or unit tests when route-fixture coverage fails.
