@@ -47,7 +47,6 @@ import {
 } from "./public-family-start.server";
 import { requestInvitedFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { DomainError } from "@/domain/errors";
 
 function assertFamilyInvitationRegistrar(context: AccessContext, programId?: string): void {
@@ -158,8 +157,6 @@ export async function sendFamilyInvitationBatch(
     assertOrganizationScope(context, destination.organizationId);
     assertSiteScope(context, destination.siteId);
     assertProgramScope(context, destination.programId);
-    if (await isDemoTenantOrganization(destination.organizationId, tx))
-      throw new DomainError("FORBIDDEN", "External family outreach is suppressed for demo schools");
     // Preopening interest is a Launch Studio marketing action. The Site must
     // have established its real, immutable Brand before any batch is queued.
     // Application invitations retain their independent institutional gate.
@@ -622,8 +619,6 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   recipient: FamilyInvitationBatchMetadata["recipients"][number],
   subject: string, metadata: FamilyInvitationBatchMetadata) {
   const school = await resolvePreopeningInterestDestination(db, programId);
-  if (await isDemoTenantOrganization(school.organizationId))
-    throw new DomainError("FORBIDDEN", "External family outreach is suppressed for demo schools");
   if (metadata.siteId !== school.siteId) throw new AuthorizationError("original pre-opening Site");
   const configuredOrigin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
   if (!configuredOrigin) throw new Error("Family interest response host is not configured");
