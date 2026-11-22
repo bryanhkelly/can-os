@@ -26,8 +26,9 @@ Launch Studio emits source-referenced private Site changes, distinguishing
 self-reported planning intent from approved Program delivery. Introduce records
 versioned campaign/package changes, package releases and event registrations
 without pretending collateral preview or creation proves distribution or reach.
-Operational learning facts use the same contract while retaining official
-attendance, completion and credentialing authorities.
+Existing operational learning, attendance and completion authorities remain
+canonical. Their reporting adapters have not yet been connected to this
+source-event projection and must not be represented as complete.
 
 A new module provides: one canonical source record, its current authorized
 operating scope, source version, timestamp, event kind and optional measurement
@@ -58,3 +59,20 @@ then add V6.1 Insights UI and reusable contextual views.
 
 Acceptance still requires exact-SHA build, typecheck, unit tests, role-isolation
 tests and database checks. Source commits do not prove a production deployment.
+
+## Current extension boundaries
+
+- `reporting-instrumentation-coverage.ts` is the source-ownership inventory.
+  Class, noncredit, Experiences and Funding are explicitly partial/unconnected.
+- Event-specific payload versions are recorded in the source envelope. The
+  catalog supports a deterministic upcaster for an explicitly versioned older
+  room event. Unknown versions fail closed.
+- After migration 0100, live receipt writers and bounded historical replay
+  use the same verified canonical owner. A fixed limit converts persistent
+  failed events into immutable dead letters.
+- Migration 0101 adds private immutable, bounded source snapshot manifests,
+  with Site-wide grant revalidation on creation and reading. Those manifests
+  cannot be published or used as verified outcome metrics by themselves.
+- Before either feature is enabled: apply the exact migrations to the chosen
+  Neon branch, run both schema preflights, execute real integration scenarios
+  and verify the application role. No database changes were performed here.

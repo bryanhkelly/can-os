@@ -11,14 +11,17 @@ deployment readiness.
 | Enrollment, attendance, assessment, outcomes | Existing operational modules | Never infer official attendance or completion from app usage |
 | Launch Studio and Introduce | Existing Launch Studio/marketing modules | Working collateral is not distribution or reach |
 | Reporting source contracts | `src/domain/reporting-source-contract.ts` | One source identity, typed dimensions, version, timestamp, correction link |
-| Source event catalog | `src/domain/reportable-event-catalog.ts` | One event schema and allowlist for each reportable operation |
+| Source event catalog | `src/domain/reportable-event-catalog.ts` | Event-specific payload versions and allowlisted, deterministic historical upcasters |
 | Source event emission | `src/platform/reportable-event.ts` | `emitReportableChange` derives all common source semantics |
 | Event journal and worker | Existing `src/platform/mutation.ts`, `public.domain_events` and worker | One transactional outbox; no shadow event table |
 | Source projection | `src/domain/reporting-source-projection.ts` | Deterministic event validation, bounded in-memory reconciliation |
 | Durable projection receipts | `src/db/schema/reporting-source-event-receipts.ts` | One receipt per outbox event; unique accepted source revision |
 | Ownership validation | `src/modules/insights/reporting-source-ownership.server.ts` | Independently verify the canonical source owner for every event |
 | Replay and retries | `src/modules/insights/reporting-source-receipts.server.ts` | Automatic historical replay, advisory locking, bounded retries and quality diagnostics |
-| Projection rollout | `reporting-projection-rollout.server.ts` | Explicit opt-in after migration 0100 and preflight |
+| Projection rollout | `reporting-projection-rollout.server.ts` | Independent feature gates for source receipts (0100) and private snapshots (0101) |
+| Private snapshot manifest | `src/domain/reporting-snapshot-manifest.ts` | Canonically ordered, SHA-256-identified accepted source membership |
+| Private snapshot service | `src/modules/insights/reporting-source-snapshots.server.ts` | Current-grant capture and read-time manifest reconciliation |
+| Coverage inventory | `src/domain/reporting-instrumentation-coverage.ts` | Explicit source ownership and uninstrumented lifecycle gaps |
 | Source quality endpoint | `src/modules/operations/site-reporting-coverage.functions.ts` | Thin private API delegating to `site-reporting-source-query.server.ts`; whole-Site grant and server-side aggregates |
 | Class and noncredit metrics | Existing domain metrics and `reporting-metric-registry.ts` | Namespaced, versioned adapter; no duplicate calculation writer |
 | Measurement Plans | `measurement-plan-contract.ts` | Inherit metric versions; require matching source ownership |
@@ -60,6 +63,10 @@ integration and domain ownership review.
    The worker and independent replay both persist receipts, including historical
    events the previous pass-through worker had already acknowledged.
    Retry-pending errors remain visible and are retried with bounded backoff.
+   After five failed attempts, invalid sources are finalized as dead letters
+   and excluded from reported counts. A source correction must create a new
+   authoritative event with appropriate approval and audit; there is currently
+   no automated privileged repair workflow.
    Per-row durability does not imply source-to-outcome reconciliation.
 6. A query with legacy non-normalized source events marks source normalization
    incomplete. A normalized event stream does **not** establish that all module
@@ -71,8 +78,12 @@ integration and domain ownership review.
 8. Event counts, document releases and room capacity are not learner reach,
    attendance, completion, funded outcomes or causal impact. Calculated metrics
    must use authoritative domain-owned readers and recorded denominators.
-9. Corrections, revocations, and published point-in-time snapshots require a
-   governed historical read model before external publication is enabled.
+9. Private point-in-time source snapshots now have migration 0101 and explicit
+   event membership. They freeze the exact accepted receipt identifiers,
+   fingerprints and cutoff. They are NOT approved/published impact reports.
+   Corrections and fresh grant checks still apply to future report generation.
+10. Publication, network disclosures, revoked grants and official report
+    approvals still require separate governed reporting infrastructure.
 
 ## Required acceptance gates
 
@@ -89,39 +100,46 @@ integration and domain ownership review.
 
 ## Activation and migration sequencing
 
-1. Review `drizzle/0100_reporting_source_event_receipts.sql` and branch
-   migration journal. Apply ONLY through the approved deployment migration
-   workflow. No production changes were made during this implementation.
-2. With `CAN_REPORTING_PROJECTION_PREFLIGHT=1`,
-   `CAN_EXPECTED_NEON_BRANCH_ID=<exact target branch id>` and the target
-   `DATABASE_URL`, run `npm run verify:reporting:projection-schema`.
-   It is read-only. Check FKs, indexes, forced RLS, the immutability trigger,
-   and verify that the runtime DB role's elevated privileges are understood.
-3. Validate exact-SHA build/typecheck, the new unit suites and the
-   two-Site authorization and reconciliation fixture.
-4. Only then set `CAN_REPORTING_SOURCE_PROJECTION_ENABLED=1` in the target
-   application deployment. When disabled, existing outbox events still complete
-   normally and are eligible for historical replay after activation.
-5. Inspect scheduled-job `reportingReplayed`, source completeness and
-   retry-pending counts. A `source_normalized` result is NOT a certificate that
-   every operational lifecycle is instrumented.
+1. Run `npm run verify:reporting:sql`. It checks source structure for
+   migrations 0100 and 0101, and now runs in prebuild and Cloudflare prebuild.
+   This is **not a PostgreSQL SQL parser** or database integration test.
+2. Apply 0100 to a specifically chosen validation database branch through an
+   approved migration workflow. Run the read-only
+   `npm run verify:reporting:projection-schema` with explicit target project,
+   branch and DATABASE_URL; verify the actual application role and permissions.
+3. Obtain exact-SHA TypeScript, lint, targeted unit tests, Cloudflare build,
+   source rollback and concurrent replay integration evidence. Only then enable
+   `CAN_REPORTING_SOURCE_PROJECTION_ENABLED=1`.
+4. Separately apply 0101 and run
+   `npm run verify:reporting:snapshot-schema` on the intended branch. Then
+   enable `CAN_REPORTING_SOURCE_SNAPSHOTS_ENABLED=1`. Both flags must be
+   enabled for source snapshot capture/read.
+5. Review dead-letter counts, source reconciliation and program/site-grant
+   isolation in the target environment. Existing published impact-report
+   permissions are NOT conferred by either feature flag.
+6. Correct invalid sources through their authoritative operational owner and
+   audited correction event; do not mutate a finalized receipt or snapshot.
+   Privileged dead-letter remediation is not yet automated.
+
+No migration was applied during this code change. Production main is untouched.
 
 ## Build status
 
-The release branch contains code, SQL migration 0100, schema, unit-test files,
-and a read-only migration acceptance script. GitHub Actions jobs for inspected
-branch commits failed with no executed test steps. There is no verified
-exact-SHA typecheck, complete unit suite, role-isolation test, database migration
-integration, or Cloudflare deployment certification. Migration 0100 has not been
-applied. The projection flag remains opt-in and must not be enabled before
-successful preflight and acceptance.
+The release branch contains source changes, migrations 0100/0101, schema,
+contract tests, source-level migration validation and read-only preflight scripts.
+Source-level checks were independently repeated against the GitHub file content,
+but there has been no successful full exact-SHA TypeScript compilation,
+complete unit suite, isolated Neon migration run, application-role isolation
+test or Cloudflare certification. GitHub Actions verification jobs inspected
+so far failed with zero executed steps. Neither migration is applied and
+neither feature flag is activated.
 
 ## Next implementation slice
 
-Validate migration 0100, transaction rollback/replay under concurrent workers,
-and the source-scoped read-model acceptance suite. Then attach the existing
-authoritative enrollment, noncredit and Classroom Connect evidence and govern
-Measurement Plan activation. Source-event receipts are intentionally not yet a
-full metric calculator, materialized participant dataset, or auditable impact
-publication lifecycle. Only after those gates should charts or sponsor impact
-reports depend on these projections.
+Validate 0100 and 0101 on an isolated Neon branch, then execute transactional
+rollback/replay and current-grant Site/Program acceptance tests. Extend the
+coverage matrix by connecting the already authoritative noncredit, Class,
+Classroom Connect, Experiences and Funding sources without duplicating their
+records. Govern Measurement Plan approval and source-specific metric execution
+before funding or impact reporting. Private source snapshots are not official
+completion reports, a metric calculator or approved external disclosures.
