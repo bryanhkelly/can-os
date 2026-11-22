@@ -12,6 +12,8 @@ export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import { siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
 import { WorkspaceShell, WorkspacePanel, StatusBadge, type StatusTone } from "@/components/workspace";
 import { SiteGuideV61 } from "./SiteGuideV61";
+import { ExistingSiteProgramsV61 } from "./ExistingSiteProgramsV61";
+import type { ExistingSiteProgramsStateV61 } from "@/domain/site-existing-programs-v61";
 
 export type LaunchOverviewProps = {
   site: { id: string; name: string; statusLabel: string; statusTone: StatusTone };
@@ -22,6 +24,7 @@ export type LaunchOverviewProps = {
   /** Server-resolved route to permanent Site Workspace. */
   workspaceUrl: string;
   completion?: LaunchModuleCompletion;
+  existingPrograms?: ExistingSiteProgramsStateV61;
 };
 
 const stagePresentation: Record<SiteLaunchStageV61, {
@@ -41,7 +44,7 @@ const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }))
  * <Button asChild variant="ghost" size="sm"><a href={previewUrl} target="_blank" rel="noopener noreferrer">Preview Website</a></Button>
  * If previewUrl is null, show disabled/unavailable status, never invent an ID.
  */
-export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, workspaceUrl, completion = {} }: LaunchOverviewProps) {
+export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, workspaceUrl, completion = {}, existingPrograms }: LaunchOverviewProps) {
   const rail = <div className="space-y-4">
     <SiteGuideV61 guide={{
       summary: mode === "first-visit" ? "Your vision begins with a Site, the people you want to serve and the experiences you hope to offer." : `You're continuing the launch plan for ${site.name}.`,
@@ -64,6 +67,7 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
         <h2 className="text-lg font-semibold">{site.name}</h2>
         <StatusBadge tone={site.statusTone}>{site.statusLabel}</StatusBadge>
       </div>
+      {existingPrograms && <ExistingSiteProgramsV61 siteId={site.id} result={existingPrograms} onOverview />}
       <section aria-labelledby="launch-stage-heading">
         <h2 id="launch-stage-heading" className="mb-2 text-lg font-semibold">Your path to launch</h2>
         <div className="grid gap-3 sm:grid-cols-2">{stages.map((stage, index) => {
