@@ -58,6 +58,7 @@ export const readExistingSiteProgramsV61 = createServerFn({ method: "GET" })
       deliveryModel: programs.deliveryModel,
     }).from(programs).where(and(
       eq(programs.siteId, site.id),
+      eq(programs.organizationId, site.organizationId),
       ...(readableIds === null ? [] : [inArray(programs.id, readableIds)]),
     )).orderBy(asc(programs.name), asc(programs.id));
     return { siteId: site.id, programs: records,
