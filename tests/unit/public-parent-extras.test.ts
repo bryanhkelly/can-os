@@ -3,6 +3,7 @@ import { readApprovedPublicParentExtras } from "@/modules/sites/public-parent-ex
 import { readApprovedPublicSchoolDay } from "@/modules/academic-time/public-school-day.server";
 import { readAcademicProgramCatalog } from "@/modules/sites/academic-program-catalog.server";
 import { resolvePublishedFamilyStartDestination } from "@/modules/enrollment/public-family-start.server";
+import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 
 const state=vi.hoisted(()=>({
   metadata:null as Record<string,unknown>|null,
@@ -190,6 +191,25 @@ describe("canonical Site parent extras",()=>{
     expect(open.admissions.applicationOpen).toBe(true);
     expect(open.admissions.programs?.[0]?.status).toBe("verified_application");
     expect(open.admissions.programs?.[0]?.informationSessionInterestAvailable).toBe(false);
+  });
+
+  it("uses the same verified admissions gate for regular and synthetic Sites",async()=>{
+    vi.mocked(resolvePublishedFamilyStartDestination).mockResolvedValue({
+      siteId,organizationId:"organization-a",programId:"program-one",
+      programName:"Early Years",slug:"oakwood",
+    });
+    // A registered demo organization must not override the shared intake
+    // authority or hide Apply on its published Program.
+    vi.mocked(isDemoTenantOrganization).mockResolvedValue(true);
+    for(const synthetic of [false,true]){
+      state.metadata={...metadata,synthetic};
+      const result=await readApprovedPublicParentExtras(
+        siteId,["program-one"],state.metadata);
+      expect(result.admissions.applicationOpen).toBe(true);
+      expect(result.admissions.programs?.[0]?.status).toBe("verified_application");
+    }
+    expect(resolvePublishedFamilyStartDestination).toHaveBeenCalledTimes(2);
+    expect(isDemoTenantOrganization).not.toHaveBeenCalled();
   });
 
   it("never publishes family services without current institution review",async()=>{
