@@ -101,8 +101,7 @@ BEGIN
     IF EXISTS (
       SELECT 1 FROM pg_policies WHERE schemaname='public'
         AND tablename=relation_name
-        AND ('{public}'::text[] && roles OR
-          '{anonymous,authenticated}'::text[] && roles)
+        AND ('{public,anonymous,authenticated}'::text[] && roles::text[])
     ) THEN
       RAISE EXCEPTION 'Reporting policy accidentally grants public access: %',
         relation_name;
