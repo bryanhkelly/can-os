@@ -8,6 +8,7 @@ import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { projectAuthorizedSourceEvents, reportingEventSignature } from "@/domain/reporting-source-projection";
 import { determineSourceReceiptDisposition } from "@/domain/reporting-source-receipt-policy";
 import { reportingProjectionRetryDelayMs } from "@/domain/reporting-source-retry-policy";
+import { assertReportingSourceOwnership } from "@/modules/insights/reporting-source-ownership.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ReceiptInsert = typeof reportingSourceEventReceipts.$inferInsert;
@@ -119,6 +120,16 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
     if (!source || projected.coverage.status !== "normalized") {
       throw new Error("Source event failed normalized evidence verification");
     }
+
+    await assertReportingSourceOwnership(tx, {
+      eventType: source.eventType,
+      sourceKind: source.sourceKind as Parameters<typeof assertReportingSourceOwnership>[1]["sourceKind"],
+      sourceId: source.sourceId,
+      scope: {
+        organizationId: source.organizationId, siteId: source.siteId!,
+        programId: source.programId,
+      },
+    });
 
     const fingerprint = createHash("sha256")
       .update(reportingEventSignature({
