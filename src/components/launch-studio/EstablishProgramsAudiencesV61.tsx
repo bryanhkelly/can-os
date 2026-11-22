@@ -17,6 +17,8 @@ import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import { programsAudiencesGuideV61 } from "@/domain/launch-site-guide-v61";
 import type { SiteGuideContentV61 } from "./SiteGuideV61";
 import { EstablishExperiencesV61, type ExperiencesStageV61 } from "./EstablishExperiencesV61";
+import { ExistingSiteProgramsV61 } from "./ExistingSiteProgramsV61";
+import type { ExistingSiteProgramsStateV61 } from "@/domain/site-existing-programs-v61";
 
 type InternalStep = 0 | 1 | 2;
 type InterestId = SiteProgramsAudiencesV61["interestIds"][number];
@@ -75,11 +77,12 @@ export function ProgramsAudiencesV61Guidance({ step, guide }: { step: InternalSt
   return <LaunchGuidancePanels guidance={guidance[step]} guide={guide} />;
 }
 
-export function EstablishProgramsAudiencesV61({ siteId, initial,
+export function EstablishProgramsAudiencesV61({ siteId, initial, existingPrograms,
   onBackToSiteInformation, onSaveAndExit, onContinueToWebsiteBrand, onInternalStepChange, onGuideChange,
 }: {
   siteId: string;
   initial: ProgramsAudiencesV61Initial;
+  existingPrograms?: ExistingSiteProgramsStateV61;
   onBackToSiteInformation: () => void;
   onSaveAndExit: () => Promise<void>;
   onContinueToWebsiteBrand: () => void;
@@ -248,6 +251,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial,
       <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : step === 1 ? "Your Audiences" : "Experiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
+        {existingPrograms && <ExistingSiteProgramsV61 siteId={siteId} result={existingPrograms} />}
         <fieldset className="space-y-4">
           <legend className="text-sm font-semibold">What kinds of programs are you thinking about offering?</legend>
           <p className="text-xs leading-5 text-muted-foreground">
