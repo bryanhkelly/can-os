@@ -113,7 +113,7 @@ test("missing named export in repository-root Vite config fails before bundling"
     "vite.config.ts": 'import { missingRevision } from "./src/revision"; void missingRevision;',
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /vite\\.config\\.ts:1:/);
+  assert.match(result.stderr, /vite[.]config[.]ts:1:/);
   assert.match(result.stderr, /does not export "missingRevision"/);
 });
 
@@ -124,5 +124,5 @@ test("valid root build-config named export is accepted", () => {
     "vite.config.ts": 'import { knownRevision } from "./src/revision"; void knownRevision;',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /1 local imported\\/re-exported bindings resolved/);
+  assert.ok(result.stdout.includes("1 local imported/re-exported bindings resolved"), result.stdout);
 });
