@@ -13,7 +13,7 @@ const previewLabels: Record<PublicSitePath, string> = {
   "/school-day": "Learning model", "/student-life": "Student life",
   "/families": "Families", "/admissions": "Admissions", "/tuition": "Tuition & aid",
   "/faq": "FAQs", "/contact": "Contact", "/programs": "Programs",
-  "/courses": "Courses", "/classes": "Classes",
+  "/courses": "Courses", "/classes": "Classes", "/experiences": "Experiences",
 };
 type Rect = readonly [number,number,number,number,number?];
 /** The only gallery input is template structure. Never use Site names,
