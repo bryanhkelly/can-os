@@ -1,4 +1,5 @@
 import { currentSafeguardingFallbacks } from "./safeguarding-routing.server";
+import { loadSite, loadPolicyAndResponders, loadIncidentAndAssignment, authorizeEvidenceOrExternalReporter } from "./safeguarding-access-queries.server";
 import { personDisplayName } from "@/domain/person-name";
 import { db } from "@/db/client";
 import {
@@ -18,7 +19,6 @@ import {
   safeguardingExternalReports,
   safeguardingSitePolicies,
   safeguardingSiteResponders,
-  sites,
   studentProfiles,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -27,7 +27,6 @@ import {
   assertSafeguardingConfigurationScope,
   assertSafeguardingReporterRelationship,
   isSafeguardingResponderRole,
-  type SafeguardingCaseResource,
 } from "@/domain/safeguarding-case-access";
 import { safeguardingIntakeGuidance, type SafeguardingObservationInput } from "@/domain/safeguarding-intake-policy";
 import { assertOnsiteSafeguardingSubmissionScope } from "@/domain/site-safeguarding-access";
@@ -83,31 +82,6 @@ export type SafeguardingEvidenceInput = {
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
-}
-
-async function loadSite(actor: AccessContext, siteId: string) {
-  const [site] = await db.select({
-    id: sites.id,
-    name: sites.name,
-    organizationId: sites.organizationId,
-  }).from(sites).where(eq(sites.id, siteId)).limit(1);
-  if (!site) throw new AuthorizationError("safeguarding site resource");
-  assertOrganizationScope(actor, site.organizationId);
-  assertSiteScope(actor, site.id);
-  return site;
-}
-
-async function loadPolicyAndResponders(siteId: string) {
-  const [policy] = await db.select().from(safeguardingSitePolicies)
-    .where(eq(safeguardingSitePolicies.siteId, siteId)).limit(1);
-  const responderRows = await db.select({
-    personId: safeguardingSiteResponders.personId,
-    responsibility: safeguardingSiteResponders.responsibility,
-    active: people.active,
-  }).from(safeguardingSiteResponders)
-    .innerJoin(people, eq(people.id, safeguardingSiteResponders.personId))
-    .where(eq(safeguardingSiteResponders.siteId, siteId));
-  return { policy, responderRows };
 }
 
 export async function saveSafeguardingSiteConfiguration(
@@ -375,18 +349,6 @@ export async function submitSafeguardingConcern(
     if (concurrent) return concurrent;
     throw error;
   }
-}
-
-async function loadIncidentAndAssignment(actor: AccessContext, incidentId: string, capability: string) {
-  const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
-  if (!incident) throw new AuthorizationError("safeguarding case resource");
-  const [assignment] = await db.select().from(safeguardingCaseAssignments).where(and(
-    eq(safeguardingCaseAssignments.incidentId, incidentId),
-    eq(safeguardingCaseAssignments.personId, actor.actorPersonId!),
-    isNull(safeguardingCaseAssignments.revokedAt),
-  )).limit(1);
-  assertSafeguardingCaseAccess(actor, incident, assignment, capability);
-  return { incident, assignment: assignment! };
 }
 
 export async function acknowledgeSafeguardingConcern(actor: AccessContext, incidentId: string) {
@@ -809,21 +771,6 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
     });
     return { claimed: true as const, responsibility: configuration.responsibility };
   });
-}
-
-async function authorizeEvidenceOrExternalReporter(
-  actor: AccessContext,
-  incidentId: string,
-  capability: "safeguarding.evidence.add" | "safeguarding.external_report.record",
-): Promise<SafeguardingCaseResource> {
-  const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
-  if (!incident) throw new AuthorizationError("safeguarding case resource");
-  if (incident.reporterPersonId === actor.actorPersonId) {
-    assertSafeguardingReporterRelationship(actor, incident);
-    return incident;
-  }
-  await loadIncidentAndAssignment(actor, incidentId, capability);
-  return incident;
 }
 
 export async function addSafeguardingEvidence(actor: AccessContext, input: SafeguardingEvidenceInput) {
