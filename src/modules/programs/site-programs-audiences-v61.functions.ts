@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { programs, sites } from "@/db/schema";
@@ -13,7 +13,7 @@ import {
   siteLaunchPreferencesSchema, siteProgramsAudiencesV61SaveSchema,
 } from "@/domain/site-launch-preferences";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
-import { assertSiteSetupScope } from "@/domain/site-setup-scope";
+import { assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { readSiteSchoolYearAvailability } from "./site-school-year-availability.server";
@@ -45,16 +45,22 @@ export const readExistingSiteProgramsV61 = createServerFn({ method: "GET" })
     const [site] = await db.select().from(sites)
       .where(eq(sites.id, data.siteId)).limit(1);
     assertSiteSetupScope(actor, site, "program.read");
-    const records = await db.select({
+    // A Site grant can be narrower than the whole Site. Never reveal sibling
+    // Programs merely because the operator can open the Site setup screen.
+    const readableIds = siteSetupReadableProgramIds(actor);
+    const records = readableIds?.length === 0 ? [] : await db.select({
       id: programs.id,
       name: programs.name,
       type: programs.type,
       status: programs.status,
       gradeRange: programs.gradeRange,
       deliveryModel: programs.deliveryModel,
-    }).from(programs).where(eq(programs.siteId, site.id))
-      .orderBy(asc(programs.name), asc(programs.id));
-    return { siteId: site.id, programs: records };
+    }).from(programs).where(and(
+      eq(programs.siteId, site.id),
+      ...(readableIds === null ? [] : [inArray(programs.id, readableIds)]),
+    )).orderBy(asc(programs.name), asc(programs.id));
+    return { siteId: site.id, programs: records,
+      visibility: readableIds === null ? "whole_site" as const : "assigned" as const };
   });
 
 /** One exact Site, private intent only. Nothing grants Program adoption or enrollment. */
