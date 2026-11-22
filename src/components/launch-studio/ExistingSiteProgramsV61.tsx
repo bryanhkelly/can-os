@@ -18,11 +18,15 @@ export function ExistingSiteProgramsV61({ result, siteId, onOverview = false }: 
     description="These are your saved Program records, separate from new ideas you choose in Programs & Audiences."
     actions={onOverview ? <a className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline"
       href={editHref}>Explore additional Programs</a> : undefined}>
+    {result.state === "ready" && result.visibility === "assigned" &&
+      <p className="mb-3 text-xs text-muted-foreground">Showing Programs included in your authorized Program access. Other Site Programs may exist.</p>}
     {result.state === "unavailable" ? <WorkspaceNotice tone="attention">
       Existing Programs could not be loaded. This does not mean your Site has no Programs.
       Reload Launch Studio to try again.
     </WorkspaceNotice> : result.programs.length === 0 ?
-      <p className="text-sm text-muted-foreground">No existing Programs are recorded for this Site yet.
+      <p className="text-sm text-muted-foreground">{result.visibility === "assigned"
+        ? "No existing Programs are visible within your current Program access."
+        : "No existing Programs are recorded for this Site yet."}
         You can explore new ideas below without creating or activating a Program.</p> :
       <div className="space-y-3" aria-label="Existing Site Program records">
         {result.programs.map(program => {
