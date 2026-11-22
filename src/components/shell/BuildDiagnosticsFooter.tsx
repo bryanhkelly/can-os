@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   comparePublicBuildRevisions,
   embeddedPublicBuildDetails,
@@ -97,15 +98,16 @@ export function BuildDiagnosticsFooter() {
         <dt className="font-semibold">Current host</dt>
         <dd className="break-all">{hostname ?? "Checking…"}</dd>
         <dt className="font-semibold">Server revision</dt>
-        <dd className="break-all font-mono">{serverRevision ?? (server.state === "checking" ? "Checking…" : "unavailable")}</dd>
+        <dd className="break-all font-mono">{serverRevision ?? (server.state === "not-checked" ? "Not checked" :
+          server.state === "checking" ? "Checking…" : "unavailable")}</dd>
         <dt className="font-semibold">Version check</dt>
         <dd aria-live="polite">{comparison}</dd>
       </dl>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => void copyDiagnostics()}
-          className="inline-flex min-h-10 items-center rounded border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <Button type="button" variant="outline" size="sm" className="min-h-10"
+          onClick={() => void copyDiagnostics()}>
           Copy diagnostics
-        </button>
+        </Button>
         {copyState !== "idle" && <span role="status" aria-live="polite">
           {copyState === "copied" ? "Diagnostics copied" : "Unable to copy. Please select the details above."}
         </span>}
