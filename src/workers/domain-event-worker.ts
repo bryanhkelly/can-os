@@ -26,6 +26,7 @@ import { processEventSubscriptions } from "@/platform/subscriptions";
 import { handleFamilyInvitationBatch } from "@/modules/enrollment/family-invitations.server";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { persistReportingSourceReceipt } from "@/modules/insights/reporting-source-receipts.server";
+import { reportingProjectionEnabled } from "@/modules/insights/reporting-projection-rollout.server";
 
 export type DomainEventHandler = (eventId: string) => Promise<void>;
 
@@ -306,7 +307,9 @@ for (const eventType of [
 // catches events marked processed before this consumer was installed.
 for (const eventType of Object.keys(REPORTABLE_EVENT_CATALOG)) {
   registerDomainEventHandler(eventType, async eventId => {
-    await persistReportingSourceReceipt(eventId);
+    // Never introduce a new table dependency before its migration is validated.
+    // Disabled events remain in the canonical outbox for future replay.
+    if (reportingProjectionEnabled()) await persistReportingSourceReceipt(eventId);
   });
 }
 

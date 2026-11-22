@@ -10,6 +10,7 @@ import { processClassParticipantDeliveries } from "@/modules/classes/class-parti
 import {runSessionDeviceRetention} from "./session-device-retention";
 import {processNoncreditWaitlistEmailDeliveries} from "@/modules/enrollment/noncredit-waitlist-delivery.server";
 import { replayReportingSourceReceipts } from "@/modules/insights/reporting-source-receipts.server";
+import { reportingProjectionEnabled } from "@/modules/insights/reporting-projection-rollout.server";
 
 /**
  * Existing periodic processor for restricted safeguarding handoffs and the outbox.
@@ -23,7 +24,7 @@ export async function runScheduledJobs(): Promise<{
   safeguardingUnroutable: number;
   missing: number;
   processed: number;
-  reportingReplayed: {processed:number;accepted:number;duplicate:number;legacy:number};
+  reportingReplayed: {enabled:boolean;processed:number;accepted:number;duplicate:number;legacy:number};
   reminders: number;
   deliveries: number;
   schoolFamilyDeliveries: number;
@@ -46,7 +47,9 @@ export async function runScheduledJobs(): Promise<{
   const processed = await processPendingDomainEvents(500);
   // Independently catch historical outbox events previously acknowledged by
   // pass-through consumers. Small batches keep maintenance bounded.
-  const reportingReplayed = await replayReportingSourceReceipts(50);
+  const reportingReplayed = reportingProjectionEnabled()
+    ? {enabled:true, ...await replayReportingSourceReceipts(50)}
+    : {enabled:false, processed:0, accepted:0, duplicate:0, legacy:0};
   const classParticipantEmails = await processClassParticipantDeliveries();
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();

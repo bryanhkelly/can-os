@@ -6,6 +6,7 @@ import { domainEvents, programs, reportingSourceEventReceipts, sites } from "@/d
 import { assertWholeSiteReportingScope } from "@/domain/site-setup-scope";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { summarizeReportingSourceCoverage } from "@/domain/reporting-source-coverage-policy";
+import { reportingProjectionEnabled } from "@/modules/insights/reporting-projection-rollout.server";
 
 /**
  * Shared authorized source-quality query. A single server-side aggregate
@@ -18,6 +19,9 @@ const MAX_PERIOD_MS = 90 * 86_400_000;
 export async function readSiteReportingSourceCoverage(
   actor: AccessContext, selection: SourceCoverageSelection,
 ) {
+  if (!reportingProjectionEnabled()) {
+    throw new Error("Reporting source projections are not activated");
+  }
   const from = new Date(selection.from), to = new Date(selection.to), asOf = new Date();
   if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) ||
       to <= from || to > asOf || to.getTime() - from.getTime() > MAX_PERIOD_MS) {
