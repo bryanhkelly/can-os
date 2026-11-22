@@ -41,7 +41,20 @@ export async function assertReportingSourceOwnership(
       break;
     }
     case "site_marketing_package": {
-      if (eventType === EventTypes.SiteMarketingPackageDeleted) {
+      // A draft may be permanently deleted (provided it has no released
+      // collateral). Earlier Create/Update/Archive events still need replay.
+      // The deletion audit is the authoritative ownership tombstone.
+      const [row] = await reader.select({
+        siteId:siteMarketingPackages.siteId,
+        organizationId:siteMarketingPackages.organizationId,
+      }).from(siteMarketingPackages)
+        .where(eq(siteMarketingPackages.id,sourceId)).limit(1);
+      if (eventType === EventTypes.SiteMarketingPackageDeleted && row) {
+        throw new Error("Deleted Marketing Package still exists in the canonical source");
+      }
+      if (row) {
+        owner = row;
+      } else {
         const [audit] = await reader.select({scope:auditEvents.scope}).from(auditEvents)
           .where(and(
             eq(auditEvents.resourceId,sourceId),
@@ -54,13 +67,6 @@ export async function assertReportingSourceOwnership(
           typeof auditScope.organizationId === "string"
           ? {siteId:auditScope.siteId,organizationId:auditScope.organizationId}
           : null;
-      } else {
-        const [row] = await reader.select({
-          siteId:siteMarketingPackages.siteId,
-          organizationId:siteMarketingPackages.organizationId,
-        }).from(siteMarketingPackages)
-          .where(eq(siteMarketingPackages.id,sourceId)).limit(1);
-        owner = row ?? null;
       }
       break;
     }
