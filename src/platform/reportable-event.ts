@@ -1,5 +1,5 @@
 import {
-  buildReportingSourceEnvelope, type ReportingSourceInput,
+  buildReportingSourceEnvelope,
 } from "@/domain/reporting-source-contract";
 import {
   REPORTABLE_EVENT_CATALOG, validateReportableEvent,
