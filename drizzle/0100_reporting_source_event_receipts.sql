@@ -56,3 +56,10 @@ ALTER TABLE "public"."reporting_source_event_receipts" FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
 REVOKE ALL PRIVILEGES ON TABLE "public"."reporting_source_event_receipts"
   FROM PUBLIC, anonymous, authenticated;
+--> statement-breakpoint
+-- Scope/date lookups during historical replay and completeness checks.
+-- This index targets the existing canonical outbox, not a new event ledger.
+CREATE INDEX IF NOT EXISTS "reporting_source_outbox_scope_period_idx"
+  ON "public"."domain_events"
+  ((payload->>'organizationId'), (payload->>'siteId'), "occurred_at")
+  WHERE payload ? 'siteId';

@@ -5,8 +5,7 @@ import {
   domainEvents, programs, reportingSourceEventReceipts, sites,
 } from "@/db/schema";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
-import { projectAuthorizedSourceEvents } from "@/domain/reporting-source-projection";
-import { reportingEventSignature } from "@/domain/reporting-source-projection";
+import { projectAuthorizedSourceEvents, reportingEventSignature } from "@/domain/reporting-source-projection";
 import { determineSourceReceiptDisposition } from "@/domain/reporting-source-receipt-policy";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -100,7 +99,11 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
     }
 
     const fingerprint = createHash("sha256")
-      .update(reportingEventSignature(event)).digest("hex");
+      .update(reportingEventSignature({
+        id: event.id, eventType: event.eventType,
+        aggregateType: event.aggregateType, aggregateId: event.aggregateId,
+        occurredAt: event.occurredAt, payload: event.payload,
+      })).digest("hex");
     // The second advisory lock is per source revision across distinct events.
     // Combined with the partial unique index, it makes replay deterministic.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${source.dedupKey}, 1))`);

@@ -305,7 +305,9 @@ for (const eventType of [
 // considers them complete. The worker handles live traffic; replay also
 // catches events marked processed before this consumer was installed.
 for (const eventType of Object.keys(REPORTABLE_EVENT_CATALOG)) {
-  registerDomainEventHandler(eventType, persistReportingSourceReceipt);
+  registerDomainEventHandler(eventType, async eventId => {
+    await persistReportingSourceReceipt(eventId);
+  });
 }
 
 // These lifecycle events have notification policies and must not be consumed

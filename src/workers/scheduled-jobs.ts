@@ -9,6 +9,7 @@ import { processInterestEventEmailDeliveries } from "./interest-event-email-work
 import { processClassParticipantDeliveries } from "@/modules/classes/class-participant-delivery.server";
 import {runSessionDeviceRetention} from "./session-device-retention";
 import {processNoncreditWaitlistEmailDeliveries} from "@/modules/enrollment/noncredit-waitlist-delivery.server";
+import { replayReportingSourceReceipts } from "@/modules/insights/reporting-source-receipts.server";
 
 /**
  * Existing periodic processor for restricted safeguarding handoffs and the outbox.
@@ -22,6 +23,7 @@ export async function runScheduledJobs(): Promise<{
   safeguardingUnroutable: number;
   missing: number;
   processed: number;
+  reportingReplayed: {processed:number;accepted:number;duplicate:number;legacy:number};
   reminders: number;
   deliveries: number;
   schoolFamilyDeliveries: number;
@@ -42,6 +44,9 @@ export async function runScheduledJobs(): Promise<{
   const interestEventEmails = await processInterestEventEmailDeliveries();
   const missing = await markOverdueSubmissionsMissing();
   const processed = await processPendingDomainEvents(500);
+  // Independently catch historical outbox events previously acknowledged by
+  // pass-through consumers. Small batches keep maintenance bounded.
+  const reportingReplayed = await replayReportingSourceReceipts(50);
   const classParticipantEmails = await processClassParticipantDeliveries();
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();
@@ -50,5 +55,5 @@ export async function runScheduledJobs(): Promise<{
   const digests = await processWeeklyDigests();
   const expiredSectionOffers = await expireOutstandingSectionOffers();
   const sessionDeviceRetention=await runSessionDeviceRetention();
-  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, schoolFamilyDeliveries, noncreditWaitlistEmails, classParticipantEmails, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails, sessionDeviceRetention };
+  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, reportingReplayed, recovered, reminders, deliveries, schoolFamilyDeliveries, noncreditWaitlistEmails, classParticipantEmails, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails, sessionDeviceRetention };
 }
