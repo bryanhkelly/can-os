@@ -41,7 +41,7 @@ describe("governed event catalog", () => {
   });
   it("passes exactly one source-linked event to the canonical outbox writer", async () => {
     const returning = vi.fn(async () => [{id:"44444444-4444-4444-8444-444444444444"}]);
-    const values = vi.fn(() => ({returning}));
+    const values = vi.fn((_row: Record<string, unknown>) => ({returning}));
     const insert = vi.fn(() => ({values}));
     const id = await emitReportableEvent({insert} as never, input);
     expect(id).toBe("44444444-4444-4444-8444-444444444444");

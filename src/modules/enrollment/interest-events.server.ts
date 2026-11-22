@@ -41,7 +41,7 @@ import {
 } from "@/domain/interest-events";
 import { EventTypes } from "@/domain/event-types";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
 import { emitReportableEvent } from "@/platform/reportable-event";
 import { readPublishedSiteCatalog } from "@/modules/sites/site-public-catalog.server";
 
@@ -582,14 +582,17 @@ export async function registerInterestEvent(
       interestEventEmailDeliveries.kind,
     ] });
 
-    await emitEvent(tx, {
+    await emitReportableEvent(tx, {
       eventType: EventTypes.InterestEventRegistrationCreated,
       aggregateType: "interest_event_registration",
       aggregateId: registration.id,
-      organizationId: event.organizationId,
-      siteId: event.siteId,
-      programId: event.programId,
-      payload: { eventId: event.id, publicInterestId, emailDeliveriesQueued: emailSchedule.map(item => item.kind) },
+      occurredAt: now,
+      source: { kind: "interest_event_registration", id: registration.id, version: "1" },
+      dimensions: { organizationId: event.organizationId, siteId: event.siteId,
+        programId: event.programId },
+      evidenceClass: "operational_record",
+      payload: { eventId: event.id, publicInterestId,
+        emailDeliveriesQueued: emailSchedule.map(item => item.kind) },
     });
     await writeAudit(tx, {
       action: "interest_event.registration.create",
