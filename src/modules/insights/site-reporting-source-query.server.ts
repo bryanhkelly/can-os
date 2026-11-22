@@ -74,8 +74,9 @@ export async function querySiteReportingSourceCoverageInTx(
         scoped, eq(reportingSourceEventReceipts.status, "accepted"),
         isNotNull(reportingSourceEventReceipts.correctionOfEventId),
         // A predecessor is resolved only when it is an accepted projection
-        // of the SAME canonical source and operating scope. A duplicate,
-        // legacy, retry-pending, or different-owner row is not valid lineage.
+        // of the SAME canonical source, operating scope, and historical
+        // cutoff. A duplicate, late-processed, or differently owned
+        // predecessor cannot resolve a point-in-time correction.
         sql`(
           ${previous.eventId} IS NULL
           OR ${previous.status} <> 'accepted'
@@ -83,6 +84,9 @@ export async function querySiteReportingSourceCoverageInTx(
           OR ${previous.sourceId} IS DISTINCT FROM ${reportingSourceEventReceipts.sourceId}
           OR ${previous.organizationId} IS DISTINCT FROM ${reportingSourceEventReceipts.organizationId}
           OR ${previous.siteId} IS DISTINCT FROM ${reportingSourceEventReceipts.siteId}
+          OR ${previous.programId} IS DISTINCT FROM ${reportingSourceEventReceipts.programId}
+          OR ${previous.recordedAt} > ${asOf}
+          OR ${previous.projectedAt} > ${asOf}
           OR ${previous.occurredAt} > ${reportingSourceEventReceipts.occurredAt}
         )`,
       ));
