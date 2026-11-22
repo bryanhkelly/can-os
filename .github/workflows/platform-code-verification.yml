@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout exact commit
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -31,6 +33,10 @@ jobs:
         run: npm ci
       - name: Validate reporting SQL migrations
         run: npm run verify:reporting:sql
+      - name: Enforce SQL-only ledger and migration write safety
+        run: |
+          npm run db:check:journal
+          npm run test:migration-safety
       - name: Test reporting contracts and reusable architecture
         run: npm run test:reporting:foundation
       - name: Parse all runtime and build source before bundling
@@ -61,6 +67,10 @@ jobs:
         run: npm run test:design-audit
       - name: Design-system lint and coverage
         run: npm run lint
+      - name: Validate warning diff parser and reject new warnings
+        run: |
+          npm run test:lint-regressions
+          npm run check:lint-regressions
       - name: Record verification evidence
         if: always()
         shell: bash

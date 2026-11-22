@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "lastGeneratedSnapshotIndex": 86,
+  "currentSqlTipIndex": 101,
+  "modelParityVerified": false,
+  "note": "Reviewed immutable SQL-only migration suffix. Generated Drizzle model parity is NOT claimed. Generate and push remain prohibited until a verified new modeled baseline exists.",
+  "sqlOnlyMigrations": [
+    {
+      "idx": 87,
+      "tag": "0087_site_signup_organization_name",
+      "gitBlobSha": "59f4780fb813bee7ed74d593254caa095f91a1d1"
+    },
+    {
+      "idx": 88,
+      "tag": "0088_site_marketing_packages",
+      "gitBlobSha": "b63829088fb4b2025904631cb5d2127d61558bde"
+    },
+    {
+      "idx": 89,
+      "tag": "0089_canonical_site_brand_versions",
+      "gitBlobSha": "06406b99a0226befa4adc6d9f9f8226d497576fa"
+    },
+    {
+      "idx": 90,
+      "tag": "0090_brand_current_and_published_backfill",
+      "gitBlobSha": "53bb81f8e89d84bbac527f7256ae672f8edc90e6"
+    },
+    {
+      "idx": 91,
+      "tag": "0091_site_website_draft_write_capability",
+      "gitBlobSha": "4c69e3819f8707c393fd5df873decac2a863954f"
+    },
+    {
+      "idx": 92,
+      "tag": "0092_marketing_package_atomic_releases",
+      "gitBlobSha": "c87b4aea6d9d37b465a226e261ad08f0bb77a4d5"
+    },
+    {
+      "idx": 93,
+      "tag": "0093_class_participant_delivery",
+      "gitBlobSha": "6410fe3d9e973669318c6788071cfad549ef3314"
+    },
+    {
+      "idx": 94,
+      "tag": "0094_class_participant_delivery_privacy",
+      "gitBlobSha": "15ab812ada2f54be0dbc110ac84b8ca4423a822a"
+    },
+    {
+      "idx": 95,
+      "tag": "0095_course_registration_class_placement",
+      "gitBlobSha": "d3526d594c74d482805f3c418d87c6ef80b5ea0c"
+    },
+    {
+      "idx": 96,
+      "tag": "0096_class_enrollment_calendar_cancellation",
+      "gitBlobSha": "2635e43ac3bab7867a50f6e4cf28818c7a13d0f0"
+    },
+    {
+      "idx": 97,
+      "tag": "0097_blueprint_public_journal_gateway",
+      "gitBlobSha": "062f6d6d4a82fd14e41b05e0709ff138f246c5b6"
+    },
+    {
+      "idx": 98,
+      "tag": "0098_blueprint_journal_client_privilege_hardening",
+      "gitBlobSha": "9337b04d56078f9f452e44d0323f7dba11c3c18d"
+    },
+    {
+      "idx": 99,
+      "tag": "0099_site_level_public_interest",
+      "gitBlobSha": "5b909bfebb075adfe3e5276710e75f474387c2a2"
+    },
+    {
+      "idx": 100,
+      "tag": "0100_reporting_source_event_receipts",
+      "gitBlobSha": "e037c558397e6d590edad45e782ec3b1e719b75e"
+    },
+    {
+      "idx": 101,
+      "tag": "0101_reporting_source_private_snapshots",
+      "gitBlobSha": "c3caf8568f0db1ae7f4299e1f11a75788b0cec4b"
+    }
+  ]
+}

@@ -15,7 +15,11 @@ if (!Array.isArray(entries) || entries.length === 0) {
 }
 const tip = entries.at(-1);
 const snapshotPath = `drizzle/meta/${String(tip.idx).padStart(4, "0")}_snapshot.json`;
-if (!existsSync(snapshotPath)) {
+const ledgerPath = "drizzle/meta/sql-only-migrations.json";
+const ledger = existsSync(ledgerPath)
+  ? JSON.parse(readFileSync(ledgerPath, "utf8")) : null;
+const hasUnmodeledSql = ledger && tip.idx > ledger.lastGeneratedSnapshotIndex;
+if (!existsSync(snapshotPath) || hasUnmodeledSql) {
   console.error(
     "Refusing drizzle-kit generate: latest migration " + tip.tag +
     " is SQL-only and lacks a generated model snapshot. " +

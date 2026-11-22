@@ -91,6 +91,12 @@ jobs:
       - name: Lint and design-system checks
         run: npm run lint
 
+      - name: Exercise changed-line warning parser
+        run: npm run test:lint-regressions
+
+      - name: Fail on newly introduced ESLint warnings
+        run: npm run check:lint-regressions
+
       - name: Test
         run: npm test
 
@@ -104,8 +110,8 @@ jobs:
       # Running drizzle-kit generate on this baseline can output duplicate
       # migrations and does NOT establish model parity. Keep the existing
       # journal/SQL guards and test this explicit fail-closed policy.
-      - name: Test Drizzle generation safety guard
-        run: node --test scripts/acceptance/guard-drizzle-generation.test.mjs
+      - name: Test governed SQL-only migration ledger and safety guards
+        run: npm run test:migration-safety
 
       # Retain fixture coverage as a hard CI gate without hiding the results
       # of typecheck, lint or unit tests when route-fixture coverage fails.

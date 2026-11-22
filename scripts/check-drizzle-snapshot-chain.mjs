@@ -5,6 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { verifySqlOnlyMigrationLedger } from "./lib/sql-only-migration-ledger.mjs";
 
 const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
 const entries = journal.entries;
@@ -22,24 +23,13 @@ const idPattern=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-
 // entries are explicitly hand-authored SQL-only migrations. Do not invent
 // synthetic JSON snapshots, skip SQL files, or claim drizzle-kit model parity.
 // A new SQL-only entry requires an explicit reviewed entry here.
-const SQL_ONLY_MIGRATIONS = new Map([
-  [87, "0087_site_signup_organization_name"],
-  [88, "0088_site_marketing_packages"],
-  [89, "0089_canonical_site_brand_versions"],
-  [90, "0090_brand_current_and_published_backfill"],
-  [91, "0091_site_website_draft_write_capability"],
-  [92, "0092_marketing_package_atomic_releases"],
-  [93, "0093_class_participant_delivery"],
-  [94, "0094_class_participant_delivery_privacy"],
-  [95, "0095_course_registration_class_placement"],
-  [96, "0096_class_enrollment_calendar_cancellation"],
-  [97, "0097_blueprint_public_journal_gateway"],
-  [98, "0098_blueprint_journal_client_privilege_hardening"],
-  [99, "0099_site_level_public_interest"],
-  [100, "0100_reporting_source_event_receipts"],
-  [101, "0101_reporting_source_private_snapshots"],
-]);
-const LAST_GENERATED_SNAPSHOT = 86;
+const sqlOnlyLedger = JSON.parse(readFileSync("drizzle/meta/sql-only-migrations.json", "utf8"));
+const LAST_GENERATED_SNAPSHOT = sqlOnlyLedger.lastGeneratedSnapshotIndex;
+const SQL_ONLY_MIGRATIONS = verifySqlOnlyMigrationLedger(entries, sqlOnlyLedger, {
+  readSql: tag => readFileSync("drizzle/" + tag + ".sql"),
+  snapshotExists: index => existsSync("drizzle/meta/" +
+    String(index).padStart(4, "0") + "_snapshot.json"),
+});
 const seen=new Set();
 const sqlOnlyChecked=[];
 let previous=null;
@@ -81,7 +71,7 @@ assert.equal(previous && previous.id !== null,true,"Missing generated snapshot b
 assert.equal(inspected.at(-1)?.migration,
   entries.find(row=>row.idx===LAST_GENERATED_SNAPSHOT)?.tag,
   "Last generated snapshot does not match the declared boundary");
-assert.equal(entries.at(-1)?.idx,101,
+assert.equal(entries.at(-1)?.idx,sqlOnlyLedger.currentSqlTipIndex,
   "Journal advanced without a new explicit snapshot or SQL-only review");
 assert.equal(sqlOnlyChecked.length,SQL_ONLY_MIGRATIONS.size,
   "SQL-only migrations are not a complete, contiguous journal suffix");
