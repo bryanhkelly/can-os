@@ -53,6 +53,22 @@ export const reportingSourceEventReceipts = pgTable("reporting_source_event_rece
       AND ${table.dedupKey} IS NULL
       AND ${table.payloadFingerprint} IS NULL)
   )`),
+  check("reporting_source_receipt_identity_ck",sql`(
+    ${table.attempts} >= 0
+    AND (${table.correctionOfEventId} IS NULL
+      OR ${table.correctionOfEventId} <> ${table.eventId})
+    AND (${table.payloadFingerprint} IS NULL
+      OR ${table.payloadFingerprint} ~ '^[0-9a-f]{64}
+    (${table.status} = 'retry_pending' AND ${table.attempts} > 0
+      AND ${table.nextAttemptAt} IS NOT NULL)
+    OR
+    (${table.status} <> 'retry_pending' AND ${table.nextAttemptAt} IS NULL)
+  )`),
+]);
+)
+    AND (${table.sourceVersion} IS NULL
+      OR char_length(${table.sourceVersion}) BETWEEN 1 AND 128)
+  )`),
   check("reporting_source_retry_state_ck",sql`(
     (${table.status} = 'retry_pending' AND ${table.attempts} > 0
       AND ${table.nextAttemptAt} IS NOT NULL)

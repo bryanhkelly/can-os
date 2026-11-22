@@ -39,6 +39,13 @@ const [table]=await query`
 `;
 assert.equal(table?.rls_enabled,true,"Reporting receipts RLS missing");
 assert.equal(table?.rls_forced,true,"Reporting receipts forced RLS missing");
+const [guard]=await query`
+  SELECT count(*)::integer AS n
+  FROM pg_trigger t
+  WHERE t.tgrelid='public.reporting_source_event_receipts'::regclass
+    AND t.tgname='guard_reporting_source_receipt_mutation' AND NOT t.tgisinternal
+`;
+assert.equal(guard?.n,1,"Final reporting receipt immutability trigger is missing");
 const indexes=await query`
   SELECT indexname FROM pg_indexes
   WHERE schemaname='public' AND tablename='reporting_source_event_receipts'
