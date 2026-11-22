@@ -53,10 +53,12 @@ for(const trigger of ["guard_reporting_source_snapshot_mutation",
 const [access]=await query`
  SELECT pg_has_role(current_user,'can_reporting_service','USAGE') AS service_member,
    (SELECT rolbypassrls OR rolsuper FROM pg_roles WHERE rolname=current_user) AS bypass_rls,
-   has_table_privilege(current_user,'public.reporting_source_snapshots',
-     'SELECT,INSERT') AS snapshot_privileges,
-   has_table_privilege(current_user,'public.reporting_source_snapshot_events',
-     'SELECT,INSERT') AS membership_privileges
+   (has_table_privilege(current_user,'public.reporting_source_snapshots','SELECT')
+     AND has_table_privilege(current_user,'public.reporting_source_snapshots','INSERT'))
+      AS snapshot_privileges,
+   (has_table_privilege(current_user,'public.reporting_source_snapshot_events','SELECT')
+     AND has_table_privilege(current_user,'public.reporting_source_snapshot_events','INSERT'))
+      AS membership_privileges
 `;
 assert.equal(access?.bypass_rls,false,
   "Runtime snapshot login must not bypass forced RLS");
