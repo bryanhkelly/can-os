@@ -708,6 +708,13 @@
       "when": 1795299000000,
       "tag": "0100_reporting_source_event_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1795302000000,
+      "tag": "0101_reporting_source_private_snapshots",
+      "breakpoints": true
     }
   ]
 }

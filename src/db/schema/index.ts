@@ -8,6 +8,7 @@ export * from "./academic-time";
 export * from "./academics";
 export * from "./work";
 export * from "./reporting-source-event-receipts";
+export * from "./reporting-source-snapshots";
 export * from "./insights";
 export * from "./communication";
 export * from "./attendance";

@@ -2,8 +2,8 @@ import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "dri
 import { alias } from "drizzle-orm/pg-core";
 import type { AccessContext } from "@/domain/access-context";
 import { db } from "@/db/client";
-import { domainEvents, programs, reportingSourceEventReceipts, sites } from "@/db/schema";
-import { assertWholeSiteReportingScope } from "@/domain/site-setup-scope";
+import { domainEvents, reportingSourceEventReceipts } from "@/db/schema";
+import { loadAuthorizedSiteReportingScope } from "@/modules/insights/site-reporting-source-scope.server";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { summarizeReportingSourceCoverage } from "@/domain/reporting-source-coverage-policy";
 import { reportingProjectionEnabled } from "@/modules/insights/reporting-projection-rollout.server";
@@ -28,13 +28,7 @@ export async function readSiteReportingSourceCoverage(
     throw new Error("Source coverage requires a closed, positive UTC window up to 90 days");
   }
   return db.transaction(async tx => {
-    const [site] = await tx.select({
-      id: sites.id, organizationId: sites.organizationId,
-    }).from(sites).where(eq(sites.id, selection.siteId)).limit(1);
-    const attached = site ? await tx.select({id: programs.id}).from(programs)
-      .where(and(eq(programs.siteId, site.id), eq(programs.organizationId, site.organizationId))) : [];
-    assertWholeSiteReportingScope(actor, site, attached.map(row => row.id));
-    if (!site) throw new Error("Unreachable: Site authorization did not establish a Site");
+    const site = await loadAuthorizedSiteReportingScope(tx, actor, selection.siteId);
 
     const scoped = and(
       eq(reportingSourceEventReceipts.organizationId, site.organizationId),
