@@ -159,7 +159,7 @@ function FamilyInvitationsWorkspace({data,selection}:{data:Data;selection:Select
       ? "Send consent-aware interest invitations for eligible, developing Programs. Interest does not authorize applications, opening or enrollment."
       : "Send verified-email application invitations for authorized receiving Programs. No child identity or admissions decision is inferred."}
     actions={<div className="flex flex-wrap gap-2">
-      {selection.siteId&&<Link to="/launch/site" search={{siteId:selection.siteId,module:"recruit"}}
+      {selection.siteId&&<Link to="/launch/site" search={{siteId:selection.siteId,module:"my-outreach"}}
         className={buttonVariants({variant:"outline"})}>Back to Launch Studio</Link>}
       <Link to="/admissions" className={buttonVariants({variant:"outline"})}>Admissions</Link>
     </div>}>
