@@ -45,9 +45,10 @@ export const readExistingSiteProgramsV61 = createServerFn({ method: "GET" })
     const [site] = await db.select().from(sites)
       .where(eq(sites.id, data.siteId)).limit(1);
     assertSiteSetupScope(actor, site, "program.read");
-    // A Site grant can be narrower than the whole Site. Never reveal sibling
-    // Programs merely because the operator can open the Site setup screen.
-    const readableIds = siteSetupReadableProgramIds(actor);
+    // A Site Admin governs all Programs of their authorized Site; registrar
+    // grants can be narrower and must not expose sibling Program records.
+    const readableIds = actor.role === "site_admin"
+      ? null : siteSetupReadableProgramIds(actor);
     const records = readableIds?.length === 0 ? [] : await db.select({
       id: programs.id,
       name: programs.name,
