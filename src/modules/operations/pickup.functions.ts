@@ -3,7 +3,7 @@ import { personDisplayName, personLegalName } from "@/domain/person-name";
 import { mayIndependentlyResolveCustodyHold } from "@/domain/pickup-custody-review-policy";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -21,7 +21,6 @@ import {
   sites,
   studentProfiles,
 } from "@/db/schema";
-import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
