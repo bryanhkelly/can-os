@@ -1,6 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { z } from "zod";
 import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
 import { launchSiteLifecycleLabel, nextLaunchAction } from "@/domain/launch-overview-v61";
@@ -8,7 +7,8 @@ import { launchModuleCompletionV61 } from "@/domain/launch-module-completion-v61
 import { safeLoader } from "@/lib/safe-loader";
 import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { siteLaunchModules, normalizeSiteLaunchModuleV61 } from "@/domain/launch-site-navigation-v61";
+import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
+import { siteLaunchSearchSchemaV61 } from "@/domain/launch-site-search-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
 import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
@@ -27,17 +27,9 @@ import { MarketingPackagesV61 } from "@/components/launch-studio/MarketingPackag
 import { isIntroduceModuleV61, introduceModuleConfigV61 } from "@/domain/launch-introduce-v61";
 import { listSiteMarketingPackagesV61, readSiteMarketingSuggestionsV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
 
-const searchSchema = z.object({
-  siteId: z.string().uuid().optional(),
-  programId: z.string().uuid().optional(),
-  solutionPlanId: z.string().uuid().optional(),
-  module: z.preprocess(normalizeSiteLaunchModuleV61,
-    z.enum(siteLaunchModules.map(item=>item.id) as [string, ...string[]]).optional()),
-});
-
 /** One authorized Site, one new Launch Studio. No legacy wizard or redirect. */
 export const Route = createFileRoute("/launch/site")({
-  validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
+  validateSearch: (search: Record<string, unknown>) => siteLaunchSearchSchemaV61.parse(search),
   loaderDeps: ({ search }) => ({ siteId: search.siteId, module: search.module }),
   loader: ({ deps }) => safeLoader(async () => {
     const options = await measureServerStep("launch.site", "site-options", () => listLaunchOptions());
