@@ -42,6 +42,7 @@ import {
 import { EventTypes } from "@/domain/event-types";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { emitReportableEvent } from "@/platform/reportable-event";
 import { readPublishedSiteCatalog } from "@/modules/sites/site-public-catalog.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -367,14 +368,16 @@ export async function createInterestEvent(
       metadata: { kind: data.kind, visibility: data.visibility },
       createdByPersonId: context.actorPersonId,
     });
-    await emitEvent(tx, {
+    await emitReportableEvent(tx, {
       eventType: EventTypes.InterestEventCreated,
       aggregateType: "interest_event",
       aggregateId: created.id,
       actorPersonId: context.actorPersonId,
-      organizationId: program.organizationId,
-      siteId: program.siteId,
-      programId: program.id,
+      occurredAt: new Date(),
+      source: { kind: "interest_event", id: created.id, version: "1" },
+      dimensions: { organizationId: program.organizationId, siteId: program.siteId,
+        programId: program.id },
+      evidenceClass: "operational_record",
       payload: { calendarEventId: projection.id, kind: data.kind, visibility: data.visibility },
     });
     await writeAudit(tx, context, {
@@ -661,14 +664,17 @@ export async function recordInterestEventAttendance(
       interestEventEmailDeliveries.registrationId,
       interestEventEmailDeliveries.kind,
     ] });
-    await emitEvent(tx, {
+    await emitReportableEvent(tx, {
       eventType: EventTypes.InterestEventAttendanceRecorded,
       aggregateType: "interest_event_registration",
       aggregateId: record.registrationId,
       actorPersonId: context.actorPersonId,
-      organizationId: record.organizationId,
-      siteId: record.siteId,
-      programId: record.programId,
+      occurredAt: now,
+      source: { kind: "interest_event_registration", id: record.registrationId,
+        version: now.toISOString() },
+      dimensions: { organizationId: record.organizationId, siteId: record.siteId,
+        programId: record.programId },
+      evidenceClass: "operational_record",
       payload: { eventId: record.eventId, attendanceStatus: data.attendanceStatus },
     });
     await writeAudit(tx, context, {
