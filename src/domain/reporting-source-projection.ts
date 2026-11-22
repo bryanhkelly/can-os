@@ -134,9 +134,9 @@ export function projectAuthorizedSourceEvents(
     }
     if (event.payload.organizationId !== org ||
         event.payload.siteId !== site ||
-        (meta.dimensions.programId !== undefined &&
-         meta.dimensions.programId !== null &&
-         event.payload.programId !== meta.dimensions.programId)) {
+        // Require exact Program attribution in both canonical outbox and envelope.
+        // A Site-owned source cannot hide a claimed Program in either location.
+        (event.payload.programId ?? null) !== (meta.dimensions.programId ?? null)) {
       throw new Error("Outbox top-level attribution and source metadata disagree");
     }
     const { reporting: _reporting, organizationId: _org,

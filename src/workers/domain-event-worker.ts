@@ -25,6 +25,7 @@ import { handleClassParticipantEvent } from "@/modules/classes/class-participant
 import { processEventSubscriptions } from "@/platform/subscriptions";
 import { handleFamilyInvitationBatch } from "@/modules/enrollment/family-invitations.server";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
+import { registerUniqueDomainEventHandler } from "@/domain/domain-event-handler-registry";
 import { persistReportingSourceReceipt } from "@/modules/insights/reporting-source-receipts.server";
 import { reportingProjectionEnabled } from "@/modules/insights/reporting-projection-rollout.server";
 
@@ -34,7 +35,8 @@ const registry = new Map<string, DomainEventHandler>();
 
 /** Register the consumer for an event type. Events with no handler stay pending. */
 export function registerDomainEventHandler(eventType: string, handler: DomainEventHandler): void {
-  registry.set(eventType, handler);
+  // Never silently replace a notification, Class or reporting consumer.
+  registerUniqueDomainEventHandler(registry, eventType, handler);
 }
 
 registerDomainEventHandler(EventTypes.AssessmentPublished, handleAcademicPassThroughEvent);

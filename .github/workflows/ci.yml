@@ -30,7 +30,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24.22.1'
           cache: npm
 
       - name: Validate reporting migrations before dependency installation

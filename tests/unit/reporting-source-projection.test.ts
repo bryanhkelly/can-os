@@ -102,6 +102,13 @@ describe("authorized source projection",()=>{
       ...first,payload:{...first.payload,studentEmail:"not-for-event@example.org"},
     }],scope,period)).toThrow();
   });
+  it("rejects a Program scope injected into a Site-owned canonical event",()=>{
+    const record=roomEvent();
+    const tampered={...record,payload:{...record.payload,
+      programId:"88888888-8888-4888-8888-888888888888"}};
+    expect(()=>projectAuthorizedSourceEvents([tampered],scope,period))
+      .toThrow("attribution and source metadata disagree");
+  });
   it("Site-owned room events never gain a Program attribution from their mutation caller",()=>{
     const record=roomEvent();
     const result=projectAuthorizedSourceEvents([record],scope,period);
