@@ -401,7 +401,8 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
                   faithOrientation:value,faithTradition:value==="faith_based"?current.faithTradition:"",
                 }))}/>)}
           </div>}
-          {isFaithBasedSiteIdentityV61(identity) && <Field label="Faith tradition (optional)">
+          {isFaithBasedSiteIdentityV61(identity) && <Field label="Faith tradition (optional)"
+            description="This is self-described and does not establish membership in a denomination or network.">
             <Select value={identity.faithTradition}
               onChange={event=>setIdentity(current=>({...current,
                 faithTradition:event.target.value as SiteIdentityV61["faithTradition"],
@@ -410,9 +411,6 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
               {siteFaithTraditionOptionsV61.map(option=>
                 <option key={option.value} value={option.value}>{option.label}</option>)}
             </Select>
-            <p className="mt-1 text-xs text-muted-foreground">
-              This is self-described and does not establish membership in a denomination or network.
-            </p>
           </Field>}
         </fieldset>}
         <div className="border bg-muted/30 p-4">
@@ -443,17 +441,14 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="other">Other</option>
           </Select></Field>
         </div>}
-        {host.hostingMode!=="undecided"&&<Field label="Hosting organization website (optional)">
+        {host.hostingMode!=="undecided"&&<Field label="Hosting organization website (optional)"
+          description="Add a website to help us understand your organization and suggest content for you to review. Saving the URL does not retrieve or publish anything.">
           <Input inputMode="url" maxLength={2048}
             placeholder="https://www.example.org"
             value={host.hostWebsiteUrl??""}
             onChange={event=>setHost(current=>({
               ...current,hostWebsiteUrl:event.target.value,
             }))}/>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Add a website to help us understand your organization and suggest content for you to review.
-            Saving the URL does not retrieve or publish anything.
-          </p>
         </Field>}
         <fieldset className="space-y-3 border-t pt-5">
           <legend className="text-sm font-semibold">Organization &amp; Tax-Exempt Status</legend>
