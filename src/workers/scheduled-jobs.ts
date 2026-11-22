@@ -24,7 +24,7 @@ export async function runScheduledJobs(): Promise<{
   safeguardingUnroutable: number;
   missing: number;
   processed: number;
-  reportingReplayed: {enabled:boolean;processed:number;accepted:number;duplicate:number;legacy:number};
+  reportingReplayed: {enabled:boolean;processed:number;accepted:number;duplicate:number;legacy:number;retryPending:number;serviceFailed:boolean};
   reminders: number;
   deliveries: number;
   schoolFamilyDeliveries: number;
@@ -47,9 +47,17 @@ export async function runScheduledJobs(): Promise<{
   const processed = await processPendingDomainEvents(500);
   // Independently catch historical outbox events previously acknowledged by
   // pass-through consumers. Small batches keep maintenance bounded.
+  // A reporting replay infrastructure problem must remain visible but must
+  // never suppress unrelated safeguarding, learning or outbound maintenance.
   const reportingReplayed = reportingProjectionEnabled()
-    ? {enabled:true, ...await replayReportingSourceReceipts(50)}
-    : {enabled:false, processed:0, accepted:0, duplicate:0, legacy:0};
+    ? await replayReportingSourceReceipts(50)
+        .then(result => ({enabled:true,serviceFailed:false,...result}))
+        .catch(() => ({
+          enabled:true,serviceFailed:true,processed:0,accepted:0,
+          duplicate:0,legacy:0,retryPending:0,
+        }))
+    : {enabled:false,serviceFailed:false,processed:0,accepted:0,
+        duplicate:0,legacy:0,retryPending:0};
   const classParticipantEmails = await processClassParticipantDeliveries();
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();

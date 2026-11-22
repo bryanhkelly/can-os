@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   domainEvents, programs, reportingSourceEventReceipts, sites,
@@ -7,8 +7,26 @@ import {
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { projectAuthorizedSourceEvents, reportingEventSignature } from "@/domain/reporting-source-projection";
 import { determineSourceReceiptDisposition } from "@/domain/reporting-source-receipt-policy";
+import { reportingProjectionRetryDelayMs } from "@/domain/reporting-source-retry-policy";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type ReceiptInsert = typeof reportingSourceEventReceipts.$inferInsert;
+
+/** Replace a retry-pending diagnostic with its verified final receipt. */
+async function saveVerifiedReceipt(
+  tx: Tx,
+  row: ReceiptInsert,
+  retryPending: boolean,
+): Promise<void> {
+  if (retryPending) {
+    await tx.update(reportingSourceEventReceipts).set({
+      ...row, nextAttemptAt: null, projectedAt: new Date(),
+    }).where(eq(reportingSourceEventReceipts.eventId, row.eventId));
+  } else {
+    await tx.insert(reportingSourceEventReceipts).values(row);
+  }
+}
+
 const FIRST_RECORDED_TIME = "0001-01-01T00:00:00.000Z";
 const LAST_RECORDED_TIME = "9999-12-31T23:59:59.999Z";
 
@@ -37,8 +55,9 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
     const [priorEvent] = await tx.select()
       .from(reportingSourceEventReceipts)
       .where(eq(reportingSourceEventReceipts.eventId, event.id)).limit(1);
-    if (priorEvent) {
-      // This is an immutable receipt. A repeated handler cannot insert a second.
+    if (priorEvent && priorEvent.status !== "retry_pending") {
+      // Committed receipts are immutable. Only retry-pending diagnostics may
+      // be replaced after the original source is successfully revalidated.
       return priorEvent.status;
     }
 
@@ -56,7 +75,10 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
       const [site] = org && siteId ? await tx.select({ id: sites.id })
         .from(sites).where(and(eq(sites.id, siteId), eq(sites.organizationId, org)))
         .limit(1) : [];
-      await tx.insert(reportingSourceEventReceipts).values({
+      if (org && siteId && !site) {
+        throw new Error("Legacy event has inconsistent Site and Organization");
+      }
+      await saveVerifiedReceipt(tx, {
         eventId: event.id,
         eventType: event.eventType,
         status: "legacy",
@@ -64,7 +86,7 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
         siteId: site ? siteId : null,
         occurredAt: event.occurredAt,
         recordedAt: event.createdAt,
-      });
+      }, priorEvent?.status === "retry_pending");
       return "legacy";
     }
 
@@ -117,7 +139,7 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
       canonical ? { payloadFingerprint: canonical.payloadFingerprint ?? "" } : null,
       { payloadFingerprint: fingerprint },
     );
-    await tx.insert(reportingSourceEventReceipts).values({
+    await saveVerifiedReceipt(tx, {
       eventId: event.id, eventType: event.eventType, status,
       sourceKind: source.sourceKind,
       sourceId: source.sourceId,
@@ -127,8 +149,46 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
       programId: source.programId,
       correctionOfEventId: source.correctionOfEventId,
       occurredAt: event.occurredAt, recordedAt: event.createdAt,
-    });
+    }, priorEvent?.status === "retry_pending");
     return status;
+  });
+}
+
+/**
+ * Record a fixed-category diagnostic so one invalid historical event does
+ * not permanently stall replay behind it. It remains visible in quality
+ * reporting and is retried with bounded backoff; source content is unchanged.
+ */
+export async function markReportingSourceRetryPending(
+  eventId: string, now = new Date(),
+): Promise<void> {
+  await db.transaction(async (tx: Tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${eventId}, 0))`);
+    const [event] = await tx.select().from(domainEvents)
+      .where(eq(domainEvents.id,eventId)).limit(1);
+    if (!event) throw new Error("Cannot retry a missing canonical domain event");
+    const [prior] = await tx.select().from(reportingSourceEventReceipts)
+      .where(eq(reportingSourceEventReceipts.eventId,eventId)).limit(1);
+    if (prior && prior.status !== "retry_pending") return;
+    const org = typeof event.payload.organizationId === "string"
+      ? event.payload.organizationId : null;
+    const siteId = typeof event.payload.siteId === "string"
+      ? event.payload.siteId : null;
+    const [site] = org && siteId ? await tx.select({id:sites.id}).from(sites)
+      .where(and(eq(sites.id,siteId),eq(sites.organizationId,org))).limit(1) : [];
+    const attempts=(prior?.attempts ?? 0)+1;
+    const row: ReceiptInsert = {
+      eventId:event.id, eventType:event.eventType,
+      status:"retry_pending", occurredAt:event.occurredAt, recordedAt:event.createdAt,
+      organizationId:site ? org : null, siteId:site ? siteId : null,
+      attempts, nextAttemptAt:new Date(now.getTime()+reportingProjectionRetryDelayMs(attempts)),
+    };
+    if (prior) {
+      await tx.update(reportingSourceEventReceipts).set(row)
+        .where(eq(reportingSourceEventReceipts.eventId,eventId));
+    } else {
+      await tx.insert(reportingSourceEventReceipts).values(row);
+    }
   });
 }
 
@@ -142,6 +202,7 @@ export async function persistReportingSourceReceipt(eventId: string): Promise<
  */
 export async function replayReportingSourceReceipts(limit = 50): Promise<{
   processed: number; accepted: number; duplicate: number; legacy: number;
+  retryPending: number;
 }> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
     throw new Error("Reporting replay batch must be between 1 and 200");
@@ -152,16 +213,26 @@ export async function replayReportingSourceReceipts(limit = 50): Promise<{
       eq(reportingSourceEventReceipts.eventId, domainEvents.id))
     .where(and(
       inArray(domainEvents.eventType, Object.keys(REPORTABLE_EVENT_CATALOG)),
-      isNull(reportingSourceEventReceipts.eventId),
+      or(
+        isNull(reportingSourceEventReceipts.eventId),
+        and(eq(reportingSourceEventReceipts.status, "retry_pending"),
+          lte(reportingSourceEventReceipts.nextAttemptAt, new Date())),
+      ),
     ))
     .orderBy(asc(domainEvents.createdAt), asc(domainEvents.id))
     .limit(limit);
-  let accepted = 0, duplicate = 0, legacy = 0;
+  let accepted = 0, duplicate = 0, legacy = 0, retryPending = 0;
   for (const record of missing) {
-    const result = await persistReportingSourceReceipt(record.id);
-    if (result === "accepted") accepted++;
-    else if (result === "duplicate") duplicate++;
-    else legacy++;
+    try {
+      const result = await persistReportingSourceReceipt(record.id);
+      if (result === "accepted") accepted++;
+      else if (result === "duplicate") duplicate++;
+      else legacy++;
+    } catch {
+      // No raw exception, source payload or personal record enters retry logs.
+      await markReportingSourceRetryPending(record.id);
+      retryPending++;
+    }
   }
-  return { processed: missing.length, accepted, duplicate, legacy };
+  return { processed: missing.length, accepted, duplicate, legacy, retryPending };
 }
