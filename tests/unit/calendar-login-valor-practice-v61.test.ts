@@ -25,16 +25,21 @@ describe("V6.1 calendar login and build footer",()=>{
    expect(calendar).toContain('normalizeClientError(error).kind === "authentication"');
    expect(calendar).toContain('title="Event unavailable"');
  });
- it("displays actual Vite-embedded revision at bottom of login screen",()=>{
+ it("displays actual Vite-embedded revision and safe diagnostics below sign-in",()=>{
    const login=read("src/routes/access.index.tsx");
-   expect(login).toContain("embeddedSourceRevision()");
-   expect(login).toContain('aria-label="Build information"');
-   expect(login).toContain('buildId?.slice(0,12)??"unavailable"');
-   const footer=login.indexOf('aria-label="Build information"');
-   expect(footer).toBeGreaterThan(login.indexOf("</WorkspacePanel>"));
+   const footer=read("src/components/shell/BuildDiagnosticsFooter.tsx");
+   const runtime=read("src/domain/build-source-revision.ts");
+   expect(login).toContain("<BuildDiagnosticsFooter />");
+   expect(login.indexOf("<BuildDiagnosticsFooter />"))
+     .toBeGreaterThan(login.indexOf("</WorkspacePanel>"));
+   expect(footer).toContain('aria-label="Build information"');
+   expect(footer).toContain('buildId?.slice(0,12)??"unavailable"');
+   expect(footer).toContain("Deployment diagnostics");
+   expect(footer).toContain("/release-fingerprint");
+   expect(runtime).toContain("embeddedSourceRevision()");
    const revision=embeddedSourceRevision();
    expect(revision===null||/^[a-f0-9]{40}$/.test(revision)).toBe(true);
- });
+ });;
 });
 
 describe("CAN Class practice and knowledge-check parity",()=>{
