@@ -6,8 +6,14 @@ import { defineConfig } from "vite";
 import { resolveBuildSourceRevision } from "./build-source-revision.ts";
 import { fileURLToPath } from "node:url";
 
-export default defineConfig({
-  define: { __CAN_SOURCE_REVISION__: JSON.stringify(resolveBuildSourceRevision()) },
+const buildTimestamp = new Date().toISOString();
+
+export default defineConfig(({ command }) => ({
+  define: {
+    __CAN_SOURCE_REVISION__: JSON.stringify(resolveBuildSourceRevision()),
+    __CAN_BUILD_TIMESTAMP__: JSON.stringify(buildTimestamp),
+    __CAN_BUILD_TARGET__: JSON.stringify(command === "serve" ? "local-development" : "cloudflare-worker"),
+  },
   resolve: {
     tsconfigPaths: true,
     alias: [
@@ -23,4 +29,4 @@ export default defineConfig({
     tanstackStart(),
     react(),
   ],
-});
+}));
