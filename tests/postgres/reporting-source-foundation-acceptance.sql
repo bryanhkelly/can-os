@@ -80,6 +80,57 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- The restricted role is provisioned but never assigned to a login by
+  -- migrations. All three tables keep forced RLS and explicit policy scope.
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='can_reporting_service'
+    AND NOT rolcanlogin AND NOT rolbypassrls AND NOT rolsuper) THEN
+    RAISE EXCEPTION 'Missing safe NOLOGIN can_reporting_service';
+  END IF;
+  FOREACH relation_name IN ARRAY ARRAY[
+    'reporting_source_event_receipts',
+    'reporting_source_snapshots',
+    'reporting_source_snapshot_events'
+  ] LOOP
+    IF NOT has_table_privilege('can_reporting_service',
+      'public.'||relation_name,'SELECT') OR
+       NOT has_table_privilege('can_reporting_service',
+      'public.'||relation_name,'INSERT') THEN
+      RAISE EXCEPTION 'Reporting service missing expected table access: %',
+        relation_name;
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename=relation_name
+        AND ('{public}'::text[] && roles OR
+          '{anonymous,authenticated}'::text[] && roles)
+    ) THEN
+      RAISE EXCEPTION 'Reporting policy accidentally grants public access: %',
+        relation_name;
+    END IF;
+  END LOOP;
+  IF NOT has_table_privilege('can_reporting_service',
+    'public.reporting_source_event_receipts','UPDATE') THEN
+    RAISE EXCEPTION 'Reporting service missing retry UPDATE permission';
+  END IF;
+  IF has_table_privilege('can_reporting_service',
+    'public.reporting_source_event_receipts','DELETE')
+    OR has_table_privilege('can_reporting_service',
+    'public.reporting_source_snapshots','UPDATE')
+    OR has_table_privilege('can_reporting_service',
+    'public.reporting_source_snapshots','DELETE')
+    OR has_table_privilege('can_reporting_service',
+    'public.reporting_source_snapshot_events','UPDATE')
+    OR has_table_privilege('can_reporting_service',
+    'public.reporting_source_snapshot_events','DELETE') THEN
+    RAISE EXCEPTION 'Reporting role gained mutable snapshot or DELETE rights';
+  END IF;
+  IF (SELECT count(*) FROM pg_policies WHERE schemaname='public'
+    AND tablename IN ('reporting_source_event_receipts',
+      'reporting_source_snapshots','reporting_source_snapshot_events')
+    AND 'can_reporting_service'=ANY(roles)) <> 7 THEN
+    RAISE EXCEPTION 'Expected seven restricted reporting service policies';
+  END IF;
+
   FOREACH role_name IN ARRAY ARRAY['anonymous','authenticated'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=role_name AND NOT rolcanlogin) THEN
       RAISE EXCEPTION 'Missing disposable NOLOGIN role: %',role_name;
@@ -107,5 +158,12 @@ BEGIN
   END LOOP;
 END;
 $reporting_acceptance$;
+
+-- Exercise the positive role through PostgreSQL RLS, not just catalog checks.
+SET ROLE can_reporting_service;
+SELECT count(*) AS accessible_reporting_receipts FROM public.reporting_source_event_receipts;
+SELECT count(*) AS accessible_reporting_snapshots FROM public.reporting_source_snapshots;
+SELECT count(*) AS accessible_reporting_members FROM public.reporting_source_snapshot_events;
+RESET ROLE;
 
 SELECT 'reporting_source_foundation_acceptance' AS test_name, 'PASS' AS status;
