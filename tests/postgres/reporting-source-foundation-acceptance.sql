@@ -105,7 +105,7 @@ BEGIN
       RAISE EXCEPTION 'Unprivileged role % can execute reporting trigger helpers',role_name;
     END IF;
   END LOOP;
-END
+END;
 $reporting_acceptance$;
 
 SELECT 'reporting_source_foundation_acceptance' AS test_name, 'PASS' AS status;
