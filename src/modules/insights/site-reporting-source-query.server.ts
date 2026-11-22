@@ -74,7 +74,18 @@ export async function readSiteReportingSourceCoverage(
       .where(and(
         scoped, eq(reportingSourceEventReceipts.status, "accepted"),
         isNotNull(reportingSourceEventReceipts.correctionOfEventId),
-        isNull(previous.eventId),
+        // A predecessor is resolved only when it is an accepted projection
+        // of the SAME canonical source and operating scope. A duplicate,
+        // legacy, retry-pending, or different-owner row is not valid lineage.
+        sql`(
+          ${previous.eventId} IS NULL
+          OR ${previous.status} <> 'accepted'
+          OR ${previous.sourceKind} IS DISTINCT FROM ${reportingSourceEventReceipts.sourceKind}
+          OR ${previous.sourceId} IS DISTINCT FROM ${reportingSourceEventReceipts.sourceId}
+          OR ${previous.organizationId} IS DISTINCT FROM ${reportingSourceEventReceipts.organizationId}
+          OR ${previous.siteId} IS DISTINCT FROM ${reportingSourceEventReceipts.siteId}
+          OR ${previous.occurredAt} > ${reportingSourceEventReceipts.occurredAt}
+        )`,
       ));
 
     const result = summarizeReportingSourceCoverage(
