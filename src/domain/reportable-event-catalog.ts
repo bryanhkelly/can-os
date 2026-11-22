@@ -12,7 +12,6 @@ import type { ReportingDimensions, ReportingSourceInput } from "@/domain/reporti
  */
 const uuid = z.string().uuid();
 const revision = z.number().int().positive();
-const simpleText = z.string().trim().min(1).max(200);
 
 export const REPORTABLE_EVENT_CATALOG = {
   [EventTypes.SiteInformationUpdated]: {
@@ -80,15 +79,14 @@ export const REPORTABLE_EVENT_CATALOG = {
     sourceKind: "site_room",
     aggregateType: "site_room",
     requiredDimensions: ["siteId"] as const,
-    payload: z.object({ name: simpleText, capacity: z.number().int().nonnegative() }).strict(),
+    payload: z.object({ capacity: z.number().int().positive() }).strict(),
   },
   [EventTypes.SiteRoomUpdated]: {
     sourceKind: "site_room",
     aggregateType: "site_room",
     requiredDimensions: ["siteId", "programId"] as const,
     payload: z.object({
-      name: simpleText, capacity: z.number().int().nonnegative(),
-      revision, reason: z.string().max(500).optional(),
+      capacity: z.number().int().positive(), revision,
     }).strict(),
   },
   [EventTypes.SiteRoomRetired]: {
@@ -96,8 +94,7 @@ export const REPORTABLE_EVENT_CATALOG = {
     aggregateType: "site_room",
     requiredDimensions: ["siteId", "programId"] as const,
     payload: z.object({
-      retiredAt: z.string().datetime({ offset: true }),
-      revision, reason: z.string().max(500).optional(),
+      retiredAt: z.string().datetime({ offset: true }), revision,
     }).strict(),
   },
 } as const;

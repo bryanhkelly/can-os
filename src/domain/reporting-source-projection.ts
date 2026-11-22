@@ -58,7 +58,7 @@ export function projectAuthorizedSourceEvents(
 ): {
   events: ProjectedSourceEvent[];
   observedCounts: Partial<Record<ReportableEventType, number>>;
-  coverage: { status: "complete" | "incomplete"; legacyEvents: number; duplicateDeliveries: number };
+  coverage: { status: "normalized" | "legacy_detected"; legacyEvents: number; duplicateDeliveries: number; lifecycleCompletenessVerified: false };
 } {
   if (!proof.verifiedOrganizationIds.size || !proof.verifiedSiteIds.size) {
     throw new Error("Verified Organization and Site grants required");
@@ -161,6 +161,6 @@ export function projectAuthorizedSourceEvents(
     observedCounts[item.eventType] = (observedCounts[item.eventType] ?? 0) + 1;
   }
   return { events: projected, observedCounts,
-    coverage: { status: legacyEvents ? "incomplete" : "complete",
-      legacyEvents, duplicateDeliveries } };
+    coverage: { status: legacyEvents ? "legacy_detected" : "normalized",
+      legacyEvents, duplicateDeliveries, lifecycleCompletenessVerified: false } };
 }

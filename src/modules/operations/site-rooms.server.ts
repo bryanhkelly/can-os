@@ -111,7 +111,7 @@ async function createRoomRecord(tx: Parameters<Parameters<typeof db.transaction>
       dimensions: { organizationId: school.organizationId, siteId: school.siteId,
         ...(school.programId ? { programId: school.programId } : {}) },
       evidenceClass: "operational_record",
-      payload: { name: input.name, capacity: input.capacity } });
+      payload: { capacity: input.capacity } });
     await writeAudit(tx, actor, { action: "site.room.created", entityType: "site_room",
       entityId: input.roomId, scope: school, after: { name: input.name, capacity: input.capacity },
       contextExtras: { domainEventId: eventId } });
@@ -190,7 +190,7 @@ export async function updateSchoolRoom(actor: AccessContext, value: z.infer<type
       dimensions: { organizationId: school.organizationId, siteId: school.siteId,
         programId: school.programId },
       evidenceClass: "operational_record",
-      payload: { ...after, reason: input.reason } });
+      payload: { capacity: after.capacity, revision: after.revision } });
     await writeAudit(tx, actor, { action: "site.room.updated", entityType: "site_room",
       entityId: room.id, scope: school, before: { name: room.name, capacity: room.capacity, revision: room.revision },
       after, contextExtras: { reason: input.reason, domainEventId: eventId } });
@@ -225,7 +225,7 @@ export async function retireSchoolRoom(actor: AccessContext, value: z.infer<type
       dimensions: { organizationId: school.organizationId, siteId: school.siteId,
         programId: school.programId },
       evidenceClass: "operational_record",
-      payload: { ...after, reason: input.reason } });
+      payload: { retiredAt: after.retiredAt, revision: after.revision } });
     await writeAudit(tx, actor, { action: "site.room.retired", entityType: "site_room",
       entityId: room.id, scope: school, before: { retiredAt: null, revision: room.revision },
       after, contextExtras: { reason: input.reason, domainEventId: eventId } });

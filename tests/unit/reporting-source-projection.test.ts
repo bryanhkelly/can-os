@@ -26,7 +26,7 @@ function roomEvent(overrides: Record<string, unknown> = {}) {
     id:eventId, eventType:EventTypes.SiteRoomCreated,
     aggregateType:"site_room",aggregateId:room,
     occurredAt:new Date("2026-11-21T10:00:00Z"),
-    payload:{name:"Community room",capacity:25,organizationId:org,siteId:site,reporting},
+    payload:{capacity:25,organizationId:org,siteId:site,reporting},
     ...overrides,
   };
 }
@@ -35,7 +35,7 @@ describe("authorized source projection",()=>{
     const event=roomEvent();
     const result=projectAuthorizedSourceEvents([event,event],scope,period);
     expect(result.observedCounts).toEqual({[EventTypes.SiteRoomCreated]:1});
-    expect(result.coverage).toMatchObject({status:"complete",duplicateDeliveries:1});
+    expect(result.coverage).toMatchObject({status:"normalized",duplicateDeliveries:1});
     expect(result.events[0]?.sourceId).toBe(room);
   });
   it("deduplicates distinct event IDs with identical source versions",()=>{
@@ -68,7 +68,7 @@ describe("authorized source projection",()=>{
     const first=roomEvent(),{reporting:_reporting,...legacy}=first.payload;
     const result=projectAuthorizedSourceEvents([{...first,payload:legacy}],scope,period);
     expect(result.events).toHaveLength(0);
-    expect(result.coverage).toMatchObject({status:"incomplete",legacyEvents:1});
+    expect(result.coverage).toMatchObject({status:"legacy_detected",legacyEvents:1});
   });
   it("rejects sensitive fields in event bodies, not just invalid metadata",()=>{
     const first=roomEvent();

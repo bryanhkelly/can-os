@@ -6,7 +6,7 @@ import { emitReportableEvent } from "@/platform/reportable-event";
 const org = "11111111-1111-4111-8111-111111111111";
 const site = "22222222-2222-4222-8222-222222222222";
 const room = "33333333-3333-4333-8333-333333333333";
-const payload = { name: "Community room", capacity: 24 };
+const payload = { capacity: 24 };
 const input = {
   eventType: EventTypes.SiteRoomCreated,
   aggregateType: "site_room" as const,
