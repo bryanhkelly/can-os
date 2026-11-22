@@ -55,6 +55,27 @@ jobs:
           test "$DATABASE_URL" = "postgresql://can_disposable:can_disposable@127.0.0.1:5432/can_disposable"
           test "${GITHUB_REPOSITORY}" = "bryanhkelly/can-os"
           echo "Only local disposable service is authorized"
+      # Production Neon supplies these roles. The isolated PostgreSQL service
+      # does not; create only NOLOGIN fixture roles so permission checks test
+      # the committed SQL instead of failing on a missing test role.
+      - name: Provision disposable database roles for RLS migration checks
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 <<'SQL'
+          DO $roles$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anonymous') THEN
+              CREATE ROLE anonymous NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+          END
+          $roles$;
+          SQL
       # drizzle-kit selects the remote Neon websocket driver in this repository
       # and cannot open the local PostgreSQL service. Execute the exact committed
       # SQL files here instead. This tests SQL compatibility but deliberately
@@ -79,6 +100,12 @@ jobs:
         run: |
           docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
             < tests/postgres/graduation-full-schema-acceptance.sql
+      - name: Verify reporting migration RLS, constraints and private snapshot schema
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
+            < tests/postgres/reporting-source-foundation-acceptance.sql
       - name: Assert 0057-0059 curriculum, finance and evidence SQL on disposable PostgreSQL
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
