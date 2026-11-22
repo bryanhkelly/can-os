@@ -39,7 +39,7 @@ describe("V6.1 calendar login and build footer",()=>{
    expect(runtime).toContain("embeddedSourceRevision()");
    const revision=embeddedSourceRevision();
    expect(revision===null||/^[a-f0-9]{40}$/.test(revision)).toBe(true);
- });;
+ });
 });
 
 describe("CAN Class practice and knowledge-check parity",()=>{
