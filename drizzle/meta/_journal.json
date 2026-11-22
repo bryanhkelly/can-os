@@ -701,6 +701,13 @@
       "when": 1795136100000,
       "tag": "0099_site_level_public_interest",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1795299000000,
+      "tag": "0100_reporting_source_event_receipts",
+      "breakpoints": true
     }
   ]
 }
