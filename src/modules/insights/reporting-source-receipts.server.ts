@@ -42,7 +42,7 @@ const LAST_RECORDED_TIME = "9999-12-31T23:59:59.999Z";
  * No network affiliation or client-supplied reporting scope is consulted.
  */
 export async function persistReportingSourceReceipt(eventId: string): Promise<
-  "accepted" | "duplicate" | "legacy"
+  "accepted" | "duplicate" | "legacy" | "dead_letter"
 > {
   return db.transaction(async (tx: Tx) => {
     // Serialize concurrent worker/replay attempts for this source event.
@@ -259,6 +259,7 @@ export async function replayReportingSourceReceipts(limit = 50): Promise<{
       const result = await persistReportingSourceReceipt(record.id);
       if (result === "accepted") accepted++;
       else if (result === "duplicate") duplicate++;
+      else if (result === "dead_letter") deadLettered++;
       else legacy++;
     } catch {
       // No raw exception, source payload or personal record enters retry logs.
