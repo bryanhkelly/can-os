@@ -1,0 +1,90 @@
+name: Independent Code Quality Gates
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, release-11212026]
+
+permissions:
+  contents: read
+
+# Independent jobs distinguish source failures from TypeScript, behavior,
+# design and Cloudflare failures. No database credentials or write actions.
+jobs:
+  source-integrity:
+    name: Source and immutable migration safeguards
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run check:test-source-syntax
+      - run: npm run check:test-import-exports
+      - run: npm run db:check:journal
+      - run: npm run test:migration-safety
+
+  authorization-regressions:
+    name: Security and refactor behavioral tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:quality:security
+      - run: npm run test:quality:p2
+
+  typescript:
+    name: Application build and full TypeScript project
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck:full
+
+  lint:
+    name: Design-system lint and new-warning ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:lint-regressions
+      - run: npm run check:lint-regressions
+
+  cloudflare:
+    name: Production-target Cloudflare bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:cloudflare

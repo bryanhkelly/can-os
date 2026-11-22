@@ -7,6 +7,7 @@ import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/a
 import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
+import { authorizedProgramWhere } from "./authorized-program-query.server";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -105,7 +106,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
    : Promise.resolve(null),
   organizations.length
    ? db.select({id:programs.id,siteId:programs.siteId}).from(programs)
-      .where(inArray(programs.organizationId,organizations))
+.where(authorizedProgramWhere(organizations, grantSites))
    : Promise.resolve([]),
  ]);
  if(ownedSites) context.scope.siteIds=ownedSites.map(site=>site.id);

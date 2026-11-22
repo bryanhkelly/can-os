@@ -112,6 +112,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   useEffect(()=>{
     let live=true;
     setBrandReadiness("loading");
+    setCurrentBrand(null);
     void readSiteBrandVersionView({data:{siteId}})
       .then(brand=>{
         if(!live)return;
@@ -127,18 +128,18 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     let live=true;
     setReleasesLoading(true);setReleasesUnavailable(false);
     setReleases([]);setPackageReleases([]);setCompare(null);
+    setSelectedBrandRevision(null);
     void Promise.all([
       listSiteMarketingReleases({data:{siteId,packageId:record.id}}),
       listSiteMarketingPackageReleases({data:{siteId,packageId:record.id}}),
-      readSiteBrandVersionView({data:{siteId}}),
       record.brandVersionId
         ? readSiteBrandVersionView({data:{siteId,versionId:record.brandVersionId}})
         : Promise.resolve(null),
-    ]).then(([records,packageVersions,brand,selected])=>{
+    ]).then(([records,packageVersions,selected])=>{
       if(live){setReleases(records);setPackageReleases(packageVersions);setReleasesLoading(false);
         setReleasesUnavailable(false);
-        setCurrentBrand(brand.current?.version
-          ? {id:brand.current.version.id,revision:brand.current.version.revision}:null);
+        // Current Brand has one owner above; history resolves only the
+        // exact immutable Brand version pinned to the selected Package.
         setSelectedBrandRevision(selected?.current?.version.revision??null);}
     }).catch(error=>{if(live){setError(message(error));setReleasesLoading(false);
       setReleasesUnavailable(true);}});

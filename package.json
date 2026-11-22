@@ -14,7 +14,7 @@
     "prestorybook": "npm run assets:prepare",
     "preview": "node scripts/preview.mjs",
     "db:generate": "node scripts/acceptance/guard-drizzle-generation.mjs && drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/acceptance/guard-drizzle-migrate.mjs && drizzle-kit migrate",
     "db:canonical:v301:rollback-check": "node scripts/check-canonical-v301-ddl.mjs",
     "db:consolidation:main:check": "node scripts/acceptance/check-main-consolidation-batches.mjs",
     "db:canonical:v301:instructional-readiness": "node scripts/check-recorded-instructor-readiness.mjs",
@@ -132,10 +132,11 @@
     "test:reporting:foundation": "vitest run tests/unit/reporting-source-contract.test.ts tests/unit/reportable-event-catalog.test.ts tests/unit/reporting-source-projection.test.ts tests/unit/reporting-source-owner-policy.test.ts tests/unit/reporting-source-coverage-policy.test.ts tests/unit/reporting-source-receipt-policy.test.ts tests/unit/reporting-source-retry-policy.test.ts tests/unit/reporting-metric-registry.test.ts tests/unit/reporting-snapshot-manifest.test.ts tests/unit/reporting-architecture-coverage.test.ts tests/unit/site-setup-scope.test.ts tests/unit/reporting-instrumentation-coverage.test.ts tests/unit/reporting-snapshot-readiness.test.ts tests/unit/domain-event-handler-registry.test.ts",
     "check:test-source-syntax": "node scripts/acceptance/check-build-source-syntax.mjs --include-tests",
     "check:test-import-exports": "node scripts/acceptance/check-local-import-exports.mjs --include-tests",
-    "test:migration-safety": "node --test scripts/lib/sql-only-migration-ledger.test.mjs scripts/acceptance/guard-drizzle-generation.test.mjs scripts/acceptance/guard-drizzle-push.test.mjs",
+    "test:migration-safety": "node --test scripts/lib/sql-only-migration-ledger.test.mjs scripts/acceptance/guard-drizzle-generation.test.mjs scripts/acceptance/guard-drizzle-push.test.mjs scripts/acceptance/guard-drizzle-migrate.test.mjs",
     "check:lint-regressions": "node scripts/acceptance/check-eslint-new-warnings.mjs",
     "test:lint-regressions": "node --test scripts/lib/diff-added-lines.test.mjs",
-    "test:quality:p2": "vitest run tests/unit/marketing-package-editor-state.test.ts tests/unit/pickup-authorization-scope.test.ts tests/unit/public-site-styles.test.ts tests/unit/public-site-html.test.ts tests/unit/marketing-package-session-scope.test.tsx"
+    "test:quality:p2": "vitest run tests/unit/marketing-package-editor-state.test.ts tests/unit/pickup-authorization-scope.test.ts tests/unit/public-site-styles.test.ts tests/unit/public-site-html.test.ts tests/unit/marketing-package-session-scope.test.tsx",
+    "test:quality:security": "vitest run tests/unit/safeguarding-mutation-authorization.test.ts tests/unit/authorized-program-query.test.ts tests/unit/safeguarding-case-access.test.ts tests/unit/access-context.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
