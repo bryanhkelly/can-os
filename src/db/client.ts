@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import * as schema from "@/db/schema";
 import { canonicalOperationsUrlValid } from "@/domain/canonical-operations-connection";
 import { measureServerStep } from "@/lib/performance/measure-server-step";
+import { assertUnscopedDatabaseAllowed, isCloudflareWorkerRuntime } from "@/domain/worker-database-scope";
 
 /**
  * Cloudflare Workers cannot share live WebSocket Pool clients across fetch
@@ -36,9 +37,10 @@ function activeDatabase(): DatabaseClient {
     if (scoped.closed) throw new Error("Database request scope has finished");
     return scoped.database;
   }
-  // Lazy initialization: Workers have no module-scope process.env bindings,
-  // and their request MUST call withRequestDatabase before any db operation.
-  // Outside that scope, Netlify/Node retains its normal reusable Pool.
+  // Workerd must never fall through to a long-lived Node pool, even when
+  // its expected ingress bindings were omitted or misconfigured.
+  assertUnscopedDatabaseAllowed(isCloudflareWorkerRuntime());
+  // Outside Workerd, Netlify/Node retains its normal reusable Pool.
   nodeDatabase ??= makePoolDatabase(process.env.DATABASE_URL ?? "");
   return nodeDatabase.database;
 }
