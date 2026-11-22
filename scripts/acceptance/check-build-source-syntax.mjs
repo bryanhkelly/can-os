@@ -39,6 +39,14 @@ async function visit(dir){
   }
 }
 for(const dir of roots)await visit(resolve(root,dir));
+// Build/tooling configs live at the repository root, outside src/ and scripts/.
+// They are executed by Vite, Drizzle, ESLint and Playwright, and malformed
+// imports here caused deploy failures even when src/ alone parsed cleanly.
+for(const entry of await readdir(root,{withFileTypes:true})){
+  if(entry.isFile() && sourceExts.has(extname(entry.name))){
+    files.push(join(root,entry.name));
+  }
+}
 files.sort();
 let errors=0;
 for(const filename of files){
