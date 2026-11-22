@@ -8,7 +8,7 @@ import { launchModuleCompletionV61 } from "@/domain/launch-module-completion-v61
 import { safeLoader } from "@/lib/safe-loader";
 import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
+import { siteLaunchModules, normalizeSiteLaunchModuleV61 } from "@/domain/launch-site-navigation-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
 import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
@@ -31,7 +31,8 @@ const searchSchema = z.object({
   siteId: z.string().uuid().optional(),
   programId: z.string().uuid().optional(),
   solutionPlanId: z.string().uuid().optional(),
-  module: z.enum(siteLaunchModules.map(item=>item.id) as [string, ...string[]]).optional(),
+  module: z.preprocess(normalizeSiteLaunchModuleV61,
+    z.enum(siteLaunchModules.map(item=>item.id) as [string, ...string[]]).optional()),
 });
 
 /** One authorized Site, one new Launch Studio. No legacy wizard or redirect. */
