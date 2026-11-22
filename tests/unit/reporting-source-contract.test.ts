@@ -69,6 +69,17 @@ describe("reusable Measurement Plan contract",()=>{
       version:"2",additions:[{...inherited.metrics[0],required:false}],
     })).toThrow("cannot be overridden");
   });
+  it("refuses weakening a mandatory inherited target or mutating the same version",()=>{
+    const mandatory={...inherited,metrics:[{...inherited.metrics[0],target:50}]};
+    expect(()=>extendMeasurementPlan(mandatory,{version:"1",targets:{"participation.registrations":60}}))
+      .toThrow("distinct immutable version");
+    expect(()=>extendMeasurementPlan(mandatory,{version:"2",targets:{"participation.registrations":20}}))
+      .toThrow("cannot be weakened");
+    expect(()=>extendMeasurementPlan(mandatory,{version:"2",targets:{"participation.registrations":null}}))
+      .toThrow("cannot be weakened");
+    expect(extendMeasurementPlan(mandatory,{version:"2",targets:{"participation.registrations":60}})
+      .metrics[0]?.target).toBe(60);
+  });
   it("rejects targets for unknown metrics instead of silently ignoring them",()=>{
     expect(()=>extendMeasurementPlan(inherited,{version:"2",targets:{"unknown.metric":1}}))
       .toThrow("unknown measurement");

@@ -47,6 +47,9 @@ export function extendMeasurementPlan(
     targets?: Readonly<Record<string, number | null>> },
 ): MeasurementPlan {
   const base = measurementPlanSchema.parse(inherited);
+  if (!options.version.trim() || options.version === base.version) {
+    throw new Error("A modified Measurement Plan requires a distinct immutable version");
+  }
   const additions = options.additions ?? [];
   const existing = new Set(base.metrics.map(m => m.metricKey));
   if (additions.some(m => existing.has(m.metricKey))) {
@@ -56,6 +59,14 @@ export function extendMeasurementPlan(
   const allKeys = new Set([...existing, ...additions.map(m => m.metricKey)]);
   if (Object.keys(targets).some(k => !allKeys.has(k))) {
     throw new Error("Target cannot reference an unknown measurement");
+  }
+  for (const m of base.metrics) {
+    const nextTarget = targets[m.metricKey];
+    if (m.required && m.target != null &&
+        Object.prototype.hasOwnProperty.call(targets,m.metricKey) &&
+        (nextTarget === null || nextTarget === undefined || nextTarget < m.target)) {
+      throw new Error("Required inherited Measurement Plan targets cannot be weakened");
+    }
   }
   const metrics = [...base.metrics, ...additions].map(m => ({
     ...m,

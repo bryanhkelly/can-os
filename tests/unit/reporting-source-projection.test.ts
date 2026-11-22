@@ -76,6 +76,26 @@ describe("authorized source projection",()=>{
     expect(result.events).toHaveLength(0);
     expect(result.coverage).toMatchObject({status:"legacy_detected",legacyEvents:1});
   });
+  it("surfaces a correction outside the loaded history without treating it as reconciled",()=>{
+    const original=roomEvent();
+    const priorId="66666666-6666-4666-8666-666666666666";
+    const metadata=buildReportingSourceEnvelope({
+      eventType:EventTypes.SiteRoomCreated,
+      source:{kind:"site_room",id:room,version:"2"},
+      occurredAt:"2026-11-21T11:00:00Z",
+      dimensions:{organizationId:org,siteId:site},
+      evidenceClass:"operational_record",correctsEventId:priorId,
+    });
+    const corrected={...original,
+      id:"77777777-7777-4777-8777-777777777777",
+      occurredAt:new Date("2026-11-21T11:00:00Z"),
+      payload:{...original.payload,capacity:26,reporting:metadata}};
+    const result=projectAuthorizedSourceEvents([corrected],scope,period);
+    expect(result.coverage).toMatchObject({
+      status:"unresolved_corrections",unresolvedCorrectionReferences:1,
+      lifecycleCompletenessVerified:false,
+    });
+  });
   it("rejects sensitive fields in event bodies, not just invalid metadata",()=>{
     const first=roomEvent();
     expect(()=>projectAuthorizedSourceEvents([{

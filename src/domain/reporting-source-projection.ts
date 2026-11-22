@@ -58,7 +58,9 @@ export function projectAuthorizedSourceEvents(
 ): {
   events: ProjectedSourceEvent[];
   observedCounts: Partial<Record<ReportableEventType, number>>;
-  coverage: { status: "normalized" | "legacy_detected"; legacyEvents: number; duplicateDeliveries: number; lifecycleCompletenessVerified: false };
+  coverage: { status: "normalized" | "legacy_detected" | "unresolved_corrections";
+    legacyEvents: number; duplicateDeliveries: number;
+    unresolvedCorrectionReferences: number; lifecycleCompletenessVerified: false };
 } {
   if (!proof.verifiedOrganizationIds.size || !proof.verifiedSiteIds.size) {
     throw new Error("Verified Organization and Site grants required");
@@ -163,6 +165,30 @@ export function projectAuthorizedSourceEvents(
       correctionOfEventId: meta.correctsEventId,
     });
   }
+  // A correction may legitimately refer to a prior reporting period. Never
+  // fabricate that missing history. Surface unresolved links as an evidence
+  // quality gap until the historical source has been loaded and reconciled.
+  let unresolvedCorrectionReferences = 0;
+  const byEventId = new Map(projected.map(item => [item.eventId, item]));
+  for (const item of projected) {
+    const previousId = item.correctionOfEventId;
+    if (!previousId) continue;
+    if (previousId === item.eventId) {
+      throw new Error("A reporting event cannot correct itself");
+    }
+    const previous = byEventId.get(previousId);
+    if (!previous) {
+      unresolvedCorrectionReferences++;
+      continue;
+    }
+    if (previous.sourceKind !== item.sourceKind ||
+        previous.sourceId !== item.sourceId ||
+        previous.organizationId !== item.organizationId ||
+        previous.siteId !== item.siteId ||
+        previous.occurredAt > item.occurredAt) {
+      throw new Error("Correction lineage conflicts with the authoritative source");
+    }
+  }
   projected.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) ||
     a.dedupKey.localeCompare(b.dedupKey));
   const observedCounts: Partial<Record<ReportableEventType, number>> = {};
@@ -170,6 +196,8 @@ export function projectAuthorizedSourceEvents(
     observedCounts[item.eventType] = (observedCounts[item.eventType] ?? 0) + 1;
   }
   return { events: projected, observedCounts,
-    coverage: { status: legacyEvents ? "legacy_detected" : "normalized",
-      legacyEvents, duplicateDeliveries, lifecycleCompletenessVerified: false } };
+    coverage: { status: legacyEvents ? "legacy_detected" :
+        unresolvedCorrectionReferences ? "unresolved_corrections" : "normalized",
+      legacyEvents, duplicateDeliveries, unresolvedCorrectionReferences,
+      lifecycleCompletenessVerified: false } };
 }
