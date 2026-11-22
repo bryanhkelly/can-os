@@ -36,7 +36,7 @@ const indexes=await query`
 `;
 const names=new Set(indexes.map(row=>row.indexname));
 for(const index of ["reporting_source_snapshots_pkey",
- "reporting_source_snapshot_events_pkey",
+ "reporting_source_snapshot_events_pk",
  "reporting_snapshots_scope_time_idx","reporting_snapshot_events_source_idx"]) {
  assert(names.has(index),"Missing snapshot index: "+index);
 }
