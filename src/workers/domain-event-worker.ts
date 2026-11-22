@@ -75,6 +75,10 @@ for (const eventType of [
   EventTypes.SectionCreditConfigured,
   EventTypes.ActionDeadlineChanged,
   EventTypes.SiteCreated,
+  // Marketing Package lifecycle measures preparation, never delivery or reach.
+  EventTypes.SiteMarketingPackageCreated,
+  EventTypes.SiteMarketingPackageUpdated,
+  EventTypes.SiteMarketingPackageReleased,
   // Church source references and editor suggestions are audited facts only.
   // They do not automatically publish content or confer institutional authority.
   EventTypes.ChurchSourceReferenceSaved,

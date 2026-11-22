@@ -12,11 +12,13 @@ import { normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { suggestMarketingStarterV61, type MarketingStarterSourcesV61 } from "@/domain/site-marketing-suggestions-v61";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
+import { EventTypes } from "@/domain/event-types";
 import {
   marketingPackageContentSchema, marketingPurposeIds,
 } from "@/domain/marketing-package-v61";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
+import { emitReportableEvent } from "@/platform/reportable-event";
 
 const uuid = z.string().uuid();
 const siteInput = z.object({ siteId: uuid }).strict();
@@ -149,10 +151,13 @@ export const createSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityId:created.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{purpose:data.purpose,revision:created.revision},
     });
-    await emitEvent(tx,{
-      eventType:"SiteMarketingPackageCreated",aggregateType:"site_marketing_package",
+    await emitReportableEvent(tx,{
+      eventType:EventTypes.SiteMarketingPackageCreated,aggregateType:"site_marketing_package",
       aggregateId:created.id,actorPersonId:actor.actorPersonId,
-      siteId:site.id,organizationId:site.organizationId,payload:{revision:created.revision},
+      occurredAt:created.createdAt,
+      source:{kind:"site_marketing_package",id:created.id,version:String(created.revision)},
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      evidenceClass:"operational_record",payload:{revision:created.revision},
     });
     return toView(created);
   }));
@@ -176,6 +181,15 @@ export const saveSiteMarketingPackageV61 = createServerFn({method:"POST"})
       action:"site.marketing_package.update",entityType:"site_marketing_package",
       entityId:current.id,scope:{siteId:site.id,organizationId:site.organizationId},
       before:{revision:current.revision},after:{revision:saved.revision},
+    });
+    await emitReportableEvent(tx,{
+      eventType:EventTypes.SiteMarketingPackageUpdated,aggregateType:"site_marketing_package",
+      aggregateId:saved.id,actorPersonId:actor.actorPersonId,
+      occurredAt:saved.updatedAt,
+      source:{kind:"site_marketing_package",id:saved.id,version:String(saved.revision)},
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      evidenceClass:"operational_record",
+      payload:{revision:saved.revision,previousRevision:current.revision},
     });
     return toView(saved);
   }));
