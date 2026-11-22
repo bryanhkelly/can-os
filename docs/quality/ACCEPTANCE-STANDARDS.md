@@ -33,6 +33,40 @@ For each acceptance claim, record exact commit, environment, test command, obser
 
 For public website and family-entry exposure, also enforce [Public Site Release Gates](PUBLIC-SITE-RELEASE-GATES.md).
 
+## Executable code-quality gates
+
+The production build checks application source and canonical migration history.
+Release CI also checks test modules, which are not included in the default
+application-only TypeScript project:
+
+- `npm run check:test-source-syntax`: parse JavaScript and TypeScript test
+  files and reject missing relative or aliased imports before Vitest starts.
+- `npm run check:test-import-exports`: resolve named/default imports from
+  project modules across the full source and test TypeScript configuration.
+- `npm run typecheck:full`: enforce types for source, tests and supporting
+  TypeScript code after generated TanStack route types exist.
+- `npm run lint` and `npm run check:lint-regressions`: enforce existing
+  error-level policies and reject warning-level violations added on changed
+  lines. The ratchet compares with the PR base, or the preceding main commit.
+  Existing warnings outside changed lines remain visible until remediated.
+- `npm run db:check:journal` and `npm run test:migration-safety`: verify
+  the generated snapshot boundary, exact SQL-only migration Git blob hashes,
+  and generation/schema-push safety guards.
+
+Drizzle's generated snapshots currently end at 0086. Entries 0087 through
+0101 are explicitly reviewed SQL-only migrations. The committed
+`drizzle/meta/sql-only-migrations.json` ledger pins their source bytes, but
+**does not establish schema/model parity or prove migration execution**.
+`npm run db:generate` and `npm run db:push` intentionally fail closed.
+To reconcile the generated model, use a disposable PostgreSQL branch,
+execute the reviewed migrations, compare the resulting schema to the current
+Drizzle model, review differences, then update the modeled baseline under
+a separately authorized migration change. Never synthesize snapshots.
+
+Do not call these gates passing unless a workflow or local run records the
+exact commit SHA, command and result. GitHub workflow failures without
+executed steps are infrastructure evidence, not compiler diagnostics.
+
 ## Historical artifacts
 
 The historical [FullFlow acceptance contract](../archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md) and [progress journal](../archive/2026-11-fullflow/retired-plans/full-flow-progress.md) remain preserved records. They do not supersede this standard.

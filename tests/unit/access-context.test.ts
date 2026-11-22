@@ -1,6 +1,6 @@
 import {readFileSync} from "node:fs";
 import {describe,it,expect} from "vitest";
-import {assertGrantSelection,assertSingleAccountPerson,resolveAccessContext,roleCapabilities,type VerifiedAccessGrant} from "@/domain/access-context";
+import {assertGrantSelection,assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,roleCapabilities,type VerifiedAccessGrant} from "@/domain/access-context";
 const grant:VerifiedAccessGrant={id:"grant-1",accountId:"account-1",personId:"person-1",role:"teacher",organizationId:"org-1",siteId:"site-1",active:true};
 describe("provider-independent authorization context",()=>{
  it("derives the actor, capabilities and scope from verified grants",()=>{
@@ -45,6 +45,21 @@ describe("provider-independent authorization context",()=>{
   expect(context.grantSiteId).toBeNull();
   context.scope.siteIds=["site-1","site-2"];
   expect(context.grantSiteId).toBeNull();
+ });
+ it("projects Programs from original verified grant breadth, not expanded Site navigation",()=>{
+  const rows=[
+   {id:"site-1-program",siteId:"site-1"},
+   {id:"sibling-program",siteId:"site-2"},
+   {id:"site-less-program",siteId:null},
+  ];
+  expect(authorizedProgramIds(rows,["org-1"],["site-1"])).toEqual(["site-1-program"]);
+  expect(authorizedProgramIds(rows,["org-1"],[])).toEqual([
+   "site-1-program","sibling-program","site-less-program",
+  ]);
+  expect(authorizedProgramIds(rows,[],["site-1"])).toEqual([]);
+  const server=readFileSync("src/modules/identity/command-context.server.ts","utf8");
+  expect(server).toContain("const [ownedSites, permittedPrograms] = await Promise.all([");
+  expect(server).toContain("authorizedProgramIds(permittedPrograms,organizations,grantSites)");
  });
  it("grants HQ site administration without any student or admissions privileges",()=>{
   const context=resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},

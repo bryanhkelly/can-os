@@ -22,7 +22,7 @@ const idPattern=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-
 // 0086 is the last committed Drizzle-generated snapshot. These subsequent
 // entries are explicitly hand-authored SQL-only migrations. Do not invent
 // synthetic JSON snapshots, skip SQL files, or claim drizzle-kit model parity.
-// A new SQL-only entry requires an explicit reviewed entry here.
+// A new SQL-only entry requires an explicit reviewed ledger entry and matching blob hash.
 const sqlOnlyLedger = JSON.parse(readFileSync("drizzle/meta/sql-only-migrations.json", "utf8"));
 const LAST_GENERATED_SNAPSHOT = sqlOnlyLedger.lastGeneratedSnapshotIndex;
 const SQL_ONLY_MIGRATIONS = verifySqlOnlyMigrationLedger(entries, sqlOnlyLedger, {
