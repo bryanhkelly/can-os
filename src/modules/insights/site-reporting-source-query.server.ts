@@ -33,75 +33,75 @@ export async function querySiteReportingSourceCoverageInTx(
   }
   const site = await loadAuthorizedSiteReportingScope(tx, actor, selection.siteId);
 
-    const scoped = and(
-      eq(reportingSourceEventReceipts.organizationId, site.organizationId),
-      eq(reportingSourceEventReceipts.siteId, site.id),
-      gte(reportingSourceEventReceipts.occurredAt, from),
-      lt(reportingSourceEventReceipts.occurredAt, to),
-      lte(reportingSourceEventReceipts.recordedAt, asOf),
-      lte(reportingSourceEventReceipts.projectedAt, asOf),
-    );
-    const groupRows = await tx.select({
-      eventType: reportingSourceEventReceipts.eventType,
-      status: reportingSourceEventReceipts.status,
-      count: sql<number>`count(*)::integer`,
-    }).from(reportingSourceEventReceipts)
-      .where(scoped)
-      .groupBy(reportingSourceEventReceipts.eventType, reportingSourceEventReceipts.status)
-      .orderBy(asc(reportingSourceEventReceipts.eventType));
+  const scoped = and(
+    eq(reportingSourceEventReceipts.organizationId, site.organizationId),
+    eq(reportingSourceEventReceipts.siteId, site.id),
+    gte(reportingSourceEventReceipts.occurredAt, from),
+    lt(reportingSourceEventReceipts.occurredAt, to),
+    lte(reportingSourceEventReceipts.recordedAt, asOf),
+    lte(reportingSourceEventReceipts.projectedAt, asOf),
+  );
+  const groupRows = await tx.select({
+    eventType: reportingSourceEventReceipts.eventType,
+    status: reportingSourceEventReceipts.status,
+    count: sql<number>`count(*)::integer`,
+  }).from(reportingSourceEventReceipts)
+    .where(scoped)
+    .groupBy(reportingSourceEventReceipts.eventType, reportingSourceEventReceipts.status)
+    .orderBy(asc(reportingSourceEventReceipts.eventType));
 
-    // Missing projections are detectable without reading private payloads.
-    const [pending] = await tx.select({
-      count: sql<number>`count(*)::integer`,
-    }).from(domainEvents).leftJoin(reportingSourceEventReceipts,
-      and(eq(reportingSourceEventReceipts.eventId, domainEvents.id),
-        lte(reportingSourceEventReceipts.projectedAt, asOf)))
-      .where(and(
-        inArray(domainEvents.eventType, Object.keys(REPORTABLE_EVENT_CATALOG)),
-        gte(domainEvents.occurredAt, from), lt(domainEvents.occurredAt, to),
-        lte(domainEvents.createdAt, asOf),
-        sql`${domainEvents.payload}->>'organizationId' = ${site.organizationId}`,
-        sql`${domainEvents.payload}->>'siteId' = ${site.id}`,
-        isNull(reportingSourceEventReceipts.eventId),
-      ));
+  // Missing projections are detectable without reading private payloads.
+  const [pending] = await tx.select({
+    count: sql<number>`count(*)::integer`,
+  }).from(domainEvents).leftJoin(reportingSourceEventReceipts,
+    and(eq(reportingSourceEventReceipts.eventId, domainEvents.id),
+      lte(reportingSourceEventReceipts.projectedAt, asOf)))
+    .where(and(
+      inArray(domainEvents.eventType, Object.keys(REPORTABLE_EVENT_CATALOG)),
+      gte(domainEvents.occurredAt, from), lt(domainEvents.occurredAt, to),
+      lte(domainEvents.createdAt, asOf),
+      sql`${domainEvents.payload}->>'organizationId' = ${site.organizationId}`,
+      sql`${domainEvents.payload}->>'siteId' = ${site.id}`,
+      isNull(reportingSourceEventReceipts.eventId),
+    ));
 
-    const previous = alias(reportingSourceEventReceipts, "previous_source_receipt");
-    const [corrections] = await tx.select({
-      count: sql<number>`count(*)::integer`,
-    }).from(reportingSourceEventReceipts)
-      .leftJoin(previous, eq(reportingSourceEventReceipts.correctionOfEventId, previous.eventId))
-      .where(and(
-        scoped, eq(reportingSourceEventReceipts.status, "accepted"),
-        isNotNull(reportingSourceEventReceipts.correctionOfEventId),
-        // A predecessor is resolved only when it is an accepted projection
-        // of the SAME canonical source, operating scope, and historical
-        // cutoff. A duplicate, late-processed, or differently owned
-        // predecessor cannot resolve a point-in-time correction.
-        sql`(
-          ${previous.eventId} IS NULL
-          OR ${previous.status} <> 'accepted'
-          OR ${previous.sourceKind} IS DISTINCT FROM ${reportingSourceEventReceipts.sourceKind}
-          OR ${previous.sourceId} IS DISTINCT FROM ${reportingSourceEventReceipts.sourceId}
-          OR ${previous.organizationId} IS DISTINCT FROM ${reportingSourceEventReceipts.organizationId}
-          OR ${previous.siteId} IS DISTINCT FROM ${reportingSourceEventReceipts.siteId}
-          OR ${previous.programId} IS DISTINCT FROM ${reportingSourceEventReceipts.programId}
-          OR ${previous.recordedAt} > ${asOf}
-          OR ${previous.projectedAt} > ${asOf}
-          OR ${previous.occurredAt} > ${reportingSourceEventReceipts.occurredAt}
-        )`,
-      ));
+  const previous = alias(reportingSourceEventReceipts, "previous_source_receipt");
+  const [corrections] = await tx.select({
+    count: sql<number>`count(*)::integer`,
+  }).from(reportingSourceEventReceipts)
+    .leftJoin(previous, eq(reportingSourceEventReceipts.correctionOfEventId, previous.eventId))
+    .where(and(
+      scoped, eq(reportingSourceEventReceipts.status, "accepted"),
+      isNotNull(reportingSourceEventReceipts.correctionOfEventId),
+      // A predecessor is resolved only when it is an accepted projection
+      // of the SAME canonical source, operating scope, and historical
+      // cutoff. A duplicate, late-processed, or differently owned
+      // predecessor cannot resolve a point-in-time correction.
+      sql`(
+        ${previous.eventId} IS NULL
+        OR ${previous.status} <> 'accepted'
+        OR ${previous.sourceKind} IS DISTINCT FROM ${reportingSourceEventReceipts.sourceKind}
+        OR ${previous.sourceId} IS DISTINCT FROM ${reportingSourceEventReceipts.sourceId}
+        OR ${previous.organizationId} IS DISTINCT FROM ${reportingSourceEventReceipts.organizationId}
+        OR ${previous.siteId} IS DISTINCT FROM ${reportingSourceEventReceipts.siteId}
+        OR ${previous.programId} IS DISTINCT FROM ${reportingSourceEventReceipts.programId}
+        OR ${previous.recordedAt} > ${asOf}
+        OR ${previous.projectedAt} > ${asOf}
+        OR ${previous.occurredAt} > ${reportingSourceEventReceipts.occurredAt}
+      )`,
+    ));
 
-    const result = summarizeReportingSourceCoverage(
-      groupRows,
-      Number(pending?.count ?? 0),
-      Number(corrections?.count ?? 0),
-    );
-    return {
-      siteId: site.id, from: from.toISOString(), to: to.toISOString(), asOf: asOf.toISOString(),
-      ...result, outcomeMetricsAvailable: false as const,
-      // Even a complete projection stream is NOT proof of full module
-      // instrumentation, Person reconciliation, or verified training outcomes.
-    };
+  const result = summarizeReportingSourceCoverage(
+    groupRows,
+    Number(pending?.count ?? 0),
+    Number(corrections?.count ?? 0),
+  );
+  return {
+    siteId: site.id, from: from.toISOString(), to: to.toISOString(), asOf: asOf.toISOString(),
+    ...result, outcomeMetricsAvailable: false as const,
+    // Even a complete projection stream is NOT proof of full module
+    // instrumentation, Person reconciliation, or verified training outcomes.
+  };
 }
 
 export async function readSiteReportingSourceCoverage(
