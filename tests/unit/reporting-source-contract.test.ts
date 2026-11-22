@@ -46,14 +46,14 @@ describe("reusable reporting source contract",()=>{
 describe("reusable Measurement Plan contract",()=>{
   const inherited={
     schemaVersion:1 as const,version:"1",owner:{kind:"solution" as const,versionId:source},
-    metrics:[{metricKey:"participation.registrations",required:true,
+    metrics:[{metricKey:"participation.registrations",definitionVersion:"1.0.0",required:true,
       purpose:"activity" as const,sourceAuthority:"noncredit_registration",
       evidenceRequirement:"Canonical registration ID"}],
   };
   it("inherits mandatory measurement rules and accepts local targets",()=>{
     const next=extendMeasurementPlan(inherited,{
       version:"2",targets:{"participation.registrations":40},
-      additions:[{metricKey:"learning.knowledge_gain",required:false,
+      additions:[{metricKey:"learning.knowledge_gain",definitionVersion:"1.0.0",required:false,
         purpose:"observed_outcome",sourceAuthority:"assessment_decision",
         evidenceRequirement:"Comparable pre and post assessments"}],
     });

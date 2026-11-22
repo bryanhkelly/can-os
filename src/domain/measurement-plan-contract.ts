@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireMetricContract, type SourceMetricContract } from "@/domain/reporting-metric-registry";
 
 /**
  * Portable Measurement Plan contract. Does not change any operational source
@@ -10,6 +11,7 @@ const key = z.string().regex(/^[a-z][a-z0-9_.-]{1,95}$/);
 const uuid = z.string().uuid();
 const metric = z.object({
   metricKey: key,
+  definitionVersion: z.string().trim().min(1).max(128),
   required: z.boolean(),
   purpose: z.enum(["activity", "observed_outcome", "evaluated_impact"]),
   sourceAuthority: key,
@@ -64,4 +66,23 @@ export function extendMeasurementPlan(
   return measurementPlanSchema.parse({
     schemaVersion: 1, owner: base.owner, version: options.version, metrics,
   });
+}
+
+// Measurement Plans may reference only explicitly versioned, source-owned
+// metrics. This validates a draft's semantics but NEVER implies it has been
+// approved for funded reporting or external disclosure.
+export function validateMeasurementPlanAgainstRegistry(
+  plan: MeasurementPlan,
+  registry: readonly SourceMetricContract[],
+): MeasurementPlan {
+  const current = measurementPlanSchema.parse(plan);
+  for (const measure of current.metrics) {
+    const definition = requireMetricContract(
+      registry, measure.metricKey, measure.definitionVersion,
+    );
+    if (measure.sourceAuthority !== definition.sourceDomain) {
+      throw new Error("Measurement source authority conflicts with metric definition");
+    }
+  }
+  return current;
 }

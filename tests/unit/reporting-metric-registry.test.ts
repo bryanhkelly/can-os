@@ -3,6 +3,7 @@ import {
   buildCurrentReportingMetricRegistry, requireMetricContract,
 } from "@/domain/reporting-metric-registry";
 import { CLASS_METRIC_DEFINITIONS } from "@/domain/participation-reporting";
+import { validateMeasurementPlanAgainstRegistry } from "@/domain/measurement-plan-contract";
 import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
 
 describe("source-owned metric registry",()=>{
@@ -25,6 +26,24 @@ describe("source-owned metric registry",()=>{
     const metric=all.find(m=>m.metricKey==="class.registrations")!;
     expect(requireMetricContract(all,metric.metricKey,metric.definitionVersion)).toBe(metric);
     expect(()=>requireMetricContract(all,metric.metricKey,"not-ratified")).toThrow("Unknown");
+  });
+  it("requires an exact, source-consistent version in Measurement Plans",()=>{
+    const metric=all.find(row=>row.metricKey==="noncredit.registrations")!;
+    const plan={
+      schemaVersion:1 as const, version:"1",
+      owner:{kind:"solution" as const,versionId:"44444444-4444-4444-8444-444444444444"},
+      metrics:[{metricKey:metric.metricKey,definitionVersion:metric.definitionVersion,
+        required:true,purpose:"activity" as const,
+        sourceAuthority:metric.sourceDomain,
+        evidenceRequirement:"Canonical noncredit registration ID"}],
+    };
+    expect(validateMeasurementPlanAgainstRegistry(plan,all)).toMatchObject(plan);
+    expect(()=>validateMeasurementPlanAgainstRegistry({
+      ...plan, metrics:[{...plan.metrics[0],definitionVersion:"unknown"}],
+    },all)).toThrow("Unknown metric");
+    expect(()=>validateMeasurementPlanAgainstRegistry({
+      ...plan, metrics:[{...plan.metrics[0],sourceAuthority:"native_class"}],
+    },all)).toThrow("source authority");
   });
   it("does not silently upgrade private counts into published impact metrics",()=>{
     expect(all.every(m=>m.disclosure==="private_operational")).toBe(true);
