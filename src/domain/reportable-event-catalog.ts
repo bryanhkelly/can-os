@@ -125,7 +125,7 @@ export const REPORTABLE_EVENT_CATALOG = {
   [EventTypes.SiteRoomUpdated]: {
     sourceKind: "site_room",
     aggregateType: "site_room",
-    requiredDimensions: ["siteId", "programId"] as const,
+    requiredDimensions: ["siteId"] as const,
     payload: z.object({
       capacity: z.number().int().positive(), revision,
     }).strict(),
@@ -133,7 +133,7 @@ export const REPORTABLE_EVENT_CATALOG = {
   [EventTypes.SiteRoomRetired]: {
     sourceKind: "site_room",
     aggregateType: "site_room",
-    requiredDimensions: ["siteId", "programId"] as const,
+    requiredDimensions: ["siteId"] as const,
     payload: z.object({
       retiredAt: z.string().datetime({ offset: true }), revision,
     }).strict(),

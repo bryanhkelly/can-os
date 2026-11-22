@@ -109,8 +109,9 @@ async function createRoomRecord(tx: Parameters<Parameters<typeof db.transaction>
     const eventId = await emitReportableChange(tx, { eventType: EventTypes.SiteRoomCreated,
       sourceId: input.roomId, sourceVersion: "1",
       actorPersonId: actor.actorPersonId, occurredAt: created.createdAt,
-      dimensions: { organizationId: school.organizationId, siteId: school.siteId,
-        ...(school.programId ? { programId: school.programId } : {}) },
+      // A physical room is owned by the Site, not by the Program
+      // used to authorize the room edit. Program usage is a separate fact.
+      dimensions: { organizationId: school.organizationId, siteId: school.siteId },
       payload: { capacity: input.capacity } });
     await writeAudit(tx, actor, { action: "site.room.created", entityType: "site_room",
       entityId: input.roomId, scope: school, after: { name: input.name, capacity: input.capacity },
@@ -186,8 +187,7 @@ export async function updateSchoolRoom(actor: AccessContext, value: z.infer<type
     const eventId = await emitReportableChange(tx, { eventType: EventTypes.SiteRoomUpdated,
       sourceId: room.id, sourceVersion: String(after.revision),
       actorPersonId: actor.actorPersonId, occurredAt: new Date(),
-      dimensions: { organizationId: school.organizationId, siteId: school.siteId,
-        programId: school.programId },
+      dimensions: { organizationId: school.organizationId, siteId: school.siteId },
       payload: { capacity: after.capacity, revision: after.revision } });
     await writeAudit(tx, actor, { action: "site.room.updated", entityType: "site_room",
       entityId: room.id, scope: school, before: { name: room.name, capacity: room.capacity, revision: room.revision },
@@ -219,8 +219,7 @@ export async function retireSchoolRoom(actor: AccessContext, value: z.infer<type
     const eventId = await emitReportableChange(tx, { eventType: EventTypes.SiteRoomRetired,
       sourceId: room.id, sourceVersion: String(after.revision),
       actorPersonId: actor.actorPersonId, occurredAt: retiredAt,
-      dimensions: { organizationId: school.organizationId, siteId: school.siteId,
-        programId: school.programId },
+      dimensions: { organizationId: school.organizationId, siteId: school.siteId },
       payload: { retiredAt: after.retiredAt, revision: after.revision } });
     await writeAudit(tx, actor, { action: "site.room.retired", entityType: "site_room",
       entityId: room.id, scope: school, before: { retiredAt: null, revision: room.revision },

@@ -102,6 +102,11 @@ describe("authorized source projection",()=>{
       ...first,payload:{...first.payload,studentEmail:"not-for-event@example.org"},
     }],scope,period)).toThrow();
   });
+  it("Site-owned room events never gain a Program attribution from their mutation caller",()=>{
+    const record=roomEvent();
+    const result=projectAuthorizedSourceEvents([record],scope,period);
+    expect(result.events[0]?.programId).toBeNull();
+  });
   it("requires current grants and a valid bounded reporting period",()=>{
     expect(()=>projectAuthorizedSourceEvents([roomEvent()],{
       verifiedOrganizationIds:new Set(), verifiedSiteIds:new Set([site]),

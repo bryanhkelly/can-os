@@ -3,8 +3,8 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { domainEvents, sites } from "@/db/schema";
-import { assertSiteSetupScope } from "@/domain/site-setup-scope";
+import { domainEvents, programs, sites } from "@/db/schema";
+import { assertWholeSiteReportingScope } from "@/domain/site-setup-scope";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { projectAuthorizedSourceEvents } from "@/domain/reporting-source-projection";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -37,7 +37,13 @@ export const getSiteReportingSourceCoverage = createServerFn({ method: "GET" })
       const [site] = await tx.select({
         id: sites.id, organizationId: sites.organizationId,
       }).from(sites).where(eq(sites.id, data.siteId)).limit(1);
-      assertSiteSetupScope(actor, site, "program.read");
+      // Explicitly prove that a partial Site grant cannot indirectly
+      // aggregate data belonging to ungranted sibling Programs.
+      const attached = site
+        ? await tx.select({ id: programs.id }).from(programs)
+          .where(and(eq(programs.siteId, site.id), eq(programs.organizationId, site.organizationId)))
+        : [];
+      assertWholeSiteReportingScope(actor, site, attached.map(row => row.id));
       const registered = Object.keys(REPORTABLE_EVENT_CATALOG);
       // Query predicates restrict the current operator first. Projection
       // repeats the scope check and verifies all source attribution.
