@@ -80,6 +80,11 @@ for (const eventType of [
   EventTypes.SiteMarketingPackageCreated,
   EventTypes.SiteMarketingPackageUpdated,
   EventTypes.SiteMarketingPackageReleased,
+  EventTypes.SiteMarketingPackageDuplicated,
+  EventTypes.SiteMarketingPackageStatusChanged,
+  EventTypes.SiteMarketingPackageBrandSelected,
+  EventTypes.SiteMarketingPackageDeleted,
+  EventTypes.SiteMarketingArtifactWithdrawn,
   // Church source references and editor suggestions are audited facts only.
   // They do not automatically publish content or confer institutional authority.
   EventTypes.ChurchSourceReferenceSaved,

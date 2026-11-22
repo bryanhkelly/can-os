@@ -1,6 +1,6 @@
 # Shared reporting foundations v1
 
-**Scope:** Pre-Insights groundwork on integrated main. No new feature branch, warehouse,
+**Scope:** Pre-Insights groundwork on `release-11212026`. No new feature branch, warehouse,
 analytics event database, duplicate enrollment/completion ledger, published report or
 new report UI is introduced by this contract.
 

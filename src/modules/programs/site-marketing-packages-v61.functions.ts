@@ -210,6 +210,13 @@ export const duplicateSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityId:copy.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{sourceId:original.id,revision:copy.revision},
     });
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageDuplicated,
+      sourceId:copy.id,sourceVersion:String(copy.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:copy.createdAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{sourcePackageId:original.id,revision:copy.revision},
+    });
     return toView(copy);
   }));
 
@@ -232,6 +239,14 @@ export const archiveSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityType:"site_marketing_package",entityId:current.id,
       scope:{siteId:site.id,organizationId:site.organizationId},
       before:{status:current.status},after:{status:saved.status},
+    });
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageStatusChanged,
+      sourceId:saved.id,sourceVersion:String(saved.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:saved.updatedAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{previousStatus:current.status,status:saved.status,
+        previousRevision:current.revision,revision:saved.revision},
     });
     return toView(saved);
   }));
@@ -261,6 +276,13 @@ export const selectSiteMarketingPackageBrandV61=createServerFn({method:"POST"})
       scope:{siteId:site.id,organizationId:site.organizationId},
       before:{brandVersionId:current.brandVersionId,revision:current.revision},
       after:{brandVersionId:brand.id,revision:saved.revision}});
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageBrandSelected,
+      sourceId:saved.id,sourceVersion:String(saved.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:saved.updatedAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{brandVersionId:brand.id,previousRevision:current.revision,revision:saved.revision},
+    });
     return toView(saved);
   }));
 
@@ -281,6 +303,14 @@ export const deleteSiteMarketingPackageV61 = createServerFn({method:"POST"})
       action:"site.marketing_package.delete",entityType:"site_marketing_package",
       entityId:current.id,scope:{siteId:site.id,organizationId:site.organizationId},
       before:{revision:current.revision,status:current.status},after:null,
+    });
+    // The deletion receipt and audit remain authoritative after the draft is gone.
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageDeleted,
+      sourceId:current.id,sourceVersion:String(current.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:new Date(),
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{lastRevision:current.revision,lastStatus:current.status},
     });
     return {deleted:true,id:current.id};
   }));

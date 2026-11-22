@@ -48,6 +48,47 @@ export const REPORTABLE_EVENT_CATALOG = {
       formats: z.array(z.string().trim().min(1).max(40)).min(1).max(20),
     }).strict(),
   },
+  [EventTypes.SiteMarketingPackageDuplicated]: {
+    sourceKind: "site_marketing_package",
+    aggregateType: "site_marketing_package",
+    requiredDimensions: ["siteId"] as const,
+    payload: z.object({ sourcePackageId: uuid, revision }).strict(),
+  },
+  [EventTypes.SiteMarketingPackageStatusChanged]: {
+    sourceKind: "site_marketing_package",
+    aggregateType: "site_marketing_package",
+    requiredDimensions: ["siteId"] as const,
+    payload: z.object({
+      previousStatus: z.enum(["draft", "archived"]),
+      status: z.enum(["draft", "archived"]),
+      previousRevision: revision, revision,
+    }).strict().refine(value => value.previousStatus !== value.status &&
+      value.revision > value.previousRevision, "Package status revision must advance"),
+  },
+  [EventTypes.SiteMarketingPackageBrandSelected]: {
+    sourceKind: "site_marketing_package",
+    aggregateType: "site_marketing_package",
+    requiredDimensions: ["siteId"] as const,
+    payload: z.object({ brandVersionId: uuid, previousRevision: revision, revision })
+      .strict().refine(value => value.revision > value.previousRevision,
+        "Brand selection revision must advance"),
+  },
+  [EventTypes.SiteMarketingPackageDeleted]: {
+    sourceKind: "site_marketing_package",
+    aggregateType: "site_marketing_package",
+    requiredDimensions: ["siteId"] as const,
+    payload: z.object({
+      lastRevision: revision, lastStatus: z.enum(["draft", "archived"]),
+    }).strict(),
+  },
+  [EventTypes.SiteMarketingArtifactWithdrawn]: {
+    sourceKind: "site_artifact_release",
+    aggregateType: "site_artifact_release",
+    requiredDimensions: ["siteId"] as const,
+    payload: z.object({
+      withdrawnAt: z.string().datetime({ offset: true }),
+    }).strict(),
+  },
   [EventTypes.InterestEventCreated]: {
     sourceKind: "interest_event",
     aggregateType: "interest_event",

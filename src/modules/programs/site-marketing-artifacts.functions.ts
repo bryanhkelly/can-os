@@ -315,11 +315,21 @@ export const withdrawSiteMarketingRelease=createServerFn({method:"POST"})
       .where(and(eq(siteArtifactReleases.id,data.releaseId),
         eq(siteArtifactReleases.siteId,site.id))).limit(1);
     if(!release)throw new DomainError("UNAVAILABLE","Artifact unavailable.");
-    await tx.insert(siteArtifactReleaseAccess).values({
-      releaseId:release.id,withdrawnAt:new Date(),withdrawnReason:data.reason,
-    }).onConflictDoNothing();
+    const withdrawnAt=new Date();
+    const [inserted]=await tx.insert(siteArtifactReleaseAccess).values({
+      releaseId:release.id,withdrawnAt,withdrawnReason:data.reason,
+    }).onConflictDoNothing().returning({releaseId:siteArtifactReleaseAccess.releaseId});
+    // Replayed withdrawal does not create another audit or reporting event.
+    if(!inserted)return {withdrawn:true};
     await writeAudit(tx,actor,{action:"site.marketing_artifact.withdrawn",
       entityType:"site",entityId:site.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{releaseId:release.id,reason:data.reason}});
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingArtifactWithdrawn,
+      sourceId:release.id,sourceVersion:withdrawnAt.toISOString(),
+      actorPersonId:actor.actorPersonId,occurredAt:withdrawnAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{withdrawnAt:withdrawnAt.toISOString()},
+    });
     return {withdrawn:true};
   }));
