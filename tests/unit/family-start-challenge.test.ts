@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({transaction:vi.fn(),audit:vi.fn(),event:vi.fn(),insert:vi.fn(),rows:[] as unknown[][]}));
 vi.mock("@/db/client",()=>({db:{transaction:state.transaction}}));
-vi.mock("@/modules/identity/demo-school-tenants.server",()=>({isDemoTenantOrganization:async()=>false}));
+vi.mock("@/modules/identity/demo-school-tenants.server",()=>({isDemoTenantOrganization:vi.fn(async()=>false)}));
 vi.mock("@/db/schema",()=>Object.fromEntries(["programs","programPublications","publicFamilyStartRequests","sitePublications","sites"].map(name=>[name,new Proxy({name},{get:(t,key)=>String(key)})])));
 vi.mock("@/domain/access-tokens",()=>({hashAccessSecret:()=>"hash",issueOpaqueSecret:()=>"single-use-secret"}));
 vi.mock("@/domain/public-family-start",()=>({publicFamilyStartInput:{},verifiedFamilyStartEmail:vi.fn()}));
@@ -10,6 +10,7 @@ vi.mock("@/modules/programs/program-site-authorization.server",()=>({requireChur
 vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event}));
 vi.mock("@/domain/event-types",()=>({EventTypes:{PublicFamilyStartRequested:"family.requested"}}));
 import {requestVerifiedFamilyStart} from "../../src/modules/enrollment/public-family-start.server";
+import {isDemoTenantOrganization} from "@/modules/identity/demo-school-tenants.server";
 const preparation={school:{programId:"program",siteId:"site",organizationId:"org",programName:"School"},
  contact:{programId:"program",firstName:"First",lastName:"Family",email:"parent@example.test"},
  evidence:{source:"staff_invitation" as const,invitationBatchId:"batch",recipientKey:"recipient"}};
@@ -32,6 +33,22 @@ describe("shared family email challenge",()=>{
    accessUrl:"https://app.example.test/family/join#token=single-use-secret",idempotencyKey:"batch:recipient"}));
   expect(state.event).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({payload:{status:"pending_email_verification",...preparation.evidence}}));
   expect(JSON.stringify(state.event.mock.calls)).not.toContain("parent@example.test");
+ });
+ it("allows a synthetic school through the same verified challenge as any Site",async()=>{
+  // The application must not inspect the demo registry to decide whether a
+  // school can issue its otherwise authorized, one-time family access link.
+  vi.mocked(isDemoTenantOrganization).mockResolvedValue(true);
+  const sender=vi.fn();
+  const synthetic={...preparation,school:{
+   ...preparation.school,organizationId:"f1000000-0000-4000-8000-000000000002",
+  }};
+  expect(await requestVerifiedFamilyStart(async()=>synthetic,sender))
+   .toEqual({requestId:"intent",created:true});
+  expect(sender).toHaveBeenCalledWith(expect.objectContaining({
+   to:"parent@example.test",
+   accessUrl:"https://app.example.test/family/join#token=single-use-secret",
+  }));
+  expect(isDemoTenantOrganization).not.toHaveBeenCalled();
  });
  it("reuses the canonical cooldown without sending a second email",async()=>{
   state.rows=[[{id:"prior"}]];const sender=vi.fn();
