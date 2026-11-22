@@ -36,6 +36,18 @@ export const outboxReportingEventSchema = z.object({
 }).strict();
 
 export type OutboxReportingEvent = z.input<typeof outboxReportingEventSchema>;
+
+/** Stable signature for deduplication and independently persisted replay. */
+export function reportingEventSignature(raw: OutboxReportingEvent): string {
+  const event = outboxReportingEventSchema.parse(raw);
+  return canonicalJson({
+    eventType: event.eventType, aggregateType: event.aggregateType,
+    aggregateId: event.aggregateId,
+    occurredAt: new Date(event.occurredAt).toISOString(),
+    payload: event.payload,
+  });
+}
+
 export type ProjectedSourceEvent = {
   eventId: string;
   dedupKey: string;
@@ -135,11 +147,7 @@ export function projectAuthorizedSourceEvents(
       evidenceClass: meta.evidenceClass,
       payload: body,
     });
-    const signature = canonicalJson({
-      eventType: event.eventType, aggregateType: event.aggregateType,
-      aggregateId: event.aggregateId, occurredAt: new Date(event.occurredAt).toISOString(),
-      payload: event.payload,
-    });
+    const signature = reportingEventSignature(event);
     const priorById = eventIds.get(event.id);
     if (priorById !== undefined) {
       if (priorById !== signature) throw new Error("Conflicting replay for same event ID");
