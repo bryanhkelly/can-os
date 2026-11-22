@@ -1,47 +1,56 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({
-  invitations: vi.fn(), admissions: vi.fn(), enrollments: vi.fn(), extended: vi.fn(), guidance: vi.fn(), research: vi.fn(),
-}));
-vi.mock("@/components/operations/LaunchWizardPage", () => ({ LaunchWizardPage: () => null }));
-vi.mock("@/modules/programs/launch.functions", () => ({ listLaunchOptions: async () => ({}), listLaunches: async () => ({ launches: [] }) }));
-vi.mock("@/modules/enrollment/admissions-program-directory.functions", () => ({ listAdmissionsPrograms: async () => [] }));
-vi.mock("@/modules/enrollment/family-invitations.functions", () => ({ listFamilyInvitations: state.invitations }));
-vi.mock("@/modules/enrollment/launch-admissions-counts.functions", () => ({ getLaunchAdmissionsCounts: state.admissions }));
-vi.mock("@/modules/enrollment/admissions-dashboard.functions", () => ({ getActiveEnrollmentCounts: state.enrollments }));
-vi.mock("@/modules/activities/extended-learning.functions", () => ({ listExtendedSeasonPlanning: state.extended }));
-vi.mock("@/modules/programs/jurisdiction-profile.functions", () => ({ listPublishedJurisdictionGuidance: state.guidance }));
-vi.mock("@/modules/programs/jurisdiction-launch-research.functions", () => ({ listLaunchJurisdictionResearch: state.research }));
-vi.mock("@/modules/programs/launch-drafts.functions", () => ({ getLaunchStudioDraft: async () => null }));
-import { Route } from "@/routes/launch.school";
-import { launchMilestoneAvailable } from "@/lib/supplementary-read";
+import { describe, expect, it } from "vitest";
+import { supplementaryRead, launchMilestoneAvailable, type LaunchReadStates } from "@/lib/supplementary-read";
 
-const load = () => (Route.options.loader as (input: unknown) => Promise<any>)({ deps: { siteId: "school", programId: "program" } });
-beforeEach(() => {
-  vi.resetAllMocks();
-  state.invitations.mockResolvedValue({ batches: [] });
-  state.admissions.mockResolvedValue({ total: 0 }); state.enrollments.mockResolvedValue([]);
-  state.extended.mockResolvedValue({}); state.guidance.mockResolvedValue({}); state.research.mockResolvedValue({});
-});
-describe("launch loader availability", () => {
+/** This is the shared read-state policy exercised by the current Settings and
+ * Launch destinations. The retired /launch/school route no longer exists. */
+const baseline: LaunchReadStates = {
+  preparationPrograms: "empty",
+  familyInvitations: "empty",
+  admissionsCounts: "empty",
+  enrollmentCounts: "empty",
+  extendedPlanning: "empty",
+  jurisdictionGuidance: "empty",
+  jurisdictionResearch: "empty",
+};
+
+describe("launch and settings supplementary-read availability", () => {
   it("retains failed jurisdiction and enrollment reads as unavailable, not zero outstanding work", async () => {
-    state.guidance.mockRejectedValue(new Error("unavailable"));
-    state.enrollments.mockRejectedValue(new Error("unavailable"));
-    const result = await load();
-    expect(result.ok).toBe(true);
-    expect(result.data.reads).toMatchObject({ jurisdictionGuidance: "unavailable", enrollmentCounts: "unavailable", admissionsCounts: "empty" });
-    expect(result.data.enrollmentCounts).toBeNull();
-    expect(launchMilestoneAvailable(result.data.reads, "opening")).toBe(false);
+    const [guidance, enrollments] = await Promise.all([
+      supplementaryRead(() => Promise.reject(new Error("unavailable")), () => true),
+      supplementaryRead(() => Promise.reject(new Error("unavailable")), () => true),
+    ]);
+    expect(guidance).toEqual({ state: "unavailable", data: null });
+    expect(enrollments).toEqual({ state: "unavailable", data: null });
+    const states: LaunchReadStates = {
+      ...baseline,
+      jurisdictionGuidance: guidance.state,
+      enrollmentCounts: enrollments.state,
+    };
+    expect(launchMilestoneAvailable(states, "opening")).toBe(false);
   });
+
   it("distinguishes permission denial from unavailable service", async () => {
-    state.research.mockRejectedValue({ code: "FORBIDDEN" });
-    const result = await load();
-    expect(result.data.reads.jurisdictionResearch).toBe("unauthorized");
-    expect(launchMilestoneAvailable(result.data.reads, "configuration")).toBe(false);
+    const research = await supplementaryRead(
+      () => Promise.reject({ code: "FORBIDDEN" }), () => true,
+    );
+    expect(research).toEqual({ state: "unauthorized", data: null });
+    const states: LaunchReadStates = { ...baseline, jurisdictionResearch: research.state };
+    expect(launchMilestoneAvailable(states, "configuration")).toBe(false);
   });
+
   it("preserves successful empty reads as actual empty results", async () => {
-    const result = await load();
-    expect(result.data.reads).toMatchObject({ enrollmentCounts: "empty", jurisdictionGuidance: "empty" });
-    expect(result.data.enrollmentCounts).toEqual([]);
-    expect(launchMilestoneAvailable(result.data.reads, "opening")).toBe(true);
+    const [enrollments, guidance] = await Promise.all([
+      supplementaryRead(async () => [] as string[], data => data.length === 0),
+      supplementaryRead(async () => ({} as Record<string, unknown>),
+        data => Object.keys(data).length === 0),
+    ]);
+    expect(enrollments).toEqual({ state: "empty", data: [] });
+    expect(guidance).toEqual({ state: "empty", data: {} });
+    const states: LaunchReadStates = {
+      ...baseline,
+      enrollmentCounts: enrollments.state,
+      jurisdictionGuidance: guidance.state,
+    };
+    expect(launchMilestoneAvailable(states, "opening")).toBe(true);
   });
 });

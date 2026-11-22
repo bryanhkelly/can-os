@@ -16,7 +16,8 @@ import { unresolvedLocalSourceModule } from "../lib/source-module-resolution.mjs
 const root=resolve(process.cwd());
 // Only runtime and build-tool source blocks a production build. Test suites
 // are parsed by their own test/CI commands, not production asset generation.
-const roots=["src","scripts"];
+const includeTests=process.argv.includes("--include-tests");
+const roots=includeTests ? ["src","scripts","tests"] : ["src","scripts"];
 const sourceExts=new Map([
   [".ts",ts.ScriptKind.TS], [".tsx",ts.ScriptKind.TSX],
   [".mts",ts.ScriptKind.TS], [".cts",ts.ScriptKind.TS],

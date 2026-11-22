@@ -39,10 +39,16 @@ jobs:
         run: npm run check:local-import-exports
       - name: Test local import/export guard behavior
         run: npm run test:local-import-exports
+      - name: Validate test imports before bundling
+        run: npm run check:test-source-syntax
       - name: Generate TanStack route types and build application
         run: npm run build
       - name: Verify the production Cloudflare build target
         run: npm run build:cloudflare
+      - name: Full TypeScript project and test typecheck
+        run: npm run typecheck:full
+      - name: Check named imports from current test modules
+        run: npm run check:test-import-exports
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests

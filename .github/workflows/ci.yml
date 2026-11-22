@@ -21,6 +21,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Assert exact CI commit
         shell: bash
@@ -44,6 +45,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate TypeScript and JavaScript test source imports
+        run: npm run check:test-source-syntax
 
       # The hosted deployment uses a distinct Vite environment and import
       # protection graph. A generic build cannot certify Cloudflare readiness.
@@ -74,6 +78,12 @@ jobs:
 
       - name: School safety and opening unit regressions
         run: npm run test:safety
+
+      - name: Typecheck application and all tests
+        run: npm run typecheck:full
+
+      - name: Check named exports imported by tests
+        run: npm run check:test-import-exports
 
       - name: Typecheck
         run: npm run typecheck

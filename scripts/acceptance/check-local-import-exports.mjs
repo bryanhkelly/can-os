@@ -9,7 +9,9 @@ import ts from "typescript";
 import { resolve, sep } from "node:path";
 
 const root = process.cwd();
-const tsconfig = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
+const includeTests = process.argv.includes("--include-tests");
+const tsconfig = ts.findConfigFile(root, ts.sys.fileExists,
+  includeTests ? "tsconfig.full.json" : "tsconfig.json");
 if (!tsconfig) throw new Error("Cannot validate local exports without tsconfig.json");
 const config = ts.readConfigFile(tsconfig, ts.sys.readFile);
 if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, "\n"));
@@ -23,12 +25,14 @@ if (parsed.errors.length) {
 const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
 const checker = program.getTypeChecker();
 const srcRoot = resolve(root, "src") + sep;
+const testsRoot = resolve(root, "tests") + sep;
 const exportCache = new Map();
 let checked = 0;
 const failures = [];
 
 for (const file of program.getSourceFiles()) {
-  if (file.isDeclarationFile || !file.fileName.startsWith(srcRoot)) continue;
+  if (file.isDeclarationFile || !(file.fileName.startsWith(srcRoot) ||
+    (includeTests && file.fileName.startsWith(testsRoot)))) continue;
   for (const statement of file.statements) {
     if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
     const specifier = statement.moduleSpecifier;
