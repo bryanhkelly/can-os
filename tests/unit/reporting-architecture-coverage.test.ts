@@ -13,6 +13,14 @@ describe("reporting event architecture",()=>{
     expect(worker).toContain("reportingProjectionEnabled()");
     expect(Object.keys(REPORTABLE_EVENT_CATALOG).length).toBeGreaterThan(10);
   });
+  it("does not hide unowned retry receipts from Site source-quality counts",()=>{
+    const reader=read("src/modules/insights/site-reporting-source-query.server.ts");
+    const join=reader.match(/\.leftJoin\(reportingSourceEventReceipts,\s*and\(([\s\S]*?)\)\)\s*\.where/)?.[1] ?? "";
+    expect(join).toContain("eq(reportingSourceEventReceipts.eventId, domainEvents.id)");
+    expect(join).toContain("eq(reportingSourceEventReceipts.organizationId, site.organizationId)");
+    expect(join).toContain("eq(reportingSourceEventReceipts.siteId, site.id)");
+    expect(join).toContain("lte(reportingSourceEventReceipts.projectedAt, asOf)");
+  });
   it("keeps operational modules on one typed emitter",()=>{
     const paths=[
       "src/modules/programs/site-information-v61.functions.ts",

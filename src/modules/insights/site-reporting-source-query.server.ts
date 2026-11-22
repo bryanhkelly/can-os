@@ -50,11 +50,16 @@ export async function querySiteReportingSourceCoverageInTx(
     .groupBy(reportingSourceEventReceipts.eventType, reportingSourceEventReceipts.status)
     .orderBy(asc(reportingSourceEventReceipts.eventType));
 
-  // Missing projections are detectable without reading private payloads.
+  // Missing OR unusably attributed projections are detectable without
+  // reading private payloads. A retry/dead-letter receipt can lack validated
+  // Site ownership, even while its original outbox event claims this Site.
+  // Never let such a receipt hide a quality gap by satisfying the LEFT JOIN.
   const [pending] = await tx.select({
     count: sql<number>`count(*)::integer`,
   }).from(domainEvents).leftJoin(reportingSourceEventReceipts,
     and(eq(reportingSourceEventReceipts.eventId, domainEvents.id),
+      eq(reportingSourceEventReceipts.organizationId, site.organizationId),
+      eq(reportingSourceEventReceipts.siteId, site.id),
       lte(reportingSourceEventReceipts.projectedAt, asOf)))
     .where(and(
       inArray(domainEvents.eventType, Object.keys(REPORTABLE_EVENT_CATALOG)),
