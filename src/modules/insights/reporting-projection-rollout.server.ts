@@ -8,3 +8,9 @@
 export function reportingProjectionEnabled(): boolean {
   return process.env.CAN_REPORTING_SOURCE_PROJECTION_ENABLED === "1";
 }
+
+/** Opt-in only after private snapshot migration 0101 passes schema preflight. */
+export function reportingSnapshotsEnabled(): boolean {
+  return reportingProjectionEnabled() &&
+    process.env.CAN_REPORTING_SOURCE_SNAPSHOTS_ENABLED === "1";
+}
