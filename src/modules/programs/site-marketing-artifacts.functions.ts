@@ -17,6 +17,8 @@ import { publicSiteHost } from "@/domain/public-site-address";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readSavedBrandVersion } from "@/modules/sites/site-brand.server";
 import { writeAudit } from "@/platform/mutation";
+import { emitReportableChange } from "@/platform/reportable-event";
+import { EventTypes } from "@/domain/event-types";
 
 const uuid=z.string().uuid();
 const scope=z.object({siteId:uuid,packageId:uuid}).strict();
@@ -161,7 +163,7 @@ export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
       sourcePackageRevision:pkg.revision,requestId:data.requestId,
       releaseNumber,formats:[...content.formats],contentSnapshot:{title:pkg.title,...content},
       createdByPersonId:actor.actorPersonId!,
-    }).returning({id:siteMarketingPackageReleases.id});
+    }).returning({id:siteMarketingPackageReleases.id,createdAt:siteMarketingPackageReleases.createdAt});
     if(!parent)throw new DomainError("UNAVAILABLE","Could not create Package Release.");
     await tx.insert(siteArtifactReleases).values(outputs.map(output=>({
       siteId:site.id,packageId:pkg.id,packageReleaseId:parent.id,
@@ -178,6 +180,15 @@ export const createSiteMarketingPackageRelease=createServerFn({method:"POST"})
       after:{packageId:pkg.id,releaseId:parent.id,releaseNumber,
         packageRevision:pkg.revision,brandVersionId:brand.version.id,
         formats:content.formats,outputChecksums:outputs.map(o=>o.checksum)}});
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageReleased,
+      sourceId:parent.id,sourceVersion:String(releaseNumber),
+      actorPersonId:actor.actorPersonId,occurredAt:parent.createdAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      // Released collateral is not evidence of sending, delivery, or audience reach.
+      payload:{packageId:pkg.id,packageRevision:pkg.revision,brandVersionId:brand.version.id,
+        formats:content.formats},
+    });
     return {id:parent.id,releaseNumber,formats:[...content.formats],created:true};
   }));
 
@@ -304,11 +315,21 @@ export const withdrawSiteMarketingRelease=createServerFn({method:"POST"})
       .where(and(eq(siteArtifactReleases.id,data.releaseId),
         eq(siteArtifactReleases.siteId,site.id))).limit(1);
     if(!release)throw new DomainError("UNAVAILABLE","Artifact unavailable.");
-    await tx.insert(siteArtifactReleaseAccess).values({
-      releaseId:release.id,withdrawnAt:new Date(),withdrawnReason:data.reason,
-    }).onConflictDoNothing();
+    const withdrawnAt=new Date();
+    const [inserted]=await tx.insert(siteArtifactReleaseAccess).values({
+      releaseId:release.id,withdrawnAt,withdrawnReason:data.reason,
+    }).onConflictDoNothing().returning({releaseId:siteArtifactReleaseAccess.releaseId});
+    // Replayed withdrawal does not create another audit or reporting event.
+    if(!inserted)return {withdrawn:true};
     await writeAudit(tx,actor,{action:"site.marketing_artifact.withdrawn",
       entityType:"site",entityId:site.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{releaseId:release.id,reason:data.reason}});
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingArtifactWithdrawn,
+      sourceId:release.id,sourceVersion:withdrawnAt.toISOString(),
+      actorPersonId:actor.actorPersonId,occurredAt:withdrawnAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{withdrawnAt:withdrawnAt.toISOString()},
+    });
     return {withdrawn:true};
   }));

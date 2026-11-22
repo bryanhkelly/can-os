@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const script = fileURLToPath(new URL("./check-local-import-exports.mjs", import.meta.url));
-function runFixture(files, options = {}) {
+function runFixture(files, options = {}, rootFiles = {}) {
   const directory = mkdtempSync(join(tmpdir(), "can-local-exports-"));
   try {
     mkdirSync(join(directory, "src"));
@@ -15,10 +15,12 @@ function runFixture(files, options = {}) {
       compilerOptions: {module: "ESNext", moduleResolution: "Bundler", baseUrl: ".",
         resolveJsonModule: true, esModuleInterop: true,
         paths: {"@/*": ["src/*"]}, ...options},
-      include: ["src/**/*.ts"],
+      include: ["src/**/*.ts", "*.ts"],
     }));
     for (const [name, content] of Object.entries(files))
       writeFileSync(join(directory, "src", name), content);
+    for (const [name, content] of Object.entries(rootFiles))
+      writeFileSync(join(directory, name), content);
     return spawnSync(process.execPath, [script], {
       cwd: directory, encoding: "utf8",
     });
@@ -102,4 +104,25 @@ test("JSON default exemption requires compatible compiler options", () => {
   }, { esModuleInterop: false, allowSyntheticDefaultImports: false });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /does not export "default"/);
+});
+
+test("missing named export in repository-root Vite config fails before bundling", () => {
+  const result = runFixture({
+    "revision.ts": "export const knownRevision = () => 'local';",
+  }, {}, {
+    "vite.config.ts": 'import { missingRevision } from "./src/revision"; void missingRevision;',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /vite[.]config[.]ts:1:/);
+  assert.match(result.stderr, /does not export "missingRevision"/);
+});
+
+test("valid root build-config named export is accepted", () => {
+  const result = runFixture({
+    "revision.ts": "export const knownRevision = () => 'local';",
+  }, {}, {
+    "vite.config.ts": 'import { knownRevision } from "./src/revision"; void knownRevision;',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes("1 local imported/re-exported bindings resolved"), result.stdout);
 });

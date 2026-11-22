@@ -22,14 +22,22 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '24.22.1'
           cache: npm
       - name: Install dependencies
         run: npm ci
+      # Parse sources and reject stale local imports before tests or bundling,
+      # so the first diagnostic points to the original defect.
       - name: Check build source syntax
         run: npm run check:build-source-syntax
       - name: Verify local imports and exports
         run: npm run check:local-import-exports
+      - name: Test local import/export regression guard
+        run: npm run test:local-import-exports
+      - name: Validate committed Drizzle history
+        run: npm run db:check:journal
+      - name: Test reporting source and snapshot contracts
+        run: npm run test:reporting:foundation
       - name: Build and typecheck
         run: npm run build
       - name: Build Cloudflare target

@@ -7,6 +7,7 @@ import { EventTypes } from "@/domain/event-types";
 import { DomainError } from "@/domain/errors";
 import { assertSiteRoomReader, assertSiteRoomManager, assignSectionRoomSchema, createSiteRoomSchema, retireSiteRoomSchema, siteRoomsScopeSchema, updateSiteRoomSchema } from "@/domain/site-rooms";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { emitReportableChange } from "@/platform/reportable-event";
 import { executeCommand } from "@/platform/execute-command";
 import type { z } from "zod";
 import { assertRoomCoverageManager, createRoomAtSiteSchema } from "@/domain/room-coverage";
@@ -101,11 +102,17 @@ async function createRoomRecord(tx: Parameters<Parameters<typeof db.transaction>
       eq(siteRooms.siteId, school.siteId), sql`lower(btrim(${siteRooms.name})) = lower(${input.name})`,
     )).limit(1);
     if (duplicate) throw new DomainError("SITE_ROOM_NAME_CONFLICT", "A room with this name already exists at this Site. Use the saved room.");
-    await tx.insert(siteRooms).values({ id: input.roomId, siteId: school.siteId,
-      name: input.name, capacity: input.capacity });
-    const eventId = await emitEvent(tx, { eventType: EventTypes.SiteRoomCreated,
-      aggregateType: "site_room", aggregateId: input.roomId, actorPersonId: actor.actorPersonId,
-      ...school, payload: { name: input.name, capacity: input.capacity } });
+    const [created] = await tx.insert(siteRooms).values({ id: input.roomId, siteId: school.siteId,
+      name: input.name, capacity: input.capacity })
+      .returning({createdAt: siteRooms.createdAt});
+    if (!created) throw new Error("Site room insert did not return its source timestamp");
+    const eventId = await emitReportableChange(tx, { eventType: EventTypes.SiteRoomCreated,
+      sourceId: input.roomId, sourceVersion: "1",
+      actorPersonId: actor.actorPersonId, occurredAt: created.createdAt,
+      // A physical room is owned by the Site, not by the Program
+      // used to authorize the room edit. Program usage is a separate fact.
+      dimensions: { organizationId: school.organizationId, siteId: school.siteId },
+      payload: { capacity: input.capacity } });
     await writeAudit(tx, actor, { action: "site.room.created", entityType: "site_room",
       entityId: input.roomId, scope: school, after: { name: input.name, capacity: input.capacity },
       contextExtras: { domainEventId: eventId } });
@@ -177,9 +184,11 @@ export async function updateSchoolRoom(actor: AccessContext, value: z.infer<type
     if (duplicate) throw new DomainError("SITE_ROOM_NAME_CONFLICT");
     const after = { name: input.name, capacity: input.capacity, revision: room.revision + 1 };
     await tx.update(siteRooms).set(after).where(eq(siteRooms.id, room.id));
-    const eventId = await emitEvent(tx, { eventType: EventTypes.SiteRoomUpdated,
-      aggregateType: "site_room", aggregateId: room.id, actorPersonId: actor.actorPersonId,
-      ...school, payload: { ...after, reason: input.reason } });
+    const eventId = await emitReportableChange(tx, { eventType: EventTypes.SiteRoomUpdated,
+      sourceId: room.id, sourceVersion: String(after.revision),
+      actorPersonId: actor.actorPersonId, occurredAt: new Date(),
+      dimensions: { organizationId: school.organizationId, siteId: school.siteId },
+      payload: { capacity: after.capacity, revision: after.revision } });
     await writeAudit(tx, actor, { action: "site.room.updated", entityType: "site_room",
       entityId: room.id, scope: school, before: { name: room.name, capacity: room.capacity, revision: room.revision },
       after, contextExtras: { reason: input.reason, domainEventId: eventId } });
@@ -207,9 +216,11 @@ export async function retireSchoolRoom(actor: AccessContext, value: z.infer<type
     const retiredAt = new Date();
     await tx.update(siteRooms).set({ retiredAt, revision: room.revision + 1 }).where(eq(siteRooms.id, room.id));
     const after = { retiredAt: retiredAt.toISOString(), revision: room.revision + 1 };
-    const eventId = await emitEvent(tx, { eventType: EventTypes.SiteRoomRetired,
-      aggregateType: "site_room", aggregateId: room.id, actorPersonId: actor.actorPersonId,
-      ...school, payload: { ...after, reason: input.reason } });
+    const eventId = await emitReportableChange(tx, { eventType: EventTypes.SiteRoomRetired,
+      sourceId: room.id, sourceVersion: String(after.revision),
+      actorPersonId: actor.actorPersonId, occurredAt: retiredAt,
+      dimensions: { organizationId: school.organizationId, siteId: school.siteId },
+      payload: { retiredAt: after.retiredAt, revision: after.revision } });
     await writeAudit(tx, actor, { action: "site.room.retired", entityType: "site_room",
       entityId: room.id, scope: school, before: { retiredAt: null, revision: room.revision },
       after, contextExtras: { reason: input.reason, domainEventId: eventId } });

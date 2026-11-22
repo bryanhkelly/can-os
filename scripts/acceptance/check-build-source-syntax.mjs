@@ -16,7 +16,8 @@ import { unresolvedLocalSourceModule } from "../lib/source-module-resolution.mjs
 const root=resolve(process.cwd());
 // Only runtime and build-tool source blocks a production build. Test suites
 // are parsed by their own test/CI commands, not production asset generation.
-const roots=["src","scripts"];
+const includeTests=process.argv.includes("--include-tests");
+const roots=includeTests ? ["src","scripts","tests"] : ["src","scripts"];
 const sourceExts=new Map([
   [".ts",ts.ScriptKind.TS], [".tsx",ts.ScriptKind.TSX],
   [".mts",ts.ScriptKind.TS], [".cts",ts.ScriptKind.TS],
@@ -39,6 +40,14 @@ async function visit(dir){
   }
 }
 for(const dir of roots)await visit(resolve(root,dir));
+// Build/tooling configs live at the repository root, outside src/ and scripts/.
+// They are executed by Vite, Drizzle, ESLint and Playwright, and malformed
+// imports here caused deploy failures even when src/ alone parsed cleanly.
+for(const entry of await readdir(root,{withFileTypes:true})){
+  if(entry.isFile() && sourceExts.has(extname(entry.name))){
+    files.push(join(root,entry.name));
+  }
+}
 files.sort();
 let errors=0;
 for(const filename of files){

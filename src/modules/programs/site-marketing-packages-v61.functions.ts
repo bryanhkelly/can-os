@@ -12,11 +12,13 @@ import { normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { suggestMarketingStarterV61, type MarketingStarterSourcesV61 } from "@/domain/site-marketing-suggestions-v61";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
+import { EventTypes } from "@/domain/event-types";
 import {
   marketingPackageContentSchema, marketingPurposeIds,
 } from "@/domain/marketing-package-v61";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
+import { emitReportableChange } from "@/platform/reportable-event";
 
 const uuid = z.string().uuid();
 const siteInput = z.object({ siteId: uuid }).strict();
@@ -149,10 +151,12 @@ export const createSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityId:created.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{purpose:data.purpose,revision:created.revision},
     });
-    await emitEvent(tx,{
-      eventType:"SiteMarketingPackageCreated",aggregateType:"site_marketing_package",
-      aggregateId:created.id,actorPersonId:actor.actorPersonId,
-      siteId:site.id,organizationId:site.organizationId,payload:{revision:created.revision},
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageCreated,
+      sourceId:created.id,sourceVersion:String(created.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:created.createdAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{revision:created.revision},
     });
     return toView(created);
   }));
@@ -177,6 +181,13 @@ export const saveSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityId:current.id,scope:{siteId:site.id,organizationId:site.organizationId},
       before:{revision:current.revision},after:{revision:saved.revision},
     });
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageUpdated,
+      sourceId:saved.id,sourceVersion:String(saved.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:saved.updatedAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{revision:saved.revision,previousRevision:current.revision},
+    });
     return toView(saved);
   }));
 
@@ -198,6 +209,13 @@ export const duplicateSiteMarketingPackageV61 = createServerFn({method:"POST"})
       action:"site.marketing_package.duplicate",entityType:"site_marketing_package",
       entityId:copy.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{sourceId:original.id,revision:copy.revision},
+    });
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageDuplicated,
+      sourceId:copy.id,sourceVersion:String(copy.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:copy.createdAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{sourcePackageId:original.id,revision:copy.revision},
     });
     return toView(copy);
   }));
@@ -221,6 +239,14 @@ export const archiveSiteMarketingPackageV61 = createServerFn({method:"POST"})
       entityType:"site_marketing_package",entityId:current.id,
       scope:{siteId:site.id,organizationId:site.organizationId},
       before:{status:current.status},after:{status:saved.status},
+    });
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageStatusChanged,
+      sourceId:saved.id,sourceVersion:String(saved.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:saved.updatedAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{previousStatus:current.status,status:saved.status,
+        previousRevision:current.revision,revision:saved.revision},
     });
     return toView(saved);
   }));
@@ -250,6 +276,13 @@ export const selectSiteMarketingPackageBrandV61=createServerFn({method:"POST"})
       scope:{siteId:site.id,organizationId:site.organizationId},
       before:{brandVersionId:current.brandVersionId,revision:current.revision},
       after:{brandVersionId:brand.id,revision:saved.revision}});
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageBrandSelected,
+      sourceId:saved.id,sourceVersion:String(saved.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:saved.updatedAt,
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{brandVersionId:brand.id,previousRevision:current.revision,revision:saved.revision},
+    });
     return toView(saved);
   }));
 
@@ -270,6 +303,14 @@ export const deleteSiteMarketingPackageV61 = createServerFn({method:"POST"})
       action:"site.marketing_package.delete",entityType:"site_marketing_package",
       entityId:current.id,scope:{siteId:site.id,organizationId:site.organizationId},
       before:{revision:current.revision,status:current.status},after:null,
+    });
+    // The deletion receipt and audit remain authoritative after the draft is gone.
+    await emitReportableChange(tx,{
+      eventType:EventTypes.SiteMarketingPackageDeleted,
+      sourceId:current.id,sourceVersion:String(current.revision),
+      actorPersonId:actor.actorPersonId,occurredAt:new Date(),
+      dimensions:{organizationId:site.organizationId,siteId:site.id},
+      payload:{lastRevision:current.revision,lastStatus:current.status},
     });
     return {deleted:true,id:current.id};
   }));

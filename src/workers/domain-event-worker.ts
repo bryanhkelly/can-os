@@ -24,6 +24,10 @@ import { handleNotificationPolicyEvent } from "@/platform/notifications/policy-h
 import { handleClassParticipantEvent } from "@/modules/classes/class-participant-events.server";
 import { processEventSubscriptions } from "@/platform/subscriptions";
 import { handleFamilyInvitationBatch } from "@/modules/enrollment/family-invitations.server";
+import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
+import { registerUniqueDomainEventHandler } from "@/domain/domain-event-handler-registry";
+import { persistReportingSourceReceipt } from "@/modules/insights/reporting-source-receipts.server";
+import { reportingProjectionEnabled } from "@/modules/insights/reporting-projection-rollout.server";
 
 export type DomainEventHandler = (eventId: string) => Promise<void>;
 
@@ -31,7 +35,8 @@ const registry = new Map<string, DomainEventHandler>();
 
 /** Register the consumer for an event type. Events with no handler stay pending. */
 export function registerDomainEventHandler(eventType: string, handler: DomainEventHandler): void {
-  registry.set(eventType, handler);
+  // Never silently replace a notification, Class or reporting consumer.
+  registerUniqueDomainEventHandler(registry, eventType, handler);
 }
 
 registerDomainEventHandler(EventTypes.AssessmentPublished, handleAcademicPassThroughEvent);
@@ -75,6 +80,16 @@ for (const eventType of [
   EventTypes.SectionCreditConfigured,
   EventTypes.ActionDeadlineChanged,
   EventTypes.SiteCreated,
+
+  // Marketing Package lifecycle measures preparation, never delivery or reach.
+
+
+
+
+
+
+
+
   // Church source references and editor suggestions are audited facts only.
   // They do not automatically publish content or confer institutional authority.
   EventTypes.ChurchSourceReferenceSaved,
@@ -82,9 +97,9 @@ for (const eventType of [
   EventTypes.ChurchContentSuggestionSubmitted,
   EventTypes.ChurchContentSuggestionReviewed,
   EventTypes.ChurchWebsiteSuggestionsRetrieved,
-  EventTypes.SiteRoomCreated,
-  EventTypes.SiteRoomUpdated,
-  EventTypes.SiteRoomRetired,
+
+
+
   EventTypes.SectionRoomAssigned,
   EventTypes.RoomCoverageScheduled,
   EventTypes.DemoRoomFacilitatorProvisioned,
@@ -138,9 +153,9 @@ for (const eventType of [
   EventTypes.CalendarEventUpdated,
   EventTypes.CalendarEventRescheduled,
   EventTypes.CalendarEventCancelled,
-  EventTypes.InterestEventCreated,
-  EventTypes.InterestEventRegistrationCreated,
-  EventTypes.InterestEventAttendanceRecorded,
+
+
+
   EventTypes.AttendanceExcuseWithdrawn,
   EventTypes.PickupAuthorizationCreated,
   EventTypes.PickupAuthorizationRevoked,
@@ -287,6 +302,17 @@ for (const eventType of [
   EventTypes.OperatingAgreementEvidenceRegistered,
 ] as const) {
   registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
+}
+
+// Source-linked events MUST persist a reporting receipt before the outbox
+// considers them complete. The worker handles live traffic; replay also
+// catches events marked processed before this consumer was installed.
+for (const eventType of Object.keys(REPORTABLE_EVENT_CATALOG)) {
+  registerDomainEventHandler(eventType, async eventId => {
+    // Never introduce a new table dependency before its migration is validated.
+    // Disabled events remain in the canonical outbox for future replay.
+    if (reportingProjectionEnabled()) await persistReportingSourceReceipt(eventId);
+  });
 }
 
 // These lifecycle events have notification policies and must not be consumed

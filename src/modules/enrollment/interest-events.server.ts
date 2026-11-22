@@ -41,7 +41,8 @@ import {
 } from "@/domain/interest-events";
 import { EventTypes } from "@/domain/event-types";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
+import { emitReportableChange } from "@/platform/reportable-event";
 import { readPublishedSiteCatalog } from "@/modules/sites/site-public-catalog.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -351,7 +352,7 @@ export async function createInterestEvent(
       status: "published",
       invitationTokenDigest: invitationToken ? accessTokenDigest(eventId, invitationToken) : null,
       createdByPersonId: context.actorPersonId!,
-    }).returning({ id: interestEvents.id });
+    }).returning({ id: interestEvents.id, createdAt: interestEvents.createdAt });
     if (!created) throw new Error("Unable to create interest event");
 
     const projection = await createProjectionIfAbsent(tx, {
@@ -367,14 +368,12 @@ export async function createInterestEvent(
       metadata: { kind: data.kind, visibility: data.visibility },
       createdByPersonId: context.actorPersonId,
     });
-    await emitEvent(tx, {
+    await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventCreated,
-      aggregateType: "interest_event",
-      aggregateId: created.id,
-      actorPersonId: context.actorPersonId,
-      organizationId: program.organizationId,
-      siteId: program.siteId,
-      programId: program.id,
+      sourceId: created.id, sourceVersion: "1",
+      actorPersonId: context.actorPersonId, occurredAt: created.createdAt,
+      dimensions: { organizationId: program.organizationId, siteId: program.siteId,
+        programId: program.id },
       payload: { calendarEventId: projection.id, kind: data.kind, visibility: data.visibility },
     });
     await writeAudit(tx, context, {
@@ -565,7 +564,7 @@ export async function registerInterestEvent(
       eventId: event.id,
       publicInterestId,
       status: "registered",
-    }).returning({ id: interestEventRegistrations.id });
+    }).returning({ id: interestEventRegistrations.id, createdAt: interestEventRegistrations.createdAt });
     if (!registration) throw new Error("Unable to save event RSVP");
 
     const now = new Date();
@@ -579,14 +578,13 @@ export async function registerInterestEvent(
       interestEventEmailDeliveries.kind,
     ] });
 
-    await emitEvent(tx, {
+    await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventRegistrationCreated,
-      aggregateType: "interest_event_registration",
-      aggregateId: registration.id,
-      organizationId: event.organizationId,
-      siteId: event.siteId,
-      programId: event.programId,
-      payload: { eventId: event.id, publicInterestId, emailDeliveriesQueued: emailSchedule.map(item => item.kind) },
+      sourceId: registration.id, sourceVersion: "1", occurredAt: registration.createdAt,
+      dimensions: { organizationId: event.organizationId, siteId: event.siteId,
+        programId: event.programId },
+      payload: { eventId: event.id, publicInterestId,
+        emailDeliveriesQueued: emailSchedule.map(item => item.kind) },
     });
     await writeAudit(tx, {
       action: "interest_event.registration.create",
@@ -661,14 +659,12 @@ export async function recordInterestEventAttendance(
       interestEventEmailDeliveries.registrationId,
       interestEventEmailDeliveries.kind,
     ] });
-    await emitEvent(tx, {
+    await emitReportableChange(tx, {
       eventType: EventTypes.InterestEventAttendanceRecorded,
-      aggregateType: "interest_event_registration",
-      aggregateId: record.registrationId,
-      actorPersonId: context.actorPersonId,
-      organizationId: record.organizationId,
-      siteId: record.siteId,
-      programId: record.programId,
+      sourceId: record.registrationId, sourceVersion: now.toISOString(),
+      actorPersonId: context.actorPersonId, occurredAt: now,
+      dimensions: { organizationId: record.organizationId, siteId: record.siteId,
+        programId: record.programId },
       payload: { eventId: record.eventId, attendanceStatus: data.attendanceStatus },
     });
     await writeAudit(tx, context, {

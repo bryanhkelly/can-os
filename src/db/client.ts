@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import * as schema from "@/db/schema";
 import { canonicalOperationsUrlValid } from "@/domain/canonical-operations-connection";
 import { measureServerStep } from "@/lib/performance/measure-server-step";
+import { assertUnscopedDatabaseAllowed, isCloudflareWorkerRuntime } from "@/domain/worker-database-scope";
 
 /**
  * Cloudflare Workers cannot share live WebSocket Pool clients across fetch
@@ -29,16 +30,19 @@ let nodeRestrictedOperations: { url: string; client: PoolDatabase } | undefined;
 let nodeDatabase: PoolDatabase | undefined;
 
 function activeDatabase(): DatabaseClient {
+  // Reject work that leaked beyond a completed request before considering
+  // the alternate restricted pool as well as the normal request pool.
+  const scoped = requestDatabase.getStore();
+  if (scoped?.closed) throw new Error("Database request scope has finished");
   const restricted = restrictedOperationsDatabase.getStore();
   if (restricted) return restricted;
-  const scoped = requestDatabase.getStore();
   if (scoped) {
-    if (scoped.closed) throw new Error("Database request scope has finished");
     return scoped.database;
   }
-  // Lazy initialization: Workers have no module-scope process.env bindings,
-  // and their request MUST call withRequestDatabase before any db operation.
-  // Outside that scope, Netlify/Node retains its normal reusable Pool.
+  // Workerd must never fall through to a long-lived Node pool, even when
+  // its expected ingress bindings were omitted or misconfigured.
+  assertUnscopedDatabaseAllowed(isCloudflareWorkerRuntime());
+  // Outside Workerd, Netlify/Node retains its normal reusable Pool.
   nodeDatabase ??= makePoolDatabase(process.env.DATABASE_URL ?? "");
   return nodeDatabase.database;
 }
@@ -120,6 +124,9 @@ export async function withCanonicalOperationsDatabase<T>(
   });
   if (scoped) return restrictedOperationsDatabase.run(scoped.database, operation);
 
+  // The restricted operations connection is a second Neon WebSocket pool.
+  // It must never become a module singleton inside a Cloudflare Worker.
+  assertUnscopedDatabaseAllowed(isCloudflareWorkerRuntime());
   if (!nodeRestrictedOperations || nodeRestrictedOperations.url !== url) {
     const previous = nodeRestrictedOperations;
     nodeRestrictedOperations = { url: url!, client: makePoolDatabase(url!) };

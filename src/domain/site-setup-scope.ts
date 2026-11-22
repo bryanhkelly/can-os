@@ -37,3 +37,34 @@ export function siteSetupReadableProgramIds(actor:AccessContext):string[]|null {
     throw new AuthorizationError("verified Program projection for this Site");
   return ids??null;
 }
+
+// A site-wide reporting source summary includes all Programs at that Site.
+// A Site-specific grant constrained to only some Programs must not see
+// sibling Program activity through a broad Site reporting endpoint.
+export function assertWholeSiteReportingScope(
+  actor: AccessContext,
+  site: { id: string; organizationId: string } | null | undefined,
+  attachedProgramIds: readonly string[],
+): void {
+  assertSiteSetupScope(actor, site, "program.read");
+  if (actor.grantSiteId !== null) {
+    const allowed = new Set(actor.scope.programIds ?? []);
+    if (attachedProgramIds.some(id => !allowed.has(id))) {
+      throw new AuthorizationError("Site reporting requires authority over every attached Program");
+    }
+  }
+}
+
+/**
+ * Capturing a durable source snapshot is an audited mutation. A read-only
+ * reporting grant is not sufficient to author one. The operating grant must
+ * authorize the entire Site and the existing launch/write capability.
+ */
+export function assertWholeSiteSnapshotAuthoringScope(
+  actor: AccessContext,
+  site: {id:string;organizationId:string}|null|undefined,
+  attachedProgramIds: readonly string[],
+): void {
+  assertWholeSiteReportingScope(actor,site,attachedProgramIds);
+  assertSiteSetupScope(actor,site,"program.launch.start");
+}

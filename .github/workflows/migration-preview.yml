@@ -1,4 +1,4 @@
-name: Migration Preview
+name: Migration Review (SQL-only baseline)
 
 on:
   workflow_dispatch:
@@ -10,24 +10,37 @@ jobs:
   migration:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact reviewed source
         uses: actions/checkout@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24.22.1'
           cache: npm
 
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Generate incremental migration SQL
-        run: npm run db:generate
+      - name: Verify reviewed SQL-only migration ledger and snapshot boundary
+        run: npm run db:check:journal
 
-      - name: Upload migration preview for review
+      - name: Validate generation and push fail-closed policies
+        run: npm run test:migration-safety
+
+      # The generated model stops at 0086 while SQL-only migrations continue.
+      # This job audits the exact committed SQL; it deliberately does not run
+      # drizzle-kit generate, push, or migrate against any database.
+      - name: Explain model parity status
+        run: |
+          echo "::notice::SQL-only migration history is reviewed, but generated Drizzle model parity is not certified."
+          echo "::notice::Migration generation, schema push and database writes are not performed by this workflow."
+
+      - name: Upload reviewed migration sources
         uses: actions/upload-artifact@v4
         with:
-          name: drizzle-migration-preview
-          path: drizzle/
+          name: drizzle-sql-only-review
+          path: |
+            drizzle/
+            scripts/lib/sql-only-migration-ledger.mjs
           retention-days: 7

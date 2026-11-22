@@ -31,7 +31,7 @@ import { SchoolConfigurationContextProvider } from "@/components/launch-studio/S
 import { LaunchCreatedHandoff } from "@/components/operations/LaunchCreatedHandoff";
 import { Route as Settings } from "@/routes/settings";
 import { Route as SettingsModule } from "@/routes/settings_.school.$module";
-import { Route as LaunchModule } from "@/routes/launch.hub.school_.$module";
+import { loadSchoolConfiguration } from "@/modules/programs/school-configuration-loader";
 const siteId="00000000-0000-4000-8000-000000000001";
 const otherSite="00000000-0000-4000-8000-000000000002";
 const revision="2026-11-06T00:00:00.000Z";
@@ -64,11 +64,11 @@ describe("dashboard school configuration",()=>{
  });
  it("keeps Site identity setup separate from first academic Program setup",()=>{
   state.module="profile";
-  const details=renderToStaticMarkup(<LaunchModule.options.component/>);
+  const details=renderToStaticMarkup(<SettingsModule.options.component/>);
   expect(details).toContain("Saved name: Saved School");
   expect(details).not.toContain("Program setup form");
   state.module="academics";
-  const academics=renderToStaticMarkup(<LaunchModule.options.component/>);
+  const academics=renderToStaticMarkup(<SettingsModule.options.component/>);
   expect(academics).toContain("Program setup form");
  });
  it("opens Site Information as a scoped setup editor",()=>{
@@ -103,11 +103,11 @@ describe("dashboard school configuration",()=>{
   expect(html).toContain("Choose your school");expect(html).not.toContain("Team records for");
   expect(html).toContain(`/settings/school/team?siteId=${otherSite}`);
  });
- it("loads identical canonical configuration for Launch and Settings",async()=>{
+ it("uses the same canonical configuration loader as the Settings route",async()=>{
   const args={deps:{siteId,programId:otherSite},params:{module:"academics"}} as any;
   state.load.mockResolvedValue(state.data.data);
   await expect(SettingsModule.options.loader!(args)).resolves.toEqual(state.data);
-  await expect(LaunchModule.options.loader!(args)).resolves.toEqual(state.data);
+  await expect(loadSchoolConfiguration(args.deps,"academics")).resolves.toEqual(state.data.data);
   expect(state.load.mock.calls).toEqual([[args.deps,"academics"],[args.deps,"academics"]]);
  });
  it("updates the existing Site with its saved revision and refreshes it",async()=>{

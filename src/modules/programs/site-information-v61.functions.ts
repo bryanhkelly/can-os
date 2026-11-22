@@ -16,7 +16,8 @@ import {
   siteEnvironmentV61Schema, siteHostingV61Schema, siteStorySourceV61Schema, siteStoryV61Schema,
 } from "@/domain/site-information-v61";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
+import { emitReportableChange } from "@/platform/reportable-event";
 
 /** Preserve change history without copying EINs into Site audit streams. */
 function safeHostingAuditValue(value:unknown){
@@ -175,11 +176,11 @@ export const saveSiteInformationV61 = createServerFn({ method: "POST" })
               selfReported: true, publicApproved: false },
       });
       // Notify the shared outbox of a revised private Site source, never its contents.
-      await emitEvent(tx, {
+      await emitReportableChange(tx, {
         eventType: EventTypes.SiteInformationUpdated,
-        aggregateType: "site", aggregateId: site.id,
-        actorPersonId: actor.actorPersonId,
-        organizationId: site.organizationId, siteId: site.id,
+        sourceId: site.id, sourceVersion: saved.updatedAt.toISOString(),
+        actorPersonId: actor.actorPersonId, occurredAt: saved.updatedAt,
+        dimensions: { organizationId: site.organizationId, siteId: site.id },
         payload: { section: data.section, revision: saved.updatedAt.toISOString(),
           selfReported: true, publicApproved: false },
       });

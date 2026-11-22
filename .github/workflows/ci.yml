@@ -21,6 +21,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Assert exact CI commit
         shell: bash
@@ -30,8 +31,11 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24.22.1'
           cache: npm
+
+      - name: Validate reporting migrations before dependency installation
+        run: npm run verify:reporting:sql
 
       - name: Validate committed Drizzle snapshot chain
         run: node scripts/check-drizzle-snapshot-chain.mjs
@@ -41,6 +45,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate TypeScript and JavaScript test source imports
+        run: npm run check:test-source-syntax
 
       # The hosted deployment uses a distinct Vite environment and import
       # protection graph. A generic build cannot certify Cloudflare readiness.
@@ -72,11 +79,23 @@ jobs:
       - name: School safety and opening unit regressions
         run: npm run test:safety
 
+      - name: Typecheck application and all tests
+        run: npm run typecheck:full
+
+      - name: Check named exports imported by tests
+        run: npm run check:test-import-exports
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Lint and design-system checks
         run: npm run lint
+
+      - name: Exercise changed-line warning parser
+        run: npm run test:lint-regressions
+
+      - name: Fail on newly introduced ESLint warnings
+        run: npm run check:lint-regressions
 
       - name: Test
         run: npm test
@@ -87,15 +106,12 @@ jobs:
       - name: Validate migration integrity
         run: npx drizzle-kit check
 
-      - name: Validate incremental migration generation
-        run: |
-          npm run db:generate
-          echo "Drizzle migration generation succeeded from committed history."
-          if [ -n "$(git status --porcelain -- drizzle/)" ]; then
-            echo "::error::Drizzle generated uncommitted migration changes. Commit generated SQL and snapshots before merging."
-            git status --short -- drizzle/
-            exit 1
-          fi
+      # Generated snapshots stop at 0086; 0087+ are reviewed SQL-only.
+      # Running drizzle-kit generate on this baseline can output duplicate
+      # migrations and does NOT establish model parity. Keep the existing
+      # journal/SQL guards and test this explicit fail-closed policy.
+      - name: Test governed SQL-only migration ledger and safety guards
+        run: npm run test:migration-safety
 
       # Retain fixture coverage as a hard CI gate without hiding the results
       # of typecheck, lint or unit tests when route-fixture coverage fails.

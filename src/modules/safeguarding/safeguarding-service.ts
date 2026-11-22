@@ -1,4 +1,5 @@
 import { currentSafeguardingFallbacks } from "./safeguarding-routing.server";
+import { loadSite, loadPolicyAndResponders, loadIncidentAndAssignmentForMutation, authorizeEvidenceOrExternalReporterForMutation, lockCurrentSafeguardingGrant } from "./safeguarding-access-queries.server";
 import { personDisplayName } from "@/domain/person-name";
 import { db } from "@/db/client";
 import {
@@ -18,7 +19,6 @@ import {
   safeguardingExternalReports,
   safeguardingSitePolicies,
   safeguardingSiteResponders,
-  sites,
   studentProfiles,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -27,7 +27,6 @@ import {
   assertSafeguardingConfigurationScope,
   assertSafeguardingReporterRelationship,
   isSafeguardingResponderRole,
-  type SafeguardingCaseResource,
 } from "@/domain/safeguarding-case-access";
 import { safeguardingIntakeGuidance, type SafeguardingObservationInput } from "@/domain/safeguarding-intake-policy";
 import { assertOnsiteSafeguardingSubmissionScope } from "@/domain/site-safeguarding-access";
@@ -85,31 +84,6 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
 }
 
-async function loadSite(actor: AccessContext, siteId: string) {
-  const [site] = await db.select({
-    id: sites.id,
-    name: sites.name,
-    organizationId: sites.organizationId,
-  }).from(sites).where(eq(sites.id, siteId)).limit(1);
-  if (!site) throw new AuthorizationError("safeguarding site resource");
-  assertOrganizationScope(actor, site.organizationId);
-  assertSiteScope(actor, site.id);
-  return site;
-}
-
-async function loadPolicyAndResponders(siteId: string) {
-  const [policy] = await db.select().from(safeguardingSitePolicies)
-    .where(eq(safeguardingSitePolicies.siteId, siteId)).limit(1);
-  const responderRows = await db.select({
-    personId: safeguardingSiteResponders.personId,
-    responsibility: safeguardingSiteResponders.responsibility,
-    active: people.active,
-  }).from(safeguardingSiteResponders)
-    .innerJoin(people, eq(people.id, safeguardingSiteResponders.personId))
-    .where(eq(safeguardingSiteResponders.siteId, siteId));
-  return { policy, responderRows };
-}
-
 export async function saveSafeguardingSiteConfiguration(
   actor: AccessContext,
   input: SafeguardingConfigurationInput,
@@ -127,6 +101,7 @@ export async function saveSafeguardingSiteConfiguration(
   }
   const now = new Date();
   await db.transaction(async (tx) => {
+    await lockCurrentSafeguardingGrant(tx, actor);
     await tx.insert(safeguardingSitePolicies).values({
       siteId: site.id,
       jurisdictionId: input.jurisdictionId,
@@ -275,6 +250,7 @@ export async function submitSafeguardingConcern(
   const incidentNumber = `SG-${now.toISOString().slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}`;
   try {
     return await db.transaction(async (tx) => {
+      await lockCurrentSafeguardingGrant(tx, actor);
       const [incident] = await tx.insert(incidents).values({
         incidentNumber,
         type: "safeguarding_concern",
@@ -377,29 +353,10 @@ export async function submitSafeguardingConcern(
   }
 }
 
-async function loadIncidentAndAssignment(actor: AccessContext, incidentId: string, capability: string) {
-  const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
-  if (!incident) throw new AuthorizationError("safeguarding case resource");
-  const [assignment] = await db.select().from(safeguardingCaseAssignments).where(and(
-    eq(safeguardingCaseAssignments.incidentId, incidentId),
-    eq(safeguardingCaseAssignments.personId, actor.actorPersonId!),
-    isNull(safeguardingCaseAssignments.revokedAt),
-  )).limit(1);
-  assertSafeguardingCaseAccess(actor, incident, assignment, capability);
-  return { incident, assignment: assignment! };
-}
-
 export async function acknowledgeSafeguardingConcern(actor: AccessContext, incidentId: string) {
-  const { incident, assignment } = await loadIncidentAndAssignment(
-    actor,
-    incidentId,
-    "safeguarding.respond",
-  );
   return db.transaction(async (tx) => {
-    // Shared with the scheduled overdue processor: acknowledgment and routing
-    // cannot pass each other's unacknowledged check concurrently.
-    await tx.select({id:incidents.id}).from(incidents)
-      .where(eq(incidents.id,incidentId)).for("update").limit(1);
+    const { incident, assignment } = await loadIncidentAndAssignmentForMutation(
+      tx, actor, incidentId, "safeguarding.respond");
     const notifications = await tx.select().from(incidentNotifications).where(and(
       eq(incidentNotifications.incidentId, incidentId),
       eq(incidentNotifications.recipientPersonId, actor.actorPersonId!),
@@ -444,11 +401,10 @@ export async function acknowledgeSafeguardingConcern(actor: AccessContext, incid
 }
 
 export async function escalateSafeguardingConcern(actor: AccessContext, incidentId: string) {
-  const { incident } = await loadIncidentAndAssignment(actor, incidentId, "safeguarding.respond");
   return db.transaction(async (tx) => {
-    const [current] = await tx.select({ status: incidents.status }).from(incidents)
-      .where(eq(incidents.id, incidentId)).for("update").limit(1);
-    if (current?.status !== "filed") throw new Error("Only an open safeguarding case can be escalated");
+    const { incident } = await loadIncidentAndAssignmentForMutation(
+      tx, actor, incidentId, "safeguarding.respond");
+    if (incident.status !== "filed") throw new Error("Only an open safeguarding case can be escalated");
     const candidates = await currentSafeguardingFallbacks(tx, incident);
     // A revoked case assignment remains revoked. Only new, currently eligible
     // assignments receive a handoff; retries never duplicate notifications.
@@ -533,14 +489,10 @@ export async function resolveSafeguardingConcern(
   if (summary.length < 10 || summary.length > 2000) {
     throw new Error("Provide a 10-2000 character factual resolution summary");
   }
-  const { incident, assignment } = await loadIncidentAndAssignment(
-    actor,
-    input.incidentId,
-    "safeguarding.respond",
-  );
   return db.transaction(async (tx) => {
-    const [current] = await tx.select().from(incidents)
-      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const { incident, assignment } = await loadIncidentAndAssignmentForMutation(
+      tx, actor, input.incidentId, "safeguarding.respond");
+    const current = incident;
     if (current?.status === "closed") {
       if (current.closedByPersonId !== actor.actorPersonId) {
         throw new Error("This safeguarding case was already closed by another responder");
@@ -757,9 +709,30 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
   return db.transaction(async tx => {
     // Re-check inside the transaction: a concurrent acknowledgment between
     // the pre-checks and this write must cancel the takeover.
-    const [current] = await tx.select({status:incidents.status}).from(incidents)
+    const [current] = await tx.select().from(incidents)
       .where(eq(incidents.id,incidentId)).for("update").limit(1);
-    if(current?.status!=="filed")throw new Error("This case is no longer awaiting a first response");
+    if (!current || current.status!=="filed" ||
+        current.type!=="safeguarding_concern" ||
+        current.classification!=="safeguarding_restricted" ||
+        current.organizationId!==incident.organizationId || current.siteId!==incident.siteId)
+      throw new Error("This restricted case changed; reload before claiming");
+    assertOrganizationScope(actor,current.organizationId);
+    assertSiteScope(actor,current.siteId);
+    await lockCurrentSafeguardingGrant(tx, actor);
+    // The fallback appointment is a mutable authorization relationship. Hold
+    // its row through the case write, just as with named case assignments.
+    const [lockedConfig]=await tx.select({
+      responsibility:safeguardingSiteResponders.responsibility,
+    }).from(safeguardingSiteResponders)
+      .innerJoin(people,eq(people.id,safeguardingSiteResponders.personId))
+      .where(and(
+        eq(safeguardingSiteResponders.siteId,current.siteId),
+        eq(safeguardingSiteResponders.personId,actor.actorPersonId!),
+        inArray(safeguardingSiteResponders.responsibility,["deputy","can_lead"]),
+        eq(people.active,true),
+      )).for("share",{of:[safeguardingSiteResponders,people]}).limit(1);
+    if(!lockedConfig)
+      throw new AuthorizationError("fallback responder appointment was withdrawn");
     const raced = await tx.select({ id: incidentNotifications.id })
       .from(incidentNotifications).where(and(
         eq(incidentNotifications.incidentId, incidentId),
@@ -771,7 +744,7 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
     const created = await tx.insert(safeguardingCaseAssignments).values({
       incidentId,
       personId: actor.actorPersonId!,
-      responsibility: configuration.responsibility,
+      responsibility: lockedConfig.responsibility,
       assignedByPersonId: actor.actorPersonId,
     }).onConflictDoNothing().returning({ id: safeguardingCaseAssignments.id });
     if (!created.length)
@@ -780,7 +753,7 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
       incidentId,
       recipientPersonId: actor.actorPersonId!,
       recipientType: "safeguarding_responder",
-      recipientLabel: configuration.responsibility,
+      recipientLabel: lockedConfig.responsibility,
       channel: "in_app",
       purpose: "safeguarding_concern_response",
       status: "pending" as const,
@@ -794,7 +767,7 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
       siteId: incident.siteId,
       programId: incident.programId,
       payload: {
-        routedResponsibilities: [configuration.responsibility],
+        routedResponsibilities: [lockedConfig.responsibility],
         trigger: "acknowledgment_overdue",
         emergencyServicesDispatched: false,
       },
@@ -804,53 +777,38 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
       entityType: "incident",
       entityId: incidentId,
       scope: { organizationId: incident.organizationId, siteId: incident.siteId, programId: incident.programId },
-      after: { responsibility: configuration.responsibility, trigger: "acknowledgment_overdue" },
+      after: { responsibility: lockedConfig.responsibility, trigger: "acknowledgment_overdue" },
       contextExtras: { domainEventId: eventId },
     });
-    return { claimed: true as const, responsibility: configuration.responsibility };
+    return { claimed: true as const, responsibility: lockedConfig.responsibility };
   });
 }
 
-async function authorizeEvidenceOrExternalReporter(
-  actor: AccessContext,
-  incidentId: string,
-  capability: "safeguarding.evidence.add" | "safeguarding.external_report.record",
-): Promise<SafeguardingCaseResource> {
-  const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
-  if (!incident) throw new AuthorizationError("safeguarding case resource");
-  if (incident.reporterPersonId === actor.actorPersonId) {
-    assertSafeguardingReporterRelationship(actor, incident);
-    return incident;
-  }
-  await loadIncidentAndAssignment(actor, incidentId, capability);
-  return incident;
-}
-
 export async function addSafeguardingEvidence(actor: AccessContext, input: SafeguardingEvidenceInput) {
-  const incident = await authorizeEvidenceOrExternalReporter(actor, input.incidentId, "safeguarding.evidence.add");
-  const [replay] = await db.select().from(incidentEvidence).where(and(
-    eq(incidentEvidence.incidentId, input.incidentId),
-    eq(incidentEvidence.addedByPersonId, actor.actorPersonId!),
-    eq(incidentEvidence.idempotencyKey, input.idempotencyKey),
-  )).limit(1);
-  if (replay) {
-    if (replay.type !== input.type || replay.description !== input.description ||
-        replay.documentId !== (input.documentId ?? null)) {
-      throw new Error("This idempotency key was already used for different evidence");
-    }
-    return { evidenceId: replay.id, replayed: true };
-  }
-  if (input.documentId) {
-    const [document] = await db.select({ id: documents.id }).from(documents).where(and(
-      eq(documents.id, input.documentId),
-      eq(documents.subjectType, "incident"),
-      eq(documents.subjectId, input.incidentId),
-      eq(documents.sensitivityTier, "safeguarding_restricted"),
-    )).limit(1);
-    if (!document) throw new AuthorizationError("restricted incident evidence document");
-  }
   try {
     return await db.transaction(async (tx) => {
+      const incident = await authorizeEvidenceOrExternalReporterForMutation(tx, actor, input.incidentId, "safeguarding.evidence.add");
+      const [replay] = await tx.select().from(incidentEvidence).where(and(
+        eq(incidentEvidence.incidentId, input.incidentId),
+        eq(incidentEvidence.addedByPersonId, actor.actorPersonId!),
+        eq(incidentEvidence.idempotencyKey, input.idempotencyKey),
+      )).limit(1);
+      if (replay) {
+        if (replay.type !== input.type || replay.description !== input.description ||
+            replay.documentId !== (input.documentId ?? null)) {
+          throw new Error("This idempotency key was already used for different evidence");
+        }
+        return { evidenceId: replay.id, replayed: true };
+      }
+      if (input.documentId) {
+        const [document] = await tx.select({ id: documents.id }).from(documents).where(and(
+          eq(documents.id, input.documentId),
+          eq(documents.subjectType, "incident"),
+          eq(documents.subjectId, input.incidentId),
+          eq(documents.sensitivityTier, "safeguarding_restricted"),
+        )).limit(1);
+        if (!document) throw new AuthorizationError("restricted incident evidence document");
+      }
       const [evidence] = await tx.insert(incidentEvidence).values({
         incidentId: input.incidentId,
         documentId: input.documentId,
@@ -882,13 +840,24 @@ export async function addSafeguardingEvidence(actor: AccessContext, input: Safeg
     });
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
-    const [concurrent] = await db.select({ id: incidentEvidence.id }).from(incidentEvidence).where(and(
-      eq(incidentEvidence.incidentId, input.incidentId),
-      eq(incidentEvidence.addedByPersonId, actor.actorPersonId!),
-      eq(incidentEvidence.idempotencyKey, input.idempotencyKey),
-    )).limit(1);
-    if (concurrent) return { evidenceId: concurrent.id, replayed: true };
-    throw error;
+    // A unique-key race cannot turn a previously valid grant into a
+    // perpetual read entitlement. Recheck live assignment before replay.
+    return db.transaction(async tx => {
+      await authorizeEvidenceOrExternalReporterForMutation(
+        tx, actor, input.incidentId, "safeguarding.evidence.add");
+      const [concurrent] = await tx.select().from(incidentEvidence).where(and(
+        eq(incidentEvidence.incidentId, input.incidentId),
+        eq(incidentEvidence.addedByPersonId, actor.actorPersonId!),
+        eq(incidentEvidence.idempotencyKey, input.idempotencyKey),
+      )).limit(1);
+      if (concurrent) {
+        if (concurrent.type !== input.type || concurrent.description !== input.description ||
+            concurrent.documentId !== (input.documentId ?? null))
+          throw new Error("This idempotency key was already used for different evidence");
+        return { evidenceId: concurrent.id, replayed: true };
+      }
+      throw error;
+    });
   }
 }
 
@@ -896,28 +865,25 @@ export async function recordSafeguardingExternalReport(
   actor: AccessContext,
   input: SafeguardingExternalReportInput,
 ) {
-  const incident = await authorizeEvidenceOrExternalReporter(
-    actor,
-    input.incidentId,
-    "safeguarding.external_report.record",
-  );
   const whereReplay = and(
     eq(safeguardingExternalReports.incidentId, input.incidentId),
     eq(safeguardingExternalReports.reporterPersonId, actor.actorPersonId!),
     eq(safeguardingExternalReports.idempotencyKey, input.idempotencyKey),
   );
-  const [replay] = await db.select().from(safeguardingExternalReports).where(whereReplay).limit(1);
-  if (replay) {
-    if (replay.status !== input.status || replay.agencyType !== input.agencyType ||
-        replay.agencyLabel !== input.agencyLabel || replay.channel !== input.channel ||
-        replay.occurredAt.toISOString() !== input.occurredAt.toISOString() ||
-        replay.reference !== (input.reference ?? null) || replay.details !== (input.details ?? null)) {
-      throw new Error("This idempotency key was already used for a different external-report record");
-    }
-    return { externalReportId: replay.id, replayed: true };
-  }
   try {
     return await db.transaction(async (tx) => {
+      const incident = await authorizeEvidenceOrExternalReporterForMutation(
+        tx, actor, input.incidentId, "safeguarding.external_report.record");
+      const [replay] = await tx.select().from(safeguardingExternalReports).where(whereReplay).limit(1);
+      if (replay) {
+        if (replay.status !== input.status || replay.agencyType !== input.agencyType ||
+            replay.agencyLabel !== input.agencyLabel || replay.channel !== input.channel ||
+            replay.occurredAt.toISOString() !== input.occurredAt.toISOString() ||
+            replay.reference !== (input.reference ?? null) || replay.details !== (input.details ?? null)) {
+          throw new Error("This idempotency key was already used for a different external-report record");
+        }
+        return { externalReportId: replay.id, replayed: true };
+      }
       const [record] = await tx.insert(safeguardingExternalReports).values({
         incidentId: input.incidentId,
         reporterPersonId: actor.actorPersonId!,
@@ -958,10 +924,21 @@ export async function recordSafeguardingExternalReport(
     });
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
-    const [concurrent] = await db.select({ id: safeguardingExternalReports.id })
-      .from(safeguardingExternalReports).where(whereReplay).limit(1);
-    if (concurrent) return { externalReportId: concurrent.id, replayed: true };
-    throw error;
+    return db.transaction(async tx => {
+      await authorizeEvidenceOrExternalReporterForMutation(
+        tx, actor, input.incidentId, "safeguarding.external_report.record");
+      const [concurrent] = await tx.select().from(safeguardingExternalReports)
+        .where(whereReplay).limit(1);
+      if (concurrent) {
+        if (concurrent.status !== input.status || concurrent.agencyType !== input.agencyType ||
+            concurrent.agencyLabel !== input.agencyLabel || concurrent.channel !== input.channel ||
+            concurrent.occurredAt.toISOString() !== input.occurredAt.toISOString() ||
+            concurrent.reference !== (input.reference ?? null) || concurrent.details !== (input.details ?? null))
+          throw new Error("This idempotency key was already used for a different external-report record");
+        return { externalReportId: concurrent.id, replayed: true };
+      }
+      throw error;
+    });
   }
 }
 
@@ -1193,10 +1170,10 @@ export async function completeSafeguardingCaseReview(actor:AccessContext,input:{
 }){
   const outcome=input.outcome.trim();
   if(outcome.length<10||outcome.length>2000)throw new Error("Record a 10-2000 character factual review outcome");
-  const {incident}=await loadIncidentAndAssignment(actor,input.incidentId,"safeguarding.respond");
   return db.transaction(async tx=>{
-    const [current]=await tx.select({status:incidents.status}).from(incidents)
-      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const {incident}=await loadIncidentAndAssignmentForMutation(
+      tx,actor,input.incidentId,"safeguarding.respond");
+    const current=incident;
     const [review]=await tx.select().from(incidentReviews).where(and(
       eq(incidentReviews.id,input.reviewId),eq(incidentReviews.incidentId,incident.id),
     )).for("update").limit(1);
@@ -1234,10 +1211,10 @@ export async function assignSafeguardingCaseReview(actor:AccessContext,input:{
   if(notes.length<10||notes.length>2000||
     !["protective_measure_review","external_reporting_review","follow_up_review"].includes(input.kind))
     throw new Error("Choose a recognized internal review and describe the task in 10-2000 characters");
-  const {incident}=await loadIncidentAndAssignment(actor,input.incidentId,"safeguarding.respond");
   return db.transaction(async tx=>{
-    const [current]=await tx.select({status:incidents.status}).from(incidents)
-      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const {incident}=await loadIncidentAndAssignmentForMutation(
+      tx,actor,input.incidentId,"safeguarding.respond");
+    const current=incident;
     const [existing]=await tx.select().from(incidentReviews).where(eq(incidentReviews.id,input.reviewId)).limit(1);
     if(existing){
       if(existing.incidentId===incident.id&&existing.reviewerPersonId===input.reviewerPersonId&&

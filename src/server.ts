@@ -2,6 +2,7 @@ import handler from "@tanstack/react-start/server-entry";
 import type {PhotoWorkerEnv} from "./platform/photography/cloudflare-production.server";
 import {withRequestDatabase} from "./db/client";
 import {runSessionDeviceRetention} from "./workers/session-device-retention";
+import { cloudflareIngressConfiguration, isCloudflareWorkerRuntime } from "./domain/worker-database-scope";
 type CloudflareScheduledEnv=PhotoWorkerEnv&{
  DATABASE_URL?:string;
  CAN_SESSION_DEVICE_RETENTION_ENABLED?:string;
@@ -15,8 +16,18 @@ export default {
   async fetch(request:Request,platform?:unknown):Promise<Response> {
     // Preserve existing Cloudflare-specific origin checks, throttling and
     // response security headers. Ordinary Netlify requests use TanStack.
-    if(platform && typeof platform==="object" &&
-       "ACCESS_REQUEST_LIMIT" in platform && "ACCESS_VERIFY_LIMIT" in platform){
+    const configured = cloudflareIngressConfiguration(
+      isCloudflareWorkerRuntime(),
+      Boolean(platform && typeof platform === "object" && "ACCESS_REQUEST_LIMIT" in platform),
+      Boolean(platform && typeof platform === "object" && "ACCESS_VERIFY_LIMIT" in platform),
+    );
+    if (configured === "misconfigured_worker") {
+      // Never bypass the trusted ingress, rate limiting or request DB scope.
+      return new Response("Service unavailable", {
+        status: 503, headers: { "Cache-Control": "no-store" },
+      });
+    }
+    if (configured === "cloudflare") {
       const worker=await import("./cloudflare-demo");
       return worker.default.fetch(request,
         platform as Parameters<typeof worker.default.fetch>[1]);

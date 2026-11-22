@@ -34,6 +34,7 @@ jobs:
         run: npm ci
       - name: Drizzle migration journal, snapshots and identity-release source gates
         run: |
+          npm run verify:reporting:sql
           npm run db:check:journal
           npx vitest run tests/unit/one-person-release-gate.test.ts tests/unit/access-context.test.ts tests/unit/personal-can-identity.test.ts tests/unit/canonical-can-sso.test.ts
       - name: Cloudflare production bundle (client AND server)

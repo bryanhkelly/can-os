@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
-import { assertSiteLocationProgramScope, assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
+import { assertWholeSiteSnapshotAuthoringScope, assertWholeSiteReportingScope,
+  assertSiteLocationProgramScope, assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 
 const site={id:"site-one",organizationId:"church-one"};
 const actor:AccessContext={
@@ -39,6 +40,34 @@ describe("Agent S verified Site and Program access",()=>{
     expect(siteSetupReadableProgramIds({...actor,scope:{organizationIds:["church-one"],siteIds:["site-one"],programIds:[]}})).toEqual([]);
     expect(()=>siteSetupReadableProgramIds({...actor,scope:{organizationIds:["church-one"],siteIds:["site-one"]}})).toThrow();
     expect(siteSetupReadableProgramIds({...actor,grantSiteId:null,scope:{organizationIds:["church-one"]}})).toBeNull();
+  });
+  it("denies Site-wide reporting to a registrar with only a subset of Site Programs",()=>{
+    expect(()=>assertWholeSiteReportingScope(actor,site,["program-one"])).not.toThrow();
+    expect(()=>assertWholeSiteReportingScope(actor,site,["program-one","sibling-program"]))
+      .toThrow("every attached Program");
+    expect(()=>assertWholeSiteReportingScope({...actor,scope:{
+      organizationIds:["church-one"],siteIds:["site-one"],
+    }},site,["program-one"])).toThrow("every attached Program");
+    expect(()=>assertWholeSiteReportingScope({...actor,actorPersonId:null},site,[]))
+      .toThrow();
+    const orgWide={...actor,role:"registrar" as const,grantSiteId:null,
+      scope:{organizationIds:["church-one"]}};
+    expect(()=>assertWholeSiteReportingScope(orgWide,site,["program-one","sibling-program"]))
+      .not.toThrow();
+    expect(()=>assertWholeSiteReportingScope(orgWide,{
+      id:"sibling",organizationId:"other-organization",
+    },[])).toThrow();
+  });
+  it("requires write capability to seal a private source snapshot",()=>{
+    expect(()=>assertWholeSiteSnapshotAuthoringScope(actor,site,["program-one"]))
+      .not.toThrow();
+    const reader={...actor,capabilities:new Set(["program.read"])};
+    expect(()=>assertWholeSiteReportingScope(reader,site,["program-one"]))
+      .not.toThrow();
+    expect(()=>assertWholeSiteSnapshotAuthoringScope(reader,site,["program-one"]))
+      .toThrow();
+    expect(()=>assertWholeSiteSnapshotAuthoringScope(actor,site,["program-one","sibling"]))
+      .toThrow("every attached Program");
   });
   it("honors organization-wide registrar grant without conferring CAN institutional approvals",()=>{
     const orgWide={...actor,role:"registrar",grantSiteId:null,

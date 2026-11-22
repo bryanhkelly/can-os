@@ -7,6 +7,7 @@ import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/a
 import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
+import { authorizedProgramWhere } from "./authorized-program-query.server";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -94,20 +95,22 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
  const grantSites=context.scope.siteIds??[];
- // An organization-wide membership can operate its own sites; a site-specific
- // membership must NEVER broaden to sibling sites under the organization.
- if(organizations.length && !grantSites.length){
-  const ownedSites=await db.select({id:schoolSites.id}).from(schoolSites)
-   .where(inArray(schoolSites.organizationId,organizations));
-  context.scope.siteIds=ownedSites.map(s=>s.id);
- }
- // Program scope is projected from the original grant breadth, not expanded
- // site IDs: an organization-wide grant may also own a site-less program.
- context.scope.programIds=[];
- if(organizations.length){
-  const permitted=await db.select({id:programs.id,siteId:programs.siteId}).from(programs).where(inArray(programs.organizationId,organizations));
-  context.scope.programIds=authorizedProgramIds(permitted,organizations,grantSites);
- }
+ // Site expansion and Program reads are independent once the verified grant
+ // breadth is known. Run both DB reads concurrently, without caching grants or
+ // reusing identity contexts across requests. Preserve original grantSites when
+ // projecting Program scope so a Site grant never expands to sibling Sites.
+ const [ownedSites, permittedPrograms] = await Promise.all([
+  organizations.length && !grantSites.length
+   ? db.select({id:schoolSites.id}).from(schoolSites)
+      .where(inArray(schoolSites.organizationId,organizations))
+   : Promise.resolve(null),
+  organizations.length
+   ? db.select({id:programs.id,siteId:programs.siteId}).from(programs)
+.where(authorizedProgramWhere(organizations, grantSites))
+   : Promise.resolve([]),
+ ]);
+ if(ownedSites) context.scope.siteIds=ownedSites.map(site=>site.id);
+ context.scope.programIds=authorizedProgramIds(permittedPrograms,organizations,grantSites);
  return context;
 }
 
