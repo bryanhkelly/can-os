@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { listLaunchOptions } from "@/modules/programs/launch.functions";
@@ -294,7 +295,7 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
         description: "Saved launch progress has not yet been verified.",
         href: base + (identity ? "?module=" : "&module=") + "site-information",
       }}
-      previewUrl={site.websiteDraft ? "/launch/site-preview?siteId=" + encodeURIComponent(site.id) : null}
+      previewUrl={site.websiteDraft ? "/launch/site-preview?siteId=" + encodeURIComponent(encodeUuidForPath(site.id)) : null}
       workspaceUrl={identity ? base.slice(0, -"/launch".length) : "/sites/" + encodeURIComponent(site.id)}
     />}
   </LaunchSiteFrame>;
