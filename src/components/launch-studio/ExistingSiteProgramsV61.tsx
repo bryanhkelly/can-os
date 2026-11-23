@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { WorkspacePanel, WorkspaceNotice, StatusBadge } from "@/components/workspace";
 import {
   existingSiteProgramPresentation,
@@ -13,7 +14,7 @@ export function ExistingSiteProgramsV61({ result, siteId, onOverview = false }: 
   siteId: string;
   onOverview?: boolean;
 }) {
-  const editHref = "/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=programs-audiences";
+  const editHref = "/launch/site?siteId=" + encodeUuidForPath(siteId) + "&module=programs-audiences";
   return <WorkspacePanel title="Existing Programs at this Site"
     description="These are your saved Program records, separate from new ideas you choose in Programs & Audiences."
     actions={onOverview ? <a className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline"
