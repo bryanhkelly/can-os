@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/select";
 import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { searchPlatformOwnerTargets } from "@/modules/identity/platform-owner-delegation.functions";
-import { getPlatformOwnerPilotLocations, grantPlatformOwnerPilotRole } from "@/modules/identity/platform-owner-pilot-access.functions";
+import { getPlatformOwnerPilotLocations, grantPlatformOwnerPilotRole, revokePlatformOwnerPilotRole } from "@/modules/identity/platform-owner-pilot-access.functions";
 import { ownerGrantRequiresSite, ownerPilotRoles } from "@/domain/platform-owner-pilot-roles";
 
 type Target = Awaited<ReturnType<typeof searchPlatformOwnerTargets>>["targets"][number];
@@ -34,6 +34,9 @@ export function PlatformOwnerPilotAccessPanel() {
   const orgs=locations.data?.organizations.filter(org=>org.lifecycleStatus==="active")??[];
   const locationSites=locations.data?.sites.filter(site=>site.organizationId===orgId)??[];
   const needsSite=ownerGrantRequiresSite(role);
+  const existingGrant=targets.find(item=>item.accountId===targetAccount&&
+    item.role===role&&item.organizationId===orgId&&
+    item.siteId===(needsSite?siteId:null));
   async function search() {
     if(busy||query.trim().length<2)return;
     setBusy(true);setError("");setNotice("");setSearched(true);setTargetAccount("");
@@ -55,6 +58,19 @@ export function PlatformOwnerPilotAccessPanel() {
         ?"Verified scoped pilot membership created and audited. Course appointments and approvals still require their own workflow."
         :"The same active scoped membership already exists. No duplicate was created.");
     }catch(cause){setError(normalizeClientError(cause,"Pilot role was not authorized.").message);}
+    finally{setBusy(false);}
+  }
+  async function revoke(){
+    if(!existingGrant||reason.trim().length<12||busy)return;
+    if(!window.confirm("Revoke this person's selected pilot role? Their active session may immediately lose access."))return;
+    setBusy(true);setNotice("");setError("");
+    try{
+      await revokePlatformOwnerPilotRole({data:{
+        grantId:existingGrant.grantId,reason:reason.trim(),
+      }});
+      setTargets(previous=>previous.filter(item=>item.grantId!==existingGrant.grantId));
+      setNotice("Scoped pilot membership revoked and audited.");
+    }catch(cause){setError(normalizeClientError(cause,"Pilot role could not be revoked.").message);}
     finally{setBusy(false);}
   }
   return <WorkspacePanel title="Pilot access setup" className="mt-6"
@@ -127,6 +143,9 @@ export function PlatformOwnerPilotAccessPanel() {
       <div className="sm:col-span-2">
         <Button type="button" disabled={busy||!targetAccount||!orgId||(needsSite&&!siteId)||reason.trim().length<12}
           onClick={()=>void grant()}>{busy?"Verifying and saving…":"Grant scoped pilot role"}</Button>
+        {existingGrant&&<Button type="button" variant="outline" className="ml-2"
+          disabled={busy||reason.trim().length<12}
+          onClick={()=>void revoke()}>Revoke selected pilot role</Button>}
       </div>
     </div>}
     {notice&&<WorkspaceNotice className="mt-3">{notice}</WorkspaceNotice>}
