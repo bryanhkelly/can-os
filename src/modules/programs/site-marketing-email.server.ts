@@ -97,8 +97,9 @@ export async function queueSiteMarketingEmail(context: AccessContext, data: Queu
     )).limit(1);
     if (!release || !release.formats.includes("email"))
       throw new DomainError("UNAVAILABLE","Create reviewed email materials before sending.");
-    const snapshot = marketingPackageContentSchema.parse(release.contentSnapshot);
-    if (marketingPackageClaimsRequireReview(pkg.title,snapshot))
+    const {title: releaseTitle, ...frozenContent} = release.contentSnapshot;
+    const snapshot = marketingPackageContentSchema.parse(frozenContent);
+    if (marketingPackageClaimsRequireReview(typeof releaseTitle === "string" ? releaseTitle : pkg.title,snapshot))
       throw new DomainError("VALIDATION_FAILED","Review unsupported claims before sending.");
     const [artifact] = await tx.select().from(siteArtifactReleases).where(and(
       eq(siteArtifactReleases.siteId,site.id),
@@ -159,7 +160,7 @@ export async function queueSiteMarketingEmail(context: AccessContext, data: Queu
     const metadata: MarketingEmailMetadata = {
       kind:KIND,version:1,requestId:data.requestId,fingerprint:requestFingerprint,
       packageId:pkg.id,releaseId:release.id,sourcePackageRevision:release.sourcePackageRevision,
-      mode:data.mode,subject:data.mode === "test" ? "[TEST] " + subject : subject,
+      mode:data.mode,subject:data.mode === "test" ? ("[TEST] " + subject).slice(0,160) : subject,
       postalAddress:data.postalAddress,
       consentBasis:data.mode === "test" ? "verified_sender_account" :
         "operator_attested_explicit_opt_in",
@@ -279,7 +280,8 @@ export async function handleSiteMarketingEmailCampaign(eventId:string) {
   const output = artifact.outputManifest as {body?:unknown;plainText?:unknown};
   if (typeof output.body !== "string" || !output.body.trim())
     throw new Error("Frozen email release has no HTML.");
-  const snapshot = marketingPackageContentSchema.parse(release.contentSnapshot);
+  const {title: releaseTitle, ...frozenContent} = release.contentSnapshot;
+    const snapshot = marketingPackageContentSchema.parse(frozenContent);
   const text = typeof output.plainText === "string" ? output.plainText :
     (snapshot.materialOverrides?.email?.message || snapshot.message);
   const origin = publicOrigin();
