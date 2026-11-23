@@ -72,7 +72,9 @@ export function opaqueUuidPathParam<K extends string>(key: K) {
   };
 }
 
-/** Use for non-router URL strings, including trusted internal redirects. */
-export function shortUuidHref(prefix: string, uuid: string): string {
-  return prefix + encodeUuidForPath(uuid);
+/** For domain link strings: compact UUIDs, preserve legacy escaping for other
+ * values until their owning route validates or rejects the reference. */
+export function shortUuidHref(prefix: string, reference: string): string {
+  const uuid = decodeUuidPathParam(reference);
+  return prefix + (uuid ? encodeUuidForPath(uuid) : encodeURIComponent(reference));
 }
