@@ -39,7 +39,7 @@ describe("canonical UUID URL encoding", () => {
     expect(codec.parse({ classId: token })).toEqual({ classId: uuid });
     expect(codec.parse({ classId: uuid })).toEqual({ classId: uuid });
     expect(codec.stringify({ classId: uuid })).toEqual({ classId: token });
-    expect(codec.parse({ classId: "untrusted" })).toBe(false);
+    expect(() => codec.parse({ classId: "untrusted" })).toThrow("Invalid record reference");
     expect(shortUuidHref("/class/", uuid)).toBe("/class/" + token);
   });
 
