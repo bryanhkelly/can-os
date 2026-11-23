@@ -10,7 +10,6 @@ import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules, type SiteLaunchModuleIdV61 } from "@/domain/launch-site-navigation-v61";
 import { findAuthorizedSiteBySlugs, friendlySiteLaunchHref, validFriendlySlug } from "@/domain/friendly-site-urls";
-import { resolveAuthorizedSiteRoute } from "@/modules/sites/site-route-resolver.functions";
 import { siteLaunchSearchSchemaV61 } from "@/domain/launch-site-search-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
 import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
@@ -49,16 +48,7 @@ export async function loadSiteLaunchView(deps: {
       : deps.siteId
         ? options.sites.find(candidate => candidate.id === deps.siteId)
         : options.sites.length === 1 ? options.sites[0] : null;
-    // On renamed Sites/Organizations, the historical slug pair resolves to
-    // the SAME authorized Site UUID. Never use alias ownership as an access grant.
-    let selectedSite = site;
-    if (!selectedSite && deps.organizationSlug && deps.siteSlug) {
-      const resolvedId = await resolveAuthorizedSiteRoute({ data: {
-        organizationSlug: deps.organizationSlug,
-        siteSlug: deps.siteSlug,
-      } }).catch(() => null);
-      selectedSite = options.sites.find(candidate => candidate.id === resolvedId) ?? null;
-    }
+    const selectedSite = site;
     // Read actual Site Programs independently of optional planning/catalog data.
     const existingProgramsRead = selectedSite && (!deps.module || deps.module === "programs-audiences")
       ? readExistingSiteProgramsV61({ data: { siteId: selectedSite.id } })

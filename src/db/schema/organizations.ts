@@ -81,27 +81,6 @@ export const sites = pgTable(
   ],
 );
 
-/** Private workspace URL aliases, historically reserved across renames.
- * Slugs identify a Site; authorization is still checked by the owning reader.
- * Rows are synchronized transactionally by database triggers. */
-export const siteRouteAliases = pgTable(
-  "site_route_aliases",
-  {
-    id: id(),
-    organizationId: uuid("organization_id").notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    siteId: uuid("site_id").notNull()
-      .references(() => sites.id, { onDelete: "cascade" }),
-    organizationSlug: text("organization_slug").notNull(),
-    siteSlug: text("site_slug").notNull(),
-    createdAt: createdAt(),
-  },
-  table => [
-    uniqueIndex("site_route_aliases_address_uq").on(table.organizationSlug, table.siteSlug),
-    index("site_route_aliases_site_idx").on(table.siteId),
-  ],
-);
-
 export const programs = pgTable(
   "programs",
   {

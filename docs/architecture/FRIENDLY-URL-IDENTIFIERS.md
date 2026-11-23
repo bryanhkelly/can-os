@@ -1,40 +1,31 @@
-# Friendly URL identity and migration
+# Friendly and compact URLs
 
-**Status:** Committed on draft branch `feature/friendly-urls-complete-20261123`. Not merged, deployed, or production-verified.
+**Status:** Draft PR #363. Not deployed or validated end-to-end.
 
-## Core contract
+## Current scope (no historical URL service)
 
-- Canonical database UUID keys and foreign keys remain unchanged. A short URL is *encoding*, not encryption or authorization.
-- Authenticated Organization/Site routes use `/o/:organizationSlug/:siteSlug`, with `/launch`, `/website`, and `/profile`. The Organization slug is globally unique; Site slug is unique in the Organization.
-- UUID-backed path params use a strict, reversible 22-character base64url encoding with no padding. Decode to the unchanged canonical UUID before calling any domain service; old 36-character UUID URLs remain valid.
-- Router-level query serialization compacts an explicit allowlist of UUID selection keys. Auth codes, share tokens, external redirects, free text, nested values, and non-UUID strings are never transformed.
-- Public Site photos use compact asset references; tenant publication, approved media checks, private R2 storage and origin-scoped read permissions stay as they were.
-- Verified Site/Organization grant scope and each destination's original permission checks remain authoritative. Slug aliases, compact IDs and QR/join codes never confer capability.
+- Canonical UUID primary/foreign keys are unchanged.
+- Current Organization and Site slugs render private workspace URLs at `/o/:organizationSlug/:siteSlug`. Site profile, Launch Studio and Website Studio are children.
+- The resolver joins **current** Organization and Site rows and filters them through the effective signed-in Person's verified Organization and Site grants. Neither a slug nor a short UUID grants access.
+- Organization and Site slug changes may invalidate old slug links. Historical aliases and canonical redirects are explicitly **out of scope** for this phase.
+- Existing legacy UUID paths remain accepted by the compact path codec to avoid breaking active bookmarks. No migration of those links is required.
+- UUID path and allowlisted query references use a reversible 22-character base64url encoding, not encryption or a share token.
 
-## Historical slug aliases
+## Deployment order and guards
 
-The **new, unapplied** governed migration `drizzle/0106_friendly_site_route_aliases.sql` introduces `site_route_aliases` with a unique Organization slug + Site slug pair and Site/Organization foreign keys.
+1. Ensure the preceding SQL migrations (including 0105 Site Go Links and 0106 private-role hardening) have been independently reviewed and applied on the chosen environment. Do **not** run automatic production migrations.
+2. Run `npm run db:check:friendly-urls:deploy` using the exact deployment `DATABASE_URL`. The read-only preflight checks the Neon project/branch, required tables, Go Link unique code index, RLS, and no anonymous/authenticated direct SQL privilege. It fails closed.
+3. Run `npm run deploy:cloudflare`, whose script includes this preflight before the Cloudflare build/deployment. Netlify production builds remain disabled by the repo's existing production ignore configuration.
+4. Roll back application deployment to the last known good build if needed. The additive Go Link table migrations are not reverted automatically; rolling back the database is unnecessary for a code rollback.
 
-- Backfills existing canonical Site pairs.
-- Transactional Site and Organization triggers reserve new names and retain historical names, rejecting reuse by another Site.
-- Lookup is server-only. The resolver requires an authenticated actor and current Organization/Site permission scope, and returns the canonical Site UUID for authorized existing or historical aliases.
-- Any desired canonical **HTTP redirect** from historical names to current names is a separate UX enhancement. Old names presently resolve the same secured content, not an automatic redirect.
-- The earlier 0105 filename was renumbered to 0106 because the release branch independently added **0105 Site Go Links**. This branch preserves the Go Links schema and experience. Do not apply 0106 before verifying the actual target database migration ledger.
+## Authorization and sharing
 
-## Coverage and limitations
+- `scopedSiteRouteAccess` fails closed for absent/empty Site scope, cross-tenant grants and missing authentication.
+- The server resolver queries current, indexed Site and Organization slugs after scope validation; downstream services independently enforce their existing permissions.
+- Real database role acceptance must confirm the application owner role can query the current Site, and `anonymous` / `authenticated` roles have no direct SELECT on private Site tables or Go Links.
+- Private workspace links require sign-in. Published website and Go outreach links are distinct; the latter are revocable and grant navigation only, never membership, admission or enrollment.
+- Never automatically copy an authenticated private website preview as a public share link; public-safe previews require the dedicated expiring/revocable flow.
 
-- The initial 14 UUID-backed dynamic workspace routes use the generic path codec; legacy route and query URLs continue to work.
-- Global typed selection query strings, private previews, Site navigation, workspace links, search results, family/academic timelines and public photo URLs are covered.
-- Existing public engagement slug paths, `/go/:code` routes, tokenized share links and meaningful non-UUID path parameters remain unchanged intentionally.
-- Some URLs intentionally remain UUID-based when generated by raw HTML or external systems rather than the application router. These require specific owning-service review, rather than global rewriting of arbitrary URLs or sensitive tokens.
-- Route usage and redirect history need actual browser verification. Source tests are **not** evidence of a successful deployment.
+## Release acceptance
 
-## Required acceptance before merging
-
-1. Exact-SHA TypeScript typecheck, source/build import checks, Cloudflare production build, route registry/manifest check, lint, and focused plus full unit tests.
-2. Browser tests for student, guardian, registrar, Site Admin, old/new UUID links, refresh/deep links, and invalid references. Confirm all current canonical Site permissions remain enforced.
-3. Cross-tenant and revoked-grant denial for Site alias lookup; independently validate Site rename/backfill/Organization rename/alias collision under an isolated Neon branch with correct service DB role and RLS.
-4. Validate migration journal ordering, SQL-only governance policy, race handling, performance and exact target-release branch alignment.
-5. Inspect final render/navigation from Website Studio, Launch Studio, Class, Action, enrolment, and existing external bookmarks.
-
-No live data migration or authorization policy changes have been executed here.
+Exact-SHA TypeScript, unit/integration tests, production build, Cloudflare CI, browser deep-link tests, deployment-preflight checks against target DB, role-boundary verification and approval remain required. The migration commands are manual and production-protected.
