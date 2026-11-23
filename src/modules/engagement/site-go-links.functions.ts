@@ -105,7 +105,7 @@ export const listSiteGoLinks = createServerFn({ method: "GET" })
       createdAt: siteGoLinks.createdAt,
     }).from(siteGoLinks).where(and(
       eq(siteGoLinks.siteId, data.siteId), eq(siteGoLinks.packageId, data.packageId),
-    )).orderBy(desc(siteGoLinks.createdAt));
+    )).orderBy(desc(siteGoLinks.createdAt)).limit(500);
     const evidence=await readSiteGoLinkEvidence(data.siteId,data.packageId);
     const byId=new Map(evidence.map(item=>[item.linkId,item]));
     return links.map(link => ({

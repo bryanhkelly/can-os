@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteGoLinks, siteGoLinkDailyVisits } from "@/db/schema";
 import { noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
@@ -22,18 +22,20 @@ export async function readSiteGoLinkEvidence(
   const links=await reader.select({
     id:siteGoLinks.id,code:siteGoLinks.code,destination:siteGoLinks.destination,
   }).from(siteGoLinks).where(and(eq(siteGoLinks.siteId,siteId),
-    eq(siteGoLinks.packageId,packageId))).limit(500);
+    eq(siteGoLinks.packageId,packageId))).orderBy(desc(siteGoLinks.createdAt)).limit(500);
   if(!links.length)return [];
   const now=new Date();
   const today=now.toISOString().slice(0,10);
   const start=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()-29));
   const firstDay=start.toISOString().slice(0,10);
+  const tomorrow=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1));
   const traffic=await reader.select({
     linkId:siteGoLinkDailyVisits.linkId,
     visits:sql<string>`sum(${siteGoLinkDailyVisits.redirects})::text`,
   }).from(siteGoLinkDailyVisits).where(and(
     inArray(siteGoLinkDailyVisits.linkId,links.map(link=>link.id)),
     gte(siteGoLinkDailyVisits.day,firstDay),
+    lte(siteGoLinkDailyVisits.day,today),
   )).groupBy(siteGoLinkDailyVisits.linkId);
   const visitsByLink=new Map(traffic.map(item=>[item.linkId,Number(item.visits)]));
   const referenced=links.filter(link=>link.destination.kind==="adult-training");
@@ -46,6 +48,7 @@ export async function readSiteGoLinkEvidence(
     inArray(noncreditSelfEnrollmentClaims.referralCode,
       referenced.map(link=>link.code)),
     gte(noncreditSelfEnrollmentClaims.createdAt,start),
+    lt(noncreditSelfEnrollmentClaims.createdAt,tomorrow),
   )).groupBy(noncreditSelfEnrollmentClaims.referralCode,
     noncreditSelfEnrollmentClaims.releaseId):[];
   const claimsByKey=new Map(claims.map(item=>[
