@@ -61,9 +61,10 @@ export function decodeUuidPathParam(value: string): string | null {
 /** TanStack Router turns internal UUID params into short links automatically. */
 export function opaqueUuidPathParam<K extends string>(key: K) {
   return {
-    parse: (params: Record<K, string>): Record<K, string> | false => {
+    parse: (params: Record<K, string>): Record<K, string> => {
       const uuid = decodeUuidPathParam(params[key]);
-      return uuid ? { ...params, [key]: uuid } : false;
+      if (!uuid) throw new Error("Invalid record reference");
+      return { ...params, [key]: uuid };
     },
     stringify: (params: Record<K, string>): Record<K, string> => {
       const uuid = decodeUuidPathParam(params[key]);
