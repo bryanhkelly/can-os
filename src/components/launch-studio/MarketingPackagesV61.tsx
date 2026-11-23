@@ -34,6 +34,7 @@ import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketin
 import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
 import { MarketingPackageReleaseControlsV61 } from "./MarketingPackageReleaseControlsV61";
 import { GoLinkWorkspace } from "./GoLinkWorkspace";
+import { MarketingEmailCampaignV61 } from "./MarketingEmailCampaignV61";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
@@ -331,6 +332,11 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
   const downloadablePackageReleases=packageReleases.filter(packageReleaseIsDownloadableV61);
   const hasDownloadableMaterials=downloadablePackageReleases.length>0;
+  const latestEmailRelease=packageReleases.find(version =>
+    version.complete && version.formats.includes("email") &&
+    version.outputs.some(output => output.format==="email" && !output.withdrawnAt))??null;
+  const latestEmailOutput=latestEmailRelease?.outputs.find(output =>
+    output.format==="email" && !output.withdrawnAt)??null;
   const materialAvailabilityMessage=releasesUnavailable
     ? "We couldn't check your generated materials. Retry the history check before downloading or creating another version."
     : releasesLoading
@@ -575,7 +581,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </ActionFooter>
       </>}
       {view==="share"&&record&&<>
-        <WorkspacePanel title="Available materials" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
+        <WorkspacePanel title="Available materials" description="Download reviewed materials, send a consent-based email, or create an interest event.">
           <p className="text-sm text-muted-foreground">
             {materialAvailabilityMessage}
           </p>
@@ -585,12 +591,36 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
                 onClick={()=>void downloadPackage(release)}>Download Package v{release.releaseNumber}</Button>)}
             {record.content.plan?.action==="attend-event"&&record.content.purpose==="event-invitation"&&
               <Button asChild variant="outline"><a href={"/operations/interest-events/new?siteId="+encodeURIComponent(siteId)+"&packageId="+encodeURIComponent(record.id)}>Create Event</a></Button>}
+            {latestEmailRelease&&<Button asChild>
+              <a href="#launch-outreach-email">Send Email <ArrowRight aria-hidden="true"/></a>
+            </Button>}
+            {!latestEmailRelease&&record.content.formats.includes("email")&&
+              <Button disabled={busy||releasesLoading||releasesUnavailable||
+                !record.brandVersionId||record.status==="archived"}
+                onClick={()=>{void releasePackage();}}>Create Email Materials</Button>}
             <Button variant="outline" onClick={()=>setView("followup")}>Follow Up <ArrowRight aria-hidden="true"/></Button>
           </div>
           {hasDownloadableMaterials&&<WorkspaceNotice tone="info">
             These files are ready to download. Sharing or sending them requires a separate action.
           </WorkspaceNotice>}
         </WorkspacePanel>
+        {(record.content.formats.includes("email") ||
+          packageReleases.some(version=>version.formats.includes("email")))&&
+          <section id="launch-outreach-email">
+          <MarketingEmailCampaignV61
+            key={record.id}
+            siteId={siteId} packageId={record.id}
+            releaseId={latestEmailRelease?.id??null}
+            emailOutputId={latestEmailOutput?.id??null}
+            releaseNumber={latestEmailRelease?.releaseNumber??null}
+            emailSubject={latestEmailRelease
+              ? latestEmailRelease.content.materialOverrides?.email?.headline ||
+                latestEmailRelease.content.headline
+              : null}
+            canCreateMaterials={Boolean(record.brandVersionId)&&record.status!=="archived"&&
+              record.content.formats.includes("email")&&!busy&&!releasesLoading&&!releasesUnavailable}
+            onCreateMaterials={()=>{void releasePackage();}}/>
+          </section>}
         <GoLinkWorkspace key={record.id} siteId={siteId} packageId={record.id} />
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
