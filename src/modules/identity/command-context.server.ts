@@ -91,7 +91,11 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  let effectiveGrant=activeGrant;
  let effectiveGrants=grants;
  let ownerDelegation: { mode:"view"|"act"; expiresAt:Date }|null=null;
- if(session.delegatedGrantId){
+ // Expiration restores the original owner's identity without granting further
+ // delegated access. No GET side effect or background session refresh is needed.
+ if(session.delegatedGrantId&&session.delegatedUntil&&session.delegatedUntil<=now){
+  // The expired grant is ignored. The explicit Return action clears it.
+ }else if(session.delegatedGrantId){
   const owner=await getVerifiedPlatformOwnerSession(request);
   if(activeGrant.role!=="platform_owner"||activeGrant.id!==owner.grantId||
      session.delegatedMode!=="view"&&session.delegatedMode!=="act"||
