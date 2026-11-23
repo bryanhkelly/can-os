@@ -113,6 +113,16 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(website).toContain('title="Website & Brand" showHeader={false}');
   });
 
+  it("keeps outreach page and content-card titles distinct", () => {
+    const outreach = read("src/components/launch-studio/MarketingPackagesV61.tsx");
+    expect(outreach).toContain('<WorkspacePanel title="Plan details">');
+    expect(outreach).toContain('<WorkspacePanel title="Available materials"');
+    expect(outreach).toContain('<WorkspacePanel title="Responses & events"');
+    expect(outreach).not.toContain('<WorkspacePanel title={record.title}>');
+    expect(outreach).not.toContain('<WorkspacePanel title="Use & Share"');
+    expect(outreach).not.toContain('<WorkspacePanel title="Follow Up"');
+  });
+
   it("reuses internal-step visuals and exposes selectable preview states", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
