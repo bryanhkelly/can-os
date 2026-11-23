@@ -10,7 +10,7 @@ import { approveAdultClassLearnerReview, revokeAdultClassLearnerReview } from "@
 import { ActionFooter, DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
-import { NativePublisherReleaseReadinessPanel } from "@/components/learning/NativePublisherReleaseReadinessPanel";
+
 import { PlatformCatalogManager } from "@/components/platform/PlatformCatalogManager";
 import { PlatformOwnerDelegationPanel } from "@/components/platform/PlatformOwnerDelegationPanel";
 import { PlatformOwnerPilotAccessPanel } from "@/components/platform/PlatformOwnerPilotAccessPanel";
@@ -71,8 +71,7 @@ function PlatformAdministration() {
     <PlatformCatalogManager/>
     <PlatformReleaseCenter records={summary.publisherReleaseReadiness}
       limited={summary.publisherReleasesLimited}/>
-    <NativePublisherReleaseReadinessPanel records={summary.publisherReleaseReadiness}
-      limited={summary.publisherReleasesLimited}/>
+
     <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady} cases={summary.reviewCases}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>
