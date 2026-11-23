@@ -28,7 +28,8 @@ ON CONFLICT ("organization_slug","site_slug") DO NOTHING;
 -- Enforce alias registration for ALL canonical Site insert/rename paths, not
 -- just the website editor. Cross-Site reuse of historical addresses fails.
 CREATE OR REPLACE FUNCTION "register_site_route_alias"()
-RETURNS trigger LANGUAGE plpgsql AS $site_alias$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public AS $site_alias$
 DECLARE parent_slug text;
 BEGIN
   SELECT o."slug" INTO parent_slug FROM "organizations" o
@@ -57,7 +58,8 @@ CREATE TRIGGER "sites_route_alias_sync"
 -- Changing an Organization slug creates new working URLs without invalidating
 -- previous links. Existing aliases for that Organization remain reserved.
 CREATE OR REPLACE FUNCTION "register_organization_route_aliases"()
-RETURNS trigger LANGUAGE plpgsql AS $organization_alias$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public AS $organization_alias$
 DECLARE row RECORD;
 BEGIN
   FOR row IN SELECT DISTINCT a."site_id",s."organization_id",a."site_slug"
