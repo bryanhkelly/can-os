@@ -9,16 +9,21 @@ CREATE TABLE IF NOT EXISTS "site_route_aliases" (
   "site_slug" text NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT now()
 );
+--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "site_route_aliases_address_uq"
   ON "site_route_aliases" ("organization_slug", "site_slug");
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "site_route_aliases_site_idx"
   ON "site_route_aliases" ("site_id");
 
 -- No public or unauthenticated route-alias list API.
+--> statement-breakpoint
 ALTER TABLE "site_route_aliases" ENABLE ROW LEVEL SECURITY;
+--> statement-breakpoint
 REVOKE ALL ON TABLE "site_route_aliases" FROM PUBLIC;
 
 -- Every existing canonical Site receives its current stable URL.
+--> statement-breakpoint
 INSERT INTO "site_route_aliases"
   ("organization_id","site_id","organization_slug","site_slug")
 SELECT s."organization_id",s."id",o."slug",s."slug"
@@ -27,6 +32,7 @@ ON CONFLICT ("organization_slug","site_slug") DO NOTHING;
 
 -- Enforce alias registration for ALL canonical Site insert/rename paths, not
 -- just the website editor. Cross-Site reuse of historical addresses fails.
+--> statement-breakpoint
 CREATE OR REPLACE FUNCTION "register_site_route_alias"()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public AS $site_alias$
@@ -50,13 +56,16 @@ BEGIN
   RETURN NEW;
 END;
 $site_alias$;
+--> statement-breakpoint
 DROP TRIGGER IF EXISTS "sites_route_alias_sync" ON "sites";
+--> statement-breakpoint
 CREATE TRIGGER "sites_route_alias_sync"
   AFTER INSERT OR UPDATE OF "slug","organization_id" ON "sites"
   FOR EACH ROW EXECUTE FUNCTION "register_site_route_alias"();
 
 -- Changing an Organization slug creates new working URLs without invalidating
 -- previous links. Existing aliases for that Organization remain reserved.
+--> statement-breakpoint
 CREATE OR REPLACE FUNCTION "register_organization_route_aliases"()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public AS $organization_alias$
@@ -81,12 +90,16 @@ BEGIN
   RETURN NEW;
 END;
 $organization_alias$;
+--> statement-breakpoint
 DROP TRIGGER IF EXISTS "organizations_route_alias_sync" ON "organizations";
+--> statement-breakpoint
 CREATE TRIGGER "organizations_route_alias_sync"
   AFTER UPDATE OF "slug" ON "organizations"
   FOR EACH ROW WHEN (OLD."slug" IS DISTINCT FROM NEW."slug")
   EXECUTE FUNCTION "register_organization_route_aliases"();
 
 -- These trigger functions are not public application endpoints.
+--> statement-breakpoint
 REVOKE ALL ON FUNCTION "register_site_route_alias"() FROM PUBLIC;
+--> statement-breakpoint
 REVOKE ALL ON FUNCTION "register_organization_route_aliases"() FROM PUBLIC;
