@@ -9,7 +9,7 @@ export const Route = createFileRoute("/o/$organizationSlug/$siteSlug/profile")({
   }),
   loader: async ({ params }) => {
     const siteId = await resolveAuthorizedSiteRoute({ data: params });
-    return readSchoolProfile(siteId ?? "unavailable");
+    return readSchoolProfile(siteId);
   },
   component: FriendlySiteProfilePage,
 });
