@@ -722,6 +722,13 @@
       "when": 1795305600000,
       "tag": "0102_reporting_source_service_access",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1795410000000,
+      "tag": "0103_site_signup_organization_classification",
+      "breakpoints": true
     }
   ]
 }
