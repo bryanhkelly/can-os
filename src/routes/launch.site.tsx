@@ -180,7 +180,9 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
   const { site, sites, organizations, siteInformation, siteGuidePlanning, programsAudiences, marketingPackages, marketingSuggestions, introduceIntent, introduceIntentUnavailable, introduceSiteRevision, prepareIntent, overview, existingPrograms, error } = outcome.data;
   if (!site && friendlyRoute) return <WorkspaceShell title="Site unavailable" eyebrow="Launch Studio"
-    subtitle="This Site could not be found in your authorized workspace." />;
+    subtitle="This Site could not be found in your authorized workspace.">
+    <p className="mt-6 text-sm text-muted-foreground">Check your Site access or return to the Site directory.</p>
+  </WorkspaceShell>;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
