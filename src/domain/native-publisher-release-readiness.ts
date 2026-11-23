@@ -6,6 +6,13 @@
  */
 export interface NativePublisherReleaseRecord {
   offeringVersionId:string;
+  offeringCode?:string;
+  noncreditTrainingStatus?:string|null;
+  noncreditAssessmentStatus?:string|null;
+  noncreditTrainingApproved?:boolean;
+  pilotLessonCount?:number;
+  pilotPlaceholderCount?:number;
+  pilotContentReviewCount?:number;
   offeringTitle:string;
   versionNo:number;
   lifecycle:string;
