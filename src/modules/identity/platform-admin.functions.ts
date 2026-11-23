@@ -17,7 +17,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getCommandContext(getRequest());
     assertCapability(actor, "platform.admin");
-    if (actor.role !== "app_admin" || actor.sessionAccountId ||
+    if (!["app_admin","platform_owner"].includes(actor.role) || actor.sessionAccountId ||
         !actor.accountId || actor.grantSiteId ||
         (actor.scope.organizationIds?.length ?? 0) > 0 ||
         (actor.scope.siteIds?.length ?? 0) > 0) {
@@ -155,6 +155,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
         .orderBy(desc(accessAdultLearningReviews.reviewedAt)).limit(50)
       :[];
     return {
+      platformOwner: actor.role === "platform_owner",
       reviewedAdultIdentityReady,
       publisherReleasesLimited:publisherReleaseRows.rows.length>25,
       publisherReleaseReadiness:publisherReleaseRows.rows.slice(0,25).map(row=>({
