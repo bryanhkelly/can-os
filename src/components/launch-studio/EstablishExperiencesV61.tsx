@@ -140,9 +140,9 @@ export function EstablishExperiencesV61({
   return <section aria-label="Experiences" className="min-w-0 space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
       <div className="space-y-1">
-        <h3 className="font-serif text-2xl">
+        <h2 className="font-serif text-2xl">
           {stage==="choose"?"What would you love to bring to your community?":"Make these Experiences yours"}
-        </h3>
+        </h2>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           {stage==="choose"
             ?"Explore the possibilities and choose up to five experiences that reflect your vision."
@@ -159,7 +159,7 @@ export function EstablishExperiencesV61({
     {stage==="choose"&&<div className="space-y-5">
       <section aria-label="Your selected Experiences" className="space-y-3 border border-primary/20 bg-accent/40 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-sm font-semibold">Your selected Experiences</h4>
+          <h3 className="text-sm font-semibold">Your selected Experiences</h3>
           <span className="text-xs text-muted-foreground">Remove one to make room for another.</span>
         </div>
         {count===0
@@ -179,7 +179,7 @@ export function EstablishExperiencesV61({
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h4 className="font-serif text-lg">Explore all {siteExperienceCatalog.length} topics</h4>
+          <h3 className="font-serif text-lg">Explore all {siteExperienceCatalog.length} topics</h3>
           <p className="text-xs leading-5 text-muted-foreground">
             Browse the ideas below. Stars highlight experiences that may be a good fit for your community.
           </p>
@@ -213,7 +213,7 @@ export function EstablishExperiencesV61({
               <Icon className="mt-0.5 size-6 shrink-0 text-primary" strokeWidth={1.5} aria-hidden="true"/>
               <div className="min-w-0 flex-1 space-y-2">
                 <div>
-                  <h5 id={"experience-group-"+group.id} className="text-sm font-semibold">{group.title}</h5>
+                  <h4 id={"experience-group-"+group.id} className="text-sm font-semibold">{group.title}</h4>
                   <p className="text-xs leading-5 text-muted-foreground">{group.description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -462,7 +462,7 @@ export function EstablishExperiencesV61({
             {selectedTopics.length+index+1}
           </span>
           <div className="min-w-0 flex-1">
-            <h5 className="font-serif text-lg">{name}</h5>
+            <h3 className="font-serif text-lg">{name}</h3>
             <p className="text-xs text-muted-foreground">
               Local planning topic. Curated activity and outcome chips are not available for custom names.
             </p>
