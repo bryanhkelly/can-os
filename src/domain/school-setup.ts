@@ -18,9 +18,31 @@ export const schoolSetupSchema = z.object({
   syntheticOnly: z.literal(true),
 }).strict();
 
+/** Self-reported identity during Site signup; it is not network authorization. */
+export const publicSignupOrganizationTypeOptions = [
+  { value: "other_partner", label: "Community, nonprofit, or other organization" },
+  { value: "church", label: "Church or local faith community" },
+  { value: "christian_school", label: "School or education provider" },
+  { value: "microschool_operator", label: "Microschool operator" },
+  { value: "consortium", label: "Association or consortium" },
+  { value: "denomination", label: "Denomination or national faith network" },
+] as const;
+export const publicSignupOrganizationTypeSchema = z.enum([
+  "other_partner", "church", "christian_school", "microschool_operator",
+  "consortium", "denomination",
+]);
+export type PublicSignupOrganizationType = z.infer<typeof publicSignupOrganizationTypeSchema>;
+
+/** A self-asserted national identity must never create network authority. */
+export function initialVerifiedSignupOrganizationType(requested: PublicSignupOrganizationType) {
+  return requested === "denomination" || requested === "consortium"
+    ? "other_partner" as const : requested;
+}
+
 export const realSchoolSetupSignupSchema = z.object({
   name: z.string().trim().min(2).max(160),
   organizationName: z.string().trim().min(2).max(160).optional(),
+  organizationType: publicSignupOrganizationTypeSchema.default("other_partner"),
   email: z.string().trim().toLowerCase().email().max(254)
     .refine(email => !email.endsWith(".demo") && !email.endsWith(".invalid"),
       "Use a real email address; demo schools use the shared-code setup."),
