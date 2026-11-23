@@ -36,6 +36,7 @@ export * from "./account-noncredit-link";
 export * from "./adult-learning-review";
 export * from "./launch-drafts";
 export * from "./marketing-packages";
+export * from "./site-go-links";
 export * from "./demo-school-tenants";
 export * from "./school-setup-signups";
 export * from "./support";
