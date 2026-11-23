@@ -79,9 +79,13 @@ export function LaunchSiteNavigation({
     </nav>
     <div className="m-3 border p-3">
       <Button asChild variant="ghost" className="w-full justify-start">
-        <Link to="/sites/$siteId" params={{ siteId: site.id }} onClick={onNavigate}>
-          <Building2 className="size-4"/> Site Workspace
-        </Link>
+        {identity
+          ? <Link to="/o/$organizationSlug/$siteSlug" params={identity} onClick={onNavigate}>
+              <Building2 className="size-4"/> Site Workspace
+            </Link>
+          : <Link to="/sites/$siteId" params={{ siteId: site.id }} onClick={onNavigate}>
+              <Building2 className="size-4"/> Site Workspace
+            </Link>}
       </Button>
     </div>
   </div>;
