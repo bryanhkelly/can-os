@@ -524,13 +524,13 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
      for(const action of gradeActions)if(permitted.has(action.studentPersonId)&&
        action.metadata.requestedByGuardianPersonId===personId)
        verifiedGradeActions.set(action.id,
-         `/guardian/students?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}&submission=${encodeURIComponent(action.submissionId)}`);
+         `/guardian/students?student=${compactUuidUrlValue(action.studentPersonId)}&section=${compactUuidUrlValue(action.sectionId??"")}&assessment=${compactUuidUrlValue(action.assessmentId)}&submission=${compactUuidUrlValue(action.submissionId)}`);
    }else if(hasRegistrarAuthority(context.role)){
      for(const action of gradeActions)if((context.scope.organizationIds??[]).length)
-       verifiedGradeActions.set(action.id,`/home?action=${encodeURIComponent(action.id)}`);
+       verifiedGradeActions.set(action.id,`/home?action=${compactUuidUrlValue(action.id)}`);
    }else if(context.role==="teacher"){
      for(const action of gradeActions)if(action.sectionId&&teacherGradeSections.includes(action.sectionId))
-       verifiedGradeActions.set(action.id,`/home?gradeAction=${encodeURIComponent(action.id)}`);
+       verifiedGradeActions.set(action.id,`/home?gradeAction=${compactUuidUrlValue(action.id)}`);
    }
  }
  const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
@@ -664,60 +664,60 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   date:n.createdAt.toISOString(),href:n.type==="noncredit_training_completed"&&
    n.resourceType==="noncredit_completion_decision"?"/learn/my-activity":
    conference?"/guardian/experiences?tab=conferences":n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
-   `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
+   `/safeguarding?case=${compactUuidUrlValue(n.resourceId)}`:
   n.type==="calendar_event_invitation"&&n.resourceType==="calendar_event"&&n.resourceId&&calendarInvitationById.has(n.resourceId)?
-   `/calendar?date=${encodeURIComponent(calendarInvitationById.get(n.resourceId)!)}&event=${encodeURIComponent(n.resourceId)}`:
+   `/calendar?date=${compactUuidUrlValue(calendarInvitationById.get(n.resourceId)!)}&event=${compactUuidUrlValue(n.resourceId)}`:
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
-   `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
-   n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
-   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="guardian"&&guardianTripIds.has(n.resourceId)?`/guardian/field-trips?trip=${encodeURIComponent(n.resourceId)}`:
+   `/guardian/attendance?student=${compactUuidUrlValue(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
+   n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${compactUuidUrlValue(medicalChildByVisit.get(n.resourceId)!)}`:
+   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="guardian"&&guardianTripIds.has(n.resourceId)?`/guardian/field-trips?trip=${compactUuidUrlValue(n.resourceId)}`:
    n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&hasRegistrarAuthority(context.role)&&staffTripIds.has(n.resourceId)?"/operations/field-trips":
    n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
    n.type==="transfer_destination_transcript_ready"&&n.resourceType==="application"&&n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)?
-   `/admissions/intake?application=${encodeURIComponent(n.resourceId)}`:
+   `/admissions/intake?application=${compactUuidUrlValue(n.resourceId)}`:
    n.type==="enrollment_activated"&&n.resourceType==="enrollment"&&
    n.resourceId&&activatedEnrollmentById.has(n.resourceId)?
-   (context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(activatedEnrollmentById.get(n.resourceId)!)}`:
+   (context.role==="guardian"?`/guardian/admission-offers?student=${compactUuidUrlValue(activatedEnrollmentById.get(n.resourceId)!)}`:
      context.role==="student"?"/home":null):
-   n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
-   n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/home?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${compactUuidUrlValue(familyChangeChildByAction.get(n.resourceId)!)}`:
+   n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/home?action=${compactUuidUrlValue(n.resourceId)}`:
    n.type==="transfer_academic_records_handoff_requested"&&n.resourceType==="action"&&n.resourceId&&permittedRecordsHandoffs.has(n.resourceId)?"/operations/transfer-records":
-   n.type==="guardian_health_review_requested"&&n.resourceType==="action"&&n.resourceId&&healthStaffActionIds.has(n.resourceId)?`/operations/health-review?action=${encodeURIComponent(n.resourceId)}`:
-   n.type==="guardian_health_review_completed"&&n.resourceType==="action"&&n.resourceId&&healthGuardianChildByAction.has(n.resourceId)?`/guardian/health?student=${encodeURIComponent(healthGuardianChildByAction.get(n.resourceId)!)}`:
-   n.type==="course_registration_guardian_decision_for_registrar"&&n.resourceType==="action"&&n.resourceId&&permittedRegistrarCourseActions.has(n.resourceId)?`/home?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="guardian_health_review_requested"&&n.resourceType==="action"&&n.resourceId&&healthStaffActionIds.has(n.resourceId)?`/operations/health-review?action=${compactUuidUrlValue(n.resourceId)}`:
+   n.type==="guardian_health_review_completed"&&n.resourceType==="action"&&n.resourceId&&healthGuardianChildByAction.has(n.resourceId)?`/guardian/health?student=${compactUuidUrlValue(healthGuardianChildByAction.get(n.resourceId)!)}`:
+   n.type==="course_registration_guardian_decision_for_registrar"&&n.resourceType==="action"&&n.resourceId&&permittedRegistrarCourseActions.has(n.resourceId)?`/home?action=${compactUuidUrlValue(n.resourceId)}`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
-   `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
+   `/guardian/attendance?student=${compactUuidUrlValue(attendanceStudent.get(n.resourceId)!)}&attendance=${compactUuidUrlValue(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
     (bySubmission.has(n.resourceId)||guardianSubmissionById.has(n.resourceId))?
    (context.role==="student"&&bySubmission.has(n.resourceId)?
      studentAssignmentHref(bySubmission.get(n.resourceId)!):
      context.role==="guardian"&&guardianSubmissionById.has(n.resourceId)?
      (()=>{const row=guardianSubmissionById.get(n.resourceId)!;
-       return `/guardian/students?student=${encodeURIComponent(row.studentPersonId)}&section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.assessmentId)}`;})():null):
+       return `/guardian/students?student=${compactUuidUrlValue(row.studentPersonId)}&section=${compactUuidUrlValue(row.sectionId)}&assessment=${compactUuidUrlValue(row.assessmentId)}`;})():null):
    n.resourceType==="action"&&n.resourceId&&gradeActionsById.has(n.resourceId)&&
     verifiedGradeActions.has(n.resourceId)?verifiedGradeActions.get(n.resourceId)!:
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
-   (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
+   (context.role==="student"?`/student/support?referral=${compactUuidUrlValue(n.resourceId)}`:null):
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?studentAssignmentHref(missingAssessmentByAction.get(n.resourceId)!):null):
    n.resourceType==="application"&&n.resourceId&&enrollmentStudent.has(n.resourceId)?
    (n.type==="admissions_stage_changed"&&!enrollmentApplicationOfferReady.get(n.resourceId)?"/launch/family":
-    `/guardian/admission-offers?student=${encodeURIComponent(enrollmentStudent.get(n.resourceId)!)}&application=${encodeURIComponent(n.resourceId)}`):
+    `/guardian/admission-offers?student=${compactUuidUrlValue(enrollmentStudent.get(n.resourceId)!)}&application=${compactUuidUrlValue(n.resourceId)}`):
    n.resourceType==="communication_thread"&&n.resourceId&&threadById.has(n.resourceId)?
    (()=>{const thread=threadById.get(n.resourceId!)!;
     if(thread.metadata?.kind==="class_announcement")
      return thread.contextId&&accessibleAnnouncementSections.has(thread.contextId)?
       "/class":null;
-    return memberThreadIds.has(thread.id)?`/messages?thread=${encodeURIComponent(thread.id)}`:null;})():
-   n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${encodeURIComponent(n.resourceId)}`:
-   n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
-   n.type==="course_registration_guardian_review"&&context.role==="guardian"&&n.resourceType==="action"&&n.resourceId&&permittedGuardianCourseActions.has(n.resourceId)?`/guardian/course-approvals?action=${encodeURIComponent(n.resourceId)}`:
-   n.type==="field_trip_permission_requested"&&context.role==="guardian"&&n.resourceType==="field_trip"&&n.resourceId&&guardianTripIds.has(n.resourceId)?`/guardian/field-trips?trip=${encodeURIComponent(n.resourceId)}`:
+    return memberThreadIds.has(thread.id)?`/messages?thread=${compactUuidUrlValue(thread.id)}`:null;})():
+   n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${compactUuidUrlValue(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${compactUuidUrlValue(n.resourceId)}`:
+   n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/admissions?application=${compactUuidUrlValue(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
+   n.type==="course_registration_guardian_review"&&context.role==="guardian"&&n.resourceType==="action"&&n.resourceId&&permittedGuardianCourseActions.has(n.resourceId)?`/guardian/course-approvals?action=${compactUuidUrlValue(n.resourceId)}`:
+   n.type==="field_trip_permission_requested"&&context.role==="guardian"&&n.resourceType==="field_trip"&&n.resourceId&&guardianTripIds.has(n.resourceId)?`/guardian/field-trips?trip=${compactUuidUrlValue(n.resourceId)}`:
    n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
-    n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
+    n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${compactUuidUrlValue(n.resourceId!)}`:"/guardian/group-permissions"):
    n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?shortUuidHref("/sites/", handoffSites.get(n.resourceId)!):
    n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/home#pickup":
-   ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/home?action=${encodeURIComponent(n.resourceId)}`:
+   ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/home?action=${compactUuidUrlValue(n.resourceId)}`:
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"||context.role==="student"?shortUuidHref("/groups/", n.resourceId):null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?shortUuidHref("/groups/",groupBySession.get(n.resourceId)!)+"?session="+compactUuidUrlValue(n.resourceId):null};});
 });
