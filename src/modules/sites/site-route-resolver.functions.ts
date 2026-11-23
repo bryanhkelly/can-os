@@ -23,10 +23,15 @@ export const resolveAuthorizedSiteRoute = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getCommandContext(getRequest());
     if (!actor.actorPersonId || !actor.scope.organizationIds?.length) return null;
-    // Site-scoped delegation must never resolve another Site in the same org.
+    // An explicitly empty Site scope means NO Sites. It must never become
+    // unrestricted Organization access simply because length === 0.
+    if (actor.scope.siteIds && actor.scope.siteIds.length === 0) return null;
+    // Site-scoped grants must stay narrow even when the same Organization
+    // has other Sites. Undefined scope means the actor's Organization-wide
+    // grant may use Site readers, not that the alias confers any capability.
     const restrictions = actor.grantSiteId
       ? [eq(sites.id, actor.grantSiteId)]
-      : actor.scope.siteIds?.length
+      : actor.scope.siteIds
         ? [inArray(sites.id, actor.scope.siteIds)]
         : [];
     const [site] = await db.select({ id: sites.id })
