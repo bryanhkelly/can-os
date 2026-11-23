@@ -35,7 +35,7 @@ export async function loadSiteLaunchView(deps: {
   siteId?: string;
   organizationSlug?: string;
   siteSlug?: string;
-  module?: string;
+  module?: SiteLaunchModuleIdV61;
 }) {
   return safeLoader(async () => {
     const options = await measureServerStep("launch.site", "site-options", () => listLaunchOptions());
@@ -171,13 +171,16 @@ function SiteLaunchPage() {
 }
 
 /** Shared presentation. Both routes load through the same security-scoped read model. */
-export function SiteLaunchView({ outcome, search }: {
+export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
   outcome: Awaited<ReturnType<typeof loadSiteLaunchView>>;
   search: { module?: string; solutionPlanId?: string };
+  friendlyRoute?: boolean;
 }) {
   const navigate = useNavigate();
   if (!outcome.ok) return <LoaderFailure title="Launch Studio" outcome={outcome}/>;
   const { site, sites, organizations, siteInformation, siteGuidePlanning, programsAudiences, marketingPackages, marketingSuggestions, introduceIntent, introduceIntentUnavailable, introduceSiteRevision, prepareIntent, overview, existingPrograms, error } = outcome.data;
+  if (!site && friendlyRoute) return <WorkspaceShell title="Site unavailable" eyebrow="Launch Studio"
+    subtitle="This Site could not be found in your authorized workspace." />;
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
@@ -230,7 +233,7 @@ export function SiteLaunchView({ outcome, search }: {
           Your saved Program planning answers could not be loaded. No changes were made.
           Reload before adding new ideas.
         </WorkspaceNotice>
-        <a href={base + (identity ? "?module=" : "&module=") + programs-audiences"}
+        <a href={base + (identity ? "?module=" : "&module=") + "programs-audiences"}
           className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
           Reload Programs & Audiences
         </a>
@@ -255,7 +258,7 @@ export function SiteLaunchView({ outcome, search }: {
       <p role="alert" className="mt-6 border bg-card p-4 text-sm">
         No packages have been changed. Check your Site access and retry this section.
       </p>
-      <a href={base + (identity ? "?module=" : "&module=") + " + selected.id}
+      <a href={base + (identity ? "?module=" : "&module=") + selected.id}
         className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
         Retry this Share step
       </a>
@@ -284,7 +287,7 @@ export function SiteLaunchView({ outcome, search }: {
       nextAction={overview ? nextLaunchAction(site.id, overview, site.lifecycleStatus, identity ? base : undefined) : {
         title: "Review Site Information",
         description: "Saved launch progress has not yet been verified.",
-        href: base + (identity ? "?module=" : "&module=") + site-information",
+        href: base + (identity ? "?module=" : "&module=") + "site-information",
       }}
       previewUrl={site.websiteDraft ? "/launch/site-preview?siteId=" + encodeURIComponent(site.id) : null}
       workspaceUrl={"/sites/" + encodeURIComponent(site.id)}
