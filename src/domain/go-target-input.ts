@@ -36,7 +36,7 @@ export function resolveGoTargetInput(
   let candidate: string | null = null;
   if (kind === "class") {
     const path = parsed.pathname.match(/^\/class\/([^/]+)\/?$/);
-    if (path && !parsed.search) candidate = path[1];
+    if (path && !parsed.search) candidate = path[1] ?? null;
     else if (parsed.pathname === "/class" &&
         [...parsed.searchParams.keys()].every(key => key === "classId") &&
         parsed.searchParams.getAll("classId").length === 1)
@@ -48,7 +48,7 @@ export function resolveGoTargetInput(
       candidate = parsed.searchParams.get("release");
   } else {
     const path = parsed.pathname.match(/^\/enrichment\/([^/]+)\/?$/);
-    if (path && !parsed.search) candidate = path[1];
+    if (path && !parsed.search) candidate = path[1] ?? null;
   }
   return candidate ? decodeUuidPathParam(candidate) : null;
 }
