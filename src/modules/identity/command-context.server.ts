@@ -1,6 +1,6 @@
 import {and,eq,gt,isNull,inArray,isNotNull} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,programs,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
