@@ -44,8 +44,8 @@ export function renderPrivateWebsitePreviewHtml(
   // who may not hold the separately granted website-editor role. Return them
   // to their actual Launch destination instead of linking to a forbidden editor.
   const returnHref = kind==="site"
-    ? `/launch/site?siteId=${encodeURIComponent(siteId)}`
-    : `/launch/website?siteId=${encodeURIComponent(siteId)}&amp;returnToHub=true&amp;step=review`;
+    ? `/launch/site?siteId=${encodeURIComponent(encodeUuidForPath(siteId))}`
+    : `/launch/website?siteId=${encodeURIComponent(encodeUuidForPath(siteId))}&amp;returnToHub=true&amp;step=review`;
   const returnLabel = kind==="site"?"Return to Launch Studio":"Return to Website &amp; Brand Studio";
   const banner = `<aside class="can-private-preview" role="status">
   <strong>Private ${kind === "site" ? "Site" : "school"} website preview</strong>
