@@ -1,3 +1,4 @@
+import { sharedPhotoReferenceSchema } from "@/domain/template-sample-images";
 import { db } from "@/db/client";
 import { siteBrandConfigurationSchema } from "@/domain/site-brand";
 import { assetInputSchema } from "./site-brand.functions";
@@ -75,6 +76,7 @@ const localContentSchema = z.object({
     templateId: z.enum(siteTemplateIds).optional(),
     headingFontId: z.enum(siteFontIds).optional(),
     bodyFontId: z.enum(siteFontIds).optional(),
+    sharedHeroPhoto:sharedPhotoReferenceSchema.nullable().optional(),
     heroImage: z.object({
       dataUrl: z.string().max(siteLocalImageMaxBase64Length + 32),
       altText: z.string().max(180),

@@ -1,3 +1,4 @@
+import { sharedPhotoReferenceSchema, type SharedPhotoReference } from "./template-sample-images";
 import { siteBrandDirectionIds, type SiteBrandDirectionId } from "./site-brand-direction";
 import type { SiteExperienceProfile } from "./site-website-experience";
 import { isSiteFontId, type SiteFontId, sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
@@ -67,6 +68,7 @@ export type SiteLocalBranding = {
   /** Structural template is versioned with local branding, not Program facts. */
   templateId?: SiteTemplateId;
   heroImage: SiteLocalImage | null;
+  sharedHeroPhoto?: SharedPhotoReference | null;
   logoImage?: SiteLocalImage | null;
   /** Curated, accessible local identity. Optional for historical revisions. */
   paletteId?: SitePaletteId;
@@ -432,6 +434,7 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   result.branding = { theme: branding.theme, paletteId, typographyId, templateId,
     ...(branding.brandDirectionId ? {brandDirectionId:branding.brandDirectionId} : {}), ...fontOverrides,
     heroImage: normalizeArtwork(branding.heroImage),
+    ...(branding.sharedHeroPhoto && !branding.heroImage ? {sharedHeroPhoto:sharedPhotoReferenceSchema.parse(branding.sharedHeroPhoto)} : {}),
     ...(branding.logoImage !== undefined ? { logoImage: normalizeArtwork(branding.logoImage) } : {}),
   };
   if (input.leadershipMembers !== undefined) {

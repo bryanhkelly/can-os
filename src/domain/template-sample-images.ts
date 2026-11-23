@@ -1,3 +1,4 @@
+import { z } from "zod";
 import manifest from "./template-sample-assets.json";
 import {siteTemplateIds, type SiteTemplateId} from "./site-theme";
 
@@ -51,3 +52,9 @@ export function templateSampleImage(
 ):string {
   return `/template-photo/${encodeURIComponent(template)}/${encodeURIComponent(role)}?v=${TEMPLATE_PHOTO_LIBRARY_REVISION}`;
 }
+
+export const sharedPhotoRoles = ["hero","story_01","story_02","program_01","program_02","program_03","community_01","community_02","admissions","portrait_01","portrait_02","portrait_03"] as const satisfies readonly TemplatePhotographyRole[];
+export const sharedPhotoReferenceSchema=z.object({template:z.enum(siteTemplateIds),role:z.enum(sharedPhotoRoles),revision:z.literal(TEMPLATE_PHOTO_LIBRARY_REVISION)}).strict();
+export type SharedPhotoReference=z.infer<typeof sharedPhotoReferenceSchema>;
+export const sharedPhotoDisclosure="Illustrative generated photography; not actual Site students, staff or facilities.";
+export function sharedPhotoUrl(reference:SharedPhotoReference){const photo=sharedPhotoReferenceSchema.parse(reference);return templateSampleImage(photo.template,photo.role);}

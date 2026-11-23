@@ -22,9 +22,6 @@ export const Route=createFileRoute("/template-photo-status")({
     const url=new URL(request.url),name=url.searchParams.get("template");
     if(!name||!siteTemplateIds.includes(name as SiteTemplateId))return unavailable(404);
     const template=name as SiteTemplateId;
-    if(process.env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE!=="true")
-      return Response.json({template,generated:0,total:12,active:false},{
-        headers:{"Cache-Control":"public, max-age=60"}});
     try{
       let generated=0;
       const ready:string[]=[];
@@ -36,7 +33,7 @@ export const Route=createFileRoute("/template-photo-status")({
         if(response.ok){generated++;ready.push(role);}
         else if(response.status!==404)return unavailable(503);
       }
-      return Response.json({template,generated,total:12,ready,active:true},{
+      return Response.json({template,generated,total:12,ready,active:process.env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{
         headers:{"Cache-Control":"public, max-age=60","X-Content-Type-Options":"nosniff"}});
     }catch{return unavailable(503);}
   }}},

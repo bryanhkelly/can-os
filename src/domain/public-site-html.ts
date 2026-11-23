@@ -8,7 +8,7 @@ import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome } from "./public-site-templates";
 import { publicSiteStyles } from "./public-site-styles";
 import { schoolBrandMonogram } from "./school-brand-identity";
-import { templateSampleImage } from "./template-sample-images";
+import { templateSampleImage, sharedPhotoUrl, sharedPhotoDisclosure } from "./template-sample-images";
 import { templateResponsiveAttributes,templateHeroPictureSources } from "./template-photo-responsive";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -288,8 +288,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   };
   const heroMedia=ownedMedia("hero");
   const approvedHero=heroMedia?.assetId==="template-sample"?null:heroMedia;
-  const heroPhotoSrc=image?.dataUrl ?? heroMedia?.src;
-  const heroPhotoAlt=image?.altText ?? heroMedia?.altText ?? "";
+  const sharedHero=local?.branding.sharedHeroPhoto;
+  const heroPhotoSrc=image?.dataUrl ?? (sharedHero?sharedPhotoUrl(sharedHero):heroMedia?.src);
+  const heroPhotoAlt=image?.altText ?? (sharedHero?sharedPhotoDisclosure:heroMedia?.altText) ?? "";
   const mediaImageAttributes = (media: PublicSchoolSiteMedia[keyof PublicSchoolSiteMedia] | null) => {
     if (!media) return "";
     const dimensions = media.width && media.height ? ` width="${media.width}" height="${media.height}"` : "";
@@ -511,7 +512,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
       (!availablePaths.includes("/academics") && availablePaths.includes("/contact")
         ? '<a class="hero-text-link" href="/contact">Contact information →</a>' : ""),
-    image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt,image?undefined:heroMedia??undefined):"",
+    image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt,image||sharedHero?undefined:heroMedia??undefined)+(sharedHero&&!image?'<span style="position:absolute;bottom:0;right:0;z-index:2;background:#fff;color:#222;padding:4px 8px;font-size:12px">Illustrative image</span>':""):"",
     mosaicImages: campusMosaicImages,
   });
   // The homepage introduces the Site; detailed local content belongs on
