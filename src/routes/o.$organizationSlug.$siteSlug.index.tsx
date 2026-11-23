@@ -5,7 +5,7 @@ import { readSiteToday, SiteTodayView } from "./sites.$siteId.index";
 export const Route = createFileRoute("/o/$organizationSlug/$siteSlug/")({
   loader: async ({ params }) => {
     const siteId = await resolveAuthorizedSiteRoute({ data: params });
-    return readSiteToday(siteId ?? "unavailable");
+    return readSiteToday(siteId);
   },
   component: FriendlySiteTodayPage,
 });
