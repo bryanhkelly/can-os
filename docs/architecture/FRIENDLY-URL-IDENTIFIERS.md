@@ -50,3 +50,9 @@ Focused acceptance: `npm run test:urls:unit` and `npm run db:check:journal`.
 - Separately compiled the Go target parser and UUID codec with the repository's strict TypeScript settings on a local isolated copy. Seven valid and nine invalid sample link cases passed. This is focused parser verification, **not** an exact-repository typecheck.
 - Ran the Node release-gate tests in isolation: 5/5 passed. This is contract behavior verification, not an actual migrated-Neon acceptance test.
 - Go Links creation accepts an internal Class, training release or enrichment link, a 22-character compact ID, or a canonical UUID. Absolute links must have the same origin as the app. Outbound navigation remains governed by the server's destination allowlist.
+
+## Three linked services
+
+For the managed Go Link capability, see [Link infrastructure: Manage, Resolve, Measure](./GO-LINK-PLATFORM-CAPABILITIES.md). It defines the link lifecycle, reusable destination registry, privacy-minimized outcome evidence and additive `0107` migration.
+
+Public short-link copying requires a verified `CAN_ACCESS_PUBLIC_ORIGIN`; a staging or preview hostname is never silently distributed.
