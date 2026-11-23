@@ -75,9 +75,14 @@ export function opaqueUuidPathParam<K extends string>(key: K) {
   };
 }
 
-/** For domain link strings: compact UUIDs, preserve legacy escaping for other
- * values until their owning route validates or rejects the reference. */
-export function shortUuidHref(prefix: string, reference: string): string {
+/** Use only for explicitly identified URL selectors. Preserve existing
+ * URL-escaping for non-UUID values while real IDs become short. */
+export function compactUuidUrlValue(reference: string): string {
   const uuid = decodeUuidPathParam(reference);
-  return prefix + (uuid ? encodeUuidForPath(uuid) : encodeURIComponent(reference));
+  return uuid ? encodeUuidForPath(uuid) : encodeURIComponent(reference);
+}
+
+/** For domain link strings, preserving prior behavior for non-UUID fixtures. */
+export function shortUuidHref(prefix: string, reference: string): string {
+  return prefix + compactUuidUrlValue(reference);
 }
