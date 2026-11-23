@@ -104,6 +104,15 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(read("src/components/workspace/selection-card.tsx")).not.toContain('layout?: "horizontal" | "vertical"');
   });
 
+  it("does not repeat Launch Studio page headers inside guided workflow cards", () => {
+    const siteInfo = read("src/components/launch-studio/EstablishSiteInformationV61.tsx");
+    const launchRoute = read("src/routes/launch.site.tsx");
+    const website = read("src/routes/site-website.tsx");
+    expect(siteInfo).toContain('<GuidedSetupShell title="Site Information" showHeader={false}');
+    expect(launchRoute).toContain('WorkspaceShell title="Programs & Audiences"');
+    expect(website).toContain('title="Website & Brand" showHeader={false}');
+  });
+
   it("reuses internal-step visuals and exposes selectable preview states", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
