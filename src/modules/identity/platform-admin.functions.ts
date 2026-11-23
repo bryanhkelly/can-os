@@ -59,7 +59,23 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     // A record's presence is not a current authorization decision.
     const publisherReleaseRows=await db.execute(sql`
       SELECT ov.id AS "offeringVersionId",o.title AS "offeringTitle",
-        ov.version_no AS "versionNo",ov.lifecycle,
+        o.code AS "offeringCode",ov.version_no AS "versionNo",ov.lifecycle,
+        training.state AS "noncreditTrainingStatus",
+        assessment.lifecycle AS "noncreditAssessmentStatus",
+        (training.approved_by_person_id IS NOT NULL) AS "noncreditTrainingApproved",
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id) AS "pilotLessonCount",
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id AND cl.content->>'placeholder'='true')
+          AS "pilotPlaceholderCount",
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id AND
+            (cl.content->>'requiresPartnerContentApproval'='true' OR
+             cl.content->>'requiresIndependentReview'='true'))
+          AS "pilotContentReviewCount",
         (SELECT count(*)::int FROM public.offering_courses oc
           WHERE oc.offering_version_id=ov.id) AS "courseCount",
         (SELECT count(*)::int FROM public.offering_courses oc
@@ -129,7 +145,10 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
           AS "approvedAdoptions"
       FROM public.offering_versions ov
       JOIN public.offerings o ON o.id=ov.offering_id
-      ORDER BY o.title,ov.version_no DESC,ov.id
+      LEFT JOIN public.noncredit_training_versions training ON training.offering_version_id=ov.id
+      LEFT JOIN public.assessment_versions assessment ON assessment.id=training.assessment_version_id
+      ORDER BY CASE WHEN o.code IN ('CLC-CUSTOM-TRAINING-01','CLC-DIGITAL-01') THEN 0 ELSE 1 END,
+        o.title,ov.version_no DESC,ov.id
       LIMIT 26
     `);
     // Keep the sensitive review UI unavailable until the approved QA/prod
@@ -160,6 +179,13 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
       publisherReleasesLimited:publisherReleaseRows.rows.length>25,
       publisherReleaseReadiness:publisherReleaseRows.rows.slice(0,25).map(row=>({
         offeringVersionId:String(row.offeringVersionId),
+        offeringCode: String(row.offeringCode??""),
+        noncreditTrainingStatus: row.noncreditTrainingStatus===null?null:String(row.noncreditTrainingStatus),
+        noncreditAssessmentStatus: row.noncreditAssessmentStatus===null?null:String(row.noncreditAssessmentStatus),
+        noncreditTrainingApproved: row.noncreditTrainingApproved===true,
+        pilotLessonCount: Number(row.pilotLessonCount??0),
+        pilotPlaceholderCount: Number(row.pilotPlaceholderCount??0),
+        pilotContentReviewCount: Number(row.pilotContentReviewCount??0),
         offeringTitle:String(row.offeringTitle),
         versionNo:Number(row.versionNo),
         lifecycle:String(row.lifecycle),
