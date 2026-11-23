@@ -20,6 +20,7 @@ vi.mock("@/modules/identity/anonymous-auth-admission.server", () => ({
 import "@/routes/site.new";
 
 const input = { name: "Valor Learning Center", organizationName: "Grace Community Church",
+  organizationType: "other_partner",
   firstName: "Alex", lastName: "Leader", email: "admin@example.org" };
 function request(body: unknown, origin = "https://example.org") {
   return new Request("https://example.org/site/new", { method: "POST",
@@ -37,6 +38,16 @@ describe("/site/new signup boundary", () => {
     expect(response.status).toBe(202);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(state.signup).toHaveBeenCalledWith(input);
+  });
+  it("keeps a denomination request provisional rather than granting network authority", async () => {
+    const data = { ...input, name: "National Learning Center",
+      organizationName: "National Faith Network", organizationType: "denomination" };
+    expect((await state.post!({ request: request(data) })).status).toBe(202);
+    expect(state.signup).toHaveBeenCalledWith(data);
+  });
+  it("rejects CAN-owned network classification from public signup", async () => {
+    expect((await state.post!({ request: request({ ...input, organizationType: "can_network" }) })).status).toBe(400);
+    expect(state.signup).not.toHaveBeenCalled();
   });
   it("rejects cross-origin, oversize, and role or demo payloads", async () => {
     expect((await state.post!({ request: request(input, "https://evil.example") })).status).toBe(403);
