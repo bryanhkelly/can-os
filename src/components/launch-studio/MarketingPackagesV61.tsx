@@ -608,7 +608,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           packageReleases.some(version=>version.formats.includes("email")))&&
           <section id="launch-outreach-email">
           <MarketingEmailCampaignV61
-            key={record.id+":"+(latestEmailRelease?.id??"pending")}
+            key={record.id}
             siteId={siteId} packageId={record.id}
             releaseId={latestEmailRelease?.id??null}
             emailOutputId={latestEmailOutput?.id??null}
