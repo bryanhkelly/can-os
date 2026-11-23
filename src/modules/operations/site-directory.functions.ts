@@ -18,6 +18,7 @@ export const listMySites = createServerFn({ method: "GET" }).handler(async () =>
   if (!siteIds.length || !organizationIds.length) return [];
   return db.select({
     id: sites.id, name: sites.name, timezone: sites.timezone,
+    slug: sites.slug, organizationSlug: organizations.slug,
     organizationName: organizations.name,
   }).from(sites)
     .innerJoin(organizations, eq(organizations.id, sites.organizationId))
