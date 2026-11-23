@@ -148,6 +148,19 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(frame).toContain("Shape · Share · Prepare · Launch");
   });
 
+  it("keeps Publish Website and Opening Checklist card headings distinct from H1", () => {
+    const publication = read("src/components/launch-studio/LaunchSitePublicationPanel.tsx");
+    const readiness = read("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
+    const opening = read("src/components/launch-studio/LaunchModuleDestinationV61.tsx");
+
+    expect(publication).toContain('<WorkspacePanel title="Final website checks"');
+    expect(publication).not.toContain('<WorkspacePanel title="Publish your website"');
+    expect(readiness).toContain('context==="open" ? "Readiness status"');
+    expect(readiness).not.toContain('"Your opening checklist"');
+    expect(opening).toContain('"Next steps to open"');
+    expect(opening).not.toContain('"Welcome participants"');
+  });
+
   it("reuses internal-step visuals and exposes selectable preview states", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");
