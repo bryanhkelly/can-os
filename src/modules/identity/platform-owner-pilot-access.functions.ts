@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { readOwnerPilotLocations, ownerPilotGrantInput, provisionOwnerPilotRole } from "./platform-owner-pilot-access.server";
+import { readOwnerPilotLocations, provisionOwnerPilotRole } from "./platform-owner-pilot-access.server";
+import { ownerPilotGrantInput } from "@/domain/platform-owner-pilot-roles";
 
 const noStore=()=>setResponseHeader("Cache-Control","private, no-store");
 export const getPlatformOwnerPilotLocations=createServerFn({method:"GET"})
