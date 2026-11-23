@@ -14,7 +14,7 @@
 ## Deployment order and guards
 
 1. Ensure the preceding SQL migrations (including 0105 Site Go Links and 0106 private-role hardening) have been independently reviewed and applied on the chosen environment. Do **not** run automatic production migrations.
-2. Run `npm run db:check:friendly-urls:deploy` using the exact deployment `DATABASE_URL`. The read-only preflight checks the Neon project/branch, required tables, Go Link unique code index, RLS, and no anonymous/authenticated direct SQL privilege. It fails closed.
+2. Run `npm run db:check:friendly-urls:deploy` using the exact deployment `DATABASE_URL`. The gate checks **all recorded migrations from 0100 through the current release tip**, not only Go Links; production was observed at 0099 on November 23, 2026. The read-only preflight checks the Neon project/branch, required tables, Go Link unique code index, RLS, and no anonymous/authenticated direct SQL privilege. It fails closed.
 3. Run `npm run deploy:cloudflare`, whose script includes this preflight before the Cloudflare build/deployment. Netlify production builds remain disabled by the repo's existing production ignore configuration.
 4. Roll back application deployment to the last known good build if needed. The additive Go Link table migrations are not reverted automatically; rolling back the database is unnecessary for a code rollback.
 
@@ -40,3 +40,13 @@ Exact-SHA TypeScript, unit/integration tests, production build, Cloudflare CI, b
 - Dedicated private preview sharing remains a separate expiring/revocable server workflow. Do not interchange those token-bearing URLs with ordinary copy controls.
 
 Focused acceptance: `npm run test:urls:unit` and `npm run db:check:journal`.
+
+## Operational validation evidence (November 23, 2026)
+
+- Verified read-only: the Neon `can-os` default/main database migration ledger has **101 records**, with the maximum recorded migration timestamp matching journal entry `0099_site_level_public_interest`. No migration beyond 0099 was confirmed applied.
+- Verified read-only: direct `SELECT` on `public.sites` and `public.organizations` is denied to the `anonymous` and `authenticated` database roles. Production `neondb_owner` has bypass-RLS permissions; application authorization must continue checking effective Site and Organization grants independently.
+- No `public.site_go_links` table is present yet. The deployment preflight is expected to block.
+- Retried CI and full-schema GitHub Actions: both failed before a runner was assigned (`runner_id=0`), with zero steps and `BlobNotFound` logs. No TypeScript or test result may be inferred.
+- Separately compiled the Go target parser and UUID codec with the repository's strict TypeScript settings on a local isolated copy. Seven valid and nine invalid sample link cases passed. This is focused parser verification, **not** an exact-repository typecheck.
+- Ran the Node release-gate tests in isolation: 5/5 passed. This is contract behavior verification, not an actual migrated-Neon acceptance test.
+- Go Links creation accepts an internal Class, training release or enrichment link, a 22-character compact ID, or a canonical UUID. Absolute links must have the same origin as the app. Outbound navigation remains governed by the server's destination allowlist.
