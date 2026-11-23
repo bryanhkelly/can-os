@@ -6,6 +6,7 @@ import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPan
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { getSiteToday } from "@/modules/operations/site-today.functions";
+import { AuthorizationError } from "@/domain/command-context";
 import { StatCard, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -18,9 +19,12 @@ import { plural } from "@/lib/format";
 import { friendlySiteBase, type FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 
 /** Reuse the exact authorized Site Today read for either URL identity. */
-export function readSiteToday(siteId: string) {
+export function readSiteToday(siteId: string | null) {
   return safeLoader(
-    () => getSiteToday({ data: { siteId } }),
+    () => {
+      if (!siteId) throw new AuthorizationError("site.today.read");
+      return getSiteToday({ data: { siteId } });
+    },
     { authMessage: "You do not have access to this school site." },
   )();
 }
