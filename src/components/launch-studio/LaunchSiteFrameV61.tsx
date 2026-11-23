@@ -9,14 +9,16 @@ import type { LaunchModuleCompletion } from "@/domain/launch-module-completion-v
 import { LaunchSiteNavigation } from "./LaunchSiteNavigationV61";
 import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
+import { SiteLinkSharing } from "./SiteLinkSharing";
 import { LaunchNavigationGuardProvider } from "./LaunchNavigationGuardProvider";
 import { LaunchAccountControls } from "@/components/shell/LaunchAccountControls";
 
-export function LaunchSiteFrame({ site, identity, active, previewHref, statusLabel, previewAvailable = true, completion = {}, children }: {
+export function LaunchSiteFrame({ site, identity, active, previewHref, statusLabel, publishedHost, previewAvailable = true, completion = {}, children }: {
   site: { id: string; name: string };
   identity?: FriendlySiteIdentity;
   active?: string;
   previewHref?: string;
+  publishedHost?: string;
   statusLabel?: string;
   previewAvailable?: boolean;
   completion?: LaunchModuleCompletion;
@@ -53,6 +55,7 @@ export function LaunchSiteFrame({ site, identity, active, previewHref, statusLab
           <span className="hidden border-l pl-3 text-xs text-muted-foreground sm:inline">Shape · Share · Prepare · Launch</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-4">
+          <SiteLinkSharing siteId={site.id} identity={identity} publishedHost={publishedHost} />
           {previewAvailable && active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
           {previewAvailable ? <Button asChild variant="ghost" size="sm" className="min-h-11">
             <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(encodeUuidForPath(site.id))} target="_blank" rel="noopener noreferrer">

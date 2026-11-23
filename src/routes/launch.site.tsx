@@ -209,7 +209,8 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
   const statusLabel = launchSiteLifecycleLabel(site.lifecycleStatus);
   return <LaunchSiteFrame site={site} identity={identity ?? undefined} active={search.module} statusLabel={statusLabel}
     completion={launchModuleCompletionV61(site, overview)}
-    previewAvailable={Boolean(site.websiteDraft)}>
+    previewAvailable={Boolean(site.websiteDraft)}
+    publishedHost={site.websiteDraft?.status === "published" ? site.websiteDraft.host : undefined}>
     {selected?.id === "site-profile" ? <WorkspaceShell title="Site Profile"
       eyebrow="Shape / Site Profile"
       subtitle="Confirm your Site identity and add contact or location details when available."

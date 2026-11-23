@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import { buildUrlDestination } from "@/domain/url-destinations";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
 import type { GoDestination } from "@/domain/site-go-links";
@@ -84,12 +86,6 @@ export function GoLinkWorkspace({ siteId, packageId }: { siteId: string; package
     } catch (cause) {setError(textError(cause));}
     finally {setBusy(false);}
   }
-  async function copy(code: string) {
-    try {
-      await navigator.clipboard.writeText(window.location.origin + "/go/" + code);
-      setNotice("Go link copied.");setError("");
-    } catch {setError("Copy failed. Select the displayed path and copy it manually.");}
-  }
   return <WorkspacePanel title="Go links" description="Create a short, revocable link that opens the right public page or registration experience. Links never grant access or enroll a participant.">
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       <label className="grid gap-1 text-sm font-medium">Destination
@@ -124,11 +120,11 @@ export function GoLinkWorkspace({ siteId, packageId }: { siteId: string; package
       {!links.length&&<p className="text-sm text-muted-foreground">No Go links have been created for this outreach plan.</p>}
       {links.map(link=><div key={link.id} className="flex flex-wrap items-center justify-between gap-3 border p-3">
         <div className="min-w-0">
-          <p className="font-mono text-sm select-all">/go/{link.code}</p>
+          <p className="font-mono text-sm select-all">{buildUrlDestination({kind:"go",code:link.code}).href}</p>
           <p className="mt-1 text-xs text-muted-foreground">{labels[link.destination.kind]} · {link.status === "active"?"Active":"Revoked"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={link.status!=="active"} onClick={()=>void copy(link.code)}>Copy link</Button>
+          {link.status === "active" && <CopyLinkButton destination={{kind:"go",code:link.code}} />}
           <Button type="button" variant="outline" size="sm" disabled={busy||link.status!=="active"} onClick={()=>void revoke(link)}>Revoke</Button>
         </div>
       </div>)}

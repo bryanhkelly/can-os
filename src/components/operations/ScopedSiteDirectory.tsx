@@ -1,6 +1,7 @@
 import type {ReactNode} from "react";
 import {Link} from "@tanstack/react-router";
 import { validFriendlySlug } from "@/domain/friendly-site-urls";
+import { CopyLinkButton } from "@/components/links/CopyLinkButton";
 
 /**
  * Scope-neutral Site directory presentation. Its callers supply only Sites
@@ -31,6 +32,13 @@ export function ScopedSiteDirectory({sites,emptyMessage,profileLinks=false}:{
       {site.organizationName&&<p className="mt-2 text-sm text-muted-foreground">{site.organizationName}</p>}
       {site.slug&&<p className="mt-2 text-xs text-muted-foreground">{site.slug}</p>}
       <p className="mt-2 text-xs text-muted-foreground">Time zone: {site.timezone}</p>
+      {profileLinks && <CopyLinkButton className="mt-3" label="Copy profile link"
+        destination={{kind:"site-profile",siteId:site.id,
+          identity: site.organizationSlug && site.slug && validFriendlySlug(site.organizationSlug) &&
+            validFriendlySlug(site.slug) ? {
+              organizationSlug:site.organizationSlug,siteSlug:site.slug,
+            } : undefined,
+        }} />}
     </article>)}
     {!sites.length&&<p className="border border-border bg-card p-5 text-sm text-muted-foreground">{emptyMessage}</p>}
   </div>;
