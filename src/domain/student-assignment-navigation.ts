@@ -11,7 +11,10 @@ export function studentAssignmentHref(assessmentId: string, options: {
   filter?: StudentAssignmentFilter;
 } = {}): string {
   const search = new URLSearchParams();
-  if (options.sectionId) search.set("section", decodeUuidPathParam(options.sectionId) ? encodeUuidForPath(decodeUuidPathParam(options.sectionId)!) : options.sectionId);
+  if (options.sectionId) {
+    const canonical = decodeUuidPathParam(options.sectionId);
+    search.set("section", canonical ? encodeUuidForPath(canonical) : options.sectionId);
+  }
   if (options.filter) search.set("filter", options.filter);
   const suffix = search.toString();
   return `/student/assignments/${compactUuidUrlValue(assessmentId)}${suffix ? `?${suffix}` : ""}`;
