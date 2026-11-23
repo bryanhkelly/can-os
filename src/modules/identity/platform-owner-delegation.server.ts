@@ -6,6 +6,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { accessSessionCookie, hashAccessSecret, sessionIdleCutoff } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { roleCapabilities } from "@/domain/access-context";
+import { platformOwnerMayActAs, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readSessionGrants } from "./session-grants.server";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
@@ -18,7 +19,7 @@ const delegationRequest = z.object({
   reason: z.string().trim().min(12).max(500),
 }).strict();
 export type PlatformOwnerDelegationRequest = z.infer<typeof delegationRequest>;
-export const ownerDelegationLifetimeMs = 15 * 60 * 1000;
+
 
 /** The caller's signed cookie and original account-wide owner membership,
  * NOT the effective impersonated identity, are the authority for this operation.
@@ -148,10 +149,7 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
     await assertRawAccountPerson(target.accountId, target.personId);
     // Do not let delegation authorize a simulated independent reviewer decision.
     // Reviewer roles may be inspected with "View as" only.
-    const protectedRoles = ["academic_content_reviewer", "can_credential_reviewer",
-      "can_jurisdiction_reviewer", "can_network_steward", "app_admin",
-      "network_admin", "safeguarding_responder", "safeguarding_lead"];
-    if (data.mode === "act" && protectedRoles.includes(target.role))
+    if (data.mode === "act" && !platformOwnerMayActAs(target.role))
       throw new AuthorizationError("independent role: use View as");
     const [changed] = await tx.update(accessSessions).set({
       delegatedGrantId: target.grantId, delegatedMode: data.mode,
