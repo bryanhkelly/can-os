@@ -353,8 +353,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   });
 
   return <section aria-label="Site Information" className="min-w-0 space-y-5">
-    <GuidedSetupShell title="Site Information"
-      description="Tell us about your community, how people will take part and what inspires you."
+    <GuidedSetupShell title="Site Information" showHeader={false}
       steps={progressSteps} progressLabel="Site Information sections"
       onStepChange={id => selectStep(Number(id) as Step)}
       navigationDisabled={busy || reloadRequired}>
