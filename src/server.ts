@@ -2,6 +2,7 @@ import handler from "@tanstack/react-start/server-entry";
 import type {PhotoWorkerEnv} from "./platform/photography/cloudflare-production.server";
 import {withRequestDatabase} from "./db/client";
 import {runSessionDeviceRetention} from "./workers/session-device-retention";
+import {classifyCloudflareCron} from "./domain/cloudflare-cron-policy";
 import { cloudflareIngressConfiguration, isCloudflareWorkerRuntime } from "./domain/worker-database-scope";
 type CloudflareScheduledEnv=PhotoWorkerEnv&{
  DATABASE_URL?:string;
@@ -34,18 +35,22 @@ export default {
     }
     return handler.fetch(request);
   },
-  scheduled(_event:unknown,env:CloudflareScheduledEnv,ctx:{waitUntil(task:Promise<unknown>):void}):void {
-    ctx.waitUntil(import("./platform/photography/cloudflare-production.server")
-      .then(({runBoundTemplatePhotoProduction})=>runBoundTemplatePhotoProduction(env))
-      .then(result=>console.info("CAN photography cron result",result))
-      .catch(error=>console.error("CAN photography cron failed",{
-        type:error instanceof Error?error.name:"unknown",
-        message:error instanceof Error?error.message.slice(0,130):"unknown",
-      })));
-    // The same durable outbox is also handled by the Node maintenance runner.
-    // DB row leases make both paths safe if they overlap. Mail is sent only
-    // after the invitation transaction has committed and is reauthorized.
-    if(env.DATABASE_URL){
+  scheduled(event:{cron?:string},env:CloudflareScheduledEnv,ctx:{waitUntil(task:Promise<unknown>):void}):void {
+    const task=classifyCloudflareCron(event.cron);
+    // The photo pipeline uses R2 and does not touch Neon; keep its minute tick.
+    if(task==="photography"){
+      ctx.waitUntil(import("./platform/photography/cloudflare-production.server")
+        .then(({runBoundTemplatePhotoProduction})=>runBoundTemplatePhotoProduction(env))
+        .then(result=>console.info("CAN photography cron result",result))
+        .catch(error=>console.error("CAN photography cron failed",{
+          type:error instanceof Error?error.name:"unknown",
+          message:error instanceof Error?error.message.slice(0,130):"unknown",
+        })));
+    }
+    // Every 15 minutes, not every minute. The existing durable database
+    // leases and provider receipts preserve idempotency with Netlify's
+    // scheduled maintenance runner, which uses the same cadence.
+    if(task==="deliveries" && env.DATABASE_URL){
       ctx.waitUntil(withRequestDatabase(
         async()=>{
           const {processNoncreditWaitlistEmailDeliveries}=await import(
@@ -62,10 +67,6 @@ export default {
           type:error instanceof Error?error.name:"unknown",
         });
       }));
-    }
-    // Class participant mail uses the same durable claim/lease protocol as the
-    // Node maintenance runner. Duplicate cron invocations cannot claim one receipt.
-    if(env.DATABASE_URL){
       ctx.waitUntil(withRequestDatabase(
         async()=>{
           const {processClassParticipantDeliveries}=await import(
@@ -83,16 +84,16 @@ export default {
         });
       }));
     }
-    // Independent of photography. A Neon transaction lease prevents more
-    // than one actual cleanup per 24 hours on the once-a-minute Worker cron.
-    if(env.CAN_SESSION_DEVICE_RETENTION_ENABLED==="1"){
+    // One daily attempt is enough: the existing transactional lease still
+    // enforces once-per-day cleanup. Never open Neon on the photo-only tick.
+    if(task==="retention" && env.DATABASE_URL &&
+      env.CAN_SESSION_DEVICE_RETENTION_ENABLED==="1"){
       ctx.waitUntil(withRequestDatabase(
         () => runSessionDeviceRetention(true),
-        env.DATABASE_URL??process.env.DATABASE_URL,
+        env.DATABASE_URL,
       ).then(executed=>{
         if(executed)console.info("CAN session metadata retention completed");
       }).catch(error=>{
-        // Logs never contain raw network addresses, database URLs or SQL.
         console.error("CAN session metadata retention failed",{
           type:error instanceof Error?error.name:"unknown",
         });
