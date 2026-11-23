@@ -89,9 +89,9 @@ export const siteRouteAliases = pgTable(
   {
     id: id(),
     organizationId: uuid("organization_id").notNull()
-      .references(() => organizations.id, { onDelete: "restrict" }),
+      .references(() => organizations.id, { onDelete: "cascade" }),
     siteId: uuid("site_id").notNull()
-      .references(() => sites.id, { onDelete: "restrict" }),
+      .references(() => sites.id, { onDelete: "cascade" }),
     organizationSlug: text("organization_slug").notNull(),
     siteSlug: text("site_slug").notNull(),
     createdAt: createdAt(),
