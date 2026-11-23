@@ -75,11 +75,13 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
               </Link>
               {journey.facilitatedFourSessions&&<Link to="/canonical/lab/facilitated" search={{siteId}}
                 className="font-semibold text-primary underline">Manage dated Classes</Link>}
-              {journey.solution?.offeringCode && <Link to="/programs/noncredit/enrollment"
-                search={{publicSiteId:siteId,offeringCode:journey.solution.offeringCode}}
-                className="font-semibold text-primary underline">
-                Review registration for this offering
-              </Link>}
+              {journey.solution?.offeringCode && context==="open" &&
+                noncredit.state==="ready" && (journey.publisherCandidateCount??0)>0 &&
+                <Link to="/programs/noncredit/enrollment"
+                  search={{publicSiteId:siteId,offeringCode:journey.solution.offeringCode}}
+                  className="font-semibold text-primary underline">
+                  Manage approved registration for this Site (provider only)
+                </Link>}
             </div>
           </li>)}
         </ul>}
