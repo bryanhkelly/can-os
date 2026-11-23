@@ -3,7 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { organizations, sites } from "@/db/schema";
+import { siteRouteAliases, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { validFriendlySlug } from "@/domain/friendly-site-urls";
 
@@ -30,11 +30,12 @@ export const resolveAuthorizedSiteRoute = createServerFn({ method: "GET" })
         ? [inArray(sites.id, actor.scope.siteIds)]
         : [];
     const [site] = await db.select({ id: sites.id })
-      .from(sites)
-      .innerJoin(organizations, eq(organizations.id, sites.organizationId))
+      .from(siteRouteAliases)
+      .innerJoin(sites, eq(sites.id, siteRouteAliases.siteId))
       .where(and(
-        eq(organizations.slug, data.organizationSlug),
-        eq(sites.slug, data.siteSlug),
+        eq(siteRouteAliases.organizationSlug, data.organizationSlug),
+        eq(siteRouteAliases.siteSlug, data.siteSlug),
+        eq(siteRouteAliases.organizationId, sites.organizationId),
         inArray(sites.organizationId, actor.scope.organizationIds),
         ...restrictions,
       )).limit(1);
