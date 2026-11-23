@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -100,9 +99,9 @@ export function PlatformReleaseCenter({records,limited}:{
             {" "}Manifest {record.manifestStatus??"not submitted"}
           </p>
           {next.key!=="creator-membership"&&next.key!=="reviewer-membership"&&
-            <Link to={route.url as "/class"} className="mt-3 inline-flex text-sm font-semibold text-primary underline">
+            <a href={route.url} className="mt-3 inline-flex text-sm font-semibold text-primary underline">
               {route.label} (requires authorized role)
-            </Link>}
+            </a>}
         </article>;
       })}
       {!shown.length&&<EmptyState title={query?"No versions match":"No Offering versions found"}
