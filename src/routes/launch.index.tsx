@@ -5,6 +5,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { friendlySiteLaunchHref, validFriendlySlug } from "@/domain/friendly-site-urls";
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 
 export const Route = createFileRoute("/launch/")({
   loader: () => safeLoader(async () => {
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/launch/")({
         name: site.name,
         href: organization && validFriendlySlug(organization.slug) && validFriendlySlug(site.slug)
           ? friendlySiteLaunchHref({ organizationSlug: organization.slug, siteSlug: site.slug })
-          : "/launch/site?siteId=" + encodeURIComponent(site.id),
+          : "/launch/site?siteId=" + compactUuidUrlValue(site.id),
       };
     });
   })(),
