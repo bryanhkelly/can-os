@@ -26,6 +26,16 @@ describe("compact router search selections", () => {
     expect(expandUuidSearchSelections(encoded)).toEqual(search);
   });
 
+  it("round trips deep links from notifications, referrals and collaboration", () => {
+    const selections = {
+      thread:uuid, case:uuid, submission:uuid, gradeAction:uuid,
+      attendance:uuid, trip:uuid, referral:uuid, offer:uuid, person:uuid,
+    };
+    const encoded = compactUuidSearchSelections(selections);
+    expect(Object.values(encoded)).toEqual(Array(9).fill(token));
+    expect(expandUuidSearchSelections(encoded)).toEqual(selections);
+  });
+
   it("accepts old UUID query links and never mutates malformed identifiers", () => {
     expect(expandUuidSearchSelections({siteId:uuid})).toEqual({siteId:uuid});
     expect(expandUuidSearchSelections({siteId:"not-an-id",session:"abc"}))
