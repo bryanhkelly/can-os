@@ -5,12 +5,13 @@ import {
 import { CLASS_METRIC_DEFINITIONS } from "@/domain/participation-reporting";
 import { validateMeasurementPlanAgainstRegistry } from "@/domain/measurement-plan-contract";
 import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
+import { GO_LINK_METRIC_DEFINITIONS } from "@/domain/go-link-evidence-metrics";
 
 describe("source-owned metric registry",()=>{
   const all = buildCurrentReportingMetricRegistry();
   it("reuses every established domain metric instead of duplicating definitions",()=>{
     expect(all).toHaveLength(CLASS_METRIC_DEFINITIONS.length +
-      NONCREDIT_PILOT_COUNT_DEFINITIONS.length);
+      NONCREDIT_PILOT_COUNT_DEFINITIONS.length + GO_LINK_METRIC_DEFINITIONS.length);
     expect(new Set(all.map(m=>m.metricKey)).size).toBe(all.length);
     expect(all.every(m=>m.source&&m.denominator&&m.rule&&m.timeBasis))
       .toBe(true);
@@ -21,6 +22,15 @@ describe("source-owned metric registry",()=>{
     expect(classRegistration?.sourceDomain).toBe("native_class");
     expect(noncreditRegistration?.sourceDomain).toBe("noncredit_pilot");
     expect(classRegistration?.source).not.toBe(noncreditRegistration?.source);
+  });
+  it("does not represent anonymous redirect observations as verified conversions",()=>{
+    const clicks=all.find(m=>m.metricKey==="go.observedRedirects30d");
+    const registrations=all.find(m=>m.metricKey==="go.referralNoncreditRegistrations30d");
+    expect(clicks?.sourceDomain).toBe("go_link");
+    expect(clicks?.rule).toContain("Go Link");
+    expect(clicks?.denominator).toContain("not a unique visitor");
+    expect(registrations?.source).toContain("noncredit_self_enrollment_claims");
+    expect(registrations?.denominator).toContain("No click-to-enrollment");
   });
   it("requires exact metric definition versions before reuse",()=>{
     const metric=all.find(m=>m.metricKey==="class.registrations")!;
