@@ -11,7 +11,7 @@ type Signup = typeof schoolSetupSignups.$inferSelect;
 
 function uniqueSlug(name: string, signupId: string): string {
   const stem = name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 38).replace(/-+$/g, "") || "school";
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 38).replace(/-+$/g, "") || "site";
   return `${stem}-${signupId.replace(/-/g, "").slice(0, 8)}`;
 }
 
