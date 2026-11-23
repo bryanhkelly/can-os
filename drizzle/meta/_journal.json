@@ -736,6 +736,13 @@
       "when": 1795450000000,
       "tag": "0104_platform_owner_delegation",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1795460000000,
+      "tag": "0105_site_go_links",
+      "breakpoints": true
     }
   ]
 }
