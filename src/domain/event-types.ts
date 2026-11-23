@@ -172,6 +172,7 @@ export const EventTypes = {
   PublicFamilyStartRequested: "PublicFamilyStartRequested",
   PublicFamilyStartVerified: "PublicFamilyStartVerified",
   FamilyInvitationBatchRequested: "FamilyInvitationBatchRequested",
+  SiteMarketingEmailCampaignRequested: "SiteMarketingEmailCampaignRequested",
   FamilyInvitationRecipientStatusChanged: "FamilyInvitationRecipientStatusChanged",
   FamilyInvitationBatchCompleted: "FamilyInvitationBatchCompleted",
   StudentLearningAccessApproved: "StudentLearningAccessApproved",
