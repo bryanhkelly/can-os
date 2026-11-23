@@ -14,7 +14,7 @@ import {
   appendMarketingFooter, formatMarketingFooter, marketingEmailDeliverySummary,
   marketingEmailMetadataSchema, parseMarketingEmailRecipients,
   type MarketingEmailMetadata, type MarketingEmailRecipient,
-  type queueMarketingEmailSchema,
+  queueMarketingEmailSchema,
 } from "@/domain/site-marketing-email";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
@@ -301,7 +301,8 @@ export async function handleSiteMarketingEmailCampaign(eventId:string) {
       )).limit(1);
     if (!asset || asset.revokedAt) throw new Error("A released email image no longer has valid rights.");
   }
-  const {title: releaseTitle, ...frozenContent} = release.contentSnapshot;
+  const frozenContent = {...release.contentSnapshot};
+  delete frozenContent.title;
     const snapshot = marketingPackageContentSchema.parse(frozenContent);
   const text = typeof output.plainText === "string" ? output.plainText :
     (snapshot.materialOverrides?.email?.message || snapshot.message);
