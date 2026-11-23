@@ -1,4 +1,4 @@
-import { encodeUuidForPath } from "@/domain/opaque-url-id";
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
 import { marketingEditorReducer, type MarketingEditorView, type MarketingEditorState } from "./marketing-package-editor-state";
 import { SiteGuideV61 } from "./SiteGuideV61";
@@ -388,7 +388,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       </WorkspaceNotice>}
       {brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
         Save your Site Brand in Shape → Website & Brand before creating materials.
-        {" "}<a href={`/launch/site?siteId=${encodeUuidForPath(siteId)}&module=website-brand`}
+        {" "}<a href={`/launch/site?siteId=${compactUuidUrlValue(siteId)}&module=website-brand`}
           className="font-semibold underline">Open Website &amp; Brand</a>
       </WorkspaceNotice>}
       {brandReadiness==="loading"&&<WorkspaceNotice tone="info">
