@@ -1,4 +1,4 @@
-import {and,eq,gt,isNull,inArray,isNotNull} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
