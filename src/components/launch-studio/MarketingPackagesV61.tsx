@@ -33,6 +33,7 @@ import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketingPackageZip } from "./marketing-output-download";
 import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
 import { MarketingPackageReleaseControlsV61 } from "./MarketingPackageReleaseControlsV61";
+import { GoLinkWorkspace } from "./GoLinkWorkspace";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
@@ -590,6 +591,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             These files are ready to download. Sharing or sending them requires a separate action.
           </WorkspaceNotice>}
         </WorkspacePanel>
+        <GoLinkWorkspace key={record.id} siteId={siteId} packageId={record.id} />
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
       {view==="followup"&&record&&<>
