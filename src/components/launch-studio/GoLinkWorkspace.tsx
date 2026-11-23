@@ -144,7 +144,8 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:stri
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">What should people do?
           <Select value={kind} onChange={event=>{
-            setKind(event.target.value as Kind);setTarget("");setAdvanced(false);
+            setKind(event.target.value as Kind);setTarget("");setSelected("");
+            setChoices([]);setAdvanced(false);
           }}>
             {Object.entries(labels).map(([value,label])=>
               <option key={value} value={value}>{label}</option>)}
@@ -231,13 +232,15 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:stri
           {link.startsAt?" · Opens "+new Date(link.startsAt).toLocaleString():""}
           {link.expiresAt?" · Expires "+new Date(link.expiresAt).toLocaleString():""}
         </p>
-        {link.evidence&&<p className="text-sm">
+        {link.evidence?<p className="text-sm">
           <strong>{link.evidence.redirects30d.toLocaleString()}</strong> redirects in the last 30 days.
           {" "}{link.evidence.registrationEvidence==="canonical_noncredit_claim"
             ?<><strong>{link.evidence.referralRegistrations30d?.toLocaleString()??"0"}</strong>
               {" "}verified training registration claims referencing this link.</>
             :<span className="text-muted-foreground">
               Verified outcome attribution is not connected for this destination.</span>}
+        </p>:<p className="text-xs text-muted-foreground">
+          Outcome evidence is temporarily unavailable. Link controls remain accessible.
         </p>}
         <div className="flex flex-wrap gap-2">
           {link.status!=="revoked"&&

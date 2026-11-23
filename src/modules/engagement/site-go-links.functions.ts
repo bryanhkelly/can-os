@@ -106,7 +106,14 @@ export const listSiteGoLinks = createServerFn({ method: "GET" })
     }).from(siteGoLinks).where(and(
       eq(siteGoLinks.siteId, data.siteId), eq(siteGoLinks.packageId, data.packageId),
     )).orderBy(desc(siteGoLinks.createdAt)).limit(500);
-    const evidence=await readSiteGoLinkEvidence(data.siteId,data.packageId);
+    // Reporting reads must never take down authorized link management.
+    // A missing observation is unavailable evidence, not zero activity.
+    let evidence:Awaited<ReturnType<typeof readSiteGoLinkEvidence>>=[];
+    try{
+      evidence=await readSiteGoLinkEvidence(data.siteId,data.packageId);
+    }catch{
+      console.error("Go Link evidence read unavailable",{kind:"operational_analytics"});
+    }
     const byId=new Map(evidence.map(item=>[item.linkId,item]));
     return links.map(link => ({
       ...link,createdAt:link.createdAt.toISOString(),
