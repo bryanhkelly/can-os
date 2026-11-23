@@ -29,3 +29,14 @@
 ## Release acceptance
 
 Exact-SHA TypeScript, unit/integration tests, production build, Cloudflare CI, browser deep-link tests, deployment-preflight checks against target DB, role-boundary verification and approval remain required. The migration commands are manual and production-protected.
+
+## Shared destination contracts and user interface
+
+- `src/domain/url-destinations.ts` is the typed constructor for supported user-facing destinations (current Site, Launch Studio, profile, Website Studio, Class, Action, assignment, published website, and /go link).
+- `src/components/links/CopyLinkButton.tsx` standardizes clipboard behavior, audience labeling, sign-in disclosure and manual-copy fallback, rather than accepting arbitrary pasted URLs.
+- `src/components/launch-studio/SiteLinkSharing.tsx` surfaces **Copy & Share** in the Launch Studio header. A public website link appears only when the authorized Site directory reports its publication as `published`.
+- `GoLinkWorkspace` reuses CopyLinkButton for approved, revocable /go codes. The Site directory supplies a Copy profile link only when the caller independently granted profile navigation.
+- Outreach creation remains the existing Introduce / Go Links workflow. A private Site workspace URL is not a public invitation or a capability token.
+- Dedicated private preview sharing remains a separate expiring/revocable server workflow. Do not interchange those token-bearing URLs with ordinary copy controls.
+
+Focused acceptance: `npm run test:urls:unit` and `npm run db:check:journal`.

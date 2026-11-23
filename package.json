@@ -137,7 +137,8 @@
     "test:lint-regressions": "node --test scripts/lib/diff-added-lines.test.mjs",
     "test:quality:p2": "vitest run tests/unit/marketing-package-editor-state.test.ts tests/unit/pickup-authorization-scope.test.ts tests/unit/public-site-styles.test.ts tests/unit/public-site-html.test.ts tests/unit/marketing-package-session-scope.test.tsx tests/unit/marketing-package-archive-files.test.ts",
     "test:quality:security": "vitest run tests/unit/safeguarding-mutation-authorization.test.ts tests/unit/authorized-program-query.test.ts tests/unit/safeguarding-case-access.test.ts tests/unit/access-context.test.ts",
-    "db:check:friendly-urls:deploy": "node scripts/acceptance/check-friendly-url-deploy-schema.mjs"
+    "db:check:friendly-urls:deploy": "node scripts/acceptance/check-friendly-url-deploy-schema.mjs",
+    "test:urls:unit": "node --test scripts/lib/friendly-url-deploy-guards.test.mjs && vitest run tests/unit/url-destinations.test.ts tests/unit/friendly-route-access-contract.test.ts tests/unit/friendly-site-urls.test.ts tests/unit/opaque-url-id.test.ts tests/unit/compact-url-search.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

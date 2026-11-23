@@ -36,6 +36,15 @@ describe("typed URL destination registry", () => {
       expect(() => buildUrlDestination({kind:"published-site",host})).toThrow();
     }
   });
+  it("never exposes a private editor preview or token-bearing URL as a copy destination", () => {
+    expect(() => buildUrlDestination({kind:"published-site",host:"school.can-os.com",page:"/login" as never}))
+      .toThrow("Unsupported published Site page");
+    expect(buildUrlDestination({kind:"site-website",siteId:uuid,identity}).href)
+      .toBe("/o/cogic/glad-tidings/website");
+    expect(buildUrlDestination({kind:"site-website",siteId:uuid}).href)
+      .toBe("/site-website?siteId="+token);
+  });
+
   it("copies absolute URLs without accepting open redirects", () => {
     const privateRoute=buildUrlDestination({kind:"site-workspace",siteId:uuid});
     expect(absoluteDestinationUrl(privateRoute,"https://app.example.com"))
