@@ -100,7 +100,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
     ]);
     const [organizationRows, siteRows, jurisdictionRows, canProviderRows] = await Promise.all([
       db
-        .select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type })
+        .select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type, slug: s.organizations.slug })
         .from(s.organizations)
         .where(inArray(s.organizations.id, organizationIds))
         .orderBy(asc(s.organizations.name)),
@@ -129,7 +129,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
         .orderBy(asc(s.jurisdictions.name)),
       // CAN provider choices are distinct from the host's organization grants.
       // This is public organization identity, not a grant or verified service agreement.
-      db.select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type })
+      db.select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type, slug: s.organizations.slug })
         .from(s.organizations).where(eq(s.organizations.type, "can_network"))
         .orderBy(asc(s.organizations.name)),
     ]);
