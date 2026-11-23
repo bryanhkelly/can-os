@@ -245,18 +245,16 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
       step === 1 ? "Who do you hope to serve?" : "What experiences interest you?"}
       description={step === 0
         ? "Choose the program ideas you want to explore. You will select how to deliver them in Prepare."
-        : step === 1 ? "Choose the people you hope to serve."
+        : step === 1 ? "Choose any groups you're considering. This is optional."
         : "Imagine what people could learn, do or enjoy. Details and approvals come later in Prepare."}
+      showHeader={step !== 2}
       steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : id === "audiences" ? 1 : 2)} navigationDisabled={disabled}>
       <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : step === 1 ? "Your Audiences" : "Experiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
         {existingPrograms && <ExistingSiteProgramsV61 siteId={siteId} result={existingPrograms} />}
         <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold">What kinds of programs are you thinking about offering?</legend>
-          <p className="text-xs leading-5 text-muted-foreground">
-            Select what interests you. You'll choose the details in Prepare.
-          </p>
+          <legend className="sr-only">Programs you want to explore</legend>
           <h3 className="text-sm font-semibold">Programs to explore</h3>
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
           {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
@@ -338,7 +336,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
         </section>
       </> : step === 1 ? <>
         <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
+          <legend className="sr-only">Audiences you hope to serve (optional)</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {audienceChoices.map(choice => <SelectionCard key={choice.id} kind="checkbox"
               value={choice.id} title={choice.label} detail={choice.detail} className="min-h-24"
