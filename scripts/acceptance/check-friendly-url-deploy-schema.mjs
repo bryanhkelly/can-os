@@ -13,13 +13,22 @@ if (!process.env.DATABASE_URL)
   throw new Error("BLOCKED: deployment DATABASE_URL is required");
 const sql = neon(process.env.DATABASE_URL);
 const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
-const tags = ["0105_site_go_links", "0106_site_go_links_private_role_access"];
-const migrations = tags.map(tag => {
-  const entry = journal.entries.find(item => item.tag === tag);
-  if (!entry) throw new Error("BLOCKED: missing reviewed migration journal: " + tag);
-  return {tag,when:entry.when,
-    hash:createHash("sha256").update(readFileSync("drizzle/" + tag + ".sql")).digest("hex")};
-});
+// Production currently ends at 0099. Do not allow the 0105 Go Link schema
+// alone to mask missing Reporting/Identity migrations from 0100 onward.
+// Every new migration added to the release journal is included automatically.
+const migrationEntries = journal.entries.filter(entry => entry.idx >= 100);
+if (migrationEntries.length < 7 ||
+    migrationEntries[0]?.idx !== 100 ||
+    !migrationEntries.some(entry => entry.tag === "0105_site_go_links") ||
+    !migrationEntries.some(entry => entry.tag === "0106_site_go_links_private_role_access") ||
+    migrationEntries.some((entry, i) => entry.idx !== i + 100))
+  throw new Error("BLOCKED: incomplete or out-of-order deployment migration journal");
+const migrations = migrationEntries.map(entry => ({
+  tag: entry.tag, when: entry.when,
+  hash: createHash("sha256").update(
+    readFileSync("drizzle/" + entry.tag + ".sql"),
+  ).digest("hex"),
+}));
 
 const [identity] = await sql`
   SELECT current_setting('neon.project_id',true) AS project_id,
@@ -73,7 +82,8 @@ const [roleChecks] = await sql`
 `;
 const recorded = await sql`
   SELECT hash, created_at FROM drizzle.__drizzle_migrations
-  WHERE created_at = ${migrations[0].when} OR created_at = ${migrations[1].when}
+  WHERE created_at >= ${migrations[0].when}
+    AND created_at <= ${migrations.at(-1).when}
 `;
 assertFriendlyUrlDeployment(
   {projectId:identity.project_id,branchId:identity.branch_id,databaseName:identity.database_name},

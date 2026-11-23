@@ -25,4 +25,6 @@ export function assertFriendlyUrlDeployment(identity, schema, roles, recorded, e
     assert.equal(applied.hash, expected.hash,
       "BLOCKED: applied SQL differs from reviewed migration: " + expected.tag);
   }
+  assert.equal(recorded.length, expectedMigrations.length,
+    "BLOCKED: unexpected migration records in the release journal window");
 }
