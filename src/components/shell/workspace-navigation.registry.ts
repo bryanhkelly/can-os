@@ -84,6 +84,7 @@ export interface WorkspaceNavigationItem {
 export const workspaceHome = {
   account_holder: "/account/",
   app_admin: "/platform",
+  platform_owner: "/platform",
   academic_content_creator: "/class?view=content",
   academic_content_reviewer: "/class?view=reviews",
   site_website_editor: "/home",
@@ -136,6 +137,7 @@ const siteAdminProfileLink = {
 const roleLinks = {
   account_holder: [{ title: "Classes", path: "/class", icon: "book" }, { title: "My Activity", path: "/learn/my-activity", icon: "book" }],
   app_admin: [],
+  platform_owner: [],
   academic_content_creator: [],
   academic_content_reviewer: [],
   site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
