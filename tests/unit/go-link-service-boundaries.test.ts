@@ -32,7 +32,7 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(evidence).not.toContain("participantPersonId");
     const editor=read("src/components/launch-studio/GoLinkWorkspace.tsx");
     expect(editor).toContain("Verified outcome attribution is not connected");
-    expect(editor).toContain("Test link does not record a visit");
+    expect(editor).toContain("Test Link does not record a visit");
   });
   it("never expands public short codes to arbitrary redirect destinations",()=>{
     const source=read("src/domain/site-go-links.ts");
