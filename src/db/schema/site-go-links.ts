@@ -1,4 +1,4 @@
-import { check, index, jsonb, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, date, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createdAt, id, updatedAt } from "./common";
 import { sites, organizations } from "./organizations";
@@ -15,13 +15,33 @@ export const siteGoLinks = pgTable("site_go_links", {
   packageId: uuid("package_id").notNull().references(() => siteMarketingPackages.id, { onDelete: "restrict" }),
   createdByPersonId: uuid("created_by_person_id").notNull().references(() => people.id, { onDelete: "restrict" }),
   destination: jsonb("destination").$type<GoDestination>().notNull(),
-  status: text("status").$type<"active" | "revoked">().notNull().default("active"),
+  name: text("name").notNull().default("Shared link"),
+  channel: text("channel").$type<"email"|"flyer"|"qr"|"social"|"partner"|"other">(),
+  startsAt: timestamp("starts_at", {withTimezone:true}),
+  expiresAt: timestamp("expires_at", {withTimezone:true}),
+  status: text("status").$type<"active" | "paused" | "revoked">().notNull().default("active"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, t => [
   uniqueIndex("site_go_links_code_uq").on(t.code),
   index("site_go_links_package_idx").on(t.siteId, t.packageId, t.createdAt),
   check("site_go_links_code_ck", sql`length(${t.code}) = 12 AND ${t.code} ~ '^[A-Za-z0-9_-]+$'`),
-  check("site_go_links_status_ck", sql`${t.status} IN ('active', 'revoked')`),
+  check("site_go_links_status_ck", sql`${t.status} IN ('active', 'paused', 'revoked')`),
+  check("site_go_links_name_ck", sql`char_length(${t.name}) BETWEEN 1 AND 120`),
+  check("site_go_links_channel_ck", sql`${t.channel} IS NULL OR ${t.channel} IN ('email','flyer','qr','social','partner','other')`),
+  check("site_go_links_schedule_ck", sql`${t.expiresAt} IS NULL OR ${t.startsAt} IS NULL OR ${t.expiresAt} > ${t.startsAt}`),
   check("site_go_links_destination_ck", sql`jsonb_typeof(${t.destination}) = 'object'`),
+]);
+
+/** Anonymous traffic is summarized per day; no IP, Person, browser or cookie identity.
+ * An observation is NOT an enrollment, a completion, or a unique visitor.
+ */
+export const siteGoLinkDailyVisits = pgTable("site_go_link_daily_visits", {
+  linkId: uuid("link_id").notNull().references(() => siteGoLinks.id, { onDelete: "restrict" }),
+  day: date("day").notNull(),
+  redirects: integer("redirects").notNull().default(0),
+}, t => [
+  uniqueIndex("site_go_link_daily_visits_day_uq").on(t.linkId,t.day),
+  index("site_go_link_daily_visits_day_idx").on(t.day),
+  check("site_go_link_daily_visits_count_ck", sql`${t.redirects} >= 0`),
 ]);

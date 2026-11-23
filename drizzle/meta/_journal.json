@@ -750,6 +750,13 @@
       "when": 1795460001000,
       "tag": "0106_site_go_links_private_role_access",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1795460002000,
+      "tag": "0107_site_go_link_capabilities",
+      "breakpoints": true
     }
   ]
 }
