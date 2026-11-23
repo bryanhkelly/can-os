@@ -1,3 +1,4 @@
+import { decodeUuidPathParam } from "@/domain/opaque-url-id";
 import {createFileRoute} from "@tanstack/react-router";
 import {slugForPublicSiteOrigin} from "@/domain/public-site-host-routing";
 import {publicSiteMediaPathPattern} from "@/domain/public-site-paths";
@@ -22,7 +23,8 @@ export const Route=createFileRoute("/published-site/media/$assetId")({
     const url=new URL(request.url);
     const path=url.pathname.slice("/published-site".length);
     if(!publicSiteMediaPathPattern.test(path))return unavailable();
-    const assetId=path.slice("/media/".length);
+    const assetId=decodeUuidPathParam(path.slice("/media/".length));
+    if(!assetId)return unavailable();
     try{
       const published=await readPublishedSchoolSitePhoto(slug,assetId);
       if(!published)return unavailable();
