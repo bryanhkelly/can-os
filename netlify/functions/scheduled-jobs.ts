@@ -10,4 +10,4 @@ import { invokeScheduledEndpoint } from "../invoke-scheduled-endpoint";
  */
 export default () => invokeScheduledEndpoint("/api/jobs", "scheduled-jobs", "scheduled maintenance");
 
-export const config = { schedule: "*/5 * * * *" };
+export const config = { schedule: "*/15 * * * *" };
