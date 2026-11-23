@@ -1,4 +1,4 @@
-import { encodeUuidForPath, shortUuidHref } from "@/domain/opaque-url-id";
+import { compactUuidUrlValue, shortUuidHref } from "@/domain/opaque-url-id";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 
 const INTERNAL_ORIGIN = "https://can-os.invalid";
@@ -39,7 +39,7 @@ export function accessLandingPath(role: string, launchSiteId?: string, returnTo?
  // A new school's first sign-in lands in its guided launcher, not a dashboard;
  // the launcher itself offers a skip to the dashboard.
  if(hasRegistrarAuthority(role)&&launchSiteId&&(!safeReturnTo||genericReturnPaths.has(safeReturnTo)))
-  return "/launch/site?siteId="+encodeUuidForPath(launchSiteId);
+  return "/launch/site?siteId="+compactUuidUrlValue(launchSiteId);
  if(safeReturnTo&&!genericReturnPaths.has(safeReturnTo))return safeReturnTo;
  // An operating school is a workspace, not a school-creation journey.
  if(hasRegistrarAuthority(role)&&homeSiteId)
