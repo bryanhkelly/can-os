@@ -47,8 +47,8 @@ export async function provisionOwnerPilotRole(request: Request, raw: unknown) {
   if (ownerGrantRequiresSite(data.role)!==Boolean(data.siteId))
     throw new AuthorizationError("role requires exact Site or organization-only scope");
   return db.transaction(async tx => {
-    await tx.execute(sql\`SELECT pg_advisory_xact_lock(hashtext(\${"owner-pilot-role:"+
-      data.accountId+":"+data.organizationId+":"+data.role+":"+(data.siteId??"organization")}))\`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"owner-pilot-role:"+
+      data.accountId+":"+data.organizationId+":"+data.role+":"+(data.siteId??"organization")}))`);
     const [target] = await tx.select({
       accountId: accessAccounts.id, personId: accessAccounts.personId,
       verified: accessAccounts.emailVerifiedAt, disabled: accessAccounts.disabled,
