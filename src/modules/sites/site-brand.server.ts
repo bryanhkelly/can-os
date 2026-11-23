@@ -132,6 +132,7 @@ export async function saveSiteBrandVersionWithinTransaction(
         if(!assetId)throw new DomainError("UNAVAILABLE","Brand media could not be saved.");
         config[property]=assetId;
       }
+      if(config.heroAssetId)config.sharedHeroPhoto=null;
       // Every referenced asset must belong to this Site and retain rights.
       for(const assetId of [config.logoAssetId,config.heroAssetId].filter((id):id is string=>Boolean(id))){
         const [asset]=await tx.select({id:siteBrandAssets.id,rights:siteBrandAssets.rightsConfirmed,
