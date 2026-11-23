@@ -85,7 +85,12 @@ const [roleChecks] = await sql`
         OR has_table_privilege(r.oid,'public.organizations','SELECT')
         OR has_table_privilege(r.oid,'public.site_go_links','SELECT')
         OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','SELECT')
-        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','INSERT')))
+        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','INSERT')
+        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','UPDATE')
+        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','DELETE')
+        OR has_table_privilege(r.oid,'public.site_go_links','INSERT')
+        OR has_table_privilege(r.oid,'public.site_go_links','UPDATE')
+        OR has_table_privilege(r.oid,'public.site_go_links','DELETE')))
       AS unauthorized_selects,
     (has_table_privilege(current_user,'public.sites','SELECT')
       AND has_table_privilege(current_user,'public.organizations','SELECT')
@@ -94,7 +99,8 @@ const [roleChecks] = await sql`
       AS application_can_read,
     (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user)
       AS application_can_bypass_go_rls,
-    has_table_privilege(current_user,'public.site_go_link_daily_visits','INSERT')
+    (has_table_privilege(current_user,'public.site_go_link_daily_visits','INSERT')
+      AND has_table_privilege(current_user,'public.site_go_link_daily_visits','UPDATE'))
       AS application_can_count_redirects
 `;
 const recorded = await sql`
