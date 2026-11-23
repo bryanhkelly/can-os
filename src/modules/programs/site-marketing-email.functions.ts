@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { z } from "zod";
 import { marketingEmailScopeSchema, queueMarketingEmailSchema } from "@/domain/site-marketing-email";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
