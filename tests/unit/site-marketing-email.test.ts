@@ -14,6 +14,16 @@ describe("marketing email recipient preflight", () => {
     expect(() => parseMarketingEmailRecipients("a@example.com\n".repeat(26))).toThrow();
   });
 
+  it("permits real opt-in recipients without relying on a Site's demo classification", () => {
+    expect(parseMarketingEmailRecipients("subscriber@realcommunity.org"))
+      .toEqual(["subscriber@realcommunity.org"]);
+    expect(() => parseMarketingEmailRecipients("alex.registrar@valorschool.demo"))
+      .toThrow(/fictional \.demo addresses/);
+    expect(() => parseMarketingEmailRecipients(
+      "subscriber@realcommunity.org\nadmin.demo@valorschool.demo",
+    )).toThrow(/fictional \.demo addresses/);
+  });
+
   it("tracks provider acceptance separately from delivery and suppressions", () => {
     expect(marketingEmailDeliverySummary([
       {key:"1",email:"a@example.com",status:"accepted",attempts:1},
