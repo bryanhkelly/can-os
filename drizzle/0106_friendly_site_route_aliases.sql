@@ -3,8 +3,8 @@
 -- by their original Site when the current Site/Organization slug changes.
 CREATE TABLE IF NOT EXISTS "site_route_aliases" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "organization_id" uuid NOT NULL REFERENCES "organizations"("id") ON DELETE RESTRICT,
-  "site_id" uuid NOT NULL REFERENCES "sites"("id") ON DELETE RESTRICT,
+  "organization_id" uuid NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+  "site_id" uuid NOT NULL REFERENCES "sites"("id") ON DELETE CASCADE,
   "organization_slug" text NOT NULL,
   "site_slug" text NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT now()
@@ -86,3 +86,7 @@ CREATE TRIGGER "organizations_route_alias_sync"
   AFTER UPDATE OF "slug" ON "organizations"
   FOR EACH ROW WHEN (OLD."slug" IS DISTINCT FROM NEW."slug")
   EXECUTE FUNCTION "register_organization_route_aliases"();
+
+-- These trigger functions are not public application endpoints.
+REVOKE ALL ON FUNCTION "register_site_route_alias"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "register_organization_route_aliases"() FROM PUBLIC;
