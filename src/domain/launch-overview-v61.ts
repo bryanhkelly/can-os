@@ -29,7 +29,7 @@ export function launchSiteLifecycleLabel(status: "planning" | "active" | "closed
 }
 
 export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidence,
-  lifecycleStatus?: "planning" | "active" | "closed" | null) {
+  lifecycleStatus?: "planning" | "active" | "closed" | null, friendlyBase?: string) {
   // Closed Sites may retain historical drafts. Never present those as work
   // that can be reopened or make enrollment-ready without a new authorization.
   if (lifecycleStatus === "closed") {
@@ -37,7 +37,9 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
       description: "This site is closed. Review its information before deciding what to do next.",
       href: "/sites/" + encodeURIComponent(siteId) };
   }
-  const route = (module: string) => "/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=" + module;
+  const route = (module: string) => friendlyBase
+    ? friendlyBase + "?module=" + encodeURIComponent(module)
+    : "/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=" + encodeURIComponent(module);
   if (evidence.information.state === "unavailable") {
     return { title: "Review Site Information",
       description: "We couldn't load your Site Information. Check it before continuing.",
