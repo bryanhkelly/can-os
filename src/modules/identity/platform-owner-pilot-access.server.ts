@@ -6,12 +6,9 @@ import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { writeAudit } from "@/platform/mutation";
 import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
+import { ownerGrantRequiresSite, ownerPilotRoles } from "@/domain/platform-owner-pilot-roles";
 
 /** Pilot staffing does not create Course appointments, approvals or learner consent. */
-export const ownerPilotRoles = [
-  "academic_content_creator", "academic_content_reviewer",
-  "registrar", "site_admin", "room_facilitator",
-] as const;
 const uuid = z.string().uuid();
 export const ownerPilotGrantInput = z.object({
   accountId: uuid, organizationId: uuid, siteId: uuid.nullable(),
@@ -19,9 +16,6 @@ export const ownerPilotGrantInput = z.object({
   reason: z.string().trim().min(12).max(500),
 }).strict();
 export type OwnerPilotGrantInput = z.infer<typeof ownerPilotGrantInput>;
-export function ownerGrantRequiresSite(role: OwnerPilotGrantInput["role"]): boolean {
-  return role === "registrar" || role === "site_admin" || role === "room_facilitator";
-}
 
 export async function readOwnerPilotLocations(request: Request) {
   await getVerifiedPlatformOwnerSession(request);
