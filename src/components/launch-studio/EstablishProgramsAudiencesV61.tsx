@@ -242,7 +242,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
   ];
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
     <GuidedSetupShell title={step === 0 ? "What would you like to bring to your community?" :
-      step === 1 ? "Who do you hope to serve?" : "What experiences interest you?"}
+      step === 1 ? "Who do you hope to serve?" : "Experiences"}
       description={step === 0
         ? "Choose the program ideas you want to explore. You will select how to deliver them in Prepare."
         : step === 1 ? "Choose any groups you're considering. This is optional."
