@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
 import { buildUrlDestination } from "@/domain/url-destinations";
@@ -243,8 +244,10 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:stri
           Outcome evidence is temporarily unavailable. Link controls remain accessible.
         </p>}
         <div className="flex flex-wrap gap-2">
-          {link.status!=="revoked"&&
-            <CopyLinkButton destination={{kind:"go",code:link.code}}/>}
+          {link.status!=="revoked"&&<>
+            <CopyLinkButton destination={{kind:"go",code:link.code}}/>
+            <GoLinkQrButton code={link.code}/>
+          </>}
           <Button type="button" size="sm" variant="outline" disabled={busy}
             onClick={()=>void inspect(link)}>Test link</Button>
           {link.status!=="revoked"&&<>
