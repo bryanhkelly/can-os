@@ -6,13 +6,13 @@ import { buildUrlDestination } from "@/domain/url-destinations";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
 import type { GoDestination } from "@/domain/site-go-links";
+import { resolveGoTargetInput } from "@/domain/go-target-input";
 import {
   createSiteGoLink, listSiteGoLinks, revokeSiteGoLink,
 } from "@/modules/engagement/site-go-links.functions";
 
 type GoLink = Awaited<ReturnType<typeof listSiteGoLinks>>[number];
 type Kind = GoDestination["kind"];
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const labels: Record<Kind,string> = {
   "site-page": "Published Site page or interest",
   "adult-training": "Specific adult training registration",
@@ -55,14 +55,17 @@ export function GoLinkWorkspace({ siteId, packageId }: { siteId: string; package
     return () => { live = false; };
   }, [siteId, packageId, retry]);
 
+  const resolvedTarget = kind === "site-page" || kind === "information" ? null
+    : resolveGoTargetInput(kind, target,
+      typeof window === "undefined" ? undefined : window.location.origin);
   const isValidTarget = kind === "site-page"
     || (kind === "information" ? /^[a-z][a-z0-9-]{1,60}$/.test(target)
-    : uuid.test(target));
+    : resolvedTarget !== null);
   function destination(): GoDestination {
     if (kind === "site-page") return page;
-    if (kind === "adult-training") return {kind, releaseId:target};
-    if (kind === "class") return {kind, classId:target};
-    if (kind === "enrichment") return {kind, seasonId:target};
+    if (kind === "adult-training") return {kind, releaseId:resolvedTarget!};
+    if (kind === "class") return {kind, classId:resolvedTarget!};
+    if (kind === "enrichment") return {kind, seasonId:resolvedTarget!};
     return {kind:"information", journeyId:target};
   }
   async function create() {
@@ -98,11 +101,15 @@ export function GoLinkWorkspace({ siteId, packageId }: { siteId: string; package
           {pageLabels.map(([value,label])=><option value={value} key={value}>{label}</option>)}
         </Select>
       </label> : <label className="grid gap-1 text-sm font-medium">
-        {kind === "information" ? "Journey ID" : kind === "adult-training" ? "Published training release ID" : kind === "class" ? "Class ID" : "Enrichment Season ID"}
+        {kind === "information" ? "Journey ID" : kind === "adult-training" ? "Training release link or ID" : kind === "class" ? "Class link or ID" : "Enrichment link or ID"}
         <Input value={target} onChange={event=>setTarget(event.target.value.trim())}
-          placeholder={kind==="information"?"teach-with-can":"Enter the exact ID"} />
+          placeholder={kind==="information"?"teach-with-can":"Paste the link or short ID"} />
       </label>}
     </div>
+    {kind !== "site-page" && kind !== "information" && <p className="mt-3 text-xs text-muted-foreground">
+      Paste an internal link, its 22-character identifier, or a UUID. No manual
+      long ID is required. The destination still performs independent access and eligibility checks.
+    </p>}
     <p className="mt-3 text-xs text-muted-foreground">
       A published Site is required for Site pages. Other targets retain their own publication, eligibility, consent and access checks. A planning-only program is not a registration destination.
     </p>
