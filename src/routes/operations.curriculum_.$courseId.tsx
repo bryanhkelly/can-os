@@ -1,9 +1,11 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute } from "@tanstack/react-router";
 import { CurriculumView, loadCurriculum } from "@/routes/operations.curriculum";
 import { uuidProgramSelectionSchema } from "@/lib/route-search";
 import { LoaderFailure } from "@/lib/loader-failure";
 
 export const Route = createFileRoute("/operations/curriculum_/$courseId")({
+  params: opaqueUuidPathParam("courseId"),
   validateSearch: (search: Record<string, unknown>) => uuidProgramSelectionSchema.parse(search),
   loaderDeps: ({ search }) => ({ programId: search.programId }),
   loader: ({ deps }) => loadCurriculum(deps.programId),
