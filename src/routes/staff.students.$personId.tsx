@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -11,6 +12,7 @@ import { plural } from "@/lib/format";
 const tabs = ["overview", "academics", "activity", "attendance", "support", "relationships"] as const;
 type ProfileTab = (typeof tabs)[number];
 export const Route = createFileRoute("/staff/students/$personId")({
+  params: opaqueUuidPathParam("personId"),
   validateSearch: (search: Record<string, unknown>): { tab?: ProfileTab } => ({
     tab: tabs.find(tab => tab === search.tab),
   }),
