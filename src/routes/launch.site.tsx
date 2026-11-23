@@ -198,6 +198,9 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
   const go = (module?: SiteLaunchModuleIdV61) => identity
     ? navigate({ to: "/o/$organizationSlug/$siteSlug/launch", params: identity, search: { module } })
     : navigate({ to: "/launch/site", search: { siteId: site.id, module } });
+  const goWorkspace = () => identity
+    ? navigate({ to: "/o/$organizationSlug/$siteSlug", params: identity })
+    : navigate({ to: "/sites/$siteId", params: { siteId: site.id } });
   const selected = siteLaunchModules.find(item=>item.id===search.module);
   const statusLabel = launchSiteLifecycleLabel(site.lifecycleStatus);
   return <LaunchSiteFrame site={site} identity={identity ?? undefined} active={search.module} statusLabel={statusLabel}
@@ -210,18 +213,18 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
       <EstablishSiteProfileUnified key={`${site.id}:${site.updatedAt}`}
         site={site} organizations={organizations}
         onBackToOverview={() => void go()}
-        onSaveAndExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
+        onSaveAndExit={() => goWorkspace()}
         onContinueToSiteInformation={() => void go("site-information")} />
     </WorkspaceShell> : selected?.id === "site-information" && siteInformation ? <SiteInformationBody
       key={site.id} site={site} initial={siteInformation} organizations={organizations} guidePlanning={siteGuidePlanning}
       onBack={() => void go("site-profile")}
-      onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
+      onExit={() => goWorkspace()}
       onContinue={() => void go("programs-audiences")} />
     : selected?.id === "programs-audiences" && programsAudiences ? <ProgramsAudiencesBody
       key={site.id} siteId={site.id} initial={programsAudiences}
        existingPrograms={existingPrograms ?? { state: "unavailable" }}
       onBack={() => void go("site-information")}
-      onExit={() => navigate({ to: "/sites/$siteId", params: { siteId: site.id } })}
+      onExit={() => goWorkspace()}
       onContinue={() => void go("website-brand")} />
     : selected?.id === "programs-audiences" ? <WorkspaceShell
       title="Programs & Audiences" eyebrow="Shape / Programs & Audiences"
@@ -290,7 +293,7 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
         href: base + (identity ? "?module=" : "&module=") + "site-information",
       }}
       previewUrl={site.websiteDraft ? "/launch/site-preview?siteId=" + encodeURIComponent(site.id) : null}
-      workspaceUrl={"/sites/" + encodeURIComponent(site.id)}
+      workspaceUrl={identity ? base.replace(/\\/launch$/, "") : "/sites/" + encodeURIComponent(site.id)}
     />}
   </LaunchSiteFrame>;
 }
