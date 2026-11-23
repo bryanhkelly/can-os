@@ -293,7 +293,7 @@ function ProgramsAudiencesBody({ siteId, initial, existingPrograms, onBack, onEx
 }) {
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
-  return <WorkspaceShell title="What would you like to bring to your community?"
+  return <WorkspaceShell title="Programs & Audiences"
     eyebrow="Shape / Programs & Audiences"
     subtitle="Explore what you want to offer, who you hope to serve and the experiences that bring your vision to life."
     width="wide" rail={<ProgramsAudiencesV61Guidance step={step} guide={guide} />}>
