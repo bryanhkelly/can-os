@@ -12,6 +12,8 @@ import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
 import { NativePublisherReleaseReadinessPanel } from "@/components/learning/NativePublisherReleaseReadinessPanel";
 import { PlatformCatalogManager } from "@/components/platform/PlatformCatalogManager";
+import { PlatformOwnerDelegationPanel } from "@/components/platform/PlatformOwnerDelegationPanel";
+import { PlatformReleaseCenter } from "@/components/platform/PlatformReleaseCenter";
 
 export const Route = createFileRoute("/platform")({
   loader: () => safeLoader(() => readPlatformAdminOverview())(),
@@ -63,7 +65,10 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
+    {summary.platformOwner && <PlatformOwnerDelegationPanel/>}
     <PlatformCatalogManager/>
+    <PlatformReleaseCenter records={summary.publisherReleaseReadiness}
+      limited={summary.publisherReleasesLimited}/>
     <NativePublisherReleaseReadinessPanel records={summary.publisherReleaseReadiness}
       limited={summary.publisherReleasesLimited}/>
     <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady} cases={summary.reviewCases}/>
