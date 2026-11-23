@@ -581,7 +581,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </ActionFooter>
       </>}
       {view==="share"&&record&&<>
-        <WorkspacePanel title="Available materials" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
+        <WorkspacePanel title="Available materials" description="Download reviewed materials, send a consent-based email, or create an interest event.">
           <p className="text-sm text-muted-foreground">
             {materialAvailabilityMessage}
           </p>
