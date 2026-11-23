@@ -15,7 +15,8 @@ export async function readWorkspaceSession(request: Request) {
     if (error instanceof AuthorizationError) return { authenticated: false as const };
     throw error;
   }
-  const sessionAccountId = context.impersonatedByAccountId ?? context.sessionAccountId ?? context.accountId;
+  const sessionAccountId = context.delegatedByPlatformOwner
+    ? context.accountId : context.impersonatedByAccountId ?? context.sessionAccountId ?? context.accountId;
   const [account] = await db.select({ email: accessAccounts.emailNormalized })
     .from(accessAccounts).where(eq(accessAccounts.id, sessionAccountId)).limit(1);
   if (!account) throw new AuthorizationError("authenticated account");
@@ -41,6 +42,10 @@ export async function readWorkspaceSession(request: Request) {
     authenticated: true as const,
     ...(isDemoAccountEmail(account.email) ? { demoTenant: true as const } : {}),
     ...(demoAccountSwitching ? { demoAccountSwitching: true as const } : {}),
+    ...(context.delegatedByPlatformOwner ? { ownerDelegation: {
+      mode: context.delegationMode!,
+      expiresAt: context.delegationExpiresAt!,
+    } } : {}),
     sites: siteChoices, programs: programChoices, activeGrantId: context.grantId,
     role: context.role, grants: grants.map(grant => ({
       id: grant.id, personId: grant.personId, role: grant.role,
