@@ -1,3 +1,4 @@
+import { SharedPhotoPicker } from "./SharedPhotoPicker";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -127,6 +128,8 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
         <DisclosureSection title="Imagery">
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Only use images you have permission to share.</p>
+            <SharedPhotoPicker value={content.branding.sharedHeroPhoto} recommendedTemplate={content.branding.templateId}
+              disabled={busy||!data.canEdit} onChange={photo=>setContent(old=>({...old,branding:{...old.branding,sharedHeroPhoto:photo,heroImage:null}}))}/>
             <WebsiteArtworkField field="heroImage" value={content.branding.heroImage}
               disabled={busy || !data.canPublish} onSelect={selectArtwork}
               onChange={next=>setContent(old=>({...old,branding:{...old.branding,heroImage:next}}))}/>
