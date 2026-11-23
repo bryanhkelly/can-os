@@ -22,7 +22,9 @@ export async function readWorkspaceSession(request: Request) {
   if (!account) throw new AuthorizationError("authenticated account");
 
   const { grants, demoAccountSwitching } = await readSessionGrants(sessionAccountId, account.email);
-  if (!grants.some(grant => grant.id === context.grantId)) {
+  const visibleGrants = context.delegatedByPlatformOwner
+    ? grants.filter(grant => grant.id === context.grantId) : grants;
+  if (!visibleGrants.some(grant => grant.id === context.grantId)) {
     throw new AuthorizationError("active membership");
   }
 
@@ -47,7 +49,7 @@ export async function readWorkspaceSession(request: Request) {
       expiresAt: context.delegationExpiresAt!,
     } } : {}),
     sites: siteChoices, programs: programChoices, activeGrantId: context.grantId,
-    role: context.role, grants: grants.map(grant => ({
+    role: context.role, grants: visibleGrants.map(grant => ({
       id: grant.id, personId: grant.personId, role: grant.role,
       firstName: grant.firstName, lastName: grant.lastName,
       organizationId: grant.organizationId, siteId: grant.siteId,
