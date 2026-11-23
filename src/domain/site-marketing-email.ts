@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isDemoAccountEmail } from "./local-demo-access";
 
 /** Marketing sends are deliberately distinct from family invitations and enrollment. */
 export const marketingEmailScopeSchema = z.object({
@@ -51,6 +52,9 @@ export function parseMarketingEmailRecipients(raw: string, limit = 25): string[]
   for (const line of lines) {
     const parsed = address.safeParse(line);
     if (!parsed.success) throw new Error("Use one valid email address per line, without names or other information.");
+    // Demo Sites can send real campaigns. Fictional .demo inboxes cannot receive them.
+    if (isDemoAccountEmail(parsed.data))
+      throw new Error("Remove fictional .demo addresses. Send only to real, opted-in inboxes.");
     unique.add(parsed.data);
   }
   return [...unique];
