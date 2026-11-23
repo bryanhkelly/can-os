@@ -20,9 +20,9 @@ export const schoolSetupSchema = z.object({
 
 /** Self-reported identity during Site signup; it is not network authorization. */
 export const publicSignupOrganizationTypeOptions = [
-  { value: "other_partner", label: "Community, nonprofit, or other organization" },
+  { value: "other_partner", label: "Community, training, nonprofit, or other education organization" },
   { value: "church", label: "Church or local faith community" },
-  { value: "christian_school", label: "School or education provider" },
+  { value: "christian_school", label: "Christian school" },
   { value: "microschool_operator", label: "Microschool operator" },
   { value: "consortium", label: "Association or consortium" },
   { value: "denomination", label: "Denomination or national faith network" },
