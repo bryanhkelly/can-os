@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTableName } from "drizzle-orm";
-import { realSchoolSetupSignupSchema, schoolSetupSchema, matchesDemoSchoolAdministrator } from "@/domain/school-setup";
+import { realSchoolSetupSignupSchema, schoolSetupSchema, matchesDemoSchoolAdministrator, initialVerifiedSignupOrganizationType } from "@/domain/school-setup";
 import { hasRegistrarAuthority, rolesAllow } from "@/domain/school-roles";
 import { resolveAccessContext, roleCapabilities } from "@/domain/access-context";
 import { getWorkspaceHome, getWorkspaceLinks } from "@/components/shell/workspace-navigation.registry";
@@ -102,6 +102,15 @@ describe("real school signup validation", () => {
     expect(realSchoolSetupSignupSchema.safeParse({name:"Example School", organizationName:"A",
       email:"admin@example.org",firstName:"Alex",lastName:"Admin"}).success).toBe(false);
   });
+  it("keeps self-described denomination and consortium identities provisional", () => {
+    expect(initialVerifiedSignupOrganizationType("denomination")).toBe("other_partner");
+    expect(initialVerifiedSignupOrganizationType("consortium")).toBe("other_partner");
+    expect(initialVerifiedSignupOrganizationType("christian_school")).toBe("christian_school");
+    expect(realSchoolSetupSignupSchema.parse({ name: "Training Hub", email: "admin@example.org",
+      firstName: "Alex", lastName: "Admin" }).organizationType).toBe("other_partner");
+    expect(realSchoolSetupSignupSchema.safeParse({ name: "Training Hub", email: "admin@example.org",
+      firstName: "Alex", lastName: "Admin", organizationType: "can_network" }).success).toBe(false);
+  });
   it("rejects caller-supplied identity and malformed signup fields", () => {
     expect(realSchoolSetupSignupSchema.safeParse({name:"Example School",email:"admin@example.org",
       firstName:"Alex",lastName:"Admin",role:"site_admin"}).success).toBe(false);
@@ -171,7 +180,7 @@ describe("verified real-school signup provisioning", () => {
     const now = new Date("2026-11-07T12:00:00Z");
     const signup = {
       id: "00000000-0000-4000-8000-000000000001", accountId: "account-real",
-      schoolName: "Example Microschool", firstName: "Alex", lastName: "Admin",
+      schoolName: "Example Microschool", organizationType: "christian_school", firstName: "Alex", lastName: "Admin",
       expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
       organizationId: null, siteId: null, createdAt: now, updatedAt: now,
     } as never;
@@ -197,6 +206,20 @@ describe("verified real-school signup provisioning", () => {
     expect(state.writes.some(row => ["demo_school_tenants", "programs", "site_publications"].includes(row.table))).toBe(false);
     expect(state.audit).toHaveBeenCalledOnce();
     expect(state.event).toHaveBeenCalledTimes(2);
+  });
+  it("does not turn an unverified national-organization claim into denomination authority", async () => {
+    const now = new Date("2026-11-07T12:00:00Z");
+    const signup = { id: "00000000-0000-4000-8000-000000000002", accountId: "account-real",
+      schoolName: "National Training HQ", organizationName: "National Faith Organization",
+      organizationType: "denomination", firstName: "Alex", lastName: "Admin",
+      expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
+      organizationId: null, siteId: null, createdAt: now, updatedAt: now } as never;
+    state.reads = [[], [{ personId: null }]];
+    await testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now));
+    expect(state.writes.find(row => row.table === "organizations")?.value).toMatchObject({
+      name: "National Faith Organization", type: "other_partner",
+      metadata: { signup: { requestedOrganizationType: "denomination", classification: "pending_verification" } },
+    });
   });
   it("uses the optional Organization name without changing the Site identity", async () => {
     const now = new Date("2026-11-07T12:00:00Z");
