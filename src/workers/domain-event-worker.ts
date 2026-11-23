@@ -24,6 +24,7 @@ import { handleNotificationPolicyEvent } from "@/platform/notifications/policy-h
 import { handleClassParticipantEvent } from "@/modules/classes/class-participant-events.server";
 import { processEventSubscriptions } from "@/platform/subscriptions";
 import { handleFamilyInvitationBatch } from "@/modules/enrollment/family-invitations.server";
+import { handleSiteMarketingEmailCampaign } from "@/modules/programs/site-marketing-email.server";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { registerUniqueDomainEventHandler } from "@/domain/domain-event-handler-registry";
 import { persistReportingSourceReceipt } from "@/modules/insights/reporting-source-receipts.server";
@@ -44,6 +45,7 @@ registerDomainEventHandler(EventTypes.AssignmentBecameMissing, handleAcademicInt
 registerDomainEventHandler(EventTypes.SubmissionReceived, handleSubmissionReceivedEvent);
 registerDomainEventHandler(EventTypes.GradePosted, handleGradePostedEvent);
 registerDomainEventHandler(EventTypes.FamilyInvitationBatchRequested, handleFamilyInvitationBatch);
+registerDomainEventHandler(EventTypes.SiteMarketingEmailCampaignRequested, handleSiteMarketingEmailCampaign);
 registerDomainEventHandler(EventTypes.CommunicationMessageSent, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.ClassAnnouncementPublished, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.AdmissionsStageChanged, handleNotificationPolicyEvent);
