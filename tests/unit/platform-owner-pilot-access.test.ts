@@ -1,7 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {readFileSync} from "node:fs";
-import {ownerGrantRequiresSite,ownerPilotRoles} from "@/domain/platform-owner-pilot-roles";
-import {ownerPilotGrantInput} from "@/modules/identity/platform-owner-pilot-access.server";
+import {ownerGrantRequiresSite,ownerPilotRoles,ownerPilotGrantInput} from "@/domain/platform-owner-pilot-roles";
 
 const source=(p:string)=>readFileSync(new URL("../../"+p,import.meta.url),"utf8");
 const uuid=(x:string)=>x+"11111111-1111-4111-8111-111111111111".slice(x.length);
