@@ -19,6 +19,10 @@ export type AccessContext = CommandContext & {
  accountId: string;
  sessionId: string;
  grantId: string;
+ /** Server-only delegation metadata set by the signed Platform Owner session. */
+ delegatedByPlatformOwner?: true;
+ delegationMode?: "view" | "act";
+ delegationExpiresAt?: string;
  /** Original verified membership site (null means organization-wide), before effective site expansion. */
  grantSiteId: string | null;
  role: string;
