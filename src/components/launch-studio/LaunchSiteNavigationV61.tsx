@@ -59,20 +59,27 @@ export function LaunchSiteNavigation({
           </Button>
           <div id={`${stagePanelBaseId}-${instance}-${stage}`} hidden={expanded !== stage}
             className="space-y-1 pb-2 pl-4">
-            {siteLaunchModules.filter(item => item.stage === stage).map(item => (
-              <Link key={item.id} to={identity ? "/o/$organizationSlug/$siteSlug/launch" : "/launch/site"}
-                params={identity ?? { organizationSlug: "", siteSlug: "" }}
-                search={identity ? { module: item.id } : { siteId: site.id, module: item.id }}
-                onClick={onNavigate} aria-current={active === item.id ? "page" : undefined}
-                className={"flex min-h-11 items-center justify-between gap-2 border-l-2 px-3 py-2 text-xs " +
-                  (active === item.id
-                    ? "border-primary bg-accent font-bold text-primary"
-                    : "border-transparent text-muted-foreground hover:bg-muted")}>
+            {siteLaunchModules.filter(item => item.stage === stage).map(item => {
+              const navClass = "flex min-h-11 items-center justify-between gap-2 border-l-2 px-3 py-2 text-xs " +
+                (active === item.id
+                  ? "border-primary bg-accent font-bold text-primary"
+                  : "border-transparent text-muted-foreground hover:bg-muted");
+              const label = <>
                 <span>{item.title}</span>
-                {completion[item.id]==="complete"&&<CheckCircle2 aria-label={item.title+" saved setup complete"}
-                  className="size-4 shrink-0 text-success" />}
-              </Link>
-            ))}
+                {completion[item.id] === "complete" &&
+                  <CheckCircle2 aria-label={item.title + " saved setup complete"}
+                    className="size-4 shrink-0 text-success" />}
+              </>;
+              return identity
+                ? <Link key={item.id} to="/o/$organizationSlug/$siteSlug/launch"
+                    params={identity} search={{ module: item.id }} onClick={onNavigate}
+                    aria-current={active === item.id ? "page" : undefined}
+                    className={navClass}>{label}</Link>
+                : <Link key={item.id} to="/launch/site"
+                    search={{ siteId: site.id, module: item.id }} onClick={onNavigate}
+                    aria-current={active === item.id ? "page" : undefined}
+                    className={navClass}>{label}</Link>;
+            })}
           </div>
         </div>
       ))}
