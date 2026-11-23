@@ -17,6 +17,7 @@ type Props = {
   releaseId: string | null;
   emailOutputId: string | null;
   releaseNumber: number | null;
+  emailSubject: string | null;
   onCreateMaterials: () => void;
   canCreateMaterials: boolean;
 };
@@ -26,7 +27,7 @@ type Props = {
  * with confirmed delivery.
  */
 export function MarketingEmailCampaignV61({
-  siteId,packageId,releaseId,emailOutputId,releaseNumber,
+  siteId,packageId,releaseId,emailOutputId,releaseNumber,emailSubject,
   onCreateMaterials,canCreateMaterials,
 }:Props) {
   const [recipients,setRecipients] = useState("");
@@ -101,29 +102,48 @@ export function MarketingEmailCampaignV61({
         Open Outreach Details to select Email and complete the material requirements.
       </p>}
     </div> : <div className="mt-4 space-y-5">
-      <div className="border bg-muted/20 p-4">
-        <p className="text-sm font-semibold">Email Materials v{releaseNumber}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          The message and Brand shown below are frozen from this release. To change them,
-          edit your outreach and create an updated release first.
-        </p>
-        {preview ? <iframe title="Generated email preview" sandbox=""
-          className="mt-3 h-72 w-full border bg-white" srcDoc={preview}/>
-          : <p className="mt-2 text-xs text-muted-foreground">
-            The preview is unavailable. Review the email in Outreach Details before sending.
-          </p>}
-      </div>
-
-      <div className="space-y-4">
-        <Field label="Recipients · one opted-in adult email address per line">
-          <Textarea rows={5} maxLength={8000} value={recipients}
+      <div className="space-y-2">
+        <Field label="To · Recipient email addresses (one per line)" required>
+          <Textarea rows={4} maxLength={8000} value={recipients}
             placeholder={"person@example.org\nanother@example.org"}
             onChange={event => setRecipients(event.target.value)}/>
         </Field>
         <p className="text-xs text-muted-foreground">
-          {count} addresses entered · maximum 25 per campaign. Audience selections are
-          not contact permission. Do not use purchased lists, student records or unverified contacts.
+          {count} {count===1?"address":"addresses"} entered · Up to 25 per campaign.
+          Use only real email addresses belonging to adults who opted in.
+          Audience selections do not grant contact permission.
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Email subject</p>
+        <div className="border border-border bg-muted/20 px-3 py-3 text-sm font-medium">
+          {emailSubject?.trim() || "Subject unavailable. Return to Outreach Details to review."}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          From Email Materials v{releaseNumber}. Edit the outreach plan and generate
+          updated materials to change this subject or message.
+        </p>
+      </div>
+
+      <details className="border border-border/70 bg-muted/20">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
+          Preview branded email
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            (expand to review the full message)
+          </span>
+        </summary>
+        <div className="space-y-2 border-t border-border/70 p-3">
+          {preview ? <iframe title="Generated email preview" sandbox=""
+            className="h-64 w-full border bg-white" srcDoc={preview}/>
+            : <WorkspaceNotice tone="attention">
+              The generated email preview is unavailable. Open Outreach Details
+              to review the email before sending.
+            </WorkspaceNotice>}
+        </div>
+      </details>
+
+      <div className="space-y-4">
         <Field label="Sender's physical mailing address (included in every email)" required>
           <Textarea rows={2} maxLength={300} value={postalAddress}
             placeholder="Street address, city, state, postal code"
