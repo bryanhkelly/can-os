@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Bell, ChevronDown, Menu, MessageCircle, Search } from "lucide-react";
 import { WorkspaceAccountTrigger } from "./WorkspaceAccountMenu";
+import { PlatformOwnerDelegationBanner } from "./PlatformOwnerDelegationBanner";
 import { Button } from "@/components/ui/button";
 import { WorkspaceNotice } from "@/components/workspace";
 import { formatWorkspaceRole, getWorkspaceScopeLabel } from "./workspace-scope";
@@ -9,7 +10,7 @@ import { accessReturnToFromLocation, safeAccessReturnTo } from "@/domain/access-
 import { useHydrated } from "@/lib/use-hydrated";
 
 export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable, sessionError,
-  error, demoAccountSwitching, demoTenant, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
+  error, demoAccountSwitching, demoTenant, ownerDelegation, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
   onOpenSwitcher, onOpenSearch, onOpenAsk, onOpenNotifications, onOpenAccount, focused = false, notificationsOpen = false }: {
   member?: { role: string; firstName: string; lastName: string; siteId: string | null };
   sites: readonly { id: string; name: string }[];
@@ -19,6 +20,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   error: string;
   demoAccountSwitching: boolean;
   demoTenant?: boolean;
+  ownerDelegation?: {mode:"view"|"act";expiresAt:string};
   changing: boolean;
   menuOpen: boolean;
   switcherOpen: boolean;
@@ -88,6 +90,9 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   </header>
   <div className="space-y-2 px-[var(--page-gutter)] empty:hidden [&:not(:empty)]:pt-3">
       {(error || sessionError) && <WorkspaceNotice tone="danger" className="w-full">{error || sessionError}</WorkspaceNotice>}
+      {ownerDelegation && <PlatformOwnerDelegationBanner mode={ownerDelegation.mode}
+        expiresAt={ownerDelegation.expiresAt}
+        targetLabel={member ? member.firstName+" "+member.lastName+" ("+formatWorkspaceRole(member.role)+")" : "Selected user"}/>}
       {demoAccountSwitching && dismissedDemoContext !== demoContext && <WorkspaceNotice className="w-full"
         onDismiss={dismissDemoNotice} dismissLabel="Dismiss demo information">
         <span className="sm:hidden">Demo session as {member?.firstName} ({member && formatWorkspaceRole(member.role)}). Shared data; switches audited.</span>
