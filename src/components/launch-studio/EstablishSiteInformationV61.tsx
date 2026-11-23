@@ -359,7 +359,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
       navigationDisabled={busy || reloadRequired}>
       <div ref={panelRef} role="region" tabIndex={-1} aria-label={steps[step].title}
         className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
-    {step === 0 && <WorkspacePanel id="site-information-step-0" title="Hosting & Organization"
+    {step === 0 && <WorkspacePanel id="site-information-step-0" title="Describe your Site and its host"
       description="First describe the Site you are creating. Then tell us who is responsible for it and where activities will be hosted.">
       <div className="space-y-5">
         <fieldset className="space-y-3">
@@ -495,11 +495,11 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         </fieldset>
       </div>
     </WorkspacePanel>}
-    {step === 1 && <WorkspacePanel id="site-information-step-1" title="How People Participate"
+    {step === 1 && <WorkspacePanel id="site-information-step-1" title="Where and how will people take part?"
       description="Will people join in person, online or both?">
       <div className="space-y-5">
         <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">How will people participate?</legend>
+          <legend className="sr-only">Participation format</legend>
           <div className="grid gap-2 lg:grid-cols-3">
             <SelectionCard kind="radio" name="site-delivery" title="In person" detail="At a physical location"
               checked={environment.delivery === "physical"} onChange={() => setEnvironment(current => ({ ...current, delivery: "physical" }))} />
@@ -521,10 +521,10 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         <WorkspaceNotice>Your address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
-    {step === 2 && <WorkspacePanel id="site-information-step-2" title="Network Affiliation"
+    {step === 2 && <WorkspacePanel id="site-information-step-2" title="Would you like to connect with a network?"
       description="Optional. Select a network or continue independently.">
       <div className="space-y-5">
-        <fieldset className="space-y-3"><legend className="text-sm font-semibold">Would you like to explore network affiliation?</legend>
+        <fieldset className="space-y-3"><legend className="sr-only">Network affiliation choice</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             <SelectionCard kind="radio" name="site-network" title="Not at this time" detail="Continue independently"
               checked={networkChoice === "independent"} onChange={() => setNetworkChoice("independent")} />
@@ -535,7 +535,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
         {networkChoice === "request" && <SiteAffiliationPanel siteId={siteId} />}
       </div>
     </WorkspacePanel>}
-    {step === 3 && <WorkspacePanel id="site-information-step-3" title="Purpose & Story"
+    {step === 3 && <WorkspacePanel id="site-information-step-3" title="Tell your Site's story"
       description={identityContext.storyPrompt}>
       <div className="space-y-6">
         <p className="text-xs text-muted-foreground">Your answers can help shape your website and outreach. You'll review any suggested wording before using it. Please don't share private details about others.</p>
