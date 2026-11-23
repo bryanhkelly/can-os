@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
+import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
 import {
   searchPlatformOwnerTargets, beginPlatformOwnerDelegation,
 } from "@/modules/identity/platform-owner-delegation.functions";
@@ -39,7 +40,7 @@ export function PlatformOwnerDelegationPanel() {
     try{
       await beginPlatformOwnerDelegation({data:{grantId:selected,mode,reason:reason.trim()}});
       // Force a full document navigation to drop every previous user cache.
-      window.location.replace("/home");
+      window.location.replace(getWorkspaceHome(target!.role)??"/home");
     }catch(cause){setError(normalizeClientError(cause,"Delegation was not authorized.").message);setBusy(false);}
   }
   const target=targets.find(item=>item.grantId===selected);
