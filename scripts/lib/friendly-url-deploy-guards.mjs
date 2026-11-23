@@ -19,6 +19,8 @@ export function assertFriendlyUrlDeployment(identity, schema, roles, recorded, e
     "BLOCKED: deployment application DB role cannot read required private Site/Go Link tables");
   assert.equal(roles?.applicationCanBypassGoRls, true,
     "BLOCKED: application DB role cannot read protected Go Link table with RLS");
+  assert.equal(roles?.applicationCanCountRedirects, true,
+    "BLOCKED: application DB role cannot write protected anonymous Go Link counters");
   for (const expected of expectedMigrations) {
     const applied = recorded.find(row => Number(row.createdAt) === expected.when);
     assert.ok(applied, "BLOCKED: migration not applied: " + expected.tag);
