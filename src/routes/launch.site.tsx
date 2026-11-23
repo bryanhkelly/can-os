@@ -87,14 +87,14 @@ export async function loadSiteLaunchView(deps: {
       const isOverview = !deps.module;
       const loadMarketing = isOverview || isIntroduceModuleV61(deps.module);
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
-        measureServerStep("launch.selectedSite", "overview-information", () => readSiteInformationV61({ data: { siteId: selectedSite.id } })),
-        measureServerStep("launch.selectedSite", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: selectedSite.id } })),
-        measureServerStep("launch.selectedSite", "overview-brand", () => readSiteBrandVersionView({ data: { siteId: selectedSite.id } })),
+        measureServerStep("launch.site", "overview-information", () => readSiteInformationV61({ data: { siteId: selectedSite.id } })),
+        measureServerStep("launch.site", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: selectedSite.id } })),
+        measureServerStep("launch.site", "overview-brand", () => readSiteBrandVersionView({ data: { siteId: selectedSite.id } })),
         loadMarketing
-          ? measureServerStep("launch.selectedSite", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: selectedSite.id } }))
+          ? measureServerStep("launch.site", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: selectedSite.id } }))
           : Promise.resolve(null),
         isOverview
-          ? measureServerStep("launch.selectedSite", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: selectedSite.id } }))
+          ? measureServerStep("launch.site", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: selectedSite.id } }))
           : Promise.resolve(null),
       ]);
       if (info.status === "fulfilled") informationRead = info.value;
@@ -134,11 +134,11 @@ export async function loadSiteLaunchView(deps: {
     return {
       overview,
       existingPrograms: await existingProgramsRead,
-      selectedSite: selectedSite ?? null,
+      site: selectedSite ?? null,
       organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name,slug:item.slug,organizationId:item.organizationId})),
-      siteGuidePlanning: selectedSite && deps.module === "selectedSite-information" ? programsRead?.intent ?? null : null,
-      siteInformation: selectedSite && deps.module === "selectedSite-information"
+      siteGuidePlanning: selectedSite && deps.module === "site-information" ? programsRead?.intent ?? null : null,
+      siteInformation: selectedSite && deps.module === "site-information"
         ? informationRead ?? await readSiteInformationV61({ data: { siteId: selectedSite.id } }) : null,
       // Both Share modules use the same authorized Site package store
       // and the same editorial projection of saved Shape information.
