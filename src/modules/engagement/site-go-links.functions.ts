@@ -34,6 +34,7 @@ async function authorizedPackage(
   const actor = await getCommandContext(getRequest());
   const [site] = await reader.select({
     id: sites.id, organizationId: sites.organizationId,
+    lifecycleStatus:sites.lifecycleStatus,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
   assertSiteSetupScope(actor, site, write ? "program.launch.start" : "program.read");
   const [pkg] = await reader.select({
@@ -53,6 +54,8 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
     const { actor, site, pkg } = await authorizedPackage(data.siteId, data.packageId, true, tx);
     if (pkg.status !== "draft")
       throw new DomainError("CONFLICT", "Restore the outreach plan before creating a link.");
+    if(site.lifecycleStatus==="closed")
+      throw new DomainError("UNAVAILABLE","Closed Sites cannot create public Go Links.");
 
     const inspection=await inspectGoDestination(
       site.id,data.destination,"000000000000",tx);
@@ -151,7 +154,8 @@ export const listAvailableGoDestinations = createServerFn({method:"GET"})
   .validator((value:unknown)=>choicesSchema.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    await authorizedPackage(data.siteId,data.packageId,false);
+    const {site}=await authorizedPackage(data.siteId,data.packageId,false);
+    if(site.lifecycleStatus==="closed")return [];
     return listGoDestinationChoices(data.siteId,data.kind);
   });
 
@@ -160,19 +164,20 @@ export const inspectSavedGoLink = createServerFn({method:"GET"})
   .validator((value:unknown)=>revokeSchema.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    await authorizedPackage(data.siteId,data.packageId,false);
+    const {site}=await authorizedPackage(data.siteId,data.packageId,false);
     const [link]=await db.select().from(siteGoLinks).where(and(
       eq(siteGoLinks.id,data.linkId),eq(siteGoLinks.siteId,data.siteId),
       eq(siteGoLinks.packageId,data.packageId),
     )).limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link not found.");
     const availability=goLinkAvailability(link);
-    const destination=availability==="available"
+    const destination=availability==="available" && site.lifecycleStatus!=="closed"
       ?await inspectGoDestination(link.siteId,link.destination,link.code):null;
     return {
       availability,destinationAvailable:destination?.available??false,
       title:destination?.title??link.name,
-      navigable:availability==="available" && destination?.available===true,
+      navigable:availability==="available" &&
+        site.lifecycleStatus!=="closed" && destination?.available===true,
     };
   });
 
