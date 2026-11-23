@@ -10,7 +10,12 @@ export const Route = createFileRoute("/o/$organizationSlug/$siteSlug/website")({
     const siteId = await resolveAuthorizedSiteRoute({ data: params });
     return {
       siteId,
-      outcome: await loadWebsiteHome(siteId ?? "unavailable"),
+      outcome: siteId ? await loadWebsiteHome(siteId) : {
+        ok: false as const,
+        authError: null,
+        message: "This Site is unavailable or access denied.",
+        retryable: false,
+      },
     };
   },
   component: FriendlySiteWebsitePage,
