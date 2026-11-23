@@ -79,7 +79,7 @@ export function GoLinkWorkspace({ siteId, packageId }: { siteId: string; package
     setBusy(true);setError("");setNotice("");
     try {
       await revokeSiteGoLink({data:{siteId,packageId,linkId:link.id}});
-      setLinks(items => items.map(item => item.id === link.id ? {...item,status:"revoked"} : item));
+      setLinks(items => items.map(item => item.id === link.id ? {...item,status:"revoked" as const} : item));
       setNotice("Go link revoked. Its destination remains unavailable.");
     } catch (cause) {setError(textError(cause));}
     finally {setBusy(false);}
