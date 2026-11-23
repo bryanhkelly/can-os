@@ -64,6 +64,7 @@ export const routeNavigation = {
   "/programs/noncredit/enrollment": hidden("Native provider release management, separate from public registration", []),
   "/enrichment/$seasonId": hidden("Extended-learning offering detail"),
   "/enrichment-review": hidden("Contextual extended-learning review", admins),
+  "/go/$code": publicPage,
   "/groups": page(learn, ["student", "teacher", "guardian"]),
   "/groups/$groupId": hidden("Study group detail", ["student", "teacher"]),
   "/groups/new": hidden("Dedicated study group creation", ["student", "teacher"]),
