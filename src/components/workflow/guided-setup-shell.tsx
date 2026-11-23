@@ -52,9 +52,11 @@ export function GuidedSetupProgress({ steps, onStepChange, navigationDisabled = 
     </ol>;
 }
 
-export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange, navigationDisabled = false, progressLabel }: {
+export function GuidedSetupShell({ title, description, steps, aside, children, onStepChange, navigationDisabled = false, progressLabel, showHeader = true }: {
   title: string;
   description?: string;
+  /** Hide redundant inner heading when an owning page already displays the title. */
+  showHeader?: boolean;
   steps: readonly GuidedSetupStep[];
   aside?: ReactNode;
   /** Optional local step navigation; does not imply saved or complete. */
@@ -65,11 +67,12 @@ export function GuidedSetupShell({ title, description, steps, aside, children, o
   children: ReactNode;
 }) {
   const titleId = useId();
-  return <section aria-labelledby={titleId} className="border border-border bg-card shadow-sm">
-    <header className="border-b px-5 py-5 sm:px-6">
+  return <section aria-labelledby={showHeader ? titleId : undefined}
+    aria-label={showHeader ? undefined : title} className="border border-border bg-card shadow-sm">
+    {showHeader && <header className="border-b px-5 py-5 sm:px-6">
       <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
       {description && <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
-    </header>
+    </header>}
     <GuidedSetupProgress steps={steps} onStepChange={onStepChange} navigationDisabled={navigationDisabled} label={progressLabel} />
     <div className={cn("grid gap-6 p-5 sm:p-6", aside && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0">{children}</div>
