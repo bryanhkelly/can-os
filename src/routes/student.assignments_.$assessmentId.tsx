@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { saveAssignmentWork, submitAssignmentWork } from "@/modules/student-experience/submit-assignment-work";
 import { AssignmentAttemptHistory } from "@/components/student/AssignmentAttemptHistory";
@@ -24,6 +25,7 @@ import { formatTimestamp } from "@/modules/calendar/timezone";
 import { canSubmitAssignmentWork, shouldAutosaveAssignmentDraft } from "@/domain/student-assignment-work";
 
 export const Route = createFileRoute("/student/assignments_/$assessmentId")({
+  params: opaqueUuidPathParam("assessmentId"),
  validateSearch: (search: Record<string, unknown>): { filter?: "all" | "todo" | "missing" | "submitted" | "feedback"; section?: string } => ({
   filter: search.filter === "all" || search.filter === "todo" || search.filter === "missing" || search.filter === "submitted" || search.filter === "feedback" ? search.filter : undefined,
   section: typeof search.section === "string" ? search.section : undefined,
