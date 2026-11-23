@@ -151,8 +151,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
             subtitle="Design your Site website." />
           <div className="mt-5">
             {data.host ? <GuidedSetupShell
-              title="Website & Brand"
-              description="Choose a layout, customize your style and edit your content."
+              title="Website & Brand" showHeader={false}
               progressLabel="Website & Brand steps"
               steps={steps.map((item,index)=>({
                 id:item.id,
