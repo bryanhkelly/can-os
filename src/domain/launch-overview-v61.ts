@@ -1,3 +1,4 @@
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 /**
  * A launch recommendation is a navigation hint derived from independently
  * authorized saved records, never an operating or enrollment approval.
@@ -39,7 +40,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   }
   const route = (module: string) => friendlyBase
     ? friendlyBase + "?module=" + encodeURIComponent(module)
-    : "/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=" + encodeURIComponent(module);
+    : "/launch/site?siteId=" + compactUuidUrlValue(siteId) + "&module=" + encodeURIComponent(module);
   if (evidence.information.state === "unavailable") {
     return { title: "Review Site Information",
       description: "We couldn't load your Site Information. Check it before continuing.",
