@@ -37,7 +37,10 @@ export function PlatformReleaseCenter({records,limited}:{
   })).sort((a,b)=>{
     const pa=a.record.lifecycle==="published"?1:0;
     const pb=b.record.lifecycle==="published"?1:0;
-    return pa-pb||a.record.offeringTitle.localeCompare(b.record.offeringTitle);
+    const priority=(record:NativePublisherReleaseRecord)=>
+      record.offeringCode==="CLC-CUSTOM-TRAINING-01"||record.offeringCode==="CLC-DIGITAL-01"?0:1;
+    return priority(a.record)-priority(b.record) || pa-pb ||
+      a.record.offeringTitle.localeCompare(b.record.offeringTitle);
   }),[records]);
   const shown=items.filter(item=>item.record.offeringTitle.toLowerCase().includes(query.trim().toLowerCase()));
   const blocked=items.filter(item=>item.next.key!=="class-verification").length;
@@ -88,6 +91,14 @@ export function PlatformReleaseCenter({records,limited}:{
               {next.label}
             </StatusBadge>
           </div>
+          {record.noncreditTrainingStatus&&<p className="mt-3 text-sm">
+            <strong>Noncredit training:</strong> {record.noncreditTrainingStatus}.
+            {" "}<strong>Assessment:</strong> {record.noncreditAssessmentStatus??"unverified"}.
+            {" "}<strong>Independent training approval:</strong> {record.noncreditTrainingApproved?"recorded":"missing"}.
+            {" "}<strong>Lesson review:</strong> {record.pilotPlaceholderCount??0} media placeholders,
+            {" "}{record.pilotContentReviewCount??0} content-review flags
+            in {record.pilotLessonCount??0} lessons.
+          </p>}
           <p className="mt-3 text-sm">{next.detail}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Responsible: {route.owner}
