@@ -43,7 +43,7 @@ export async function readWorkspaceSession(request: Request) {
   return {
     authenticated: true as const,
     ...(isDemoAccountEmail(account.email) ? { demoTenant: true as const } : {}),
-    ...(demoAccountSwitching ? { demoAccountSwitching: true as const } : {}),
+    ...(demoAccountSwitching && !context.delegatedByPlatformOwner ? { demoAccountSwitching: true as const } : {}),
     ...(context.delegatedByPlatformOwner ? { ownerDelegation: {
       mode: context.delegationMode!,
       expiresAt: context.delegationExpiresAt!,
