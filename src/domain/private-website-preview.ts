@@ -1,3 +1,4 @@
+import { encodeUuidForPath, decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { isPublicSitePagePath, type PublicSitePath } from "./public-site-paths";
 import { escapePublicHtml } from "./public-site-html";
 
@@ -5,7 +6,7 @@ import { escapePublicHtml } from "./public-site-html";
 export const privateWebsitePreviewPath = "/website-preview";
 
 export function privateWebsitePreviewUrl(siteId: string, page: PublicSitePath = "/"): string {
-  return `${privateWebsitePreviewPath}?siteId=${encodeURIComponent(siteId)}&page=${encodeURIComponent(page)}`;
+  return `${privateWebsitePreviewPath}?siteId=${encodeURIComponent(encodeUuidForPath(siteId))}&page=${encodeURIComponent(page)}`;
 }
 
 const siteUuid = /^[\da-f]{8}-[\da-f]{4}-[1-8\da-f]{4}-[89ab\da-f]{4}-[\da-f]{12}$/i;
@@ -16,9 +17,9 @@ export function parsePrivateWebsitePreviewRequest(requestUrl: string):
   const params = new URL(requestUrl).searchParams;
   if ([...params.keys()].some(key => key !== "siteId" && key !== "page") ||
       params.getAll("siteId").length !== 1 || params.getAll("page").length > 1) return null;
-  const siteId = params.get("siteId") ?? "";
+  const siteId = decodeUuidPathParam(params.get("siteId") ?? "");
   const page = params.get("page") ?? "/";
-  if (!siteUuid.test(siteId) || !isPublicSitePagePath(page)) return null;
+  if (!siteId || !siteUuid.test(siteId) || !isPublicSitePagePath(page)) return null;
   return { siteId, page };
 }
 
@@ -34,7 +35,7 @@ export function renderPrivateWebsitePreviewHtml(
 ): string {
   const links = new Set(availablePages.filter(isPublicSitePagePath));
   const siteFirstUrl = (page:PublicSitePath) =>
-    "/launch/site-preview?siteId="+encodeURIComponent(siteId)+"&page="+encodeURIComponent(page);
+    "/launch/site-preview?siteId="+encodeURIComponent(encodeUuidForPath(siteId))+"&page="+encodeURIComponent(page);
   const converted = html.replace(/href="(\/[a-z-]*)"/g, (_match, path: string) =>
     isPublicSitePagePath(path) && links.has(path)
       ? `href="${kind==="site"?siteFirstUrl(path):privateWebsitePreviewUrl(siteId, path)}"`
