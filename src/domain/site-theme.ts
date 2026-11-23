@@ -12,9 +12,25 @@ export function resolveSiteTemplateId(value: unknown): SiteTemplateId {
     ? value as SiteTemplateId : "heritage";
 }
 
-export const sitePaletteIds = ["signature","heritage","forest","copper","coastal","harbor",
+const historicalSitePaletteIds = ["signature","heritage","forest","copper","coastal","harbor",
   "brand-heritage","brand-community","brand-modern","brand-bright-futures",
   "brand-summit","brand-classic","brand-campus"] as const;
+export const curatedSitePalettes = {
+  oxford: { label:"Oxford", ink:"#142D50", secondary:"#862B39", accent:"#C6A15B", surface:"#E5DCCB", canvas:"#FAF8F3" },
+  electric: { label:"Electric", ink:"#181B35", secondary:"#5945E8", accent:"#00D9D0", surface:"#DAD7FF", canvas:"#F7F7FF" },
+  evergreen: { label:"Evergreen", ink:"#173F35", secondary:"#52845C", accent:"#B4CD83", surface:"#DFE9D4", canvas:"#F8FAF4" },
+  sunburst: { label:"Sunburst", ink:"#173AA4", secondary:"#FF6B24", accent:"#FFCB32", surface:"#FFE4B5", canvas:"#FFF9ED" },
+  monochrome: { label:"Monochrome", ink:"#171717", secondary:"#424242", accent:"#969696", surface:"#E5E5E5", canvas:"#FFFFFF" },
+  terracotta: { label:"Terracotta", ink:"#743B2B", secondary:"#C45E3D", accent:"#E6A478", surface:"#EAD5BF", canvas:"#FCF5EC" },
+  pacific: { label:"Pacific", ink:"#07546B", secondary:"#008DAB", accent:"#60D5C5", surface:"#D7F0F3", canvas:"#F5FCFF" },
+  majesty: { label:"Majesty", ink:"#3D165C", secondary:"#7543A5", accent:"#D6B354", surface:"#E7DAF3", canvas:"#FAF6FF" },
+  bloom: { label:"Bloom", ink:"#831843", secondary:"#DB2777", accent:"#F9A8D4", surface:"#FCE7F3", canvas:"#FFF7FA" },
+  varsity: { label:"Varsity", ink:"#222222", secondary:"#C8102E", accent:"#F1B82D", surface:"#D8D8D8", canvas:"#FFFFFF" },
+  botanical: { label:"Botanical", ink:"#353D23", secondary:"#929D4C", accent:"#E8AA59", surface:"#E9E6D4", canvas:"#FAF9F1" },
+  horizon: { label:"Horizon", ink:"#263A74", secondary:"#EF6461", accent:"#F6BD60", surface:"#B9D9EB", canvas:"#FFFAF3" },
+} as const;
+export const curatedSitePaletteIds = Object.keys(curatedSitePalettes) as Array<keyof typeof curatedSitePalettes>;
+export const sitePaletteIds = [...historicalSitePaletteIds, ...curatedSitePaletteIds] as const;
 export type SitePaletteId = typeof sitePaletteIds[number];
 export const siteTypographyIds = ["editorial","traditional","contemporary"] as const;
 export type SiteTypographyId = typeof siteTypographyIds[number];
@@ -75,7 +91,7 @@ const fonts = {
 export type SiteTheme = {
   paletteId: SitePaletteId;
   typographyId: SiteTypographyId;
-  ink: string; canvas: string; accent: string; secondary: string; muted: string;
+  ink: string; canvas: string; accent: string; secondary: string; muted: string; surface?: string;
   displayFont: string; bodyFont: string; onDark: "#ffffff";
 };
 
@@ -84,7 +100,9 @@ export function resolveSiteTheme(paletteId?: string, typographyId?: string, head
     ? paletteId as SitePaletteId : "signature";
   const typography = siteTypographyIds.includes(typographyId as SiteTypographyId)
     ? typographyId as SiteTypographyId : "editorial";
-  const colors=palettes[palette], type=fonts[typography];
+  const curated = Object.hasOwn(curatedSitePalettes,palette) ? curatedSitePalettes[palette as keyof typeof curatedSitePalettes] : undefined;
+  const colors = curated ? {...curated, muted:curated.ink} : palettes[palette as keyof typeof palettes];
+  const type=fonts[typography];
   if (contrastRatio(colors.ink,colors.canvas)<4.5 ||
       contrastRatio(colors.muted,colors.canvas)<4.5 ||
       contrastRatio("#ffffff",colors.ink)<4.5) {
