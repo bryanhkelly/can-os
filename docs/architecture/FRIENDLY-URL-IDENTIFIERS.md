@@ -1,30 +1,40 @@
-# Friendly Site URL identity
+# Friendly URL identity and migration
 
-**Status:** Implementation on a draft feature branch. Acceptance and production rollout are not verified.
+**Status:** Committed on draft branch `feature/friendly-urls-complete-20261123`. Not merged, deployed, or production-verified.
 
-## Contract
+## Core contract
 
-- Database UUID primary keys and foreign keys remain authoritative. User-facing URLs are lookup aliases, not authorization or access tokens.
-- Friendly Site paths are namespaced as `/o/:organizationSlug/:siteSlug`, with `/launch`, `/website`, and `/profile` subpaths.
-- `organizations.slug` is globally unique. `sites.slug` is unique within its Organization. The pair, not Site slug alone, identifies a friendly Site address.
-- Launch Studio resolves the pair from the authorized `listLaunchOptions` result. The other friendly routes call `resolveAuthorizedSiteRoute`, which validates the pair against an authenticated, verified organization/Site grant scope before returning the UUID.
-- Every destination invokes its pre-existing resource reader/permission checks. A valid path or a returned UUID never grants capability to operate, edit, publish or impersonate.
-- Existing UUID routes remain available. Do not rewrite, mutate or rekey domain IDs as part of this URL change.
-- The `/o` namespace prevents ambiguous root route collisions and should not be used for public website or external access tokens.
+- Canonical database UUID keys and foreign keys remain unchanged. A short URL is *encoding*, not encryption or authorization.
+- Authenticated Organization/Site routes use `/o/:organizationSlug/:siteSlug`, with `/launch`, `/website`, and `/profile`. The Organization slug is globally unique; Site slug is unique in the Organization.
+- UUID-backed path params use a strict, reversible 22-character base64url encoding with no padding. Decode to the unchanged canonical UUID before calling any domain service; old 36-character UUID URLs remain valid.
+- Router-level query serialization compacts an explicit allowlist of UUID selection keys. Auth codes, share tokens, external redirects, free text, nested values, and non-UUID strings are never transformed.
+- Public Site photos use compact asset references; tenant publication, approved media checks, private R2 storage and origin-scoped read permissions stay as they were.
+- Verified Site/Organization grant scope and each destination's original permission checks remain authoritative. Slug aliases, compact IDs and QR/join codes never confer capability.
 
-## Security and privacy
+## Historical slug aliases
 
-- Keep personal identifiers, student names, access tokens and sensitive records out of readable slugs.
-- Site slugs are discoverable identifiers. Their opacity must never be relied on for access control.
-- Share/preview links must continue using separate, authorized, revocable, expiring random tokens.
-- Failure for unknown or unauthorized Site slugs must not expose an unscoped list of sites.
-- Ensure no cross-organization Site slugs resolve to records outside the signed-in scope.
+The **new, unapplied** governed migration `drizzle/0106_friendly_site_route_aliases.sql` introduces `site_route_aliases` with a unique Organization slug + Site slug pair and Site/Organization foreign keys.
 
-## Deferred work, not certified by this implementation
+- Backfills existing canonical Site pairs.
+- Transactional Site and Organization triggers reserve new names and retain historical names, rejecting reuse by another Site.
+- Lookup is server-only. The resolver requires an authenticated actor and current Organization/Site permission scope, and returns the canonical Site UUID for authorized existing or historical aliases.
+- Any desired canonical **HTTP redirect** from historical names to current names is a separate UX enhancement. Old names presently resolve the same secured content, not an automatic redirect.
+- The earlier 0105 filename was renumbered to 0106 because the release branch independently added **0105 Site Go Links**. This branch preserves the Go Links schema and experience. Do not apply 0106 before verifying the actual target database migration ledger.
 
-1. Add a governed, immutable routing-alias history and redirect policy before promising durable friendly bookmarks across Site or Organization slug renames. The current code uses mutable canonical slugs.
-2. Extend friendly or independent opaque public identifiers to the remaining application routes (Classes, applications, actions, specific enrollment records and direct previews), keeping private domain authorization unchanged.
-3. Perform exact-SHA typecheck, Cloudflare build, source/route-contract checks, unit tests, multi-tenant browser smoke tests, deep-link reloads, accessibility/navigation regressions and security checks.
-4. Define URL redirect and canonical-link strategy for old UUID links, recognizing that internal links may still lead to UUID URLs in modules not yet migrated.
+## Coverage and limitations
 
-No live database migrations or automatic redirects to a newly renamed slug are included in this release.
+- The initial 14 UUID-backed dynamic workspace routes use the generic path codec; legacy route and query URLs continue to work.
+- Global typed selection query strings, private previews, Site navigation, workspace links, search results, family/academic timelines and public photo URLs are covered.
+- Existing public engagement slug paths, `/go/:code` routes, tokenized share links and meaningful non-UUID path parameters remain unchanged intentionally.
+- Some URLs intentionally remain UUID-based when generated by raw HTML or external systems rather than the application router. These require specific owning-service review, rather than global rewriting of arbitrary URLs or sensitive tokens.
+- Route usage and redirect history need actual browser verification. Source tests are **not** evidence of a successful deployment.
+
+## Required acceptance before merging
+
+1. Exact-SHA TypeScript typecheck, source/build import checks, Cloudflare production build, route registry/manifest check, lint, and focused plus full unit tests.
+2. Browser tests for student, guardian, registrar, Site Admin, old/new UUID links, refresh/deep links, and invalid references. Confirm all current canonical Site permissions remain enforced.
+3. Cross-tenant and revoked-grant denial for Site alias lookup; independently validate Site rename/backfill/Organization rename/alias collision under an isolated Neon branch with correct service DB role and RLS.
+4. Validate migration journal ordering, SQL-only governance policy, race handling, performance and exact target-release branch alignment.
+5. Inspect final render/navigation from Website Studio, Launch Studio, Class, Action, enrolment, and existing external bookmarks.
+
+No live data migration or authorization policy changes have been executed here.
