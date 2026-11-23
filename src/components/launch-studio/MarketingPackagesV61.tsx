@@ -613,6 +613,10 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             releaseId={latestEmailRelease?.id??null}
             emailOutputId={latestEmailOutput?.id??null}
             releaseNumber={latestEmailRelease?.releaseNumber??null}
+            emailSubject={latestEmailRelease
+              ? latestEmailRelease.content.materialOverrides?.email?.headline ||
+                latestEmailRelease.content.headline
+              : null}
             canCreateMaterials={Boolean(record.brandVersionId)&&record.status!=="archived"&&
               record.content.formats.includes("email")&&!busy&&!releasesLoading&&!releasesUnavailable}
             onCreateMaterials={()=>{void releasePackage();}}/>
