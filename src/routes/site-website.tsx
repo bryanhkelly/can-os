@@ -367,6 +367,7 @@ function LocalWebsiteCopyEditor({
       displayName:brandDisplayName.trim(),
       logoAssetId:brandConfigRef.current?.logoAssetId??null,
       heroAssetId:brandConfigRef.current?.heroAssetId??null,
+      sharedHeroPhoto:branding.heroImage?null:branding.sharedHeroPhoto??null,
     };
   }
   function acceptSavedBrand(brand:{
@@ -482,7 +483,7 @@ function LocalWebsiteCopyEditor({
     setPreparingArtwork(true); setError("");
     try {
       const dataUrl = await prepareWebsiteArtwork(file);
-      setContent(old => ({ ...old, branding: { ...old.branding, [field]: {
+      setContent(old => ({ ...old, branding: { ...old.branding, ...(field==="heroImage"?{sharedHeroPhoto:null}:{}), [field]: {
         dataUrl, altText: "", rightsConfirmed: false, childImageConsent: "unconfirmed",
       } } }));
     } catch (caught) {
