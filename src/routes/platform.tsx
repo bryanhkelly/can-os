@@ -13,6 +13,7 @@ import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.fun
 import { NativePublisherReleaseReadinessPanel } from "@/components/learning/NativePublisherReleaseReadinessPanel";
 import { PlatformCatalogManager } from "@/components/platform/PlatformCatalogManager";
 import { PlatformOwnerDelegationPanel } from "@/components/platform/PlatformOwnerDelegationPanel";
+import { PlatformOwnerPilotAccessPanel } from "@/components/platform/PlatformOwnerPilotAccessPanel";
 import { PlatformReleaseCenter } from "@/components/platform/PlatformReleaseCenter";
 
 export const Route = createFileRoute("/platform")({
@@ -65,6 +66,7 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
+    {summary.platformOwner && <PlatformOwnerPilotAccessPanel/>}
     {summary.platformOwner && <PlatformOwnerDelegationPanel/>}
     <PlatformCatalogManager/>
     <PlatformReleaseCenter records={summary.publisherReleaseReadiness}
