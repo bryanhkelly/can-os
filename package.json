@@ -86,7 +86,7 @@
     "test:design-audit": "node --test scripts/lib/v61-source-audit.test.mjs scripts/lib/v61-component-dependencies.test.mjs scripts/codemods/v61-canonical-control-transform.test.mjs scripts/lib/source-module-resolution.test.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
-    "deploy:cloudflare": "node scripts/acceptance/check-one-person-deploy-schema.mjs && npm run build:cloudflare && wrangler deploy",
+    "deploy:cloudflare": "npm run db:check:friendly-urls:deploy && node scripts/acceptance/check-one-person-deploy-schema.mjs && npm run build:cloudflare && wrangler deploy",
     "test:classroom:unit": "node scripts/run-unit-suite.mjs classroom",
     "test:classroom:unconfigured": "playwright test --config playwright.authenticated-routes.config.ts --grep 'classroom join fails closed|learner and guardian cannot use facilitator|companion without a verified'",
     "db:canonical:noncredit-self-enrollment": "node scripts/acceptance/check-noncredit-self-enrollment.mjs",
@@ -136,7 +136,8 @@
     "check:lint-regressions": "node scripts/acceptance/check-eslint-new-warnings.mjs",
     "test:lint-regressions": "node --test scripts/lib/diff-added-lines.test.mjs",
     "test:quality:p2": "vitest run tests/unit/marketing-package-editor-state.test.ts tests/unit/pickup-authorization-scope.test.ts tests/unit/public-site-styles.test.ts tests/unit/public-site-html.test.ts tests/unit/marketing-package-session-scope.test.tsx tests/unit/marketing-package-archive-files.test.ts",
-    "test:quality:security": "vitest run tests/unit/safeguarding-mutation-authorization.test.ts tests/unit/authorized-program-query.test.ts tests/unit/safeguarding-case-access.test.ts tests/unit/access-context.test.ts"
+    "test:quality:security": "vitest run tests/unit/safeguarding-mutation-authorization.test.ts tests/unit/authorized-program-query.test.ts tests/unit/safeguarding-case-access.test.ts tests/unit/access-context.test.ts",
+    "db:check:friendly-urls:deploy": "node scripts/acceptance/check-friendly-url-deploy-schema.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
