@@ -1,4 +1,4 @@
-import { encodeUuidForPath } from "../src/domain/opaque-url-id";
+import { encodeUuidForPath } from "../../src/domain/opaque-url-id";
 import { randomUUID } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 import { expect, test } from "@playwright/test";
