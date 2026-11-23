@@ -4,8 +4,8 @@
   "generatedFromBranch": "main",
   "routes": [
     {
-      "file": "src/routes/__root.tsx",
-      "route": "<root>",
+      "file": "src/routes/index.tsx",
+      "route": "/",
       "owner": "shell",
       "verification": "pending",
       "roleJourney": "pending",
@@ -103,6 +103,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/admin.tsx",
+      "route": "/admin",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/admin_.invite.tsx",
       "route": "/admin_/invite",
       "owner": "identity",
@@ -121,9 +130,18 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/admin.tsx",
-      "route": "/admin",
-      "owner": "identity",
+      "file": "src/routes/admissions.tsx",
+      "route": "/admissions",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.index.tsx",
+      "route": "/admissions/",
+      "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -166,8 +184,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/admissions.index.tsx",
-      "route": "/admissions/",
+      "file": "src/routes/admissions.intake.tsx",
+      "route": "/admissions/intake",
       "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
@@ -177,15 +195,6 @@
     {
       "file": "src/routes/admissions.intake_.new.tsx",
       "route": "/admissions/intake_/new",
-      "owner": "enrollment",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/admissions.intake.tsx",
-      "route": "/admissions/intake",
       "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
@@ -218,15 +227,6 @@
       "roleJourney": "Registrar searches authorized transcript candidates; optional student person ID selects an exact candidate within query results, including same-name students",
       "writeBoundary": "pending",
       "readBoundary": "listTranscriptIssuanceCandidates retains registrar and credit-issuer authority; unavailable selected candidates never fall back to another student"
-    },
-    {
-      "file": "src/routes/admissions.tsx",
-      "route": "/admissions",
-      "owner": "enrollment",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
     },
     {
       "file": "src/routes/api.family-alert-delivery.tsx",
@@ -274,15 +274,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/calendar-export.tsx",
-      "route": "/calendar-export",
-      "owner": "calendar",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/calendar.tsx",
       "route": "/calendar",
       "owner": "calendar",
@@ -292,13 +283,22 @@
       "readBoundary": "Canonical scoped calendar visibility; guardian deadline child bindings come only from active academic relationships and active Section enrollments within current Site and Program scope"
     },
     {
-      "file": "src/routes/canonical_.noncredit-review-queue.tsx",
-      "route": "/canonical/noncredit-review-queue",
-      "owner": "learning",
+      "file": "src/routes/calendar-export.tsx",
+      "route": "/calendar-export",
+      "owner": "calendar",
       "verification": "pending",
-      "roleJourney": "Privately scoped noncredit completion queue for current provider",
-      "readBoundary": "Bounded exact-Site and current provider entitlement, not a global completion search",
-      "writeBoundary": "Review workflow remains gated; no guessed credential or completion writer"
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.index.tsx",
+      "route": "/canonical/",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
     },
     {
       "file": "src/routes/canonical.assessment-publications.tsx",
@@ -353,15 +353,6 @@
       "roleJourney": "Independent staff reviewer requests/approves canonical completion source evidence at verified provider scope",
       "readBoundary": "Current canonical independently scoped reviewer and exact provider/Site/source authorization; no network-only access",
       "writeBoundary": "Versioned source-bound review requests and decisions behind restricted WS3 review gating"
-    },
-    {
-      "file": "src/routes/canonical.index.tsx",
-      "route": "/canonical/",
-      "owner": "shell",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
     },
     {
       "file": "src/routes/canonical.issuer-access.tsx",
@@ -499,6 +490,15 @@
       "writeBoundary": "Download uses a recipient-bound POST with current credential validity check; no issuance or revocation action on this page"
     },
     {
+      "file": "src/routes/canonical_.noncredit-review-queue.tsx",
+      "route": "/canonical/noncredit-review-queue",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Privately scoped noncredit completion queue for current provider",
+      "readBoundary": "Bounded exact-Site and current provider entitlement, not a global completion search",
+      "writeBoundary": "Review workflow remains gated; no guessed credential or completion writer"
+    },
+    {
       "file": "src/routes/canonical.noncredit.completion.tsx",
       "route": "/canonical/noncredit/completion",
       "owner": "learning",
@@ -535,15 +535,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/class_.$classId.tsx",
-      "route": "/class_/$classId",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "One native Class workspace for learner, teacher, facilitator and manager, including governed completion and evidence reporting",
-      "readBoundary": "Native Class workspace validates current relationship, active staff authorization and current Site scope independently of URL view",
-      "writeBoundary": "Each existing Class command separately checks actor, Site, Course adoption, session and independent review requirements"
-    },
-    {
       "file": "src/routes/class.tsx",
       "route": "/class",
       "owner": "learning",
@@ -551,6 +542,15 @@
       "roleJourney": "One production /class experience for discovery, enrollment, Class management, publisher activities, recorded instruction draft production, and independent content review",
       "readBoundary": "Each view uses its original authorized source reader and exact current role, organization, Course and independent provider appointment checks",
       "writeBoundary": "Each create, edit, submit, review and publish command retains existing server-side author/reviewer separation, idempotency and audit"
+    },
+    {
+      "file": "src/routes/class_.$classId.tsx",
+      "route": "/class_/$classId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "One native Class workspace for learner, teacher, facilitator and manager, including governed completion and evidence reporting",
+      "readBoundary": "Native Class workspace validates current relationship, active staff authorization and current Site scope independently of URL view",
+      "writeBoundary": "Each existing Class command separately checks actor, Site, Course adoption, session and independent review requirements"
     },
     {
       "file": "src/routes/classroom.$sessionId.presentation.tsx",
@@ -571,8 +571,8 @@
       "readBoundary": "Per-person Course attempt, verified pairing or personal invited survey, current Site and native grant; no cross-person responses"
     },
     {
-      "file": "src/routes/enrichment_.$seasonId.tsx",
-      "route": "/enrichment/$seasonId",
+      "file": "src/routes/enrichment.tsx",
+      "route": "/enrichment",
       "owner": "activities",
       "verification": "pending",
       "roleJourney": "pending",
@@ -589,8 +589,8 @@
       "verification": "pending"
     },
     {
-      "file": "src/routes/enrichment.tsx",
-      "route": "/enrichment",
+      "file": "src/routes/enrichment_.$seasonId.tsx",
+      "route": "/enrichment/$seasonId",
       "owner": "activities",
       "verification": "pending",
       "roleJourney": "pending",
@@ -625,6 +625,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/groups.tsx",
+      "route": "/groups",
+      "owner": "study-groups",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/groups_.$groupId.tsx",
       "route": "/groups/$groupId",
       "owner": "study-groups",
@@ -636,15 +645,6 @@
     {
       "file": "src/routes/groups_.new.tsx",
       "route": "/groups/new",
-      "owner": "study-groups",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/groups.tsx",
-      "route": "/groups",
       "owner": "study-groups",
       "verification": "pending",
       "roleJourney": "pending",
@@ -787,15 +787,6 @@
       "readBoundary": "Verified workspace session; onsite view requires onsite persona and matches requested Site to server-returned grant Site"
     },
     {
-      "file": "src/routes/index.tsx",
-      "route": "/",
-      "owner": "shell",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/interest-event.ts",
       "route": "/interest-event",
       "owner": "enrollment",
@@ -814,8 +805,8 @@
       "readBoundary": "Only the signed-in learner's eligible Course attempts; QR secret is erased from URL fragment and never logged in path"
     },
     {
-      "file": "src/routes/landing.$journeyId.tsx",
-      "route": "/landing/$journeyId",
+      "file": "src/routes/landing.tsx",
+      "route": "/landing",
       "owner": "engagement",
       "verification": "pending",
       "roleJourney": "pending",
@@ -832,8 +823,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/landing.tsx",
-      "route": "/landing",
+      "file": "src/routes/landing.$journeyId.tsx",
+      "route": "/landing/$journeyId",
       "owner": "engagement",
       "verification": "pending",
       "roleJourney": "pending",
@@ -841,9 +832,9 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/launch.family.tsx",
-      "route": "/launch/family",
-      "owner": "enrollment",
+      "file": "src/routes/launch.tsx",
+      "route": "/launch",
+      "owner": "shell",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -859,6 +850,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/launch.family.tsx",
+      "route": "/launch/family",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/launch.school_.$programId.tsx",
       "route": "/launch/school_/$programId",
       "owner": "programs",
@@ -868,15 +868,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/launch.site-preview.ts",
-      "route": "/launch/site-preview",
-      "owner": "sites",
-      "verification": "pending",
-      "roleJourney": "Authorized Site operator sees a private iframe preview rendered by the canonical Site website engine with proposed interests visibly distinguished from approved offerings",
-      "writeBoundary": "GET only; no Site publication, Program mutation, enrollment or form submission",
-      "readBoundary": "Exact Site and verified registrar membership, owned Site publication reservation; approved-only Program catalogs and private Site-owned design; no-store noindex and same-origin frame"
-    },
-    {
       "file": "src/routes/launch.site.tsx",
       "route": "/launch/site",
       "owner": "programs",
@@ -884,6 +875,15 @@
       "roleJourney": "New canonical V6.1 four-milestone Site Launch Studio Overview and module slots, selected from authorized canonical Sites. Supersedes five-step Site-first wizard.",
       "writeBoundary": "No write in the frame or Overview; future modules use existing authorized Site commands and revision checks.",
       "readBoundary": "Only Sites returned from the authorized launch Site loader; explicit Site ID is rejected when not in scoped results."
+    },
+    {
+      "file": "src/routes/launch.site-preview.ts",
+      "route": "/launch/site-preview",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Authorized Site operator sees a private iframe preview rendered by the canonical Site website engine with proposed interests visibly distinguished from approved offerings",
+      "writeBoundary": "GET only; no Site publication, Program mutation, enrollment or form submission",
+      "readBoundary": "Exact Site and verified registrar membership, owned Site publication reservation; approved-only Program catalogs and private Site-owned design; no-store noindex and same-origin frame"
     },
     {
       "file": "src/routes/launch.staff.tsx",
@@ -898,15 +898,6 @@
       "file": "src/routes/launch.student.tsx",
       "route": "/launch/student",
       "owner": "profiles",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/launch.tsx",
-      "route": "/launch",
-      "owner": "shell",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -1003,8 +994,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/o.$organizationSlug.$siteSlug.index.tsx",
-      "route": "/o/$organizationSlug/$siteSlug/",
+      "file": "src/routes/o.$organizationSlug.$siteSlug.tsx",
+      "route": "/o/$organizationSlug/$siteSlug",
       "owner": "sites",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1012,8 +1003,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/o.$organizationSlug.$siteSlug.launch.tsx",
-      "route": "/o/$organizationSlug/$siteSlug/launch",
+      "file": "src/routes/o.$organizationSlug.$siteSlug.index.tsx",
+      "route": "/o/$organizationSlug/$siteSlug/",
       "owner": "sites",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1030,8 +1021,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/o.$organizationSlug.$siteSlug.tsx",
-      "route": "/o/$organizationSlug/$siteSlug",
+      "file": "src/routes/o.$organizationSlug.$siteSlug.launch.tsx",
+      "route": "/o/$organizationSlug/$siteSlug/launch",
       "owner": "sites",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1042,6 +1033,15 @@
       "file": "src/routes/o.$organizationSlug.$siteSlug.website.tsx",
       "route": "/o/$organizationSlug/$siteSlug/website",
       "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.tsx",
+      "route": "/operations",
+      "owner": "operations",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -1064,6 +1064,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.curriculum.tsx",
+      "route": "/operations/curriculum",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "curriculum-authorized Site Admin/registrar immediately sees selected release and course cards or an explicit empty selection across authorized programs; release cards link to existing marketplace review; publisher tools are secondary; connected acceptance pending",
+      "writeBoundary": "existing explicit institutional curriculum.publish grant, membership and Organization/Site/Program scope; immutable releases, revision checks and transactional audit/outbox remain unchanged; installation and adoption retain marketplace review",
+      "readBoundary": "canonical curriculum adopter program and marketplace reads recheck institutional curriculum.adopt or curriculum.publish authority and scope; publisher drafts require curriculum.publish; failed reads are not empty selections"
     },
     {
       "file": "src/routes/operations.curriculum_.$courseId.tsx",
@@ -1093,6 +1102,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.curriculum-marketplace.tsx",
+      "route": "/operations/curriculum-marketplace",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "curriculum-authorized Site Admin/registrar selects a class, uploads classwide or lesson-linked private video and previews student content; acceptance pending",
+      "writeBoundary": "existing scoped institutional curriculum.publish or curriculum.adopt authority; current active Section and pinned published version; verified immutable private upload; transactional audit/outbox; deployment gate",
+      "readBoundary": "staff video options and preview recheck institutional Organization/Program/Site authority; private preview requires active same-class/version verified attachment; no student upload access"
+    },
+    {
       "file": "src/routes/operations.curriculum-marketplace_.imports.tsx",
       "route": "/operations/curriculum-marketplace_/imports",
       "owner": "learning",
@@ -1120,22 +1138,13 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/operations.curriculum-marketplace.tsx",
-      "route": "/operations/curriculum-marketplace",
-      "owner": "learning",
+      "file": "src/routes/operations.family-alerts.tsx",
+      "route": "/operations/family-alerts",
+      "owner": "communication",
       "verification": "pending",
-      "roleJourney": "curriculum-authorized Site Admin/registrar selects a class, uploads classwide or lesson-linked private video and previews student content; acceptance pending",
-      "writeBoundary": "existing scoped institutional curriculum.publish or curriculum.adopt authority; current active Section and pinned published version; verified immutable private upload; transactional audit/outbox; deployment gate",
-      "readBoundary": "staff video options and preview recheck institutional Organization/Program/Site authority; private preview requires active same-class/version verified attachment; no student upload access"
-    },
-    {
-      "file": "src/routes/operations.curriculum.tsx",
-      "route": "/operations/curriculum",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "curriculum-authorized Site Admin/registrar immediately sees selected release and course cards or an explicit empty selection across authorized programs; release cards link to existing marketplace review; publisher tools are secondary; connected acceptance pending",
-      "writeBoundary": "existing explicit institutional curriculum.publish grant, membership and Organization/Site/Program scope; immutable releases, revision checks and transactional audit/outbox remain unchanged; installation and adoption retain marketplace review",
-      "readBoundary": "canonical curriculum adopter program and marketplace reads recheck institutional curriculum.adopt or curriculum.publish authority and scope; publisher drafts require curriculum.publish; failed reads are not empty selections"
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
     },
     {
       "file": "src/routes/operations.family-alerts_.compose.tsx",
@@ -1147,9 +1156,9 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/operations.family-alerts.tsx",
-      "route": "/operations/family-alerts",
-      "owner": "communication",
+      "file": "src/routes/operations.field-trips.tsx",
+      "route": "/operations/field-trips",
+      "owner": "field-trips",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -1167,15 +1176,6 @@
     {
       "file": "src/routes/operations.field-trips_.new.tsx",
       "route": "/operations/field-trips_/new",
-      "owner": "field-trips",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/operations.field-trips.tsx",
-      "route": "/operations/field-trips",
       "owner": "field-trips",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1201,6 +1201,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.interest-events.tsx",
+      "route": "/operations/interest-events",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "Site administrator or registrar reaches Interest Events from Launch and family outreach",
+      "writeBoundary": "Canonical interest-event commands; time-sensitive creation disabled without a valid selected school timezone",
+      "readBoundary": "Authorized Program and Site event listing; no browser-zone or Pacific fallback"
+    },
+    {
       "file": "src/routes/operations.interest-events_.$eventId.tsx",
       "route": "/operations/interest-events_/$eventId",
       "owner": "enrollment",
@@ -1219,15 +1228,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/operations.interest-events.tsx",
-      "route": "/operations/interest-events",
-      "owner": "enrollment",
-      "verification": "pending",
-      "roleJourney": "Site administrator or registrar reaches Interest Events from Launch and family outreach",
-      "writeBoundary": "Canonical interest-event commands; time-sensitive creation disabled without a valid selected school timezone",
-      "readBoundary": "Authorized Program and Site event listing; no browser-zone or Pacific fallback"
-    },
-    {
       "file": "src/routes/operations.jurisdiction-profiles.tsx",
       "route": "/operations/jurisdiction-profiles",
       "owner": "programs",
@@ -1235,6 +1235,15 @@
       "roleJourney": "network policy administrator reviews jurisdiction guidance",
       "readBoundary": "listJurisdictionProfileReviews (jurisdiction.profile.manage)",
       "writeBoundary": "saveJurisdictionProfileReview and publishJurisdictionProfile (jurisdiction.profile.manage)"
+    },
+    {
+      "file": "src/routes/operations.school-years.tsx",
+      "route": "/operations/school-years",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
     },
     {
       "file": "src/routes/operations.school-years_.$yearId.tsx",
@@ -1248,15 +1257,6 @@
     {
       "file": "src/routes/operations.school-years_.new.tsx",
       "route": "/operations/school-years_/new",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/operations.school-years.tsx",
-      "route": "/operations/school-years",
       "owner": "operations",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1280,15 +1280,6 @@
       "roleJourney": "Institutional records registrar selects an exact handoff Action; transcript issuance links preserve the student's person ID and search context",
       "writeBoundary": "pending",
       "readBoundary": "listTransferRecordsHandoffs retains institutional and delegated records scope; unavailable selected Actions never display a different handoff"
-    },
-    {
-      "file": "src/routes/operations.tsx",
-      "route": "/operations",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
     },
     {
       "file": "src/routes/operations.workflows.tsx",
@@ -1327,6 +1318,15 @@
       "writeBoundary": "Immutable release consent/version/capacity; provider operation-Site scope and canonical audit"
     },
     {
+      "file": "src/routes/published-site.ts",
+      "route": "/published-site",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "Default-off canonical mode resolves only published slugs and current public claims through the restricted reader function; default mode retains the existing published-site catalog.",
+      "writeBoundary": "GET-only; canonical claims projection is read-only."
+    },
+    {
       "file": "src/routes/published-site.$page.ts",
       "route": "/published-site/$page",
       "owner": "operations",
@@ -1361,15 +1361,6 @@
       "roleJourney": "Public visitor sees only a currently published, rights-reviewed photo belonging to the verified tenant Site, with no account/session, source folder or evidence data exposed",
       "readBoundary": "GET-only exact UUID path, host/slugs and public Site status checked, Site/document ownership, image MIME and current subject releases independently revalidated on every request",
       "writeBoundary": "No writes. R2 private object fetched server-side through short-lived signing; never exposes storage key or signed R2 URL"
-    },
-    {
-      "file": "src/routes/published-site.ts",
-      "route": "/published-site",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "Default-off canonical mode resolves only published slugs and current public claims through the restricted reader function; default mode retains the existing published-site catalog.",
-      "writeBoundary": "GET-only; canonical claims projection is read-only."
     },
     {
       "file": "src/routes/readiness.tsx",
@@ -1408,15 +1399,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/settings_.school.$module.tsx",
-      "route": "/settings_/school/$module",
-      "owner": "programs",
-      "verification": "pending",
-      "roleJourney": "Settings reuses the same exact-Site School Profile, Site Information, team, academic, compliance and Website Studio workflows as Launch Hub",
-      "writeBoundary": "Delegates to the same revision-checked, audited Site and domain commands; Settings adds no authority",
-      "readBoundary": "Verified registrar-capable membership and explicit Site selection; no silent substitution of another Site"
-    },
-    {
       "file": "src/routes/settings.tsx",
       "route": "/settings",
       "owner": "shell",
@@ -1424,6 +1406,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/settings_.school.$module.tsx",
+      "route": "/settings_/school/$module",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "Settings reuses the same exact-Site School Profile, Site Information, team, academic, compliance and Website Studio workflows as Launch Hub",
+      "writeBoundary": "Delegates to the same revision-checked, audited Site and domain commands; Settings adds no authority",
+      "readBoundary": "Verified registrar-capable membership and explicit Site selection; no silent substitution of another Site"
     },
     {
       "file": "src/routes/site-identity.tsx",
@@ -1451,6 +1442,24 @@
       "roleJourney": "Public entry for verified Site signup. After email verification, the existing identity service provisions the canonical Site and initial Site Admin.",
       "writeBoundary": "Same-origin and anonymous-admission gated; strict public input; pending signup stores optional responsible Organization display name; transactional Site provisioning happens only on single-use email challenge redemption.",
       "readBoundary": "Public page does not expose account, Site, tenant, or invitation state; response is generic to prevent account enumeration."
+    },
+    {
+      "file": "src/routes/sites.index.tsx",
+      "route": "/sites/",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/sites.$siteId.tsx",
+      "route": "/sites/$siteId",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
     },
     {
       "file": "src/routes/sites.$siteId.index.tsx",
@@ -1489,24 +1498,6 @@
       "writeBoundary": "pending"
     },
     {
-      "file": "src/routes/sites.$siteId.tsx",
-      "route": "/sites/$siteId",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/sites.index.tsx",
-      "route": "/sites/",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/staff.attendance.tsx",
       "route": "/staff/attendance",
       "owner": "staff",
@@ -1516,8 +1507,8 @@
       "readBoundary": "Authenticated attendance workspace before roster or queue restoration; student selection filters only the authorized roster and reports unavailable records; tab storage isolated by principal, Site and Program; legacy unscoped queues never adopted"
     },
     {
-      "file": "src/routes/staff.students.$personId.tsx",
-      "route": "/staff/students/$personId",
+      "file": "src/routes/staff.students.tsx",
+      "route": "/staff/students",
       "owner": "staff",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1534,8 +1525,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/staff.students.tsx",
-      "route": "/staff/students",
+      "file": "src/routes/staff.students.$personId.tsx",
+      "route": "/staff/students/$personId",
       "owner": "staff",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1552,8 +1543,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/student.assignments_.$assessmentId.tsx",
-      "route": "/student/assignments/$assessmentId",
+      "file": "src/routes/student.tsx",
+      "route": "/student",
       "owner": "student-experience",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1563,6 +1554,15 @@
     {
       "file": "src/routes/student.assignments.tsx",
       "route": "/student/assignments",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.assignments_.$assessmentId.tsx",
+      "route": "/student/assignments/$assessmentId",
       "owner": "student-experience",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1651,15 +1651,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/student.tsx",
-      "route": "/student",
-      "owner": "student-experience",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/support.tsx",
       "route": "/support",
       "owner": "support",
@@ -1730,6 +1721,15 @@
       "roleJourney": "signed-in Site Administrator or current Site website editor opens read-only saved draft with the existing verified email/code session",
       "writeBoundary": "GET only; no forms or mutation endpoints; cannot publish or open an academic admission flow",
       "readBoundary": "current verified grantSiteId must match exact Site UUID; canonical website editor relationship and draft-read capability enforced on server; cache private no-store; noindex"
+    },
+    {
+      "file": "src/routes/__root.tsx",
+      "route": "<root>",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
