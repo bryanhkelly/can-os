@@ -1,3 +1,4 @@
+import { shortUuidHref, compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { eq, desc, and, inArray, isNull, isNotNull, or, sql } from "drizzle-orm";
@@ -714,11 +715,11 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
-   n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
+   n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?shortUuidHref("/sites/", handoffSites.get(n.resourceId)!):
    n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/home#pickup":
    ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/home?action=${encodeURIComponent(n.resourceId)}`:
-   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"||context.role==="student"?`/groups/${encodeURIComponent(n.resourceId)}`:null):
-   context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/groups/${encodeURIComponent(groupBySession.get(n.resourceId)!)}?session=${encodeURIComponent(n.resourceId)}`:null};});
+   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"||context.role==="student"?shortUuidHref("/groups/", n.resourceId):null):
+   context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?shortUuidHref("/groups/",groupBySession.get(n.resourceId)!)+"?session="+compactUuidUrlValue(n.resourceId):null};});
 });
 export const readNotification=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({id:z.string().uuid()}).parse(data)).handler(async({data})=>{
