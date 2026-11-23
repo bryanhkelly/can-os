@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, communicationThreads, domainEvents, siteArtifactReleaseAccess,
-  siteArtifactReleases, siteMarketingPackageReleases, siteMarketingPackages, sites,
+  siteArtifactReleases, siteMarketingPackageReleases, siteMarketingPackages, siteBrandAssets, sites,
 } from "@/db/schema";
 import { assertCapability } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
@@ -18,6 +18,7 @@ import {
 } from "@/domain/site-marketing-email";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { sendNotificationEmailWithReceipt } from "@/modules/communication/notification-email.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import type { z } from "zod";
@@ -82,8 +83,8 @@ export async function queueSiteMarketingEmail(context: AccessContext, data: Queu
     const [site] = await tx.select({id:sites.id,organizationId:sites.organizationId})
       .from(sites).where(eq(sites.id,data.siteId)).limit(1);
     assertSiteSetupScope(context,site,"program.launch.start");
-    if (await isDemoTenantOrganization(site.organizationId,tx))
-      throw new DomainError("FORBIDDEN","Synthetic demo Sites cannot send real email.");
+    if (data.mode === "campaign" && await isDemoTenantOrganization(site.organizationId,tx))
+      throw new DomainError("FORBIDDEN","Synthetic demo Sites cannot send real campaigns. Send a test to a verified real account instead.");
     const [pkg] = await tx.select().from(siteMarketingPackages).where(and(
       eq(siteMarketingPackages.siteId,site.id),
       eq(siteMarketingPackages.id,data.packageId),
@@ -123,8 +124,8 @@ export async function queueSiteMarketingEmail(context: AccessContext, data: Queu
         email:accessAccounts.emailNormalized,verifiedAt:accessAccounts.emailVerifiedAt,
         disabled:accessAccounts.disabled,
       }).from(accessAccounts).where(eq(accessAccounts.id,context.accountId)).limit(1);
-      if (!account || account.disabled || !account.verifiedAt)
-        throw new DomainError("FORBIDDEN","Verify your own account email before sending a test.");
+      if (!account || account.disabled || !account.verifiedAt || isDemoAccountEmail(account.email))
+        throw new DomainError("FORBIDDEN","A test requires a verified, non-demo sign-in email.");
       emails = [account.email];
     } else {
       try { emails = parseMarketingEmailRecipients(data.recipients); }
@@ -149,6 +150,15 @@ export async function queueSiteMarketingEmail(context: AccessContext, data: Queu
       return {id:prior.id,created:false,summary:marketingEmailDeliverySummary(old.recipients)};
     }
 
+    
+    const recent = existingRows.filter(row => row.createdAt.getTime() >
+      Date.now() - 60*60*1000).flatMap(row => {
+        const parsed = marketingEmailMetadataSchema.safeParse(row.metadata);
+        return parsed.success ? [parsed.data] : [];
+      });
+    if (recent.filter(item => item.mode === data.mode).length >=
+      (data.mode === "test" ? 10 : 5))
+      throw new DomainError("UNAVAILABLE","This Site has reached its hourly email send limit.");
     const suppressed = await optouts(site.id,tx);
     const recipients: MarketingEmailRecipient[] = emails.map(email => ({
       key:crypto.randomUUID(),email,
@@ -271,7 +281,7 @@ export async function handleSiteMarketingEmailCampaign(eventId:string) {
     .where(eq(siteArtifactReleaseAccess.releaseId,artifact.id)).limit(1) : [];
   if (!release || !pkg || pkg.status !== "draft" || !artifact || access?.withdrawnAt ||
     artifact.brandVersionId !== release.brandVersionId ||
-    await isDemoTenantOrganization(site.organizationId)) {
+    (batch.mode === "campaign" && await isDemoTenantOrganization(site.organizationId))) {
     for (const recipient of batch.recipients.filter(item =>
       item.status === "queued" || item.status === "failed"))
       await persistRecipient(row.id,recipient.key,{status:"suppressed"});
@@ -280,6 +290,17 @@ export async function handleSiteMarketingEmailCampaign(eventId:string) {
   const output = artifact.outputManifest as {body?:unknown;plainText?:unknown};
   if (typeof output.body !== "string" || !output.body.trim())
     throw new Error("Frozen email release has no HTML.");
+  if (createHash("sha256").update(output.body).digest("hex") !== artifact.outputChecksum)
+    throw new Error("Frozen email release failed its checksum verification.");
+  const manifest = artifact.assetManifest as {logo?:{id:string}|null;hero?:{id:string}|null};
+  for (const image of [manifest.logo,manifest.hero]) {
+    if (!image?.id) continue;
+    const [asset] = await db.select({revokedAt:siteBrandAssets.revokedAt})
+      .from(siteBrandAssets).where(and(
+        eq(siteBrandAssets.id,image.id),eq(siteBrandAssets.siteId,site.id),
+      )).limit(1);
+    if (!asset || asset.revokedAt) throw new Error("A released email image no longer has valid rights.");
+  }
   const {title: releaseTitle, ...frozenContent} = release.contentSnapshot;
     const snapshot = marketingPackageContentSchema.parse(frozenContent);
   const text = typeof output.plainText === "string" ? output.plainText :
