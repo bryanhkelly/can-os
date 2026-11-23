@@ -1,4 +1,4 @@
-import { shortUuidHref } from "@/domain/opaque-url-id";
+import { shortUuidHref, compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { createServerFn } from "@tanstack/react-start";
 import { personDisplayName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -299,8 +299,8 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
       sub: row.gradeLevel ? `Grade ${row.gradeLevel}` : "Student",
       to:
         actor.role === "guardian"
-          ? `/guardian/students?student=${encodeURIComponent(row.personId)}`
-          : `/staff/students/${row.personId}`,
+          ? `/guardian/students?student=${compactUuidUrlValue(row.personId)}`
+          : shortUuidHref("/staff/students/",row.personId),
     });
     if (hits.length >= 5) break;
   }
