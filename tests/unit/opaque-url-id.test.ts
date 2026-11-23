@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  decodeUuidPathParam, encodeUuidForPath, opaqueUuidPathParam, shortUuidHref,
+  compactUuidUrlValue, decodeUuidPathParam, encodeUuidForPath, opaqueUuidPathParam, shortUuidHref,
 } from "@/domain/opaque-url-id";
 
 const cases = [
@@ -41,6 +41,8 @@ describe("canonical UUID URL encoding", () => {
     expect(codec.stringify({ classId: uuid })).toEqual({ classId: token });
     expect(() => codec.parse({ classId: "untrusted" })).toThrow("Invalid record reference");
     expect(shortUuidHref("/class/", uuid)).toBe("/class/" + token);
+    expect(compactUuidUrlValue(uuid)).toBe(token);
+    expect(compactUuidUrlValue("school one")).toBe("school%20one");
   });
 
   it("rejects invalid outbound UUIDs rather than fabricating a stable link", () => {
