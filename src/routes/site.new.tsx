@@ -6,10 +6,11 @@ import {
   Globe2, Mail, ShieldCheck, Sun, UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { realSchoolSetupSignupSchema } from "@/domain/school-setup";
+import { realSchoolSetupSignupSchema, publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
 import { useHydrated } from "@/lib/use-hydrated";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
 const noStore = { "Cache-Control": "no-store" };
@@ -106,6 +107,7 @@ function SiteNewPage() {
     const payload = {
       name: String(values.get("siteName") ?? "").trim(),
       organizationName: String(values.get("organizationName") ?? "").trim() || undefined,
+      organizationType: String(values.get("organizationType") ?? "").trim(),
       firstName: String(values.get("firstName") ?? "").trim(),
       lastName: String(values.get("lastName") ?? "").trim(),
       email: String(values.get("email") ?? "").trim(),
@@ -176,6 +178,13 @@ function SiteNewPage() {
               <Field label="Organization name (optional)"
                 description="Only if the organization responsible for this Site has a different name. Affiliations and legal authority are reviewed separately.">
                 <Input name="organizationName" placeholder="e.g., Grace Community Church" minLength={2} maxLength={160} />
+              </Field>
+              <Field label="Responsible organization type" required
+                description="Choose how your organization describes itself. National network status and affiliations require independent verification.">
+                <Select name="organizationType" defaultValue="other_partner" required>
+                  {publicSignupOrganizationTypeOptions.map(option =>
+                    <option key={option.value} value={option.value}>{option.label}</option>)}
+                </Select>
               </Field>
               <div className="border-t pt-5">
                 <p className={eyebrow}>Initial Site administrator</p>
