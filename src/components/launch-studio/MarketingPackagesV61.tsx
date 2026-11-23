@@ -453,7 +453,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             Review its highlights and message before creating another release.
             Earlier materials are unchanged.
           </WorkspaceNotice>}
-        {record.content.plan&&<WorkspacePanel title="Your outreach plan">
+        {record.content.plan&&<WorkspacePanel title="Audience & highlights">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <p><strong>Who you want to reach:</strong> {record.content.plan.recipients.map(id=>marketingAudienceOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</p>
             <p><strong>Who will benefit:</strong> {record.content.plan.beneficiaries.map(id=>id.replaceAll("_"," ").replace(/^./,c=>c.toUpperCase())).join(", ")||"Not selected"}</p>
@@ -518,7 +518,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             <p className="mt-2 text-muted-foreground">This kit is for talking points, not verified operational claims.</p>
           </div>}
         </WorkspacePanel>
-        <WorkspacePanel title="Plan details">
+        <WorkspacePanel title="Message & materials">
           <dl className="mt-3 space-y-4 text-sm">
             <div><dt className="font-semibold">Purpose</dt><dd className="text-muted-foreground">
               {marketingPurposeOptions.find(option=>option.id===record.content.purpose)?.label}</dd></div>
