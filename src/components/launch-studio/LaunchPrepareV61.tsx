@@ -294,7 +294,8 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
       {module === "facilities-resources" && <PrepareFacilitiesV61 key={siteId} siteId={siteId} />}
       {module === "invite-team" && <PrepareTeamV61 key={siteId} siteId={siteId} />}
       {module === "schedules-capacity" && <PrepareSchedulesV61 key={siteId} siteId={siteId} />}
-      {(module === "funding-enrollment" || module === "opening-compliance") && <WorkspacePanel title="What to prepare"
+      {(module === "funding-enrollment" || module === "opening-compliance") && <WorkspacePanel
+        title={module === "funding-enrollment" ? "Before people register" : "Opening decisions and requirements"}
         description="Requirements depend on the Solution and location.">
         <div className="flex gap-3">
           <ClipboardCheck aria-hidden="true" className="mt-1 size-5 shrink-0 text-primary" />
