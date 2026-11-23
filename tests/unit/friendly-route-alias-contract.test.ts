@@ -24,6 +24,7 @@ describe("governed friendly Site URL migration", () => {
     expect(sql).toContain("CREATE TRIGGER \"sites_route_alias_sync\"");
     expect(sql).toContain("CREATE TRIGGER \"organizations_route_alias_sync\"");
     expect(sql).toContain("ENABLE ROW LEVEL SECURITY");
+    expect(sql).toContain('"site_id" uuid NOT NULL REFERENCES "sites"("id") ON DELETE CASCADE');
     expect(sql).toContain("REVOKE ALL ON TABLE \"site_route_aliases\" FROM PUBLIC");
     expect(sql).not.toContain("DROP TABLE");
     expect(sql).not.toContain("TRUNCATE TABLE");
@@ -33,6 +34,7 @@ describe("governed friendly Site URL migration", () => {
     const reader = source("src/modules/sites/site-route-resolver.functions.ts");
     expect(reader).toContain("actor.scope.organizationIds");
     expect(reader).toContain("actor.grantSiteId");
+    expect(reader).toContain("actor.scope.siteIds.length === 0");
     expect(reader).toContain("siteRouteAliases.organizationSlug");
     expect(reader).toContain("siteRouteAliases.siteSlug");
     expect(reader).toContain("siteRouteAliases.organizationId");
