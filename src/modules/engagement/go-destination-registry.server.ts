@@ -97,27 +97,27 @@ export async function listGoDestinationChoices(
   if(kind==="site-page"){
     if(!await publishedSiteHost(siteId,reader))return [];
     const pages=["contact","home","programs","experiences","courses","classes","academics","admissions"] as const;
-    return pages.map(page=>({destination:{kind:"site-page",page},
+    return pages.map(page=>({destination:{kind:"site-page" as const,page},
       title:page==="contact"?"Express interest / Contact":page==="home"?"Site homepage":page[0]!.toUpperCase()+page.slice(1),
       description:"Published Site page"}));
   }
   if(kind==="information"){
     return Object.values(engagementJourneys).map(journey=>({
-      destination:{kind:"information",journeyId:journey.id},
+      destination:{kind:"information" as const,journeyId:journey.id},
       title:journey.headline,description:journey.audience,
     }));
   }
   if(kind==="adult-training"){
     const releases=await readEligibleSelfEnrollmentReleases(reader,undefined,{siteId,limit:50});
     return releases.filter(item=>item.siteId===siteId).map(item=>({
-      destination:{kind:"adult-training",releaseId:item.id},
+      destination:{kind:"adult-training" as const,releaseId:item.id},
       title:item.title,description:item.deliveryMode==="facilitated"?"Facilitated training":"Independent training",
     }));
   }
   if(kind==="enrichment"){
     const seasons=await readEnrichmentCatalog(siteId,reader);
     return seasons.filter(item=>item.registrationOpen).slice(0,50).map(item=>({
-      destination:{kind:"enrichment",seasonId:item.seasonId},
+      destination:{kind:"enrichment" as const,seasonId:item.seasonId},
       title:item.name+" · "+item.seasonName,description:"Open registration",
     }));
   }
@@ -140,7 +140,7 @@ export async function listGoDestinationChoices(
     (!item.opensAt || item.opensAt<=now) &&
     (!item.closesAt || item.closesAt>now),
   ).slice(0,50).map(item=>({
-    destination:{kind:"class",classId:item.id},title:item.title,
+    destination:{kind:"class" as const,classId:item.id},title:item.title,
     description:"Public Class offering",
   }));
 }
