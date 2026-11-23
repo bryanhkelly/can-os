@@ -19,6 +19,8 @@ describe("marketing email recipient preflight", () => {
       .toEqual(["subscriber@realcommunity.org"]);
     expect(() => parseMarketingEmailRecipients("alex.registrar@valorschool.demo"))
       .toThrow(/fictional \.demo addresses/);
+    expect(() => parseMarketingEmailRecipients("test@events.valorschool.demo"))
+      .toThrow(/fictional \.demo addresses/);
     expect(() => parseMarketingEmailRecipients(
       "subscriber@realcommunity.org\nadmin.demo@valorschool.demo",
     )).toThrow(/fictional \.demo addresses/);
