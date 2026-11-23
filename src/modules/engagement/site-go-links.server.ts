@@ -23,12 +23,14 @@ export async function resolveSiteGoLink(code: string): Promise<string | null> {
     organizationId:sites.organizationId,lifecycleStatus:sites.lifecycleStatus,
   }).from(sites).where(eq(sites.id,link.siteId)).limit(1);
   if(!site || site.organizationId!==link.organizationId ||
-      site.lifecycleStatus!=="active")return null;
+      site.lifecycleStatus==="closed")return null;
   const [pkg]=await db.select({status:siteMarketingPackages.status,
     siteId:siteMarketingPackages.siteId,
     organizationId:siteMarketingPackages.organizationId,
   }).from(siteMarketingPackages).where(eq(siteMarketingPackages.id,link.packageId)).limit(1);
-  if(!pkg || pkg.status!=="draft" || pkg.siteId!==link.siteId ||
+  // Package archival locks editing; it does not retract already distributed
+  // collateral or navigation. Explicit pause/revoke controls govern the link.
+  if(!pkg || pkg.siteId!==link.siteId ||
       pkg.organizationId!==link.organizationId)return null;
 
   const outcome=await inspectGoDestination(link.siteId,link.destination,code);
