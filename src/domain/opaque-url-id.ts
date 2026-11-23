@@ -65,10 +65,12 @@ export function opaqueUuidPathParam<K extends string>(key: K) {
       const uuid = decodeUuidPathParam(params[key]);
       return uuid ? { ...params, [key]: uuid } : false;
     },
-    stringify: (params: Record<K, string>): Record<K, string> => ({
-      ...params,
-      [key]: encodeUuidForPath(params[key]),
-    }),
+    stringify: (params: Record<K, string>): Record<K, string> => {
+      const uuid = decodeUuidPathParam(params[key]);
+      // Preserve old, already-authorized application link generation in
+      // incomplete/test data. Incoming routes still reject invalid IDs.
+      return { ...params, [key]: uuid ? encodeUuidForPath(uuid) : params[key] };
+    },
   };
 }
 
