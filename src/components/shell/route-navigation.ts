@@ -198,7 +198,6 @@ export const routeNavigation = {
   "/sites/$siteId/publish": page(schoolProfile, admins),
   "/staff/students/$personId": page("/staff/students", staff),
   "/sites/$siteId": page("/home", [...admins, "site_leader", "site_staff"]),
-  "/o/$organizationSlug/$siteSlug/": hidden("Authorized friendly Site Today route", [...admins, "site_leader", "site_staff"]),
   "/staff/students": page("/staff/students", staff),
   "/canonical/assessment-publications": hidden("Independent assessment publication workspace", []),
   "/canonical/assessment-reviews": hidden("Independent assessment review workspace", []),
