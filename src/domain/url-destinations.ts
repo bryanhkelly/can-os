@@ -56,7 +56,7 @@ export function buildUrlDestination(target: UrlDestination): ResolvedUrlDestinat
       if (target.identity) return workspace(friendlySiteLaunchHref(target.identity, target.module));
       const query = new URLSearchParams({ siteId: compactId(target.siteId) });
       if (target.module) query.set("module", target.module);
-      return workspace("/launch/site?" + query);
+      return workspace("/launch/site?" + query.toString());
     }
     case "class": return workspace("/class/" + compactId(target.classId));
     case "action": return workspace("/actions/" + compactId(target.actionId));
