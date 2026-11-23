@@ -8,6 +8,7 @@ import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { authorizedProgramWhere } from "./authorized-program-query.server";
+import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -34,6 +35,9 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
   email:accessAccounts.emailNormalized,accountPersonId:accessAccounts.personId,
   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
+  delegatedGrantId:accessSessions.delegatedGrantId,
+  delegatedMode:accessSessions.delegatedMode,
+  delegatedUntil:accessSessions.delegatedUntil,
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
@@ -81,16 +85,65 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
   catch { return rejectSession(request,"membership_unavailable"); }
  }
+ // A Platform Owner's actual grant remains active on the original session.
+ // The impersonated Person is an independently verified, expiring projection,
+ // never a browser-provided role or permanent membership transfer.
+ let effectiveGrant=activeGrant;
+ let effectiveGrants=grants;
+ let ownerDelegation: { mode:"view"|"act"; expiresAt:Date }|null=null;
+ if(session.delegatedGrantId){
+  const owner=await getVerifiedPlatformOwnerSession(request);
+  if(activeGrant.role!=="platform_owner"||activeGrant.id!==owner.grantId||
+     session.delegatedMode!=="view"&&session.delegatedMode!=="act"||
+     !session.delegatedUntil||session.delegatedUntil<=now)
+   return rejectSession(request,"membership_unavailable");
+  // View As never runs mutations, including privileged server functions.
+  if(session.delegatedMode==="view"&&request.method!=="GET")
+   throw new AuthorizationError("read-only owner delegation");
+  const [target]=await db.select({
+   accountId:accountPersonGrants.accountId,
+   personId:accountPersonGrants.personId,
+   role:accountPersonGrants.role,
+   email:accessAccounts.emailNormalized,
+   accountPersonId:accessAccounts.personId,
+  }).from(accountPersonGrants)
+   .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+   .where(and(eq(accountPersonGrants.id,session.delegatedGrantId),
+      eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false),
+      isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
+  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||
+     !target.accountPersonId||target.accountPersonId!==target.personId)
+   return rejectSession(request,"membership_unavailable");
+  try{await assertRawAccountPerson(target.accountId,target.personId);}
+  catch{return rejectSession(request,"membership_unavailable");}
+  const eligible=await readSessionGrants(target.accountId,target.email);
+  const exact=eligible.grants.find(grant=>grant.id===session.delegatedGrantId&&grant.active);
+  if(!exact)return rejectSession(request,"membership_unavailable");
+  if(session.delegatedMode==="act" &&
+      ["academic_content_reviewer","can_credential_reviewer","can_jurisdiction_reviewer",
+       "can_network_steward","app_admin","network_admin",
+       "safeguarding_responder","safeguarding_lead"].includes(exact.role))
+   throw new AuthorizationError("independent protected reviewer role");
+  effectiveGrant=exact;
+  effectiveGrants=eligible.grants;
+  ownerDelegation={mode:session.delegatedMode,expiresAt:session.delegatedUntil};
+ }
  const context=resolveAccessContext({
-  accountId:activeGrant.accountId,
-  sessionId:session.id,activeGrantId:session.activeGrantId,
- },grants);
+  accountId:effectiveGrant.accountId,
+  sessionId:session.id,activeGrantId:effectiveGrant.id,
+ },effectiveGrants);
+ if(ownerDelegation){
+  context.impersonatedByAccountId=session.accountId;
+  context.delegatedByPlatformOwner=true;
+  context.delegationMode=ownerDelegation.mode;
+  context.delegationExpiresAt=ownerDelegation.expiresAt.toISOString();
+ }
  // Delegation is established ONLY by the server-verified Demo Admin login
  // and selected active target grant. Downstream services receive the ordinary
  // effective actor and use identical role, Site, Class and enrollment checks.
  // Keep the session owner separately for audit, not as a domain authorization
  // exclusion that turns demo data into a different application.
- if(demoAccountSwitching && activeGrant.accountId!==session.accountId)
+ if(!ownerDelegation && demoAccountSwitching && activeGrant.accountId!==session.accountId)
   context.impersonatedByAccountId=session.accountId;
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
