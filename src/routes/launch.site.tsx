@@ -1,4 +1,4 @@
-import { encodeUuidForPath } from "@/domain/opaque-url-id";
+import { encodeUuidForPath, compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { listLaunchOptions } from "@/modules/programs/launch.functions";
@@ -198,7 +198,7 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
   if (!site) return <WorkspaceShell title="Choose your Site" eyebrow="Launch Studio"
     subtitle={error ?? "Select an authorized Site to continue its launch."}>
     <div className="mt-6 space-y-3">{sites.map(item=><a key={item.id}
-      href={"/launch/site?siteId="+encodeURIComponent(item.id)}
+      href={"/launch/site?siteId="+compactUuidUrlValue(item.id)}
       className="block border bg-card p-4 font-medium hover:bg-muted">{item.name}</a>)}</div>
     {!sites.length && <a href="/site/new" className="mt-6 inline-flex min-h-11 items-center font-semibold text-primary">
       Create your Site
@@ -208,7 +208,7 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
   const identity = organization && validFriendlySlug(organization.slug) && validFriendlySlug(site.slug)
     ? { organizationSlug: organization.slug, siteSlug: site.slug }
     : null;
-  const base = identity ? friendlySiteLaunchHref(identity) : "/launch/site?siteId=" + encodeURIComponent(site.id);
+  const base = identity ? friendlySiteLaunchHref(identity) : "/launch/site?siteId=" + compactUuidUrlValue(site.id);
   const go = (module?: SiteLaunchModuleIdV61) => identity
     ? navigate({ to: "/o/$organizationSlug/$siteSlug/launch", params: identity, search: { module } })
     : navigate({ to: "/launch/site", search: { siteId: site.id, module } });
