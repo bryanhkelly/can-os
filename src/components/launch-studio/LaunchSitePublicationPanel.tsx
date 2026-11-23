@@ -170,8 +170,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
     }
   }
 
-  return <WorkspacePanel title="Publish your website"
-    description="Review your website and make sure its words, photos, and important details are ready. Publishing your website is separate from opening registration.">
+  return <WorkspacePanel title="Final website checks"
+    description="Review the copy, images, program listings and website address. Publishing does not open registration.">
     {loading || (publicationSnapshot !== null && publicationSnapshot.siteId !== siteId)
       ? <p role="status" className="text-sm text-muted-foreground">Checking your website's publication status…</p>
       : state ? <div className="space-y-5">
