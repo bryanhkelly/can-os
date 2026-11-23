@@ -41,7 +41,7 @@ describe("platform App Admin role isolation", () => {
   it("requires verified non-demo identity for platform operations", () => {
     const auth = readFileSync("src/modules/identity/platform-admin.functions.ts", "utf8");
     expect(auth).toContain('assertCapability(actor, "platform.admin")');
-    expect(auth).toContain('actor.role !== "app_admin"');
+    expect(auth).toContain('!["app_admin","platform_owner"].includes(actor.role)');
     expect(auth).toContain("isDemoAccountEmail(account.email)");
     expect(auth).toContain("actor.sessionAccountId");
     expect(auth).toContain('private, no-store');
