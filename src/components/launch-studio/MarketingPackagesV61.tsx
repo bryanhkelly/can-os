@@ -591,6 +591,13 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
                 onClick={()=>void downloadPackage(release)}>Download Package v{release.releaseNumber}</Button>)}
             {record.content.plan?.action==="attend-event"&&record.content.purpose==="event-invitation"&&
               <Button asChild variant="outline"><a href={"/operations/interest-events/new?siteId="+encodeURIComponent(siteId)+"&packageId="+encodeURIComponent(record.id)}>Create Event</a></Button>}
+            {latestEmailRelease&&<Button asChild>
+              <a href="#launch-outreach-email">Send Email <ArrowRight aria-hidden="true"/></a>
+            </Button>}
+            {!latestEmailRelease&&record.content.formats.includes("email")&&
+              <Button disabled={busy||releasesLoading||releasesUnavailable||
+                !record.brandVersionId||record.status==="archived"}
+                onClick={()=>{void releasePackage();}}>Create Email Materials</Button>}
             <Button variant="outline" onClick={()=>setView("followup")}>Follow Up <ArrowRight aria-hidden="true"/></Button>
           </div>
           {hasDownloadableMaterials&&<WorkspaceNotice tone="info">
@@ -599,6 +606,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </WorkspacePanel>
         {(record.content.formats.includes("email") ||
           packageReleases.some(version=>version.formats.includes("email")))&&
+          <section id="launch-outreach-email">
           <MarketingEmailCampaignV61
             key={record.id+":"+(latestEmailRelease?.id??"pending")}
             siteId={siteId} packageId={record.id}
@@ -607,7 +615,8 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             releaseNumber={latestEmailRelease?.releaseNumber??null}
             canCreateMaterials={Boolean(record.brandVersionId)&&record.status!=="archived"&&
               record.content.formats.includes("email")&&!busy&&!releasesLoading&&!releasesUnavailable}
-            onCreateMaterials={()=>{void releasePackage();}}/>}
+            onCreateMaterials={()=>{void releasePackage();}}/>
+          </section>}
         <GoLinkWorkspace key={record.id} siteId={siteId} packageId={record.id} />
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
