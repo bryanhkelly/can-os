@@ -25,13 +25,13 @@ function PlatformAdministration() {
   if (!result.ok) {
     return <WorkspaceShell width="wide" eyebrow="CAN OS · Platform"
       title="Platform administration"
-      subtitle="This area requires an independently provisioned, verified App Admin account.">
+      subtitle="This area requires a verified App Admin or Platform Owner account.">
       <p role="alert" className="mt-6 border border-destructive p-4 text-sm text-destructive">
         {result.message}
       </p>
       <p className="mt-4 text-sm text-muted-foreground">
         Site Admin and Registrar grants do not authorize platform administration.
-        An authorized operator must provision the account-wide App Admin membership.
+        An authorized operator must provision the account-wide App Admin or Platform Owner membership.
       </p>
     </WorkspaceShell>;
   }
