@@ -35,8 +35,8 @@ const layout:Record<SiteBrandDirectionId,SiteTemplateId>={
   creative:"bright-futures",leadership:"summit",
 };
 const palette:Record<SiteBrandDirectionId,SitePaletteId>={
-  belonging:"brand-community",excellence:"brand-heritage",innovation:"brand-modern",
-  classical:"brand-classic",creative:"brand-bright-futures",leadership:"brand-summit",
+  belonging:"terracotta",excellence:"oxford",innovation:"electric",
+  classical:"majesty",creative:"sunburst",leadership:"monochrome",
 };
 export const brandRecommendedLayout=(id:SiteBrandDirectionId)=>layout[id];
 export const brandRecommendedPalette=(id:SiteBrandDirectionId)=>palette[id];
