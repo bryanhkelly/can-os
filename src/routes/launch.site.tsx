@@ -293,7 +293,7 @@ export function SiteLaunchView({ outcome, search, friendlyRoute = false }: {
         href: base + (identity ? "?module=" : "&module=") + "site-information",
       }}
       previewUrl={site.websiteDraft ? "/launch/site-preview?siteId=" + encodeURIComponent(site.id) : null}
-      workspaceUrl={identity ? base.replace(/\\/launch$/, "") : "/sites/" + encodeURIComponent(site.id)}
+      workspaceUrl={identity ? base.slice(0, -"/launch".length) : "/sites/" + encodeURIComponent(site.id)}
     />}
   </LaunchSiteFrame>;
 }
