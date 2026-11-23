@@ -54,6 +54,12 @@ export function PlatformOwnerPilotAccessPanel() {
         accountId:targetAccount,organizationId:orgId,
         siteId:needsSite?siteId:null,role,reason:reason.trim(),
       }});
+      if(out.created){
+        const person=accounts.find(item=>item.accountId===targetAccount);
+        if(person)setTargets(previous=>[...previous,{
+          ...person,grantId:out.grantId,role,organizationId:orgId,siteId:needsSite?siteId:null,
+        }]);
+      }
       setNotice(out.created
         ?"Verified scoped pilot membership created and audited. Course appointments and approvals still require their own workflow."
         :"The same active scoped membership already exists. No duplicate was created.");
