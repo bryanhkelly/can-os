@@ -35,7 +35,7 @@ export function nextLaunchAction(siteId: string, evidence: LaunchOverviewEvidenc
   if (lifecycleStatus === "closed") {
     return { title: "Review Closed Site",
       description: "This site is closed. Review its information before deciding what to do next.",
-      href: "/sites/" + encodeURIComponent(siteId) };
+      href: friendlyBase ? friendlyBase.replace(/\\/launch$/, "") : "/sites/" + encodeURIComponent(siteId) };
   }
   const route = (module: string) => friendlyBase
     ? friendlyBase + "?module=" + encodeURIComponent(module)
