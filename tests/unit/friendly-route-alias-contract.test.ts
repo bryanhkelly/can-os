@@ -28,6 +28,8 @@ describe("governed friendly Site URL migration", () => {
     expect(sql).toContain("REVOKE ALL ON TABLE \"site_route_aliases\" FROM PUBLIC");
     expect(sql).not.toContain("DROP TABLE");
     expect(sql).not.toContain("TRUNCATE TABLE");
+    expect(sql).toContain("--> statement-breakpoint");
+    expect(source("src/modules/sites/site-publication.server.ts")).toContain("historicalConflict");
   });
 
   it("resolver enforces Organization and Site authorization before selecting an alias", () => {
@@ -38,6 +40,7 @@ describe("governed friendly Site URL migration", () => {
     expect(reader).toContain("siteRouteAliases.organizationSlug");
     expect(reader).toContain("siteRouteAliases.siteSlug");
     expect(reader).toContain("siteRouteAliases.organizationId");
+    expect(reader).toContain("actor.scope.siteIds && actor.scope.siteIds.length === 0");
     expect(reader).toContain("inArray(sites.id, actor.scope.siteIds)");
   });
 
