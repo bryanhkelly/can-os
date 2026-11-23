@@ -1,11 +1,12 @@
 import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, organizations, sites, people } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { writeAudit } from "@/platform/mutation";
 import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
-import { ownerGrantRequiresSite, ownerPilotGrantInput } from "@/domain/platform-owner-pilot-roles";
+import { ownerGrantRequiresSite, ownerPilotGrantInput, ownerPilotRoles } from "@/domain/platform-owner-pilot-roles";
 
 /** Pilot staffing does not create Course appointments, approvals or learner consent. */
 
@@ -84,5 +85,44 @@ export async function provisionOwnerPilotRole(request: Request, raw: unknown) {
         authority:"platform-owner-pilot-setup",independentCourseAppointmentCreated:false},
     });
     return {grantId:created.id,created:true};
+  });
+}
+
+/** Revoke only one of the tightly scoped first-wave pilot grants.
+ * Full user and professional-appointment governance remains a separate workstream.
+ */
+export async function revokeOwnerPilotRole(request:Request,raw:unknown) {
+  if(request.headers.get("origin")!==new URL(request.url).origin)
+    throw new AuthorizationError("same-origin owner role revocation");
+  const owner=await getVerifiedPlatformOwnerSession(request);
+  if(owner.delegatedGrantId && owner.delegatedUntil && owner.delegatedUntil>new Date())
+    throw new AuthorizationError("return to Platform Owner before revocation");
+  const input=z.object({
+    grantId:z.string().uuid(),reason:z.string().trim().min(12).max(500),
+  }).strict().parse(raw);
+  return db.transaction(async tx=>{
+    const [grant]=await tx.select({
+      id:accountPersonGrants.id,accountId:accountPersonGrants.accountId,
+      personId:accountPersonGrants.personId,role:accountPersonGrants.role,
+      organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId,
+    }).from(accountPersonGrants).where(and(
+      eq(accountPersonGrants.id,input.grantId),eq(accountPersonGrants.active,true),
+    )).limit(1).for("update");
+    if(!grant||grant.accountId===owner.ownerAccountId||
+       !ownerPilotRoles.includes(grant.role as (typeof ownerPilotRoles)[number])||
+       !grant.organizationId)
+      throw new AuthorizationError("current eligible scoped pilot role");
+    const [changed]=await tx.update(accountPersonGrants).set({active:false})
+      .where(and(eq(accountPersonGrants.id,grant.id),eq(accountPersonGrants.active,true)))
+      .returning({id:accountPersonGrants.id});
+    if(!changed)throw new AuthorizationError("current eligible scoped pilot role");
+    await writeAudit(tx,{
+      actorPersonId:owner.ownerPersonId,action:"platform.owner.pilot_role.revoked",
+      resourceType:"account_person_grant",resourceId:grant.id,
+      scope:{organizationId:grant.organizationId,siteId:grant.siteId},
+      context:{ownerAccountId:owner.ownerAccountId,targetAccountId:grant.accountId,
+        targetPersonId:grant.personId,role:grant.role,reason:input.reason},
+    });
+    return {revoked:true};
   });
 }
