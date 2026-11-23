@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { familyActionWorkspaceLink } from "./family-needs";
 
@@ -95,7 +96,7 @@ function actionAttention(action: DailyOperationsAction, role: "registrar" | "sit
     title: action.title,
     detail: action.detail ?? action.description ?? "Review the canonical Action in Operations.",
     href: action.type === "onsite_coverage_gap" && role === "site_leader" && action.siteId
-      ? "/sites/" + encodeURIComponent(action.siteId) : actionHref(action),
+      ? shortUuidHref("/sites/", action.siteId) : actionHref(action),
     nextStep: action.type === "onsite_coverage_gap" && !action.ownerPersonId
       ? "Ask the host registrar to appoint an eligible director and assign this gap"
       : category === "opening" ? "Review the named handoff" :
@@ -158,7 +159,7 @@ export function buildDailyOperationsAttention(input: {
       category: "staffing",
       title: issue.title,
       detail: issue.description,
-      href: "/launch/school/" + encodeURIComponent(issue.programId),
+      href: shortUuidHref("/launch/school/", issue.programId),
       nextStep: issue.kind === "waitlist" ? "Review the section waitlist" : "Review staffing and capacity",
       ownerName: null,
       dueAt: null,

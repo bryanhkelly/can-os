@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 type FamilyNeed = { kind: string; priority?: string; dueAt?: string | null };
 
 // Guardian-owned Action types resolve in their owning workspace, not on a
@@ -18,7 +19,7 @@ export function familyActionWorkspaceLink(item: { kind: string; id?: string; typ
   const workspace = item.type ? familyActionWorkspaces[item.type] : undefined;
   if (workspace === "/guardian/group-permissions")
     return workspace + "?action=" + encodeURIComponent(item.id);
-  return workspace ?? "/actions/" + encodeURIComponent(item.id);
+  return workspace ?? shortUuidHref("/actions/", item.id);
 }
 
 export function prioritizeFamilyNeeds<T extends FamilyNeed>(items: T[], now: number): T[] {

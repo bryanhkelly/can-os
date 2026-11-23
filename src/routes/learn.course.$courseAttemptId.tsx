@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
@@ -13,6 +14,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { touchMyNoncreditLearningSession } from "@/modules/enrollment/noncredit-native-session-activity.functions";
 
 export const Route=createFileRoute("/learn/course/$courseAttemptId")({
+  params: opaqueUuidPathParam("courseAttemptId"),
   loader:({params})=>safeLoader(async()=>{
     const course=await getMyNoncreditCourseByAttemptId({data:{courseAttemptId:params.courseAttemptId}});
     if(!course)throw new AuthorizationError("current owned noncredit course");

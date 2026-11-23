@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import { getClassroomPresentationState } from "@/modules/learning/classroom-evid
  * An optional QR code is passed via one-time URL fragment, never an HTTP path.
  */
 export const Route = createFileRoute("/classroom/$sessionId/presentation")({
+  params: opaqueUuidPathParam("sessionId"),
   head: () => ({ meta: [{ name: "referrer", content: "no-referrer" }] }),
   validateSearch:(raw:Record<string,unknown>)=>z.object({
     layout:z.enum(["presentation","single"]).default("presentation"),

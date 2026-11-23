@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "../../src/domain/opaque-url-id";
 import { randomUUID } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 import { expect, test } from "@playwright/test";
@@ -57,7 +58,7 @@ test("school administrator reviews, publishes and renames a standalone school we
   await page.goto(`/launch/site?siteId=${siteId}`);
   await expect(page.getByRole("heading", { name: "Bring your learning community to life." })).toBeVisible();
   await expect(page.getByRole("link", { name: /Preview Website/ }))
-    .toHaveAttribute("href", `/launch/site-preview?siteId=${siteId}`);
+    .toHaveAttribute("href", `/launch/site-preview?siteId=${encodeUuidForPath(siteId)}`);
   await page.goto(`/launch/website?siteId=${siteId}`);
   await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
   await page.reload();
@@ -88,8 +89,8 @@ test("school administrator reviews, publishes and renames a standalone school we
   // V6.1 uses the same authorized private preview endpoint, without the retired embedded wizard.
   await page.goto(`/launch/site?siteId=${siteId}`);
   await expect(page.getByRole("link", { name: /Preview Website/ }))
-    .toHaveAttribute("href", `/launch/site-preview?siteId=${siteId}`);
-  const embeddedResponse = await page.request.get(`/launch/site-preview?siteId=${siteId}`);
+    .toHaveAttribute("href", `/launch/site-preview?siteId=${encodeUuidForPath(siteId)}`);
+  const embeddedResponse = await page.request.get(`/launch/site-preview?siteId=${encodeUuidForPath(siteId)}`);
   expect(embeddedResponse.status()).toBe(200);
   expect(embeddedResponse.headers()["x-frame-options"]).toBe("SAMEORIGIN");
   expect(embeddedResponse.headers()["content-security-policy"]).toContain("frame-ancestors 'self'");

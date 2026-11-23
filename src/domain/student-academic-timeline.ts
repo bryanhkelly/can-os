@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 /** A small, role-scoped chronological view derived from *already authorized*
  * academic, attendance and owned-work records. This is not a new ledger and
  * never includes medical, counselor or private case notes.
@@ -30,7 +31,7 @@ export function studentAcademicTimeline(input:{
         id:`action:${a.id}`,at:a.createdAt.toISOString(),kind:"action" as const,
         title:a.type==="guardian_grade_follow_up"?"Guardian academic question":"Academic follow-up",
         detail:`Status: ${a.status.replaceAll("_"," ")}`,
-        href:`/actions/${encodeURIComponent(a.id)}` as string|null,
+        href:shortUuidHref("/actions/", a.id) as string|null,
       })),
   ];
   return items.sort((a,b)=>b.at.localeCompare(a.at)||a.id.localeCompare(b.id))

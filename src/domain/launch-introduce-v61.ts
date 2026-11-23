@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import type { MarketingPurpose } from "./marketing-package-v61";
 
 /** One Outreach Plan surface and one library. Both reuse the single existing
@@ -11,7 +12,7 @@ type Config={
   purposes:readonly MarketingPurpose[];handoffDescription:string;
   handoffs:readonly Handoff[];
 };
-const encode=(id:string)=>encodeURIComponent(id);
+const encode=(id:string)=>encodeUuidForPath(id);
 export const introduceModuleConfigV61:Record<IntroduceModuleV61,Config>={
   "create-outreach":{
     title:"Create Outreach",eyebrow:"Share / Create Outreach",

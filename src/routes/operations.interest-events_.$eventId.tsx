@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute } from "@tanstack/react-router";
 import { InterestEventsWorkspace } from "@/routes/operations.interest-events";
 import { listSchoolInterestEvents } from "@/modules/enrollment/interest-events.functions";
@@ -6,6 +7,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
 export const Route = createFileRoute("/operations/interest-events_/$eventId")({
+  params: opaqueUuidPathParam("eventId"),
   validateSearch: (search: Record<string, unknown>) => siteProgramSelectionSchema.parse(search),
   loader: safeLoader(() => listSchoolInterestEvents(), { authMessage: "Sign in as an authorized school administrator to view this event." }),
   component: InterestEventDetailPage,

@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -518,7 +519,7 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
             <option value="planned">Still looking for a location</option>
           </Select>
         </Field>}
-        <WorkspaceNotice>Your address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeURIComponent(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
+        <WorkspaceNotice>Your address is managed in <a className="font-semibold underline" href={"/launch/site?siteId=" + encodeUuidForPath(siteId) + "&module=site-profile"}>Site Profile</a>. Facilities, staffing, schedules, equipment and approvals are established during Prepare, based on the Solutions selected.</WorkspaceNotice>
       </div>
     </WorkspacePanel>}
     {step === 2 && <WorkspacePanel id="site-information-step-2" title="Would you like to connect with a network?"

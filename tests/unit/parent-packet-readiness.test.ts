@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { describe, expect, it } from "vitest";
 import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClaim } from "@/domain/parent-information";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
@@ -54,7 +55,7 @@ describe("approved parent packet and independent publishing gates", () => {
     const location=r.gaps.find(g=>g.message.includes("public-facing location"));
     const tuition=r.gaps.find(g=>g.message.includes("tuition/fee statement"));
     expect(location?.required).toBe(true);
-    expect(location?.destination).toBe("/sites/5d7a7cf5-00b7-4b38-82db-8f334c5af889/parent-information");
+    expect(location?.destination).toBe("/sites/" + encodeUuidForPath("5d7a7cf5-00b7-4b38-82db-8f334c5af889") + "/parent-information");
     expect(tuition?.required).toBe(true);
     expect(r.information).toBe("incomplete");
     expect(r.marketing).toBe("published");
@@ -151,7 +152,7 @@ describe("approved parent packet and independent publishing gates", () => {
       .toBe("/operations/school-years");
     expect(diagnostics.gaps.some(g=>g.category==="leadership")).toBe(true);
     expect(diagnostics.gaps.find(g=>g.category==="identity_contact" &&
-      g.message.includes("public contact"))?.destination).toContain("/sites/5d7a7cf5");
+      g.message.includes("public contact"))?.destination).toContain("/sites/" + encodeUuidForPath("5d7a7cf5-00b7-4b38-82db-8f334c5af889"));
   });
 
 });

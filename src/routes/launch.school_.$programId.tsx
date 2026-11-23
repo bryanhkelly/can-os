@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute } from "@tanstack/react-router";
 import { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
 import { safeLoader } from "@/lib/safe-loader";
@@ -5,6 +6,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { LaunchAcademicSetupWorkspace } from "@/components/operations/LaunchAcademicSetupWorkspace";
 
 export const Route = createFileRoute("/launch/school_/$programId")({
+  params: opaqueUuidPathParam("programId"),
   loader: ({ params }) => safeLoader(
     () => getLaunchAcademicSetup({ data: { programId: params.programId } }),
     { authMessage: "Sign in with a registrar grant for this program." },

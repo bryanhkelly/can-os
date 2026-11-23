@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
-import { createRouter } from "@tanstack/react-router";
+import { createRouter, parseSearchWith, stringifySearchWith } from "@tanstack/react-router";
+import { compactUuidSearchSelections, expandUuidSearchSelections } from "@/domain/compact-url-search";
 import { routeTree } from "./routeTree.gen";
 import { assertRouterRefresh } from "./lib/router-refresh";
 import { AccessReturnError, AccessReturnNotFound } from "./lib/access-return-recovery";
@@ -8,8 +9,13 @@ import { PageFrame } from "@/components/workspace";
 export const getRouter = () => {
   const queryClient = new QueryClient();
 
+  const parseDefaultSearch = parseSearchWith(JSON.parse);
+  const stringifyDefaultSearch = stringifySearchWith(JSON.stringify);
+
   const router = createRouter({
     routeTree,
+    parseSearch: query => expandUuidSearchSelections(parseDefaultSearch(query)),
+    stringifySearch: search => stringifyDefaultSearch(compactUuidSearchSelections(search)),
     context: { queryClient },
     defaultErrorComponent: AccessReturnError,
     defaultNotFoundComponent: AccessReturnNotFound,

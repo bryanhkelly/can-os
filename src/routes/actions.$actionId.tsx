@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { PageFrame, RecordHeader, RecordLayout, RecordFacts, WorkspacePanel, StatusBadge } from "@/components/workspace";
 
 export const Route = createFileRoute("/actions/$actionId")({
+  params: opaqueUuidPathParam("actionId"),
   loader: ({ params }) => safeLoader(() => getActionDetail({ data: { actionId: params.actionId } }), {
     authMessage: "This action is unavailable in your current staff workspace.",
   })(),

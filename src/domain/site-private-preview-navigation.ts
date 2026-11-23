@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { isPublicSitePagePath } from "./public-site-paths";
 
 /** Keep navigation inside an authenticated Site-first preview, rather than
@@ -12,7 +13,7 @@ export function linkPrivateSitePreviewPages(
     throw new Error("A valid Site ID is required for private navigation");
   return renderedHtml.replace(/href="(\/[a-z-]*)"/g,(full, path: string)=>{
     if (!isPublicSitePagePath(path)) return full;
-    const query=new URLSearchParams({siteId,page:path});
+    const query=new URLSearchParams({siteId:encodeUuidForPath(siteId),page:path});
     return 'href="/launch/site-preview?'+query.toString().replaceAll("&","&amp;")+'"';
   });
 }

@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 import { createServerFn } from "@tanstack/react-start";
 import { personDisplayName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -327,7 +328,7 @@ async function searchActions(actor: Actor, term: string): Promise<SearchHit[]> {
       .slice(0, 5).map(item => ({
         id: `action-${item.id}`, label: item.title,
         sub: `${item.sectionTitle} · ${item.status.replaceAll("_", " ")}`,
-        to: `/actions/${encodeURIComponent(item.id)}`,
+        to: shortUuidHref("/actions/", item.id),
       }));
   }
   if (!hasRegistrarAuthority(actor.role)) return [];

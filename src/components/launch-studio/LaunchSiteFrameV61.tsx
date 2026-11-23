@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 
 import { useId, useState, type ReactNode } from "react";
 import { Globe2, Menu, X } from "lucide-react";
@@ -6,12 +7,14 @@ import { Modal } from "@/components/ui/modal";
 import { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
 import type { LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { LaunchSiteNavigation } from "./LaunchSiteNavigationV61";
+import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
 import { LaunchNavigationGuardProvider } from "./LaunchNavigationGuardProvider";
 import { LaunchAccountControls } from "@/components/shell/LaunchAccountControls";
 
-export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previewAvailable = true, completion = {}, children }: {
+export function LaunchSiteFrame({ site, identity, active, previewHref, statusLabel, previewAvailable = true, completion = {}, children }: {
   site: { id: string; name: string };
+  identity?: FriendlySiteIdentity;
   active?: string;
   previewHref?: string;
   statusLabel?: string;
@@ -30,7 +33,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
   });
   const expanded = stageChoice.active === active ? stageChoice.stage : activeStage;
   const renderSidebar = (instance: "desktop" | "drawer") => (
-    <LaunchSiteNavigation site={site} active={active} statusLabel={statusLabel} completion={completion}
+    <LaunchSiteNavigation site={site} identity={identity} active={active} statusLabel={statusLabel} completion={completion}
       expanded={expanded} instance={instance} stagePanelBaseId={stagePanelBaseId}
       onToggleStage={stage => setStageChoice({
         active, stage: expanded === stage ? "" : stage,
@@ -52,7 +55,7 @@ export function LaunchSiteFrame({ site, active, previewHref, statusLabel, previe
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-4">
           {previewAvailable && active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
           {previewAvailable ? <Button asChild variant="ghost" size="sm" className="min-h-11">
-            <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer">
+            <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(encodeUuidForPath(site.id))} target="_blank" rel="noopener noreferrer">
               <Globe2 className="size-4"/> Preview Website
             </a>
           </Button> : <Button type="button" variant="ghost" size="sm" disabled
