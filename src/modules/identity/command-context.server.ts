@@ -9,6 +9,7 @@ import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { authorizedProgramWhere } from "./authorized-program-query.server";
 import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
+import { platformOwnerMayActAs } from "@/domain/platform-owner-delegation";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -123,10 +124,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   const eligible=await readSessionGrants(target.accountId,target.email);
   const exact=eligible.grants.find(grant=>grant.id===session.delegatedGrantId&&grant.active);
   if(!exact)return rejectSession(request,"membership_unavailable");
-  if(session.delegatedMode==="act" &&
-      ["academic_content_reviewer","can_credential_reviewer","can_jurisdiction_reviewer",
-       "can_network_steward","app_admin","network_admin",
-       "safeguarding_responder","safeguarding_lead"].includes(exact.role))
+  if(session.delegatedMode==="act" && !platformOwnerMayActAs(exact.role))
    throw new AuthorizationError("independent protected reviewer role");
   effectiveGrant=exact;
   effectiveGrants=eligible.grants;
