@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, like, or } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents,
@@ -92,7 +92,9 @@ async function listPublicFamilyStartGrantIds(
  * demo Site, not just people on a hardcoded fixture allowlist.
  * This is LOGIN/SWITCH code ONLY. It never provisions or overrides a
  * Person's role, Site scope, independent approvals, or Class enrollment.
- * Unverified/disabled accounts are NOT offered for selection because a\n * dead-end selected session would prevent switching back. Protected commands\n * enforce the selected effective grant as usual.
+ * A demo-code account does not require verified mailbox ownership, but its
+ * Person, tenant and active grant must still match. Real accounts still
+ * require verified email; disabled accounts remain excluded.
  */
 export async function listDemoSourceGrants(database: GrantReader = db) {
   const rows = await database.select(grantSelection).from(accountPersonGrants)
@@ -100,7 +102,10 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
       eq(accessAccounts.id, accountPersonGrants.accountId),
       eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
-      isNotNull(accessAccounts.emailVerifiedAt),
+      // The original Valor tenant is an explicitly scoped synthetic fixture.
+      // Do not silently treat an arbitrary *.demo email as verified.
+      or(isNotNull(accessAccounts.emailVerifiedAt),
+        like(accessAccounts.emailNormalized, "%@valorschool.demo")),
     ))
     .innerJoin(people, and(
       eq(people.id, accountPersonGrants.personId),
@@ -207,16 +212,15 @@ export async function readSessionGrants(accountId: string, email: string, reader
     };
   }
 
-  // The original fixed accounts retain their controlled demo login bindings.
-  // Additional verified users of the same Site use their own CAN grants.
-  // This exception belongs solely to demo authentication, not domain services.
+  // Fixed accounts keep immutable identity bindings. Additional Valor demo
+  // accounts need the same exact active tenant grant, not mailbox verification.
+  // Ordinary real-email testers use the separate verified-email path above.
   const fixed = LOCAL_DEMO_ACCOUNTS.some(account =>
     account.accountId === accountId && account.email === normalizedEmail);
   const grants = ownGrants.filter(grant =>
     fixed ? isApprovedDemoGrant(grant, normalizedEmail) :
       normalizedEmail.endsWith("@valorschool.demo") &&
       grant.email === normalizedEmail &&
-      grant.emailVerifiedAt !== null &&
       grant.organizationId === LOCAL_DEMO_ADMIN.organizationId &&
       grant.siteId === LOCAL_DEMO_ADMIN.siteId,
   );
