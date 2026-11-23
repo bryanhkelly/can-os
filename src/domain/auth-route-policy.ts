@@ -19,7 +19,7 @@ export function isPublicCanPath(pathname: string): boolean {
   return path.startsWith("/access/") ||
     path.startsWith("/landing/") || path.startsWith("/next/") ||
     path.startsWith("/explore/") || path.startsWith("/enrichment/") ||
-    path.startsWith("/published-site/");
+    path.startsWith("/published-site/") || path.startsWith("/go/");
 }
 
 export function signInReturnUrl(value: unknown): string {
