@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 /**
  * V6.1 Launch Studio module destinations. Show real owned capabilities and
  * honest planned states instead of a shared "not connected" placeholder.
@@ -23,7 +24,7 @@ type Destination = {
   note: string;
   links: readonly ModuleLink[];
 };
-const scope = (siteId: string) => encodeURIComponent(siteId);
+const scope = (siteId: string) => encodeUuidForPath(siteId);
 export const launchModuleDestinationsV61: Record<DestinationModuleId, Destination> = {
   open: {
     subtitle: "Ready to welcome participants?",
