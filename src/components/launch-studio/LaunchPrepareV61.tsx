@@ -105,7 +105,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
       { title: "Review school admissions", detail: "View applications when your program uses school admissions.", href: id => "/admissions?siteId=" + scoped(id) },
       { title: "Review admissions capacity", detail: "Check available places when using school admissions.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
       { title: "Manage Class registration", detail: "Manage registration for eligible Classes.", href: id => "/class?view=manage&siteId=" + scoped(id) },
-      { title: "Manage noncredit registration", detail: "Set up registration for approved noncredit offerings.", href: () => "/programs/noncredit/enrollment" },
+      { title: "Manage noncredit registration", detail: "Continue with the selected Site. Only an independently authorized provider may publish a noncredit enrollment release.", href: id => "/programs/noncredit/enrollment?publicSiteId=" + scoped(id) },
     ],
   },
   "opening-compliance": {
