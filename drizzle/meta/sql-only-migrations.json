@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lastGeneratedSnapshotIndex": 86,
-  "currentSqlTipIndex": 102,
+  "currentSqlTipIndex": 106,
   "modelParityVerified": false,
   "note": "Reviewed immutable SQL-only migration suffix. Generated Drizzle model parity is NOT claimed. Generate and push remain prohibited until a verified new modeled baseline exists.",
   "sqlOnlyMigrations": [
@@ -84,6 +84,26 @@
       "idx": 102,
       "tag": "0102_reporting_source_service_access",
       "gitBlobSha": "2477b3a1d93161342c5b5d9385261fc17269dea2"
+    },
+    {
+      "idx": 103,
+      "tag": "0103_site_signup_organization_classification",
+      "gitBlobSha": "6415f375aa8afb7f460c46ca3cfbedb25eedc2d6"
+    },
+    {
+      "idx": 104,
+      "tag": "0104_platform_owner_delegation",
+      "gitBlobSha": "58b88485fbbb5d17937d5b55ea1fb053c4b51bf1"
+    },
+    {
+      "idx": 105,
+      "tag": "0105_site_go_links",
+      "gitBlobSha": "a9e54a1165128a78727caecfcb756c7e06e5719e"
+    },
+    {
+      "idx": 106,
+      "tag": "0106_site_go_links_private_role_access",
+      "gitBlobSha": "18186768b27aa0176c5c592ccd751b6a3c2bfc89"
     }
   ]
 }
