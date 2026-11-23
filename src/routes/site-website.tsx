@@ -1,3 +1,4 @@
+import { decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
@@ -73,7 +74,7 @@ const websiteGuideSteps: readonly SiteGuideContentV61[] = [
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
   // an invalid Site and open the editor under a different active membership.
-  siteId:z.string().optional(),
+  siteId:z.preprocess(value => typeof value === "string" ? decodeUuidPathParam(value) ?? value : value, z.string().optional()),
   programId:z.string().optional(),
   returnGrantId:z.string().optional(),
   returnToHub:z.boolean().optional(),
