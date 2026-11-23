@@ -1,14 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { getSchoolProfile } from "@/modules/operations/school-profile.functions";
+import { AuthorizationError } from "@/domain/command-context";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { SchoolProfile, schoolRecordTabs, type SchoolProfileData, type SchoolRecordTab } from "@/components/operations/SchoolProfile";
 
-export function readSchoolProfile(siteId: string) {
+export function readSchoolProfile(siteId: string | null) {
   return safeLoader(async (): Promise<SchoolProfileData> => {
+    if (!siteId) throw new AuthorizationError("school.profile.read");
     const [site, experiences] = await Promise.all([
       getSchoolProfile({ data: { siteId } }),
       // School-life sections are supplementary; roles without that read still get the record.
