@@ -8,7 +8,7 @@ import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { searchPlatformOwnerTargets } from "@/modules/identity/platform-owner-delegation.functions";
 import { getPlatformOwnerPilotLocations, grantPlatformOwnerPilotRole } from "@/modules/identity/platform-owner-pilot-access.functions";
-import { ownerGrantRequiresSite, ownerPilotRoles } from "@/modules/identity/platform-owner-pilot-access.server";
+import { ownerGrantRequiresSite, ownerPilotRoles } from "@/domain/platform-owner-pilot-roles";
 
 type Target = Awaited<ReturnType<typeof searchPlatformOwnerTargets>>["targets"][number];
 
