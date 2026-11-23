@@ -196,8 +196,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     title={data.siteName + " · website & brand"}
     subtitle={data.organizationName} actions={returnToLaunch}>
     <GuidedSetupShell
-      title="Website & Brand"
-      description="Choose a layout, customize your style and edit your content."
+      title="Website & Brand" showHeader={false}
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Choose a style":index===1?"Choose a layout":
           index===2?"Colors, fonts and imagery":index===3?"Use saved information":
