@@ -16,6 +16,8 @@ const uuidSelectors = new Set([
   "releaseId", "offeringId", "returnGrantId", "grantId", "participantId",
   // Established filters use the same authoritative UUID values.
   "student", "section", "assessment", "action", "session", "event", "enrollment", "release",
+  "submission", "case", "gradeAction", "trip", "attendance", "referral", "offer", "thread",
+  "notification", "person", "insight",
 ]);
 
 export function compactUuidSearchSelections<T extends Record<string, unknown>>(search: T): T {
