@@ -92,16 +92,7 @@ export function MarketingEmailCampaignV61({
 
   return <WorkspacePanel title="Send Email"
     description="Send a generated, reviewed email to adults who have opted in. Sending is separate from creating materials.">
-    {!releaseId ? <div className="mt-4 space-y-3">
-      <WorkspaceNotice tone="attention">
-        No completed email material is available. Create the email first, then return here to send it.
-      </WorkspaceNotice>
-      <Button type="button" disabled={!canCreateMaterials}
-        onClick={onCreateMaterials}>Create Email Materials</Button>
-      {!canCreateMaterials && <p className="text-xs text-muted-foreground">
-        Open Outreach Details to select Email and complete the material requirements.
-      </p>}
-    </div> : <div className="mt-4 space-y-5">
+    <div className="mt-4 space-y-5">
       <div className="space-y-2">
         <Field label="To · Recipient email addresses (one per line)" required>
           <Textarea rows={4} maxLength={8000} value={recipients}
@@ -115,6 +106,17 @@ export function MarketingEmailCampaignV61({
         </p>
       </div>
 
+      {!releaseId ? <div className="space-y-3 border border-border/70 bg-muted/20 p-4">
+        <WorkspaceNotice tone="attention">
+          No email materials have been generated yet. Your recipient addresses will stay
+          in place while you create the materials.
+        </WorkspaceNotice>
+        <Button type="button" disabled={!canCreateMaterials}
+          onClick={onCreateMaterials}>Create Email Materials</Button>
+        {!canCreateMaterials && <p className="text-xs text-muted-foreground">
+          Open Outreach Details to select Email and complete the material requirements.
+        </p>}
+      </div> : <>
       <div className="space-y-2">
         <p className="text-sm font-medium">Email subject</p>
         <div className="border border-border bg-muted/20 px-3 py-3 text-sm font-medium">
@@ -168,7 +170,8 @@ export function MarketingEmailCampaignV61({
           </Button>
         </ActionFooter>
       </div>
-    </div>}
+      </>}
+    </div>
     <div className="mt-6 border-t pt-5">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Email sending history</h3>
