@@ -518,7 +518,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             <p className="mt-2 text-muted-foreground">This kit is for talking points, not verified operational claims.</p>
           </div>}
         </WorkspacePanel>
-        <WorkspacePanel title={record.title}>
+        <WorkspacePanel title="Plan details">
           <dl className="mt-3 space-y-4 text-sm">
             <div><dt className="font-semibold">Purpose</dt><dd className="text-muted-foreground">
               {marketingPurposeOptions.find(option=>option.id===record.content.purpose)?.label}</dd></div>
@@ -574,7 +574,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </ActionFooter>
       </>}
       {view==="share"&&record&&<>
-        <WorkspacePanel title="Use & Share" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
+        <WorkspacePanel title="Available materials" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
           <p className="text-sm text-muted-foreground">
             {materialAvailabilityMessage}
           </p>
@@ -593,7 +593,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
       {view==="followup"&&record&&<>
-        <WorkspacePanel title="Follow Up" description="Review inquiries and interest events for your site. These may include activity unrelated to this outreach plan.">
+        <WorkspacePanel title="Responses & events" description="Review inquiries and interest events for your site. These may include activity unrelated to this outreach plan.">
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <WorkspaceActionLink title="Inquiries & responses" description="See inquiries and recorded interest for this site."
               href={"/admissions/intake?siteId="+encodeURIComponent(siteId)} actionLabel="Review inquiries"/>
