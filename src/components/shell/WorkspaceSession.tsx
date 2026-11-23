@@ -24,6 +24,7 @@ export function workspaceSessionIdentity(result: WorkspaceSessionResult) {
   return JSON.stringify({
     grant: result.session.activeGrantId,
     demoAccountSwitching: result.session.demoAccountSwitching ?? false,
+    ownerDelegation: result.session.ownerDelegation ?? null,
     grants: [...result.session.grants].sort((a, b) => a.id.localeCompare(b.id)),
     scope: Object.fromEntries(Object.entries(result.session.activeContext).map(([key, ids]) => [key, [...ids].sort()])),
   });
