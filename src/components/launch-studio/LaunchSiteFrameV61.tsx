@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 
 import { useId, useState, type ReactNode } from "react";
 import { Globe2, Menu, X } from "lucide-react";
@@ -54,7 +55,7 @@ export function LaunchSiteFrame({ site, identity, active, previewHref, statusLab
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-4">
           {previewAvailable && active !== "website-brand" && <LaunchPreviewSharing key={site.id} siteId={site.id} />}
           {previewAvailable ? <Button asChild variant="ghost" size="sm" className="min-h-11">
-            <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(site.id)} target="_blank" rel="noopener noreferrer">
+            <a href={previewHref ?? "/launch/site-preview?siteId="+encodeURIComponent(encodeUuidForPath(site.id))} target="_blank" rel="noopener noreferrer">
               <Globe2 className="size-4"/> Preview Website
             </a>
           </Button> : <Button type="button" variant="ghost" size="sm" disabled
