@@ -14,7 +14,7 @@ export const publicSiteMetadataPaths = ["/robots.txt", "/sitemap.xml"] as const;
 export type PublicSiteMetadataPath = typeof publicSiteMetadataPaths[number];
 /** Canonical UUID and reversible 22-character asset references. The server
  * must decode and independently check tenant publication and media approval. */
-export const publicSiteMediaPathPattern=/^\\/media\\/(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[A-Za-z0-9_-]{22})$/i;
+export const publicSiteMediaPathPattern=/^\/media\/(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[A-Za-z0-9_-]{22})$/i;
 export function isPublicSiteReadPath(path: string): boolean {
   return isPublicSitePagePath(path) ||
     publicSiteMetadataPaths.some(candidate => candidate === path) ||
