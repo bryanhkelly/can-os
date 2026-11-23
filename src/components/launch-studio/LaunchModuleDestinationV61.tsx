@@ -55,7 +55,7 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
       next: destination.note }} />}>
     <div className="mt-5 space-y-5">
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
-      <WorkspacePanel title={module === "open" ? "Welcome participants" : "Your next steps"}
+      <WorkspacePanel title={module === "open" ? "Next steps to open" : "Your next steps"}
         description={module === "open"
           ? "Check readiness, then open registration for each eligible offering."
           : "Open the existing authorized workspace, retaining the selected Site where that destination supports it."}>
