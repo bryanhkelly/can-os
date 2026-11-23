@@ -21,7 +21,7 @@ import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { sendNotificationEmailWithReceipt } from "@/modules/communication/notification-email.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
-import type { z } from "zod";
+import { z } from "zod";
 
 const KIND = "site_marketing_email_campaign";
 type QueueInput = z.infer<typeof queueMarketingEmailSchema>;
