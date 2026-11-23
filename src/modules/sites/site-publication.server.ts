@@ -5,7 +5,7 @@ import { normalizeSiteLocalContent, emptySiteLocalContent } from "@/domain/site-
 import { resolveSiteTemplateId } from "@/domain/site-theme";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { db } from "@/db/client";
-import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sites } from "@/db/schema";
+import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, siteRouteAliases, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -243,7 +243,21 @@ export async function changeSitePublicIdentity(
     const [siteConflict] = await tx.select({ id: sites.id }).from(sites).where(and(
       eq(sites.organizationId, site.organizationId), eq(sites.slug, slug), ne(sites.id, site.id),
     )).limit(1);
-    if (publicConflict || siteConflict) throw new DomainError("CONFLICT", "The requested school address is already reserved.");
+    // The public hostname constraint and current Site slug constraint are
+    // insufficient once old workspace URLs are immutable. Reject an alias
+    // reserved by another Site BEFORE triggering the canonical rename.
+    const [organization] = await tx.select({ slug: organizations.slug })
+      .from(organizations).where(eq(organizations.id, site.organizationId)).limit(1);
+    if (!organization) throw new DomainError("CONFLICT", "The owning Organization is unavailable.");
+    const [historicalConflict] = await tx.select({ siteId: siteRouteAliases.siteId })
+      .from(siteRouteAliases).where(and(
+        eq(siteRouteAliases.organizationSlug, organization.slug),
+        eq(siteRouteAliases.siteSlug, slug),
+        ne(siteRouteAliases.siteId, site.id),
+      )).limit(1);
+    if (publicConflict || siteConflict || historicalConflict)
+      throw new DomainError("CONFLICT",
+        "The requested school address is already reserved, including historical Site addresses.");
     const updatedAt = new Date(Math.max(Date.now(), address.updatedAt.getTime() + 1));
     await tx.update(sites).set({ name, slug, updatedAt }).where(eq(sites.id, site.id));
     await tx.update(sitePublications).set({ slug, updatedAt }).where(eq(sitePublications.siteId, site.id));
