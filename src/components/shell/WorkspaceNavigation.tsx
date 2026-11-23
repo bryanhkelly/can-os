@@ -109,6 +109,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   sessionAvailable={Boolean(session)} sessionError={sessionError} error={error}
   demoAccountSwitching={authenticated?.demoAccountSwitching===true} changing={changing}
   demoTenant={authenticated?.demoTenant===true}
+  ownerDelegation={authenticated?.ownerDelegation}
   focused={focusedClassroom}
   menuOpen={menuOpen} switcherOpen={switcherOpen} accountOpen={accountOpen} notificationsOpen={tray==="notifications"}
   onToggleMenu={()=>setMenuOpen(value=>!value)}
