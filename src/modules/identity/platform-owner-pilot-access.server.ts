@@ -1,21 +1,13 @@
 import { and, eq, isNull, ne, sql } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, organizations, sites, people } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { writeAudit } from "@/platform/mutation";
 import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
-import { ownerGrantRequiresSite, ownerPilotRoles } from "@/domain/platform-owner-pilot-roles";
+import { ownerGrantRequiresSite, ownerPilotGrantInput } from "@/domain/platform-owner-pilot-roles";
 
 /** Pilot staffing does not create Course appointments, approvals or learner consent. */
-const uuid = z.string().uuid();
-export const ownerPilotGrantInput = z.object({
-  accountId: uuid, organizationId: uuid, siteId: uuid.nullable(),
-  role: z.enum(ownerPilotRoles),
-  reason: z.string().trim().min(12).max(500),
-}).strict();
-export type OwnerPilotGrantInput = z.infer<typeof ownerPilotGrantInput>;
 
 export async function readOwnerPilotLocations(request: Request) {
   await getVerifiedPlatformOwnerSession(request);
