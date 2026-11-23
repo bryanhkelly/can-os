@@ -10,6 +10,7 @@ import { measureServerStep } from "@/lib/performance/measure-server-step";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { siteLaunchModules, type SiteLaunchModuleIdV61 } from "@/domain/launch-site-navigation-v61";
 import { findAuthorizedSiteBySlugs, friendlySiteLaunchHref, validFriendlySlug } from "@/domain/friendly-site-urls";
+import { resolveAuthorizedSiteRoute } from "@/modules/sites/site-route-resolver.functions";
 import { siteLaunchSearchSchemaV61 } from "@/domain/launch-site-search-v61";
 import { LaunchStudioOverview } from "@/components/launch-studio/LaunchStudioOverviewV61";
 import type { SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
@@ -48,9 +49,19 @@ export async function loadSiteLaunchView(deps: {
       : deps.siteId
         ? options.sites.find(candidate => candidate.id === deps.siteId)
         : options.sites.length === 1 ? options.sites[0] : null;
+    // On renamed Sites/Organizations, the historical slug pair resolves to
+    // the SAME authorized Site UUID. Never use alias ownership as an access grant.
+    let selectedSite = site;
+    if (!selectedSite && deps.organizationSlug && deps.siteSlug) {
+      const resolvedId = await resolveAuthorizedSiteRoute({ data: {
+        organizationSlug: deps.organizationSlug,
+        siteSlug: deps.siteSlug,
+      } }).catch(() => null);
+      selectedSite = options.sites.find(candidate => candidate.id === resolvedId) ?? null;
+    }
     // Read actual Site Programs independently of optional planning/catalog data.
-    const existingProgramsRead = site && (!deps.module || deps.module === "programs-audiences")
-      ? readExistingSiteProgramsV61({ data: { siteId: site.id } })
+    const existingProgramsRead = selectedSite && (!deps.module || deps.module === "programs-audiences")
+      ? readExistingSiteProgramsV61({ data: { siteId: selectedSite.id } })
           .then(value => ({ state: "ready" as const, programs: value.programs,
             visibility: value.visibility }))
           .catch(() => ({ state: "unavailable" as const }))
@@ -62,28 +73,28 @@ export async function loadSiteLaunchView(deps: {
     let marketingRead: Awaited<ReturnType<typeof listSiteMarketingPackagesV61>> | undefined;
     // Suggestions are independent of overview readiness. Start their read
     // concurrently instead of placing it behind the five overview reads.
-    const suggestionsRead = site && isIntroduceModuleV61(deps.module)
-      ? readSiteMarketingSuggestionsV61({ data: { siteId: site.id } }).catch(() => null)
+    const suggestionsRead = selectedSite && isIntroduceModuleV61(deps.module)
+      ? readSiteMarketingSuggestionsV61({ data: { siteId: selectedSite.id } }).catch(() => null)
       : Promise.resolve(null);
     // Project next steps from real Site-scoped reads. A failed read must never
     // be confused with an empty saved answer or falsely reported as complete.
     // Website & Brand redirects to its dedicated route; avoid five overview
     // reads for a page whose only rendered content is a redirect.
-    const overview = site && deps.module !== "website-brand" ? await (async () => {
+    const overview = selectedSite && deps.module !== "website-brand" ? await (async () => {
       // Sidebar completion needs Site, planning and Brand facts. The expensive
       // Blueprint workspace and Marketing list are only needed for Overview
       // (or Share itself). Their own modules load canonical detail.
       const isOverview = !deps.module;
       const loadMarketing = isOverview || isIntroduceModuleV61(deps.module);
       const [info, programs, brand, marketing, solutionPlans] = await Promise.allSettled([
-        measureServerStep("launch.site", "overview-information", () => readSiteInformationV61({ data: { siteId: site.id } })),
-        measureServerStep("launch.site", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: site.id } })),
-        measureServerStep("launch.site", "overview-brand", () => readSiteBrandVersionView({ data: { siteId: site.id } })),
+        measureServerStep("launch.selectedSite", "overview-information", () => readSiteInformationV61({ data: { siteId: selectedSite.id } })),
+        measureServerStep("launch.selectedSite", "overview-programs", () => readSiteProgramsAudiencesV61({ data: { siteId: selectedSite.id } })),
+        measureServerStep("launch.selectedSite", "overview-brand", () => readSiteBrandVersionView({ data: { siteId: selectedSite.id } })),
         loadMarketing
-          ? measureServerStep("launch.site", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: site.id } }))
+          ? measureServerStep("launch.selectedSite", "overview-marketing", () => listSiteMarketingPackagesV61({ data: { siteId: selectedSite.id } }))
           : Promise.resolve(null),
         isOverview
-          ? measureServerStep("launch.site", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: site.id } }))
+          ? measureServerStep("launch.selectedSite", "overview-solutions", () => readCanonicalBlueprintWorkspace({ data: { siteId: selectedSite.id } }))
           : Promise.resolve(null),
       ]);
       if (info.status === "fulfilled") informationRead = info.value;
@@ -108,7 +119,7 @@ export async function loadSiteLaunchView(deps: {
               hasPackages: marketing.value.some(item => item.status !== "archived"),
             } } : { state: "unavailable" as const },
         solutions: solutionPlans.status === "fulfilled" && solutionPlans.value !== null &&
-            solutionPlans.value.siteId === site.id
+            solutionPlans.value.siteId === selectedSite.id
           ? { state: "ready" as const, value: {
               plans: solutionPlans.value.configurations.map(plan => ({
                 configurationId: plan.configurationId,
@@ -116,38 +127,38 @@ export async function loadSiteLaunchView(deps: {
               })),
             } }
           : { state: "unavailable" as const },
-        websiteDraftAvailable: Boolean(site.websiteDraft),
-        websiteContentSaved: site.websiteContentSaved === true,
+        websiteDraftAvailable: Boolean(selectedSite.websiteDraft),
+        websiteContentSaved: selectedSite.websiteContentSaved === true,
       };
     })() : null;
     return {
       overview,
       existingPrograms: await existingProgramsRead,
-      site: site ?? null,
+      selectedSite: selectedSite ?? null,
       organizations: options.organizations,
       sites: options.sites.map(item=>({id:item.id,name:item.name,slug:item.slug,organizationId:item.organizationId})),
-      siteGuidePlanning: site && deps.module === "site-information" ? programsRead?.intent ?? null : null,
-      siteInformation: site && deps.module === "site-information"
-        ? informationRead ?? await readSiteInformationV61({ data: { siteId: site.id } }) : null,
+      siteGuidePlanning: selectedSite && deps.module === "selectedSite-information" ? programsRead?.intent ?? null : null,
+      siteInformation: selectedSite && deps.module === "selectedSite-information"
+        ? informationRead ?? await readSiteInformationV61({ data: { siteId: selectedSite.id } }) : null,
       // Both Share modules use the same authorized Site package store
       // and the same editorial projection of saved Shape information.
       // Failure of optional suggestions must not hide already saved packages.
-      marketingPackages: site && isIntroduceModuleV61(deps.module)
-        ? marketingRead ?? await listSiteMarketingPackagesV61({ data: { siteId: site.id } })
+      marketingPackages: selectedSite && isIntroduceModuleV61(deps.module)
+        ? marketingRead ?? await listSiteMarketingPackagesV61({ data: { siteId: selectedSite.id } })
             .catch(() => null) : null,
-      marketingSuggestions: site && isIntroduceModuleV61(deps.module)
+      marketingSuggestions: selectedSite && isIntroduceModuleV61(deps.module)
         ? await suggestionsRead : null,
-      introduceIntent: site && isIntroduceModuleV61(deps.module) ? programsRead?.intent ?? null : null,
-      introduceIntentUnavailable: Boolean(site && isIntroduceModuleV61(deps.module) && !programsRead),
-      introduceSiteRevision: site && isIntroduceModuleV61(deps.module) ? programsRead?.revision??null : null,
-      programsAudiences: site && deps.module === "programs-audiences"
-        ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: site.id } })
+      introduceIntent: selectedSite && isIntroduceModuleV61(deps.module) ? programsRead?.intent ?? null : null,
+      introduceIntentUnavailable: Boolean(selectedSite && isIntroduceModuleV61(deps.module) && !programsRead),
+      introduceSiteRevision: selectedSite && isIntroduceModuleV61(deps.module) ? programsRead?.revision??null : null,
+      programsAudiences: selectedSite && deps.module === "programs-audiences"
+        ? programsRead ?? await readSiteProgramsAudiencesV61({ data: { siteId: selectedSite.id } })
             .catch(() => null) : null,
       // Shape preferences are optional context for catalog discovery. The
       // separately authorized catalog must remain navigable if this read is
       // unavailable or its data needs repair. Never pretend it loaded empty.
-      prepareIntent: site && deps.module === "program-catalog"
-        ? await Promise.resolve(programsRead ?? readSiteProgramsAudiencesV61({ data: { siteId: site.id } }))
+      prepareIntent: selectedSite && deps.module === "program-catalog"
+        ? await Promise.resolve(programsRead ?? readSiteProgramsAudiencesV61({ data: { siteId: selectedSite.id } }))
             .then(result => ({
               kind: "ready" as const, intent: result.intent, delivery: result.delivery,
               schoolYearAvailability: result.schoolYearAvailability,
@@ -155,7 +166,7 @@ export async function loadSiteLaunchView(deps: {
             }))
             .catch(() => ({ kind: "unavailable" as const }))
         : null,
-      error: (deps.siteId || deps.organizationSlug || deps.siteSlug) && !site ? "Site unavailable or access denied." : null,
+      error: (deps.siteId || deps.organizationSlug || deps.siteSlug) && !selectedSite ? "Site unavailable or access denied." : null,
     };
   })();
 }
