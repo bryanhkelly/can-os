@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,17 @@ import { absoluteDestinationUrl, buildUrlDestination, type UrlDestination } from
 import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 
 type CopyState = "idle" | "copied" | "unavailable" | "blocked";
+
+let sharedApprovedOrigin:Promise<string>|null=null;
+function loadApprovedOrigin(){
+  // One validated public origin for all copied Go Links on this page.
+  if(!sharedApprovedOrigin)
+    sharedApprovedOrigin=getCanonicalGoLinkShareOrigin().catch(error=>{
+      sharedApprovedOrigin=null;
+      throw error;
+    });
+  return sharedApprovedOrigin;
+}
 
 /** One accessible copy interaction for governed, typed URL destinations.
  * No generic input that could inadvertently share private preview tokens. */
@@ -15,16 +26,23 @@ export function CopyLinkButton({ destination, label = "Copy link", className }: 
   const [state, setState] = useState<CopyState>("idle");
   const resolved = buildUrlDestination(destination);
   const [fallback, setFallback] = useState("");
+  const [goOrigin,setGoOrigin]=useState<string|null>(null);
+  useEffect(()=>{
+    if(destination.kind!=="go")return;
+    let live=true;
+    loadApprovedOrigin().then(value=>{if(live)setGoOrigin(value);})
+      .catch(()=>{if(live)setState("blocked");});
+    return ()=>{live=false;};
+  },[destination.kind]);
   async function copy() {
     let url: string;
     try {
-      // Printed /go/ links must never accidentally capture a staging,
-      // preview or transient localhost domain.
-      const origin = destination.kind === "go"
-        ? await getCanonicalGoLinkShareOrigin()
-        : window.location.origin;
-      url = absoluteDestinationUrl(resolved, origin);
-    } catch {
+      // Do not await a network request between the user's click and the
+      // Clipboard API: browsers may expire the user-activation gesture.
+      const origin=destination.kind==="go"?goOrigin:window.location.origin;
+      if(!origin)throw new Error("Approved public origin is not available");
+      url=absoluteDestinationUrl(resolved,origin);
+    }catch{
       setFallback("");
       setState("blocked");
       return;
@@ -39,7 +57,8 @@ export function CopyLinkButton({ destination, label = "Copy link", className }: 
     }
   }
   return <div className={className}>
-    <Button type="button" size="sm" variant="outline" onClick={() => void copy()}>
+    <Button type="button" size="sm" variant="outline"
+      disabled={destination.kind==="go"&&!goOrigin} onClick={() => void copy()}>
       {state === "copied" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       {state === "copied" ? "Copied" : label}
     </Button>
