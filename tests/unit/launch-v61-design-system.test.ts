@@ -111,6 +111,7 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(siteInfo).toContain('<GuidedSetupShell title="Site Information" showHeader={false}');
     expect(launchRoute).toContain('WorkspaceShell title="Programs & Audiences"');
     expect(website).toContain('title="Website & Brand" showHeader={false}');
+    expect(website.match(/title="Website & Brand" showHeader=\{false\}/g)).toHaveLength(2);
   });
 
   it("keeps outreach page and content-card titles distinct", () => {
