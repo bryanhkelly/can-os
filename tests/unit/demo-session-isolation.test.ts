@@ -130,25 +130,25 @@ describe("public demo session isolation", () => {
       launchSiteId:LOCAL_DEMO_ADMIN.siteId,
     });
   });
-  it("allows any verified, correctly scoped Valor demo Person without a fixed ID", async () => {
+  it("allows a correctly scoped synthetic Valor demo Person without an email mailbox", async () => {
     const newStudent = {
       ...studentGrant, id:"new-verified-grant", accountId:"new-can-account",
       personId:"new-canonical-person", email:"verified-new@valorschool.demo",
-      emailVerifiedAt:new Date("2026-11-20T12:00:00Z"),
+      emailVerifiedAt:null,
     };
     state.rows=[[newStudent]];
     expect(await readSessionGrants(newStudent.accountId,newStudent.email)).toEqual({
       grants:[newStudent],demoAccountSwitching:false,
     });
   });
-  it("rejects disabled, unverified and wrong-Site demo memberships", async () => {
+  it("rejects wrong-Site, wrong-organization and changed-email demo memberships", async () => {
     const base={
       ...studentGrant,id:"new-verified-grant",accountId:"new-can-account",
       personId:"new-canonical-person",email:"verified-new@valorschool.demo",
       emailVerifiedAt:new Date("2026-11-20T12:00:00Z"),
     };
     for(const invalid of [
-      {emailVerifiedAt:null},{siteId:"another-site"},
+      {siteId:"another-site"},
       {organizationId:"other-organization"},{email:"other@example.test"},
     ]){
       const candidate={...base,...invalid};

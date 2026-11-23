@@ -8,6 +8,7 @@ import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { authorizedProgramWhere } from "./authorized-program-query.server";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
 import { platformOwnerMayActAs } from "@/domain/platform-owner-delegation";
 
@@ -34,7 +35,8 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  const now=new Date();
  const [session]=await db.select({
   id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
-  email:accessAccounts.emailNormalized,accountPersonId:accessAccounts.personId,
+  email:accessAccounts.emailNormalized,emailVerifiedAt:accessAccounts.emailVerifiedAt,
+  accountPersonId:accessAccounts.personId,
   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
   delegatedGrantId:accessSessions.delegatedGrantId,
   delegatedMode:accessSessions.delegatedMode,
@@ -42,10 +44,12 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
-   gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false),
-   isNotNull(accessAccounts.emailVerifiedAt)))
+   gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false)))
   .limit(1);
- if(!session) return rejectSession(request,"session_not_current");
+ // Only real email-link logins attest mailbox ownership. A .demo session
+ // must instead pass the exact active grant and tenant binding checks below.
+ if(!session || (!session.emailVerifiedAt && !isDemoAccountEmail(session.email)))
+  return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
@@ -76,12 +80,14 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  if(demoAccountSwitching && activeGrant.accountId!==session.accountId){
   const [target]=await db.select({
    personId:accessAccounts.personId,
+   email:accessAccounts.emailNormalized,
+   emailVerifiedAt:accessAccounts.emailVerifiedAt,
   }).from(accessAccounts).where(and(
    eq(accessAccounts.id,activeGrant.accountId),
    eq(accessAccounts.disabled,false),
-   isNotNull(accessAccounts.emailVerifiedAt),
   )).limit(1);
-  if(!target || target.personId!==activeGrant.personId)
+  if(!target || target.personId!==activeGrant.personId ||
+     (!target.emailVerifiedAt && !isDemoAccountEmail(target.email)))
    return rejectSession(request,"membership_unavailable");
   try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
   catch { return rejectSession(request,"membership_unavailable"); }

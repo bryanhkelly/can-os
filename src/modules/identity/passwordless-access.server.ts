@@ -288,8 +288,10 @@ export async function redeemDemoAccess(
   step="account_lookup";
   const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized})
    .from(accessAccounts)
-   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false),
-     isNotNull(accessAccounts.emailVerifiedAt)))
+   // Shared demo codes attest an explicitly bound synthetic Person and grant,
+   // NOT control of a deliverable mailbox. The grant reader below enforces
+   // fixed Valor identities or exact registered-school/invitation bindings.
+   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
    .limit(1);
   if(!account)throw new InvalidAccessCredentialError("Invalid demo credentials");
   step="grant_lookup";

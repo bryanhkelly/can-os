@@ -62,6 +62,10 @@ integration("public demo school canonical setup", () => {
         expect(first.siteId).not.toBe(second.siteId);
         expect(await setupSchool(input, tx)).toEqual({ ...first, created: false });
         expect(await isDemoTenantOrganization(first.organizationId, tx)).toBe(true);
+        const [demoAdmin] = await tx.select({ verifiedAt: schema.accessAccounts.emailVerifiedAt })
+          .from(schema.accessAccounts)
+          .where(eq(schema.accessAccounts.emailNormalized, first.adminEmail));
+        expect(demoAdmin?.verifiedAt).toBeNull();
         const login = await redeemDemoAccess(first.adminEmail, "000000");
         expect(login).toMatchObject({ role: "site_admin", launchSiteId: first.siteId });
         const request = new Request("https://app.example.test", {
@@ -130,6 +134,9 @@ integration("public demo school canonical setup", () => {
         });
         const staffLogin = await redeemDemoAccess(staffEmail, "000000");
         expect(staffLogin).toMatchObject({ accountId: staffAccount.id, role: "teacher" });
+        const [stillUnverified] = await tx.select({ verifiedAt: schema.accessAccounts.emailVerifiedAt })
+          .from(schema.accessAccounts).where(eq(schema.accessAccounts.id, staffAccount.id));
+        expect(stillUnverified?.verifiedAt).toBeNull();
         const staffRequest = new Request("https://app.example.test", {
           headers: { cookie: staffLogin.setCookie.split(";")[0]! },
         });
