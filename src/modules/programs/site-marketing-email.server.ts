@@ -17,7 +17,6 @@ import {
   queueMarketingEmailSchema,
 } from "@/domain/site-marketing-email";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { sendNotificationEmailWithReceipt } from "@/modules/communication/notification-email.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -83,8 +82,6 @@ export async function queueSiteMarketingEmail(context: AccessContext, data: Queu
     const [site] = await tx.select({id:sites.id,organizationId:sites.organizationId})
       .from(sites).where(eq(sites.id,data.siteId)).limit(1);
     assertSiteSetupScope(context,site,"program.launch.start");
-    if (data.mode === "campaign" && await isDemoTenantOrganization(site.organizationId,tx))
-      throw new DomainError("FORBIDDEN","Synthetic demo Sites cannot send real campaigns. Send a test to a verified real account instead.");
     const [pkg] = await tx.select().from(siteMarketingPackages).where(and(
       eq(siteMarketingPackages.siteId,site.id),
       eq(siteMarketingPackages.id,data.packageId),
@@ -280,8 +277,7 @@ export async function handleSiteMarketingEmailCampaign(eventId:string) {
   const [access] = artifact ? await db.select().from(siteArtifactReleaseAccess)
     .where(eq(siteArtifactReleaseAccess.releaseId,artifact.id)).limit(1) : [];
   if (!release || !pkg || pkg.status !== "draft" || !artifact || access?.withdrawnAt ||
-    artifact.brandVersionId !== release.brandVersionId ||
-    (batch.mode === "campaign" && await isDemoTenantOrganization(site.organizationId))) {
+    artifact.brandVersionId !== release.brandVersionId) {
     for (const recipient of batch.recipients.filter(item =>
       item.status === "queued" || item.status === "failed"))
       await persistRecipient(row.id,recipient.key,{status:"suppressed"});
