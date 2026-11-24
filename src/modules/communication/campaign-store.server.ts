@@ -24,8 +24,10 @@ type Work={id:string;lease_id:string;email:string;unsubscribe_token:string;attem
 async function claimCampaignDelivery(){
  return db.transaction(async tx=>{
  // Expired ambiguous attempts are never retried outside the provider's idempotency window.
- await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='failed',outcome_unconfirmed=true,lease_id=NULL,lease_until=NULL
- FROM public.engagement_campaigns c WHERE c.id=d.campaign_id AND c.cancelled_at IS NOT NULL AND d.status='processing' AND d.lease_until<now()`);
+ await tx.execute(sql`UPDATE public.campaign_deliveries d SET status=CASE WHEN d.outcome_unconfirmed OR d.status='processing' THEN 'failed' ELSE 'cancelled' END,
+ outcome_unconfirmed=d.outcome_unconfirmed OR d.status='processing',lease_id=NULL,lease_until=NULL
+ FROM public.engagement_campaigns c WHERE c.id=d.campaign_id AND c.cancelled_at IS NOT NULL
+ AND (d.status='pending' OR (d.status='processing' AND d.lease_until<now()))`);
  await tx.execute(sql`UPDATE public.campaign_deliveries SET status='failed',outcome_unconfirmed=outcome_unconfirmed OR status='processing',lease_id=NULL,lease_until=NULL
  WHERE status IN ('pending','processing') AND (lease_until IS NULL OR lease_until<now())
  AND (attempts>=4 OR first_attempt_at<now()-interval '20 hours')`);
@@ -49,7 +51,9 @@ async function claimCampaignDelivery(){
  });
 }
 async function settle(work:Work,status:string,providerId:string|null=null,unconfirmed=false,delayMs=outboundRetryDelayMs(work.attempts)){
- const rows=await campaignRows<{id:string;status:string;outcome_unconfirmed:boolean}>(db,sql`UPDATE public.campaign_deliveries SET status=CASE WHEN ${status} IN ('suppressed','failed','cancelled') AND (outcome_unconfirmed OR ${unconfirmed}) THEN 'failed' ELSE ${status} END,
+ const rows=await campaignRows<{id:string;status:string;outcome_unconfirmed:boolean}>(db,sql`UPDATE public.campaign_deliveries SET status=CASE WHEN ${status}='pending' AND EXISTS(SELECT 1 FROM public.engagement_campaigns c WHERE c.id=campaign_deliveries.campaign_id AND c.cancelled_at IS NOT NULL)
+ THEN CASE WHEN outcome_unconfirmed OR ${unconfirmed} THEN 'failed' ELSE 'cancelled' END
+ WHEN ${status} IN ('suppressed','failed','cancelled') AND (outcome_unconfirmed OR ${unconfirmed}) THEN 'failed' ELSE ${status} END,
  outcome_unconfirmed=CASE WHEN ${status}='accepted' THEN false ELSE outcome_unconfirmed OR ${unconfirmed} END,lease_id=NULL,lease_until=NULL,
  next_attempt_at=now()+(${delayMs} * interval '1 millisecond'),
  provider_message_id=coalesce(provider_message_id,${providerId}),

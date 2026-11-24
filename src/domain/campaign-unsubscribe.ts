@@ -13,7 +13,7 @@ export async function validateCampaignUnsubscribe(request:Request):Promise<200|4
  try{
   const bytes=await readBoundedRequestBytes(request,MAX_UNSUBSCRIBE_BYTES);
   if(bytes===null)return 413;
-  const form=await new Response(bytes,{headers:{"Content-Type":type}}).formData();
+  const form=await new Response(new Uint8Array(bytes),{headers:{"Content-Type":type}}).formData();
   const fields=Array.from(form.entries());
   return fields.length===1&&fields[0][0]==="List-Unsubscribe"&&fields[0][1]==="One-Click"?200:400;
  }catch{return 400;}
