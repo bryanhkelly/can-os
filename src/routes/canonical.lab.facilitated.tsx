@@ -2,7 +2,7 @@ import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { Label } from "@/components/ui/label";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { WorkspaceShell, StatusBadge, ActionDialog, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, EmptyState, WorkspaceShell, StatusBadge, ActionDialog, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { invalidateRouterAndCheck } from "@/lib/router-refresh";
 import { Button } from "@/components/ui/button";
@@ -176,12 +176,8 @@ function FacilitatedLabContent({data,preferredSiteId}:{
             courseVersionId:rehearsal.courseVersionId,siteId:rehearsal.siteId,
           });}}>Preview approved media</Button>
       </div>
-      {rehearsalFailed&&<p role="alert" className="mt-3 text-sm text-destructive">
-        Authorized preview courses could not be loaded.
-      </p>}
-      {rehearsalOptions?.partial&&<p role="status" className="mt-3 text-xs text-muted-foreground">
-        The Site preview list is limited. Narrow the authorized deployment before rehearsing additional courses.
-      </p>}
+      {rehearsalFailed&&<WorkspaceNotice tone="danger" className="mt-3">Authorized preview courses could not be loaded.</WorkspaceNotice>}
+      {rehearsalOptions?.partial&&<WorkspaceNotice tone="attention" className="mt-3">The Site preview list is limited. Narrow the authorized deployment before rehearsing additional courses.</WorkspaceNotice>}
       {rehearsalScope&&(!preferredSiteId||rehearsalScope.siteId===preferredSiteId)&&
         <ClassroomRehearsalPlayer scope={rehearsalScope}
           onClose={()=>setRehearsalScope(null)}/>}
@@ -207,7 +203,7 @@ function FacilitatedLabContent({data,preferredSiteId}:{
         ));
       }}/>
     <MutationFeedback state={feedback} pendingMessage="Updating the room…" className="mt-4"/>
-    {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
+    {message&&<WorkspaceNotice tone="attention" className="mt-4">{message}</WorkspaceNotice>}
     {code && Date.parse(code.expiresAt) > clockMs &&
       visibleRooms.some(room => room.id === code.roomId &&
         effectiveRoomState(room, clockMs) === "live") &&
@@ -283,7 +279,7 @@ function FacilitatedLabContent({data,preferredSiteId}:{
               <ClassroomAttendancePanel facilitatedSessionId={room.id}/>
               <ClassroomAssistedActivityPanel facilitatedSessionId={room.id}/>
               <ClassroomSurveyManager facilitatedSessionId={room.id}/>
-              {roomState==="live"&&<div className="mt-4 flex flex-wrap gap-2">
+              {roomState==="live"&&<ActionFooter layout="inline" className="mt-4">
                 <Button type="button" size="sm" variant="outline" disabled={busy}
                   onClick={()=>void run(async()=>{
                     const renewed=await renewFacilitatedLearningPairing({
@@ -294,14 +290,12 @@ function FacilitatedLabContent({data,preferredSiteId}:{
                   },"New pairing code generated.")}>Generate new pairing code</Button>
                 <Button type="button" size="sm" variant="destructive" disabled={busy}
                   onClick={()=>setEndingRoomId(room.id)}>End room</Button>
-              </div>}
+              </ActionFooter>}
             </>}
           </div>
         </article>;
         })}
-        {!visibleRooms.length&&<p className="border border-border p-5 text-sm text-muted-foreground">
-          No facilitated learning rooms have been started under your current Site permissions.
-        </p>}
+        {!visibleRooms.length&&<EmptyState title="No facilitated learning rooms have been started under your current Site permissions."/>}
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
         Session and pairing records are participation evidence only. Actual recorded-media
@@ -322,7 +316,7 @@ function FacilitatedLabContent({data,preferredSiteId}:{
           setEndingRoomId(null);
         },"Room ended.");
       }}>
-      {feedback.error&&!feedback.refreshFailed&&<p role="alert" className="text-sm text-destructive">{feedback.error}</p>}
+      {feedback.error&&!feedback.refreshFailed&&<WorkspaceNotice tone="danger">{feedback.error}</WorkspaceNotice>}
     </ActionDialog>
   </WorkspaceShell>;
 }
