@@ -6,7 +6,7 @@ import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
 import { buildUrlDestination } from "@/domain/url-destinations";
-import type { GoDestination } from "@/domain/site-go-links";
+import { goDestinationLabels, type GoDestination } from "@/domain/site-go-links";
 import { resolveGoTargetInput } from "@/domain/go-target-input";
 import {
   createSiteGoLink, listSiteGoLinksPage, revokeSiteGoLink,
@@ -16,12 +16,7 @@ import {
 type GoLink=Awaited<ReturnType<typeof listSiteGoLinksPage>>["items"][number];
 type Choice=Awaited<ReturnType<typeof listAvailableGoDestinations>>[number];
 type Kind=GoDestination["kind"];
-const labels:Record<Kind,string>={
-  "site-page":"Site page or express interest",
-  "adult-training":"Training registration",
-  class:"Class",enrichment:"Program or camp",
-  information:"Curated information",
-};
+const labels=goDestinationLabels;
 const channelChoices=["email","flyer","qr","social","partner","other"] as const;
 const readableState:Record<GoLink["availability"],string>={
   available:"Active",scheduled:"Scheduled",expired:"Expired",

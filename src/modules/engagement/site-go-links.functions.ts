@@ -7,7 +7,7 @@ import { db } from "@/db/client";
 import { siteGoLinks, siteMarketingPackages, sites } from "@/db/schema";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
-import { goDestinationSchema, type GoDestination } from "@/domain/site-go-links";
+import { goDestinationKindSchema, goDestinationSchema } from "@/domain/site-go-links";
 import { goLinkManagementSchema, goLinkStatusTransition, goLinkAvailability } from "@/domain/go-link-policy";
 import { inspectGoDestination, listGoDestinationChoices } from "./go-destination-registry.server";
 import { readSiteGoLinkEvidence } from "./go-link-evidence.server";
@@ -25,7 +25,7 @@ const pageSchema=packageScope.extend({
   cursor:uuid.optional(), limit:z.number().int().min(1).max(50).default(20),
 }).strict();
 const choicesSchema=packageScope.extend({
-  kind:z.enum(["site-page","adult-training","class","enrichment","information"]),
+  kind:goDestinationKindSchema,
 }).strict();
 const manageSchema=packageScope.extend({
   linkId:uuid, action:z.enum(["pause","resume"]),
