@@ -19,6 +19,8 @@ import type { AccessContext } from "@/domain/access-context";
 import { assertSiteSetupScope, assertWholeSiteProgramsInScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { resolveGoExperience } from "./engagement-go.server";
+import { buildEngagementInvitation } from "@/domain/engagement-distribution";
 import { readAuthorizedGoLinkEvidence } from "./go-link-evidence.server";
 import { writeAudit } from "@/platform/mutation";
 
@@ -356,4 +358,32 @@ export const listSiteEngagementDefinitions=createServerFn({method:"GET"})
         publishedAt:row.publishedAt.toISOString(),
       }];
     });
+  });
+
+/** Distribution is a separately authorized action. Build only from an exact
+ * saved email-channel link and its immutable definition. No provider send,
+ * recipient list, delivery claim or additional visit is produced by this GET. */
+export const prepareEngagementEmailDraft=createServerFn({method:"GET"})
+  .validator((input:unknown)=>linkInput.parse(input))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const record=await authorizedDefinition(data.engagementId,actor,true,db);
+    assertCapability(actor,"communication.send");
+    if(record.status!=="active")throw new DomainError("UNAVAILABLE","Engagement is retired.");
+    const [link]=await db.select().from(siteGoLinks).where(eq(siteGoLinks.id,data.linkId)).limit(1);
+    if(!link?.engagementVersionId||link.channel!=="email"||
+       link.organizationId!==record.organizationId||link.siteId!==record.siteId)
+      throw new AuthorizationError("exact email-channel engagement link");
+    const [version]=await db.select().from(engagementDefinitionVersions).where(and(
+      eq(engagementDefinitionVersions.id,link.engagementVersionId),
+      eq(engagementDefinitionVersions.engagementId,record.id))).limit(1);
+    if(!version)throw new AuthorizationError("exact published engagement version");
+    const definition=engagementDefinitionSchema.parse(version.content);
+    const experience=await resolveGoExperience(link.code,"/",false);
+    if(!experience||experience.mode==="website-preview")
+      throw new DomainError("UNAVAILABLE","The invitation destination is no longer available.");
+    const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
+    if(!origin)throw new DomainError("UNAVAILABLE","Approved public sharing origin is not configured.");
+    return buildEngagementInvitation(definition,link.code,origin);
   });

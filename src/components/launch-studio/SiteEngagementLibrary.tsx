@@ -1,3 +1,4 @@
+import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
 import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export function SiteEngagementLibrary({
   const [records,setRecords]=useState<Entry[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [links,setLinks]=useState<Link[]>([]);
+  const [distribution,setDistribution]=useState<string|null>(null);
   const [loading,setLoading]=useState(true);
   const [linksLoading,setLinksLoading]=useState(false);
   const [refresh,setRefresh]=useState(0);
@@ -55,6 +57,7 @@ export function SiteEngagementLibrary({
 
   useEffect(()=>{
     let active=true;
+    setDistribution(null);
     if(!selected){setLinks([]);return;}
     setLinksLoading(true);
     listEngagementGoLinks({data:{engagementId:selected}})
@@ -162,12 +165,14 @@ export function SiteEngagementLibrary({
             <Button type="button" size="sm" variant="outline"
               disabled={link.status==="revoked"||record?.status!=="active"}
               onClick={()=>void copy(link)}>Copy</Button>
+            {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>Prepare email</Button>}
             {link.status==="active"&&record?.status==="active"&&
               <Button type="button" size="sm" variant="outline" disabled={busy}
                 onClick={()=>void revoke(link)}>Revoke</Button>}
           </div>
         </div>)}
       </div>}
+      {distribution&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
     </>}
     {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
     {message&&<p role="status" className="mt-4 text-sm">{message}</p>}
