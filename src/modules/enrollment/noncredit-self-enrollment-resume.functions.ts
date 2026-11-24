@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
+import { appendResponseHeader, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -12,6 +12,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
+import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 
 /** Native session renewal is only for this verified Person's existing live
@@ -28,9 +29,10 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure learning access is temporarily unavailable");
     const result=await db.transaction(async tx=>{
+      await assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx);
       const [bridge]=await tx.select().from(accessAccountNoncreditPrincipals)
         .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId)).limit(1);
-      if(!bridge||bridge.accessPersonId!==owner.personId)
+      if(!bridge||bridge.accessPersonId!==owner.personId||bridge.canonicalPersonId!==owner.personId)
         throw new AuthorizationError("linked noncredit learner account");
       const now=new Date();
       const [record]=await tx.select({
@@ -111,6 +113,6 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
       });
       return {cookie};
     });
-    setResponseHeader("Set-Cookie",result.cookie);
+    appendResponseHeader("Set-Cookie",result.cookie);
     return {ready:true,courseAttemptId:data.courseAttemptId};
   });
