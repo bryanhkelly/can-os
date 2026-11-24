@@ -32,3 +32,5 @@ export { MasterDetailWorkspace, MasterDetailListItem } from "./master-detail-wor
 export { DashboardProgress, DashboardTimeline, DashboardPreviewList, DashboardMediaTile } from "./dashboard-widgets";
 export type { TimelineEntry, DashboardPreviewItem } from "./dashboard-widgets";
 export { SelectionCard, type SelectionCardProps } from "./selection-card";
+
+export { SelectionChip, SelectionChipGroup, type SelectionChipProps } from "./selection-chip";
