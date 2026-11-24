@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { ActionFooter, MutationFeedback } from "@/components/workspace";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { submitRecordedVideoForReview } from "@/modules/learning/recorded-video-review.functions";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { classVideoFileSchema, videoUploadPolicy } from "@/domain/class-video";
 import { createPrivateUploadTask } from "@/platform/storage/private-upload";
@@ -139,8 +140,9 @@ export function ProviderVideoUploadForm({
             className="space-y-3 p-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{draft.title}</span>
-              <span className="text-muted-foreground">Private draft · Review required</span>
+              <span className="text-muted-foreground">{draft.reviewRequestedAt?"Submitted for independent review":"Private draft · Review required"}</span>
             </div>
+            {!draft.reviewRequestedAt&&<Button type="button" variant="outline" disabled={busy||!draft.sha256} onClick={()=>void feedback.run(()=>submitRecordedVideoForReview({data:{courseVersionId,assetVersionId:draft.assetVersionId,expectedHash:draft.sha256!}}),{successMessage:"Recording submitted for independent review.",commandErrorMessage:"Submission blocked. Verify the recording and your Course appointment."})}>Submit for review</Button>}
             <ClassVideoPlayer title={draft.title+" · private creator preview"}
               resourceId={draft.assetVersionId}
               loadUrl={async()=>(await getOwnRecordedVideoPreview({data:{
