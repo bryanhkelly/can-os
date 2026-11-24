@@ -19,13 +19,18 @@ type Issuance = Omit<typeof siteGoLinks.$inferInsert,"code"|"id"|"siteId"|"organ
 export function goRequestFingerprint(value:unknown):string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
+function requireGoLinkMutationActor(actor:AccessContext):string{
+  if(!actor.actorPersonId||actor.delegationMode==="view")throw new DomainError("FORBIDDEN");
+  return actor.actorPersonId;
+}
+
 export async function findGoIssuance(tx:Tx,actor:AccessContext,site:Scope,requestId:string,fingerprint:string):Promise<Link|undefined>{
-  if(!actor.actorPersonId)throw new DomainError("FORBIDDEN");
-  const key=[site.id,actor.actorPersonId,requestId].join(":");
+  const personId=requireGoLinkMutationActor(actor);
+  const key=[site.id,personId,requestId].join(":");
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
   const [prior]=await tx.select().from(siteGoLinks).where(and(
     eq(siteGoLinks.siteId,site.id),eq(siteGoLinks.organizationId,site.organizationId),
-    eq(siteGoLinks.createdByPersonId,actor.actorPersonId),eq(siteGoLinks.requestId,requestId),
+    eq(siteGoLinks.createdByPersonId,personId),eq(siteGoLinks.requestId,requestId),
   )).limit(1);
   if(prior && prior.requestFingerprint!==fingerprint)throw new DomainError("CONFLICT","Request ID already used for another link.");
   return prior;
@@ -33,11 +38,11 @@ export async function findGoIssuance(tx:Tx,actor:AccessContext,site:Scope,reques
 /** One collision-safe allocation path for both resolution modes.
  * Callers must validate ownership and destination before invoking this private helper. */
 async function allocateGoLink(tx:Tx,actor:AccessContext,scope:OwnerScope,input:Issuance):Promise<Link>{
-  if(!actor.actorPersonId||actor.delegationMode==="view")throw new DomainError("FORBIDDEN");
+  const personId=requireGoLinkMutationActor(actor);
   for(let attempt=0;attempt<5;attempt++){
     const [created]=await tx.insert(siteGoLinks).values({
       ...input,code:randomBytes(9).toString("base64url"),siteId:scope.siteId,
-      organizationId:scope.organizationId,createdByPersonId:actor.actorPersonId,
+      organizationId:scope.organizationId,createdByPersonId:personId,
     }).onConflictDoNothing({target:siteGoLinks.code}).returning();
     if(created)return created;
   }
@@ -45,7 +50,6 @@ async function allocateGoLink(tx:Tx,actor:AccessContext,scope:OwnerScope,input:I
 }
 
 export async function issueAuthorizedGoLink(tx:Tx,actor:AccessContext,site:Scope,input:Issuance):Promise<Link>{
-  if(!actor.actorPersonId)throw new DomainError("FORBIDDEN");
   goDestinationSchema.parse(input.destination);
   if(input.engagementVersionId)throw new DomainError("VALIDATION_FAILED");
   if(input.expiresAt && input.expiresAt<=new Date())throw new DomainError("VALIDATION_FAILED","Expiration must be in the future.");
@@ -85,7 +89,8 @@ export async function revokeAuthorizedEngagementGoLink(tx:Tx,actor:AccessContext
 }
 
 async function transitionLockedGoLink(tx:Tx,actor:AccessContext,scope:OwnerScope,link:Link,desired:"active"|"paused"|"revoked",mode:"site"|"engagement"){
-  if(!actor.actorPersonId||actor.delegationMode==="view"||link.siteId!==scope.siteId||link.organizationId!==scope.organizationId)throw new DomainError("FORBIDDEN");
+  requireGoLinkMutationActor(actor);
+  if(link.siteId!==scope.siteId||link.organizationId!==scope.organizationId)throw new DomainError("FORBIDDEN");
   if(link.status==="revoked" && desired!=="revoked")throw new DomainError("CONFLICT","A revoked link cannot be resumed.");
   const status=goLinkStatusTransition(link.status,desired);
   if(status!==link.status){
