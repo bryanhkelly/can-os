@@ -76,6 +76,10 @@ export async function runScheduledJobs(): Promise<{
   const escalated = await escalateTerminalDeliveryFailures();
   const digests = await processWeeklyDigests();
   const expiredSectionOffers = await expireOutstandingSectionOffers();
+  // Campaign failures never block transactional or safeguarding work.
+  await import("@/modules/communication/campaign-store.server")
+    .then(m=>m.processEngagementCampaignDeliveries())
+    .catch(()=>console.error("engagement_campaign_dispatch_unavailable"));
   const sessionDeviceRetention=await runSessionDeviceRetention();
   return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, reportingReplayed, recovered, reminders, deliveries, schoolFamilyDeliveries, noncreditWaitlistEmails, classParticipantEmails, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails, sessionDeviceRetention };
 }

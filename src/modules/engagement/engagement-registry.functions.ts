@@ -370,17 +370,17 @@ export const listSiteEngagementDefinitions=createServerFn({method:"GET"})
 /** Distribution is a separately authorized action. Build only from an exact
  * saved email-channel link and its immutable definition. No provider send,
  * recipient list, delivery claim or additional visit is produced by this GET. */
-export const prepareEngagementEmailDraft=createServerFn({method:"GET"})
-  .validator((input:unknown)=>linkInput.parse(input))
-  .handler(async({data})=>{
-    setResponseHeader("Cache-Control","private, no-store");
-    const actor=await getCommandContext(getRequest());
-    const record=await authorizedDefinition(data.engagementId,actor,true,db);
-    if(record.ownerKind==="organization"&&actor.role==="network_admin")assertCapability(actor,"network.sites.manage");
-    else if(record.ownerKind==="platform")assertCapability(actor,"platform.admin");
-    else assertCapability(actor,"communication.send");
+export async function authorizeEngagementDistribution(engagementId:string,actor:AccessContext){
+ const record=await authorizedDefinition(engagementId,actor,true,db);
+ if(record.ownerKind==="organization"&&actor.role==="network_admin")assertCapability(actor,"network.sites.manage");
+ else if(record.ownerKind==="platform")assertCapability(actor,"platform.admin");
+ else assertCapability(actor,"communication.send");
+ return record;
+}
+export async function readAuthorizedEngagementInvitation(engagementId:string,linkId:string,actor:AccessContext){
+ const record=await authorizeEngagementDistribution(engagementId,actor);
     if(record.status!=="active")throw new DomainError("UNAVAILABLE","Engagement is retired.");
-    const [link]=await db.select().from(siteGoLinks).where(eq(siteGoLinks.id,data.linkId)).limit(1);
+    const [link]=await db.select().from(siteGoLinks).where(eq(siteGoLinks.id,linkId)).limit(1);
     if(!link?.engagementVersionId||link.channel!=="email"||
        link.organizationId!==record.organizationId||link.siteId!==record.siteId)
       throw new AuthorizationError("exact email-channel engagement link");
@@ -395,7 +395,14 @@ export const prepareEngagementEmailDraft=createServerFn({method:"GET"})
     const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
     if(!origin)throw new DomainError("UNAVAILABLE","Approved public sharing origin is not configured.");
     return buildEngagementInvitation(definition,link.code,origin);
-  });
+
+}
+export const prepareEngagementEmailDraft=createServerFn({method:"GET"})
+ .validator((input:unknown)=>linkInput.parse(input))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  return readAuthorizedEngagementInvitation(data.engagementId,data.linkId,await getCommandContext(getRequest()));
+ });
 
 /** An owner workspace may publish a national invitation without fabricating
  * a local marketing package. Only directly owned Sites are eligible. */

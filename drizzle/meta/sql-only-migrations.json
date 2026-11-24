@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lastGeneratedSnapshotIndex": 86,
-  "currentSqlTipIndex": 114,
+  "currentSqlTipIndex": 115,
   "modelParityVerified": false,
   "note": "Reviewed immutable SQL-only migration suffix. Generated Drizzle model parity is NOT claimed. Generate and push remain prohibited until a verified new modeled baseline exists.",
   "sqlOnlyMigrations": [
@@ -144,6 +144,11 @@
       "idx": 114,
       "tag": "0114_go_response_metrics",
       "gitBlobSha": "8e435939abd9bf9b50699235bfac77255952d664"
+    },
+    {
+      "idx": 115,
+      "tag": "0115_engagement_campaigns",
+      "gitBlobSha": "5c7bec4a09363e41ed7b050ed40c22c2baf35a88"
     }
   ]
 }

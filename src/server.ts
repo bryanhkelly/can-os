@@ -51,6 +51,10 @@ export default {
     // leases and provider receipts preserve idempotency with Netlify's
     // scheduled maintenance runner, which uses the same cadence.
     if(task==="deliveries" && env.DATABASE_URL){
+      ctx.waitUntil(withRequestDatabase(async()=>{
+        const {processEngagementCampaignDeliveries}=await import("./modules/communication/campaign-store.server");
+        return processEngagementCampaignDeliveries();
+      },env.DATABASE_URL).catch(()=>console.error("CAN campaign dispatch unavailable")));
       ctx.waitUntil(withRequestDatabase(
         async()=>{
           const {processNoncreditWaitlistEmailDeliveries}=await import(

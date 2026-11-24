@@ -69,7 +69,7 @@ export function verifyResendWebhookSignature(
 
 export type ResendReceiptEvent = {
   type: "email.delivered" | "email.bounced" | "email.complained" | "email.failed" | "email.suppressed";
-  source: "school_family" | "noncredit_waitlist";
+  source: "school_family" | "noncredit_waitlist" | "engagement_campaign";
   receiptId: string;
   providerMessageId: string;
 };
@@ -88,7 +88,7 @@ export function parseResendReceiptEvent(raw: unknown): ResendReceiptEvent | null
   const values = tags as Record<string, unknown>;
   const receiptId = values.can_receipt;
   const messageId = info.email_id;
-  if (!["school_family", "noncredit_waitlist"].includes(String(values.can_source)) ||
+  if (!["school_family", "noncredit_waitlist", "engagement_campaign"].includes(String(values.can_source)) ||
       typeof receiptId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receiptId) ||
       typeof messageId !== "string" || messageId.length < 8 || messageId.length > 256)

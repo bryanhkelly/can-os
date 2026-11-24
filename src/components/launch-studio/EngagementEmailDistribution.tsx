@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {NativeEngagementCampaigns} from "./NativeEngagementCampaigns";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/choice";
 import {Field} from "@/components/ui/field";
@@ -59,7 +60,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
   }
   return <section className="mt-4 border p-4" aria-label="Email invitation distribution">
     <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Prepare email invitation</h3><Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button></div>
-    <WorkspaceNotice className="mt-3">Use your own authorized email account to send a small pilot invitation. Recipients are placed in BCC. Becomuna does not send, store these addresses, subscribe them, or claim delivery. For a bulk campaign, use your organization’s approved consent and unsubscribe system.</WorkspaceNotice>
+    <WorkspaceNotice className="mt-3">For a small external email draft, recipients stay in your browser and are placed in BCC. Native campaign sending below uses saved consented lists and separate provider receipts.</WorkspaceNotice>
     {draft&&<>
       <div className="mt-3 border p-3 text-sm"><p className="font-semibold">{draft.subject}</p><p className="mt-2 whitespace-pre-wrap break-words">{draft.body}</p></div>
       <Field className="mt-3" label="Recipient email addresses (up to 20)" description={`${parsed.recipients.length} unique addresses.`}
@@ -70,6 +71,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
       <div className="mt-3 flex flex-wrap gap-2"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></div>
     </>}
     {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
+    {draft&&<NativeEngagementCampaigns engagementId={engagementId} linkId={linkId}/>}
     {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
     {draft&&error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
   </section>;
