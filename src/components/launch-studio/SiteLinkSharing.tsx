@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
 import { buildUrlDestination, type UrlDestination } from "@/domain/url-destinations";
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
+import { friendlySiteBase } from "@/domain/friendly-site-urls";
 import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 
 /** Copying private navigation never publishes a Site or creates a bearer token.
@@ -15,7 +17,9 @@ export function SiteLinkSharing({ siteId, identity, publishedHost }: {
   const workspace: UrlDestination = {kind:"site-workspace",siteId,identity};
   const website: UrlDestination | null = publishedHost
     ? {kind:"published-site",host:publishedHost} : null;
-  const shareJourney = buildUrlDestination({kind:"site-launch",siteId,identity,module:"create-outreach"});
+  const shareJourney=buildUrlDestination({kind:"site-launch",siteId,identity,module:"create-outreach"});
+  const directSiteLinks=identity?friendlySiteBase(identity)+"/go-links"
+    :"/sites/"+encodeUuidForPath(siteId)+"/go-links";
   return <>
     <Button type="button" variant="ghost" size="sm" className="min-h-11 gap-2"
       onClick={() => setOpen(true)}>
@@ -47,12 +51,15 @@ export function SiteLinkSharing({ siteId, identity, publishedHost }: {
         <section className="border p-4">
           <h3 className="font-semibold">Revocable outreach / Go link</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Use a saved outreach plan to create a short, revocable /go/ link for families,
-            participants or partners. It grants navigation only, not enrollment or membership.
+            Create a Site-owned short link directly, or connect it to an Introduce outreach plan.
+            It grants navigation only, not enrollment or membership.
           </p>
           <Button asChild variant="outline" size="sm" className="mt-3">
-            <a href={shareJourney.href}>Manage Go links in Introduce</a>
+            <a href={directSiteLinks}>Manage Site Go Links</a>
           </Button>
+          <a className="mt-3 block text-sm underline" href={shareJourney.href}>
+            Open Introduce outreach plans
+          </a>
         </section>
         <p className="text-xs text-muted-foreground">
           Sharing a private website preview uses the separate Share preview control.
