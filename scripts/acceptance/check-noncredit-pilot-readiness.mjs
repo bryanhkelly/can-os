@@ -59,38 +59,64 @@ async function run() {
       ["provider publication",defs.provisioning.includes("t.approved_by_person_id IS NOT NULL") &&
         defs.provisioning.includes("t.state='published'")],
     ];
+    // The cutover moved these tables to public. Check the exact parent and
+    // firing mode of every required trigger, not just the first three tables.
+    const expectedTriggers=[
+      ["learner_course_attempts","v301_noncredit_attempt_assessment_access"],
+      ["assessment_administrations","v301_noncredit_admin_assessment_access"],
+      ["noncredit_completion_decisions","noncredit_completion_authority"],
+      ["noncredit_registrations","noncredit_registration_policy_pin"],
+      ["noncredit_participation_events","v301_noncredit_auto_on_participation"],
+      ["learner_lesson_progress","v301_noncredit_auto_on_lesson"],
+      ["assessment_attempts","v301_noncredit_auto_on_assessment"],
+      ["learner_course_attempts","v301_noncredit_auto_on_course"],
+      ["evidence_document_versions","v301_noncredit_auto_on_evidence"],
+      ["noncredit_self_enrollment_claims","v301_noncredit_attribution_required"],
+    ];
     const {rows:triggers}=await db.query(`
-      SELECT tgname FROM pg_trigger
-      WHERE tgrelid IN (
-        'public.learner_course_attempts'::regclass,
-        'public.assessment_administrations'::regclass,
-        'public.noncredit_completion_decisions'::regclass
-      ) AND NOT tgisinternal
+      SELECT c.relname,t.tgname,t.tgenabled
+      FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+      JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND NOT t.tgisinternal
+        AND t.tgname=ANY($1::text[])
+    `,[expectedTriggers.map(([,name])=>name)]);
+    const installed=new Set(triggers.filter(r=>["O","A"].includes(r.tgenabled))
+      .map(row=>row.relname+":"+row.tgname));
+    for(const [table,trigger] of expectedTriggers)
+      requirements.push([table+"."+trigger,installed.has(table+":"+trigger)]);
+    requirements.push(["UUID-compatible assessment administration lookup",
+      defs.provisioning.includes("min(ad.id::text)::uuid") &&
+      !defs.provisioning.includes("min(ad.id)") &&
+      defs.provisioning.includes("IF administration_count=1 THEN")]);
+    const {rows:uuidCases}=await db.query(`
+      WITH cases(kind,id) AS (VALUES
+        ('one','10000000-0000-4000-8000-000000000001'::uuid),
+        ('multiple','10000000-0000-4000-8000-000000000001'::uuid),
+        ('multiple','10000000-0000-4000-8000-000000000002'::uuid)),
+      labels(kind) AS (VALUES ('zero'),('one'),('multiple'))
+      SELECT labels.kind,count(cases.id)::int AS candidates,
+        min(cases.id::text)::uuid AS chosen
+      FROM labels LEFT JOIN cases USING(kind)
+      GROUP BY labels.kind
     `);
-    const installed=new Set(triggers.map(row=>row.tgname));
-    for(const trigger of [
-      "v301_noncredit_attempt_assessment_access",
-      "v301_noncredit_admin_assessment_access",
-      "noncredit_completion_authority",
-      "noncredit_registration_policy_pin",
-      "v301_noncredit_auto_on_participation",
-      "v301_noncredit_auto_on_lesson",
-      "v301_noncredit_auto_on_assessment",
-      "v301_noncredit_auto_on_course",
-      "v301_noncredit_auto_on_evidence",
-    ]) requirements.push([trigger,installed.has(trigger)]);
-
+    requirements.push(["zero/one/multiple administration ambiguity",
+      uuidCases.find(r=>r.kind==="zero")?.chosen===null &&
+      uuidCases.find(r=>r.kind==="one")?.candidates===1 &&
+      uuidCases.find(r=>r.kind==="multiple")?.candidates===2]);
     const {rows:rls}=await db.query(`
       SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity
       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public'
         AND c.relname=ANY($1::text[])
     `,[["noncredit_registrations","learner_course_attempts",
-       "assessment_access_grants","assessment_attempts","survey_responses"]]);
+       "assessment_access_grants","assessment_attempts","survey_responses",
+       "noncredit_self_enrollment_claims","noncredit_completion_decisions","noncredit_participation_events"]]);
     const secure=new Set(rls.filter(r=>r.relrowsecurity && r.relforcerowsecurity).map(r=>r.relname));
     requirements.push(["restricted participant and assessment tables",
       secure.has("noncredit_registrations")&&secure.has("learner_course_attempts") &&
-      secure.has("assessment_access_grants")&&secure.has("assessment_attempts")]);
+      secure.has("assessment_access_grants")&&secure.has("assessment_attempts")&&
+      secure.has("survey_responses")&&secure.has("noncredit_self_enrollment_claims")&&
+      secure.has("noncredit_completion_decisions")&&secure.has("noncredit_participation_events")]);
     const {rows:columns}=await db.query(`
       SELECT table_name,column_name FROM information_schema.columns
       WHERE table_schema='public'
