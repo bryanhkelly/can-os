@@ -69,6 +69,8 @@ async function run() {
       ["noncredit_participation_events","v301_noncredit_auto_on_participation"],
       ["learner_lesson_progress","v301_noncredit_auto_on_lesson"],
       ["assessment_attempts","v301_noncredit_auto_on_assessment"],
+      ["assessment_attempts","v301_noncredit_knowledge_feedback"],
+      ["survey_campaigns","noncredit_feedback_campaign_scope"],
       ["learner_course_attempts","v301_noncredit_auto_on_course"],
       ["evidence_document_versions","v301_noncredit_auto_on_evidence"],
       ["noncredit_self_enrollment_claims","v301_noncredit_attribution_required"],
@@ -87,7 +89,8 @@ async function run() {
     requirements.push(["UUID-compatible assessment administration lookup",
       defs.provisioning.includes("min(ad.id::text)::uuid") &&
       !defs.provisioning.includes("min(ad.id)") &&
-      defs.provisioning.includes("IF administration_count=1 THEN")]);
+      defs.provisioning.includes("IF administration_count=1 THEN") &&
+      defs.provisioning.includes("VALUES(selected_administration_id,person_learner")]);
     const {rows:uuidCases}=await db.query(`
       WITH cases(kind,id) AS (VALUES
         ('one','10000000-0000-4000-8000-000000000001'::uuid),
