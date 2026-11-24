@@ -1,3 +1,4 @@
+import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -104,7 +105,7 @@ export function SiteEngagementLibrary({
   }
   async function copy(link:Link){
     try{
-      await navigator.clipboard.writeText(window.location.origin+"/go/"+link.code);
+      await navigator.clipboard.writeText(new URL("/go/"+link.code,await getCanonicalGoLinkShareOrigin()).href);
       setMessage("Go Link copied.");setError("");
     }catch{setError("Unable to copy automatically. Select and copy the displayed link.");}
   }

@@ -1,3 +1,4 @@
+import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,7 +108,7 @@ export function UniversalEngagementPublisher({
   }
   async function copy(code:string){
     try{
-      await navigator.clipboard.writeText(window.location.origin+"/go/"+code);
+      await navigator.clipboard.writeText(new URL("/go/"+code,await getCanonicalGoLinkShareOrigin()).href);
       setError("");setNotice("Copied Go Link.");
     }catch{setError("Unable to copy. Select the link text and copy manually.");}
   }

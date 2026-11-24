@@ -13,6 +13,10 @@ export interface NativePublisherReleaseRecord {
   pilotLessonCount?:number;
   pilotPlaceholderCount?:number;
   pilotContentReviewCount?:number;
+  pilotAssessmentPendingCount?:number;
+  completionPolicies?:number;
+  registrationListings?:number;
+  openRegistrationListings?:number;
   offeringTitle:string;
   versionNo:number;
   lifecycle:string;
@@ -93,4 +97,22 @@ export function projectPublisherReleaseNextStep(
     key:"class-verification",label:"Verify Class launch prerequisites",
     detail:"A recorded adoption exists. Class authorization, Site placement, cohort sessions and enrollment still require separate live checks.",
   };
+}
+
+/** Observations only: all missing prerequisites, not just the first next step.
+ * A published listing is not proof that a new participant can enroll. */
+export function projectNoncreditPilotBlockers(record:Readonly<NativePublisherReleaseRecord>):string[]{
+  const blockers:string[]=[];
+  if(!record.pilotLessonCount)blockers.push("Add instructional lessons");
+  if((record.pilotPlaceholderCount??0)>0)blockers.push("Replace placeholder instructional media");
+  if((record.pilotContentReviewCount??0)>0)blockers.push("Resolve instructional content review flags");
+  if((record.pilotAssessmentPendingCount??0)>0)blockers.push("Resolve lesson assessment review flags");
+  if(record.noncreditAssessmentStatus!=="published")blockers.push("Publish independently reviewed assessment");
+  if(record.noncreditTrainingStatus!=="published"||!record.noncreditTrainingApproved)
+    blockers.push("Publish independently approved training version");
+  if(!record.completionPolicies)blockers.push("Publish effective completion policy");
+  if(!record.approvedAdoptions)blockers.push("Approve exact local Offering adoption");
+  if(!record.registrationListings)blockers.push("Authorize and publish registration listing");
+  else if(!record.openRegistrationListings)blockers.push("Verify currently open registration window");
+  return blockers;
 }

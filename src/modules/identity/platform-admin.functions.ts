@@ -76,6 +76,11 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             (cl.content->>'requiresPartnerContentApproval'='true' OR
              cl.content->>'requiresIndependentReview'='true'))
           AS "pilotContentReviewCount",
+        (SELECT count(*)::int FROM public.offering_courses oc JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id AND cl.content->>'assessmentStatus'='not_published') AS "pilotAssessmentPendingCount",
+        (SELECT count(*)::int FROM public.noncredit_completion_policies p WHERE p.training_version_id=training.id AND p.published_at IS NOT NULL AND p.approved_by_person_id IS NOT NULL AND p.effective_at<=now()) AS "completionPolicies",
+        (SELECT count(*)::int FROM public.noncredit_self_enrollment_releases r WHERE r.training_version_id=training.id AND r.offering_version_id=ov.id AND r.status='published') AS "registrationListings",
+        (SELECT count(*)::int FROM public.noncredit_self_enrollment_releases r WHERE r.training_version_id=training.id AND r.offering_version_id=ov.id AND r.status='published' AND r.opens_at<=now() AND r.closes_at>now()) AS "openRegistrationListings",
         (SELECT count(*)::int FROM public.offering_courses oc
           WHERE oc.offering_version_id=ov.id) AS "courseCount",
         (SELECT count(*)::int FROM public.offering_courses oc
@@ -186,6 +191,10 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
         pilotLessonCount: Number(row.pilotLessonCount??0),
         pilotPlaceholderCount: Number(row.pilotPlaceholderCount??0),
         pilotContentReviewCount: Number(row.pilotContentReviewCount??0),
+        pilotAssessmentPendingCount: Number(row.pilotAssessmentPendingCount??0),
+        completionPolicies: Number(row.completionPolicies??0),
+        registrationListings: Number(row.registrationListings??0),
+        openRegistrationListings: Number(row.openRegistrationListings??0),
         offeringTitle:String(row.offeringTitle),
         versionNo:Number(row.versionNo),
         lifecycle:String(row.lifecycle),

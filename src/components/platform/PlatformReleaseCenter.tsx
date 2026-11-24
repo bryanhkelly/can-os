@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
-import { projectPublisherReleaseNextStep,
+import { projectPublisherReleaseNextStep, projectNoncreditPilotBlockers,
   type NativePublisherReleaseRecord,
   type PublisherReleaseNextStep } from "@/domain/native-publisher-release-readiness";
 
@@ -42,8 +42,8 @@ export function PlatformReleaseCenter({records,limited}:{
     return priority(a.record)-priority(b.record) || pa-pb ||
       a.record.offeringTitle.localeCompare(b.record.offeringTitle);
   }),[records]);
-  const shown=items.filter(item=>item.record.offeringTitle.toLowerCase().includes(query.trim().toLowerCase()));
-  const blocked=items.filter(item=>item.next.key!=="class-verification").length;
+  const shown=items.filter(item=>[item.record.offeringTitle,item.record.offeringCode??""].some(value=>value.toLowerCase().includes(query.trim().toLowerCase())));
+  const blocked=items.filter(item=>item.next.key!=="class-verification" || (!!item.record.noncreditTrainingStatus && projectNoncreditPilotBlockers(item.record).length>0)).length;
   return <WorkspacePanel title="Release Center" className="mt-6"
     description="One place to triage real publisher prerequisites and navigate to the authorized owner. This is operational coordination, not blanket approval authority.">
     <div className="mt-2 grid gap-3 sm:grid-cols-3">
@@ -78,6 +78,7 @@ export function PlatformReleaseCenter({records,limited}:{
     <div className="mt-4 space-y-3">
       {shown.map(({record,next})=>{
         const route=nextWorkspace[next.key];
+        const pilotBlockers=record.noncreditTrainingStatus?projectNoncreditPilotBlockers(record):[];
         return <article key={record.offeringVersionId} className="border border-border p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -87,8 +88,8 @@ export function PlatformReleaseCenter({records,limited}:{
                 {" "}{record.publishedCourses}/{record.courseCount} Courses published
               </p>
             </div>
-            <StatusBadge tone={next.key==="class-verification"?"info":"attention"}>
-              {next.label}
+            <StatusBadge tone={next.key==="class-verification"&&!pilotBlockers.length?"info":"attention"}>
+              {pilotBlockers.length&&next.key==="class-verification"?"Noncredit prerequisites outstanding":next.label}
             </StatusBadge>
           </div>
           {record.noncreditTrainingStatus&&<p className="mt-3 text-sm">
@@ -99,6 +100,7 @@ export function PlatformReleaseCenter({records,limited}:{
             {" "}{record.pilotContentReviewCount??0} content-review flags
             in {record.pilotLessonCount??0} lessons.
           </p>}
+          {pilotBlockers.length>0&&<div className="mt-3 border p-3"><p className="text-sm font-semibold">Noncredit readiness blockers</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{pilotBlockers.map(blocker=><li key={blocker}>{blocker}</li>)}</ul><a className="mt-2 inline-block text-sm underline" href={"/programs/noncredit/enrollment?offeringCode="+encodeURIComponent(record.offeringCode??"")}>Inspect registration operations (authorized provider)</a><p className="mt-2 text-xs text-muted-foreground">A recorded open window does not prove eligibility, capacity or permission.</p></div>}
           <p className="mt-3 text-sm">{next.detail}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Responsible: {route.owner}
