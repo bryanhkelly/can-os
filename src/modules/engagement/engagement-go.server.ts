@@ -1,9 +1,9 @@
 import { requireCurrentNetworkAgreement } from "@/modules/networks/network-agreement.server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   engagementDefinitions, engagementDefinitionVersions, organizations,
-  programs, siteGoLinks, siteGoLinkDailyVisits, siteBrandVersions, sites,
+  programs, siteBrandVersions, sites,
 } from "@/db/schema";
 import {
   engagementDefinitionSchema, type EngagementDefinition,
@@ -13,7 +13,9 @@ import { inspectEngagementDestination } from "./go-destination-registry.server";
 import { siteBrandConfigurationSchema } from "@/domain/site-brand";
 import { resolveSiteTheme, type SiteTheme } from "@/domain/site-theme";
 import { goLinkAvailability } from "@/domain/go-link-policy";
-import { resolveSiteGoExperience } from "./site-go-links.server";
+import { resolveLoadedSiteGoExperience } from "./site-go-links.server";
+
+import { readPublicGoLink, observePublicGoEntry } from "./go-public-gateway.server";
 
 export type GoExperience =
   | {mode:"website-preview";html:string}
@@ -80,36 +82,14 @@ async function validOwner(
   return null;
 }
 
-/** One best-effort aggregate observation shared by direct and universal links.
- * Redirects include automated requests; an observation is not an identity.
- */
-async function observeUniversalGoVisit(linkId:string):Promise<void>{
-  try{
-    await db.insert(siteGoLinkDailyVisits).values({
-      linkId,day:new Date().toISOString().slice(0,10),redirects:1,
-    }).onConflictDoUpdate({
-      target:[siteGoLinkDailyVisits.linkId,siteGoLinkDailyVisits.day],
-      set:{redirects:sql`${siteGoLinkDailyVisits.redirects}+1`},
-    });
-  }catch{
-    console.error("Universal Go Link observation unavailable",{kind:"daily_counter"});
-  }
-}
-
 /** Single public resolver; Site and universal engagement links share code store. */
 export async function resolveGoExperience(code:string,page:string="/",observe=true):Promise<GoExperience|null>{
   if(!goCodeSchema.safeParse(code).success)return null;
-  const [link]=await db.select({
-    id:siteGoLinks.id,
-    startsAt:siteGoLinks.startsAt,expiresAt:siteGoLinks.expiresAt,
-    destination:siteGoLinks.destination,status:siteGoLinks.status,
-    siteId:siteGoLinks.siteId,organizationId:siteGoLinks.organizationId,
-    engagementVersionId:siteGoLinks.engagementVersionId,
-  }).from(siteGoLinks).where(eq(siteGoLinks.code,code)).limit(1);
+  const link=await readPublicGoLink(code);
   if(!link || goLinkAvailability(link)!=="available")return null;
 
   if(!link.engagementVersionId){
-    return resolveSiteGoExperience(code,observe,page);
+    return resolveLoadedSiteGoExperience(code,link,observe,page);
   }
   const [version]=await db.select({
     content:engagementDefinitionVersions.content,
@@ -137,7 +117,7 @@ export async function resolveGoExperience(code:string,page:string="/",observe=tr
   },destination,code);
   if(!result.available||!result.href)return null;
   const href=result.href;
-  if(observe)await observeUniversalGoVisit(link.id);
+  if(observe)await observePublicGoEntry(code,link.id);
   if(definition.execution.mode==="redirect")return {mode:"redirect",href};
   const identity=await publishedExperienceBrand(
     owner.siteId,definition.presentation.brandVersionId,
