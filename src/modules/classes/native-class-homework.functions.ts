@@ -71,7 +71,7 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
     noStore();
     const actor = await getInstructionalLearnerContext(getRequest());
     return db.transaction(async tx => {
-      const {cls,courseAttemptId} = await authorized(tx,actor,data.classEnrollmentId);
+      const {cls,enrollment,courseAttemptId} = await authorized(tx,actor,data.classEnrollmentId);
       const result = await tx.execute(sql`
         SELECT a.id, a.assignment_key, a.assignment_spec, a.due_at,
           o.official_spec, s.id AS submission_id, s.status, s.response, s.submitted_at
@@ -86,7 +86,23 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
         ORDER BY a.due_at NULLS LAST, a.assignment_key
         LIMIT 100
       `);
-      return {courseAttemptId, assignments:(result.rows as HomeworkRow[]).map(item => {
+      // Preserve access to original academic evidence during the cutover.
+      // Exact recovery provenance only; no title inference or new enrollment.
+      const legacy = actor.role==="student" ? await tx.execute(sql`
+        SELECT DISTINCT sec.id AS section_id
+        FROM public.enrollments e
+        JOIN public.student_profiles sp ON sp.id=e.student_profile_id
+        JOIN public.sections sec ON sec.id=e.section_id
+        WHERE sp.person_id=${enrollment.learnerPersonId}::uuid
+          AND e.kind='section' AND e.status='active'
+          AND sec.site_id=${cls.siteId}::uuid
+          AND e.organization_id=${cls.operatingOrganizationId}::uuid
+          AND md5('valor-v61:classenrollment:'||e.id)::uuid=${enrollment.id}::uuid
+          AND md5('valor-v61:class:'||sec.code)::uuid=${cls.id}::uuid
+        LIMIT 2
+      `) : null;
+      const legacySectionId=legacy?.rows.length===1?String(legacy.rows[0]?.section_id):null;
+      return {courseAttemptId, legacySectionId, assignments:(result.rows as HomeworkRow[]).map(item => {
         const spec=asRecord(item.assignment_spec);
         const official=asRecord(item.official_spec);
         const response=asRecord(item.response);
