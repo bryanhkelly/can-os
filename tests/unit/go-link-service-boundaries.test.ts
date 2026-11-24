@@ -6,7 +6,8 @@ describe("Go Link service boundary and privacy contracts",()=>{
     const create=read("src/modules/engagement/site-go-links.functions.ts");
     const resolve=read("src/modules/engagement/site-go-links.server.ts");
     expect(create).toContain("inspectGoDestination(");
-    expect(resolve).toContain("inspectGoDestination(");
+    expect(resolve).toContain("executeSiteGoDestination(");
+    expect(read("src/modules/engagement/go-destination-registry.server.ts")).toContain("inspectGoDestination(");
     expect(resolve).toContain("goLinkAvailability(link)");
     expect(create).toContain("authorizedPackage(");
     expect(create).toContain("listAvailableGoDestinations");
@@ -44,8 +45,7 @@ describe("Go Link service boundary and privacy contracts",()=>{
   });
   it("registers the new private aggregate table in ordered SQL migration",()=>{
     const journal=JSON.parse(read("drizzle/meta/_journal.json"));
-    const last=journal.entries.at(-1);
-    expect(last).toMatchObject({idx:109,tag:"0109_site_go_link_reuse"});
+    expect(journal.entries).toContainEqual(expect.objectContaining({idx:109,tag:"0109_site_go_link_reuse"}));
     const migration=read("drizzle/0108_site_go_link_capabilities.sql");
     expect(migration).toContain("ENABLE ROW LEVEL SECURITY");
     expect(migration).toContain("FORCE ROW LEVEL SECURITY");
@@ -58,6 +58,6 @@ describe("Go Link service boundary and privacy contracts",()=>{
     const operations=read("src/modules/engagement/site-go-links.functions.ts");
     expect(operations).toContain("listSiteGoLinksPage");
     expect(operations).toContain("requestFingerprint");
-    expect(operations).toContain("pg_advisory_xact_lock");
+    expect(read("src/modules/engagement/go-link-lifecycle.server.ts")).toContain("pg_advisory_xact_lock");
   });
 });
