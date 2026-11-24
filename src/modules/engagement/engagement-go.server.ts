@@ -15,7 +15,7 @@ import { resolveSiteTheme, type SiteTheme } from "@/domain/site-theme";
 import { goLinkAvailability } from "@/domain/go-link-policy";
 import { resolveLoadedSiteGoExperience } from "./site-go-links.server";
 
-import { readPublicGoLink, observePublicGoEntry } from "./go-public-gateway.server";
+import { readPublicGoLink, observePublicGoResponse } from "./go-public-gateway.server";
 
 export type GoExperience =
   | {mode:"website-preview";html:string}
@@ -117,7 +117,7 @@ export async function resolveGoExperience(code:string,page:string="/",observe=tr
   },destination,code);
   if(!result.available||!result.href)return null;
   const href=result.href;
-  if(observe)await observePublicGoEntry(code,link.id);
+  if(observe)await observePublicGoResponse(code,link.id,definition.execution.mode==="redirect"?"redirect":"page");
   if(definition.execution.mode==="redirect")return {mode:"redirect",href};
   const identity=await publishedExperienceBrand(
     owner.siteId,definition.presentation.brandVersionId,
