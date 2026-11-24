@@ -18,7 +18,7 @@ export function SelectionChip({ children, selected, onChange, disabled = false,
   return <Button type="button" variant="outline" size="sm" aria-pressed={selected}
     disabled={disabled} onClick={() => onChange(!selected)}
     data-selection-chip={density}
-    className={cn("max-w-full min-w-0 rounded-none gap-1 whitespace-normal text-left font-medium",
+    className={cn("max-w-full min-w-0 gap-1 whitespace-normal text-left font-medium",
       density === "compact" ? "min-h-7 px-2 py-1 text-xs" : "min-h-9 px-3 py-1 text-sm",
       selected ? "border-primary bg-accent text-primary hover:bg-accent" :
         recommended ? "border-primary/60 bg-accent/50 text-primary" : "border-input",
