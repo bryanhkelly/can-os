@@ -94,7 +94,7 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
           const sortable = column.sortable && onSort;
           const direction = sort?.column === column.id ? sort.direction : undefined;
           const Icon = direction === "ascending" ? ArrowUp : direction === "descending" ? ArrowDown : ArrowUpDown;
-          return <TableHead key={column.id} scope="col" aria-sort={sortable ? direction ?? "none" : undefined}
+          return <TableHead key={column.id} scope="col" aria-sort={direction}
             className="px-4 py-3">
             {sortable ? <Button variant="ghost" size="sm" onClick={() => onSort({
               column: column.id, direction: direction === "ascending" ? "descending" : "ascending",
