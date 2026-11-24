@@ -8,7 +8,7 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { sourceDependencySpecifiers, sharedUiImportViolation, resolveSourceDependency } from "./lib/v61-component-dependencies.mjs";
+import { sourceDependencySpecifiers, sharedUiImportViolation, resolveSourceDependency, runtimeDependencySpecifiers, featureRuntimeImportViolation } from "./lib/v61-component-dependencies.mjs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import ts from "typescript";
@@ -68,6 +68,10 @@ for (const file of files) {
     }
     const violation = sharedUiImportViolation(path, value);
     if (violation) sharedLayerCandidates.push({file: path, dependency: value, violation});
+  }
+  for (const specifier of runtimeDependencySpecifiers(syntax, ts)) {
+    const violation = featureRuntimeImportViolation(path, specifier);
+    if (violation) boundaryCandidates.push({file: path, dependency: specifier, violation});
   }
   function candidate(name, body) {
     if (!body || body.getWidth(syntax) < 180) return;
