@@ -9,7 +9,7 @@ import {
   assessmentExecutionAttempts,assessmentExecutionResults,
   assessmentFormAdministrations,noncreditCompletionDecisions,
   surveyInvitations,surveyCampaigns,surveyResponses,noncreditParticipationEvents,
-  noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
+  noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,evidenceDocumentVersions,
 } from "@/db/canonical-v301";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
@@ -17,6 +17,7 @@ import {
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
+import { countVerifiedNoncreditMinutes } from "@/domain/noncredit-completion";
 import { currentNoncreditCompletionStates } from "@/domain/verified-completion-projection";
 
 /**
@@ -40,7 +41,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const {organizationId,siteIds}=await requireCanonicalLabProvider("noncredit.enrollment.read");
-    const to=data.to?new Date(data.to):new Date();
+    const generatedAt=new Date();
+    const to=data.to?new Date(data.to):generatedAt;
     const from=data.from?new Date(data.from):new Date(to.getTime()-90*86400000);
     if(!(to>from)||to.getTime()-from.getTime()>366*86400000)
       throw new Error("Pilot reporting must use a positive range of no more than 366 days");
@@ -61,7 +63,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       .orderBy(asc(noncreditTrainingVersions.title)).limit(take);
     checkBound(trainings.length,"Published pilot training versions");
     if(!trainings.length)return {
-      from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,
+      from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
       totals:summarizeNoncreditPilot([]),byTraining:[],
       publicationSafe:publicationSafePilotSummary(summarizeNoncreditPilot([])),
     };
@@ -74,6 +76,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       offeringVersionId:noncreditRegistrations.offeringVersionId,
       registeringOrganizationId:noncreditRegistrations.registeringOrganizationId,
       registeredAt:noncreditRegistrations.registeredAt,
+      siteId:noncreditSelfEnrollmentClaims.siteId,
     }).from(noncreditRegistrations)
       // A local Site operator cannot see registrations from unrelated Sites.
       // Claim + release establish the exact authorized Site for this pilot.
@@ -98,7 +101,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const registrationIds=registrations.map(r=>r.id);
     if(!registrationIds.length){
       const empty=summarizeNoncreditPilot([]);
-      return {from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,
+      return {from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
         totals:empty,byTraining:[],publicationSafe:publicationSafePilotSummary(empty)};
     }
     const attempts=await db.select({
@@ -135,12 +138,23 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         .where(inArray(noncreditCompletionDecisions.registrationId,registrationIds))
         .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(20001),
       db.select({
+        id:noncreditParticipationEvents.id,
         registrationId:noncreditParticipationEvents.registrationId,
+        supersedesId:noncreditParticipationEvents.supersedesId,
+        eventKind:noncreditParticipationEvents.eventKind,
+        evidenceVersionId:noncreditParticipationEvents.evidenceVersionId,
         occurredAt:noncreditParticipationEvents.occurredAt,
         countedMinutes:noncreditParticipationEvents.countedMinutes,
       }).from(noncreditParticipationEvents)
-        .where(inArray(noncreditParticipationEvents.registrationId,registrationIds)),
+        .where(inArray(noncreditParticipationEvents.registrationId,registrationIds)).limit(20001),
     ]);
+    if(participationEvents.length>20000)throw new Error("Participation evidence exceeds the safe report limit");
+    const evidenceIds=uuidSet(participationEvents.map(e=>e.evidenceVersionId));
+    const evidence=evidenceIds.length?await db.select({id:evidenceDocumentVersions.id,verifiedAt:evidenceDocumentVersions.verifiedAt,verifiedByPersonId:evidenceDocumentVersions.verifiedByPersonId,validFrom:evidenceDocumentVersions.validFrom,validThrough:evidenceDocumentVersions.validThrough}).from(evidenceDocumentVersions).where(inArray(evidenceDocumentVersions.id,evidenceIds)):[];
+    const today=generatedAt.toISOString().slice(0,10);
+    const verifiedEvidence=new Set(evidence.filter(e=>e.verifiedAt!==null&&e.verifiedAt<=generatedAt&&e.verifiedByPersonId!==null&&(e.validFrom===null||e.validFrom<=today)&&(e.validThrough===null||e.validThrough>=today)).map(e=>e.id));
+    const eventsByRegistration=new Map<string,typeof participationEvents>();
+    for(const event of participationEvents){const rows=eventsByRegistration.get(event.registrationId);if(rows)rows.push(event);else eventsByRegistration.set(event.registrationId,[event]);}
     if(decisions.length>20000)
       throw new Error("Completion decision history exceeds the safe report limit");
     const completion=currentNoncreditCompletionStates(registrationIds,decisions);
@@ -289,6 +303,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
           latestSubmittedAt:feedbackSubmittedAt??null,
         }),
         completionRecorded:completion.states.get(reg.id)==="completed",
+        verifiedParticipationMinutes:countVerifiedNoncreditMinutes((eventsByRegistration.get(reg.id)??[]).map(e=>({...e,evidenceVersionId:e.evidenceVersionId&&verifiedEvidence.has(e.evidenceVersionId)?e.evidenceVersionId:null})),generatedAt),
         baselineFraction:paired?Number(firstBaseline.earned)/Number(firstBaseline.possible):null,
         finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
       };
@@ -303,6 +318,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const totals=summarizeNoncreditPilot(facts);
     return {from:from.toISOString(),to:to.toISOString(),
       participantCount:registrations.length,
+      deliverySites:new Set(registrations.map(r=>r.siteId)).size,
       distinctLearners:countDistinctNoncreditLearners(registrations.map(r=>r.participantPersonId)),
       totals,byTraining,
       publicationSafe:publicationSafePilotSummary(totals)};
