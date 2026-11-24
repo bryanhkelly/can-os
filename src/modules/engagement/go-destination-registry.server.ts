@@ -80,11 +80,11 @@ function defineGoProvider<K extends DestinationKind>(kind:K,provider:GoProvider<
 const providers={
   "website-preview":defineGoProvider("website-preview",{
     authoring:"specialized",
-    async inspect({siteId,code,reader},destination){
+    async inspect({siteId,code},destination){
     const pages=await previewPages(siteId,destination);
     return pages?.["/"]?{available:true,title:"Website preview",href:"/go/"+code}:unavailable;
     },
-    async choices({siteId,reader,term}){return [];
+    async choices(){return [];
     },
     async execute({siteId,code,page},destination){
       if(!isPublicSitePagePath(page))return null;
@@ -195,13 +195,13 @@ const providers={
   }),
   "information":defineGoProvider("information",{
     authoring:"catalog",
-    async inspect({siteId,code,reader},destination){
+    async inspect({code},destination){
     const journey=Object.values(engagementJourneys)
       .find(item=>item.id===destination.journeyId);
     const href=journey?goDestinationHref(destination,code):null;
     return href&&journey?{available:true,title:journey.headline,href}:unavailable;
     },
-    async choices({siteId,reader,term}){
+    async choices({term}){
     return Object.values(engagementJourneys).map(journey=>({
       destination:{kind:"information" as const,journeyId:journey.id},
       title:journey.headline,description:journey.audience,
@@ -240,6 +240,7 @@ export type EngagementTargetOwner=PublicEngagementOwnerScope;
 export async function inspectEngagementDestination(
   owner:EngagementTargetOwner,destination:GoDestination,code:string,reader:Reader=db,
 ):Promise<DestinationInspection>{
+  if(goDestinationAuthoring(destination.kind)!=="catalog")return unavailable;
   if(destination.kind==="website-preview")return unavailable;
   // A Program-only author cannot publish an enrollment link to a sibling
   // Program's Class or release. Enrichment has an explicit Program ID check below.
