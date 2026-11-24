@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveGoExperience } from "@/modules/engagement/engagement-go.server";
 import { sitePreviewShareHeaders } from "@/domain/site-preview-sharing";
-import { renderEngagementPage } from "@/domain/engagement-page-renderer";
+import { renderEngagementPage, renderUnavailableEngagementPage } from "@/domain/engagement-page-renderer";
 
 const headers={
   "Cache-Control":"private, no-store",
@@ -13,19 +13,7 @@ const headers={
 };
 function unavailable(status:404|503){
   // Do not reveal Site identity, unpublished destinations or reason for denial.
-  const title=status===404?"This link is no longer available":"This link is temporarily unavailable";
-  const detail=status===404
-    ?"The invitation may have expired or the opportunity may no longer be shared."
-    :"We could not open this invitation. You can explore other opportunities.";
-  const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} · Becomuna</title><style>
-body{font:16px system-ui,sans-serif;background:#f8fafc;color:#152033;min-height:100vh;margin:0;display:grid;place-items:center}
-main{max-width:36rem;background:#fff;border:1px solid #e2e8f0;padding:2.5rem;margin:2rem;border-radius:1rem}
-h1{font-size:clamp(1.6rem,4vw,2.3rem)}p{line-height:1.7;color:#475569}
-a{display:inline-block;margin-top:1rem;padding:.8rem 1.2rem;background:#162a47;color:#fff;border-radius:.45rem;text-decoration:none}
-a:focus-visible{outline:3px solid #0284c7;outline-offset:3px}
-</style></head><body><main><small>Becomuna · Shared link</small><h1>${title}</h1><p>${detail}</p><a href="/landing">Explore current opportunities</a></main></body></html>`;
-  return new Response(html,{status,headers:{...headers,
+  return new Response(renderUnavailableEngagementPage(status),{status,headers:{...headers,
     "Content-Type":"text/html; charset=utf-8"}});
 }
 
