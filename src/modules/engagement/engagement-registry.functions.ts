@@ -6,18 +6,17 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   engagementDefinitions, engagementDefinitionVersions, organizations, programs,
-  siteGoLinks, siteMarketingPackages, sitePublications, siteBrandVersions, sites,
+  siteGoLinks, siteMarketingPackages, siteBrandVersions, sites,
 } from "@/db/schema";
 import {
   engagementDefinitionSchema, engagementOwnerSchema,
   engagementContextSummary, engagementRequiresClaimReview, type EngagementOwner,
 } from "@/domain/engagement-definition";
-import { goDestinationHref } from "@/domain/site-go-links";
+import { inspectEngagementDestination } from "./go-destination-registry.server";
 import { engagementActionAvailable, engagementDestination } from "@/domain/engagement-action-policy";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
-import { publicSiteHost } from "@/domain/public-site-address";
 import { DomainError } from "@/domain/errors";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
@@ -114,23 +113,15 @@ async function authorizedDefinition(
 }
 async function assertDestinationReady(
   definition:z.infer<typeof engagementDefinitionSchema>,
-  siteId:string|null,reader:Reader,
+  owner:OwnerRecord,reader:Reader,
 ){
-  const destination=definition.execution.mode==="page"
-    ? definition.execution.action : definition.execution.destination;
-  let host:string|null=null;
-  if(destination.kind==="site-page"){
-    if(!siteId)throw new DomainError("VALIDATION_FAILED","A published Site page needs an exact Site owner.");
-    const [site]=await reader.select({
-      slug:sitePublications.slug,status:sitePublications.status,
-      publishedAt:sitePublications.publishedAt,
-    }).from(sitePublications).where(eq(sitePublications.siteId,siteId)).limit(1);
-    if(!site || site.status!=="published" || !site.publishedAt)
-      throw new DomainError("UNAVAILABLE","This Site has no published website.");
-    host=publicSiteHost(site.slug);
-  }
-  if(!goDestinationHref(destination,"0123456789ab",host))
-    throw new DomainError("VALIDATION_FAILED","This engagement action is not an authorized navigation destination.");
+  const destination=engagementDestination(definition);
+  const outcome=await inspectEngagementDestination(
+    owner,destination,"0123456789ab",reader,
+  );
+  if(!outcome.available || !outcome.href)
+    throw new DomainError("UNAVAILABLE",
+      "The selected opportunity is not currently published, eligible, or owned by this engagement.");
 }
 
 /** Publishes one immutable, source-neutral definition. No enrollment or contact record. */
@@ -145,7 +136,7 @@ export const createEngagementDefinition=createServerFn({method:"POST"})
     if(engagementRequiresClaimReview(data.definition))
       throw new DomainError("VALIDATION_FAILED",
         "Public claims about licensing, funding, admissions, affiliation or institutional approval require separate authoritative review.");
-    await assertDestinationReady(data.definition,owner.siteId,tx);
+    await assertDestinationReady(data.definition,owner,tx);
     if(data.definition.source?.marketingPackageId){
       const [pkg]=await tx.select({
         id:siteMarketingPackages.id,siteId:siteMarketingPackages.siteId,
@@ -216,7 +207,7 @@ export const createEngagementGoLink=createServerFn({method:"POST"})
     )).limit(1);
     if(!version)throw new DomainError("UNAVAILABLE","Published engagement version unavailable.");
     const definition=engagementDefinitionSchema.parse(version.content);
-    await assertDestinationReady(definition,record.siteId,tx);
+    await assertDestinationReady(definition,record,tx);
     for(let attempt=0;attempt<5;attempt++){
       const code=randomBytes(9).toString("base64url");
       const [link]=await tx.insert(siteGoLinks).values({
