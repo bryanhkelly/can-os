@@ -23,6 +23,8 @@ describe("Course → Class source consolidation contract",()=>{
     expect(placement).toContain('eq(canonicalClassSessions.classId,cls.id)');
     expect(placement).toContain('eq(canonicalClassEnrollments.learnerPersonId,args.personId)');
     expect(placement).toContain("sourceAttributions.length!==1");
+    expect(placement).toContain("classEnrollmentId:placed.id,releaseId:null,");
+    expect(placement).toContain("releaseId:args.release.id,");
   });
   it("has one explicit database source exception with a strict provenance trigger",()=>{
     expect(migration).toContain("course_attempt_one_registration_with_optional_class_ck");
