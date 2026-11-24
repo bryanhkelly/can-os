@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,gt,inArray,isNotNull,isNull} from "drizzle-orm";
+import {and,desc,eq,gt,isNotNull,isNull} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
@@ -14,6 +14,7 @@ import {assertCurrentCanonicalStaffForMutation} from
   "@/modules/identity/canonical-transaction-authorization.server";
 import {assertNativeClassOperatorExitScope} from "@/domain/native-class-lifecycle";
 import {currentClassAuthority} from "./native-class-authority.server";
+import {readOpenNativeClassEnrollment} from "./native-class-enrollment-history.server";
 
 const uuid=z.string().uuid();
 const approveInput=z.object({
@@ -89,12 +90,7 @@ export const authorizeNativeClassRepeat=createServerFn({method:"POST"})
       throw new AuthorizationError("previous repeat authorization consumed or expired");
     return {repeatAuthorizationId:existing.id,duplicate:true,expiresAt:existing.expiresAt};
    }
-   const [active]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,cls.id),
-      eq(canonicalClassEnrollments.learnerPersonId,prior.learnerPersonId),
-      inArray(canonicalClassEnrollments.status,["pending","active"]),
-    )).limit(1);
+   const active=await readOpenNativeClassEnrollment(tx,cls.id,prior.learnerPersonId);
    if(active)throw new AuthorizationError("learner already has active Class participation");
    const expiresAt=new Date(now.getTime()+30*24*60*60*1000);
    const [saved]=await tx.insert(canonicalClassEnrollmentRepeatAuthorizations).values({
