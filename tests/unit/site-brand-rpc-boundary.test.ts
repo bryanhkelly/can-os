@@ -34,7 +34,8 @@ describe("Site Brand client/server execution boundary", () => {
     expect(server).toContain("readSavedBrandVersion");
     expect(server).toContain("saveSiteBrandVersionWithinTransaction");
     expect(server).toContain("writeAudit");
-    expect(server).toContain("websitePreviewSharesV1");
+    expect(server).toContain("transitionAuthorizedGoLink");
+    expect(server).toContain("website-preview");
     expect(server).toContain("db.transaction");
     expect(server).not.toContain("createServerFn");
   });
