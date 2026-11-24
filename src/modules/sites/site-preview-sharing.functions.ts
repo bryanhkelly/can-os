@@ -86,8 +86,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { actor } = await authorizedShareSite(data.siteId);
-    return db.transaction(async tx => {
-      const [site] = await tx.select({
+    // Render outside the write transaction: the renderer uses its own canonical\n    // read queries and must not hold a Site row lock during rendering.\n    let stage = "render";\n    try {\n      const preview=await getPartnerWebsitePreview(actor);\n      stage = "transaction";\n      return await db.transaction(async tx => {\n      const [site] = await tx.select({
         id: sites.id, name: sites.name, organizationId: sites.organizationId,
         lifecycleStatus: sites.lifecycleStatus, metadata: sites.metadata,
         updatedAt: sites.updatedAt,
@@ -126,7 +125,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       // Render the SAME saved Site revision and CAN OS sections as the
       // authenticated Website & Brand preview. Never synthesize a miniature
       // second website or silently suppress its setup/network sections.
-      const preview=await getPartnerWebsitePreview(actor);
+      stage = "revision-check";
       if(preview.siteId!==site.id ||
         preview.currentRevision!==latest.revision ||
         preview.currentBrandVersionId!==brand.version.id ||
@@ -134,6 +133,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         throw new DomainError("UNAVAILABLE",
           "The website changed while preparing this share. Reload the saved revision and try again.");
       const shareId=randomUUID();
+      stage = "snapshot-storage";
       const snapshot=await writeSitePreviewSnapshot(
         sitePreviewSnapshotKey(site.id,shareId),preview.previewPages);
 
@@ -153,10 +153,12 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       const keep = [...existing].reverse().filter(item => active.some(a => a.id === item.id))
         .slice(0, 5).reverse();
       const revision = nextSiteConfigurationRevision(site.updatedAt);
+      stage = "share-persistence";
       await tx.update(sites).set({
         metadata: { ...site.metadata, websitePreviewSharesV1: [...keep, entry] },
         updatedAt: revision,
       }).where(eq(sites.id, site.id));
+      stage = "audit";
       await writeAudit(tx, actor, {
         action: "site.website.preview_share.created",
         entityType: "site", entityId: site.id,
@@ -165,6 +167,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
           brandVersionId:brand.version.id,
           expiresAt: entry.expiresAt, proposed: true, officialPublication: false },
       });
+      stage = "event";
       await emitEvent(tx, {
         eventType: EventTypes.SiteWebsitePreviewShared,
         aggregateType: "site", aggregateId: site.id,
@@ -180,7 +183,11 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         }).toString(),
         expiresAt: entry.expiresAt, sourceRevision: entry.sourceRevision,
       };
-    });
+      });
+    } catch (error) {
+      // Do not log content, bearer credentials, SQL or raw provider errors.\n      console.error("Website preview share creation failed", { stage, errorType: error instanceof Error ? error.name : "unknown" });
+      throw error;
+    }
   });
 
 /** Revocation is immediate for all pages because each anonymous GET checks
