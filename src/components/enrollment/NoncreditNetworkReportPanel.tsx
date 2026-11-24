@@ -1,4 +1,4 @@
-import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
+import {useStandaloneProviderReportFilters} from "@/hooks/use-provider-report-filters";
 import {providerDeliveryQueryKey} from "@/domain/report-filter-state";
 import {hasGeographyFilterOption} from "@/domain/geographic-reporting";
 import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
@@ -13,7 +13,7 @@ import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit
  * report requires separate network membership authority and disclosure review. */
 export function NoncreditNetworkReportPanel(){
   const scope=usePrivateReportScope();
-  const controller=useProviderReportFilters(scope);
+  const controller=useStandaloneProviderReportFilters(scope);
   const geography=controller.filters.geography;
   const options=useReportGeography(scope,"current");
   const ready=!geography||!!options.data&&hasGeographyFilterOption(geography,options.data);
@@ -27,7 +27,7 @@ export function NoncreditNetworkReportPanel(){
       including authorized Sites. This is not a national cross-organization report.
     </p>
     <div className="mt-4"><ReportGeographyFilter value={geography} options={options.data??[]} onChange={value=>controller.dispatch({type:"geography",value})} basis="current" loading={options.query.isFetching} error={options.query.isError}/></div>
-    {!ready&&<p role="status" className="mt-4 text-sm text-muted-foreground">Selected geography must be verified before displaying report results. <Button type="button" size="sm" variant="outline" onClick={()=>controller.dispatch({type:"geography",value:""})}>Clear geography</Button></p>}
+    {!ready&&<p role="status" className="mt-4 text-sm text-muted-foreground">Selected geography must be verified before displaying report results. <Button type="button" size="sm" variant="outline" onClick={()=>controller.dispatch({type:"geography",value:""})}>Clear geography</Button> <Button type="button" size="sm" variant="outline" onClick={()=>void options.query.refetch()}>Retry geography options</Button></p>}
     {ready&&(report.isPending||report.isFetching)&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
     {ready&&report.isError&&<p role="alert" className="mt-4 text-sm">
       Reporting is unavailable or its bounded dataset needs partitioning.

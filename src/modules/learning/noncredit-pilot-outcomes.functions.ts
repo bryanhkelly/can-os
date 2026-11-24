@@ -1,4 +1,5 @@
-import {authorizedReportSite,selectProviderOutcomeCohort} from "@/domain/report-filter-state";
+import {selectProviderOutcomeCohort} from "@/domain/report-filter-state";
+import {requireSelectedProviderReportSite} from "@/modules/reporting/provider-report-sites.server";
 import {geographyFilterSchema} from "@/domain/geographic-reporting";
 import {geographyFactPredicate} from "@/modules/geography/reporting-geography.server";
 import { and, asc, desc, eq, gte, inArray, lt, sql, count, notExists } from "drizzle-orm";
@@ -50,7 +51,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const {organizationId,siteIds}=await requireCanonicalLabProvider("noncredit.enrollment.read");
-    const selectedSite=authorizedReportSite(data.siteId,siteIds);
+    const selectedSite=await requireSelectedProviderReportSite(db,{organizationId,siteIds},data.siteId);
     const generatedAt=new Date();
     const to=data.to?new Date(data.to):generatedAt;
     const from=data.from?new Date(data.from):new Date(to.getTime()-90*86400000);

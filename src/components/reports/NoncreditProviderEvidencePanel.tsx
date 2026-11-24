@@ -1,6 +1,6 @@
 import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
 import {useProviderReportOptions} from "@/hooks/use-provider-report-options";
-import {providerDeliveryQueryKey} from "@/domain/report-filter-state";
+import {providerDeliveryQueryKey,PROVIDER_REPORT_FILTER_CAPABILITIES} from "@/domain/report-filter-state";
 import {ProviderReportFilters} from "./ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {useMemo,useState} from "react";
@@ -32,7 +32,8 @@ export function NoncreditProviderEvidencePanel(){
   const scope=usePrivateReportScope();
   const controller=useProviderReportFilters(scope);
   const {geography,siteId:requestedSite}=controller.filters;
-  const options=useProviderReportOptions(scope,"current",controller.filters);
+  const basis=PROVIDER_REPORT_FILTER_CAPABILITIES["provider-delivery"].geographyBasis;
+  const options=useProviderReportOptions(scope,basis,controller.filters);
   const [showDefinitions,setShowDefinitions]=useState(false);
   const {query:response,data}=usePrivateReportQuery({scope,key:providerDeliveryQueryKey(geography),enabled:options.ready,read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
@@ -93,14 +94,14 @@ export function NoncreditProviderEvidencePanel(){
       The current account cannot access this provider report, or reporting exceeds
       the service's safe result bounds. No partial totals are displayed.
     </p>}
-    {scope!==null&&<ProviderReportFilters controller={controller} options={options} basis="current"/>}
+    {scope!==null&&<ProviderReportFilters controller={controller} options={options} basis={basis}/>}
     {data&&<>
       <div className="border border-border bg-card p-4 text-xs text-muted-foreground">
         <p>As of {data.asOf}</p>
         <p>Lifetime registered releases. Historical time-window selection requires a versioned source lifecycle projection.</p>
       </div>
       {selectionUnavailable&&<p role="status" className="text-sm text-muted-foreground">No release evidence matches the selected Site and current geography. The selection remains applied.</p>}
-      {data.sites.length>0&&data.sites.length<=60&&<ReportRankedComparison title="Registrations by authorized Site" description="Select a Site to filter the metrics, release chart and release evidence below. This does not open a new reporting scope."
+      {data.sites.length>0&&data.sites.length<=60&&<ReportRankedComparison title="Registrations by authorized Site" description="Comparison across Sites matching the current geography. Select a Site to narrow the metrics, release chart and evidence below; this comparison remains the navigation overview."
         rows={data.sites.map(s=>({id:s.siteId,label:s.siteName,value:s.registrations}))} selectedId={requestedSite} onSelect={value=>controller.dispatch({type:"site",value})}/>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {([

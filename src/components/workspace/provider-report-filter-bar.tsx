@@ -17,7 +17,8 @@ export function ProviderReportFilterBar({filters,dispatch,basis,geography,sites,
         onChange={value=>dispatch({type:"site",value})}/>
     </div>
     <div className="flex flex-wrap items-center gap-2">
-      {(filters.geography||filters.siteId)&&<Button type="button" size="sm" variant="outline" onClick={()=>{dispatch({type:"geography",value:""});dispatch({type:"site",value:""});}}>Clear geography and Site</Button>}
+      {filters.geography&&<Button type="button" size="sm" variant="outline" onClick={()=>dispatch({type:"geography",value:""})}>Clear geography</Button>}
+      {filters.siteId&&<Button type="button" size="sm" variant="outline" onClick={()=>dispatch({type:"site",value:""})}>Clear Site</Button>}
       {(geography.error||sites.error||!ready&&!pending)&&<Button type="button" size="sm" variant="outline" onClick={onRetry}>Retry filter options</Button>}
     </div>
     {!ready&&<WorkspaceNotice tone={pending?"info":"attention"}>{pending?"Verifying selected filters…":"The selected filters cannot be verified. No report results are shown until the selection is available or explicitly cleared."}</WorkspaceNotice>}

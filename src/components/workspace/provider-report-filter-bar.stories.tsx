@@ -34,7 +34,9 @@ export const CrossReportSelection:Story={play:async({canvasElement})=>{
  await userEvent.selectOptions(canvas.getByRole("combobox",{name:"Delivery geography"}),"US-GA");
  await expect(canvas.getByText("Matching authorized results")).toBeVisible();
  await expect(canvas.getByRole("combobox",{name:"Delivery Site"})).toHaveValue("site-a");
- await userEvent.click(canvas.getByRole("button",{name:"Clear geography and Site"}));
+ await userEvent.click(canvas.getByRole("button",{name:"Clear geography",exact:true}));
+ await expect(canvas.getByRole("combobox",{name:"Delivery Site"})).toHaveValue("site-a");
+ await userEvent.click(canvas.getByRole("button",{name:"Clear Site",exact:true}));
  await expect(canvas.getByRole("combobox",{name:"Delivery Site"})).toHaveValue("");
 }};
 export const Dark:Story={globals:{theme:"dark"}};

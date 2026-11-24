@@ -1,6 +1,6 @@
 import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
 import {useProviderReportOptions} from "@/hooks/use-provider-report-options";
-import {resolveProviderOutcomeSelection} from "@/domain/report-filter-state";
+import {resolveProviderOutcomeSelection,PROVIDER_REPORT_FILTER_CAPABILITIES} from "@/domain/report-filter-state";
 import {ProviderReportFilters} from "@/components/reports/ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
@@ -24,7 +24,8 @@ export function NoncreditPilotOutcomesPanel(){
   const scope=usePrivateReportScope();
   const controller=useProviderReportFilters(scope);
   const {geography,siteId,outcomePeriod:{range}}=controller.filters;
-  const options=useProviderReportOptions(scope,"historical",controller.filters);
+  const basis=PROVIDER_REPORT_FILTER_CAPABILITIES["noncredit-registration-outcomes"].geographyBasis;
+  const options=useProviderReportOptions(scope,basis,controller.filters);
   const selection=resolveProviderOutcomeSelection(controller.filters,new Date());
   const {rolling}=selection;
   const {query,data:report}=usePrivateReportQuery({
@@ -54,7 +55,7 @@ export function NoncreditPilotOutcomesPanel(){
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">{rolling?"Showing the last 90 days through the current time (including today).":"Showing a selected closed UTC cohort."}</p>
       {!rolling&&<Button type="button" variant="outline" size="sm" disabled={query.isFetching} onClick={()=>controller.dispatch({type:"rolling"})}>Use rolling 90 days</Button>}
-      <ProviderReportFilters controller={controller} options={options} basis="historical"/>
+      <ProviderReportFilters controller={controller} options={options} basis={basis}/>
       <ReportDateFilter key={range.fromDay+":"+range.untilDay} initial={range} maxDays={366} onApply={next=>{
         if(!rolling&&next.fromDay===range.fromDay&&next.untilDay===range.untilDay){if(options.ready)void query.refetch();}else controller.dispatch({type:"closed",range:next});
       }} disabled={query.isFetching}/>

@@ -7,7 +7,7 @@ export function ProviderReportFilters({controller,options,basis}:{
  controller:ReturnType<typeof useProviderReportFilters>;options:ReturnType<typeof useProviderReportOptions>;basis:ReportGeographyBasis;
 }){
  return <ProviderReportFilterBar filters={controller.filters} dispatch={controller.dispatch} basis={basis}
-   geography={{data:options.geography.data??[],loading:options.geography.query.isFetching,error:options.geography.query.isError}}
-   sites={{data:options.sites.data??[],loading:options.sites.query.isFetching,error:options.sites.query.isError}}
+   geography={{data:options.geography.data??[],loading:options.geography.query.isPending||options.geography.query.isFetching,error:options.geography.query.isError}}
+   sites={{data:options.sites.data??[],loading:options.sites.query.isPending||options.sites.query.isFetching,error:options.sites.query.isError}}
    ready={options.ready} pending={options.pending} onRetry={options.retry}/>;
 }

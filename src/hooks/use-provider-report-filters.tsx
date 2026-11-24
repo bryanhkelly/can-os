@@ -2,7 +2,7 @@ import {createContext,useContext,useState,type ReactNode} from "react";
 import {initialProviderReportFilters,updateProviderReportFilters,type ProviderFilterAction,type ProviderReportFilters} from "@/domain/report-filter-state";
 type Controller={scope:string|null;filters:ProviderReportFilters;dispatch:(action:ProviderFilterAction)=>void};
 const Context=createContext<Controller|null>(null);
-function useScopedController(scope:string|null):Controller{
+export function useStandaloneProviderReportFilters(scope:string|null):Controller{
   const [stored,setStored]=useState(()=>({scope,filters:initialProviderReportFilters(new Date())}));
   // Reset synchronously on identity change, including logout. No old selections
   // survive switching away and back to the same workspace grant.
@@ -13,13 +13,13 @@ function useScopedController(scope:string|null):Controller{
   }};
 }
 export function ProviderReportFilterProvider({scope,children}:{scope:string;children:ReactNode}){
-  const controller=useScopedController(scope);
+  const controller=useStandaloneProviderReportFilters(scope);
   return <Context.Provider value={controller}>{children}</Context.Provider>;
 }
 /** A standalone report still owns scope-keyed selection state. A context
  * cannot be consumed across different verified workspace identities. */
 export function useProviderReportFilters(scope:string|null){
   const shared=useContext(Context);
-  const local=useScopedController(scope);
+  const local=useStandaloneProviderReportFilters(scope);
   return shared&&scope!==null&&shared.scope===scope?shared:local;
 }
