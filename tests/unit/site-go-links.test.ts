@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { goCodeSchema, goDestinationHref } from "@/domain/site-go-links";
+import { goCodeSchema, goDestinationHref, goDestinationSelectionKey } from "@/domain/site-go-links";
 
 const code = "K7x2p9AaB3cD";
 const id = "11111111-1111-4111-8111-111111111111";
 describe("site Go link routing", () => {
+  it("uses canonical destination selection identity across property order and destination kinds", () => {
+    expect(goDestinationSelectionKey({kind:"adult-training",releaseId:id})).toBe(
+      goDestinationSelectionKey({releaseId:id,kind:"adult-training"}));
+    expect(goDestinationSelectionKey({kind:"class",classId:id})).not.toBe(
+      goDestinationSelectionKey({kind:"adult-training",releaseId:id}));
+    const preview={kind:"website-preview" as const,snapshotId:id,snapshotDigest:"a".repeat(64),sourceRevision:1,brandVersionId:id};
+    expect(goDestinationSelectionKey(preview)).not.toBe(goDestinationSelectionKey({...preview,sourceRevision:2}));
+    expect(goDestinationSelectionKey(preview)).not.toBe(goDestinationSelectionKey({...preview,snapshotDigest:"b".repeat(64)}));
+  });
   it("accepts only fixed-length opaque codes", () => {
     expect(goCodeSchema.safeParse(code).success).toBe(true);
     expect(goCodeSchema.safeParse("../admin").success).toBe(false);
