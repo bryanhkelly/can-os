@@ -5,7 +5,7 @@ import {
   assertNativeClassOperatorExitScope,
   assertNativeClassLearnerSessionForExit, assertOperationalClassOfferingTerms,
   assertNativeClassAttemptForExit, assertVerifiedAdultNativeClassExit,
-  assertNativeClassSeatAvailable, assertNativeClassExitReason,
+  assertNativeClassSeatAvailable, assertNativeClassExitReason, nativeClassCapacity,
 } from "./native-class-lifecycle";
 import type { CommandContext } from "./command-context";
 
@@ -80,6 +80,21 @@ describe("WS2 native Class enrollment lifecycle", () => {
 });
 
 describe("WS2 shared Class capacity and lifecycle reason policy",()=>{
+  it("projects the same capacity used by transactional admission",()=>{
+    for(const method of ["self","invitation","approval","assignment"] as const){
+      for(const activeOrPending of [0,7,8,9,10,11]){
+        const input={method,activeOrPending,classCapacity:10,offeringCapacity:8};
+        const capacity=method==="assignment"?10:8;
+        const result=nativeClassCapacity(input);
+        expect(result).toEqual({capacity,remainingSeats:Math.max(0,capacity-activeOrPending)});
+        if(result.remainingSeats===0)expect(()=>assertNativeClassSeatAvailable(input)).toThrow();
+        else expect(()=>assertNativeClassSeatAvailable(input)).not.toThrow();
+      }
+    }
+    expect(nativeClassCapacity({method:"self",activeOrPending:25,classCapacity:null})).toEqual({capacity:null,remainingSeats:null});
+    expect(nativeClassCapacity({method:"self",activeOrPending:3,classCapacity:null,offeringCapacity:5})).toEqual({capacity:5,remainingSeats:2});
+    expect(()=>nativeClassCapacity({method:"self",activeOrPending:0,classCapacity:0})).toThrow();
+  });
   it("uses one Class seat pool across self and assignment",()=>{
     expect(()=>assertNativeClassSeatAvailable({
       method:"self",activeOrPending:9,classCapacity:10,offeringCapacity:12,
