@@ -93,7 +93,12 @@ export const listSiteGoLinks = createServerFn({ method: "GET" })
     }).from(siteGoLinks).where(and(
       eq(siteGoLinks.siteId, data.siteId), eq(siteGoLinks.packageId, data.packageId),
     )).orderBy(desc(siteGoLinks.createdAt));
-    return links.map(link => ({ ...link, createdAt: link.createdAt.toISOString() }));
+    return links.flatMap(link => {
+      const parsed=goDestinationSchema.safeParse(link.destination);
+      return parsed.success ? [{
+        ...link,destination:parsed.data,createdAt:link.createdAt.toISOString(),
+      }] : [];
+    });
   });
 
 export const revokeSiteGoLink = createServerFn({ method: "POST" })
