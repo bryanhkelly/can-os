@@ -35,7 +35,7 @@ describe("immutable public engagement page renderer",()=>{
     expect(engagementRequiresClaimReview(
       engagementDefinitionSchema.parse({
         ...definition,presentation:{
-          headline:"Enrollment is now open",
+          headline:"Enrollment now open",
           summary:"Explore a partnership with our community.",
         },
       }),
