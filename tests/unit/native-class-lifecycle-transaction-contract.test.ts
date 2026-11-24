@@ -91,11 +91,13 @@ describe("WS2 native Class transaction and integration invariants",()=>{
   });
 
   it("preserves Course Attempt authority when a Class ends",()=>{
-    expect(exit).toContain("assertNativeClassAttemptForExit(");
+    const attempts=read("src/modules/classes/native-class-attempt.server.ts");
+    expect(attempts).toContain("assertNativeClassAttemptForExit(");
+    expect(attempts).toContain("await tx.update(learnerCourseAttempts)");
     expect(exit).toContain("assertNativeClassExitReason(");
     expect(exit).toContain("assertVerifiedAdultNativeClassExit(");
     expect(exit).toContain("assertCurrentCanonicalStaffForMutation(");
-    const attemptClose=exit.indexOf("await tx.update(learnerCourseAttempts)");
+    const attemptClose=exit.indexOf("await withdrawNativeClassAttempts(tx,enrollment,cls)");
     const enrollmentClose=exit.indexOf("await tx.update(canonicalClassEnrollments)");
     expect(attemptClose).toBeGreaterThan(0);
     expect(enrollmentClose).toBeGreaterThan(attemptClose);
