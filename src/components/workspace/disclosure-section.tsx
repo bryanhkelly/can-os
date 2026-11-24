@@ -18,8 +18,8 @@ export function DisclosureSection({ title, description, children, defaultOpen = 
       <Button type="button" variant="ghost" aria-expanded={expanded}
         aria-controls={panelId} onClick={change}
         className="flex min-h-14 h-auto w-full items-start justify-between gap-4 px-4 py-4 text-left sm:px-5">
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">{title}</span>
+        <span className="min-w-0 flex-1 whitespace-normal [overflow-wrap:anywhere]">
+          <span className="block text-sm font-semibold leading-5">{title}</span>
           {description && <span className="mt-1 block text-xs font-normal leading-5 text-muted-foreground">{description}</span>}
         </span>
         {expanded ? <ChevronUp aria-hidden="true" className="mt-1 size-4" /> :
