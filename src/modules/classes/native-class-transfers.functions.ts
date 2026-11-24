@@ -1,4 +1,4 @@
-import {createHash} from "node:crypto";
+import { nativeClassConsentDigest } from "./native-class-consent.server";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,asc,eq,inArray} from "drizzle-orm";
@@ -171,9 +171,7 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
       attempt,enrollment:source,classInstance:sourceClass,requireSelectedPointer:false,
     });
    }
-   const consentSha256=createHash("sha256")
-    .update(terms.consentVersion!).update("\u0000").update(terms.consentText!)
-    .digest("hex");
+   const consentSha256=nativeClassConsentDigest(terms.consentVersion!,terms.consentText!);
 
    // Source Attempt changes precede its source Enrollment state change because
    // the canonical DB trigger insists the parent remains active during exit.
