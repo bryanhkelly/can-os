@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { DashboardProgress, EmptyState, QueryState, WorkspaceNotice } from "@/components/workspace";
+import { DashboardProgress, EmptyState, QueryState, WorkspaceLinkNavigation, WorkspaceNotice } from "@/components/workspace";
 import { CourseAssessmentPanel } from "./CourseAssessmentPanel";
 import { NoncreditCourseSurveys } from "./NoncreditCourseSurveys";
 import { getLearnerCourseParticipationKind } from "@/modules/learning/noncredit-learning.functions";
@@ -52,12 +51,7 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
       .catch(()=>{if(active)setReadinessError(true);});
     return ()=>{active=false;};
   },[courseAttemptId,source,lessonProgressRevision,assessmentRevision,retryRevision]);
-  if(sourceError&&source===null)return <WorkspaceNotice tone="danger">
-    <p>Your learning activities could not be loaded. No course progress was changed.</p>
-    <Button className="mt-3" type="button" variant="outline" size="sm"
-      onClick={()=>setRetryRevision(revision=>revision+1)}>Retry learning activities</Button>
-  </WorkspaceNotice>;
-  if(source===null)return <p role="status" className="text-sm">Loading your course activities…</p>;
+  if(source===null)return <QueryState loading={!sourceError&&"Loading your course activities…"} error={sourceError&&"Your learning activities could not be loaded. No course progress was changed."} onRetry={()=>setRetryRevision(revision=>revision+1)}/>;
   if(source!=="noncredit")return null;
   return <div className="space-y-5" aria-label="Noncredit learning activities">
     <section className="border border-border bg-card p-5" aria-label="Your learning journey">
@@ -67,17 +61,17 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
         respond to any invited feedback survey, and review your completion.
         Your progress remains your own if you switch recorded instructors.
       </p>
-      <nav aria-label="Training steps" className="mt-4 flex flex-wrap gap-4 text-sm">
+      <WorkspaceLinkNavigation label="Training steps" surface="plain" className="mt-4">
         {hasBaseline&&<a href="#course-baseline-check" className="font-semibold text-primary underline">Before learning: knowledge check</a>}
         <a href="#course-recorded-lessons" className="font-semibold text-primary underline">Recorded lessons</a>
         {hasFinal&&<a href="#course-final-check" className="font-semibold text-primary underline">Final knowledge check</a>}
         <a href="#course-feedback" className="font-semibold text-primary underline">Feedback</a>
         <a href="#course-progress" className="font-semibold text-primary underline">Completion</a>
-      </nav>
+      </WorkspaceLinkNavigation>
       {readiness&&<div className="mt-5">
         {readiness.totalLessons>0?<DashboardProgress label="Lesson progress" value={readiness.completedLessons}
           max={readiness.totalLessons} description={`${readiness.completedLessons} of ${readiness.totalLessons} lessons marked complete`}/>
-          :<p role="status" className="text-sm">No published lessons available.</p>}
+          :<EmptyState title="No published lessons available."/>}
         <p className="mt-2 text-xs text-muted-foreground">
           {readiness.recordedCompletion?"Training completion confirmed.":
             readiness.eligible?"Learning requirements met; final completion decision is separate.":
@@ -127,9 +121,8 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
           </p>
         </>:
         <QueryState loading={!readinessError?"Loading completion requirements…":undefined}
-          error={readinessError?"Completion information is temporarily unavailable.":undefined}/>}
-      {readinessError&&<Button type="button" size="sm" variant="outline"
-        onClick={()=>setRetryRevision(revision=>revision+1)}>Retry completion status</Button>}
+          error={readinessError?"Completion information is temporarily unavailable.":undefined}
+          onRetry={()=>setRetryRevision(revision=>revision+1)}/>}
     </section>
   </div>;
 }
