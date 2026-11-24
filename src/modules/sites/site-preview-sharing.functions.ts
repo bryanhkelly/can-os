@@ -22,7 +22,7 @@ import { goLinkAvailability } from "@/domain/go-link-policy";
 import { buildUrlDestination } from "@/domain/url-destinations";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { getPartnerWebsitePreview } from "./site-website-preview.server";
-import { sitePreviewSnapshotKey, writeSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
+import { sitePreviewSnapshotKey, writeSitePreviewSnapshot, deleteUnreferencedSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
 
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
@@ -101,6 +101,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
     // Render outside the write transaction: the renderer uses its own canonical
     // read queries and must not hold a Site row lock during rendering.
     let stage = "render";
+    let attemptedSnapshotId:string|undefined;
     try {
       const preview=await getPartnerWebsitePreview(actor,undefined,"external-preview");
       stage = "transaction";
@@ -156,6 +157,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         throw new DomainError("UNAVAILABLE",
           "The website changed while preparing this share. Reload the saved revision and try again.");
       const shareId=randomUUID();
+      attemptedSnapshotId=shareId;
       stage = "snapshot-storage";
       const snapshot=await writeSitePreviewSnapshot(
         sitePreviewSnapshotKey(site.id,shareId),preview.previewPages);
@@ -193,6 +195,20 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       };
       });
     } catch (error) {
+      // A lost commit response is not proof of rollback. Confirm absence in
+      // a new transaction under the same request lock before deleting.
+      if(attemptedSnapshotId){
+        const snapshotId=attemptedSnapshotId;
+        try{
+          await db.transaction(async tx=>{
+            await findGoIssuance(tx,actor,authorizedSite,data.requestId,fingerprint);
+            const [reference]=await tx.select({id:siteGoLinks.id}).from(siteGoLinks).where(and(
+              eq(siteGoLinks.siteId,data.siteId),sql`${siteGoLinks.destination}->>'snapshotId'=${snapshotId}`,
+            )).limit(1);
+            if(!reference)await deleteUnreferencedSitePreviewSnapshot(data.siteId,snapshotId);
+          });
+        }catch{console.error("Website preview artifact reconciliation deferred");}
+      }
       // Do not log content, bearer credentials, SQL or raw provider errors.
       console.error("Website preview share creation failed", { stage, errorType: error instanceof Error ? error.name : "unknown" });
       throw error;
