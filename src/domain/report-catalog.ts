@@ -11,8 +11,8 @@ type ReportCatalogEntry={
 };
 export const REPORT_CATALOG=[
   {id:"provider-delivery",version:1,title:"Program and Site delivery",description:"Registration, attendance and completion evidence with release-level detail.",scope:"provider",period:"lifetime_current",placement:"report_center",classification:"private_operational"},
-  {id:"noncredit-registration-outcomes",version:1,title:"Program learning outcomes",description:"Unique learners, engagement, verified participation minutes and knowledge checks.",scope:"provider",period:"closed_utc",placement:"report_center",classification:"private_operational"},
-  {id:"native-class-evidence",version:1,title:"Class evidence",description:"Sessions, enrollment, verified attendance, assessments and awards.",scope:"class",period:"closed_utc",placement:"class_workspace",classification:"private_operational"},
+  {id:"noncredit-registration-outcomes",version:1,title:"Program learning outcomes",description:"Unique learners, engagement, verified participation minutes and knowledge checks.",scope:"provider",period:"rolling_utc",placement:"report_center",classification:"private_operational"},
+  {id:"native-class-evidence",version:1,title:"Class evidence",description:"Sessions, enrollment, verified attendance, assessments and awards.",scope:"class",period:"current",placement:"class_workspace",classification:"private_operational"},
   {id:"site-campaign-delivery",version:1,title:"Email delivery evidence",description:"Delivery counts, provider acceptance, bounces and suppression.",scope:"site",period:"closed_utc",placement:"engagement_library",classification:"private_operational"},
   {id:"go-link-evidence",version:1,title:"Go Link distribution",description:"Observed requests and separately attributed registration claims.",scope:"link",period:"rolling_utc",placement:"go_link_workspace",classification:"private_operational"},
   {id:"projection-health",version:1,title:"Reporting infrastructure health",description:"Source projection receipt status and reconciliation.",scope:"platform",period:"current",placement:"platform_workspace",classification:"private_operational"},

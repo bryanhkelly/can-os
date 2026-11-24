@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/choice";
 import {useState} from "react";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
 import {ReportDateFilter} from "@/components/workspace/report-date-filter";
-import {previousCompleteUtcDays,priorReportDateRange,resolveReportDateRange,type ReportDateRange} from "@/components/workspace/report-date-range";
+import {utcDaysThroughToday,priorReportDateRange,resolveReportDateRange,type ReportDateRange} from "@/components/workspace/report-date-range";
 import {ReportMetricComparison} from "@/components/workspace/report-period-comparison";
 import {getNativeClassReport} from "@/modules/reporting/native-class-report.functions";
 import {reportingCsvRow} from "@/domain/reporting-csv";
@@ -43,10 +43,10 @@ function useClassReport(classId:string,range:ReportDateRange|null,scope:string|n
  * rectangular panels. No cross-provider publish button is exposed. */
 export function NativeClassReportPanel({classId}:{classId:string}){
   const scope=usePrivateReportScope();
-  const [range,setRange]=useState(()=>previousCompleteUtcDays(30,new Date()));
+  const [range,setRange]=useState(()=>utcDaysThroughToday(30,new Date()));
   const [compare,setCompare]=useState(false);
   const [expanded,setExpanded]=useState(false);
-  const valid=resolveReportDateRange(range,366,new Date())!==null;
+  const valid=resolveReportDateRange(range,366,new Date(),true)!==null;
   const {query:report,data}=useClassReport(classId,valid?range:null,scope);
   const priorRange=priorReportDateRange(range,366,new Date());
   const {query:previous,data:previousData}=useClassReport(classId,priorRange,scope,compare);
@@ -66,12 +66,14 @@ export function NativeClassReportPanel({classId}:{classId:string}){
       </Button>
     </div>
     <div className="space-y-3 border border-border bg-card p-4">
-      <ReportDateFilter initial={range} maxDays={366} onApply={setRange}/>
+      <ReportDateFilter initial={range} maxDays={366} allowPartialToday onApply={setRange}/>
       <Label className="flex items-center gap-2 text-sm">
         <Checkbox checked={compare} onChange={e=>setCompare(e.target.checked)}/> Compare equal-length prior period
       </Label>
+      {compare&&!priorRange&&<p role="status" className="text-xs text-muted-foreground">Choose a completed UTC window for an equal-period comparison. Today is partial.</p>}
       {compare&&priorRange&&<p className="text-xs text-muted-foreground">Prior window: {priorRange.fromDay} to {priorRange.untilDay} exclusive (UTC). Both cohorts reflect their source state at query time, not historical snapshots.</p>}
     </div>
+    {scope===null&&<p role="status" className="text-sm text-muted-foreground">A current verified workspace session is required.</p>}
     {!valid&&<p role="alert" className="border border-border p-3 text-sm">
       Choose ascending dates covering no more than 366 days.
     </p>}
@@ -91,7 +93,7 @@ export function NativeClassReportPanel({classId}:{classId:string}){
           Unavailable metrics are not zero. Their underlying authoritative evidence or
           governed decision source is not yet reportable.
         </p>}
-      <ReportMetricComparison compare={compare} items={data.definitions.map(def=>({
+      <ReportMetricComparison compare={compare&&priorRange!==null} items={data.definitions.map(def=>({
         id:def.key,label:def.label,value:data.metrics[def.key],prior:comparable?.metrics[def.key],hint:def.denominator,
       }))}/>
       {compare&&previous.isError&&<p role="status" className="text-sm">

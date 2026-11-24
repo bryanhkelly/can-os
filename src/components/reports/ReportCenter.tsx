@@ -34,6 +34,7 @@ export function ReportCenter(){
       </div>
       <p className="mt-4 text-xs text-muted-foreground">Site campaign, Go Link and platform infrastructure reports remain in their owning workspaces. Network-wide and external impact reports are not enabled by catalog membership.</p>
     </WorkspacePanel>
+    <div className="flex justify-end"><Link to="/programs/noncredit/enrollment" search={{}} className="text-sm font-semibold text-primary underline">Manage noncredit delivery</Link></div>
     <div key={scope+":"+selected}>
       {selected==="provider-delivery"?<NoncreditProviderEvidencePanel/>:<NoncreditPilotOutcomesPanel/>}
     </div>

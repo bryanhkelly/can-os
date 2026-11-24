@@ -46,7 +46,9 @@ export const getNativeClassReport=createServerFn({method:"GET"})
     const asOf=new Date();
     if(!Number.isFinite(from.getTime())||!Number.isFinite(to.getTime())||
       from.getTime()>=to.getTime() || to.getTime()-from.getTime()>366*86400000 ||
-      from.getTime()>asOf.getTime())throw new Error("Choose a valid UTC report window of up to 366 days");
+      from.toISOString().slice(0,10)!==data.from||to.toISOString().slice(0,10)!==data.to||
+      from.getTime()>asOf.getTime()||to.getTime()>Date.parse(asOf.toISOString().slice(0,10)+"T00:00:00.000Z")+86400000)
+      throw new Error("Choose a valid UTC report window of up to 366 days");
     const actor=await getCanonicalCommandContext(getRequest());
     return db.transaction(async tx=>{
       const [cls]=await tx.select().from(canonicalClasses)

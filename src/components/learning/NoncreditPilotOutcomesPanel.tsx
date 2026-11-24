@@ -18,10 +18,11 @@ export function NoncreditPilotOutcomesPanel(){
   const [showDefinitions,setShowDefinitions]=useState(false);
   const scope=usePrivateReportScope();
   const [range,setRange]=useState(()=>previousCompleteUtcDays(90,new Date()));
-  const period=resolveReportDateRange(range,366,new Date());
+  const [rolling,setRolling]=useState(true);
+  const period=rolling?null:resolveReportDateRange(range,366,new Date());
   const {query,data:report}=usePrivateReportQuery({
-    scope,key:["noncredit-registration-outcomes",period?.from??null,period?.to??null],
-    enabled:period!==null,read:()=>getNoncreditPilotOutcomes({data:period!}),
+    scope,key:["noncredit-registration-outcomes",rolling?"rolling-90-days":"closed-utc",period?.from??null,period?.to??null],
+    enabled:rolling||period!==null,read:()=>getNoncreditPilotOutcomes({data:rolling?{}:period!}),
   });
   const summary=report?.totals;
   if(scope===null)return <WorkspaceNotice tone="attention">A current verified provider session is required to view program evidence.</WorkspaceNotice>;
@@ -35,7 +36,7 @@ export function NoncreditPilotOutcomesPanel(){
           registrations. Learning, feedback and completion are tracked per registration.
         </p>
         {report&&<p className="text-xs text-muted-foreground">
-          Reporting window (UTC): {report.from.slice(0,10)} inclusive to {report.to.slice(0,10)} exclusive.
+          Reporting window (UTC): {report.from} inclusive to {report.to} exclusive.
         </p>}
       </div>
       <Button type="button" size="sm" variant="outline" disabled={query.isFetching}
@@ -43,9 +44,13 @@ export function NoncreditPilotOutcomesPanel(){
         Refresh evidence
       </Button>
     </div>
-    <ReportDateFilter initial={range} maxDays={366} onApply={next=>{
-      if(next.fromDay===range.fromDay&&next.untilDay===range.untilDay)void query.refetch();else setRange(next);
-    }} disabled={query.isFetching}/>
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">{rolling?"Showing the last 90 days through the current time (including today).":"Showing a selected closed UTC cohort."}</p>
+      {!rolling&&<Button type="button" variant="outline" size="sm" disabled={query.isFetching} onClick={()=>setRolling(true)}>Use rolling 90 days</Button>}
+      <ReportDateFilter initial={range} maxDays={366} onApply={next=>{
+        if(!rolling&&next.fromDay===range.fromDay&&next.untilDay===range.untilDay)void query.refetch();else {setRange(next);setRolling(false);}
+      }} disabled={query.isFetching}/>
+    </div>
     <QueryState loading={query.isPending||query.isFetching?"Loading verified program evidence…":undefined}
       error={query.isError?"Program evidence is unavailable or exceeds the bounded report size.":undefined}
       retrying={query.isFetching} onRetry={()=>void query.refetch()}/>

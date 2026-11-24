@@ -14,7 +14,7 @@ export function usePrivateReportQuery<T>(options:{
   const enabled=options.scope!==null&&options.enabled!==false;
   const query=useQuery<T>({
     queryKey:["private-report",options.scope,...options.key],
-    queryFn:options.read,enabled,retry:false,staleTime:0,gcTime:0,refetchOnMount:"always",
+    queryFn:()=>{if(!enabled)throw Error("Private report scope or selection unavailable");return options.read();},enabled,retry:false,staleTime:0,gcTime:0,refetchOnMount:"always",
   });
   return {query,data:enabled&&!query.isError&&!query.isFetching&&!query.isPlaceholderData?query.data:undefined};
 }

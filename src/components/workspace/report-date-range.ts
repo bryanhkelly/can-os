@@ -6,10 +6,10 @@ function utcDay(value:string):number|null{
   return Number.isFinite(time)&&new Date(time).toISOString().slice(0,10)===value?time:null;
 }
 /** Exclusive end, complete UTC days only, matching server cohort boundaries. */
-export function resolveReportDateRange(range:ReportDateRange,maxDays:number,now:Date){
+export function resolveReportDateRange(range:ReportDateRange,maxDays:number,now:Date,allowPartialToday=false){
   const from=utcDay(range.fromDay),to=utcDay(range.untilDay);
   if(!Number.isSafeInteger(maxDays)||maxDays<1||from===null||to===null||to<=from||
-    to-from>maxDays*dayMs||!Number.isFinite(now.getTime())||to>now.getTime())return null;
+    to-from>maxDays*dayMs||!Number.isFinite(now.getTime())||from>now.getTime()||to>(allowPartialToday?Date.parse(now.toISOString().slice(0,10)+"T00:00:00.000Z")+dayMs:now.getTime()))return null;
   return {from:new Date(from).toISOString(),to:new Date(to).toISOString()};
 }
 export function previousCompleteUtcDays(days:number,now:Date):ReportDateRange{
@@ -23,4 +23,12 @@ export function priorReportDateRange(range:ReportDateRange,maxDays:number,now:Da
   if(!period)return null;
   const from=Date.parse(period.from),to=Date.parse(period.to);
   return {fromDay:new Date(from-(to-from)).toISOString().slice(0,10),untilDay:range.fromDay};
+}
+
+/** Current-day operational reporting may include a partial UTC day.
+ * Do not use this window for equal complete-period comparisons.
+ */
+export function utcDaysThroughToday(daysBeforeToday:number,now:Date):ReportDateRange{
+  const range=previousCompleteUtcDays(daysBeforeToday,now);
+  return {...range,untilDay:new Date(Date.parse(range.untilDay+"T00:00:00.000Z")+dayMs).toISOString().slice(0,10)};
 }
