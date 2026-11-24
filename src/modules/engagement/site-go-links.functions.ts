@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, ilike, isNull, sql } from "drizzle-orm";
@@ -9,11 +9,11 @@ import { assertSiteSetupScope, assertWholeSiteProgramsInScope } from "@/domain/s
 import { DomainError } from "@/domain/errors";
 import { goDestinationKindSchema, goDestinationSchema } from "@/domain/site-go-links";
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
-import { goLinkManagementSchema, goLinkStatusTransition, goLinkAvailability } from "@/domain/go-link-policy";
+import { goLinkManagementSchema, goLinkAvailability } from "@/domain/go-link-policy";
 import { inspectGoDestination, listGoDestinationChoices } from "./go-destination-registry.server";
 import { readSiteGoLinkEvidence } from "./go-link-evidence.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { writeAudit } from "@/platform/mutation";
+import { findGoIssuance, goRequestFingerprint, issueAuthorizedGoLink, transitionAuthorizedGoLink } from "./go-link-lifecycle.server";
 
 const uuid = z.string().uuid();
 /** Site ownership is mandatory; a marketing-package relationship is optional. */
@@ -86,22 +86,11 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
     const requestId=data.requestId??randomUUID();
     // Fingerprint the requested semantics, not a mutable Site or destination
     // title. Retrying after publication closes returns the same original code.
-    const fingerprint=createHash("sha256").update(JSON.stringify({
-      siteId:site.id,packageId:pkg?.id??null,destination:data.destination,
-      management:data.management??null,
-    })).digest("hex");
-    const lockKey=[site.id,actor.actorPersonId,requestId].join(":");
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
-    const [prior]=await tx.select().from(siteGoLinks).where(and(
-      eq(siteGoLinks.siteId,site.id),
-      eq(siteGoLinks.createdByPersonId,actor.actorPersonId!),
-      eq(siteGoLinks.requestId,requestId),
-    )).limit(1);
-    if(prior){
-      if(prior.requestFingerprint!==fingerprint)
-        throw new DomainError("CONFLICT","This request ID was already used for a different link.");
-      return toGoLinkView(prior);
-    }
+    const fingerprint=goRequestFingerprint({
+      siteId:site.id,packageId:pkg?.id??null,destination:data.destination,management:data.management??null,
+    });
+    const prior=await findGoIssuance(tx,actor,site,requestId,fingerprint);
+    if(prior)return toGoLinkView(prior);
     if (pkg && pkg.status !== "draft")
       throw new DomainError("CONFLICT","Restore the outreach plan before creating a link.");
     if(site.lifecycleStatus==="closed")
@@ -119,24 +108,10 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
       throw new DomainError("VALIDATION_FAILED","Expiration must be in the future.");
     // Schedule and destination are immutable. Reissue or pause instead of
     // changing the meaning of a code already printed in a physical flyer.
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const code = randomBytes(9).toString("base64url");
-      const [created] = await tx.insert(siteGoLinks).values({
-        code, siteId: site.id, organizationId: site.organizationId,
-        packageId: pkg?.id??null,createdByPersonId:actor.actorPersonId!,
-        destination:data.destination,name,channel,startsAt,expiresAt,
-        requestId,requestFingerprint:fingerprint,
-      }).onConflictDoNothing({ target: siteGoLinks.code }).returning();
-      if (!created) continue;
-      await writeAudit(tx, actor, {
-        action: "site.go_link.create", entityType: "site_go_link", entityId: created.id,
-        scope: { siteId: site.id, organizationId: site.organizationId },
-        after: { packageId: pkg?.id??null, destination: data.destination.kind,
-          status: created.status, name,channel,startsAt,expiresAt },
-      });
-      return toGoLinkView(created);
-    }
-    throw new DomainError("CONFLICT", "Unable to create a unique link. Try again.");
+    return toGoLinkView(await issueAuthorizedGoLink(tx,actor,site,{
+      packageId:pkg?.id??null,destination:data.destination,name,channel,startsAt,expiresAt,
+      requestId,requestFingerprint:fingerprint,
+    }));
   }));
 
 export const listSiteGoLinks = createServerFn({ method: "GET" })
@@ -184,16 +159,7 @@ export const revokeSiteGoLink = createServerFn({ method: "POST" })
       data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
     )).for("update").limit(1);
     if (!link) throw new DomainError("UNAVAILABLE", "Go link not found in this outreach plan.");
-    if (link.status === "revoked") return { id: link.id, status: "revoked" as const };
-    await tx.update(siteGoLinks).set({
-      status: "revoked", updatedAt: new Date(),
-    }).where(eq(siteGoLinks.id, link.id));
-    await writeAudit(tx, actor, {
-      action: "site.go_link.revoke", entityType: "site_go_link", entityId: link.id,
-      scope: { siteId: site.id, organizationId: site.organizationId },
-      before: { status: link.status }, after: { status: "revoked" },
-    });
-    return { id: link.id, status: "revoked" as const };
+    return transitionAuthorizedGoLink(tx,actor,site,link,"revoked");
   }));
 
 /** All discovery is governed by the same Site+package permission as management. */
@@ -243,19 +209,7 @@ export const setSiteGoLinkPaused = createServerFn({method:"POST"})
     )).for("update").limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link unavailable.");
     const desired=data.action==="pause"?"paused" as const:"active" as const;
-    if(link.status==="revoked")
-      throw new DomainError("CONFLICT","A revoked link cannot be resumed.");
-    const status=goLinkStatusTransition(link.status,desired);
-    if(status!==link.status){
-      await tx.update(siteGoLinks).set({status,updatedAt:new Date()})
-        .where(eq(siteGoLinks.id,link.id));
-      await writeAudit(tx,actor,{
-        action:"site.go_link.status_change",entityType:"site_go_link",entityId:link.id,
-        scope:{siteId:site.id,organizationId:site.organizationId},
-        before:{status:link.status},after:{status},
-      });
-    }
-    return {id:link.id,status};
+    return transitionAuthorizedGoLink(tx,actor,site,link,data.action==="pause"?"paused":"active");
   }));
 
 /** Stable keyset pagination by (created_at, id). The cursor is a scoped
