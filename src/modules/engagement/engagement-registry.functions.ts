@@ -145,10 +145,11 @@ export const createEngagementDefinition=createServerFn({method:"POST"})
       const [pkg]=await tx.select({
         id:siteMarketingPackages.id,siteId:siteMarketingPackages.siteId,
         organizationId:siteMarketingPackages.organizationId,
+        status:siteMarketingPackages.status,
       }).from(siteMarketingPackages).where(eq(
         siteMarketingPackages.id,data.definition.source.marketingPackageId,
       )).limit(1);
-      if(!pkg || !owner.siteId || pkg.siteId!==owner.siteId ||
+      if(!pkg || pkg.status!=="draft" || !owner.siteId || pkg.siteId!==owner.siteId ||
           pkg.organizationId!==owner.organizationId)
         throw new AuthorizationError("owned marketing package attribution");
     }
