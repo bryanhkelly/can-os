@@ -15,7 +15,7 @@ export function campaignSender(){
  const address=process.env.CAN_CAMPAIGN_POSTAL_ADDRESS?.trim();
  const key=process.env.RESEND_API_KEY;
  const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
- if(!from||!address||!key||!origin||/[\r\n]/.test(from)||address.length>500)return null;
+ if(!from||!address||!key||!origin||!process.env.RESEND_WEBHOOK_SECRET||/[\r\n]/.test(from)||address.length>500)return null;
  try{const url=new URL(origin);if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)return null;}catch{return null;}
  return {from,address,key,origin};
 }
@@ -23,7 +23,9 @@ type Work={id:string;lease_id:string;email:string;unsubscribe_token:string;attem
 async function claimCampaignDelivery(){
  return db.transaction(async tx=>{
  // Expired ambiguous attempts are never retried outside the provider's idempotency window.
- await tx.execute(sql`UPDATE public.campaign_deliveries SET status='failed',lease_id=NULL,lease_until=NULL
+ await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='failed',outcome_unconfirmed=true,lease_id=NULL,lease_until=NULL
+ FROM public.engagement_campaigns c WHERE c.id=d.campaign_id AND c.cancelled_at IS NOT NULL AND d.status='processing' AND d.lease_until<now()`);
+ await tx.execute(sql`UPDATE public.campaign_deliveries SET status='failed',outcome_unconfirmed=true,lease_id=NULL,lease_until=NULL
  WHERE status IN ('pending','processing') AND (lease_until IS NULL OR lease_until<now())
  AND (attempts>=4 OR first_attempt_at<now()-interval '20 hours')`);
  const [row]=await campaignRows<Work>(tx,sql`
@@ -44,8 +46,8 @@ async function claimCampaignDelivery(){
  return row;
  });
 }
-async function settle(work:Work,status:string,providerId:string|null=null){
- await db.execute(sql`UPDATE public.campaign_deliveries SET status=${status},lease_id=NULL,lease_until=NULL,
+async function settle(work:Work,status:string,providerId:string|null=null,unconfirmed=false){
+ await db.execute(sql`UPDATE public.campaign_deliveries SET status=${status},outcome_unconfirmed=${unconfirmed},lease_id=NULL,lease_until=NULL,
  next_attempt_at=now()+interval '15 minutes',
  provider_message_id=coalesce(provider_message_id,${providerId}),
  accepted_at=CASE WHEN ${status}='accepted' THEN coalesce(accepted_at,now()) ELSE accepted_at END
@@ -63,7 +65,7 @@ async function stillEligible(work:Work){
 }
 /** Both schedulers use this exact queue. One message per recipient; never BCC bulk mail. */
 export async function processEngagementCampaignDeliveries(limit=10){
- const counts={accepted:0,failed:0,suppressed:0,retry:0};
+ const counts={accepted:0,failed:0,suppressed:0,retry:0,unconfirmed:0};
  const sender=campaignSender();if(!sender)return counts;
  for(let i=0;i<Math.min(10,limit);i++){
   const work=await claimCampaignDelivery();if(!work)break;
@@ -98,7 +100,7 @@ export async function processEngagementCampaignDeliveries(limit=10){
    await settle(work,"failed");counts.failed++;
   }catch{
    const retry=campaignRetryable(work.attempts,work.first_attempt_at);
-   await settle(work,retry?"pending":"failed");counts[retry?"retry":"failed"]++;
+   await settle(work,retry?"pending":"failed",null,true);counts[retry?"retry":"unconfirmed"]++;
   }
  }
  return counts;
@@ -119,7 +121,7 @@ export async function attachCampaignProviderReceipt(event:ResendReceiptEvent){
  await db.transaction(async tx=>{
  const [match]=await campaignRows<{email:string;sender_scope:string}>(tx,sql`
  WITH updated AS (
- UPDATE public.campaign_deliveries SET status='accepted',accepted_at=coalesce(accepted_at,now()),
+ UPDATE public.campaign_deliveries SET status='accepted',outcome_unconfirmed=false,accepted_at=coalesce(accepted_at,now()),
  provider_message_id=${event.providerMessageId},lease_id=NULL,lease_until=NULL,
  delivered_at=CASE WHEN ${event.type}='email.delivered' THEN coalesce(delivered_at,now()) ELSE delivered_at END,
  provider_failure=CASE WHEN ${event.type}='email.delivered' OR provider_failure='email.complained' THEN provider_failure

@@ -813,6 +813,13 @@
       "when": 1795462009000,
       "tag": "0115_engagement_campaigns",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1795462010000,
+      "tag": "0116_campaign_delivery_management",
+      "breakpoints": true
     }
   ]
 }

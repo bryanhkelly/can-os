@@ -63,6 +63,9 @@ describe("signed Resend source receipt callbacks", () => {
       })).toMatchObject({ type, receiptId, providerMessageId });
     }
   });
+  it("correlates native campaign delivery without trusting recipient identity", () => {
+    expect(parseResendReceiptEvent({type:"email.bounced",data:{email_id:providerMessageId,tags:{can_source:"engagement_campaign",can_receipt:receiptId},to:["secret@example.com"]}})).toEqual({type:"email.bounced",source:"engagement_campaign",receiptId,providerMessageId});
+  });
   it("accepts canonical noncredit receipts and rejects unrelated products", () => {
     expect(parseResendReceiptEvent({ type: "email.delivered", data: {
       email_id: providerMessageId, tags: { can_source: "noncredit_waitlist", can_receipt: receiptId },

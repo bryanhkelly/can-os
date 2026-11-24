@@ -71,7 +71,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
       <div className="mt-3 flex flex-wrap gap-2"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></div>
     </>}
     {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
-    {draft&&<NativeEngagementCampaigns engagementId={engagementId} linkId={linkId}/>}
+    <NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady={!!draft}/>
     {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
     {draft&&error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
   </section>;
