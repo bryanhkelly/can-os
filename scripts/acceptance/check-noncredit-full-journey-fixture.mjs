@@ -55,6 +55,9 @@ const rows=await sql`
     AND ev.verified_at<=now() AND ev.verified_by_person_id IS NOT NULL
     AND (ev.valid_from IS NULL OR ev.valid_from<=current_date)
     AND (ev.valid_through IS NULL OR ev.valid_through>=current_date)
+    AND EXISTS(SELECT 1 FROM public.survey_trigger_rules rule WHERE rule.campaign_id=sc.id AND rule.enabled AND rule.trigger_kind='knowledge_check_submitted')
+    AND NOT EXISTS(SELECT 1 FROM public.class_survey_campaigns cc WHERE cc.campaign_id=sc.id)
+    AND NOT EXISTS(SELECT 1 FROM public.facilitated_room_survey_campaigns fc WHERE fc.survey_campaign_id=sc.id)
     AND (SELECT count(*) FROM public.survey_questions q WHERE q.survey_version_id=sv.id)=5) AS surveys
  FROM public.noncredit_self_enrollment_releases r
  JOIN public.noncredit_training_versions t ON t.id=r.training_version_id
@@ -92,4 +95,6 @@ for(const [key,value] of Object.entries({lessons:fixture.lessons.length,registra
 const [definition]=await sql`SELECT pg_get_functiondef('education_v30.v301_provision_noncredit_knowledge_access(uuid)'::regprocedure) AS definition`;
 assert.ok(definition.definition.includes("min(ad.id::text)::uuid"),"Apply verified UUID compatibility migration first");
 assert.ok(definition.definition.includes("VALUES(selected_administration_id,person_learner"),"Apply verified grant-variable migration 0118 first");
+const [feedback]=await sql`SELECT count(*)::int AS installed FROM pg_trigger WHERE NOT tgisinternal AND tgenabled IN ('O','A') AND ((tgrelid='public.assessment_attempts'::regclass AND tgname='v301_noncredit_knowledge_feedback') OR (tgrelid='public.survey_campaigns'::regclass AND tgname='noncredit_feedback_campaign_scope'))`;
+assert.equal(feedback.installed,2,"Apply feedback invitation and scope migrations 0119 and 0120 first");
 console.log("PASS: dedicated QA fixture and UUID provisioning prerequisites (read only). Browser acceptance remains separate.");
