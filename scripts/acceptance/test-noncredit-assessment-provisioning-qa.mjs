@@ -24,8 +24,11 @@ try{
    seven_lessons_required:true,automatic_completion_once:true,completion_audit_and_domain_event:true,
    baseline_no_feedback:true,final_feedback_exact_scope:true,feedback_invitation_idempotent:true,
    five_feedback_answers:true,duplicate_feedback_denied:true,
+   restricted_go_exact_code:true,go_counter_two_opens:true,paused_go_denied:true,
+   one_authoritative_person:true,wrong_site_claim_denied:true,attributed_claim_persisted:true,
+   canonical_report_reconciled:true,
  }]);
- console.log("PASS: 15 canonical assessment, completion and feedback checks; synthetic fixture rolled back.");
+ console.log("PASS: 22 canonical Go, enrollment, assessment, completion, feedback and evidence checks; synthetic fixture rolled back.");
 }finally{
  if(client){try{await client.query("ROLLBACK");}finally{client.release();}}
  await pool.end();
