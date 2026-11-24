@@ -5,6 +5,7 @@ import {
   Search, Sparkles, Users, Wallet, X, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { WorkspaceNotice, SelectionChip, SelectionChipGroup } from "@/components/workspace";
@@ -184,13 +185,12 @@ export function EstablishExperiencesV61({
             Browse the ideas below. Stars highlight experiences that may be a good fit for your community.
           </p>
         </div>
-        <label className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <Search className="size-4 text-muted-foreground" aria-hidden="true"/>
-          <span className="sr-only">Search topics and activities</span>
           <Input type="search" value={query} disabled={disabled}
             placeholder="Search topics or activities" aria-label="Search topics and activities"
-            onChange={event=>setQuery(event.target.value)} className="w-56"/>
-        </label>
+            onChange={event=>setQuery(event.target.value)} className="w-56 max-w-full"/>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground" aria-label="Selection legend">
         <span className="flex items-center gap-2">
@@ -241,17 +241,15 @@ export function EstablishExperiencesV61({
           Optional. A local idea counts toward your five, and needs no narrative description.
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-2">
-          <label className="min-w-48 flex-1 space-y-1 text-sm font-medium">
-            Local topic name
+          <Field label="Local topic name" error={customError || undefined} className="min-w-48 flex-1">
             <Input maxLength={100} value={customName} type="text"
               disabled={disabled||count>=siteExperienceLimit}
               placeholder="e.g. Neighborhood history"
               onChange={event=>{setCustomName(event.target.value);setCustomError("");}}/>
-          </label>
+          </Field>
           <Button variant="outline" disabled={disabled||count>=siteExperienceLimit||!customName.trim()}
             onClick={addCustomExperience}>Add my idea</Button>
         </div>
-        {customError&&<p role="alert" className="mt-2 text-xs text-destructive">{customError}</p>}
       </details>
       {count>siteExperienceLimit&&<WorkspaceNotice tone="attention">
         This older Site plan contains more than five Experiences.
@@ -312,8 +310,7 @@ export function EstablishExperiencesV61({
                   {index+1}
                 </span>
                 <span className="font-serif text-lg">{topic.title}</span>
-                <label className="flex items-center gap-1">
-                  <span className="sr-only">Priority for {topic.title}</span>
+                <div className="flex items-center gap-1">
                   <Select value={detail.priority} disabled={disabled}
                     aria-label={"Priority for "+topic.title}
                     onChange={event=>patchDetail(topic.id,{
@@ -326,7 +323,7 @@ export function EstablishExperiencesV61({
                       {priorityLabel(priority)}
                     </option>)}
                   </Select>
-                </label>
+                </div>
               </div>
               <Button type="button" variant="ghost" size="sm"
                 disabled={disabled} aria-expanded={expanded}
