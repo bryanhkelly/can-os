@@ -5,7 +5,6 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   canonicalClasses,canonicalClassEnrollments,
-  canonicalClassEnrollmentRepeatAuthorizations,
   canonicalAccountGrants,canonicalAccounts,canonicalPersons,
   participationAttributions,
 } from "@/db/canonical-v301";
@@ -18,6 +17,7 @@ import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} 
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
+import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
   assertNativeClassOperatorExitScope,
@@ -122,18 +122,10 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
       });
       const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
       if(repeatAuthorization){
-        await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
-          .set({consumedByEnrollmentId:enrollment.id})
-          .where(and(
-            eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
-            isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
-          ));
-        await emitCanonicalDomainEvent(tx,{
-          eventType:"ClassRepeatAuthorizationConsumed",
-          aggregateType:"class_repeat_authorization",aggregateId:repeatAuthorization.id,
-          actorPersonId:actor.actorPersonId!,
-          payload:{classId:cls.id,priorEnrollmentId:completed!.id,
-            classEnrollmentId:enrollment.id,courseAttemptId:attempt.id},
+        await consumeNativeClassRepeatAuthorization(tx,{
+          authorizationId:repeatAuthorization.id,classId:cls.id,learnerPersonId:person.id,
+          priorEnrollmentId:completed!.id,classEnrollmentId:enrollment.id,
+          courseAttemptId:attempt.id,actorPersonId:actor.actorPersonId!,
         });
       }
       await writeCanonicalAudit(tx,{
