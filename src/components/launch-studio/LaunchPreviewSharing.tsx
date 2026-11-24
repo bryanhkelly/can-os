@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Share2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ExternalLink, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
@@ -22,7 +24,8 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
   const [shares, setShares] = useState<Share[]>([]);
   const [expiresAfterDays, setExpiresAfterDays] = useState<7 | 30 | null>(7);
   const [createdUrl, setCreatedUrl] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [createdCode,setCreatedCode]=useState<string|null>(null);
+  const pending=useRef<{siteId:string;expires:7|30|null;id:string}|null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +34,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
     setOpen(false);
     // The raw bearer URL is intentionally shown only in this creation session.
     setCreatedUrl("");
-    setCopied(false);
+    setCreatedCode(null);
   }
 
   useEffect(() => {
@@ -54,10 +57,14 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
     setBusy(true);
     setError(null);
     setCreatedUrl("");
-    setCopied(false);
+    setCreatedCode(null);
     try {
       const origin=await getCanonicalGoLinkShareOrigin();
-      const result = await createSitePreviewShare({ data: { siteId, expiresAfterDays } });
+      const request=pending.current?.siteId===siteId&&pending.current.expires===expiresAfterDays?pending.current:{siteId,expires:expiresAfterDays,id:crypto.randomUUID()};
+      pending.current=request;
+      const result = await createSitePreviewShare({ data: { siteId, expiresAfterDays,requestId:request.id } });
+      pending.current=null;
+      setCreatedCode(result.relativeUrl.split("/").at(-1)??null);
       const url = new URL(result.relativeUrl, origin);
       setCreatedUrl(url.toString());
       // The share has already been committed. A failed list refresh must not\n      // masquerade as a failed creation or cause the operator to issue duplicates.\n      try {\n        setShares(await listSitePreviewShares({ data: { siteId } }));\n      } catch {\n        setError("Your link was created. The active links list could not be refreshed. Copy your link before closing.");\n      }\n    } catch (cause) {\n      setError(normalizeClientError(cause,\n        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
@@ -72,20 +79,10 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
       await revokeSitePreviewShare({ data: { siteId, shareId } });
       setShares(await listSitePreviewShares({ data: { siteId } }));
       setCreatedUrl("");
-      setCopied(false);
+      setCreatedCode(null);
     } catch (cause) {
       setError(normalizeClientError(cause, "Could not revoke this preview link.").message);
     } finally { setBusy(false); }
-  }
-
-  async function copy() {
-    if (!createdUrl) return;
-    try {
-      await navigator.clipboard.writeText(createdUrl);
-      setCopied(true);
-    } catch {
-      setError("Clipboard access is unavailable. Select the link below to copy it manually.");
-    }
   }
 
   const activeShares = shares.filter(share => !share.revokedAt &&
@@ -145,10 +142,8 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
           <div className="mt-3 flex flex-wrap gap-2">
             <Input readOnly aria-label="Created shareable website preview URL" value={createdUrl}
               onFocus={event => event.currentTarget.select()} className="min-w-0 flex-1" />
-            <Button type="button" variant="outline" onClick={() => void copy()}>
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              {copied ? "Copied" : "Copy link"}
-            </Button>
+            {createdCode && <CopyLinkButton destination={{kind:"go",code:createdCode}}/>}
+            {createdCode && <GoLinkQrButton key={createdCode} code={createdCode}/>}
             <Button asChild variant="outline">
               <a href={createdUrl} target="_blank" rel="noopener noreferrer">Open <ExternalLink className="size-4" /></a>
             </Button>
@@ -173,7 +168,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
                 <div className="flex gap-2">
                   {share.paused && <span className="text-xs">Paused</span>}
                   {share.code && <Button size="sm" variant="outline" disabled={busy} onClick={async()=>{
-                    try{const origin=await getCanonicalGoLinkShareOrigin();setCreatedUrl(new URL("/go/"+share.code,origin).href);setCopied(false);}catch{setError("Could not load the approved sharing origin.");}
+                    try{const origin=await getCanonicalGoLinkShareOrigin();setCreatedUrl(new URL("/go/"+share.code,origin).href);setCreatedCode(share.code);}catch{setError("Could not load the approved sharing origin.");}
                   }}>Show link</Button>}
                   <Button size="sm" variant="outline" disabled={busy}
                     onClick={() => void revoke(share.id)}>Revoke</Button>
