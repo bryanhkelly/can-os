@@ -8,7 +8,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceShell, WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, EmptyState, QueryState, WorkspaceShell, WorkspaceNotice } from "@/components/workspace";
 import {
   closeNoncreditSelfEnrollment,getNoncreditEnrollmentPublisher,
   publishNoncreditSelfEnrollment,publishNoncreditAcrossAuthorizedSites,
@@ -132,11 +132,7 @@ function NoncreditPublicationSession({scope}:{scope:string}){
         Filtering authorized results to Offering {offeringCode}. This link does not approve or publish it.
       </p>}
     </section>}
-    {query.isPending&&<p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your provider-scoped training and deployment authority…</p>}
-    {query.isError&&<p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
-      Enrollment management is unavailable for this Site. Sign in with a currently authorized provider or Site role, then retry. No Site identity bridge is required.
-      <Button variant="ghost" type="button" className="ml-2 font-semibold text-primary underline" onClick={()=>void query.refetch()}>Retry</Button>
-    </p>}
+    <QueryState loading={query.isPending&&"Loading your provider-scoped training and deployment authority…"} error={query.isError&&"Enrollment management is unavailable for this Site. Sign in with a currently authorized provider or Site role, then retry. No Site identity bridge is required."} onRetry={()=>void query.refetch()} retrying={query.isFetching}/>
     {currentData&&<div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(15rem,.8fr)]">
       <section className="border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">Publish enrollment</h2>
@@ -145,10 +141,7 @@ function NoncreditPublicationSession({scope}:{scope:string}){
           published Course, approved completion policy and your verified operator role are all required.
           Enrollment terms are versioned and immutable after publication.
         </p>
-        {candidates.length===0&&<p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
-          No eligible training/adoption combination is available in your current operator and Site scope. The shared Site must have an active authorized deployment, approved Offering adoption and registration authorization.
-          Finalize the curriculum, completion policy and deployment approval first.
-        </p>}
+        {candidates.length===0&&<EmptyState className="mt-5" title="No eligible training or adoption is available in your current operator and Site scope." description="The shared Site must have an active authorized deployment, approved Offering adoption and registration authorization. Finalize the curriculum, completion policy and deployment approval first."/>}
         {candidates.length>0&&<form onSubmit={event=>void submit(event)} className="mt-5 space-y-5">
           <div>
             <Label htmlFor="nc-candidate" className="block text-sm font-semibold">Approved training / deployment</Label>
@@ -260,9 +253,9 @@ function NoncreditPublicationSession({scope}:{scope:string}){
             Publication is immediate when the window is open. You can close a release, but changing
             its terms, delivery, course or capacity requires a new release.
           </p>
-          <Button type="submit" disabled={!valid||busy}>{busy?"Publishing…":additionalSites.length?"Publish at selected Sites":"Publish self-enrollment"}</Button>
+          <ActionFooter layout="inline"><Button type="submit" disabled={!valid||busy} loading={busy} loadingLabel="Publishing…">{additionalSites.length?"Publish at selected Sites":"Publish self-enrollment"}</Button></ActionFooter>
         </form>}
-        {message&&<p role="status" className="mt-4 border border-border bg-muted/20 p-4 text-sm">{message}</p>}
+        {message&&<WorkspaceNotice className="mt-4">{message}</WorkspaceNotice>}
         {created&&<Link to="/learn/enroll" search={{release:created}}
           className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">View learner registration</Link>}
       </section>
