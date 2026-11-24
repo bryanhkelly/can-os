@@ -23,7 +23,7 @@ import { buildUrlDestination } from "@/domain/url-destinations";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { getPartnerWebsitePreview } from "./site-website-preview.server";
 import { sitePreviewSnapshotKey, writeSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
-import { assertSiteSetupScope } from "@/domain/site-setup-scope";
+
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -39,12 +39,9 @@ async function assertPreviewSharingScope(
   actor: AccessContext, site: { id: string; organizationId: string } | null | undefined,
   executor: Pick<typeof db, "select"> = db,
 ) {
-  if (actor.role === "site_website_editor") {
-    const editor = await requirePartnerWebsiteEditor(actor, executor, "site.website.draft.write");
-    if (editor.id !== site?.id) throw new AuthorizationError("website sharing Site scope");
-    return;
-  }
-  assertSiteSetupScope(actor, site, "program.launch.start");
+  const editor = await requirePartnerWebsiteEditor(actor, executor, "site.website.draft.write");
+  if (editor.id !== site?.id || editor.organizationId !== site.organizationId)
+    throw new AuthorizationError("website sharing Site scope");
 }
 
 async function authorizedShareSite(siteId: string) {
