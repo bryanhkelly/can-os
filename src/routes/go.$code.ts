@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveGoExperience } from "@/modules/engagement/engagement-go.server";
+import { sitePreviewShareHeaders } from "@/domain/site-preview-sharing";
 import { renderEngagementPage } from "@/domain/engagement-page-renderer";
 
 const headers={
@@ -31,10 +32,13 @@ a:focus-visible{outline:3px solid #0284c7;outline-offset:3px}
 /** One public code: either 302 to an existing service or render an immutable, safe landing. */
 export const Route=createFileRoute("/go/$code")({
   server:{handlers:{
-    GET:async({params})=>{
+    GET:async({params,request})=>{
       try{
-        const experience=await resolveGoExperience(params.code);
+        const query=new URL(request.url).searchParams;
+        if(query.getAll("page").length>1)return unavailable(404);
+        const experience=await resolveGoExperience(params.code,query.get("page")??"/");
         if(!experience)return unavailable(404);
+        if(experience.mode==="website-preview")return new Response(experience.html,{status:200,headers:sitePreviewShareHeaders});
         if(experience.mode==="redirect"){
           return new Response(null,{status:302,headers:{...headers,Location:experience.href}});
         }
