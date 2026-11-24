@@ -62,14 +62,9 @@ if(profile==="pilot"){
   if(enabled("--database")&&process.env.TEST_DATABASE_URL&&process.env.CAN_APPLICATION_DB_HOST){
     run("Isolated noncredit evidence and completion schema (read only)",["run","verify:pilot:noncredit-schema"],{...process.env,APP_ENV:"test",NODE_ENV:"test"});
   }else block("Isolated noncredit evidence and completion schema","Requires approved TEST_DATABASE_URL and CAN_APPLICATION_DB_HOST");
-  // The legacy noncredit browser suite covers registration and withdrawal, not
-  // full instruction and reporting. A missing mutation fixture must not pass.
-  const env=process.env;
-  if(enabled("--browser")&&env.CAN_RELEASE_SOURCE_SHA===sha&&env.CAN_RELEASE_DEPLOYED_SHA===sha&&env.CAN_RELEASE_E2E_URL&&env.CAN_NONCREDIT_E2E_WRITES==="1"&&env.APP_ENV==="test"&&env.CAN_TEST_DB_WRITES_ENABLED==="true"&&env.CAN_NONCREDIT_QA_RELEASE_ID&&env.CAN_NONCREDIT_QA_CAN_SESSION_1&&env.CAN_NONCREDIT_QA_CAN_SESSION_2&&env.CAN_NONCREDIT_QA_CAN_SESSION_1!==env.CAN_NONCREDIT_QA_CAN_SESSION_2&&env.TEST_DATABASE_URL&&env.CAN_APPLICATION_DB_HOST){
-    // Verify the isolated branch before any mutating browser run. The preview
-    // must also be independently attested to use this exact branch.
-    block("Mutating deployed noncredit journey","Requires separate runtime-to-database attestation before any preview mutation; see pilot acceptance runbook");
-  }else block("Mutating deployed noncredit journey","Requires exact-SHA preview, isolated branch attestation and two distinct verified QA identities");
+  // Registration/withdrawal smoke tests do not establish complete pilot acceptance.
+  // Mutating deployed tests require separate runtime-to-disposable-database attestation.
+  block("Mutating deployed noncredit journey","Requires exact-SHA preview, isolated runtime database attestation and two distinct verified QA identities; see docs/runbooks/pilot-release-acceptance.md");
   block("Full pilot learning and impact acceptance","Requires actual approved fixture media, assessments, feedback, authoritative completion, corrected attendance and report reconciliation; registration smoke is insufficient");
 }
 if(enabled("--database")&&process.env.DATABASE_URL){
