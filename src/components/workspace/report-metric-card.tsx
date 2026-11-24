@@ -11,7 +11,7 @@ export function matchReportMetricDefinition(item:Pick<ReportMetricItem,"id"|"def
 }
 export function ReportMetricDefinition({definition,expanded=false}:{definition:SourceMetricContract;expanded?:boolean}){
   return <details open={expanded?true:undefined} className="border-x border-b border-border bg-card p-3 text-xs text-muted-foreground">
-    <summary className="cursor-pointer font-medium text-foreground">Definition and source</summary>
+    <summary className="cursor-pointer font-medium text-foreground">Definition and source<span className="sr-only"> for {definition.label}</span></summary>
     <dl className="mt-2 space-y-2">
       <div><dt className="font-medium text-foreground">Version</dt><dd>{definition.metricKey} · v{definition.definitionVersion}</dd></div>
       <div><dt className="font-medium text-foreground">Source</dt><dd className="break-words [overflow-wrap:anywhere]">{definition.source}</dd></div>

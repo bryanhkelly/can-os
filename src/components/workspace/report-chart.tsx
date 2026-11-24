@@ -6,6 +6,8 @@ import {EmptyState} from "./empty-state";
 import {WorkspaceNotice} from "./notice";
 import {QueryState} from "./query-state";
 import {ReportSeriesMark,ReportSeriesLegend} from "./report-chart-marks";
+import {ReportMetricDefinitions} from "./report-metric-definitions";
+import type {SourceMetricContract} from "@/domain/reporting-metric-registry";
 const ReportChartPlot=lazy(()=>import("./report-chart-plot"));
 class PlotBoundary extends Component<{children:ReactNode},{failed:boolean}>{
   state={failed:false};
@@ -43,8 +45,8 @@ export type ReportPresentation="interactive"|"print";
 /** V6.1 visualization composition. The plot is supplementary, never the only
  * route to values. Print presentation deliberately uses exact tables, not SVG.
  */
-export function ReportChart({spec,presentation="interactive",headingLevel="h3"}:{
-  spec:ReportChartSpec;presentation?:ReportPresentation;headingLevel?:"h2"|"h3"|"h4"|"h5"|"h6";
+export function ReportChart({spec,presentation="interactive",headingLevel="h3",definitions=[],asOf}:{
+  spec:ReportChartSpec;presentation?:ReportPresentation;definitions?:readonly SourceMetricContract[];asOf?:string;headingLevel?:"h2"|"h3"|"h4"|"h5"|"h6";
 }){
   const valid=validateReportChart(spec);
   const categorical=spec.kind==="stacked"?spec.series:spec.kind==="distribution"?spec.points:null;
@@ -52,6 +54,7 @@ export function ReportChart({spec,presentation="interactive",headingLevel="h3"}:
     <DashboardPanel title={spec.title} description={spec.description} headingLevel={headingLevel}>
       <div className="min-w-0 space-y-4">
         {!valid?<WorkspaceNotice tone="attention">Invalid or unbounded chart data. Use the source report.</WorkspaceNotice>:<>
+          {asOf&&<p className="text-xs text-muted-foreground">Evidence as of {asOf}</p>}
           {spec.axisMax!==undefined&&<p className="text-xs text-muted-foreground">Shared axis: 0 to {formatReportChartValue(spec.axisMax,spec.format)}.</p>}
           {"population" in spec&&<p className="text-xs text-muted-foreground">Population: {spec.population}{spec.kind==="distribution"?". Total: "+formatReportChartValue(spec.total,spec.format):""}</p>}
           {hasReportChartValues(spec)?<>
@@ -68,6 +71,7 @@ export function ReportChart({spec,presentation="interactive",headingLevel="h3"}:
             </div>}
           </>:<EmptyState title="No reported values available" description="Unavailable evidence is not a measured zero." className="p-4"/>}
           <ReportExactValues spec={spec}/>
+          {presentation==="interactive"&&<ReportMetricDefinitions title={spec.title} definitions={definitions}/> }
         </>}
       </div>
     </DashboardPanel>

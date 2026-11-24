@@ -19,7 +19,7 @@ export default function ReportChartPlot({spec}: {spec: ReportChartSpec}){
   const prefix=useReportPaintPrefix();
   const layout=reportChartLayout(width);
   const labels=new Map((spec.kind==="stacked"?spec.rows:spec.points).map(p=>[p.id,p.label]));
-  const numberAxis={...axisGeometry,tickFormatter:(n:number)=>formatReportAxisValue(n,spec.format),
+  const numberAxis={...axisGeometry,allowDataOverflow:spec.axisMax!==undefined||spec.format==="percent",tickFormatter:(n:number)=>formatReportAxisValue(n,spec.format),
     allowDecimals:(spec.format??"count")!=="count",tickCount:layout.tickCount};
   const domain=reportChartDomain(spec);
   const labelFor=(id:unknown)=>labels.get(String(id))??String(id??"");

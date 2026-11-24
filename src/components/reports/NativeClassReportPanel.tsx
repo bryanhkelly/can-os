@@ -94,7 +94,7 @@ export function NativeClassReportPanel({classId}:{classId:string}){
           governed decision source is not yet reportable.
         </p>}
       <ReportMetricComparison compare={compare&&priorRange!==null} items={data.definitions.map(def=>({
-        id:def.key,label:def.label,value:data.metrics[def.key],prior:comparable?.metrics[def.key],hint:def.denominator,
+        id:def.key,label:def.label,value:data.metrics[def.key],prior:comparable?.metrics[def.key],hint:def.denominator,asOf:data.asOf,
       }))}/>
       {compare&&previous.isError&&<p role="status" className="text-sm">
         Prior-period comparison is unavailable. Current period remains independently sourced.

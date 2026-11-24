@@ -21,7 +21,7 @@ function CampaignReport({siteId,scope}:{siteId:string;scope:string}){
   const report:ReportDocument|null=data?{version:1,definitionId:reportDefinitionId("site-campaign-delivery"),title:"Site email delivery evidence",
     scopeLabel:"Current authorized Site, across its Site- and Program-owned campaigns",
     basis:"Campaigns created "+data.from+" through "+data.to+" (exclusive); current state checked "+data.asOf,
-    definitions,blocks:[
+    asOf:data.asOf,definitions,blocks:[
       {id:"metrics",kind:"metrics",items},
       {id:"outcomes",kind:"chart",spec:{title:"Delivery evidence",description:"Current counts may overlap, especially provider acceptance. Do not sum the bars or interpret them as a conversion funnel.",valueLabel:"Delivery rows",kind:"comparison",format:"count",points:items.filter(i=>i.id!=="campaign.total")}},
       {id:"scope",kind:"note",text:"Organization-owned campaigns are excluded. Delivery rows are not unique people, opens, human reach, or attributable conversions."},
