@@ -16,6 +16,15 @@ describe("Site link sharing integration contracts", () => {
     expect(sharing).toContain("Revocable outreach / Go link");
     expect(sharing).toContain("publishedHost");
   });
+  it("reuses the governed action composition on engagement authoring surfaces", () => {
+    for(const name of ["UniversalEngagementPublisher","SiteEngagementLibrary"]){
+      const source=read("src/components/launch-studio/"+name+".tsx");
+      expect(source).toContain("<GoLinkActions");
+      expect(source).toContain("allowPause={false}");
+      expect(source).not.toContain("<CopyLinkButton");
+      expect(source).not.toContain(">Revoke</Button>");
+    }
+  });
   it("does not publish a draft or pretend a private preview is an ordinary copy link", () => {
     const launch = read("src/routes/launch.site.tsx");
     expect(launch).toContain('site.websiteDraft?.status === "published"');
