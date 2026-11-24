@@ -7,7 +7,7 @@ import { GoLinkActions } from "@/components/links/GoLinkActions";
 import { GoDestinationChoiceField } from "@/components/links/GoDestinationChoiceField";
 import { useGoDestinationChoices } from "@/hooks/use-go-destination-choices";
 import { Select } from "@/components/ui/select";
-import { WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, ActionFooter, EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { buildUrlDestination } from "@/domain/url-destinations";
 import { goDestinationLabels, goDestinationSelectionKey, type GoDestination } from "@/domain/site-go-links";
 import { resolveGoTargetInput } from "@/domain/go-target-input";
@@ -78,6 +78,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [revokeTarget,setRevokeTarget]=useState<GoLink|null>(null);
 
   useEffect(()=>{
     let live=true;
@@ -139,13 +140,11 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
 
   async function change(link:GoLink,action:"pause"|"resume"|"revoke"){
     if(busy || link.status==="revoked")return;
-    if(action==="revoke" && !window.confirm(
-      "Revoke this Go Link permanently? Distributed copies will stop working."))return;
     setBusy(true);setError("");setNotice("");
     try{
       if(action==="revoke"){
         await revokeSiteGoLink({data:{siteId,packageId,linkId:link.id}});
-        setNotice("Go Link permanently revoked.");
+        setNotice("Go Link permanently revoked.");setRevokeTarget(null);
       }else{
         await setSiteGoLinkPaused({data:{siteId,packageId,linkId:link.id,action}});
         setNotice(action==="pause"?"Go Link paused.":"Go Link resumed.");
@@ -229,12 +228,12 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
             onChange={event=>setExpiresAt(event.target.value)}/>
         </Field>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <ActionFooter layout="inline">
         <Button type="button" disabled={busy||!destination||readState!=="ready"}
           onClick={()=>void create()}>{busy?"Working…":"Create Go Link"}</Button>
         <Button type="button" variant="outline" disabled={busy}
           onClick={()=>{setRetry(n=>n+1);setSelected(null);catalog.retry();}}>Refresh</Button>
-      </div>
+      </ActionFooter>
     </section>
 
     <Field label="Search saved links by name" className="mt-5">
@@ -242,15 +241,13 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
         onChange={event=>setLinkTerm(event.target.value)}
         placeholder="Search links across this Site or outreach plan" maxLength={80}/>
         </Field>
-    {readState==="loading"&&<p role="status" className="mt-4 text-sm">Loading saved links…</p>}
-    {readState==="error"&&<p role="alert" className="mt-4 text-sm text-destructive">
-      Saved links are currently unavailable.</p>}
-    {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
-    {notice&&<p role="status" className="mt-4 text-sm">{notice}</p>}
+    {readState!=="ready"&&<QueryState loading={readState==="loading"?"Loading saved links…":undefined}
+      error={readState==="error"?"Saved links are currently unavailable.":undefined} onRetry={()=>setRetry(n=>n+1)}/>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
+    {notice&&<WorkspaceNotice className="mt-4">{notice}</WorkspaceNotice>}
     {readState==="ready"&&<section aria-label="Managed links" className="mt-5 space-y-3">
       <h3 className="font-semibold">Your links</h3>
-      {!links.length&&<p className="text-sm text-muted-foreground">
-        {linkTerm?"No links match this search.":"No Go Links yet. Select an eligible destination above to create one."}</p>}
+      {!links.length&&<EmptyState kind={linkTerm?"matches":"records"} title={linkTerm?"No links match this search.":"No Go Links yet. Select an eligible destination above to create one."}/>}
       {links.map(link=><article key={link.id} className="space-y-2 border p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -258,7 +255,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
             <p className="mt-1 break-all font-mono text-xs select-all">
               {buildUrlDestination({kind:"go",code:link.code}).href}</p>
           </div>
-          <span className="text-xs font-semibold">{readableState[link.availability]}</span>
+          <StatusBadge tone={link.availability==="available"?"success":link.availability==="scheduled"?"info":link.availability==="paused"?"attention":"neutral"}>{readableState[link.availability]}</StatusBadge>
         </div>
         <p className="text-xs text-muted-foreground">
           {labels[link.destination.kind]}{link.channel?" · "+link.channel:""}
@@ -278,13 +275,12 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
         </p>}
         {link.evidence&&<GoLinkEvidenceReport evidence={link.evidence}/>}
         <GoLinkActions code={link.code} status={link.status} busy={busy}
-          onTest={()=>void inspect(link)} onChange={action=>void change(link,action)}/>
+          onTest={()=>void inspect(link)} onChange={action=>{if(action==="revoke")setRevokeTarget(link);else void change(link,action);}}/>
 
       </article>)}
       {nextCursor&&<div className="space-y-2">
-        <Button type="button" size="sm" variant="outline" disabled={loadingMore}
-          onClick={()=>void loadMore()}>{loadingMore?"Loading…":"Load more links"}</Button>
-        {pageError&&<p role="alert" className="text-xs text-destructive">{pageError}</p>}
+        <Button type="button" size="sm" variant="outline" loading={loadingMore} loadingLabel="Loading…" onClick={()=>void loadMore()}>Load more links</Button>
+        {pageError&&<WorkspaceNotice tone="danger">{pageError}</WorkspaceNotice>}
       </div>}
       <p className="text-xs text-muted-foreground">
         Link opens, rendered pages and redirects are unfiltered anonymous observations, which can include
@@ -294,5 +290,12 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
         never as zero conversions.
       </p>
     </section>}
+    <ActionDialog open={!!revokeTarget} title="Revoke Go Link permanently"
+      description="Distributed copies of this Go Link will stop working."
+      confirmLabel="Revoke link" pending={busy} destructive
+      confirmDisabled={readState!=="ready"||!revokeTarget||!links.some(link=>link.id===revokeTarget.id&&link.status!=="revoked")}
+      onClose={()=>setRevokeTarget(null)} onConfirm={()=>{if(revokeTarget)void change(revokeTarget,"revoke");}}>
+      {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+    </ActionDialog>
   </WorkspacePanel>;
 }
