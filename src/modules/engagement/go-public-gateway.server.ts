@@ -31,14 +31,21 @@ export async function readPublicGoLink(code:string){
 export type PublicGoLink=NonNullable<Awaited<ReturnType<typeof readPublicGoLink>>>;
 
 /** Anonymous aggregate only. Failure cannot block a valid destination. */
-export async function observePublicGoEntry(code:string,linkId:string):Promise<void>{
+export async function observePublicGoResponse(code:string,linkId:string,response:"redirect"|"page",entry=true):Promise<void>{
+  const opens=entry||response==="redirect"?1:0;
+  const views=response==="page"?1:0;
+  const redirects=response==="redirect"?1:0;
   try{
     await withGoCode(code,async tx=>{
       await tx.insert(siteGoLinkDailyVisits).values({
-        linkId,day:sql`(now() AT TIME ZONE 'UTC')::date`,redirects:1,
+        linkId,day:sql`(now() AT TIME ZONE 'UTC')::date`,redirects:opens,
+        linkOpens:opens,pageViews:views,redirectResponses:redirects,
       }).onConflictDoUpdate({
         target:[siteGoLinkDailyVisits.linkId,siteGoLinkDailyVisits.day],
-        set:{redirects:sql`${siteGoLinkDailyVisits.redirects}+1`},
+        set:{redirects:sql`${siteGoLinkDailyVisits.redirects}+${opens}`,
+          linkOpens:sql`${siteGoLinkDailyVisits.linkOpens}+${opens}`,
+          pageViews:sql`${siteGoLinkDailyVisits.pageViews}+${views}`,
+          redirectResponses:sql`${siteGoLinkDailyVisits.redirectResponses}+${redirects}`},
       });
     });
   }catch{
