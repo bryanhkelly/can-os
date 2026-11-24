@@ -2,8 +2,9 @@ import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
 import {and,desc,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
+import {sites as operatingSites} from "@/db/schema";
 import {
-  canonicalEnrollmentSites,facilitatedClassroomPlans,
+  facilitatedClassroomPlans,
   facilitatedRoomAttendanceAssertions,learnerCourseAttempts,
   noncreditCompletionDecisions,noncreditRegistrations,
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
@@ -31,18 +32,17 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       id:noncreditSelfEnrollmentReleases.id,
       siteId:noncreditSelfEnrollmentReleases.siteId,
       title:noncreditTrainingVersions.title,
-      siteName:canonicalEnrollmentSites.name,
+      siteName:operatingSites.name,
       deliveryMode:noncreditSelfEnrollmentReleases.deliveryMode,
       trainingVersionId:noncreditSelfEnrollmentReleases.trainingVersionId,
       deploymentId:noncreditSelfEnrollmentReleases.deploymentId,
       adoptionId:noncreditSelfEnrollmentReleases.adoptionId,
       offeringVersionId:noncreditSelfEnrollmentReleases.offeringVersionId,
-      siteOrganizationId:canonicalEnrollmentSites.organizationId,
+      siteOrganizationId:operatingSites.organizationId,
     }).from(noncreditSelfEnrollmentReleases)
       .innerJoin(noncreditTrainingVersions,eq(
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
-      .innerJoin(canonicalEnrollmentSites,eq(
-        canonicalEnrollmentSites.id,noncreditSelfEnrollmentReleases.siteId))
+      .innerJoin(operatingSites,eq(operatingSites.id,noncreditSelfEnrollmentReleases.siteId))
       .where(and(
         eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
         inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds),
