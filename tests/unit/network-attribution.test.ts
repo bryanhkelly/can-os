@@ -38,10 +38,13 @@ describe("network attribution is not a parallel enrollment system",()=>{
     expect(service).toContain("insert(noncreditSelfEnrollmentClaims)");
     expect(service).toContain('attributionBasis:selectedMembership?"self_reported":"provider_default"');
     const native=read("src/modules/classes/native-class-enrollment.functions.ts");
-    expect(native).toContain("insert(participationAttributions)");
+    expect(native).toContain("writeNativeClassAttribution(tx,");
+    const attribution=read("src/modules/classes/native-class-attribution.server.ts");
+    expect(attribution).toContain("insert(participationAttributions)");
+    expect(attribution).toContain("Class attribution requires its authorized Site");
     expect(native).toContain("Class enrollment requires a Site");
     const assignment=read("src/modules/classes/native-class-assignment.functions.ts");
-    expect(assignment).toContain("insert(participationAttributions)");
+    expect(assignment).toContain("writeNativeClassAttribution(tx,");
   });
   it("permits an optional verifiable affiliate selector but not freeform attribution",()=>{
     const request={releaseId:id,acceptedConsent:true,adultConfirmed:true,
