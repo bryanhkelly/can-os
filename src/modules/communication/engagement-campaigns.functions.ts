@@ -71,8 +71,8 @@ export const queueEngagementCampaign=createServerFn({method:"POST"})
  return db.transaction(async tx=>{
  const [list]=await campaignRows<{id:string}>(tx,sql`SELECT id FROM public.campaign_recipient_lists WHERE id=${data.listId} AND owner_scope=${s.ownerScope} FOR UPDATE`);
  if(!list)throw new Error("Recipient list unavailable.");
- const [existing]=await campaignRows<{id:string;list_id:string;link_id:string;engagement_id:string}>(tx,sql`SELECT id,list_id,link_id,engagement_id FROM public.engagement_campaigns WHERE owner_scope=${s.ownerScope} AND request_id=${data.requestId}`);
- if(existing){if(existing.list_id!==data.listId||existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId)throw new Error("Request already used.");return {id:existing.id};}
+ const [existing]=await campaignRows<{id:string;list_id:string;link_id:string;engagement_id:string;scheduled_at:string|Date}>(tx,sql`SELECT id,list_id,link_id,engagement_id,scheduled_at FROM public.engagement_campaigns WHERE owner_scope=${s.ownerScope} AND request_id=${data.requestId}`);
+ if(existing){if(existing.list_id!==data.listId||existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId||new Date(existing.scheduled_at).getTime()!==scheduledAt.getTime())throw new Error("Request already used.");return {id:existing.id};}
  const [campaign]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.engagement_campaigns(owner_scope,sender_scope,engagement_id,link_id,list_id,request_id,subject,body,public_url,sender_from,sender_address,created_by_person_id,scheduled_at)
  VALUES(${s.ownerScope},${s.senderScope},${data.engagementId},${data.linkId},${data.listId},${data.requestId},${draft.subject},${draft.body+"\n\nInvited by "+s.senderLabel},${draft.url},${sender.from},${sender.address},${s.actor.actorPersonId},${data.scheduledAt}::timestamptz) RETURNING id`);
  const inserted=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_deliveries(owner_scope,campaign_id,email,status,next_attempt_at)
@@ -92,7 +92,7 @@ export const cancelEngagementCampaign=createServerFn({method:"POST"})
  const [cancelled]=await campaignRows<{id:string;cancelled_at:string|Date}>(tx,sql`UPDATE public.engagement_campaigns SET cancelled_at=now() WHERE id=${data.campaignId} AND owner_scope=${s.ownerScope} AND engagement_id=${data.engagementId} AND link_id=${data.linkId} AND cancelled_at IS NULL RETURNING id,cancelled_at`);
  if(cancelled&&s.record.ownerKind==="site"&&s.record.siteId&&s.record.organizationId)
    await emitReportableChange(tx,{eventType:EventTypes.SiteCampaignCancelled,sourceId:cancelled.id,sourceVersion:"cancelled",occurredAt:new Date(cancelled.cancelled_at),actorPersonId:s.actor.actorPersonId,dimensions:{organizationId:s.record.organizationId,siteId:s.record.siteId},payload:{engagementId:data.engagementId,linkId:data.linkId}});
- await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='cancelled' FROM public.engagement_campaigns c WHERE d.campaign_id=c.id AND c.id=${data.campaignId} AND c.owner_scope=${s.ownerScope} AND c.engagement_id=${data.engagementId} AND c.link_id=${data.linkId} AND c.cancelled_at IS NOT NULL AND d.status='pending'`);
+ await tx.execute(sql`UPDATE public.campaign_deliveries d SET status=CASE WHEN d.outcome_unconfirmed THEN 'failed' ELSE 'cancelled' END FROM public.engagement_campaigns c WHERE d.campaign_id=c.id AND c.id=${data.campaignId} AND c.owner_scope=${s.ownerScope} AND c.engagement_id=${data.engagementId} AND c.link_id=${data.linkId} AND c.cancelled_at IS NOT NULL AND d.status='pending'`);
  });
  return {ok:true};
  });
@@ -127,12 +127,12 @@ export const updateCampaignListMember=createServerFn({method:"POST"})
  if(data.operation==="withdraw"){
   await tx.execute(sql`INSERT INTO public.campaign_suppressions(sender_scope,email,reason,recorded_by_person_id)
   VALUES(${s.senderScope},${email},'unsubscribe',${s.actor.actorPersonId}) ON CONFLICT(sender_scope,email) DO NOTHING`);
-  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='suppressed'
+  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status=CASE WHEN d.outcome_unconfirmed THEN 'failed' ELSE 'suppressed' END
   FROM public.engagement_campaigns c WHERE c.id=d.campaign_id AND c.sender_scope=${s.senderScope}
   AND d.email=${email} AND d.status='pending'`);
  }else{
   await tx.execute(sql`DELETE FROM public.campaign_list_members WHERE owner_scope=${s.ownerScope} AND list_id=${list.id} AND email=${email}`);
-  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='suppressed' FROM public.engagement_campaigns c
+  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status=CASE WHEN d.outcome_unconfirmed THEN 'failed' ELSE 'suppressed' END FROM public.engagement_campaigns c
   WHERE c.id=d.campaign_id AND c.owner_scope=${s.ownerScope} AND c.list_id=${list.id} AND d.email=${email} AND d.status='pending'`);
  }
  return {changed:true};

@@ -13,3 +13,10 @@ export function campaignOwnerScope(owner:{ownerKind:string;organizationId:string
 export function campaignRetryable(attempts:number,firstAttemptAt:string|Date,now=Date.now()){
  return attempts<4 && now-new Date(firstAttemptAt).getTime()<20*60*60*1000;
 }
+
+/** Preserve ambiguous prior sends until authenticated provider evidence resolves them. */
+export function campaignRetryAfterMs(value:string|null,now=Date.now()){
+ if(!value)return 0;
+ const ms=/^\d+$/.test(value)?Number(value)*1000:Date.parse(value)-now;
+ return Number.isFinite(ms)?Math.min(20*60*60*1000,Math.max(0,ms)):0;
+}

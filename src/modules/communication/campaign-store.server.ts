@@ -2,7 +2,8 @@ import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
 import {resolveGoExperience} from "@/modules/engagement/engagement-go.server";
 import {isDemoTenantOrganization} from "@/modules/identity/demo-school-tenants.server";
-import {campaignRetryable,parseCampaignRecipients} from "@/domain/campaign-policy";
+import {OUTBOUND_LEASE_MS,outboundRetryDelayMs} from "@/domain/outbound-retry-policy";
+import {campaignRetryable,parseCampaignRecipients,campaignRetryAfterMs} from "@/domain/campaign-policy";
 import type {ResendReceiptEvent} from "@/domain/resend-webhook";
 
 type Executor=Pick<typeof db,"execute">;
@@ -19,13 +20,13 @@ export function campaignSender(){
  try{const url=new URL(origin);if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)return null;}catch{return null;}
  return {from,address,key,origin};
 }
-type Work={id:string;lease_id:string;email:string;unsubscribe_token:string;attempts:number;first_attempt_at:string;subject:string;body:string;public_url:string;sender_from:string;sender_address:string;sender_scope:string;organization_id:string|null;code:string;cancelled_at:string|null};
+type Work={id:string;lease_id:string;email:string;unsubscribe_token:string;attempts:number;first_attempt_at:string;outcome_unconfirmed:boolean;subject:string;body:string;public_url:string;sender_from:string;sender_address:string;sender_scope:string;organization_id:string|null;code:string;cancelled_at:string|null};
 async function claimCampaignDelivery(){
  return db.transaction(async tx=>{
  // Expired ambiguous attempts are never retried outside the provider's idempotency window.
  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='failed',outcome_unconfirmed=true,lease_id=NULL,lease_until=NULL
  FROM public.engagement_campaigns c WHERE c.id=d.campaign_id AND c.cancelled_at IS NOT NULL AND d.status='processing' AND d.lease_until<now()`);
- await tx.execute(sql`UPDATE public.campaign_deliveries SET status='failed',outcome_unconfirmed=true,lease_id=NULL,lease_until=NULL
+ await tx.execute(sql`UPDATE public.campaign_deliveries SET status='failed',outcome_unconfirmed=outcome_unconfirmed OR status='processing',lease_id=NULL,lease_until=NULL
  WHERE status IN ('pending','processing') AND (lease_until IS NULL OR lease_until<now())
  AND (attempts>=4 OR first_attempt_at<now()-interval '20 hours')`);
  const [row]=await campaignRows<Work>(tx,sql`
@@ -37,7 +38,8 @@ async function claimCampaignDelivery(){
   ORDER BY d.next_attempt_at,d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
  ), claimed AS (
   UPDATE public.campaign_deliveries d SET status='processing',lease_id=gen_random_uuid(),
-   lease_until=now()+interval '2 minutes',attempts=attempts+1,first_attempt_at=coalesce(first_attempt_at,now())
+   lease_until=now()+(${OUTBOUND_LEASE_MS} * interval '1 millisecond'),attempts=attempts+1,first_attempt_at=coalesce(first_attempt_at,now()),
+   outcome_unconfirmed=outcome_unconfirmed OR status='processing'
   FROM candidate WHERE d.id=candidate.id RETURNING d.*
  )
  SELECT d.*,c.subject,c.body,c.public_url,c.sender_from,c.sender_address,c.sender_scope,c.cancelled_at,
@@ -46,13 +48,14 @@ async function claimCampaignDelivery(){
  return row;
  });
 }
-async function settle(work:Work,status:string,providerId:string|null=null,unconfirmed=false){
- const rows=await campaignRows<{id:string}>(db,sql`UPDATE public.campaign_deliveries SET status=${status},outcome_unconfirmed=${unconfirmed},lease_id=NULL,lease_until=NULL,
- next_attempt_at=now()+interval '15 minutes',
+async function settle(work:Work,status:string,providerId:string|null=null,unconfirmed=false,delayMs=outboundRetryDelayMs(work.attempts)){
+ const rows=await campaignRows<{id:string;status:string;outcome_unconfirmed:boolean}>(db,sql`UPDATE public.campaign_deliveries SET status=CASE WHEN ${status} IN ('suppressed','failed','cancelled') AND (outcome_unconfirmed OR ${unconfirmed}) THEN 'failed' ELSE ${status} END,
+ outcome_unconfirmed=CASE WHEN ${status}='accepted' THEN false ELSE outcome_unconfirmed OR ${unconfirmed} END,lease_id=NULL,lease_until=NULL,
+ next_attempt_at=now()+(${delayMs} * interval '1 millisecond'),
  provider_message_id=coalesce(provider_message_id,${providerId}),
  accepted_at=CASE WHEN ${status}='accepted' THEN coalesce(accepted_at,now()) ELSE accepted_at END
- WHERE id=${work.id} AND lease_id=${work.lease_id} AND status='processing' RETURNING id`);
- return rows.length===1;
+ WHERE id=${work.id} AND lease_id=${work.lease_id} AND status='processing' RETURNING id,status,outcome_unconfirmed`);
+ return rows[0]??null;
 }
 async function stillEligible(work:Work){
  const [row]=await campaignRows<{eligible:boolean}>(db,sql`SELECT EXISTS(
@@ -68,22 +71,31 @@ async function stillEligible(work:Work){
 export async function processEngagementCampaignDeliveries(limit=10){
  const counts={accepted:0,failed:0,suppressed:0,retry:0,unconfirmed:0};
  const sender=campaignSender();if(!sender)return counts;
+ function countSettled(row:Awaited<ReturnType<typeof settle>>){
+  if(!row)return;
+  if(row.status==="accepted")counts.accepted++;
+  else if(row.status==="pending")counts.retry++;
+  else if(row.status==="suppressed")counts.suppressed++;
+  else if(row.status==="failed")counts[row.outcome_unconfirmed?"unconfirmed":"failed"]++;
+ }
  for(let i=0;i<Math.min(10,limit);i++){
   const work=await claimCampaignDelivery();if(!work)break;
+  let transportStarted=false;
   try{
    const parsed=parseCampaignRecipients(work.email);
    const url=new URL(work.public_url);
    if(parsed.invalid.length||parsed.recipients.length!==1||work.sender_from!==sender.from||work.sender_address!==sender.address||
      url.origin!==new URL(sender.origin).origin||url.pathname!=="/go/"+work.code||url.search||url.hash||
      await isDemoTenantOrganization(work.organization_id)){
-    if(await settle(work,"suppressed"))counts.suppressed++;continue;
+    countSettled(await settle(work,"suppressed"));continue;
    }
    const experience=await resolveGoExperience(work.code,"/",false);
    if(!experience||experience.mode==="website-preview"||!await stillEligible(work)){
-    if(await settle(work,"suppressed"))counts.suppressed++;continue;
+    countSettled(await settle(work,"suppressed"));continue;
    }
    const unsubscribe=new URL("/api/campaigns/unsubscribe",sender.origin);
    unsubscribe.searchParams.set("token",work.unsubscribe_token);
+   transportStarted=true;
    const response=await fetch("https://api.resend.com/emails",{
     method:"POST",redirect:"error",signal:AbortSignal.timeout(20000),headers:{Authorization:"Bearer "+sender.key,
      "Content-Type":"application/json","Idempotency-Key":"engagement-campaign/"+work.id},
@@ -95,13 +107,20 @@ export async function processEngagementCampaignDeliveries(limit=10){
    if(response.ok){
     const result=await response.json() as {id?:unknown};
     if(typeof result.id!=="string"||!result.id)throw new Error("missing provider receipt");
-    if(await settle(work,"accepted",result.id))counts.accepted++;continue;
+    countSettled(await settle(work,"accepted",result.id));continue;
    }
-   if(response.status===429||response.status===408||response.status===409||response.status>=500)throw new Error("retryable provider result");
-   if(await settle(work,"failed"))counts.failed++;
+   if(response.status===429||response.status===408||response.status===409||response.status>=500){
+    const retry=campaignRetryable(work.attempts,work.first_attempt_at);
+    const delay=Math.max(outboundRetryDelayMs(work.attempts),campaignRetryAfterMs(response.headers.get("retry-after")));
+    // 429 is a definite rejection of this attempt, but cannot erase earlier uncertainty.
+    countSettled(await settle(work,retry?"pending":"failed",null,response.status!==429,delay));
+    if(response.status===429||response.status>=500)break;
+    continue;
+   }
+   countSettled(await settle(work,"failed"));
   }catch{
    const retry=campaignRetryable(work.attempts,work.first_attempt_at);
-   if(await settle(work,retry?"pending":"failed",null,true))counts[retry?"retry":"unconfirmed"]++;
+   countSettled(await settle(work,retry?"pending":"failed",null,transportStarted));
   }
  }
  return counts;
@@ -112,7 +131,7 @@ export async function suppressCampaignRecipient(token:string){
    SELECT c.sender_scope,d.email,'unsubscribe' FROM public.campaign_deliveries d
    JOIN public.engagement_campaigns c ON c.id=d.campaign_id WHERE d.unsubscribe_token=${token}
    ON CONFLICT(sender_scope,email) DO NOTHING`);
-  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='suppressed' FROM public.engagement_campaigns c
+  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status=CASE WHEN d.outcome_unconfirmed THEN 'failed' ELSE 'suppressed' END FROM public.engagement_campaigns c
    WHERE c.id=d.campaign_id AND d.status='pending' AND EXISTS(
    SELECT 1 FROM public.campaign_deliveries target JOIN public.engagement_campaigns source ON source.id=target.campaign_id
    WHERE target.unsubscribe_token=${token} AND target.email=d.email AND source.sender_scope=c.sender_scope)`);

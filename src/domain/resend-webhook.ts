@@ -1,34 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import {readBoundedRequestBytes} from "./bounded-request-body";
 
 const MAX_WEBHOOK_BYTES = 64 * 1024;
 
 /** Bound webhook memory even when Content-Length is omitted or false. */
 export async function readBoundedResendWebhookBody(request: Request): Promise<string | null> {
-  if (!request.body) return "";
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > MAX_WEBHOOK_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        return null;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const part of chunks) {
-    bytes.set(part, offset);
-    offset += part.byteLength;
-  }
-  return new TextDecoder().decode(bytes);
+ const bytes=await readBoundedRequestBytes(request,MAX_WEBHOOK_BYTES);
+ return bytes===null?null:new TextDecoder().decode(bytes);
 }
 
 const MAX_SIGNATURE_AGE_SECONDS = 300;
