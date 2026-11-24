@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
-import { WorkspaceShell, MutationFeedback, QueryState, EmptyState, WorkspaceNotice, RecordFacts, EntityCard, StatusBadge } from "@/components/workspace";
+import { ActionFooter, WorkspaceLinkNavigation, WorkspaceShell, MutationFeedback, QueryState, EmptyState, WorkspaceNotice, RecordFacts, EntityCard, StatusBadge } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import {
@@ -377,35 +377,35 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     </div>
     {!signedIn && <div className="mt-5 space-y-3 border-t border-border pt-4">
       <p className="text-sm">Verify your CAN account to finish. Your course selection will be preserved after signing in.</p>
-      <div className="flex flex-wrap gap-3">
+      <ActionFooter layout="inline" className="mt-0">
         <Button asChild size="lg"><Link to="/access" search={{returnTo}}>
           Sign in
         </Link></Button>
         <Button asChild size="lg" variant="outline"><Link to="/access/register" search={{returnTo}}>
           Create an adult CAN account
         </Link></Button>
-      </div>
+      </ActionFooter>
     </div>}
     {waitlistStatus&&<p role="status" className="mt-4 text-sm text-muted-foreground">
       Waitlist: {invited?"Reserved invitation, confirm enrollment before it expires":waitlistStatus}.
       <Link to="/learn/my-activity" className="ml-2 text-primary underline">Manage</Link>
     </p>}
-    {isStudent&&<p role="status" className="mt-4 text-sm text-muted-foreground">Adult self-registration requires an independently verified adult CAN account. Switch to an eligible account to enroll.</p>}
+    {isStudent&&<WorkspaceNotice tone="attention" className="mt-4">Adult self-registration requires an independently verified adult CAN account. Switch to an eligible account to enroll.</WorkspaceNotice>}
     {signedIn && !enrolled && !isStudent && <Button type="button" className="mt-5 min-h-11"
       disabled={!accepted||!adult||busy||waitlisted||waitlistLoading||waitlistUnavailable||
         (!!waitlistStatus&&joinQueue&&waitlistStatus==="waiting")||
         (!joinQueue&&(classChoiceLoading||classChoiceError||!classId))}
-      onClick={onSubmit}>
-      {busy?"Saving…":waitlistLoading?"Checking your waitlist…":joinQueue?"Join waiting list":invited?"Claim my reserved place":"Confirm my registration"}
+      loading={busy||waitlistLoading} loadingLabel={busy?"Saving…":"Checking your waitlist…"} onClick={onSubmit}>
+      {waitlistLoading?"Checking your waitlist…":joinQueue?"Join waiting list":invited?"Claim my reserved place":"Confirm my registration"}
     </Button>}
     <MutationFeedback state={feedback} pendingMessage="Saving enrollment decision…" className="mt-4"/>
-    {enrolled && <nav aria-label="After enrollment" className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+    {enrolled && <WorkspaceLinkNavigation label="After enrollment" surface="plain" className="mt-4">
       <Button asChild size="lg"><Link to="/learn/course/$courseAttemptId"
         params={{courseAttemptId:enrolled.courseAttemptId}}>Start learning</Link></Button>
       <Link to="/learn/my-activity" className="font-semibold text-primary underline underline-offset-4">
         View My Activity
       </Link>
-    </nav>}
+    </WorkspaceLinkNavigation>}
   </section>;
 }
 
@@ -436,7 +436,7 @@ function AffiliateAttributionSelector({releaseId,onMembershipChange}:{
       placeholder="Organization or church name" maxLength={80}
       className="mt-1 min-h-11"/>
     {results.isError&&term.trim().length>=2&&
-      <p className="mt-2 text-xs" role="alert">The affiliate directory is unavailable. You can register without local attribution.</p>}
+      <WorkspaceNotice tone="attention" className="mt-2">The affiliate directory is unavailable. You can register without local attribution.</WorkspaceNotice>}
     {results.data&&<Label htmlFor="affiliate-choice" className="mt-3 block text-sm font-medium">
       Select your organization
       <Select id="affiliate-choice" value={choice} className="mt-1 min-h-11"
