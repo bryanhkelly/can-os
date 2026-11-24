@@ -203,7 +203,7 @@ function LearnerClass({workspace}:{workspace:Workspace}){
       </DetailNavigation>
       {delivery==="recorded"&&learner.status==="active"
         ?<RecordedInstructorWorkspace key={learner.courseAttemptId} courseAttemptId={learner.courseAttemptId}
-          initialLessonId={workspace.selectedLessonId} mode="native"/>
+          initialLessonId={workspace.selectedLessonId} classEnrollmentId={learner.classEnrollmentId} mode="native"/>
         :<NativeClassLessonContentPanel classEnrollmentId={learner.classEnrollmentId}
           lessons={data.lessons} selectedLessonId={workspace.selectedLessonId}/>}
     </div>}
