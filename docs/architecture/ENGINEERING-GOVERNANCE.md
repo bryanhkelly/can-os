@@ -16,9 +16,10 @@ Run from a clean, locked checkout:
 npm ci
 npm run verify:architecture
 npm run architecture:inventory
+npm run check:reuse
 ```
 
-The first command installs the lockfile. The second composes existing source and test syntax/import checks, component and Class architecture checks, route identity checks, migration safety, migration journal, reporting SQL and V6.1 checks. It does not migrate a database or contact a provider. The inventory is observational. On a local release-* branch the default design audit compares against the origin/main merge base; fetch that ref first or set V61_BASE_REF to an explicitly reviewed commit. Cloudflare CI resolves the PR base or release merge base using full history and retains the architecture diagnostics. Do not use only HEAD^ to certify a multi-commit release.
+The first command installs the lockfile. The second composes existing source and test syntax/import checks, component and Class architecture checks, route identity checks, migration safety, migration journal, reporting SQL and V6.1 checks. It does not migrate a database or contact a provider. The inventory is observational by default. The same inventory has a blocking `--check` mode (`npm run check:reuse`), which compares all substantial exact function-body copies across production TypeScript/TSX files to the committed base. It permits unchanged debt and relocation/removal, rejects increased copies, and lists all regressions with paths and lines (the ordinary inventory still displays the largest 50 groups). The analysis preserves AST structure and literal values; it does not prove semantic equivalence, detect every near-copy, or justify merging distinct authorization policies. Missing Git base or unreadable baseline is a failure, not a pass. The focused tests use an isolated temporary Git repository. On a local release-* branch the default design audit compares against the origin/main merge base; fetch that ref first or set V61_BASE_REF to an explicitly reviewed commit. Cloudflare CI resolves the PR base or release merge base using full history and retains the architecture diagnostics. Do not use only HEAD^ to certify a multi-commit release.
 
 ## Independent acceptance
 
