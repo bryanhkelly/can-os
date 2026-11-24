@@ -6,6 +6,7 @@ import { accessAccounts, accessAdultLearningReviews } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import academicIntegritySql from "../../../scripts/acceptance/academic-integrity-inventory.sql?raw";
 
 /**
  * Platform administration is an independently provisioned, account-wide
@@ -178,7 +179,17 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
       }).from(accessAdultLearningReviews)
         .orderBy(desc(accessAdultLearningReviews.reviewedAt)).limit(50)
       :[];
+    // Aggregate inventory only, behind the independently verified platform grant.
+    // A failed diagnostic must not prevent the remaining admin workflows.
+    const academicIntegrity = await db.execute(sql.raw(academicIntegritySql)).then(result => ({
+      status: "available" as const,
+      checkedAt: new Date().toISOString(),
+      findings: result.rows.map(item => ({code:String(item.code),priority:String(item.priority),
+        siteId:item.site_id == null ? null : String(item.site_id),
+        siteName:item.site_name == null ? "Unassigned Site" : String(item.site_name), affected:Number(item.affected)})),
+    })).catch(() => ({status:"unavailable" as const,checkedAt:new Date().toISOString(),findings:[]}));
     return {
+      academicIntegrity,
       platformOwner: actor.role === "platform_owner",
       reviewedAdultIdentityReady,
       publisherReleasesLimited:publisherReleaseRows.rows.length>25,
