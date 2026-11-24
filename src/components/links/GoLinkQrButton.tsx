@@ -9,13 +9,13 @@ import { goCodeSchema } from "@/domain/site-go-links";
  * The PNG is produced locally only when requested. No external QR API,
  * tracking pixel, identity cookie or participant metadata is involved.
  */
-export function GoLinkQrButton({code}:{code:string}){
+export function GoLinkQrButton({code,disabled=false}:{code:string;disabled?:boolean}){
   const [image,setImage]=useState<string|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [open,setOpen]=useState(false);
   async function show(){
-    if(busy)return;
+    if(busy||disabled)return;
     setOpen(true);
     if(image)return;
     setBusy(true);setError("");
@@ -34,7 +34,7 @@ export function GoLinkQrButton({code}:{code:string}){
   }
   return <div>
     <Button type="button" size="sm" variant="outline"
-      onClick={()=>void show()}><QrCode aria-hidden="true"/> QR code</Button>
+      disabled={disabled||busy} onClick={()=>void show()}><QrCode aria-hidden="true"/> QR code</Button>
     {open&&<div className="mt-2 max-w-xs border bg-card p-3" role="group"
       aria-label="Go Link QR code">
       <div className="flex items-center justify-between gap-2">
