@@ -144,6 +144,32 @@ const [roleChecks] = await sql`
       AND has_table_privilege(current_user,'public.site_go_link_daily_visits','UPDATE'))
       AS application_can_count_redirects
 `;
+// A scoped gateway is mandatory for public registry access. The broader
+// catalog and authenticated management services retain their existing role.
+const [gateway] = await sql`
+  SELECT EXISTS (
+    SELECT 1 FROM pg_roles r WHERE r.rolname='can_go_gateway'
+      AND NOT (r.rolcanlogin OR r.rolbypassrls OR r.rolsuper OR r.rolcreaterole OR r.rolcreatedb)
+      AND pg_has_role(current_user,r.oid,'MEMBER')
+      AND NOT has_table_privilege(r.oid,'public.site_go_links','SELECT,INSERT,UPDATE,DELETE')
+      AND has_column_privilege(r.oid,'public.site_go_links','code','SELECT')
+      AND NOT has_column_privilege(r.oid,'public.site_go_links','created_by_person_id','SELECT')
+      AND NOT has_table_privilege(r.oid,'public.site_go_link_daily_visits','DELETE,TRUNCATE')
+  ) AS restricted_gateway,
+  (SELECT count(*)=4 FROM pg_policies WHERE schemaname='public'
+    AND policyname IN ('go_gateway_exact_code','go_gateway_counter_read',
+      'go_gateway_counter_insert','go_gateway_counter_update')
+    AND 'can_go_gateway'=ANY(roles)) AS gateway_policies
+`;
+if(!gateway.restricted_gateway || !gateway.gateway_policies)
+  throw new Error("BLOCKED: scoped Go gateway role/policies or runtime membership missing");
+const [,roleAttestation] = await sql.transaction([
+  sql`SET LOCAL ROLE can_go_gateway`,
+  sql`SELECT current_user='can_go_gateway' AS assumed,
+    count(*)=0 AS unscoped_denied FROM public.site_go_links`,
+]);
+if(!roleAttestation[0]?.assumed||!roleAttestation[0]?.unscoped_denied)
+  throw new Error("BLOCKED: runtime could not assume an isolated Go gateway role");
 const recorded = await sql`
   SELECT hash, created_at FROM drizzle.__drizzle_migrations
   WHERE created_at >= ${migrations[0].when}
