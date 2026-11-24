@@ -25,7 +25,7 @@ describe("Saved Site website presentation",()=>{
     expect(wrapped).toContain("Private Site website preview");
     expect(wrapped).not.toContain("Demonstration website preview");
     expect(wrapped).toContain(name);
-    const share=renderSharedSitePreview(html,siteId,"A".repeat(43),["/"],true);
+    const share=renderSharedSitePreview(html,"K7x2p9AaB3cD",["/"]);
     expect(share).toContain("Proposed learning community · Website preview");
     expect(share).not.toContain("Demonstration website preview");
     expect(share).toContain(name);
@@ -60,7 +60,7 @@ describe("Saved Site website presentation",()=>{
     const sharing=read("src/modules/sites/site-preview-sharing.functions.ts");
     expect(route).toContain("websitePreviewEditorialBlocks(baseContentBlocks)");
     expect(editor).toContain("websitePreviewEditorialBlocks(baseContentBlocks)");
-    expect(sharing).toContain("getPartnerWebsitePreview(actor)");
+    expect(sharing).toContain('getPartnerWebsitePreview(actor,undefined,"external-preview")');
     expect(sharing).toContain("writeSitePreviewSnapshot(");
     expect(sharing).not.toContain("projectShareableSitePreview({");
   });
