@@ -91,7 +91,7 @@ export const routeNavigation = {
   "/published-site": publicPage,
   "/readiness": page("/home", admins),
   "/safeguarding": hidden("Restricted reports and assigned-case workspace"),
-  "/settings": page("/settings", [...all, "app_admin", "platform_owner", "academic_content_creator", "academic_content_reviewer"]),
+  "/settings": page("/settings", [...all, "app_admin", "platform_owner", "academic_content_creator", "academic_content_reviewer", "reporting_relationship_manager"]),
   "/settings/school/$module": page("/settings", admins),
   "/site-website": page({site_website_editor:"/site-website",site_admin:"/settings"}, ["site_website_editor", "site_admin"]),
   "/release-fingerprint": endpoint,
