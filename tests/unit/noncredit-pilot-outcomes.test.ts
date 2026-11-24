@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
-  countDistinctNoncreditLearners,NONCREDIT_PILOT_COUNT_DEFINITIONS,
+  countDistinctNoncreditLearners,NONCREDIT_PILOT_COUNT_DEFINITIONS,buildPilotDisclosureEvidence,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 const sample: PilotParticipantFact={
@@ -32,18 +32,30 @@ describe("noncredit pilot reporting",()=>{
   expect(s.pairedKnowledgeChecks).toBe(0);
   expect(s.averageImprovementPercentagePoints).toBeNull();
  });
- it("hides small groups from public/partner summaries",()=>{
-  const summary=summarizeNoncreditPilot(Array.from({length:12},(_,i)=>({
-   ...sample,registrationId:"r"+i,knowledgeResult:i<8?"pass" as const:"fail" as const,
-   completionRecorded:i<3,surveySubmitted:i<8,
-  })));
-  const safe=publicationSafePilotSummary(summary);
+ it("requires distinct people and suppresses small complementary cells",()=>{
+  const facts=Array.from({length:24},(_,i)=>({
+   ...sample,registrationId:"r"+i,knowledgeResult:i<12?"pass" as const:"fail" as const,
+   completionRecorded:i<3,surveySubmitted:i<22,
+   baselineFraction:i<12?0.4:null,finalFraction:i<12?0.8:null,
+  }));
+  const summary=summarizeNoncreditPilot(facts);
+  const people=new Map(facts.map(f=>[f.registrationId,"person-"+f.registrationId]));
+  const safe=publicationSafePilotSummary(summary,10,buildPilotDisclosureEvidence(facts,people));
   expect(safe.publishable).toBe(true);
-  expect(safe.summary?.registrations).toBe(12);
-  expect(safe.summary?.knowledgeCheckPasses).toBeNull();
+  expect(safe.summary?.registrations).toBe(24);
+  expect(safe.summary?.knowledgeCheckPasses).toBe(12);
   expect(safe.summary?.confirmedNoncreditCompletions).toBeNull();
+  expect(safe.summary?.surveyRespondents).toBeNull();
   expect(safe.summary?.pairedKnowledgeChecks).toBe(12);
-  expect(publicationSafePilotSummary(summarizeNoncreditPilot([sample])).publishable).toBe(false);
+  expect(safe.summary?.engagedParticipants).toBeNull();
+  expect(publicationSafePilotSummary(summary).publishable).toBe(false);
+  const repeats=new Map(facts.map(f=>[f.registrationId,"one-person"]));
+  expect(publicationSafePilotSummary(summary,10,buildPilotDisclosureEvidence(facts,repeats)).publishable).toBe(false);
+ });
+ it("sums source-verified participant minutes and refuses invalid values",()=>{
+  const report=summarizeNoncreditPilot([{...sample,verifiedParticipationMinutes:45},{...sample,registrationId:"r2",verifiedParticipationMinutes:30}]);
+  expect(report.verifiedParticipationMinutes).toBe(75);
+  expect(()=>summarizeNoncreditPilot([{...sample,verifiedParticipationMinutes:-1}])).toThrow("Invalid verified participation minutes");
  });
  it("refuses double-counted registrations",()=>{
   expect(()=>summarizeNoncreditPilot([sample,sample])).toThrow("Duplicate pilot");
