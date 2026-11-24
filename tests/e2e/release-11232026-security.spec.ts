@@ -52,6 +52,8 @@ test("public Go lifecycle and anonymous rendering", async ({ page, request }) =>
   expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
   expect(response?.headers()["x-frame-options"]).toBe("DENY");
   expect(response?.headers()["x-robots-tag"]).toContain("noindex");
+  const [observations]=await sql.query("SELECT link_opens,page_views,redirect_responses,redirects FROM public.site_go_link_daily_visits WHERE link_id=$1",[link]);
+  expect(observations).toMatchObject({link_opens:1,page_views:1,redirect_responses:0,redirects:1});
   expect((await request.get(url+"?page=%2F&page=%2F")).status()).toBe(404);
   const unknown=await request.get("/go/"+randomBytes(9).toString("base64url"),{maxRedirects:0});
   expect(unknown.status()).toBe(404);
