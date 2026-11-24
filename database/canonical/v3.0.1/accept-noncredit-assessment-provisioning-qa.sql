@@ -1,6 +1,6 @@
 -- Rollback-only integration regression; synthetic reviews are test evidence only.
 DO $qa$
-DECLARE org uuid:=gen_random_uuid(); author uuid:=gen_random_uuid(); reviewer uuid:=gen_random_uuid(); person_a uuid:=gen_random_uuid(); person_b uuid:=gen_random_uuid(); op uuid:=gen_random_uuid(); offering uuid:=gen_random_uuid(); ov uuid:=gen_random_uuid(); course uuid:=gen_random_uuid(); cv uuid:=gen_random_uuid(); dep uuid:=gen_random_uuid(); adoption uuid:=gen_random_uuid(); training uuid:=gen_random_uuid(); pol uuid:=gen_random_uuid(); doc uuid:=gen_random_uuid(); evidence uuid:=gen_random_uuid(); bank uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); iv uuid:=gen_random_uuid(); adf uuid; av uuid; frm uuid; fv uuid; sect uuid; admin uuid; baseline uuid; final uuid; baseline_admin uuid; final_admin uuid; final_form uuid; reg uuid; ca uuid; reg_b uuid; ca_b uuid; phase text; k text; n int; results jsonb; unit_id uuid:=gen_random_uuid(); lesson record; final_grant uuid; learner uuid; attempt uuid; attempt_item uuid; response uuid; form_item uuid; final_result uuid; completion_id uuid; option_id uuid:=gen_random_uuid(); survey_id uuid:=gen_random_uuid(); sv uuid:=gen_random_uuid(); campaign uuid:=gen_random_uuid(); disabled_campaign uuid:=gen_random_uuid(); other_campaign uuid:=gen_random_uuid(); invitation uuid; survey_response uuid; q record; baseline_form uuid; other_org uuid:=gen_random_uuid();
+DECLARE org uuid:=gen_random_uuid(); author uuid:=gen_random_uuid(); reviewer uuid:=gen_random_uuid(); person_a uuid:=gen_random_uuid(); person_b uuid:=gen_random_uuid(); op uuid:=gen_random_uuid(); offering uuid:=gen_random_uuid(); ov uuid:=gen_random_uuid(); course uuid:=gen_random_uuid(); cv uuid:=gen_random_uuid(); dep uuid:=gen_random_uuid(); adoption uuid:=gen_random_uuid(); training uuid:=gen_random_uuid(); pol uuid:=gen_random_uuid(); doc uuid:=gen_random_uuid(); evidence uuid:=gen_random_uuid(); bank uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); iv uuid:=gen_random_uuid(); adf uuid; av uuid; frm uuid; fv uuid; sect uuid; admin uuid; baseline uuid; final uuid; baseline_admin uuid; final_admin uuid; final_form uuid; reg uuid; ca uuid; reg_b uuid; ca_b uuid; phase text; k text; n int; results jsonb; unit_id uuid:=gen_random_uuid(); lesson record; final_grant uuid; learner uuid; attempt uuid; attempt_item uuid; response uuid; form_item uuid; final_result uuid; completion_id uuid; option_id uuid:=gen_random_uuid(); survey_id uuid:=gen_random_uuid(); sv uuid:=gen_random_uuid(); campaign uuid:=gen_random_uuid(); disabled_campaign uuid:=gen_random_uuid(); other_campaign uuid:=gen_random_uuid(); invitation uuid; survey_response uuid; q record; baseline_form uuid; other_org uuid:=gen_random_uuid(); site_id_qa uuid:=gen_random_uuid(); other_site uuid:=gen_random_uuid(); release_id_qa uuid:=gen_random_uuid(); can_account uuid:=gen_random_uuid(); native_account uuid:=gen_random_uuid(); go_id uuid:=gen_random_uuid(); wrong_go_id uuid:=gen_random_uuid(); go_code text:=substr(replace(gen_random_uuid()::text,'-',''),1,12); wrong_code text:=substr(replace(gen_random_uuid()::text,'-',''),1,12); consent_text_qa text:='TEST ONLY synthetic adult consent for isolated regression.'; consent_hash text; gateway_count int; gateway_opens int; report_row record;
 BEGIN
  IF current_setting('neon.project_id',true) IS DISTINCT FROM 'sweet-hall-62441909'
  OR current_setting('neon.branch_id',true) IS DISTINCT FROM current_setting('can.qa_expected_branch',true)
@@ -55,7 +55,39 @@ BEGIN
  END LOOP;
  INSERT INTO public.noncredit_training_versions(id,offering_version_id,provider_organization_id,title,required_instruction_minutes,state,published_at,author_person_id,approved_by_person_id,assessment_version_id,baseline_assessment_version_id) VALUES(training,ov,org,'TEST ONLY',0,'published',now(),author,reviewer,final,baseline);
  INSERT INTO public.noncredit_completion_policies(id,training_version_id,policy_version,min_participation_minutes,skills_assessment_required,minimum_assessment_fraction,effective_at,approved_by_person_id,published_at,require_all_lessons,completion_mode) VALUES(pol,training,1,0,true,0.8,now()-interval '1 hour',reviewer,now(),true,'automatic');
+ INSERT INTO public.sites(id,organization_id,name,slug,site_kind,lifecycle_status) VALUES(site_id_qa,org,'TEST ONLY site','pilot-qa-'||site_id_qa,'virtual','active'),(other_site,org,'TEST ONLY other site','pilot-qa-'||other_site,'virtual','active');
+ INSERT INTO public.education_operation_sites(operation_id,site_id,valid_from,purpose) VALUES(op,site_id_qa,now()-interval '1 day','TEST ONLY');
+ INSERT INTO public.site_organization_roles(site_id,organization_id,role_code,valid_from) VALUES(site_id_qa,org,'operator',now()-interval '1 day');
+ INSERT INTO public.noncredit_self_enrollment_releases(id,deployment_id,adoption_id,offering_version_id,training_version_id,course_version_id,provider_organization_id,registering_organization_id,site_id,delivery_mode,opens_at,closes_at,max_participants,consent_version,consent_text,published_by_person_id) VALUES(release_id_qa,dep,adoption,ov,training,cv,org,org,site_id_qa,'independent',now()-interval '1 hour',now()+interval '1 hour',2,'qa-v1',consent_text_qa,reviewer);
+ INSERT INTO public.site_go_links(id,code,organization_id,site_id,created_by_person_id,destination,name,status) VALUES(go_id,go_code,org,site_id_qa,reviewer,jsonb_build_object('kind','adult-training','releaseId',release_id_qa),'TEST ONLY','active'),(wrong_go_id,wrong_code,org,other_site,reviewer,jsonb_build_object('kind','adult-training','releaseId',release_id_qa),'TEST ONLY other','paused');
+ -- Actual restricted gateway role, not an owner-level approximation.
+ PERFORM set_config('can.go_code',go_code,true);
+ EXECUTE 'SET LOCAL ROLE can_go_gateway';
+ SELECT count(*) INTO gateway_count FROM public.site_go_links WHERE id IN(go_id,wrong_go_id);
+ IF gateway_count<>1 OR NOT EXISTS(SELECT 1 FROM public.site_go_links WHERE id=go_id AND destination->>'releaseId'=release_id_qa::text) THEN RAISE EXCEPTION 'Exact code gateway scope failed'; END IF;
+ INSERT INTO public.site_go_link_daily_visits(link_id,day,redirects,link_opens,page_views,redirect_responses) VALUES(go_id,(now() AT TIME ZONE 'UTC')::date,1,1,0,1)
+ ON CONFLICT(link_id,day) DO UPDATE SET redirects=site_go_link_daily_visits.redirects+1,link_opens=site_go_link_daily_visits.link_opens+1,redirect_responses=site_go_link_daily_visits.redirect_responses+1;
+ INSERT INTO public.site_go_link_daily_visits(link_id,day,redirects,link_opens,page_views,redirect_responses) VALUES(go_id,(now() AT TIME ZONE 'UTC')::date,1,1,0,1)
+ ON CONFLICT(link_id,day) DO UPDATE SET redirects=site_go_link_daily_visits.redirects+1,link_opens=site_go_link_daily_visits.link_opens+1,redirect_responses=site_go_link_daily_visits.redirect_responses+1;
+ SELECT link_opens INTO gateway_opens FROM public.site_go_link_daily_visits WHERE link_id=go_id;
+ IF gateway_opens<>2 THEN RAISE EXCEPTION 'Go counter failed'; END IF;
+ PERFORM set_config('can.go_code',wrong_code,true);
+ IF EXISTS(SELECT 1 FROM public.site_go_links WHERE id IN(go_id,wrong_go_id)) THEN RAISE EXCEPTION 'Paused or other code exposed'; END IF;
+ EXECUTE 'RESET ROLE';
+ -- One authoritative Person is already present; create account linkage only.
+ INSERT INTO public.access_accounts(id,email_normalized,email_verified_at,person_id) VALUES(can_account,can_account||'@example.invalid',now(),person_a);
+ INSERT INTO education_v30.canonical_accounts(id,email_normalized,email_verified_at) VALUES(native_account,can_account||'@example.invalid',now());
+ INSERT INTO public.access_account_noncredit_principals(access_account_id,access_person_id,canonical_account_id,canonical_person_id,linkage_method) VALUES(can_account,person_a,native_account,person_a,'verified_existing_can_session');
+ IF EXISTS(SELECT 1 FROM education_v30.persons WHERE id=person_a) THEN RAISE EXCEPTION 'Duplicate Person unexpectedly created'; END IF;
  INSERT INTO public.noncredit_registrations(deployment_id,training_version_id,adoption_id,offering_version_id,participant_person_id,registering_organization_id,status) VALUES(dep,training,adoption,ov,person_a,org,'registered') RETURNING id INTO reg;
+ consent_hash:=encode(public.digest('qa-v1'||E'\n'||consent_text_qa,'sha256'),'hex');
+ BEGIN
+ INSERT INTO public.noncredit_self_enrollment_claims(release_id,registration_id,participant_person_id,canonical_account_id,site_id,consent_version,consent_sha256,adult_attested,referral_code) VALUES(release_id_qa,reg,person_a,native_account,other_site,'qa-v1',consent_hash,true,go_code);
+ RAISE EXCEPTION 'Wrong Site claim accepted' USING ERRCODE='ZX002';
+ EXCEPTION WHEN raise_exception THEN NULL; END;
+ INSERT INTO public.noncredit_self_enrollment_claims(release_id,registration_id,participant_person_id,canonical_account_id,site_id,consent_version,consent_sha256,adult_attested,referral_code) VALUES(release_id_qa,reg,person_a,native_account,site_id_qa,'qa-v1',consent_hash,true,go_code);
+ INSERT INTO public.participation_attributions(noncredit_registration_id,release_id,delivery_site_id,reporting_site_id,credited_organization_id,attribution_basis) VALUES(reg,release_id_qa,site_id_qa,site_id_qa,org,'provider_default');
+ SET CONSTRAINTS ALL IMMEDIATE;
  INSERT INTO public.learner_course_attempts(noncredit_registration_id,deployment_id,adoption_id,offering_version_id,course_version_id,attempt_no,status) VALUES(reg,dep,adoption,ov,cv,1,'active') RETURNING id INTO ca;
  SELECT count(*) INTO n FROM public.assessment_access_grants WHERE course_attempt_id=ca AND administration_id IN(baseline_admin,final_admin) AND access_status='approved';
  IF n<>2 THEN RAISE EXCEPTION 'Expected two grants; got %',n; END IF;
@@ -133,7 +165,28 @@ BEGIN
  INSERT INTO public.learner_course_attempts(noncredit_registration_id,deployment_id,adoption_id,offering_version_id,course_version_id,attempt_no,status) VALUES(reg_b,dep,adoption,ov,cv,1,'active') RETURNING id INTO ca_b;
  IF (SELECT count(*) FROM public.assessment_access_grants WHERE course_attempt_id=ca_b)<>1 OR NOT EXISTS(SELECT 1 FROM public.assessment_access_grants WHERE course_attempt_id=ca_b AND administration_id=baseline_admin) THEN RAISE EXCEPTION 'Ambiguous final assessment must fail closed'; END IF;
  IF EXISTS(SELECT 1 FROM public.assessment_access_grants a JOIN public.assessment_access_grants x ON a.learner_id=x.learner_id WHERE a.course_attempt_id=ca AND x.course_attempt_id=ca_b) THEN RAISE EXCEPTION 'Cross-learner grant'; END IF;
- results:=jsonb_build_object('assessment_grants',n,'repeat_idempotent',true,'learner_and_policy_pinned',true,'no_premature_completion',true,'ambiguous_final_denied',true,'distinct_learner_grants',true,'assessment_alone_not_completion',true,'seven_lessons_required',true,'automatic_completion_once',true,'completion_audit_and_domain_event',true,'baseline_no_feedback',true,'final_feedback_exact_scope',true,'feedback_invitation_idempotent',true,'five_feedback_answers',true,'duplicate_feedback_denied',true);
+ -- Independent reconciliation over persisted registration, claim, Site,
+ -- finalized paired assessments, current completion and identified feedback.
+ SELECT count(DISTINCT r.id) AS registrations,count(DISTINCT r.participant_person_id) AS learners,count(DISTINCT cl.site_id) AS sites,
+ count(DISTINCT lp.lesson_id) AS lessons,count(DISTINCT d.id) AS completions,count(DISTINCT sr.id) AS feedback,
+ count(DISTINCT CASE WHEN ad.assessment_version_id=baseline THEN ar.id END) AS baseline_results,
+ count(DISTINCT CASE WHEN ad.assessment_version_id=final THEN ar.id END) AS final_results
+ INTO report_row FROM public.noncredit_registrations r
+ JOIN public.noncredit_self_enrollment_claims cl ON cl.registration_id=r.id AND cl.participant_person_id=r.participant_person_id
+ JOIN public.noncredit_self_enrollment_releases rel ON rel.id=cl.release_id AND rel.site_id=cl.site_id AND rel.deployment_id=r.deployment_id AND rel.training_version_id=r.training_version_id
+ JOIN public.participation_attributions pa ON pa.noncredit_registration_id=r.id AND pa.release_id=rel.id AND pa.delivery_site_id=cl.site_id
+ JOIN public.learner_course_attempts lc ON lc.noncredit_registration_id=r.id
+ LEFT JOIN public.learner_lesson_progress lp ON lp.course_attempt_id=lc.id AND lp.status='completed'
+ LEFT JOIN public.assessment_access_grants ag ON ag.course_attempt_id=lc.id
+ LEFT JOIN public.assessment_attempts aa ON aa.access_grant_id=ag.id AND aa.state='finalized'
+ LEFT JOIN public.assessment_attempt_results ar ON ar.attempt_id=aa.id AND ar.result_status='finalized'
+ LEFT JOIN public.assessment_administrations ad ON ad.id=aa.administration_id
+ LEFT JOIN public.noncredit_completion_decisions d ON d.registration_id=r.id AND d.outcome='completed'
+ LEFT JOIN public.survey_invitations si ON si.invited_person_id=r.participant_person_id AND si.campaign_id=campaign
+ LEFT JOIN public.survey_responses sr ON sr.invitation_id=si.id
+ WHERE rel.registering_organization_id=org AND cl.site_id=site_id_qa;
+ IF ROW(report_row.registrations,report_row.learners,report_row.sites,report_row.lessons,report_row.completions,report_row.feedback,report_row.baseline_results,report_row.final_results) IS DISTINCT FROM ROW(1::bigint,1::bigint,1::bigint,7::bigint,1::bigint,1::bigint,1::bigint,1::bigint) THEN RAISE EXCEPTION 'Scoped reporting reconciliation failed: %',report_row; END IF;
+ results:=jsonb_build_object('assessment_grants',n,'repeat_idempotent',true,'learner_and_policy_pinned',true,'no_premature_completion',true,'ambiguous_final_denied',true,'distinct_learner_grants',true,'assessment_alone_not_completion',true,'seven_lessons_required',true,'automatic_completion_once',true,'completion_audit_and_domain_event',true,'baseline_no_feedback',true,'final_feedback_exact_scope',true,'feedback_invitation_idempotent',true,'five_feedback_answers',true,'duplicate_feedback_denied',true,'restricted_go_exact_code',true,'go_counter_two_opens',true,'paused_go_denied',true,'one_authoritative_person',true,'wrong_site_claim_denied',true,'attributed_claim_persisted',true,'canonical_report_reconciled',true);
  RAISE EXCEPTION USING ERRCODE='ZX001',MESSAGE='QA rollback';
  EXCEPTION WHEN SQLSTATE 'ZX001' THEN INSERT INTO pg_temp.pilot_qa_result VALUES(results);
  END;
