@@ -77,7 +77,6 @@ export const routeNavigation = {
   "/o/$organizationSlug/$siteSlug/launch": hidden("Authenticated, scoped Site Launch Studio alias", admins),
   "/o/$organizationSlug/$siteSlug/website": hidden("Authenticated, scoped Site Website Studio alias", ["site_admin", "site_website_editor"]),
   "/launch/site-preview": endpoint,
-  "/site-preview-share": hidden("Unlisted revocable Site website preview; never a navigation destination", []),
   "/landing": publicPage,
   "/landing/$journeyId": publicPage,
   "/next/$journeyId": publicPage,
