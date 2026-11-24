@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   engagementDomains, engagementAudienceKinds, engagementInteractions,
   engagementChannels, engagementChannelLabels, type EngagementChannel,
@@ -56,6 +56,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [revokeTarget,setRevokeTarget]=useState<CreatedLink|null>(null);
 
   // A placeholder is never publishable; the real destination must be chosen
   // from the server's current publication-aware catalog.
@@ -102,14 +103,13 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
   }
   async function revoke(link:CreatedLink){
     if(!published||busy||revoked.has(link.linkId))return;
-    if(!window.confirm("Revoke this link? Previously distributed copies will stop working."))return;
     setBusy(true);setError("");setNotice("");
     try{
       await revokeEngagementGoLink({
         data:{engagementId:published.engagementId,linkId:link.linkId},
       });
       setRevoked(current=>new Set(current).add(link.linkId));
-      setNotice("The link was revoked.");
+      setNotice("The link was revoked.");setRevokeTarget(null);
     }catch(error){setError(errorMessage(error));}
     finally{setBusy(false);}
   }
@@ -198,20 +198,27 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
         </Button>
       </div>
       <div className="mt-4 space-y-3">
-        {!links.length&&<p className="text-sm text-muted-foreground">Create a link for distribution.</p>}
+        {!links.length&&<EmptyState title="Create a link for distribution."/>}
         {links.map(link=><div key={link.linkId} className="flex flex-wrap items-center justify-between gap-2 border p-3">
           <div>
             <p className="font-mono text-sm select-all">/go/{link.code}</p>
-            {revoked.has(link.linkId)&&<p className="text-xs text-muted-foreground">Revoked</p>}
+            {revoked.has(link.linkId)&&<StatusBadge>Revoked</StatusBadge>}
           </div>
           <div className="flex gap-2">
             <GoLinkActions code={link.code} status={revoked.has(link.linkId)?"revoked":"active"}
-              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")void revoke(link);}}/>
+              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")setRevokeTarget(link);}}/>
           </div>
         </div>)}
       </div>
     </>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
+    <ActionDialog open={!!revokeTarget} title="Revoke Go Link"
+      description="Previously distributed copies of this link will stop working."
+      confirmLabel="Revoke link" pending={busy} destructive
+      confirmDisabled={!published||!revokeTarget||revoked.has(revokeTarget.linkId)}
+      onClose={()=>setRevokeTarget(null)} onConfirm={()=>{if(revokeTarget)void revoke(revokeTarget);}}>
+      {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+    </ActionDialog>
   </WorkspacePanel>;
 }
