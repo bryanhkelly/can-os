@@ -102,6 +102,7 @@ export const workspaceHome = {
   specialist: "/home",
   counselor: "/home",
   network_admin: "/home",
+  reporting_relationship_manager: "/home",
   can_network_steward: "/home",
   can_credential_reviewer: "/canonical/issuer-access",
   can_jurisdiction_reviewer: "/home",
@@ -169,6 +170,7 @@ const roleLinks = {
   safeguarding_responder: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
   safeguarding_lead: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
   network_admin: [],
+  reporting_relationship_manager: [],
   can_network_steward: [
     { title: "Jurisdiction profiles", path: "/operations/jurisdiction-profiles", icon: "clipboard" },
   ],
