@@ -95,6 +95,7 @@
     "test:classroom:browser": "playwright test tests/e2e/classroom-connect.spec.ts --config=playwright.authenticated-routes.config.ts",
     "db:canonical:noncredit:integration": "node scripts/acceptance/test-noncredit-self-enrollment-test01.mjs",
     "test:e2e:noncredit": "playwright test --config=playwright.noncredit-self-enrollment.config.ts",
+    "test:e2e:noncredit:journey": "playwright test --config=playwright.noncredit-pilot-journey.config.ts",
     "db:check:main": "node scripts/acceptance/check-production-drizzle-parity.mjs",
     "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
     "test:site:channels": "node scripts/run-unit-suite.mjs site",
