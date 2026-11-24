@@ -209,7 +209,7 @@ export const setSiteGoLinkPaused = createServerFn({method:"POST"})
     )).for("update").limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link unavailable.");
     const desired=data.action==="pause"?"paused" as const:"active" as const;
-    return transitionAuthorizedGoLink(tx,actor,site,link,data.action==="pause"?"paused":"active");
+    return transitionAuthorizedGoLink(tx,actor,site,link,desired);
   }));
 
 /** Stable keyset pagination by (created_at, id). The cursor is a scoped
