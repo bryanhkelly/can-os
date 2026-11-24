@@ -18,6 +18,7 @@ import { UniversalEngagementPublisher } from "@/components/launch-studio/Univers
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { PlatformReportingHealth } from "@/components/platform/PlatformReportingHealth";
+import { PlatformAcademicIntegrity } from "@/components/platform/PlatformAcademicIntegrity";
 import { PlatformReleaseCenter } from "@/components/platform/PlatformReleaseCenter";
 
 export const Route = createFileRoute("/platform")({
@@ -74,6 +75,7 @@ function PlatformAdministration() {
     {summary.platformOwner && <PlatformOwnerPilotAccessPanel/>}
     {summary.platformOwner && <PlatformOwnerDelegationPanel/>}
     <PlatformReportingHealth/>
+    <PlatformAcademicIntegrity integrity={summary.academicIntegrity}/>
     <PlatformCatalogManager/>
     <PlatformReleaseCenter records={summary.publisherReleaseReadiness}
       limited={summary.publisherReleasesLimited}/>
