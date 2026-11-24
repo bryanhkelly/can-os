@@ -7,7 +7,7 @@ import {
   accessAccounts, accountPersonGrants, accessAccountNoncreditPrincipals,
   accessAccountCanonicalPrincipals, accessAdultLearningReviews, people, documents,
 } from "@/db/schema";
-import { canonicalAccounts, canonicalPersons, canonicalEnrollmentOrganizations, canonicalAccountGrants, canonicalSessions } from "@/db/canonical-v301";
+import { canonicalAccounts, canonicalEnrollmentOrganizations, canonicalAccountGrants, canonicalSessions } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -105,18 +105,9 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
      // Reuse an exact, consented noncredit link. An email match by itself,
      // an operator identity, or a different CAN Person never authorizes reuse.
      if(operator||Boolean(native)!==Boolean(link)||
-        (link&&(link.accessPersonId!==account.personId||
+        (link&&(link.accessPersonId!==account.personId||link.personId!==account.personId||
           link.accountId!==native?.id||!native?.verified||native.disabledAt)))
        throw new AuthorizationError("existing canonical identity requires independent reconciliation");
-     if(link){
-       const [existingPerson]=await tx.select({
-         birthDate:canonicalPersons.birthDate,
-       }).from(canonicalPersons).where(eq(canonicalPersons.id,link.personId)).limit(1);
-       if(!existingPerson||
-          (existingPerson.birthDate!==null&&
-           existingPerson.birthDate!==data.verifiedBirthDate))
-         throw new AuthorizationError("existing canonical Person requires independently reviewed reconciliation");
-     }
      const evidenceId=data.evidenceReference.slice("document:".length);
      const [evidence]=await tx.select({
        subjectType:documents.subjectType,
