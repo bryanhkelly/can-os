@@ -24,11 +24,12 @@ function QueryState({ loading, error, isEmpty, empty, children, onRetry, retryin
   }
   if (error) {
     return <WorkspaceNotice tone="danger" className="mt-8">
-      <span>{error}</span>
-      {onRetry && <Button type="button" variant="ghost" size="sm" onClick={onRetry} loading={retrying} disabled={retrying}
-        className="ml-auto underline underline-offset-4">
-        {retrying ? "Retrying…" : "Retry"}
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{error}</span>
+      {onRetry && <Button type="button" variant="ghost" size="sm" onClick={onRetry} loading={retrying} loadingLabel="Retrying…" disabled={retrying}>
+        Retry
       </Button>}
+      </div>
     </WorkspaceNotice>;
   }
   if (isEmpty) {
