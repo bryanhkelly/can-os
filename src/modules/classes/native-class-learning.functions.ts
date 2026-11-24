@@ -12,6 +12,7 @@ import { authorizeNativeLearnerClass } from "./native-learner-class-access.serve
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 import { canonicalLessonVideoResources } from "@/domain/canonical-lesson-video-resources";
+import { deriveNativeClassResume } from "@/domain/native-class-resume";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
@@ -63,13 +64,8 @@ export const getNativeClassLearningResume=createServerFn({method:"GET"})
     const actor=await getInstructionalLearnerContext(getRequest());
     return db.transaction(async tx=>{
       const {cls,access}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
-      const lessons=(await readLearnerLessons(tx,access.courseVersionId,access.courseAttemptId))
-        .filter(lesson=>lesson.lessonBody.trim().length>0||lesson.videoResources.length>0);
-      const isComplete=(lesson:typeof lessons[number])=>lesson.progressStatus==="completed"||lesson.progressStatus==="waived";
-      const next=lessons.find(lesson=>!isComplete(lesson));
-      return {classId:cls.id,title:cls.title,
-        lesson:next?{id:next.lessonId,title:next.lessonTitle}:null,
-        completed:lessons.filter(isComplete).length,total:lessons.length};
+      const lessons=await readLearnerLessons(tx,access.courseVersionId,access.courseAttemptId);
+      return deriveNativeClassResume(cls.id,cls.title,lessons);
     });
   });
 
