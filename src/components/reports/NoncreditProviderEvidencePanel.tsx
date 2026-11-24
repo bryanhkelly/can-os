@@ -3,7 +3,8 @@ import {useProviderReportOptions} from "@/hooks/use-provider-report-options";
 import {providerDeliveryQueryKey,PROVIDER_REPORT_FILTER_CAPABILITIES} from "@/domain/report-filter-state";
 import {ProviderReportFilters} from "./ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import {useMemo,useState} from "react";
+import {useMemo} from "react";
+import { DisclosureSection, WorkspaceNotice } from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {ReportMetricCard} from "@/components/workspace/report-metric-card";
 import {ReportRankedComparison} from "@/components/workspace/report-ranked-comparison";
@@ -24,7 +25,6 @@ export function NoncreditProviderEvidencePanel(){
   const {geography,siteId:requestedSite}=controller.filters;
   const basis=PROVIDER_REPORT_FILTER_CAPABILITIES["provider-delivery"].geographyBasis;
   const options=useProviderReportOptions(scope,basis,controller.filters);
-  const [showDefinitions,setShowDefinitions]=useState(false);
   const {query:response,data}=usePrivateReportQuery({scope,key:providerDeliveryQueryKey(geography),enabled:options.ready,read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
   const selectionUnavailable=!!requestedSite&&!site;
@@ -77,13 +77,12 @@ export function NoncreditProviderEvidencePanel(){
         Export private evidence CSV
       </Button>
     </div>
-    {scope!==null&&options.ready&&(response.isPending||response.isFetching)&&<p role="status" className="border border-border p-4 text-sm">
-      Reconciling authorized releases and canonical outcomes…
-    </p>}
-    {scope!==null&&options.ready&&response.isError&&<p role="alert" className="border border-border p-4 text-sm">
+    {scope!==null&&options.ready&&(response.isPending||response.isFetching)&&<WorkspaceNotice>Reconciling authorized releases and canonical outcomes…</WorkspaceNotice>}
+    {scope!==null&&options.ready&&response.isError&&<WorkspaceNotice tone="danger">
       The current account cannot access this provider report, or reporting exceeds
       the service's safe result bounds. No partial totals are displayed.
-    </p>}
+    </WorkspaceNotice>}
+    {scope===null&&<WorkspaceNotice tone="attention">A current verified workspace session is required.</WorkspaceNotice>}
     {scope!==null&&<ProviderReportFilters controller={controller} options={options} basis={basis}/>}
     {data&&<>
       <div className="border border-border bg-card p-4 text-xs text-muted-foreground">
@@ -139,14 +138,7 @@ export function NoncreditProviderEvidencePanel(){
           </TableBody>
         </Table>
       </div>
-      <section className="border border-border bg-card p-4">
-        <Button type="button" variant="ghost" aria-expanded={showDefinitions}
-          onClick={()=>setShowDefinitions(x=>!x)}
-          className="flex w-full justify-between gap-4 px-0 text-left">
-          Metric definitions and source interpretation
-          <span aria-hidden="true">{showDefinitions?"−":"+"}</span>
-        </Button>
-        {showDefinitions&&<div className="mt-3">
+      <DisclosureSection title="Metric definitions and source interpretation">
           <Table scrollLabel="Metric definitions and source interpretation" aria-label="Metric definitions and source interpretation" className="w-full min-w-[36rem] text-left text-sm"><TableCaption className="sr-only">Metric definitions and source interpretation</TableCaption>
             <TableHeader className="border-b border-border">
               <TableRow><TableHead className="p-3">Metric</TableHead><TableHead className="p-3">Source</TableHead><TableHead className="p-3">Counting rule</TableHead></TableRow>
@@ -157,8 +149,7 @@ export function NoncreditProviderEvidencePanel(){
               <TableCell className="p-3">{item.grain}. {item.meaning}.</TableCell>
             </TableRow>)}</TableBody>
           </Table>
-        </div>}
-      </section>
+      </DisclosureSection>
       <p className="border-t border-border pt-3 text-xs text-muted-foreground">
         Internal operator-only evidence, not approved for public release or use as verified
         funding impact. Cross-provider network access requires independently authorized host
