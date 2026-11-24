@@ -1,5 +1,4 @@
 import { Field } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
 import { SiteCampaignEvidencePanel } from "@/components/reports/SiteCampaignEvidencePanel";
 import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
 import { GoLinkActions } from "@/components/links/GoLinkActions";
@@ -9,7 +8,7 @@ import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementD
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, EmptyState, QueryState, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   createEngagementGoLink, listEngagementGoLinks,
   listSiteEngagementDefinitions, listOwnerEngagementDefinitions, retireEngagementDefinition,
@@ -42,6 +41,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
+  const [confirmation,setConfirmation]=useState<{engagementId:string;link?:Link}|null>(null);
 
   useEffect(()=>{
     let active=true;
@@ -87,7 +87,6 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
   }
   async function revoke(link:Link){
     if(!record||busy||linksFor!==record.engagementId||link.status==="revoked")return;
-    if(!window.confirm("Revoke this Go Link? Existing distributed copies will stop working."))return;
     setBusy(true);setError("");setMessage("");
     try{
       await revokeEngagementGoLink({
@@ -95,19 +94,18 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
       });
       setLinks(current=>current.map(row=>row.id===link.id
         ? {...row,status:"revoked" as const}:row));
-      setMessage("Go Link revoked.");
+      setMessage("Go Link revoked.");setConfirmation(null);
     }catch(error){setError(problem(error));}
     finally{setBusy(false);}
   }
   async function retire(){
     if(!record||busy||record.status==="retired")return;
-    if(!window.confirm("Retire this engagement? All of its Go Links will stop resolving."))return;
     setBusy(true);setError("");setMessage("");
     try{
       await retireEngagementDefinition({data:{engagementId:record.engagementId}});
       setRecords(rows=>rows.map(row=>row.engagementId===record.engagementId
         ? {...row,status:"retired" as const}:row));
-      setMessage("Engagement retired. Existing links cannot be used.");
+      setMessage("Engagement retired. Existing links cannot be used.");setConfirmation(null);
     }catch(error){setError(problem(error));}
     finally{setBusy(false);}
   }
@@ -118,20 +116,19 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
       <Button type="button" variant="outline" size="sm" disabled={busy}
         onClick={()=>setRefresh(n=>n+1)}>Refresh</Button>
     </div>
-    {loading&&<p role="status" className="mt-4 text-sm">Loading published engagements…</p>}
-    {!loading&&!records.length&&
-      <p className="mt-4 text-sm text-muted-foreground">No published experiences in this workspace yet.</p>}
+    {loading&&<QueryState loading="Loading published engagements…"/>}
+    {!loading&&!records.length&&!error&&
+      <EmptyState className="mt-4" title="No published experiences in this workspace yet."/>}
     {!loading&&records.length>0&&<>
-      <div className="mt-4 grid gap-1">
-        <Label htmlFor="saved-go-engagement">Published experience</Label>
+      <Field className="mt-4" label="Published experience">
         <Select id="saved-go-engagement" disabled={busy} value={selected??""} onChange={event=>{
-          setSelected(event.target.value);setLinks([]);setLinksFor(null);setLinksLoading(true);setDistribution(null);setError("");setMessage("");
+          setSelected(event.target.value);setLinks([]);setLinksFor(null);setLinksLoading(true);setDistribution(null);setConfirmation(null);setError("");setMessage("");
         }}>
           {records.map(row=><option key={row.engagementId} value={row.engagementId}>
             {row.headline} (v{row.version}, {row.status})
           </option>)}
         </Select>
-      </div>
+      </Field>
       {record&&<>
         <div className="mt-3 text-sm text-muted-foreground">
           <span className="font-medium">{record.domain}</span> · {record.mode==="page"?"Rendered experience":"Direct destination"} · {record.status}
@@ -146,12 +143,12 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
             {busy?"Working…":"Create another Go Link"}
           </Button>
           <Button type="button" variant="outline" disabled={busy||record.status==="retired"}
-            onClick={()=>void retire()}>Retire engagement</Button>
+            onClick={()=>setConfirmation({engagementId:record.engagementId})}>Retire engagement</Button>
         </div>
       </>}
-      {linksLoading&&<p className="mt-4 text-sm" role="status">Loading saved links…</p>}
+      {linksLoading&&<QueryState loading="Loading saved links…"/>}
       {!linksLoading&&selected!==null&&linksFor===selected&&<div className="mt-4 grid gap-2">
-        {!links.length&&<p className="text-sm text-muted-foreground">No Go Links issued for this engagement.</p>}
+        {!links.length&&<EmptyState title="No Go Links issued for this engagement."/>}
         {links.map(link=><div key={link.id} className="flex flex-wrap justify-between gap-2 border p-3">
           <div className="min-w-0">
             <p className="font-mono text-sm select-all">/go/{link.code}</p>
@@ -162,16 +159,26 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
           </div>
           <div className="flex flex-wrap gap-2">
             {link.status==="active"&&record?.status==="active"&&<GoLinkActions code={link.code} status="active"
-              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")void revoke(link);}}/>
+              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")setConfirmation({engagementId:record.engagementId,link});}}/>
             {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>Prepare email</Button>}
-}
           </div>
         </div>)}
       </div>}
       {distribution&&!linksLoading&&linksFor===selected&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
     </>}
     {siteId&&!ownerSurface&&<SiteCampaignEvidencePanel key={siteId} siteId={siteId}/>}
-    {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
-    {message&&<p role="status" className="mt-4 text-sm">{message}</p>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
+    {message&&<WorkspaceNotice tone="success" className="mt-4">{message}</WorkspaceNotice>}
+    <ActionDialog open={!!confirmation&&confirmation.engagementId===selected}
+      title={confirmation?.link?"Revoke Go Link":"Retire engagement"}
+      description={confirmation?.link?"Existing distributed copies of this Go Link will stop working.":"All Go Links for this engagement will stop resolving."}
+      confirmLabel={confirmation?.link?"Revoke link":"Retire engagement"}
+      pending={busy} destructive confirmDisabled={!record||record.status!=="active"||!!confirmation?.link&&(linksFor!==selected||!links.some(link=>link.id===confirmation.link?.id&&link.status==="active"))}
+      onClose={()=>setConfirmation(null)} onConfirm={()=>{
+        if(!confirmation||confirmation.engagementId!==selected)return;
+        if(confirmation.link)void revoke(confirmation.link);else void retire();
+      }}>
+      {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+    </ActionDialog>
   </WorkspacePanel>;
 }
