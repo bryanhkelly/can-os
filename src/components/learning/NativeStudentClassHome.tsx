@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, StatusBadge, WorkspaceLinkNavigation, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 
 export type StudentClass={
@@ -29,25 +29,22 @@ export function NativeStudentClassHome({classes,navigation}:{
     {navigation}
     {groups.map(group=><section key={group.title} className="mt-6 space-y-3" aria-label={group.title}>
       <h2 className="font-serif text-2xl">{group.title}</h2>
-      {group.items.length===0&&<p className="text-sm text-muted-foreground">
-        {group.title==="Enrolled Classes"?"No active Class enrollments are available.":"No other Classes are available for your Site."}
-      </p>}
+      {group.items.length===0&&<EmptyState title={group.title==="Enrolled Classes"?"No active Class enrollments are available.":"No other Classes are available for your Site."}/>}
       <div className="grid gap-4 md:grid-cols-2">
         {group.items.map(item=>{
           const enrolled=item.status==="active"&&!!item.courseAttemptId;
           return <article key={item.classId} className="space-y-3 border border-border bg-card p-5">
             <h3 className="font-serif text-xl">{item.title}</h3>
-            <p className="text-xs text-muted-foreground">
-              {item.deliveryMode.replaceAll("_"," ")} · {enrolled?"Enrolled":
-                item.status==="pending"?"Enrollment pending":"Not enrolled"}
-            </p>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{item.deliveryMode.replaceAll("_"," ")}</span>
+              <StatusBadge tone={enrolled?"success":item.status==="pending"?"attention":"neutral"}>{enrolled?"Enrolled":item.status==="pending"?"Enrollment pending":"Not enrolled"}</StatusBadge>
+            </div>
             {enrolled&&item.creditMode==="not_applicable"&&<p className="text-xs text-muted-foreground">Noncredit participation. No academic credit is awarded.</p>}
-            {enrolled?<div className="flex flex-wrap gap-2"><Button asChild>
+            {enrolled?<WorkspaceLinkNavigation label={item.title+" actions"} surface="plain" className="gap-2"><Button asChild>
               <Link to="/class/$classId" params={{classId:item.classId}}
                 search={{view:"learn",tab:"lessons"}}>
                 Open Class
               </Link>
-            </Button><Button asChild variant="outline"><Link to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"assignments"}}>Assignments</Link></Button><Button asChild variant="outline"><Link to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"progress"}}>Progress</Link></Button></div>:<div className="space-y-2">
+            </Button><Button asChild variant="outline"><Link to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"assignments"}}>Assignments</Link></Button><Button asChild variant="outline"><Link to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"progress"}}>Progress</Link></Button></WorkspaceLinkNavigation>:<div className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 {item.status==="pending"
                   ?"Your Class enrollment is awaiting authorization."
