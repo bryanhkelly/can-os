@@ -1,7 +1,8 @@
 import { renderSharedSitePreview } from "@/domain/site-preview-sharing";
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { sitePreviewSnapshotKey, readSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
-import { and, desc, eq, ilike } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, isNull, lte, notExists, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { sitePublications, sites } from "@/db/schema";
 import { canonicalClasses, canonicalClassOfferingVersions } from "@/db/canonical-v301";
@@ -149,29 +150,25 @@ const providers={
     const href=goDestinationHref(destination,code);
     return href?{available:true,title:row.title,href}:unavailable;
     },
-    async choices({siteId,reader,term}){  const versions=await reader.select({
-    id:canonicalClasses.id,siteId:canonicalClasses.siteId,title:canonicalClasses.title,
-    state:canonicalClasses.state,visibility:canonicalClassOfferingVersions.visibility,
-    versionState:canonicalClassOfferingVersions.state,
-    opensAt:canonicalClassOfferingVersions.opensAt,
-    closesAt:canonicalClassOfferingVersions.closesAt,
-  }).from(canonicalClasses).innerJoin(canonicalClassOfferingVersions,
-    eq(canonicalClassOfferingVersions.classId,canonicalClasses.id))
-    .where(and(eq(canonicalClasses.siteId,siteId),eq(canonicalClasses.state,"active"),
-      term?ilike(canonicalClasses.title,goLikeContainsLiteral(term)):undefined))
-    .orderBy(desc(canonicalClassOfferingVersions.versionNo)).limit(200);
-  const latest=new Map<string,(typeof versions)[number]>();
-  for(const version of versions)if(!latest.has(version.id))latest.set(version.id,version);
-  const now=new Date();
-  return [...latest.values()].filter(item=>
-    item.state==="active" && item.visibility==="public" &&
-    item.versionState==="published" &&
-    (!item.opensAt || item.opensAt<=now) &&
-    (!item.closesAt || item.closesAt>now),
-  ).slice(0,50).map(item=>({
-    destination:{kind:"class" as const,classId:item.id},title:item.title,
-    description:"Public Class offering",
-  }));
+    async choices({siteId,reader,term}){
+      const now=new Date();
+      const version=canonicalClassOfferingVersions;
+      const newer=alias(version,"go_newer_class_offering");
+      // Select the current version before applying visibility/window filters
+      // and the catalog limit. Older public versions cannot resurrect a closed
+      // Class, and heavily revised Classes cannot crowd out other choices.
+      const rows=await reader.select({id:canonicalClasses.id,title:canonicalClasses.title})
+        .from(canonicalClasses).innerJoin(version,eq(version.classId,canonicalClasses.id))
+        .where(and(eq(canonicalClasses.siteId,siteId),eq(canonicalClasses.state,"active"),
+          eq(version.state,"published"),eq(version.visibility,"public"),
+          or(isNull(version.opensAt),lte(version.opensAt,now)),
+          or(isNull(version.closesAt),gt(version.closesAt,now)),
+          notExists(reader.select({id:newer.id}).from(newer).where(and(
+            eq(newer.classId,version.classId),gt(newer.versionNo,version.versionNo)))),
+          term?ilike(canonicalClasses.title,goLikeContainsLiteral(term)):undefined))
+        .orderBy(asc(canonicalClasses.title),asc(canonicalClasses.id)).limit(50);
+      return rows.map(item=>({destination:{kind:"class" as const,classId:item.id},
+        title:item.title,description:"Public Class offering"}));
     },
   }),
   "enrichment":defineGoProvider("enrichment",{
