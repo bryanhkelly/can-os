@@ -10,14 +10,18 @@ import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagemen
 import {CampaignListMembers} from "./CampaignListMembers";
 import {parseCampaignRecipients} from "@/domain/campaign-policy";
 type Workspace=Awaited<ReturnType<typeof readEngagementCampaignWorkspace>>;
-export function NativeEngagementCampaigns({engagementId,linkId,invitationReady}:{engagementId:string;linkId:string;invitationReady:boolean}){
+type CampaignProps={engagementId:string;linkId:string;invitationReady:boolean};
+export function NativeEngagementCampaigns(props:CampaignProps){
+ return <NativeCampaignSession key={JSON.stringify([props.engagementId,props.linkId])} {...props}/>;
+}
+function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignProps){
  const [data,setData]=useState<Workspace|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [name,setName]=useState(""),[raw,setRaw]=useState(""),[source,setSource]=useState(""),[attested,setAttested]=useState(false);
  const [list,setList]=useState(""),[when,setWhen]=useState(""),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
  const [manageList,setManageList]=useState(false);
  const requestId=useRef<{id:string;scheduledAt:string}|null>(null),pending=useRef(false);
  const scope={engagementId,linkId};
- useEffect(()=>{let active=true;readEngagementCampaignWorkspace({data:{engagementId,linkId}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active)setError("Native campaign workspace unavailable.");});return()=>{active=false;};},[engagementId,linkId,refresh]);
+ useEffect(()=>{let active=true;setData(null);setError("");readEngagementCampaignWorkspace({data:{engagementId,linkId}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active){setData(null);setError("Native campaign workspace unavailable.");}});return()=>{active=false;};},[engagementId,linkId,refresh]);
  async function run(action:()=>Promise<void>){if(pending.current)return;pending.current=true;setBusy(true);setError("");setNotice("");try{await action();setRefresh(v=>v+1);}catch{setError("The operation could not be confirmed. Review the saved state and try again.");}finally{pending.current=false;setBusy(false);}}
  const parsed=parseCampaignRecipients(raw);
  const valid=!!name.trim()&&source.trim().length>=5&&attested&&parsed.recipients.length>0&&!parsed.invalid.length&&!parsed.tooMany;
