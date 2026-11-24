@@ -1,3 +1,5 @@
+import {readScopedSiteGeography} from "@/modules/geography/site-geography-read.server";
+import {editorialCommunityProfileSchema} from "@/domain/editorial-community-profile";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteBrandVersions, siteLocalContentVersions, sites, programs, organizations } from "@/db/schema";
@@ -30,7 +32,13 @@ export async function readAuthorizedSiteContentBrief(actor:AccessContext,siteId:
     const [org]=await tx.select({name:organizations.name}).from(organizations).where(eq(organizations.id,site.organizationId)).limit(1);
     const savedBrand=brand?siteBrandConfigurationSchema.parse(brand.configuration):null;
     const brief=projectSiteContentBriefV61({siteId:site.id,siteName:site.name,timezone:site.timezone,siteRevision:site.updatedAt.toISOString(),metadata:site.metadata,brandVersionId:site.currentBrandVersionId,brandRevision:brand?.revision??null,websiteContent:copy,websiteContentRevision:website?.revision??null});
-    return {...brief,organizationId:site.organizationId,organizationName:org?.name??null,editorialBrand:savedBrand?{displayName:savedBrand.displayName,directionId:savedBrand.directionId}:null};
+    const geography=await readScopedSiteGeography(tx,site);
+    const communityProfiles=geography.communityProfiles.flatMap(profile=>{
+      const area=geography.areas.find(a=>a.code===profile.areaCode);
+      const parsed=editorialCommunityProfileSchema.safeParse({...profile,areaName:area?.name});
+      return parsed.success?[parsed.data]:[];
+    }).slice(0,2);
+    return {...brief,...(communityProfiles.length?{communityProfiles}:{}),organizationId:site.organizationId,organizationName:org?.name??null,editorialBrand:savedBrand?{displayName:savedBrand.displayName,directionId:savedBrand.directionId}:null};
   };
   return executor?project(executor):db.transaction(project);
 }

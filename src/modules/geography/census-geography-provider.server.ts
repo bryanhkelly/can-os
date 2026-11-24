@@ -90,7 +90,7 @@ export function createCensusGeographyProvider(options:{fetcher?:typeof fetch;api
       if(address.country!=="US"||/^\s*(?:p\.?\s*o\.?\s*box|post office box)\b/i.test(address.street1))return null;
       const url=new URL("https://geocoding.geo.census.gov/geocoder/geographies/address");
       url.search=new URLSearchParams({street:address.street1,city:address.city,state:address.state,zip:address.postalCode.slice(0,5),
-        benchmark:"Public_AR_Current",vintage:"Current_Current",layers:"all",format:"json"}).toString();
+        benchmark:"Public_AR_Current",vintage:"ACS2024_Current",layers:"all",format:"json"}).toString();
       return parseCensusGeography(await json(url),address);
     },
     async communityProfile(area,year){

@@ -11,7 +11,7 @@ async function rows<T>(reader:Reader,query:SQL):Promise<T[]>{
 }
 // Explicit release dataset. Refresh with a reviewed version change, not an unversioned moving query.
 const ACS_YEAR=2024;
-type Work={site_id:string;organization_id:string;generation:string;lease_id:string;attempts:number;address:unknown};
+type Work={site_id:string;organization_id:string;generation:string;lease_id:string;attempts:number;address:unknown;eligible:boolean};
 async function claimSite():Promise<Work|undefined>{
  return db.transaction(async tx=>{
   await tx.execute(sql`UPDATE public.site_geography_jobs SET status='failed',lease_id=NULL,lease_until=NULL,updated_at=now()
@@ -24,8 +24,8 @@ async function claimSite():Promise<Work|undefined>{
     claimed AS (UPDATE public.site_geography_jobs j SET status='processing',attempts=attempts+1,
       lease_id=gen_random_uuid(),lease_until=now()+interval '2 minutes',updated_at=now()
       FROM candidate c WHERE j.site_id=c.site_id RETURNING j.*)
-    SELECT j.site_id,j.organization_id,j.generation,j.lease_id,j.attempts,s.address FROM claimed j
-    JOIN public.sites s ON s.id=j.site_id AND s.organization_id=j.organization_id AND s.site_kind='physical'`);
+    SELECT j.site_id,j.organization_id,j.generation,j.lease_id,j.attempts,s.address,public.site_geography_eligible(s.site_kind,s.metadata,s.address) AS eligible FROM claimed j
+    JOIN public.sites s ON s.id=j.site_id AND s.organization_id=j.organization_id`);
   return work;
  });
 }
@@ -120,7 +120,7 @@ export async function processGeographicIntelligence(options:{provider?:Geography
  if(work){
   try{
    const address=physicalSiteAddressSchema.safeParse(siteAddressEditorDraft(work.address));
-   if(!address.success||address.data.country!=="US"||await isDemoTenantOrganization(work.organization_id)){
+   if(!work.eligible||!address.success||address.data.country!=="US"||await isDemoTenantOrganization(work.organization_id)){
     await finishSite(work,"unsupported");
    }else{
     const result=await provider.resolve(address.data);

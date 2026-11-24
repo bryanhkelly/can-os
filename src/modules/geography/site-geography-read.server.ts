@@ -14,7 +14,7 @@ export async function readScopedSiteGeography(tx:Tx,scope:{id:string;organizatio
   ORDER BY resolved_at DESC LIMIT 1`);
  const version=(result.rows as unknown as Version[])[0];
  if(!version){
-  const job=await tx.execute(sql`SELECT status FROM public.site_geography_jobs WHERE site_id=${scope.id} AND organization_id=${scope.organizationId}`);
+  const job=await tx.execute(sql`SELECT status FROM public.site_geography_jobs WHERE site_id=${scope.id} AND organization_id=${scope.organizationId} AND updated_at<=${asOf}`);
   return {status:(job.rows[0]?.status as string|undefined)??"unknown",market:null,areas:[],communityProfiles:[],version:null};
  }
  const membership=await tx.execute(sql`SELECT a.code,v.name,v.kind,v.source_id,p.year,p.indicators
