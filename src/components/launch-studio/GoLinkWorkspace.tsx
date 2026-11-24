@@ -272,7 +272,8 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
           {link.expiresAt?" · Expires "+new Date(link.expiresAt).toLocaleString():""}
         </p>
         {link.evidence?<p className="text-sm">
-          <strong>{link.evidence.redirects30d.toLocaleString()}</strong> successful link opens in the last 30 days.
+          <strong>{link.evidence.linkOpens30d.toLocaleString()}</strong> classified link opens, {link.evidence.pageViews30d.toLocaleString()} rendered pages and {link.evidence.redirectResponses30d.toLocaleString()} redirects in the last 30 days.
+          {link.evidence.unclassifiedEntries30d>0&&<> {link.evidence.unclassifiedEntries30d.toLocaleString()} legacy entries have no response classification.</>}
           {" "}{link.evidence.registrationEvidence==="referenced_noncredit_claim"
             ?<><strong>{link.evidence.referralRegistrations30d?.toLocaleString()??"0"}</strong>
               {" "}training registration claims carrying this referral code (not verified click-through conversions).</>
@@ -291,7 +292,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
         {pageError&&<p role="alert" className="text-xs text-destructive">{pageError}</p>}
       </div>}
       <p className="text-xs text-muted-foreground">
-        Redirects are unfiltered anonymous observations, which can include
+        Link opens, rendered pages and redirects are unfiltered anonymous observations, which can include
         automated requests. They are not unique visitors or enrollments.
         Training registrations are counted from canonical enrollment claims,
         not from clicks. Other destination outcome types are shown as not connected,
