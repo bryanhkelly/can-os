@@ -5,6 +5,8 @@ import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Field } from "@/components/ui/field";
+import { EmptyState, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import { getNativeClassHomework, getNativeClassHomeworkHistory, getNativeClassHistoricalWork, submitNativeClassHomework } from
   "@/modules/classes/native-class-homework.functions";
 import { normalizeClientError } from "@/lib/client-error";
@@ -49,20 +51,17 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
         with your Course Attempt. It does not automatically become a grade or credit.
       </p>
     </div>
-    {query.isPending&&<p role="status">Loading your assignments…</p>}
-    {query.isError&&<p role="alert">
-      Homework is unavailable under your current verified enrollment.
-      <Button type="button" variant="outline" className="ml-3" onClick={()=>void query.refetch()}>
-        Retry
-      </Button>
-    </p>}
+    <QueryState loading={query.isPending&&"Loading your assignments…"}
+      error={query.isError&&"Homework is unavailable under your current verified enrollment."}
+      onRetry={()=>void query.refetch()} retrying={query.isFetching}
+      isEmpty={false}/>
     {query.data?.legacySectionId&&<div className="space-y-2 border border-border p-3">
       <p className="text-sm">Original school assignments and feedback remain in your recovered Section until historical records are reconciled.</p>
       <Button asChild variant="outline" size="sm"><Link to="/student/assignments" search={{section:query.data.legacySectionId}}>View original school assignments</Link></Button>
     </div>}
     {query.data?.legacySectionId&&<HistoricalClassWork key={classEnrollmentId} queryScope={["historical-class-work",classEnrollmentId]} loadPage={beforeId=>getNativeClassHistoricalWork({data:{classEnrollmentId,beforeId}})}/>}
     {query.data?.assignments.length===0&&
-      <p className="text-sm">No written assignments are available for this Course yet.</p>}
+      <EmptyState title="No written assignments are available for this Course yet."/>}
     {query.data?.assignments.map(item=>{
       const submitted=item.status==="submitted"||item.status==="graded";
       const current=drafts[item.id]??item.responseText;
@@ -74,16 +73,15 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
               Due {new Date(item.dueAt).toLocaleDateString()}
             </p>}
           </div>
-          <span className="text-xs font-semibold">{item.status.replaceAll("_"," ")}</span>
+          <StatusBadge>{item.status.replaceAll("_"," ")}</StatusBadge>
         </div>
         <p className="whitespace-pre-line text-sm">{item.instructions}</p>
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">Your response</span>
+        <Field label={<>Your response<span className="sr-only"> for {item.title}</span></>}>
           <Textarea value={current} disabled={submitted||!!submitting}
-            aria-label={"Response for "+item.title} rows={7}
+            rows={7}
             onChange={event=>setDrafts(previous=>({...previous,[item.id]:event.target.value}))}
             placeholder="Type your answer here…"/>
-        </label>
+        </Field>
         {item.practiceFeedback&&<section className="space-y-1 border border-border bg-muted/30 p-3" aria-label="Practice feedback">
           <h4 className="text-sm font-semibold">Teacher practice feedback</h4>
           <p className="whitespace-pre-wrap text-sm">{item.practiceFeedback}</p>
@@ -95,16 +93,17 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
           queryScope={["native-homework-history",classEnrollmentId,item.id]}
           loadPage={beforeRevision=>getNativeClassHomeworkHistory({data:{classEnrollmentId,assignmentId:item.id,beforeRevision}})}/>}
         {!submitted?<Button type="button" disabled={!!submitting||current.trim().length<5}
+          loading={submitting===item.id} loadingLabel="Submitting…"
           onClick={()=>void submit(item.id,current.trim())}>
-          {submitting===item.id?"Submitting…":"Submit homework"}
+          Submit homework
         </Button>:<p className="text-sm text-muted-foreground">
           {item.status==="graded"?"Reviewed work.":"Submitted for review."}
           {item.submittedAt&&" "+new Date(item.submittedAt).toLocaleString()}
         </p>}
       </article>;
     })}
-    {notice&&<p role="status" className="text-sm">{notice}</p>}
-    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+    {notice&&<WorkspaceNotice tone="success">{notice}</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
   </section>;
 }
 
