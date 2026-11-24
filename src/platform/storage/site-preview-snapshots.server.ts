@@ -95,3 +95,14 @@ export async function readSitePreviewSnapshot(key:string,digest:string):
     return document.pages as Partial<Record<PublicSitePath,string>>;
   }catch{return null;}
 }
+
+/** Only call after a transaction has failed and the canonical link registry
+ * has confirmed this newly generated snapshot is not referenced. */
+export async function deleteUnreferencedSitePreviewSnapshot(siteId:string,snapshotId:string):Promise<void>{
+  const key=sitePreviewSnapshotKey(siteId,snapshotId);
+  if(!keyPattern.test(key))throw new Error("Invalid preview object key");
+  const bucket=(await liveCloudflarePhotoEnv())?.TEMPLATE_PHOTO_BUCKET;
+  if(bucket?.delete){await bucket.delete(key);return;}
+  const response=await fetch(signPrivateObjectUrl({method:"DELETE",key,keyPattern}),{method:"DELETE",redirect:"error"});
+  if(!response.ok&&response.status!==404)throw new Error("Private preview artifact cleanup failed");
+}
