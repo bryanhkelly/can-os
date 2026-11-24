@@ -33,9 +33,9 @@ describe("immutable Website R2 preview snapshots",()=>{
   });
   it("shares the saved full website, with immutable private storage",()=>{
     const writer=readFileSync("src/modules/sites/site-preview-sharing.functions.ts","utf8");
-    const reader=readFileSync("src/routes/site-preview-share.ts","utf8");
+    const reader=readFileSync("src/modules/engagement/go-destination-registry.server.ts","utf8");
     const bucket=readFileSync("src/platform/storage/site-preview-snapshots.server.ts","utf8");
-    expect(writer).toContain("getPartnerWebsitePreview(actor)");
+    expect(writer).toContain('getPartnerWebsitePreview(actor,undefined,"external-preview")');
     expect(writer).toContain("sitePreviewSnapshotKey(site.id,shareId)");
     expect(writer).toContain("writeSitePreviewSnapshot");
     expect(writer).not.toContain("projectShareableSitePreview({");
