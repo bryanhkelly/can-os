@@ -2,7 +2,8 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { EmptyState, QueryState } from "@/components/workspace";
+import { EmptyState, QueryState, StatCard, WorkspaceNotice } from "@/components/workspace";
+import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getNoncreditPilotOutcomes } from "@/modules/learning/noncredit-pilot-outcomes.functions";
 import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
 type Report=Awaited<ReturnType<typeof getNoncreditPilotOutcomes>>;
@@ -12,14 +13,19 @@ const count=(n:number)=>n.toLocaleString("en-US");
 /** Reusable, provider-only learning-outcomes panel, using Design System 6.1. */
 export function NoncreditPilotOutcomesPanel(){
   const [showDefinitions,setShowDefinitions]=useState(false);
+  const {session,error:sessionError}=useWorkspaceSession();
+  const authorizedSession=session?.authenticated&&!sessionError?session:null;
+  const scope=authorizedSession?JSON.stringify([authorizedSession.activeGrantId,authorizedSession.role,authorizedSession.activeContext,authorizedSession.ownerDelegation??null]):null;
   const query=useQuery<Report>({
-    queryKey:["noncredit-pilot-outcomes"],
+    queryKey:["noncredit-pilot-outcomes",scope],
+    enabled:scope!==null,
     queryFn:()=>getNoncreditPilotOutcomes({data:{}}),
     retry:false,
     staleTime:30_000,
   });
-  const report=query.data;
+  const report=scope!==null&&!query.isError?query.data:undefined;
   const summary=report?.totals;
+  if(scope===null)return <WorkspaceNotice tone="attention">A current verified provider session is required to view program evidence.</WorkspaceNotice>;
   return <section aria-label="Noncredit program evidence" className="space-y-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="space-y-1">
@@ -45,17 +51,15 @@ export function NoncreditPilotOutcomesPanel(){
       title="No registrations in this reporting window"
       description="Publish approved training and an enrollment release. Results appear here after learners register and participate."/>}
     {summary&&summary.registrations>0&&<>
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {NONCREDIT_PILOT_COUNT_DEFINITIONS.map(def=>{
           const value=def.key==="distinctLearners"
             ?report!.distinctLearners
             :summary[def.key];
-          return <div key={def.key} className="border border-border bg-card p-4">
-            <dt className="text-xs text-muted-foreground">{def.label}</dt>
-            <dd className="mt-2 text-2xl font-semibold tabular-nums">{count(value)}</dd>
-          </div>;
+          return <StatCard key={def.key} label={def.label} value={count(value)}/>;
         })}
-      </dl>
+      </div>
+      <WorkspaceNotice>Verified learning hours and participating congregation counts are not available in this report. Lesson ticks, playback and registrations must not be substituted for either measure.</WorkspaceNotice>
       <div className="border border-border bg-card p-4">
         <h3 className="font-semibold">Demonstrated learning improvement</h3>
         <p className="mt-1 text-sm">
