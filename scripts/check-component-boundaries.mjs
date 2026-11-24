@@ -12,7 +12,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency } from "./lib/v61-component-dependencies.mjs";
+import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency, runtimeDependencySpecifiers, featureRuntimeImportViolation } from "./lib/v61-component-dependencies.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const failures = [];
@@ -48,8 +48,6 @@ for (const file of files) {
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   checkParseDiagnostics(file, source, program);
   for (const importPath of sourceDependencySpecifiers(program, ts)) {
-    if(importPath==="recharts"&&file!=="src/components/workspace/report-chart-plot.tsx")
-      failures.push(file+": import Recharts only through the shared reporting plot adapter");
     const dependencyProblem = sharedUiImportViolation(file, importPath);
     if (dependencyProblem) failures.push(file + ": " + dependencyProblem);
     const target = resolveSourceDependency(file, importPath);
@@ -59,6 +57,10 @@ for (const file of files) {
     // Feature orchestration components may compose other feature components.
     // The shared-layer guard above independently forbids that dependency
     // from primitives, workspace patterns and workflow foundations.
+  }
+  for (const specifier of runtimeDependencySpecifiers(program, ts)) {
+    const violation = featureRuntimeImportViolation(file, specifier);
+    if (violation) failures.push(file + ": " + violation);
   }
   if (/\bcreateFileRoute\s*\(/.test(source) || /\bcreateServerFn\s*\(/.test(source))
     failures.push(file + ": shared presentation must not own a route or server command");
