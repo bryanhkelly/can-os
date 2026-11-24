@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike } from "drizzle-orm";
 import { db } from "@/db/client";
-import { sitePublications } from "@/db/schema";
+import { sitePublications, sites } from "@/db/schema";
 import { canonicalClasses, canonicalClassOfferingVersions } from "@/db/canonical-v301";
 import { readEligibleSelfEnrollmentReleases } from "@/modules/enrollment/noncredit-self-enrollment-catalog.server";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
@@ -147,4 +147,64 @@ export async function listGoDestinationChoices(
     destination:{kind:"class" as const,classId:item.id},title:item.title,
     description:"Public Class offering",
   }));
+}
+
+/** Minimal persisted parent scope. The authenticated author has already been
+ * checked when publishing, but public resolution must check the CURRENT
+ * owner and public availability again. A typed link alone never grants access.
+ */
+export type EngagementTargetOwner={
+  ownerKind:"platform"|"organization"|"site"|"program";
+  organizationId:string|null;
+  siteId:string|null;
+  programId:string|null;
+};
+
+/** Resolve public destination under the published engagement's owning scope.
+ * Reuse the original Go registry so new journeys cannot weaken publish gates.
+ * National Organization links may target an existing published release at one
+ * of that Organization's own Sites, without manufacturing a Marketing Package.
+ */
+export async function inspectEngagementDestination(
+  owner:EngagementTargetOwner,destination:GoDestination,code:string,reader:Reader=db,
+):Promise<DestinationInspection>{
+  if(destination.kind==="information"){
+    const journey=Object.values(engagementJourneys).find(v=>v.id===destination.journeyId);
+    const href=journey?goDestinationHref(destination,code):null;
+    return href?{available:true,href,title:journey!.headline}:unavailable;
+  }
+  let targetSiteId:string|null=owner.siteId;
+  if(!targetSiteId){
+    if(owner.ownerKind!=="platform" && owner.ownerKind!=="organization")return unavailable;
+    if(destination.kind==="site-page")return unavailable;
+    if(destination.kind==="adult-training"){
+      const releases=await readEligibleSelfEnrollmentReleases(reader,destination.releaseId);
+      targetSiteId=releases[0]?.siteId??null;
+    }else if(destination.kind==="enrichment"){
+      const seasons=await readEnrichmentCatalog(undefined,reader,destination.seasonId);
+      targetSiteId=seasons.find(v=>v.seasonId===destination.seasonId)?.siteId??null;
+    }else if(destination.kind==="class"){
+      const [cls]=await reader.select({siteId:canonicalClasses.siteId})
+        .from(canonicalClasses).where(eq(canonicalClasses.id,destination.classId)).limit(1);
+      targetSiteId=cls?.siteId??null;
+    }
+  }
+  if(!targetSiteId)return unavailable;
+  const [site]=await reader.select({
+    organizationId:sites.organizationId,status:sites.lifecycleStatus,
+  }).from(sites).where(eq(sites.id,targetSiteId)).limit(1);
+  if(!site || site.status==="closed" ||
+      (owner.organizationId!==null && site.organizationId!==owner.organizationId))
+    return unavailable;
+  if(owner.siteId && targetSiteId!==owner.siteId)return unavailable;
+  // The original catalog enforces exact current Site, release publication,
+  // seat windows, guardian registration policy and Class visibility.
+  const inspected=await inspectGoDestination(targetSiteId,destination,code,reader);
+  if(!inspected.available)return unavailable;
+  if(owner.programId && destination.kind==="enrichment"){
+    const seasons=await readEnrichmentCatalog(targetSiteId,reader,destination.seasonId);
+    if(!seasons.some(s=>s.seasonId===destination.seasonId && s.programId===owner.programId))
+      return unavailable;
+  }
+  return inspected;
 }
