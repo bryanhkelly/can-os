@@ -59,7 +59,11 @@ export function NoncreditPilotOutcomesPanel(){
           return <StatCard key={def.key} label={def.label} value={count(value)}/>;
         })}
       </div>
-      <WorkspaceNotice>Verified learning hours and participating congregation counts are not available in this report. Lesson ticks, playback and registrations must not be substituted for either measure.</WorkspaceNotice>
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Recorded participant hours" value={(summary.verifiedParticipationMinutes/60).toLocaleString(undefined,{maximumFractionDigits:1})} hint="Verified minutes divided by 60; not unique person time"/>
+        <StatCard label="Delivery Sites with registrations" value={count(report!.deliverySites)} hint="Authorized Sites, not a count of congregations"/>
+      </div>
+      <WorkspaceNotice>Only source-verified participation minutes are counted. Lesson ticks, playback and registrations are not evidence of attendance. National congregation reach requires independently authorized network attribution.</WorkspaceNotice>
       <div className="border border-border bg-card p-4">
         <h3 className="font-semibold">Demonstrated learning improvement</h3>
         <p className="mt-1 text-sm">
