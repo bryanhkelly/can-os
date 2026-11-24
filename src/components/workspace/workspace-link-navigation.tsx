@@ -18,7 +18,7 @@ export function WorkspaceLinkNavigation({
 }) {
   return <nav aria-label={label} data-workspace-link-navigation={surface}
     className={cn(
-      "flex min-w-0 flex-wrap items-center gap-4 text-sm",
+      "flex min-w-0 flex-wrap items-center gap-4 text-sm [&>a]:min-w-0 [&>a]:max-w-full [&>a]:[overflow-wrap:anywhere]",
       surface === "panel" && "border border-border bg-card p-4",
       className,
     )}>
