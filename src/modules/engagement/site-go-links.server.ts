@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { siteGoLinks, siteGoLinkDailyVisits, siteMarketingPackages, sites } from "@/db/schema";
+import { siteGoLinks, siteGoLinkDailyVisits, siteMarketingPackages, sites, organizations } from "@/db/schema";
+import { requireCurrentNetworkAgreement } from "@/modules/networks/network-agreement.server";
 import { goCodeSchema } from "@/domain/site-go-links";
 import { goLinkAvailability } from "@/domain/go-link-policy";
 import { executeSiteGoDestination, type SiteGoExecution } from "./go-destination-registry.server";
@@ -25,6 +26,12 @@ export async function resolveSiteGoExperience(code: string, observe=true, page="
   }).from(sites).where(eq(sites.id,link.siteId)).limit(1);
   if(!site || site.organizationId!==link.organizationId ||
       site.lifecycleStatus==="closed")return null;
+  const [organization]=await db.select({status:organizations.lifecycleStatus,type:organizations.type})
+    .from(organizations).where(eq(organizations.id,link.organizationId)).limit(1);
+  if(!organization||organization.status==="inactive"||organization.status==="closed")return null;
+  if(organization.type==="denomination"){
+    try{await requireCurrentNetworkAgreement(db,link.organizationId);}catch{return null;}
+  }
   // An outreach plan is optional. The Site owns every code, including
   // direct Class/program links created outside the Introduce workflow.
   if(link.packageId){
