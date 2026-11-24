@@ -5,7 +5,7 @@ import { and, desc, eq, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { programs, siteGoLinks, siteMarketingPackages, sites } from "@/db/schema";
-import { assertSiteSetupScope, assertWholeSiteReportingScope } from "@/domain/site-setup-scope";
+import { assertSiteSetupScope, assertWholeSiteProgramsInScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { goDestinationKindSchema, goDestinationSchema } from "@/domain/site-go-links";
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
@@ -51,7 +51,7 @@ async function authorizedPackage(
     const attached=await reader.select({id:programs.id}).from(programs)
       .where(and(eq(programs.siteId,siteId),
         eq(programs.organizationId,site!.organizationId)));
-    assertWholeSiteReportingScope(actor,site,attached.map(item=>item.id));
+    assertWholeSiteProgramsInScope(actor,attached.map(item=>item.id),"Site link management");
   }
   const [pkg]=packageId?await reader.select({
     id:siteMarketingPackages.id,status:siteMarketingPackages.status,
