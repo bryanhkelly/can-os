@@ -841,6 +841,13 @@
       "when": 1795462013000,
       "tag": "0119_noncredit_feedback_invitation",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1795462014000,
+      "tag": "0120_noncredit_feedback_campaign_scope",
+      "breakpoints": true
     }
   ]
 }
