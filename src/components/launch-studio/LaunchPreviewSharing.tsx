@@ -58,10 +58,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
       const result = await createSitePreviewShare({ data: { siteId, expiresAfterDays } });
       const url = new URL(result.relativeUrl, window.location.origin);
       setCreatedUrl(url.toString());
-      setShares(await listSitePreviewShares({ data: { siteId } }));
-    } catch (cause) {
-      setError(normalizeClientError(cause,
-        "Could not create a public-safe website preview. Check the saved content and try again.").message);
+      // The share has already been committed. A failed list refresh must not\n      // masquerade as a failed creation or cause the operator to issue duplicates.\n      try {\n        setShares(await listSitePreviewShares({ data: { siteId } }));\n      } catch {\n        setError("Your link was created. The active links list could not be refreshed. Copy your link before closing.");\n      }\n    } catch (cause) {\n      setError(normalizeClientError(cause,\n        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
     } finally { setBusy(false); }
   }
 
