@@ -41,7 +41,7 @@ export async function executeSiteGoDestination(siteId:string,raw:unknown,code:st
     const pages=await previewPages(siteId,destination);
     const html=pages?.[page];
     if(!pages||!html)return null;
-    return {mode:"website-preview",html:renderSharedSitePreview(html,siteId,"",Object.keys(pages),false,code)};
+    return {mode:"website-preview",html:renderSharedSitePreview(html,code,Object.keys(pages))};
   }
   const inspection=await inspectGoDestination(siteId,destination,code,reader);
   return inspection.available&&inspection.href?{mode:"redirect",href:inspection.href}:null;
