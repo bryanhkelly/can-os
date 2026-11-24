@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts,accessAccountNoncreditPrincipals,
@@ -29,6 +29,7 @@ import {
   assertNativeClassSeatAvailable,
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
+import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -94,12 +95,8 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
         assertOperationalClassOfferingTerms(row);
         const {authority,openSeats}=await db.transaction(async tx=>{
           const authority=await currentClassAuthority(tx,row.classId,now);
-          const [occupancy]=await tx.select({total:count()})
-            .from(canonicalClassEnrollments).where(and(
-              eq(canonicalClassEnrollments.classId,row.classId),
-              inArray(canonicalClassEnrollments.status,["pending","active"]),
-            ));
-          return {authority,openSeats:occupancy?.total??0};
+          const occupancy=await readNativeClassOccupancy(tx,row.classId);
+          return {authority,openSeats:occupancy};
         });
         // All enrollment methods share one occupied-seat count. The optional
         // publication limit narrows only self-registration, not assignment.
@@ -168,17 +165,13 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
         try{
           assertOperationalClassOfferingTerms(row);
           const authority=await currentClassAuthority(tx,row.classId,now);
-          const [occupancy]=await tx.select({total:count()})
-            .from(canonicalClassEnrollments).where(and(
-              eq(canonicalClassEnrollments.classId,row.classId),
-              inArray(canonicalClassEnrollments.status,["pending","active"]),
-            ));
+          const occupancy=await readNativeClassOccupancy(tx,row.classId);
           const limits=[row.capacity,authority.classCapacity]
             .filter((n):n is number=>n!==null);
           const capacity=limits.length?Math.min(...limits):null;
           items.push({...row,capacity,
             remainingSeats:capacity===null?null:
-              Math.max(0,capacity-(occupancy?.total??0))});
+              Math.max(0,capacity-(occupancy))});
         }catch(error){
           if(!(error instanceof AuthorizationError))throw error;
         }
@@ -325,14 +318,12 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       const repeatAuthorization=completed
         ?await requireNativeRepeatAuthorization(tx,instance.id,learnerPersonId,completed.id,now)
         :null;
-      const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-        .where(and(eq(canonicalClassEnrollments.classId,instance.id),
-          inArray(canonicalClassEnrollments.status,["pending","active"])));
+      const occupancy=await readNativeClassOccupancy(tx,instance.id);
       assertOperationalClassOfferingTerms(version);
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
       assertNativeClassSeatAvailable({method:invitation?"invitation":approval?"approval":"self",
-        activeOrPending:occupancy?.total??0,
+        activeOrPending:occupancy,
         classCapacity:current.classCapacity,offeringCapacity:version.capacity});
       // Revocation between preflight and insertion must fail inside the same
       // transaction as the seat change, including cross-provider public Classes.
