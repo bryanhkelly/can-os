@@ -91,4 +91,5 @@ for(const [key,value] of Object.entries({lessons:fixture.lessons.length,registra
  assert.equal(row[key],value,"Fixture check failed: "+key);
 const [definition]=await sql`SELECT pg_get_functiondef('education_v30.v301_provision_noncredit_knowledge_access(uuid)'::regprocedure) AS definition`;
 assert.ok(definition.definition.includes("min(ad.id::text)::uuid"),"Apply verified UUID compatibility migration first");
+assert.ok(definition.definition.includes("VALUES(selected_administration_id,person_learner"),"Apply verified grant-variable migration 0118 first");
 console.log("PASS: dedicated QA fixture and UUID provisioning prerequisites (read only). Browser acceptance remains separate.");
