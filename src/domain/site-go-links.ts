@@ -7,6 +7,7 @@ const uuid = z.string().uuid();
 export const goPageIds = ["home", "programs", "experiences", "courses", "classes", "academics", "admissions", "contact"] as const;
 
 export const goDestinationSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("website-preview"), snapshotId: uuid, snapshotDigest: z.string().regex(/^[a-f0-9]{64}$/), sourceRevision: z.number().int().nonnegative(), brandVersionId: uuid }).strict(),
   z.object({ kind: z.literal("site-page"), page: z.enum(goPageIds) }).strict(),
   z.object({ kind: z.literal("adult-training"), releaseId: uuid }).strict(),
   z.object({ kind: z.literal("class"), classId: uuid }).strict(),
@@ -19,10 +20,11 @@ export type GoDestination = z.infer<typeof goDestinationSchema>;
  * and the server. A Go Link is deliberately narrower than private navigation.
  */
 export const goDestinationKinds=[
-  "site-page","adult-training","class","enrichment","information",
+  "site-page","adult-training","class","enrichment","information","website-preview",
 ] as const;
 export const goDestinationKindSchema=z.enum(goDestinationKinds);
 export const goDestinationLabels:Record<GoDestination["kind"],string>={
+  "website-preview":"Website preview",
   "site-page":"Site page or express interest",
   "adult-training":"Training registration",
   class:"Class",enrichment:"Program or camp",information:"Curated information",
@@ -34,6 +36,7 @@ export function goDestinationHref(
   const destination = goDestinationSchema.safeParse(value);
   if (!destination.success || !goCodeSchema.safeParse(code).success) return null;
   switch (destination.data.kind) {
+    case "website-preview": return "/go/" + code;
     case "site-page": {
       if (!publishedSiteHost || !/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(publishedSiteHost)) return null;
       const path = destination.data.page === "home" ? "/" : "/" + destination.data.page;
