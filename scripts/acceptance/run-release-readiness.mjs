@@ -29,6 +29,9 @@ const sanitized={...process.env};
 for(const key of Object.keys(sanitized)){
   if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE|GLOO_API_KEY|RESEND_API_KEY|CAN_NONCREDIT_QA_CAN_SESSION|CAN_PILOT_QA_.*(?:SESSION|FIXTURE)|CAN_ACCESS_TOKEN_PEPPER|RESEND_WEBHOOK_SECRET|CAN_CAMPAIGN_FROM_EMAIL|CAN_CAMPAIGN_POSTAL_ADDRESS/i.test(key))delete sanitized[key];
 }
+// Preserve test session and media configuration, but prevent browser rehearsals
+// from accidentally sending real email or submitting data to an AI provider.
+const browserEnv={...process.env,APP_ENV:"test",NODE_ENV:"test",RESEND_API_KEY:"",RESEND_WEBHOOK_SECRET:"",GLOO_API_KEY:"",GLOO_MODEL:"",CAN_CAMPAIGN_FROM_EMAIL:""};
 function run(name,argv,env=sanitized){
   const start=Date.now();
   console.log("\n[release] "+name);
@@ -67,7 +70,7 @@ if(profile==="pilot"){
   // Run the same guarded learner journey for either independently approved fixture.
   // A fresh fixture and verified sessions are mandatory for each run.
   if(enabled("--browser")&&process.env.CAN_PILOT_QA_FIXTURE_JSON&&process.env.TEST_DATABASE_URL&&process.env.CAN_PILOT_QA_BRANCH_ID){
-    run("Independent noncredit full learner journey",["run","test:e2e:noncredit:journey"],{...process.env,APP_ENV:"test",NODE_ENV:"test",CAN_RELEASE_SOURCE_SHA:sha});
+    run("Independent noncredit full learner journey",["run","test:e2e:noncredit:journey"],{...browserEnv,CAN_RELEASE_SOURCE_SHA:sha});
   }else block("Independent noncredit full learner journey","Requires --browser, fresh approved fixture and dedicated QA branch; run once for each pilot");
   block("Real Platform Owner and independent reviewer acceptance","Requires verified non-demo owner, separate approver and scoped role/session audit evidence");
   block("Live campaign delivery acceptance","Requires explicit test recipient authorization, verified sender and signed provider receipt reconciliation");
@@ -81,7 +84,7 @@ if(enabled("--database")&&process.env.DATABASE_URL){
   run("Deployment database schema and privileges (read only)",["run","db:check:friendly-urls:deploy"],process.env);
 }else block("Deployment database schema and privileges","Requires --database and exact deployment DATABASE_URL");
 if(enabled("--browser")&&process.env.TEST_DATABASE_URL){
-  run("Isolated browser security acceptance",["run","test:e2e:release-security"],{...process.env,DATABASE_URL:process.env.TEST_DATABASE_URL});
+  run("Isolated browser security acceptance",["run","test:e2e:release-security"],{...browserEnv,DATABASE_URL:process.env.TEST_DATABASE_URL,CAN_ADMISSIONS_TEST_BRANCH_ID:process.env.CAN_ADMISSIONS_TEST_BRANCH_ID??process.env.CAN_E2E_TEST_BRANCH_ID??process.env.CAN_PILOT_QA_BRANCH_ID});
 }else block("Isolated browser security acceptance","Requires --browser and attested disposable test database; never use production");
 if(enabled("--live")&&/^[A-Za-z0-9_-]{12}$/.test(process.env.CAN_LIVE_PREVIEW_CODE??"")){
   run("Anonymous live Go preview",["run","test:e2e:live-go"],process.env);
