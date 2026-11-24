@@ -11,7 +11,7 @@ import type {SiteGenerationOptions} from "@/domain/site-content-generation";
 import type {MarketingPackageContent} from "@/domain/marketing-package-v61";
 type Stored=Awaited<ReturnType<typeof readSiteIntelligenceContent>>;
 type Preview=Awaited<ReturnType<typeof previewSiteIntelligence>>;
-type Patch={website:Partial<SiteContentPackage["website"]>|null;outreach:Partial<SiteContentPackage["marketing"]["site-announcement"]>|null};
+type Patch={website:Partial<SiteContentPackage["website"]>|null;websiteComposition?:SiteContentPackage["websiteComposition"];outreach:Partial<SiteContentPackage["marketing"]["site-announcement"]>|null};
 const defaults:SiteGenerationOptions={tone:"welcoming",language:"en",includeStory:false,includeLeadership:false,includeExistingCopy:false,includePublicReferences:false};
 const optionalSources=[{key:"includeStory",label:"Saved Site Story"},{key:"includeLeadership",label:"Consented leadership biographies"},{key:"includeExistingCopy",label:"Existing saved website copy"},{key:"includePublicReferences",label:"Saved public website and consented profile references"}] as const;
 const fields:Record<string,string>={heroHeadline:"Homepage headline",welcomeMessage:"Welcome",localDescription:"Site story",schoolVision:"Vision",communityOutreach:"Community",headline:"Headline",message:"Message",callToAction:"Requested action"};
@@ -80,8 +80,8 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
      {item.reviewNotes.length>0&&<div className="text-xs text-muted-foreground"><strong>Review notes</strong><ul className="list-disc pl-5">{item.reviewNotes.map((note,i)=><li key={i}>{note}</li>)}</ul></div>}
      <Button type="button" disabled={!canUse||!selected.length} onClick={()=>{
        const patch=Object.fromEntries(Object.entries(values).filter(([key])=>selected.includes(key)));
-       onApply({website:target==="website"?patch:null,outreach:target==="outreach"?patch:null});
-       setNotice("Selected stored wording applied to your working editor. Save using the existing workflow.");setSelected([]);
+       onApply({website:target==="website"?patch:null,websiteComposition:target==="website"&&!item.stale?item.websiteComposition??undefined:undefined,outreach:target==="outreach"?patch:null});
+       setNotice("Selected stored wording applied to your working editor. Review the website preview and save using the existing workflow.");setSelected([]);
      }}>Use selected stored wording</Button>
    </div>}
    {target==="outreach"&&<p className="text-xs text-muted-foreground">Process or refresh the shared Site content package in Website &amp; Brand. Marketing does not invoke Gloo.</p>}

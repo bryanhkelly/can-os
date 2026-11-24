@@ -303,7 +303,6 @@ function LocalWebsiteCopyEditor({
   const revisionConflict = editor.siteId === data.siteId && editor.revision !== data.currentRevision;
   const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const [preparingArtwork, setPreparingArtwork] = useState(false);
-  const [contentBlocksDirty, setContentBlocksDirty] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
   const artworkGaps = [content.branding.heroImage, content.branding.logoImage ?? null]
@@ -385,10 +384,6 @@ function LocalWebsiteCopyEditor({
 
   async function saveDraft(mode: "stay" | "exit" = "stay") {
     if(busy||!data.canEdit||!data.draftStorageReady||revisionConflict)return;
-    if(contentBlocksDirty){
-      setError("Save your website section layout using 'Save private blocks' before saving or exiting.");
-      return;
-    }
     setError("");
     const submitted=content;
     const outcome=await mutation.run(()=>saveSiteWebsiteAndBrand({data:{
@@ -582,9 +577,7 @@ function LocalWebsiteCopyEditor({
         disabled={busy||!data.canEdit}
         hasSavedContent={data.currentRevision>0}/>}
       {step===4&&<WebsiteSiteContentStep data={data} content={content}
-        setContent={setContent} busy={busy} allowPublication={allowPublication}
-        onContentBlocksSaved={()=>{void router.invalidate();}}
-        onContentBlocksDirty={setContentBlocksDirty} onSavePrivateDraft={()=>void saveDraft("stay")}/>}
+        setContent={setContent} busy={busy} onSavePrivateDraft={()=>void saveDraft("stay")}/>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
         setContent={setContent} onSelectArtwork={selectArtwork}/>}

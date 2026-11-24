@@ -53,7 +53,7 @@ export async function readStoredSitePackage(actor:AccessContext,siteId:string,co
      if(canonicalJson(saved.site.identity)!==canonicalJson(current.site.identity))continue;
      if(hash(saved)!==source.inputDigest||hash(result.content)!==result.outputDigest)throw new Error("Stored Site Intelligence integrity check failed.");
      const content=parseSiteContentPackage(canonicalJson(result.content),saved);
-     return {status:"ready" as const,latestStatus:latest?.status??"ready",package:{id:result.id,revision:source.revision,generatedAt:result.createdAt.toISOString(),language:saved.preferences.language,stale:hash(current)!==source.inputDigest,website:consumer==="website"?content.website:null,marketing:consumer==="outreach"?content.marketing:null,reviewNotes:content.reviewNotes}};
+     return {status:"ready" as const,latestStatus:latest?.status??"ready",package:{id:result.id,revision:source.revision,generatedAt:result.createdAt.toISOString(),language:saved.preferences.language,stale:hash(current)!==source.inputDigest,website:consumer==="website"?content.website:null,websiteComposition:consumer==="website"?content.websiteComposition??null:null,marketing:consumer==="outreach"?content.marketing:null,reviewNotes:content.reviewNotes}};
    }
    return {status:latest?.status==="processing"&&latest.leaseUntil&&latest.leaseUntil>new Date()?"processing" as const:latest?"refresh-required" as const:"not-generated" as const,package:null};
  };

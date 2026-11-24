@@ -1,3 +1,4 @@
+import {websiteCompositionSchema} from "@/domain/website-composition";
 import { sharedPhotoReferenceSchema } from "@/domain/template-sample-images";
 import { db } from "@/db/client";
 import { siteBrandConfigurationSchema } from "@/domain/site-brand";
@@ -50,6 +51,7 @@ const siteFontIds = Object.keys(siteFontCatalog) as [SiteFontId, ...SiteFontId[]
 const localContentSchema = z.object({
   ...localFields,
   contentReuseConsent: z.enum(["unselected", "granted", "denied"]).optional(),
+  websiteComposition:websiteCompositionSchema.optional(),
   leadershipMembers:z.array(z.object({
     id:z.string().regex(/^[a-zA-Z0-9-]{8,64}$/),
     name:z.string().max(120),

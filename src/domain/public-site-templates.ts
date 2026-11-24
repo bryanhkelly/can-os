@@ -1,3 +1,4 @@
+import {orderWebsiteHomeSections,type WebsiteComposition,type WebsiteHomeSectionId} from "./website-composition";
 import type { SiteTemplateId } from "./site-theme";
 import type { SiteExperienceProfile } from "./site-website-experience";
 
@@ -24,9 +25,38 @@ export type PublicSiteHomeSections = {
 };
 
 /** Each design has a distinct content rhythm while preserving all approved facts. */
-export function composePublicSiteHome(template: SiteTemplateId, sections: PublicSiteHomeSections): string {
+export function composePublicSiteHome(template: SiteTemplateId, sections: PublicSiteHomeSections, composition?:WebsiteComposition): string {
   const join = (keys: readonly (keyof PublicSiteHomeSections)[]) =>
     keys.map(key => sections[key]).join("");
+  if(composition){
+    // The template continues to own its distinctive visual shell and block
+    // treatments. Group contiguous members without changing the saved order.
+    const groups:Record<SiteTemplateId,{shell:string;group:string;members:readonly WebsiteHomeSectionId[]}>={
+      heritage:{shell:"heritage",group:"heritage-editorial-pair",members:["vision","story"]},
+      community:{shell:"community",group:"community-people-first",members:["story","enrichment","channelsCommunity"]},
+      modern:{shell:"modern",group:"modern-information-first",members:["academics","channelsLearning","explore"]},
+      "bright-futures":{shell:"bright",group:"bright-family-first",members:["explore","enrichment","channelsCommunity"]},
+      summit:{shell:"summit",group:"summit-manifesto",members:["vision"]},
+      classic:{shell:"classic",group:"classic-pillars",members:["academics","channelsLearning","vision","enrichment","channelsCommunity"]},
+      campus:{shell:"campus",group:"campus-stories",members:["story","enrichment","channelsCommunity","explore"]},
+    };
+    const layout=groups[template];
+    // Existing template order supplies the fallback for newly eligible sections.
+    const keys=Object.keys(sections) as WebsiteHomeSectionId[];
+    const markers=Object.fromEntries(keys.map(key=>[key,"<!--"+key+"-->"])) as PublicSiteHomeSections;
+    const base=composePublicSiteHome(template,markers);
+    const defaults=keys.sort((a,b)=>base.indexOf(markers[a])-base.indexOf(markers[b]));
+    const ordered=orderWebsiteHomeSections(defaults,composition).filter(key=>key!=="hero"&&sections[key]);
+    let body="",groupOpen=false;
+    for(const key of ordered){
+      const grouped=layout.members.includes(key);
+      if(grouped&&!groupOpen){body+='<div class="'+layout.group+'">';groupOpen=true;}
+      if(!grouped&&groupOpen){body+='</div>';groupOpen=false;}
+      body+=sections[key];
+    }
+    if(groupOpen)body+='</div>';
+    return sections.hero+'<div class="home-composition home-'+layout.shell+'">'+body+'</div>';
+  }
   switch(template) {
     case "heritage": return sections.hero +
       '<div class="home-composition home-heritage"><div class="heritage-editorial-pair">' +

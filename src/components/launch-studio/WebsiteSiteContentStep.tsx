@@ -8,8 +8,6 @@ import {
 } from "@/domain/site-identity-v61";
 import { SiteIntelligenceContentPanel } from "./SiteIntelligenceContentPanel";
 import { WebsiteCopyField, type WebsiteCopyFieldSpec } from "./WebsiteCopyField";
-import { SiteContentChannelEditor } from "./SiteContentChannelEditor";
-import { WebsiteTemplateSourceGuide } from "./WebsiteTemplateSourceGuide";
 import { WebsiteLeadershipEditor } from "./WebsiteLeadershipEditor";
 import {
   restoreOriginalWebsiteField, websiteStarterFieldIds,
@@ -36,14 +34,12 @@ const contentFields:ReadonlyArray<WebsiteCopyFieldSpec>=[
 /** All copy controls consume the one saved Site Story and the one Website
  * document. No second editor, source field store or Brand implementation. */
 export function WebsiteSiteContentStep({
-  data,content,setContent,busy,allowPublication,onContentBlocksSaved,
-  onContentBlocksDirty,onSavePrivateDraft,
+  data,content,setContent,busy,onSavePrivateDraft,
 }:{
   data:Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
   content:SiteLocalContent;
   setContent:Dispatch<SetStateAction<SiteLocalContent>>;
-  busy:boolean;allowPublication:boolean;
-  onContentBlocksSaved:()=>void;onContentBlocksDirty:(dirty:boolean)=>void;onSavePrivateDraft?:()=>void;
+  busy:boolean;onSavePrivateDraft?:()=>void;
 }){
   const canReuse=content.contentReuseConsent === "granted";
   const canApplyExperienceWelcome=canReuse &&
@@ -134,21 +130,10 @@ export function WebsiteSiteContentStep({
 
     </div>
 
-    <details className="border border-border p-3" aria-label="Website section source reference">
-      <summary className="cursor-pointer text-sm font-semibold">
-        Where website content comes from
-      </summary>
-      <p className="mt-2 text-xs text-muted-foreground">
-        See which sections use your text, template content, or Site information.
-      </p>
-      <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/" />
-      <WebsiteTemplateSourceGuide template={content.branding.templateId ?? "heritage"} page="/experiences" />
-    </details>
     {data.plannedExperienceNames.length>0&&<div className="space-y-3 border p-4">
       <h4 className="text-sm font-semibold">Experiences from your Site plan</h4>
       <p className="text-xs text-muted-foreground">
-        These are ideas you're exploring. You can feature them on your homepage
-        and Experiences page, then refine how they're described and displayed.
+        These are ideas you're exploring. Your website draws on the saved Site plan; launch and enrollment approval remain separate.
       </p>
       <p className="text-sm">{data.plannedExperienceNames.join(" · ")}</p>
       <div className="flex flex-wrap items-center gap-3">
@@ -208,7 +193,7 @@ export function WebsiteSiteContentStep({
       </Link>
     </div>}
     {canReuse&&data.editingContent?.contentReuseConsent!=="granted"&&onSavePrivateDraft&&<WorkspaceNotice tone="info"><p>Save your private website draft to record your content reuse choice before using Gloo. Nothing will be published.</p><Button type="button" variant="outline" size="sm" className="mt-2" disabled={busy||!data.canEdit||!data.draftStorageReady} onClick={onSavePrivateDraft}>Save private draft</Button></WorkspaceNotice>}
-    {canReuse&&<SiteIntelligenceContentPanel key={data.siteId+":website:"+data.currentRevision} siteId={data.siteId} target="website" disabled={busy||!data.canEdit} onApply={draft=>{if(draft.website)setContent(old=>({...old,...draft.website}));}}/>}
+    {canReuse&&<SiteIntelligenceContentPanel key={data.siteId+":website:"+data.currentRevision} siteId={data.siteId} target="website" disabled={busy||!data.canEdit} onApply={draft=>{if(draft.website)setContent(old=>({...old,...draft.website,...(draft.websiteComposition&&!old.websiteComposition?{websiteComposition:draft.websiteComposition}:{})}));}}/>}
     {primaryFields.map(renderField)}
     {canReuse&&churchSite&&<details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">
@@ -233,25 +218,6 @@ export function WebsiteSiteContentStep({
       <div className="mt-4 space-y-5">{faithFields.map(renderField)}</div>
     </details>}
     <WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>
-    <details className="border p-4" id="website-content-layout">
-      <summary className="cursor-pointer text-sm font-semibold">
-        Arrange website sections
-      </summary>
-
-      {data.canPublish
-        ? <div className="mt-4">
-            <SiteContentChannelEditor
-              key={data.siteId+":"+data.contentChannelConfig.revision}
-              siteId={data.siteId}
-              initialConfig={data.contentChannelConfig}
-              canPublish={allowPublication&&data.canPublish}
-              onSaved={onContentBlocksSaved}
-              onDirtyChange={onContentBlocksDirty}/>
-          </div>
-        : <WorkspaceNotice tone="attention" className="mt-4">
-            Your current Site assignment does not permit editing website sections.
-            Ask a Site Administrator for the appropriate authorization.
-          </WorkspaceNotice>}
-    </details>
+    <p className="text-xs text-muted-foreground">Your website pages and sections are prepared from your Site information and evolve with your approved learning opportunities.</p>
   </div>;
 }

@@ -1,3 +1,4 @@
+import {websiteCompositionSchema,type WebsiteComposition} from "./website-composition";
 import { containsProtectedInstitutionalClaim } from "./public-claims-policy";
 import { sharedPhotoReferenceSchema, type SharedPhotoReference } from "./template-sample-images";
 import { siteBrandDirectionIds, type SiteBrandDirectionId } from "./site-brand-direction";
@@ -88,6 +89,8 @@ export type WebsiteContentReuseConsent = "unselected" | "granted" | "denied";
 export type SiteLocalContent = SiteLocalTextContent & {
   /** Site-scoped authorization to derive website and marketing copy from Shape data. */
   contentReuseConsent?: WebsiteContentReuseConsent;
+  /** Reviewed composition pinned to this immutable website content revision. */
+  websiteComposition?: WebsiteComposition;
   branding: SiteLocalBranding;
   /** Site-owned, optional Leadership page content; never auto-scraped. */
   leadershipMembers?:SiteLeader[];
@@ -378,6 +381,7 @@ export function validateInlinePng(dataUrl: string): void {
 
 export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   contentReuseConsent?: WebsiteContentReuseConsent;
+  websiteComposition?: WebsiteComposition;
   leadershipMembers?: SiteLeader[];
   branding?: SiteLocalBranding | null;
   editorialBaseline?: SiteEditorialBaseline;
@@ -386,6 +390,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   if(input.contentReuseConsent !== undefined && !["unselected", "granted", "denied"].includes(input.contentReuseConsent))
     throw new Error("Choose a valid website content reuse decision");
   result.contentReuseConsent = input.contentReuseConsent ?? "unselected";
+  if(input.websiteComposition!==undefined&&result.contentReuseConsent==="granted")
+    result.websiteComposition=websiteCompositionSchema.parse(input.websiteComposition);
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
     result[field] = normalizeText(input[field] ?? "", field);
   }

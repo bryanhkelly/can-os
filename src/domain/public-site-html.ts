@@ -1,3 +1,4 @@
+import {orderEligibleWebsitePages} from "./website-composition";
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import type { SiteContentBlockProjection } from "./site-content-channels";
 import type { SiteEnrollmentOpportunity } from "./site-enrollment-opportunities";
@@ -176,9 +177,10 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     ...(hasLeadership?["/leadership"] as const:[]),
   ];
   const profile=resolveSiteExperienceProfile(opportunities,page.planningPreferences??null);
-  return profile==="school" || profile==="mixed"
+  const eligible:PublicSitePath[]=profile==="school" || profile==="mixed"
     ? ["/",...(hasStory||hasReviewedPeople?["/about"] as const:[]),...educational,...extra]
     : ["/",...educational,...(hasStory||hasReviewedPeople?["/about"] as const:[]),...extra];
+  return orderEligibleWebsitePages(eligible,local?.websiteComposition);
 }
 
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
@@ -935,7 +937,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <a href="/academics" class="hero-button">Explore available programs</a></section>` : "",
     contact: siteInterestForm || reviewedContact || reviewedAddress ? contactSection : "",
     channelsClosing: contentChannelAt("closing"),
-  });
+  },local?.websiteComposition);
   const leadershipProfiles=(local?.leadershipMembers??[])
     .filter(person=>person.consentConfirmed)
     .map(person=>{
