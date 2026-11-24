@@ -3,7 +3,8 @@ import { CopyLinkButton } from "./CopyLinkButton";
 import { GoLinkQrButton } from "./GoLinkQrButton";
 import type { GoLinkStatus } from "@/domain/go-link-policy";
 
-export type GoLinkAction="pause"|"resume"|"revoke";
+import { GoLinkLifecycleActions, type GoLinkAction } from "./GoLinkLifecycleActions";
+export type { GoLinkAction } from "./GoLinkLifecycleActions";
 export type GoLinkActionsProps={
   code:string;
   status:GoLinkStatus;
@@ -21,12 +22,6 @@ export function GoLinkActions({code,status,busy=false,onTest,onShow,onChange}:Go
       <GoLinkQrButton key={"qr-"+code} code={code} disabled={busy}/>
       {onShow&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={onShow}>Show link</Button>}
     </>}
-    {onTest&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={onTest}>Test link</Button>}
-    {status!=="revoked"&&onChange&&<>
-      <Button type="button" size="sm" variant="outline" disabled={busy}
-        onClick={()=>onChange(status==="paused"?"resume":"pause")}>{status==="paused"?"Resume":"Pause"}</Button>
-      <Button type="button" size="sm" variant="outline" disabled={busy}
-        onClick={()=>onChange("revoke")}>Revoke</Button>
-    </>}
+    <GoLinkLifecycleActions status={status} busy={busy} onTest={onTest} onChange={onChange}/>
   </div>;
 }
