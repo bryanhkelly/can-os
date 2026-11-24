@@ -4,7 +4,7 @@ import {Field} from "@/components/ui/field";
 import {Select} from "@/components/ui/select";
 import {Checkbox} from "@/components/ui/choice";
 import {Label} from "@/components/ui/label";
-import {WorkspaceNotice} from "@/components/workspace/notice";
+import {ActionFooter,EmptyState,StatusBadge,WorkspaceNotice} from "@/components/workspace";
 import type {RelationshipAction,RelationshipMetric,RelationshipProposal,ReportingRelationship} from "@/domain/bottom-up-reporting-relationships";
 
 const relationshipLabels={
@@ -54,12 +54,12 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
       <p className="text-sm text-muted-foreground">Tag organizations and agree on aggregate reporting metrics. Acceptance records consent; report release requires separate disclosure checks.</p>
     </div>
     {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
-    {entries.length===0?<p className="text-sm text-muted-foreground">No relationships for this scope yet.</p>:
+    {entries.length===0?<EmptyState title="No relationships for this scope yet."/>:
       <ul className="space-y-3">{entries.map(({agreement,organizationName,scopeName,metricLabels,allowedActions})=>
         <li key={agreement.id} className="space-y-2 border border-border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-semibold">{organizationName}</span>
-            <span className="text-sm capitalize text-muted-foreground">{agreement.status}</span>
+            <StatusBadge tone={agreement.status==="accepted"?"success":agreement.status==="pending"?"attention":"neutral"}>{agreement.status}</StatusBadge>
           </div>
           <p className="text-sm">{relationshipLabels[agreement.relationshipKind]}</p>
           <p className="text-sm text-muted-foreground">Scope: {agreement.scopeKind}{scopeName?": "+scopeName:""}. Selected metrics: {metricLabels.join(", ")||"None"}.</p>
@@ -68,10 +68,10 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
             variant="outline" disabled={busy} onClick={()=>setConfirm({id:agreement.id,action})}>{actionLabels[action]}</Button>)}</div>
           {confirm?.id===agreement.id&&allowedActions.includes(confirm.action)&&<div className="space-y-2">
             <WorkspaceNotice tone="attention">{confirm.action==="accept"?"Accept these exact sharing terms?":confirm.action==="revoke"?"Revoke future reporting access? Previously released reports are not recalled.":"Confirm this relationship decision?"}</WorkspaceNotice>
-            <div className="flex flex-wrap gap-2">
+            <ActionFooter layout="inline">
               <Button type="button" disabled={busy} onClick={()=>{onAction(confirm.id,confirm.action);setConfirm(null);}}>Confirm</Button>
               <Button type="button" variant="ghost" disabled={busy} onClick={()=>setConfirm(null)}>Cancel</Button>
-            </div>
+            </ActionFooter>
           </div>}
         </li>)}</ul>}
     {canPropose&&<form className="space-y-4 border-t border-border pt-4" onSubmit={event=>{
@@ -102,7 +102,7 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
         })}
       </fieldset>
       <p className="text-sm text-muted-foreground">This request covers future activity at this scope until revoked. It does not share historical activity.</p>
-      <Button type="submit" disabled={busy||!currentRecipient||availableMetrics.length===0}>Request relationship</Button>
+      <ActionFooter layout="form"><Button type="submit" disabled={busy||!currentRecipient||availableMetrics.length===0} loading={busy} loadingLabel="Working…">Request relationship</Button></ActionFooter>
     </form>}
   </section>;
 }
