@@ -730,3 +730,11 @@ Verification requires **all** of source/lint, TypeScript, focused
 unit/Storybook interaction tests, and visual inspection on desktop/mobile
 (including active, disabled, checked, keyboard focus and overflow states).
 A green source/lint result alone is not a completed visual audit.
+
+## Governed selection patterns and Storybook review
+
+Use `SelectionCard` for choices requiring explanatory context (its compact variant for secondary choices), `SelectionChip` standard for curated topics, and compact for dense taxonomies. Chips are controlled toggles with native Button focus and aria-pressed; the feature owns limits, validation and persistence. Use Checkbox/Radio for conventional form choices and StatusBadge for noninteractive status. Do not recreate chip styling in feature pages.
+
+Compact chips use square corners, 28px minimum height, 12px text, 8px horizontal padding and 6px group gaps. Standard chips use 36px minimum height and 14px text. Both use semantic tokens and reserve selection-icon space to avoid layout shifts. Storybook: Workspace / Selection Chip and Workspace / Selection Patterns. Launch Studio / Shape / Audiences uses the production AudienceIntentFieldsV61 component with offline fixtures, not a replica of its field markup. Navigation and writes are disabled in that review harness.
+
+Review light, dark and validated Site brand themes at 390, 768, 1024 and 1440px. Capture empty, typical, dense, disabled and error states where relevant. Run npm run build-storybook, npm run test:storybook and npm run design:inventory; use the existing npm run test:visual when Chromatic is configured. A committed story is not proof of a passing test or accepted visual baseline. New page stories must compose production presentation components with deterministic fixtures and must not call live Site services.
