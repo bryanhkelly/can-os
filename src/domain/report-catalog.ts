@@ -6,7 +6,7 @@ type ReportCatalogEntry={
   id:string;version:1;title:string;description:string;
   scope:"provider"|"class"|"site"|"link"|"platform"|"network";
   period:"lifetime_current"|"closed_utc"|"rolling_utc"|"current";
-  placement:"report_center"|"class_workspace"|"engagement_library"|"go_link_workspace"|"platform_workspace"|"not_available";
+  placement:"report_center"|"class_workspace"|"engagement_library"|"go_link_workspace"|"platform_workspace"|"network_workspace"|"not_available";
   classification:"private_operational";
 };
 export const REPORT_CATALOG=[
@@ -16,6 +16,7 @@ export const REPORT_CATALOG=[
   {id:"site-campaign-delivery",version:1,title:"Email delivery evidence",description:"Delivery counts, provider acceptance, bounces and suppression.",scope:"site",period:"closed_utc",placement:"engagement_library",classification:"private_operational"},
   {id:"go-link-evidence",version:1,title:"Go Link distribution",description:"Observed requests and separately attributed registration claims.",scope:"link",period:"rolling_utc",placement:"go_link_workspace",classification:"private_operational"},
   {id:"projection-health",version:1,title:"Reporting infrastructure health",description:"Source projection receipt status and reconciliation.",scope:"platform",period:"current",placement:"platform_workspace",classification:"private_operational"},
+  {id:"network-reporting-readiness",version:1,title:"Network reporting readiness",description:"Current HQ reporting setup and explicit execution blockers.",scope:"network",period:"current",placement:"network_workspace",classification:"private_operational"},
   {id:"network-impact",version:1,title:"Network impact",description:"Requires independently authorized network reporting grants and disclosure governance.",scope:"network",period:"closed_utc",placement:"not_available",classification:"private_operational"},
 ] as const satisfies readonly ReportCatalogEntry[];
 export type ReportCatalogId=typeof REPORT_CATALOG[number]["id"];

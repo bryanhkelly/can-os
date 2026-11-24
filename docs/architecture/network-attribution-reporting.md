@@ -132,3 +132,11 @@ APP_ENV=test CAN_NETWORK_SCHEMA_VALIDATION=1 \
 
 These are release blockers to a **full national network** claim, not reasons
 to create a parallel Class schema or route around canonical authorization.
+
+## 2026-11-24 readiness increment
+
+A read-only inspection of the production main database confirmed public network units, reporting memberships, reporting grants, participation attributions and evidence tables have forced RLS. Anonymous/authenticated roles have no SELECT on the four network data tables. The inventory at inspection contained zero units, memberships and grants, and 131 attribution records; these are not verified network results. No schema or row changes were made.
+
+The HQ readiness workspace now reads only scoped counts of configuration records after current direct verified HQ identity and agreement checks. It intentionally does not read participant records or grant evidence contents. A current grant row is not a validated report permission. The shared pure period policy requires an explicit host set, approved metric allowlist, separately authorized network-wide or unit scope, full-period grant coverage, current grant validity, bounded dates and no future period. The policy takes independently verified grants and trusted scope, never browser-supplied authority. It is not wired to a cross-provider outcome endpoint.
+
+Next gates: approved host grant evidence workflow with independent review and revocation; separately ratified network reporting capability and jurisdiction-specific principal bindings; verified historical network attribution reconciliation; bounded cross-host source readers using existing domain projections; immutable disclosure approvals with small-cell and differencing review; restricted-principal and browser acceptance. No hardcoded denomination tiers or synthetic grant issuance.

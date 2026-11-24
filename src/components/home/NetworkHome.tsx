@@ -1,3 +1,4 @@
+import {NetworkReportingReadinessPanel} from "@/components/reports/NetworkReportingReadinessPanel";
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
@@ -115,6 +116,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
         {data.affiliations.length === 0 && <p className="text-sm text-muted-foreground">No school affiliation requests yet.</p>}
       </div>
     </section>
+    <NetworkReportingReadinessPanel/>
     <section id="network-engagement" className="mt-8 space-y-4">
       <h2 className="font-serif text-2xl">Network invitations and distribution</h2>
       <p className="text-sm text-muted-foreground">Publish an HQ invitation and distribute a Go Link without transferring ownership of independent affiliates. Training registration requires a currently authorized HQ-operated delivery Site.</p>
