@@ -11,6 +11,7 @@ import { assertNativeClassSeatAvailable, nativeClassCapacity } from "@/domain/na
 import { accessAccountNoncreditPrincipals } from "@/db/schema";
 import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
+import {readOpenNativeClassEnrollment} from "@/modules/classes/native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "@/modules/classes/native-class-capacity.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { emitCanonicalDomainEvent, writeCanonicalAudit } from "@/platform/canonical-mutation.server";
@@ -132,12 +133,7 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
     if(!existing)throw new AuthorizationError("Class change needs an authorized transfer");
     return {classId,classEnrollmentId:existing.id,created:false};
   }
-  const [previous]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,classId),
-      eq(canonicalClassEnrollments.learnerPersonId,args.personId),
-      inArray(canonicalClassEnrollments.status,["active","pending"]),
-    )).limit(1);
+  const previous=await readOpenNativeClassEnrollment(tx,classId,args.personId);
   if(previous)throw new AuthorizationError("existing Class participation requires reconciliation");
   const occupancy=await readNativeClassOccupancy(tx,classId);
   assertNativeClassSeatAvailable({
