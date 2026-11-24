@@ -16,7 +16,7 @@ import { inspectEngagementDestination } from "./go-destination-registry.server";
 import { engagementActionAvailable, engagementDestination } from "@/domain/engagement-action-policy";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
-import { assertSiteSetupScope } from "@/domain/site-setup-scope";
+import { assertSiteSetupScope, assertWholeSiteProgramsInScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
@@ -80,6 +80,10 @@ export async function authorizeEngagementOwner(
     }).from(sites).where(eq(sites.id,owner.siteId)).limit(1);
     if(!site || site.status==="closed")throw new AuthorizationError("active Site owner");
     assertSiteSetupScope(actor,site,write?"program.launch.start":"program.read");
+    const attached=await reader.select({id:programs.id}).from(programs)
+      .where(and(eq(programs.siteId,site.id),
+        eq(programs.organizationId,site.organizationId)));
+    assertWholeSiteProgramsInScope(actor,attached.map(row=>row.id),"Site link management");
     return {ownerKind:"site",organizationId:site.organizationId,siteId:site.id,programId:null};
   }
   const [program]=await reader.select({
