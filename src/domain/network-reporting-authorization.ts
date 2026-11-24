@@ -116,7 +116,8 @@ export function authorizeNetworkReportPeriod(
   reader:VerifiedNetworkReader,
   verifiedGrants:readonly NetworkReportGrant[],
   request:{hostOrganizationIds:readonly string[];metricKeys:readonly string[];from:string;to:string;unitId:string|null},
-  policy:{allowedMetricKeys:readonly string[];allowedUnitIds:readonly string[];allowNetworkWide:boolean},
+  policy:{networkOrganizationId:string;actorPersonId:string;allowedMetricKeys:readonly string[];
+    scopes:readonly {unitId:string|null;hostOrganizationIds:readonly string[]}[]},
   now=new Date(),
 ){
   const from=validDate(request.from),to=validDate(request.to),current=now.getTime();
@@ -126,8 +127,11 @@ export function authorizeNetworkReportPeriod(
     throw new Error("Network report exceeds bounded host or metric scope");
   if(request.metricKeys.some(key=>!policy.allowedMetricKeys.includes(key)))
     throw new Error("Metric is not approved for network reporting");
-  if(request.unitId===null?!policy.allowNetworkWide:!request.unitId||!policy.allowedUnitIds.includes(request.unitId))
-    throw new Error("Explicit authorized network reporting unit required");
+  if(policy.networkOrganizationId!==reader.networkOrganizationId||policy.actorPersonId!==reader.actorPersonId)
+    throw new Error("Trusted network reporting scope does not match reader");
+  const scopes=policy.scopes.filter(scope=>scope.unitId===request.unitId);
+  if(scopes.length!==1||request.hostOrganizationIds.some(host=>!scopes[0]!.hostOrganizationIds.includes(host)))
+    throw new Error("Explicit authorized network reporting unit and host scope required");
   const covering=verifiedGrants.filter(grant=>validDate(grant.validFrom)<=from&&
     (grant.validThrough===null||validDate(grant.validThrough)>=to));
   return {...authorizeNetworkMetricScope(reader,covering,{

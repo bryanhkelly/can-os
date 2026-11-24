@@ -3,11 +3,12 @@ import {Button} from "@/components/ui/button";
 import {WorkspacePanel,WorkspaceNotice,QueryState} from "@/components/workspace";
 import {ReportDocumentView,type ReportDocument} from "@/components/workspace/report-document";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import {reportDefinitionId} from "@/domain/report-catalog";
 import {getNetworkReportingReadiness} from "@/modules/insights/network-reporting-readiness.functions";
 function Readiness({scope}:{scope:string}){
   const {query,data}=usePrivateReportQuery({scope,key:["network-reporting-readiness"],read:()=>getNetworkReportingReadiness()});
   const report:ReportDocument|null=data?{
-    version:1,definitionId:"network-reporting-readiness-v1",title:"Reporting setup inventory",
+    version:1,definitionId:reportDefinitionId("network-reporting-readiness"),title:"Reporting setup inventory",
     scopeLabel:"Current denomination HQ only",basis:"Checked "+data.asOf+"; counts are configuration records, not verified permissions or outcomes",
     blocks:[{id:"inventory",kind:"metrics",items:[
       {id:"units",label:"Current reporting units",value:data.counts.activeUnits,hint:"Districts, jurisdictions or other network-defined units"},
