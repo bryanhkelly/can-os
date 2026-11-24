@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { PageFrame, PageHeader } from "@/components/workspace";
+import { PageFrame, PageHeader, QueryState, WorkspaceNotice } from "@/components/workspace";
 import { ClassroomProjectorPlayer } from "@/components/learning/ClassroomProjectorPlayer";
 import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
 import { ClassroomPublicPromptControls } from "@/components/learning/ClassroomPublicPromptControls";
@@ -64,15 +64,12 @@ function ClassroomPresentation() {
         void document.documentElement.requestFullscreen?.()}>
         Full screen
       </Button>} />
-    {state.isPending && <p role="status" className="mt-6">
-      Verifying current facilitator and room authority…
-    </p>}
-    {state.isError && <p role="alert" className="mt-6">
-      This classroom presentation is unavailable. Sign in as its authorized facilitator.
-    </p>}
-    {state.isSuccess && state.data && !live && <p role="status" className="mt-6 border border-border p-5">
+    <QueryState loading={state.isPending&&"Verifying current facilitator and room authority…"}
+      error={state.isError&&"This classroom presentation is unavailable. Sign in as its authorized facilitator."}
+      onRetry={()=>void state.refetch()} retrying={state.isFetching}/>
+    {state.isSuccess && state.data && !live && <WorkspaceNotice className="mt-6">
       This room is {state.data.roomState}. The presentation is closed.
-    </p>}
+    </WorkspaceNotice>}
     {state.isSuccess && state.data && live && <div className="mx-auto mt-6 grid max-w-screen-2xl gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="space-y-4">
         <ClassroomProjectorPlayer facilitatedSessionId={sessionId}/>
