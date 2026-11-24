@@ -1,0 +1,79 @@
+-- Install reviewed noncredit feedback invitation hook on canonical public tables.
+-- Additive survey trigger vocabulary; no invitations are backfilled.
+ALTER TABLE public.survey_trigger_rules
+ DROP CONSTRAINT IF EXISTS survey_trigger_rules_trigger_kind_check;
+ALTER TABLE public.survey_trigger_rules
+ ADD CONSTRAINT survey_trigger_rules_trigger_kind_check
+ CHECK(trigger_kind IN (
+ 'enrollment_started','unit_completed','track_switched','tutoring_completed',
+ 'term_ended','staff_onboarded','incident_resolved','program_renewal',
+ 'knowledge_check_submitted'));
+-- Explicit opt-in feedback campaigns receive one private in-app invitation
+-- when a published noncredit Course knowledge check is submitted and scored.
+CREATE OR REPLACE FUNCTION education_v30.v301_invite_noncredit_knowledge_feedback(p_attempt uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $feedback$
+DECLARE participant record; at timestamptz:=clock_timestamp();
+BEGIN
+ -- The knowledge-check event belongs to one published Offering, not every
+ -- training sharing the Deployment. A campaign without Offering scope is
+ -- intentionally ineligible for an automatic course-feedback invitation.
+ SELECT r.participant_person_id,r.deployment_id,ov.offering_id,
+        r.registering_organization_id
+ INTO participant
+ FROM public.assessment_attempts a
+ JOIN public.assessment_access_grants g ON g.id=a.access_grant_id
+   AND g.learner_id=a.learner_id AND g.administration_id=a.administration_id
+ JOIN public.learner_course_attempts ca ON ca.id=g.course_attempt_id
+ JOIN public.noncredit_registrations r ON r.id=ca.noncredit_registration_id
+ JOIN public.offering_versions ov ON ov.id=r.offering_version_id
+ JOIN public.noncredit_training_versions t ON t.id=r.training_version_id
+ JOIN public.assessment_administrations ad ON ad.id=a.administration_id
+ WHERE a.id=p_attempt AND a.state IN ('scored','finalized')
+   AND ca.enrollment_id IS NULL AND ca.section_id IS NULL AND ca.status='active'
+   AND r.learner_id=a.learner_id AND r.status IN ('registered','active')
+   AND r.deployment_id=ca.deployment_id
+   AND r.offering_version_id=ca.offering_version_id AND r.adoption_id=ca.adoption_id
+   AND t.offering_version_id=ca.offering_version_id
+   AND t.state='published' AND t.assessment_version_id=ad.assessment_version_id
+   AND ad.administering_organization_id=t.provider_organization_id
+   AND ad.course_version_id=ca.course_version_id
+   AND ad.deployment_id=ca.deployment_id
+   AND g.access_status='approved';
+ IF NOT FOUND THEN RETURN; END IF;
+ INSERT INTO public.survey_invitations(campaign_id,invited_person_id,delivery_channel,sent_at)
+ SELECT c.id,participant.participant_person_id,'in_app',at
+ FROM public.survey_campaigns c
+ JOIN public.survey_trigger_rules rule ON rule.campaign_id=c.id
+   AND rule.enabled AND rule.trigger_kind='knowledge_check_submitted'
+ JOIN public.survey_versions v ON v.id=c.survey_version_id AND v.lifecycle='published'
+ JOIN public.survey_definitions d ON d.id=v.survey_id AND d.status='active'
+   AND d.intended_audience IN ('learner','any')
+ JOIN public.evidence_document_versions permission ON permission.id=c.survey_permission_evidence_id
+ WHERE c.deployment_id=participant.deployment_id
+   AND c.offering_id=participant.offering_id
+   AND c.operating_organization_id=participant.registering_organization_id
+   AND c.status='active' AND c.response_mode='identified'
+   AND NOT EXISTS (SELECT 1 FROM public.class_survey_campaigns x WHERE x.campaign_id=c.id)
+   AND NOT EXISTS (SELECT 1 FROM public.facilitated_room_survey_campaigns x WHERE x.survey_campaign_id=c.id)
+   AND NOT EXISTS (SELECT 1 FROM public.survey_questions q WHERE q.survey_version_id=v.id AND q.safety_triage)
+   AND NOT EXISTS (SELECT 1 FROM public.survey_question_branch_rules q WHERE q.survey_version_id=v.id)
+   AND c.starts_at<=at AND (c.ends_at IS NULL OR c.ends_at>at)
+   AND permission.verified_by_person_id IS NOT NULL AND permission.verified_at IS NOT NULL
+   AND permission.verified_at<=at
+   AND (permission.valid_from IS NULL OR permission.valid_from<=at::date)
+   AND (permission.valid_through IS NULL OR permission.valid_through>=at::date)
+ ON CONFLICT (campaign_id,invited_person_id) DO NOTHING;
+END $feedback$;
+CREATE OR REPLACE FUNCTION education_v30.v301_noncredit_feedback_attempt_trigger() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $feedback_trigger$
+BEGIN
+ IF NEW.state='scored' AND OLD.state IS DISTINCT FROM NEW.state THEN
+   PERFORM education_v30.v301_invite_noncredit_knowledge_feedback(NEW.id);
+ END IF;
+ RETURN NEW;
+END $feedback_trigger$;
+CREATE OR REPLACE TRIGGER v301_noncredit_knowledge_feedback
+AFTER UPDATE OF state ON public.assessment_attempts
+FOR EACH ROW EXECUTE FUNCTION education_v30.v301_noncredit_feedback_attempt_trigger();
+REVOKE ALL ON FUNCTION education_v30.v301_invite_noncredit_knowledge_feedback(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION education_v30.v301_noncredit_feedback_attempt_trigger() FROM PUBLIC;
