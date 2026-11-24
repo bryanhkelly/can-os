@@ -1,27 +1,32 @@
 import {useEffect,useState} from "react";
 import {Button} from "@/components/ui/button";
+import {Field} from "@/components/ui/field";
 import {Textarea} from "@/components/ui/textarea";
-import {WorkspaceNotice} from "@/components/workspace";
+import {QueryState, WorkspaceNotice} from "@/components/workspace";
 import {prepareEngagementEmailDraft} from "@/modules/engagement/engagement-registry.functions";
 import {buildInvitationMailto,parseInvitationRecipients,type EngagementInvitation} from "@/domain/engagement-distribution";
 
 /** Shared operator-mediated handoff. Recipient addresses stay in this browser
  * and never appear in logs, links sent to participants or a shadow CRM. */
-export function EngagementEmailDistribution({engagementId,linkId,onClose}:{
-  engagementId:string;linkId:string;onClose:()=>void;
-}){
+type DistributionProps={engagementId:string;linkId:string;onClose:()=>void};
+export function EngagementEmailDistribution(props:DistributionProps){
+  return <EmailDistributionSession key={props.engagementId+":"+props.linkId} {...props}/>;
+}
+function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProps){
   const [draft,setDraft]=useState<EngagementInvitation|null>(null);
   const [recipients,setRecipients]=useState("");
   const [authorized,setAuthorized]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [busy,setBusy]=useState(false);
+  const [revision,setRevision]=useState(0);
+  const [copying,setCopying]=useState(false);
   useEffect(()=>{let active=true;setDraft(null);setRecipients("");setAuthorized(false);setError("");setNotice("");
     prepareEngagementEmailDraft({data:{engagementId,linkId}})
       .then(value=>{if(active)setDraft(value);})
       .catch(()=>{if(active)setError("The saved email invitation could not be verified.");});
     return()=>{active=false;};
-  },[engagementId,linkId]);
+  },[engagementId,linkId,revision]);
   const parsed=parseInvitationRecipients(recipients);
   const ready=!!draft&&authorized&&parsed.recipients.length>0&&!parsed.invalid.length&&!parsed.tooMany;
   async function handoff(){
@@ -38,25 +43,28 @@ export function EngagementEmailDistribution({engagementId,linkId,onClose}:{
     finally{setBusy(false);}
   }
   async function copy(){
+    if(copying||busy)return;
+    setCopying(true);setError("");setNotice("");
     try{const current=await prepareEngagementEmailDraft({data:{engagementId,linkId}});
       await navigator.clipboard.writeText(current.subject+"\n\n"+current.body);
       setNotice("Invitation copied. No email sent.");
     }catch{setError("Could not copy a currently eligible invitation.");}
+    finally{setCopying(false);}
   }
   return <section className="mt-4 border p-4" aria-label="Email invitation distribution">
     <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Prepare email invitation</h3><Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button></div>
     <WorkspaceNotice className="mt-3">Use your own authorized email account to send a small pilot invitation. Recipients are placed in BCC. Becomuna does not send, store these addresses, subscribe them, or claim delivery. For a bulk campaign, use your organization’s approved consent and unsubscribe system.</WorkspaceNotice>
     {draft&&<>
       <div className="mt-3 border p-3 text-sm"><p className="font-semibold">{draft.subject}</p><p className="mt-2 whitespace-pre-wrap break-words">{draft.body}</p></div>
-      <label className="mt-3 grid gap-1 text-sm font-medium">Recipient email addresses (up to 20)
-        <Textarea value={recipients} maxLength={6000} rows={3} placeholder="Enter one address per line" onChange={e=>{setRecipients(e.target.value);setAuthorized(false);}}/>
-      </label>
-      <p className="mt-1 text-xs text-muted-foreground">{parsed.recipients.length} unique addresses. {parsed.invalid.length>0?"Remove invalid or synthetic addresses.":""} {parsed.tooMany?"Limit is 20 addresses.":""}</p>
+      <Field className="mt-3" label="Recipient email addresses (up to 20)" description={`${parsed.recipients.length} unique addresses.`}
+        error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"Limit is 20 addresses.":undefined}>
+        <Textarea value={recipients} maxLength={6000} rows={3} disabled={busy||copying} placeholder="Enter one address per line" onChange={e=>{setRecipients(e.target.value);setAuthorized(false);}}/>
+      </Field>
       <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/>I have permission to contact these recipients for this invitation and will honor their communication preferences.</label>
-      <div className="mt-3 flex flex-wrap gap-2"><Button type="button" disabled={!ready||busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" onClick={()=>void copy()}>Copy invitation</Button></div>
+      <div className="mt-3 flex flex-wrap gap-2"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></div>
     </>}
-    {!draft&&!error&&<p role="status" className="mt-3 text-sm">Verifying saved invitation…</p>}
+    {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
     {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {draft&&error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
   </section>;
 }
