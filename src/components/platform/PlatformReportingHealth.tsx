@@ -1,7 +1,7 @@
 import {useEffect,useState} from "react";
 import {ReportChart} from "@/components/workspace/report-chart";
 import {Button} from "@/components/ui/button";
-import {StatCard,WorkspaceNotice} from "@/components/workspace";
+import {ActionFooter,StatCard,WorkspaceNotice} from "@/components/workspace";
 import {getReportingProjectionHealth,replayReportingProjectionBatch} from "@/modules/insights/reporting-projection-health.functions";
 type Health=Awaited<ReturnType<typeof getReportingProjectionHealth>>;
 export function PlatformReportingHealth(){
@@ -37,8 +37,8 @@ export function PlatformReportingHealth(){
       {id:"retry",label:"Retry pending",value:health.counts.retryPending},{id:"dead",label:"Dead letters",value:health.counts.deadLetter}],
   }}/>} 
   <p className="text-xs text-muted-foreground">Checked {health.asOf}. {health.oldestMissingAt?"Oldest unprojected event: "+health.oldestMissingAt:""} Full lifecycle coverage is not certified by these counts.</p></>}
-  {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
-  {message&&<p role="status" className="text-sm">{message}</p>}
-  <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" disabled={busy} onClick={()=>void refresh()}>Refresh health</Button><Button type="button" disabled={busy||!health?.enabled||!health.storageReady||!health.counts||(health.counts.missing+health.counts.dueRetries===0)} onClick={()=>void replay()}>Replay up to 50 source events</Button></div>
+  {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+  {message&&<WorkspaceNotice>{message}</WorkspaceNotice>}
+  <ActionFooter layout="inline"><Button type="button" variant="outline" disabled={busy} onClick={()=>void refresh()}>Refresh health</Button><Button type="button" disabled={busy||!health?.enabled||!health.storageReady||!health.counts||(health.counts.missing+health.counts.dueRetries===0)} onClick={()=>void replay()}>Replay up to 50 source events</Button></ActionFooter>
  </section>;
 }
