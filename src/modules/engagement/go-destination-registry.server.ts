@@ -1,3 +1,4 @@
+import { sitePreviewSnapshotKey, readSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
 import { and, desc, eq, ilike } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sitePublications, sites } from "@/db/schema";
@@ -39,6 +40,10 @@ export async function inspectGoDestination(
   siteId:string,destination:GoDestination,code:string,
   reader:Reader=db,
 ):Promise<DestinationInspection>{
+  if(destination.kind==="website-preview"){
+    const pages=await readSitePreviewSnapshot(sitePreviewSnapshotKey(siteId,destination.snapshotId),destination.snapshotDigest);
+    return pages?.["/"]?{available:true,title:"Website preview",href:"/go/"+code}:unavailable;
+  }
   if(destination.kind==="site-page"){
     const host=await publishedSiteHost(siteId,reader);
     const href=host?goDestinationHref(destination,code,host):null;
@@ -96,6 +101,7 @@ export async function inspectGoDestination(
 export async function listGoDestinationChoices(
   siteId:string,kind:GoDestination["kind"],reader:Reader=db,term?:string,
 ):Promise<GoDestinationChoice[]>{
+  if(kind==="website-preview")return []; // Issued only by Website & Brand.
   if(kind==="site-page"){
     if(!await publishedSiteHost(siteId,reader))return [];
     const pages=["contact","home","programs","experiences","courses","classes","academics","admissions"] as const;
@@ -164,6 +170,7 @@ export type EngagementTargetOwner=PublicEngagementOwnerScope;
 export async function inspectEngagementDestination(
   owner:EngagementTargetOwner,destination:GoDestination,code:string,reader:Reader=db,
 ):Promise<DestinationInspection>{
+  if(destination.kind==="website-preview")return unavailable;
   // A Program-only author cannot publish an enrollment link to a sibling
   // Program's Class or release. Enrichment has an explicit Program ID check below.
   if(owner.ownerKind==="program" &&
