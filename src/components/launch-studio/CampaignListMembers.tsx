@@ -4,7 +4,11 @@ import {Checkbox} from "@/components/ui/choice";
 import {QueryState,WorkspaceNotice} from "@/components/workspace";
 import {readCampaignListMembers,updateCampaignListMember} from "@/modules/communication/engagement-campaigns.functions";
 type Members=Awaited<ReturnType<typeof readCampaignListMembers>>;
-export function CampaignListMembers({engagementId,linkId,listId,onChange}:{engagementId:string;linkId:string;listId:string;onChange:()=>void}){
+type MemberProps={engagementId:string;linkId:string;listId:string;onChange:()=>void};
+export function CampaignListMembers(props:MemberProps){
+ return <CampaignMemberSession key={JSON.stringify([props.engagementId,props.linkId,props.listId])} {...props}/>;
+}
+function CampaignMemberSession({engagementId,linkId,listId,onChange}:MemberProps){
  const [page,setPage]=useState(0),[revision,setRevision]=useState(0),[data,setData]=useState<Members|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
  const [selected,setSelected]=useState<{email:string;operation:"remove"|"withdraw"}|null>(null),[confirmed,setConfirmed]=useState(false);
  useEffect(()=>{let active=true;setData(null);setError("");readCampaignListMembers({data:{engagementId,linkId,listId,offset:page*50}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active)setError("Recipient list unavailable.");});return()=>{active=false;};},[engagementId,linkId,listId,page,revision]);
