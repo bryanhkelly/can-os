@@ -39,3 +39,24 @@ Status: foundation source on `release-11232026`. Source is **not** a deployed, e
 3. Platform owner, network Organization admin, Site admin, unrelated Site staff, and delegated view-mode access.
 4. No cross-Organization leakage; no public exposure of confidential contacts; audit writes and idempotency/retry.
 5. Verify against the exact deployment commit and matching database migration.
+
+## Follow-on hardening (2026-11-23)
+
+- Launch Studio now uses one universal publisher and a separate persistent library for existing published engagements. An editor refresh must not cause existing Go Links to become unmanageable. Older direct Site Go Link records remain readable but the competing legacy creator is not exposed.
+- A universal engagement may render a static, sanitized page or return a non-cacheable 302. The route loads the DB resolver server-side, not into a browser bundle.
+- Link publication rejects a declared interaction that the selected downstream destination cannot fulfill. Initial supported contracts: discover (any governed destination), respond (curated information journey or published Site contact), and register (governed noncredit release or enrichment Season). Apply, schedule, contribute, accept and resume require genuine downstream services; never advertise them as completed just because a visitor landed on a page.
+- A published Site-owned experience pins its exact immutable `site_brand_versions` identifier into the versioned content snapshot. The runtime renderer resolves finite, contrast-reviewed palette and typography tokens through the existing Site Brand theme registry. Never accept CSS, remote fonts, external image URLs or unverified assets from the link.
+- Organization and platform experiences currently use the verified owner display name and the neutral platform theme; a versioned Organization brand is not implemented.
+- The public institutional claims review is shared with the Site Website policy, without requiring the entire website module in the engagement registry.
+- The Site library has a bounded 100-version list and retrieves saved links by exact engagement version IDs. This is a pilot-scale read, not yet a paginated national operations console.
+- Public visits are not yet source events in the reporting ledger. User actions must be verified by their original domain services before they become reportable outcomes.
+- The first renderer has a constrained accessible HTML shell with governed Brand tokens. It is not a generic drag-and-drop form builder, workflow executor, or a fully componentized V6.1 Site website renderer.
+
+## Verification conditions (updated)
+
+- Source commits are on `release-11232026` and remain in draft PR #364.
+- `0105` and `0106` were applied on the isolated Neon validation branch `v61-launch-brand-migration-validation-20261119`. No new production schema was installed by these commits.
+- Neon read-only catalog checks confirmed owner/shape constraints and immutable-version trigger. The validation branch currently has no published engagements or Go Links, so an authenticated end-to-end publish/render/revoke journey has **not** been verified.
+- Netlify deploy-preview #364 was skipped with the provider message `Skipped due to account builds usage exceeded`. It is not a compiler failure, but also supplies no build evidence.
+- GitHub's workflow run collection for the release branch returned no CI runs at inspection time. No claim of passing TypeScript, Vitest, Cloudflare build or browser tests can be made.
+- Before merging: restore CI/build capacity; run the full workflow at the exact head SHA; test platform, Organization, Site and Program ownership with real verified grants; verify the browser runtime through a staging database with both migrations applied; test revocation, retirement and Brand-version persistence; then explicitly plan production migration.
