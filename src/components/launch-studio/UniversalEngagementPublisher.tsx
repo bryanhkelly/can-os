@@ -10,7 +10,7 @@ import {
   type EngagementDefinition,
 } from "@/domain/engagement-definition";
 import {
-  goDestinationSchema, goPageIds, type GoDestination,
+  goPageIds, type GoDestination,
 } from "@/domain/site-go-links";
 import {
   createEngagementDefinition, createEngagementGoLink,
