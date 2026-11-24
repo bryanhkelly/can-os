@@ -1,3 +1,4 @@
+import { siteAudienceNames } from "@/domain/site-audiences";
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
 import { marketingEditorReducer, type MarketingEditorView, type MarketingEditorState } from "./marketing-package-editor-state";
 import { SiteGuideV61 } from "./SiteGuideV61";
@@ -457,7 +458,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         {record.content.plan&&<WorkspacePanel title="Audience & highlights">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <p><strong>Who you want to reach:</strong> {record.content.plan.recipients.map(id=>marketingAudienceOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</p>
-            <p><strong>Who will benefit:</strong> {record.content.plan.beneficiaries.map(id=>id.replaceAll("_"," ").replace(/^./,c=>c.toUpperCase())).join(", ")||"Not selected"}</p>
+            <p><strong>Who will benefit:</strong> {record.content.plan.beneficiaries.map(id=>siteAudienceNames[id]).join(", ")||"Not selected"}</p>
             <p><strong>Highlights:</strong> {record.content.plan.highlights.map(x=>x.label).join(", ")||"Not selected"}</p>
             <p><strong>Requested action:</strong> {record.content.plan.action.replaceAll("-"," ").replace(/^./,c=>c.toUpperCase())}</p>
           </div>
