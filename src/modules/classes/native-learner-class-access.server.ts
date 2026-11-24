@@ -25,9 +25,7 @@ export async function authorizeNativeLearnerClass(tx:Tx,actor:CommandContext,cla
   const [cls]=await tx.select().from(canonicalClasses).where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
   if(!cls || (mode!=="history_read"&&cls.state!=="active"))
     throw new AuthorizationError("current Class");
-  if(actor.role==="student"&&(!cls.siteId || actor.scope.siteIds?.[0]!==cls.siteId ||
-     !actor.scope.organizationIds?.includes(cls.operatingOrganizationId)))
-    throw new AuthorizationError("own CAN student Site");
+  // The canonical Course Attempt boundary owns exact student Site authority.
   const access=await authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId,mode==="history_read",enrollment.id);
   if(access.source!=="class"||access.sectionId!==null||access.courseVersionId!==cls.courseVersionId)
     throw new AuthorizationError("own canonical Class Course Attempt");
