@@ -27,7 +27,7 @@ if(git(["status","--porcelain"]))throw new Error("Commit or stash changes before
 const results=[];
 const sanitized={...process.env};
 for(const key of Object.keys(sanitized)){
-  if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE|GLOO_API_KEY|RESEND_API_KEY|CAN_NONCREDIT_QA_CAN_SESSION|CAN_PILOT_QA_.*(?:SESSION|FIXTURE)|CAN_ACCESS_TOKEN_PEPPER|RESEND_WEBHOOK_SECRET|CAN_CAMPAIGN_FROM_EMAIL|CAN_CAMPAIGN_POSTAL_ADDRESS/i.test(key))delete sanitized[key];
+  if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE|GLOO_API_KEY|RESEND_API_KEY|CAN_NONCREDIT_QA_CAN_SESSION|CAN_PILOT_QA_.*(?:SESSION|FIXTURE)|CAN_ACCESS_TOKEN_PEPPER|CAN_CANONICAL_ACCESS_TOKEN_PEPPER|CAN_NONCREDIT_ASSESSMENT_KEY_HEX|RESEND_WEBHOOK_SECRET|CAN_CAMPAIGN_FROM_EMAIL|CAN_CAMPAIGN_POSTAL_ADDRESS/i.test(key))delete sanitized[key];
 }
 // Preserve test session and media configuration, but prevent browser rehearsals
 // from accidentally sending real email or submitting data to an AI provider.
@@ -65,6 +65,11 @@ if(profile==="pilot"){
   if(enabled("--database")&&process.env.TEST_DATABASE_URL&&process.env.CAN_APPLICATION_DB_HOST){
     run("Isolated noncredit evidence and completion schema (read only)",["run","verify:pilot:noncredit-schema"],{...process.env,APP_ENV:"test",NODE_ENV:"test"});
   }else block("Isolated noncredit evidence and completion schema","Requires approved TEST_DATABASE_URL and CAN_APPLICATION_DB_HOST");
+  // Rollback-only regression is separate from the read-only schema check.
+  // Never silently opt in to test writes or run against an unattested branch.
+  if(enabled("--database")&&process.env.CAN_TEST_DB_WRITES_ENABLED==="true"&&process.env.CAN_PILOT_QA_BRANCH_ID&&process.env.TEST_DATABASE_URL&&process.env.CAN_APPLICATION_DB_HOST){
+    run("Isolated canonical pilot database integration (rollback only)",["run","verify:pilot:noncredit-regression"],{...process.env,APP_ENV:"test",NODE_ENV:"test"});
+  }else block("Isolated canonical pilot database integration","Requires explicit QA branch, isolated database URL, production host comparison, and CAN_TEST_DB_WRITES_ENABLED=true");
   // Run the same guarded learner journey for either independently approved fixture.
   // A fresh fixture and verified sessions are mandatory for each run.
   if(enabled("--browser")&&process.env.CAN_PILOT_QA_FIXTURE_JSON&&process.env.TEST_DATABASE_URL&&process.env.CAN_PILOT_QA_BRANCH_ID){
