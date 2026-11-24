@@ -1,3 +1,5 @@
+import {EventTypes} from "@/domain/event-types";
+import {emitReportableChange} from "@/platform/reportable-event";
 import {createHash,randomUUID} from "node:crypto";
 import {and,desc,eq,gt,sql} from "drizzle-orm";
 import {db} from "@/db/client";
@@ -73,7 +75,9 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
    const now=new Date();
    if(existing?.status==="ready"){
      // Re-select the prior successful package without another provider call.
-     await tx.update(inputs).set({updatedAt:now}).where(eq(inputs.id,existing.id));
+     const reusedAt=new Date(Math.max(now.getTime(),existing.updatedAt.getTime()+1));
+     await tx.update(inputs).set({updatedAt:reusedAt}).where(eq(inputs.id,existing.id));
+     await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligencePackageReused,sourceId:existing.id,sourceVersion:reusedAt.toISOString(),occurredAt:reusedAt,actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:existing.attempts}});
      await writeAudit(tx,actor,{action:"site.content_generation.reused",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:existing.id,inputDigest:data.digest}});
      return {kind:"reused" as const};
    }
@@ -95,7 +99,9 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
      inputId=row.id;
    }
    await writeAudit(tx,actor,{action:"site.content_generation.requested",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId,inputDigest:data.digest,provider:"gloo",externalProcessingConfirmed:true}});
-   return {kind:"claimed" as const,inputId};
+   const attempt=(existing?.attempts??0)+1;
+   await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingRequested,sourceId:inputId,sourceVersion:String(attempt),occurredAt:now,actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt}});
+   return {kind:"claimed" as const,inputId,attempt};
  });
  if(claim.kind!=="claimed")return {status:claim.kind};
  const fence=and(scope(data.siteId,organizationId),eq(inputs.id,claim.inputId),eq(inputs.status,"processing"),eq(inputs.leaseToken,token));
@@ -113,12 +119,15 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
      if(!row)throw new Error("Site Intelligence processing lease expired");
      const outputDigest=hash(result.content);
      const [saved]=await tx.insert(outputs).values({siteId:data.siteId,organizationId,intelligenceVersionId:row.id,content:result.content,outputDigest,provider:"gloo",model:result.model,providerResponseId:result.providerResponseId}).returning({id:outputs.id});
+     if(!saved)throw new Error("Site Intelligence output missing");
+     await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingCompleted,sourceId:row.id,sourceVersion:String(claim.attempt),occurredAt:new Date(),actorPersonId:currentActor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt,outputId:saved.id}});
      await writeAudit(tx,currentActor,{action:"site.content_generation.completed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:row.id,outputId:saved?.id,inputDigest:data.digest,outputDigest,model:result.model}});
    });
    return {status:"ready" as const};
  }catch{
    await db.transaction(async tx=>{
      const [failed]=await tx.update(inputs).set({status:"failed",leaseToken:null,leaseUntil:null,errorCode:"processing_failed",updatedAt:new Date()}).where(fence).returning({id:inputs.id});
+     if(failed)await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingFailed,sourceId:failed.id,sourceVersion:String(claim.attempt),occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt}});
      if(failed)await writeAudit(tx,actor,{action:"site.content_generation.failed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:failed.id,inputDigest:data.digest,errorCode:"processing_failed"}});
    });
    throw new Error("Site Intelligence processing failed. Existing content is unchanged.");

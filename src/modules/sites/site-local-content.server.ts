@@ -1,3 +1,4 @@
+import {emitReportableChange} from "@/platform/reportable-event";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, siteLocalContentVersions, sitePublications } from "@/db/schema";
@@ -5,7 +6,7 @@ import type { AccessContext } from "@/domain/access-context";
 import {
   classifySiteLocalContent, normalizeSiteLocalContent, websiteCopyOnlyForStorage, type SiteLocalContent,
 } from "@/domain/site-local-content";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteDraftWriteCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { DomainError } from "@/domain/errors";
@@ -170,17 +171,10 @@ export async function publishPartnerLocalContentWithinTransaction(
       // Actual immutable copy is retained on this version row, not in
       // unrestricted event notifications or action metadata.
     });
-    await emitEvent(tx, {
-      eventType: decision.status === "draft"
-        ? EventTypes.SiteLocalWebsiteDraftSaved
-        : decision.status === "published"
-          ? EventTypes.SiteLocalWebsiteContentPublished
-          : EventTypes.SiteLocalWebsiteContentReviewRequested,
-      aggregateType: "site_local_content_version", aggregateId: created.id,
-      actorPersonId: actor.actorPersonId,
-      organizationId: site.organizationId, siteId: site.id,
-      payload: { revision, status: decision.status },
-    });
+    const evidence={sourceId:created.id,sourceVersion:String(revision),occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId:site.organizationId,siteId:site.id}};
+    if(decision.status==="draft")await emitReportableChange(tx,{...evidence,eventType:EventTypes.SiteLocalWebsiteDraftSaved,payload:{revision,status:"draft"}});
+    else if(decision.status==="published")await emitReportableChange(tx,{...evidence,eventType:EventTypes.SiteLocalWebsiteContentPublished,payload:{revision,status:"published"}});
+    else await emitReportableChange(tx,{...evidence,eventType:EventTypes.SiteLocalWebsiteContentReviewRequested,payload:{revision,status:"review_required"}});
     return { changed: true, revision, status: decision.status,
       flaggedFields: decision.flaggedFields, ...restored };
 }

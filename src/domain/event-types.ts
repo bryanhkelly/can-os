@@ -1,4 +1,12 @@
 export const EventTypes = {
+  SiteIntelligenceProcessingRequested: "SiteIntelligenceProcessingRequested",
+  SiteIntelligenceProcessingCompleted: "SiteIntelligenceProcessingCompleted",
+  SiteIntelligenceProcessingFailed: "SiteIntelligenceProcessingFailed",
+  SiteIntelligencePackageReused: "SiteIntelligencePackageReused",
+  SiteBrandVersionSaved: "SiteBrandVersionSaved",
+  SiteProgramLaunchRecorded: "SiteProgramLaunchRecorded",
+  SiteCampaignQueued: "SiteCampaignQueued",
+  SiteCampaignCancelled: "SiteCampaignCancelled",
   LaunchDraftSaved: "LaunchDraftSaved",
   SchoolSetupCompleted: "SchoolSetupCompleted",
   OnsiteRoomPlanReviewed: "OnsiteRoomPlanReviewed",

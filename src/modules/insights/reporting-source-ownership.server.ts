@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   auditEvents, interestEventRegistrations, interestEvents,
   siteArtifactReleases, siteMarketingPackageReleases,
-  siteMarketingPackages, siteRooms,
+  siteMarketingPackages, siteRooms, siteIntelligenceVersions, siteBrandVersions, siteLocalContentVersions, programs, sites,
 } from "@/db/schema";
 import {
   assertReportingSourceOwnerMatches,
@@ -13,7 +13,7 @@ import {
 import { EventTypes } from "@/domain/event-types";
 import type { ReportableEventType, ReportableSourceKind } from "@/domain/reportable-event-catalog";
 
-type Reader = Pick<typeof db, "select">;
+type Reader = Pick<typeof db, "select" | "execute">;
 /**
  * Validate the actual source's owner, not merely a claimed Site relationship
  * inside a trusted-looking event. A deleted draft is verified against its
@@ -34,6 +34,30 @@ export async function assertReportingSourceOwnership(
     case "site":
       owner = { siteId: sourceId };
       break;
+    case "site_intelligence_version": {
+      const [row]=await reader.select({siteId:siteIntelligenceVersions.siteId,organizationId:siteIntelligenceVersions.organizationId}).from(siteIntelligenceVersions).where(eq(siteIntelligenceVersions.id,sourceId)).limit(1);
+      owner=row??null;break;
+    }
+    case "site_brand_version": {
+      const [row]=await reader.select({siteId:siteBrandVersions.siteId,organizationId:sites.organizationId}).from(siteBrandVersions).innerJoin(sites,eq(sites.id,siteBrandVersions.siteId)).where(eq(siteBrandVersions.id,sourceId)).limit(1);
+      owner=row??null;break;
+    }
+    case "site_local_content_version": {
+      const [row]=await reader.select({siteId:siteLocalContentVersions.siteId,organizationId:sites.organizationId}).from(siteLocalContentVersions).innerJoin(sites,eq(sites.id,siteLocalContentVersions.siteId)).where(eq(siteLocalContentVersions.id,sourceId)).limit(1);
+      owner=row??null;break;
+    }
+    case "program": {
+      const [row]=await reader.select({siteId:programs.siteId,organizationId:programs.organizationId,programId:programs.id}).from(programs).where(eq(programs.id,sourceId)).limit(1);
+      owner=row?.siteId?{...row,siteId:row.siteId}:null;break;
+    }
+    case "site_campaign": {
+      const result=await reader.execute(sql`SELECT e.site_id AS "siteId",e.organization_id AS "organizationId"
+        FROM public.engagement_campaigns c JOIN public.engagement_definitions e ON e.id=c.engagement_id
+        WHERE c.id=${sourceId} AND e.owner_kind='site' AND e.program_id IS NULL
+        AND c.owner_scope='site:'||e.site_id::text AND c.sender_scope='organization:'||e.organization_id::text`);
+      const row=result.rows[0];
+      owner=row&&typeof row.siteId==="string"&&typeof row.organizationId==="string"?{siteId:row.siteId,organizationId:row.organizationId}:null;break;
+    }
     case "site_room": {
       const [row] = await reader.select({siteId:siteRooms.siteId}).from(siteRooms)
         .where(eq(siteRooms.id,sourceId)).limit(1);

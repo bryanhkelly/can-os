@@ -1,3 +1,5 @@
+import {EventTypes} from "@/domain/event-types";
+import {emitReportableChange} from "@/platform/reportable-event";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {sql,eq} from "drizzle-orm";
@@ -85,6 +87,8 @@ export const queueEngagementCampaign=createServerFn({method:"POST"})
  FROM public.campaign_list_members m LEFT JOIN public.campaign_suppressions s ON s.sender_scope=${s.senderScope} AND s.email=m.email
  WHERE m.owner_scope=${s.ownerScope} AND m.list_id=${list.id} RETURNING id`);
  if(!inserted.length||inserted.length>campaignRecipientLimit)throw new Error("Recipient list is empty or exceeds the campaign limit.");
+ if(s.record.ownerKind==="site"&&s.record.siteId&&s.record.organizationId)
+   await emitReportableChange(tx,{eventType:EventTypes.SiteCampaignQueued,sourceId:campaign.id,sourceVersion:"queued",occurredAt:new Date(),actorPersonId:s.actor.actorPersonId,dimensions:{organizationId:s.record.organizationId,siteId:s.record.siteId},payload:{engagementId:data.engagementId,linkId:data.linkId,recipientCount:inserted.length,scheduledAt:scheduledAt.toISOString()}});
  return {id:campaign.id};
  });
  });
@@ -92,7 +96,9 @@ export const cancelEngagementCampaign=createServerFn({method:"POST"})
  .validator((v:unknown)=>input.extend({campaignId:uuid}).strict().parse(v)).handler(async({data})=>{
  const s=await scope(data.engagementId);
  await db.transaction(async tx=>{
- await tx.execute(sql`UPDATE public.engagement_campaigns SET cancelled_at=coalesce(cancelled_at,now()) WHERE id=${data.campaignId} AND owner_scope=${s.ownerScope} AND engagement_id=${data.engagementId} AND link_id=${data.linkId}`);
+ const [cancelled]=await campaignRows<{id:string;cancelled_at:string|Date}>(tx,sql`UPDATE public.engagement_campaigns SET cancelled_at=now() WHERE id=${data.campaignId} AND owner_scope=${s.ownerScope} AND engagement_id=${data.engagementId} AND link_id=${data.linkId} AND cancelled_at IS NULL RETURNING id,cancelled_at`);
+ if(cancelled&&s.record.ownerKind==="site"&&s.record.siteId&&s.record.organizationId)
+   await emitReportableChange(tx,{eventType:EventTypes.SiteCampaignCancelled,sourceId:cancelled.id,sourceVersion:"cancelled",occurredAt:new Date(cancelled.cancelled_at),actorPersonId:s.actor.actorPersonId,dimensions:{organizationId:s.record.organizationId,siteId:s.record.siteId},payload:{engagementId:data.engagementId,linkId:data.linkId}});
  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status='cancelled' FROM public.engagement_campaigns c WHERE d.campaign_id=c.id AND c.id=${data.campaignId} AND c.owner_scope=${s.ownerScope} AND c.engagement_id=${data.engagementId} AND c.link_id=${data.linkId} AND c.cancelled_at IS NOT NULL AND d.status='pending'`);
  });
  return {ok:true};

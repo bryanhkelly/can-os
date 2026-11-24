@@ -1,3 +1,4 @@
+import {emitReportableChange} from "@/platform/reportable-event";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { programPublications, programs, sitePublications } from "@/db/schema";
@@ -6,7 +7,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import {
   academicMarketingSnapshot, publishableAcademicProgram,
 } from "@/domain/academic-program-publication";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
 import { requireSitePublisher } from "./site-publication.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { readSchoolJurisdictionReview } from "@/modules/programs/school-jurisdiction-review.server";
@@ -129,14 +130,9 @@ export async function changeAcademicProgramPublication(
         institutionalAuthorizationId,
         reviewed: target === "published" ? input.contentReviewed : null },
     });
-    await emitEvent(tx, {
-      eventType: target === "published"
-        ? EventTypes.AcademicProgramMarketingPublished : EventTypes.AcademicProgramMarketingUnpublished,
-      aggregateType: "program", aggregateId: program.id,
-      actorPersonId: actor.actorPersonId, organizationId: site.organizationId,
-      siteId: site.id, programId: program.id,
-      payload: { publicationStatus: target },
-    });
+    const evidence={sourceId:program.id,sourceVersion:updatedAt.toISOString(),occurredAt:updatedAt,actorPersonId:actor.actorPersonId,dimensions:{organizationId:site.organizationId,siteId:site.id,programId:program.id}};
+    if(target==="published")await emitReportableChange(tx,{...evidence,eventType:EventTypes.AcademicProgramMarketingPublished,payload:{publicationStatus:"published"}});
+    else await emitReportableChange(tx,{...evidence,eventType:EventTypes.AcademicProgramMarketingUnpublished,payload:{publicationStatus:"draft"}});
     return { programId: program.id, status: target, changed: true,
       updatedAt: updatedAt.toISOString() };
   });

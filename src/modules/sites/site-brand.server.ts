@@ -1,3 +1,5 @@
+import {EventTypes} from "@/domain/event-types";
+import {emitReportableChange} from "@/platform/reportable-event";
 import { canonicalJson } from "@/lib/canonical-json";
 import type { PartnerLocalContentTx } from "./site-local-content.server";
 import { transitionAuthorizedGoLink } from "@/modules/engagement/go-link-lifecycle.server";
@@ -163,6 +165,7 @@ export async function saveSiteBrandVersionWithinTransaction(
         before:{brandVersionId:site.currentBrandVersionId,revision:previous[0]?.revision??null},
         after:{brandVersionId:saved.id,revision:nextRevision,fingerprint},
       });
+      await emitReportableChange(tx,{eventType:EventTypes.SiteBrandVersionSaved,sourceId:saved.id,sourceVersion:String(nextRevision),occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId:authorized.organizationId,siteId:site.id},payload:{revision:nextRevision}});
       return {changed:true,brandVersionId:saved.id,revision:nextRevision,configuration:config};
 
 }

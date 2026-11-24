@@ -14,6 +14,81 @@ const uuid = z.string().uuid();
 const revision = z.number().int().positive();
 
 export const REPORTABLE_EVENT_CATALOG = {
+  [EventTypes.SiteIntelligenceProcessingRequested]: {
+    sourceKind: "site_intelligence_version", aggregateType: "site_intelligence_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({attempt: z.number().int().min(1).max(3)}).strict(),
+  },
+  [EventTypes.SiteIntelligenceProcessingCompleted]: {
+    sourceKind: "site_intelligence_version", aggregateType: "site_intelligence_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({attempt: z.number().int().min(1).max(3), outputId: uuid}).strict(),
+  },
+  [EventTypes.SiteIntelligenceProcessingFailed]: {
+    sourceKind: "site_intelligence_version", aggregateType: "site_intelligence_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({attempt: z.number().int().min(1).max(3)}).strict(),
+  },
+  [EventTypes.SiteIntelligencePackageReused]: {
+    sourceKind: "site_intelligence_version", aggregateType: "site_intelligence_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({attempt: z.number().int().min(1).max(3)}).strict(),
+  },
+  [EventTypes.SiteBrandVersionSaved]: {
+    sourceKind: "site_brand_version", aggregateType: "site_brand_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({revision}).strict(),
+  },
+  [EventTypes.SiteProgramLaunchRecorded]: {
+    sourceKind: "program", aggregateType: "program",
+    requiredDimensions: ["siteId", "programId"] as const,
+    schemaVersion: 1 as const, payload: z.object({stage:z.enum(["started","activated"]),journeyId:uuid}).strict(),
+  },
+  [EventTypes.SiteCampaignQueued]: {
+    sourceKind: "site_campaign", aggregateType: "site_campaign",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({engagementId:uuid,linkId:uuid,recipientCount:z.number().int().positive().max(1000),scheduledAt:z.string().datetime({offset:true})}).strict(),
+  },
+  [EventTypes.SiteCampaignCancelled]: {
+    sourceKind: "site_campaign", aggregateType: "site_campaign",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({engagementId:uuid,linkId:uuid}).strict(),
+  },
+  [EventTypes.SiteLocalWebsiteDraftSaved]: {
+    sourceKind: "site_local_content_version", aggregateType: "site_local_content_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({revision,status:z.literal("draft")}).strict(),
+  },
+  [EventTypes.SiteLocalWebsiteContentPublished]: {
+    sourceKind: "site_local_content_version", aggregateType: "site_local_content_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({revision,status:z.literal("published")}).strict(),
+  },
+  [EventTypes.SiteLocalWebsiteContentReviewRequested]: {
+    sourceKind: "site_local_content_version", aggregateType: "site_local_content_version",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({revision,status:z.literal("review_required")}).strict(),
+  },
+  [EventTypes.SitePublished]: {
+    sourceKind: "site", aggregateType: "site",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({slug:z.string().max(200),status:z.literal("published"),publishedAt:z.string().datetime({offset:true}).nullable(),publicationAction:z.enum(["publish","republish","unpublish"]).optional()}).strict(),
+  },
+  [EventTypes.SiteUnpublished]: {
+    sourceKind: "site", aggregateType: "site",
+    requiredDimensions: ["siteId"] as const,
+    schemaVersion: 1 as const, payload: z.object({slug:z.string().max(200),status:z.literal("draft"),publishedAt:z.string().datetime({offset:true}).nullable(),publicationAction:z.enum(["publish","republish","unpublish"]).optional()}).strict(),
+  },
+  [EventTypes.AcademicProgramMarketingPublished]: {
+    sourceKind: "program", aggregateType: "program",
+    requiredDimensions: ["siteId", "programId"] as const,
+    schemaVersion: 1 as const, payload: z.object({publicationStatus:z.literal("published")}).strict(),
+  },
+  [EventTypes.AcademicProgramMarketingUnpublished]: {
+    sourceKind: "program", aggregateType: "program",
+    requiredDimensions: ["siteId", "programId"] as const,
+    schemaVersion: 1 as const, payload: z.object({publicationStatus:z.literal("draft")}).strict(),
+  },
   [EventTypes.SiteInformationUpdated]: {
     sourceKind: "site",
     aggregateType: "site",
