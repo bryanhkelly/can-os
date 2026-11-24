@@ -94,7 +94,7 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
     if(!native || native.disabledAt || !native.verifiedAt ||
        native.email!==owner.email)
       throw new AuthorizationError("verified native identity unavailable");
-    return {accountId:native.id,personId:person.id};
+    return {accountId:native.id,personId:owner.personId};
   }
   const [operatorLinked]=await tx.select({id:accessAccountCanonicalPrincipals.id})
     .from(accessAccountCanonicalPrincipals).where(and(
