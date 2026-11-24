@@ -15,17 +15,17 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(transfer).toContain("orderBy(asc(canonicalClasses.id)).for(\"update\")");
   expect(transfer).toContain('source.status!=="active"');
   expect(transfer).toContain("assertCurrentNativeClassLearnerForMutation");
-  expect(transfer).toContain("assertNativeClassAttemptForExit");
+  expect(transfer).toContain("withdrawNativeClassAttempts(tx,source,sourceClass)");
   expect(transfer).toContain("assertNativeSelfEnrollmentEligible");
   expect(transfer).toContain("assertNativeClassSeatAvailable");
  });
  it("preserves source history, creates one destination Attempt and attribution",()=>{
   expect(transfer).toContain('set({status:"withdrawn"})');
   expect(transfer).toContain("tx.insert(canonicalClassEnrollments)");
-  expect(transfer).toContain("tx.insert(learnerCourseAttempts)");
+  expect(transfer).toContain("createInitialNativeClassAttempt(tx,destination.id,destinationAuthority)");
   expect(transfer).toContain("tx.insert(participationAttributions)");
   expect(transfer).toContain('eventType:"ClassEnrollmentTransferred"');
-  expect(transfer).toContain("sourceAttemptIdsClosed:live.map");
+  expect(transfer).toContain("sourceAttemptIdsClosed:closedAttemptIds");
   expect(learner).toContain("transferMyNativeClassEnrollment");
   expect(learner).toContain("I accept the destination Class terms");
  });
