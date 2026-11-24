@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,6 +51,10 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
         Retry
       </Button>
     </p>}
+    {query.data?.legacySectionId&&<div className="space-y-2 border border-border p-3">
+      <p className="text-sm">Original school assignments and feedback remain in your recovered Section until historical records are reconciled.</p>
+      <Button asChild variant="outline" size="sm"><Link to="/student/assignments" search={{section:query.data.legacySectionId}}>View original school assignments</Link></Button>
+    </div>}
     {query.data?.assignments.length===0&&
       <p className="text-sm">No written assignments are available for this Course yet.</p>}
     {query.data?.assignments.map(item=>{
