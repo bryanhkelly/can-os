@@ -45,10 +45,14 @@ describe("Go Link Site reuse and scaled operations",()=>{
       expect(source).not.toContain("setChoices(");
     }
     const hook=read("src/hooks/use-go-destination-choices.ts");
-    expect(hook).toContain("workspaceSessionIdentity(session)");
-    expect(hook).toContain('queryKey:["go-destination-choices",scope,...key]');
-    expect(hook).toContain("gcTime:0");
-    expect(hook).toContain("query.isPlaceholderData");
+    expect(hook).toContain('namespace:"go-destination-choices"');
+    expect(hook).toContain("usePrivateWorkspaceQuery(");
+    expect(read("src/hooks/use-private-report-query.ts")).toContain("usePrivateWorkspaceQuery(");
+    const shared=read("src/hooks/use-private-workspace-query.ts");
+    expect(shared).toContain("workspaceSessionIdentity(session)");
+    expect(shared).toContain("queryKey:[options.namespace,options.scope,...options.key]");
+    expect(shared).toContain("gcTime:0");
+    expect(shared).toContain("query.isPlaceholderData");
   });
   it("enforces exactly-once creation semantics for repeated request IDs",()=>{
     const schema=read("src/db/schema/site-go-links.ts");
