@@ -18,7 +18,8 @@ WITH source_assessments AS (
         (SELECT count(*) FROM public.enrollments e
           WHERE e.kind='section' AND e.section_id=sa.section_id AND e.student_profile_id=sp.id) placement_count,
         (SELECT count(*) FROM public.enrollments e
-          JOIN public.class_enrollments ce ON ce.id=md5('valor-v61:classenrollment:'||e.id)::uuid
+          JOIN public.academic_enrollment_cutover_links link ON link.legacy_enrollment_id=e.id
+          JOIN public.class_enrollments ce ON ce.id=link.class_enrollment_id
             AND ce.class_id=sa.class_id AND ce.learner_person_id=sp.person_id
           JOIN public.learner_course_attempts ca ON ca.id=ce.course_attempt_id
             AND ca.class_enrollment_id=ce.id AND ca.course_version_id=sa.course_version_id
@@ -26,7 +27,8 @@ WITH source_assessments AS (
           WHERE e.kind='section' AND e.section_id=sa.section_id AND e.student_profile_id=sp.id
             AND e.status='active' AND ce.status='active') active_destination_count,
         (SELECT count(*) FROM public.enrollments e
-          JOIN public.class_enrollments ce ON ce.id=md5('valor-v61:classenrollment:'||e.id)::uuid
+          JOIN public.academic_enrollment_cutover_links link ON link.legacy_enrollment_id=e.id
+          JOIN public.class_enrollments ce ON ce.id=link.class_enrollment_id
             AND ce.class_id=sa.class_id AND ce.learner_person_id=sp.person_id
           WHERE e.kind='section' AND e.section_id=sa.section_id AND e.student_profile_id=sp.id
             AND ce.status='pending') pending_destination_count
