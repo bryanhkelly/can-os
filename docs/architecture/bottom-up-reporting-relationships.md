@@ -1,6 +1,6 @@
 # Bottom-up reporting relationships
 
-Status: source increment on release-11232026. Not deployed or accepted.
+Status: additive schema installed on Neon main; relationship workflow source integrated on release-11232026. Not deployed or browser accepted.
 
 ## Direction
 The data-owning organization initiates a tag, selects a relationship type and
@@ -56,8 +56,7 @@ Current revocation or expiry blocks historical queries too.
 
 The V6.1 panel uses the existing Button, Select, Field, Checkbox, Label and
 WorkspaceNotice primitives. It is controlled by its authorized parent workspace,
-with explicit metric selection and decision confirmation. It is not mounted
-on application routes yet. An accessible, bounded organization search and
+with explicit metric selection and decision confirmation. The continuation mounts it in the independent relationship manager home workspace. An accessible, bounded organization search and
 pagination, date-selection, incoming inbox, refresh/error handling and
 notification integration remain work.
 
@@ -65,8 +64,7 @@ notification integration remain work.
 1. Ratify direct relationship proposal/decision/revocation/report capabilities
    through the existing centralized verified role and grant system; never
    bootstrap real agreements through impersonation or use ordinary tenant
-   administration as implied consent. No mapping for the new capabilities is
-   enabled by this increment.
+   administration as implied consent. The capability mapping is now implemented for an explicit relationship manager role; real assignments remain unprovisioned.
 2. Establish a trusted per-scope, versioned disclosure metric allowlist; the
    existing registry describes private operational metrics, not permission to
    share them. Recipient discovery, acceptance eligibility and current actor
@@ -92,7 +90,48 @@ notification integration remain work.
    integration/browser acceptance before promoting.
 
 Read-only main schema inspection confirmed canonical public table/column names
-for the source scope and approved Offering adoption joins. No DB writes or
-production migration were executed by this source increment. No checkout or
+for the source scope and approved Offering adoption joins. The original source increment did not write the database; the continuation installed the additive migration as recorded below. No checkout or
 dependency install was available in the authoring runtime; no build, unit,
 Storybook, migration execution or browser pass is claimed.
+
+## Continuation: 2026-11-24
+- Corrected invalid Offering-owner SQL function dollar quoting and require both
+  parties to remain active at acceptance. Applied the committed additive
+  migration on Neon CAN OS main (neondb), not a test01 branch.
+- Independently verified both tables, forced RLS, one policy per table,
+  no direct anonymous/authenticated access, 10 validated agreement FKs,
+  three validated event FKs, four valid agreement indexes, two enabled
+  agreement triggers, one audit immutability trigger, and no anonymous or
+  authenticated execution privilege on the Offering owner resolver.
+- The live inventory contains zero agreements, zero events and zero active
+  reporting_relationship_manager account grants. No real grants or synthetic
+  acceptance records were created. Lifecycle behavior is not yet DB-tested.
+- The dedicated reporting_relationship_manager role reuses account_person_grants
+  and the central capability map, without default administrative inheritance.
+  It is excluded from delegated Owner actions and ordinary Site/Program scope
+  expansion. Initial workflow requires an independently verified, direct,
+  organization-wide appointment. Rechecks lock current grant, account, Person,
+  organization and session rows inside commands. Synthetic tenants are excluded.
+- Bounded organization search lists only active organizations with a real
+  relationship manager; bounded resource choices use canonical ownership or
+  Offering adoption. Incoming/outgoing inbox returns exact resource and metric
+  labels but omits actor Person IDs. No outcome records are returned.
+- Server functions use a server-owned, version-pinned proposal metric allowlist
+  for registration/reach and selected noncredit participation/completion terms.
+  Acceptance does not approve an external release. The new role's /home
+  workspace uses the existing V6.1 panel, query framework and mutation feedback.
+- A pure internal registration projection applies eligible direct agreements
+  at canonical fact grain, deduplicates overlaps, and reuses the existing
+  participation rollup for registrations and distinct Person counts. Four
+  registration/reach metrics are supported by this pure projection. It is not
+  connected to live source adapters or an external report endpoint.
+- Additional regression tests cover role isolation, owner delegation, source
+  overlap, distinct contributors, wrong owner, revoked permission, version
+  mismatch and unsupported metric/source combinations. Tests are written,
+  not executed. Full typecheck, build, Storybook, browser and restricted-
+  principal lifecycle acceptance remain blockers.
+- Next: authorized role provisioning, independent source adapters with current
+  scope proofs and report-disclosure artifact/workflow, then test and release
+  the aggregate-only reporting reader. Add resource-local entry points,
+  expiry controls, notifications and operational acceptance. Do not merge or
+  deploy unvalidated code solely because the database schema exists.
