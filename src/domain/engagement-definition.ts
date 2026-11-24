@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { goDestinationSchema } from "./site-go-links";
+import { containsProtectedInstitutionalClaim } from "./site-local-content";
 
 /**
  * Cross-domain public engagement vocabulary. This models an invitation and
@@ -71,6 +72,17 @@ export const engagementDefinitionSchema = z.object({
 }).strict();
 
 export type EngagementDefinition = z.infer<typeof engagementDefinitionSchema>;
+
+/** Public copy needs review rather than unverified institutional approval claims. */
+export function engagementRequiresClaimReview(definition:EngagementDefinition):boolean {
+  return containsProtectedInstitutionalClaim([
+    definition.subject.label,
+    definition.presentation.headline,
+    definition.presentation.summary,
+    definition.presentation.detail??"",
+    definition.execution.mode==="page"?definition.execution.actionLabel:"",
+  ].join(" "));
+}
 
 export function isEngagementExecutable(value:unknown):value is EngagementDefinition {
   return engagementDefinitionSchema.safeParse(value).success;
