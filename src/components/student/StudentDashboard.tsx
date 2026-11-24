@@ -37,7 +37,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   const studentClasses = data?.classes?.ok && data.classes.data.kind === "student"
     ? data.classes.data.classes : [];
   const enrolledClasses = studentClasses.filter(item => item.status === "active" && !!item.courseAttemptId);
-  const onlyClassId = enrolledClasses.length === 1 ? enrolledClasses[0]?.classId : null;
+  const resumeClassId = enrolledClasses.find(item => item.classId === learning?.classId)?.classId;
   const community = data?.community.ok ? data.community.data : null;
   const events = [...liveData.events].sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const scheduled = events.filter(event => !event.cancelled);
@@ -55,7 +55,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
     quickActions={<>
       <DashboardShortcut title="Continue Learning" description={learning?.lesson?.title ?? nextWork?.title ?? "Open your enrolled classes"}
         icon={<BookOpen className="size-5" />}>{learning?.lesson
-          ? onlyClassId ? <Link to="/class/$classId" params={{classId:onlyClassId}} search={{view:"learn",tab:"lessons"}} /> : <Link to="/class" />
+          ? resumeClassId ? <Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons",lesson:learning.lesson.id}} /> : <Link to="/class" />
           : nextWork ? <StudentAssignmentLink assessmentId={nextWork.assessmentId} sectionId={nextWork.sectionId} />
           : <Link to="/class" />}</DashboardShortcut>
       <DashboardShortcut title="View Assignments" description={assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}

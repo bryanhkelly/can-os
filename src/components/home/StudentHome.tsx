@@ -5,10 +5,11 @@ import { getQuickWinActions } from "@/modules/actions/student-actions.functions"
 import { getStudentReportCard } from "@/modules/learning/report-cards.functions";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getClassWorkspace } from "@/modules/learning/class-workspace.functions";
+import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { DataUnavailableError, safeLoader } from "@/lib/safe-loader";
-import type { StudentDashboardData } from "@/components/student/student-dashboard-data";
+import type { LearningResume, StudentDashboardData } from "@/components/student/student-dashboard-data";
 import {
   deriveStudentSuccessSupportTasks,
   type StudentSuccessSupportSummary,
@@ -64,7 +65,33 @@ export async function loadStudentToday() {
   const preferredSectionId = success?.steps.find(step => step.canEdit && step.sectionId)?.sectionId;
   const candidates = [...today.sections].sort((a, b) =>
     Number(b.sectionId === preferredSectionId) - Number(a.sectionId === preferredSectionId));
-  const learning = await safeLoader(async () => {
+  const classes = await classesPromise;
+  const learning = await safeLoader(async (): Promise<LearningResume | null> => {
+    if (!classes.ok) throw new DataUnavailableError();
+    const native = classes.data.classes.filter(item => item.status === "active" && item.enrollmentId && item.courseAttemptId);
+    if (native.length) {
+      let fallback: LearningResume | null = null;
+      // Reuse the authorized native lesson service. Never infer a Class from a Section title.
+      for (let offset = 0; offset < native.length; offset += 3) {
+        const results = await Promise.all(native.slice(offset, offset + 3).map(item =>
+          safeLoader(() => getNativeClassLearning({data:{classEnrollmentId:item.enrollmentId!}}))()));
+        for (const result of results) {
+          if (!result.ok) continue;
+          const view = result.data;
+          const lessons = view.lessons.filter(lesson => lesson.lessonBody.trim().length > 0 || lesson.videoResources.length > 0);
+          if (!lessons.length) continue;
+          const completed = lessons.filter(lesson => lesson.progressStatus === "completed" || lesson.progressStatus === "waived").length;
+          const next = lessons.find(lesson => lesson.progressStatus !== "completed" && lesson.progressStatus !== "waived");
+          const resume: LearningResume = {classId:view.classId,title:view.classTitle,
+            lesson:next ? {id:next.lessonId,title:next.lessonTitle} : null,completed,total:lessons.length};
+          if (next) return resume;
+          fallback ??= resume;
+        }
+      }
+      if (!fallback) throw new DataUnavailableError();
+      return fallback;
+    }
+    // Section-only schools retain their existing read path until migrated.
     let completedFallback: {
       sectionId: string; title: string;
       lesson: { id: string; title: string; estimatedMinutes?: number } | null;
@@ -106,7 +133,6 @@ export async function loadStudentToday() {
     if (!completedFallback && candidates.length) throw new DataUnavailableError();
     return completedFallback;
   })();
-  const classes = await classesPromise;
   const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community, classes };
   return { today, success, support, dashboard };
 }

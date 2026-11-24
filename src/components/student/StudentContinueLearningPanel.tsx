@@ -21,8 +21,8 @@ export function StudentContinueLearningPanel({
   const textLink = "student-dashboard-link";
   const enrolledClasses = classes.filter(item =>
     item.status === "active" && !!item.courseAttemptId);
-  // A legacy Section is not a native Class, even when only one Class exists.
-  // Until a governed mapping is present, show explicit authorized destinations.
+  const resumeClassId = enrolledClasses.find(item => item.classId === resume?.classId)?.classId;
+  // Legacy Section progress never supplies a native Class destination.
   const classLinks = enrolledClasses.length > 0 && <nav aria-label="Your enrolled Classes" className="mt-4 border-t border-border pt-3">
     <p className="mb-2 text-xs font-semibold">Your Classes</p>
     <div className="flex flex-wrap gap-2">{enrolledClasses.map(item =>
@@ -42,7 +42,7 @@ export function StudentContinueLearningPanel({
                     max={resume.total} className="mt-4" /> : <p className="mt-3 text-xs text-muted-foreground">No published instructional lessons available.</p>}
                 </div>
               </div>
-              <Link to="/class" className="student-resume-action">Choose Class →</Link>
+              {resumeClassId ? <Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons",lesson:resume?.lesson?.id}} className="student-resume-action">Resume lesson →</Link> : <Link to="/class" className="student-resume-action">Choose Class →</Link>}
               <p className="mt-2 text-3xs text-muted-foreground">Self-reported completion is not mastery or earned credit.</p>
             </div>
             <div className="student-up-next">
@@ -51,7 +51,7 @@ export function StudentContinueLearningPanel({
                 <p className="text-xs">{resume.lesson?.title ?? "Check your classwork and feedback"}</p></div>
               {resume.lesson?.estimatedMinutes && <div className="mt-3 flex gap-2"><Clock3 aria-hidden="true" className="size-4 shrink-0" />
                 <p className="text-xs">About {resume.lesson.estimatedMinutes} min · estimated duration</p></div>}
-              <Link to="/class" className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">Choose Class →</Link>
+              {resumeClassId ? <Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons",lesson:resume?.lesson?.id}} className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">Open lesson →</Link> : <Link to="/class" className="mt-4 block border bg-accent p-2 text-center text-xs font-semibold text-accent-foreground">Choose Class →</Link>}
               {nextWork && <div className="mt-4 space-y-2 border-t border-border pt-3">
                 <p className="text-xs font-semibold">Assignment needing attention</p>
                 <p className="text-xs text-muted-foreground">{nextWork.title}</p>
