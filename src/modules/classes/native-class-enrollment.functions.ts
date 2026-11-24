@@ -18,8 +18,7 @@ import {
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
   educationOperationOrganizationRoles,
-  canonicalOfferingCourses, participationAttributions, networkMemberships,
-} from "@/db/canonical-v301";
+  canonicalOfferingCourses, } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
@@ -31,6 +30,7 @@ import { currentClassAuthority } from "./native-class-authority.server";
 import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
+import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
 import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
@@ -315,31 +315,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
         consentVersion:version.consentVersion,consentSha256,consentedAt:now,
       }).returning({id:canonicalClassEnrollments.id});
       if(!enrollment)throw new Error("Class Enrollment insert failed");
-      const [selectedMembership]=data.networkMembershipId
-        ?await tx.select({
-          id:networkMemberships.id,
-          memberOrganizationId:networkMemberships.memberOrganizationId,
-        }).from(networkMemberships).where(and(
-          eq(networkMemberships.id,data.networkMembershipId),
-          eq(networkMemberships.status,"approved"),
-          eq(networkMemberships.directoryVisible,true),
-          eq(networkMemberships.networkOrganizationId,current.operatingOrganizationId),
-          lte(networkMemberships.validFrom,now),
-          or(isNull(networkMemberships.validThrough),gt(networkMemberships.validThrough,now)),
-        )).limit(1):[];
-      if(data.networkMembershipId&&!selectedMembership)
-        throw new AuthorizationError("approved directory-visible network affiliate");
-      await tx.insert(participationAttributions).values({
-        classEnrollmentId:enrollment.id,
-        deliverySiteId:current.siteId,reportingSiteId:current.siteId,
-        creditedOrganizationId:selectedMembership?.memberOrganizationId??
-          current.operatingOrganizationId,
-        networkMembershipId:selectedMembership?.id??null,
-        attributionBasis:selectedMembership?"self_reported":"provider_default",
-        relationshipSnapshot:selectedMembership?{}:{
-          kind:"provider_default",classId:instance.id,
-          organizationId:current.operatingOrganizationId,siteId:current.siteId},
-      });
+      await writeNativeClassAttribution(tx,{enrollmentId:enrollment.id,source:current,now:now,networkMembershipId:data.networkMembershipId});
       const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
       if(repeatAuthorization){
         await consumeNativeClassRepeatAuthorization(tx,{
