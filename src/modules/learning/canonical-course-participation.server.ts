@@ -9,6 +9,7 @@ import { AuthorizationError, assertCapability, type CommandContext } from "@/dom
 import { resolveCanonicalCourseParticipation, type CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
 import { authorizeNativeClassAttempt } from "@/domain/native-class-enrollment";
 import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
+import { studentSiteScope } from "@/domain/student-site-scope";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -42,6 +43,12 @@ export async function authorizeCanonicalCourseAttempt(
       : [];
     if (!classInstance || !classEnrollment) {
       throw new AuthorizationError("current native Class Enrollment");
+    }
+    if(context.role==="student"){
+      const membership=studentSiteScope(context);
+      if(!membership || membership.siteId!==classInstance.siteId ||
+         membership.organizationId!==classInstance.operatingOrganizationId)
+        throw new AuthorizationError("own current student Class Site");
     }
     // One server-owned publication/operation/Site authority for discovery,
     // enrollment and instruction. History relaxes only the Class state.
