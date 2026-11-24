@@ -2,7 +2,8 @@ import { Field } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { SiteCampaignEvidencePanel } from "@/components/reports/SiteCampaignEvidencePanel";
 import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
-import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import { GoLinkActions } from "@/components/links/GoLinkActions";
+import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,8 +30,7 @@ const problem=(error:unknown)=>error instanceof Error?error.message:"Action unav
  */
 type LibraryProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface};
 export function SiteEngagementLibrary(props:LibraryProps){
-  const owner=props.ownerSurface?.owner;
-  const scope=JSON.stringify([props.siteId,props.packageId,owner?.kind,owner?.kind==="organization"?owner.organizationId:null]);
+  const scope=engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner);
   return <SiteEngagementLibrarySession key={scope} {...props}/>;
 }
 function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryProps){
@@ -165,11 +165,10 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
             {link.evidence?<p className="mt-1 text-xs text-muted-foreground">{link.evidence.redirects30d} observed requests · {link.evidence.registrationEvidence==="referenced_noncredit_claim"?`${link.evidence.referralRegistrations30d??0} matching registration claims`:"Outcome not connected"} (30 days; not unique people or causal conversions)</p>:<p className="mt-1 text-xs text-muted-foreground">Outcome evidence unavailable.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
-            {link.status==="active"&&record?.status==="active"&&<CopyLinkButton destination={{kind:"go",code:link.code}}/>}
+            {link.status==="active"&&record?.status==="active"&&<GoLinkActions code={link.code} status="active"
+              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")void revoke(link);}}/>
             {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>Prepare email</Button>}
-            {link.status==="active"&&record?.status==="active"&&
-              <Button type="button" size="sm" variant="outline" disabled={busy}
-                onClick={()=>void revoke(link)}>Revoke</Button>}
+}
           </div>
         </div>)}
       </div>}
