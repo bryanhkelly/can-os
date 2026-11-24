@@ -1,5 +1,8 @@
 import { Field } from "@/components/ui/field";
-import {useEffect,useState} from "react";
+import {useState} from "react";
+import {Button} from "@/components/ui/button";
+import {GoDestinationChoiceField} from "./GoDestinationChoiceField";
+import {useGoDestinationChoices} from "@/hooks/use-go-destination-choices";
 import {Select} from "@/components/ui/select";
 import {Input} from "@/components/ui/input";
 import {listOwnerEngagementDestinations} from "@/modules/engagement/engagement-registry.functions";
@@ -14,23 +17,18 @@ export function OwnerEngagementDestinationPicker({surface,value,onChange,disable
   const [kind,setKind]=useState<"information"|"adult-training">("information");
   const [siteId,setSiteId]=useState("");
   const [term,setTerm]=useState("");
-  const [choices,setChoices]=useState<Awaited<ReturnType<typeof listOwnerEngagementDestinations>>>([]);
-  const [error,setError]=useState(false);
-  const [loading,setLoading]=useState(true);
   const ownerId=surface.owner.kind==="organization"?surface.owner.organizationId:null;
-  useEffect(()=>{let active=true;setLoading(true);setError(false);setChoices([]);
-    listOwnerEngagementDestinations({data:{owner:surface.owner,kind,siteId:siteId||undefined,term:term.trim()}})
-      .then(rows=>{if(active){setChoices(rows);setLoading(false);}})
-      .catch(()=>{if(active){setError(true);setLoading(false);}});
-    return()=>{active=false;};
-  },[surface.owner.kind,ownerId,kind,siteId,term]);
+  const {choices,loading,error,retry}=useGoDestinationChoices(
+    ["owner",surface.owner.kind,ownerId,kind,siteId||null,term.trim()],
+    ()=>listOwnerEngagementDestinations({data:{owner:surface.owner,kind,siteId:siteId||undefined,term:term.trim()}}),
+  );
   return <div className="grid gap-3 sm:grid-cols-2">
     <Field label="Destination type"><Select value={kind} disabled={disabled} onChange={e=>{setKind(e.target.value as typeof kind);onChange(null);}}><option value="information">Information or inquiry</option><option value="adult-training">Published adult training</option></Select></Field>
     {kind==="adult-training"&&<Field label="Delivery Site"><Select value={siteId} disabled={disabled} onChange={e=>{setSiteId(e.target.value);onChange(null);}}><option value="">Choose a delivery Site</option>{surface.sites.map(site=><option value={site.id} key={site.id}>{site.name}</option>)}</Select></Field>}
     <Field label="Search eligible destinations"><Input value={term} maxLength={90} disabled={disabled} onChange={e=>{setTerm(e.target.value);onChange(null);}}/></Field>
-    <Field label="Where should this link lead?" className="sm:col-span-2"><Select disabled={disabled||loading||error||!choices.length} value={value?JSON.stringify(value):""} onChange={e=>onChange(choices.find(choice=>JSON.stringify(choice.destination)===e.target.value)?.destination??null)}><option value="">Choose an available destination</option>{choices.map(choice=><option key={JSON.stringify(choice.destination)} value={JSON.stringify(choice.destination)}>{choice.title}</option>)}</Select></Field>
+    <GoDestinationChoiceField className="sm:col-span-2" choices={choices} value={value} onChange={onChange} disabled={disabled||loading||error}/>
     {loading&&<p role="status" className="text-sm">Checking eligible destinations…</p>}
-    {error&&<p role="alert" className="text-sm text-destructive">Could not verify destination authority.</p>}
+    {error&&<div className="sm:col-span-2"><p role="alert" className="text-sm text-destructive">Could not verify destination authority.</p><Button type="button" variant="outline" size="sm" disabled={disabled} className="mt-2" onClick={()=>{onChange(null);retry();}}>Retry</Button></div>}
     {!loading&&!error&&!choices.length&&<p className="text-sm text-muted-foreground">No eligible published destinations match. Draft training is not enrollable.</p>}
   </div>;
 }
