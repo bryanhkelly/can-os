@@ -1,19 +1,12 @@
+import { downloadBlob } from "@/lib/download";
+
 /** Browser-only downloads from an already authorized, immutable artifact output. */
 export type DownloadableMarketingOutput = {
   content:string;mimeType:string;fileName:string;plainText?:string|null;
 };
 
-function saveBlob(file:Blob,fileName:string){
-  const url=URL.createObjectURL(file);
-  const link=document.createElement("a");
-  try{
-    link.href=url;link.download=fileName;link.style.display="none";
-    document.body.append(link);link.click();link.remove();
-  }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1500);}
-}
-
 export function downloadOriginalMarketingOutput(output:DownloadableMarketingOutput):void{
-  saveBlob(new Blob([output.content],{type:output.mimeType}),output.fileName);
+  downloadBlob(new Blob([output.content],{type:output.mimeType}),output.fileName);
 }
 
 /** PNG derivative is made only from the frozen SVG's original bytes, not the current Brand. */
@@ -37,7 +30,7 @@ export async function downloadMarketingPng(output:DownloadableMarketingOutput):P
       result=>result?resolve(result):reject(new Error("Unable to export PNG. Check image permissions.")),
       "image/png",
     ));
-    saveBlob(blob,output.fileName.replace(/\.svg$/i,".png"));
+    downloadBlob(blob,output.fileName.replace(/\.svg$/i,".png"));
   }finally{URL.revokeObjectURL(svgUrl);}
 }
 
@@ -123,6 +116,6 @@ export function downloadMarketingPackageZip(
   const zip=buildMarketingPackageZip(files);
   const name=title.replace(/[^a-zA-Z0-9_-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,64)||
     "marketing-package";
-  saveBlob(new Blob([zip.buffer as ArrayBuffer],{type:"application/zip"}),
+  downloadBlob(new Blob([zip.buffer as ArrayBuffer],{type:"application/zip"}),
     name+"-v"+releaseNumber+".zip");
 }
