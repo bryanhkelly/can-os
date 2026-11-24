@@ -1,16 +1,11 @@
 import {z} from "zod";
+import {readBoundedResponseText} from "@/domain/bounded-request-body";
 import {SITE_CONTENT_INSTRUCTIONS,parseGeneratedSiteContent,type SiteGenerationInput} from "@/domain/site-content-generation";
 import {SITE_PACKAGE_INSTRUCTIONS,parseSiteContentPackage,type SitePackageInput} from "@/domain/site-content-package";
 const endpoint="https://platform.ai.gloo.com/ai/v2/guarded/responses";
 const responseSchema=z.object({status:z.string().optional(),model:z.string().optional(),id:z.string().optional(),
   output:z.array(z.object({type:z.string(),content:z.array(z.object({type:z.string(),text:z.string().optional()}).passthrough()).optional()}).passthrough()),
 }).passthrough();
-async function boundedText(response:Response){
-  if(!response.body)throw new Error("Gloo returned no content");
-  const reader=response.body.getReader();const decoder=new TextDecoder();let size=0,body="";
-  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>128000)throw new Error("Gloo response exceeds limit");body+=decoder.decode(value,{stream:true});}return body+decoder.decode();}
-  finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
-}
 /** Fixed provider endpoint, server-only credentials, no automatic provider fallback. */
 async function requestGloo(input:unknown,instructions:string,maxTokens:number,send:typeof fetch){
   const key=process.env.GLOO_API_KEY?.trim(),model=process.env.GLOO_MODEL?.trim();
@@ -20,7 +15,7 @@ async function requestGloo(input:unknown,instructions:string,maxTokens:number,se
     body:JSON.stringify({model,instructions,input:JSON.stringify(input),max_output_tokens:maxTokens})});
   if(!response.ok)throw new Error("Gloo AI could not generate an eligible draft ("+response.status+").");
   let value:z.infer<typeof responseSchema>;
-  try{value=responseSchema.parse(JSON.parse(await boundedText(response)));}catch{throw new Error("Gloo returned an invalid response.");}
+  try{value=responseSchema.parse(JSON.parse(await readBoundedResponseText(response,128000)));}catch{throw new Error("Gloo returned an invalid response.");}
   if(value.status&&value.status!=="completed")throw new Error("Gloo AI returned an incomplete draft.");
   const raw=value.output.filter(item=>item.type==="message").flatMap(item=>item.content??[]).filter(c=>c.type==="output_text").map(c=>c.text??"").join("");
   return {raw,model:value.model??model,providerResponseId:value.id??null};
