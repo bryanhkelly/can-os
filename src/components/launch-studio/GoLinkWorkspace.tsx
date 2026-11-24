@@ -47,7 +47,11 @@ function advancedDestination(kind:Kind,value:string):GoDestination|null {
 /** Three separate responsibilities share the same canonical Site-owned link:
  * selection/management, publication-aware routing, read-only outcome evidence.
  */
-export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:string}){
+type GoLinkWorkspaceProps={siteId:string;packageId?:string};
+export function GoLinkWorkspace(props:GoLinkWorkspaceProps){
+  return <GoLinkWorkspaceSession key={JSON.stringify([props.siteId,props.packageId])} {...props}/>;
+}
+function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
   const [links,setLinks]=useState<GoLink[]>([]);
   const [linkTerm,setLinkTerm]=useState("");
   const [destinationTerm,setDestinationTerm]=useState("");
