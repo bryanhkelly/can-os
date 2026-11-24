@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { downloadBase64, downloadBlob } from "@/lib/download";
+import { downloadReportingCsv } from "@/lib/reporting-download";
 
 const anchor = { href: "", download: "", click: vi.fn(), remove: vi.fn() };
 const appendChild = vi.fn();
@@ -47,6 +48,18 @@ describe("shared browser downloads", () => {
     expect(anchor.remove).toHaveBeenCalledOnce();
     vi.advanceTimersByTime(1000);
     expect(URL.revokeObjectURL).toHaveBeenCalledOnce();
+  });
+
+  it("downloads formula-safe reporting rows using the shared browser transport", async () => {
+    downloadReportingCsv([["Metric", "Value"], ["=1+2", 0], ["Unknown", null]], "private-evidence.csv");
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0]![0];
+    if (!(blob instanceof Blob)) throw new Error("Expected a Blob");
+    expect(blob.type).toBe("text/csv;charset=utf-8");
+    expect(await blob.text()).toBe('"Metric","Value"\r\n"\'=1+2","0"\r\n"Unknown","Unavailable"');
+    expect(anchor.download).toBe("private-evidence.csv");
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith("blob:isolated-download");
   });
 
   it("rejects malformed base64 before allocating a URL", () => {
