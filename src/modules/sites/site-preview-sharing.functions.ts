@@ -1,6 +1,6 @@
 import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -17,6 +17,7 @@ import {
 import {
   readSitePreviewShares, type SitePreviewShare,
 } from "@/domain/site-preview-sharing";
+import { findGoIssuance, goRequestFingerprint, issueAuthorizedGoLink, transitionAuthorizedGoLink } from "@/modules/engagement/go-link-lifecycle.server";
 import { goLinkAvailability } from "@/domain/go-link-policy";
 import { buildUrlDestination } from "@/domain/url-destinations";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
@@ -91,11 +92,15 @@ export const listSitePreviewShares = createServerFn({ method: "GET" })
 export const createSitePreviewShare = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     siteId: siteIdSchema,
+    requestId: z.string().uuid(),
     expiresAfterDays: z.union([z.literal(7), z.literal(30), z.null()]),
   }).strict().parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    const { actor } = await authorizedShareSite(data.siteId);
+    const { actor, site: authorizedSite } = await authorizedShareSite(data.siteId);
+    const fingerprint=goRequestFingerprint({kind:"website-preview",siteId:data.siteId,expiresAfterDays:data.expiresAfterDays});
+    const prior=await db.transaction(tx=>findGoIssuance(tx,actor,authorizedSite,data.requestId,fingerprint));
+    if(prior?.destination?.kind==="website-preview")return {shareId:prior.id,relativeUrl:buildUrlDestination({kind:"go",code:prior.code}).href,expiresAt:prior.expiresAt?.toISOString()??null,sourceRevision:prior.destination.sourceRevision};
     // Render outside the write transaction: the renderer uses its own canonical
     // read queries and must not hold a Site row lock during rendering.
     let stage = "render";
@@ -110,6 +115,8 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       }).from(sites).where(eq(sites.id, data.siteId)).for("update").limit(1);
       if (!site) throw new AuthorizationError("Site preview sharing scope");
       await assertPreviewSharingScope(actor, site, tx);
+      const retry=await findGoIssuance(tx,actor,site,data.requestId,fingerprint);
+      if(retry?.destination?.kind==="website-preview")return {shareId:retry.id,relativeUrl:buildUrlDestination({kind:"go",code:retry.code}).href,expiresAt:retry.expiresAt?.toISOString()??null,sourceRevision:retry.destination.sourceRevision};
       if (site.lifecycleStatus === "closed") throw new AuthorizationError("closed Site");
       const existing = readSitePreviewShares(site.metadata);
       const now = new Date();
@@ -158,17 +165,12 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
 
       const expiresAt=data.expiresAfterDays===null?null:new Date(now.getTime()+data.expiresAfterDays*86_400_000);
       stage = "share-persistence";
-      let entry:typeof siteGoLinks.$inferSelect|undefined;
-      for(let attempt=0;attempt<5;attempt++){
-        [entry]=await tx.insert(siteGoLinks).values({
-          code:randomBytes(9).toString("base64url"),siteId:site.id,organizationId:site.organizationId,
-          createdByPersonId:actor.actorPersonId!,name:"Website preview · Revision "+latest.revision,
-          expiresAt,destination:{kind:"website-preview",snapshotId:shareId,snapshotDigest:snapshot.digest,
-            sourceRevision:latest.revision,brandVersionId:brand.version.id},
-        }).onConflictDoNothing({target:siteGoLinks.code}).returning();
-        if(entry)break;
-      }
-      if(!entry)throw new DomainError("CONFLICT","Unable to issue a unique Go link.");
+      const entry=await issueAuthorizedGoLink(tx,actor,site,{
+        name:"Website preview · Revision "+latest.revision,expiresAt,
+        requestId:data.requestId,requestFingerprint:fingerprint,
+        destination:{kind:"website-preview",snapshotId:shareId,snapshotDigest:snapshot.digest,
+          sourceRevision:latest.revision,brandVersionId:brand.version.id},
+      });
       stage = "audit";
       await writeAudit(tx, actor, {
         action: "site.website.preview_share.created",
@@ -218,8 +220,7 @@ export const revokeSitePreviewShare = createServerFn({ method: "POST" })
       const [link]=await tx.select().from(siteGoLinks).where(and(eq(siteGoLinks.id,data.shareId),eq(siteGoLinks.siteId,site.id))).for("update").limit(1);
       if(link?.destination?.kind==="website-preview"){
         if(link.status==="revoked")return {changed:false};
-        await tx.update(siteGoLinks).set({status:"revoked",updatedAt:new Date()}).where(eq(siteGoLinks.id,link.id));
-        await writeAudit(tx,actor,{action:"site.go_link.revoke",entityType:"site_go_link",entityId:link.id,scope:{siteId:site.id,organizationId:site.organizationId},before:{status:link.status},after:{status:"revoked"}});
+        await transitionAuthorizedGoLink(tx,actor,site,link,"revoked");
         await emitEvent(tx,{eventType:EventTypes.SiteWebsitePreviewRevoked,aggregateType:"site",aggregateId:site.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,payload:{shareId:link.id,revokedAt:new Date().toISOString()}});
         return {changed:true};
       }
