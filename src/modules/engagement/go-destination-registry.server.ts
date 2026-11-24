@@ -168,6 +168,11 @@ export type EngagementTargetOwner={
 export async function inspectEngagementDestination(
   owner:EngagementTargetOwner,destination:GoDestination,code:string,reader:Reader=db,
 ):Promise<DestinationInspection>{
+  // A Program-only author cannot publish an enrollment link to a sibling
+  // Program's Class or release. Enrichment has an explicit Program ID check below.
+  if(owner.ownerKind==="program" &&
+      (destination.kind==="adult-training" || destination.kind==="class"))
+    return unavailable;
   if(destination.kind==="information"){
     const journey=Object.values(engagementJourneys).find(v=>v.id===destination.journeyId);
     const href=journey?goDestinationHref(destination,code):null;
