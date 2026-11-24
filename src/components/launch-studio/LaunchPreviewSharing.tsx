@@ -73,7 +73,10 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
         setShares(await listSitePreviewShares({ data: { siteId } }));
       } catch {
         setError("Your link was created. The active links list could not be refreshed. Copy your link before closing.");
-      }\n    } catch (cause) {\n      setError(normalizeClientError(cause,\n        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
+      }
+    } catch (cause) {
+      setError(normalizeClientError(cause,
+        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
     } finally { setBusy(false); }
   }
 
