@@ -18,7 +18,8 @@ describe("Course → Class source consolidation contract",()=>{
   });
   it("uses the exact published Course, Site, Person and validated Class authority",()=>{
     expect(placement).toContain("currentClassAuthority(tx,classId,new Date())");
-    expect(placement).toContain("verifiedAdultOn(person?.birthDate,new Date())");
+    expect(placement).toContain("assertCurrentReviewedNativeLearner(link.canonicalAccountId,args.personId,new Date(),tx,true)");
+    expect(placement).not.toContain("canonicalPersons");
     expect(placement).toContain("assertNativeClassSeatAvailable");
     expect(placement).toContain('eq(canonicalClassSessions.classId,cls.id)');
     expect(placement).toContain('eq(canonicalClassEnrollments.learnerPersonId,args.personId)');
