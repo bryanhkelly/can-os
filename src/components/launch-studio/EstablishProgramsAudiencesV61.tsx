@@ -1,10 +1,10 @@
-import { siteAudienceGroups } from "@/domain/site-audiences";
+import { AudienceIntentFieldsV61 } from "./AudienceIntentFieldsV61";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Users, Heart, House, Globe2, HandHeart, Accessibility } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GuidedSetupShell } from "@/components/workflow";
-import { ActionFooter, SelectionCard, SelectionChip, SelectionChipGroup, WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, SelectionCard, WorkspaceNotice } from "@/components/workspace";
 import {
   reconcileSiteExperienceAssociationsV61, siteProgramsAudiencesV61SaveSchema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
@@ -50,7 +50,7 @@ const times = [
   { id: "daytime", label: "Daytime", detail: "Morning, afternoon, or full day" },
   { id: "evenings", label: "Evenings", detail: "After-work or evening learning" },
 ] as const;
-const audienceIcons = [Users, Heart, House, Globe2, HandHeart, Accessibility] as const;
+
 
 const guidance = [
   {
@@ -331,26 +331,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
           </div>
         </section>
       </> : step === 1 ? <>
-        <fieldset className="space-y-4">
-          <legend className="sr-only">Audiences you desire to serve (optional)</legend>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Select all that apply. Optional.</span>
-            <span role="status">{draft.audienceIds.length} selected</span>
-          </div>
-          {siteAudienceGroups.map((group,index)=>{
-            const Icon=audienceIcons[index];
-            return <fieldset key={group.id} className="space-y-2 border-b pb-3 last:border-0">
-              <legend className="flex items-center gap-2 text-sm font-semibold">
-                <Icon className="size-4 text-muted-foreground" aria-hidden="true"/>{group.label}
-              </legend>
-              <SelectionChipGroup>
-                {group.items.map(item=><SelectionChip key={item.id} selected={draft.audienceIds.includes(item.id)}
-                  disabled={disabled} onChange={checked=>toggleAudience(item.id,checked)}>{item.label}</SelectionChip>)}
-              </SelectionChipGroup>
-            </fieldset>;
-          })}
-          <WorkspaceNotice tone="info">Your selections express your aspirations, not current capabilities or commitments to deliver programs.</WorkspaceNotice>
-        </fieldset>
+        <AudienceIntentFieldsV61 selected={draft.audienceIds} disabled={disabled} onChange={toggleAudience}/>
       </> : <>
         <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled}
           programCatalog={programs} stage={experienceStage} onStageChange={setExperienceStage}/>
