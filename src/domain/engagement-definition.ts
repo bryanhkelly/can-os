@@ -66,7 +66,6 @@ export const engagementDefinitionSchema = z.object({
   execution:engagementExecutionSchema,
   /** Optional attribution, never an authorization/affiliation assertion. */
   source:z.object({
-    campaignId:z.string().uuid().optional(),
     marketingPackageId:z.string().uuid().optional(),
   }).strict().optional(),
 }).strict();
