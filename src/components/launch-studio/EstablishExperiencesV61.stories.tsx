@@ -56,3 +56,19 @@ export const EmptySearch:Story={render:()=> <Review/>,play:async({canvasElement}
   await expect(canvas.getByText(/No topics match that search/)).toBeInTheDocument();
 }};
 export const Disabled:Story={render:()=> <Review initial={five} disabled/>};
+
+export const LocalTopicValidation:Story={render:()=> <Review/>,play:async({canvasElement})=>{
+  const canvas=within(canvasElement);
+  await userEvent.click(canvas.getByText("Have something else in mind? Add your idea"));
+  const input=canvas.getByRole("textbox",{name:"Local topic name"});
+  await userEvent.type(input,"x");
+  await userEvent.click(canvas.getByRole("button",{name:"Add my idea"}));
+  await expect(input).toHaveAttribute("aria-invalid","true");
+  await expect(input).toHaveAccessibleDescription("Enter a plain-text local topic name between 2 and 100 characters.");
+  await userEvent.clear(input);
+  await userEvent.type(input,"Neighborhood history");
+  await expect(input).not.toHaveAttribute("aria-invalid","true");
+  await userEvent.click(canvas.getByRole("button",{name:"Add my idea"}));
+  await expect(input).toHaveValue("");
+  await expect(canvas.getByText(/1 of five selected/)).toBeInTheDocument();
+}};
