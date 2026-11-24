@@ -13,6 +13,7 @@ import {
   engagementContextSummary, engagementRequiresClaimReview, type EngagementOwner,
 } from "@/domain/engagement-definition";
 import { goDestinationHref } from "@/domain/site-go-links";
+import { engagementActionAvailable, engagementDestination } from "@/domain/engagement-action-policy";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
@@ -139,6 +140,8 @@ export const createEngagementDefinition=createServerFn({method:"POST"})
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     const owner=await authorizeEngagementOwner(data.owner,actor,true,tx);
+    if(!engagementActionAvailable(data.definition.interaction,engagementDestination(data.definition)))
+      throw new DomainError("VALIDATION_FAILED","Selected destination does not support the requested interaction.");
     if(engagementRequiresClaimReview(data.definition))
       throw new DomainError("VALIDATION_FAILED",
         "Public claims about licensing, funding, admissions, affiliation or institutional approval require separate authoritative review.");
