@@ -19,6 +19,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  */
 export async function authorizeCanonicalCourseAttempt(
   tx: Tx, context: CommandContext, courseAttemptId: string, allowCompletedHistory = false,
+  expectedClassEnrollmentId?: string,
 ): Promise<CanonicalParticipationAccess> {
   if (!context.actorPersonId ||
       !["learner", "student"].includes(context.role ?? "")) {
@@ -28,6 +29,8 @@ export async function authorizeCanonicalCourseAttempt(
   const [attempt] = await tx.select().from(learnerCourseAttempts)
     .where(eq(learnerCourseAttempts.id,courseAttemptId)).limit(1);
   if (!attempt) throw new AuthorizationError("course participation");
+  if(expectedClassEnrollmentId!==undefined && attempt.classEnrollmentId!==expectedClassEnrollmentId)
+    throw new AuthorizationError("exact requested Class Enrollment");
   // Native Class enrollments are the authoritative learner source, never
   // inferred from an academic Section, noncredit registration or marketing Site.
   if (attempt.classEnrollmentId) {
