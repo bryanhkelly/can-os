@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveGoExperience } from "@/modules/engagement/engagement-go.server";
-import { renderEngagementPage } from "@/domain/engagement-page-renderer";
+
 
 const headers={
   "Cache-Control":"private, no-store",
@@ -20,6 +19,9 @@ export const Route=createFileRoute("/go/$code")({
   server:{handlers:{
     GET:async({params})=>{
       try{
+        // Keep database-only modules out of the public/client route graph.
+        const {resolveGoExperience}=await import("@/modules/engagement/engagement-go.server");
+        const {renderEngagementPage}=await import("@/domain/engagement-page-renderer");
         const experience=await resolveGoExperience(params.code);
         if(!experience)return unavailable(404);
         if(experience.mode==="redirect"){
