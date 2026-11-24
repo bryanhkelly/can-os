@@ -86,7 +86,7 @@ export const listSitePreviewShares = createServerFn({ method: "GET" })
 
 /** An immutable, sanitized website snapshot is captured when the URL is
  * created. Editing the Site later never silently changes what recipients see.
- * The bearer token is returned once; only its digest is stored.
+ * The Go code is retrievable by authorized Site operators; the HTML stays private.
  */
 export const createSitePreviewShare = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
@@ -96,7 +96,14 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { actor } = await authorizedShareSite(data.siteId);
-    // Render outside the write transaction: the renderer uses its own canonical\n    // read queries and must not hold a Site row lock during rendering.\n    let stage = "render";\n    try {\n      const preview=await getPartnerWebsitePreview(actor);\n      stage = "transaction";\n      return await db.transaction(async tx => {\n      const [site] = await tx.select({
+    // Render outside the write transaction: the renderer uses its own canonical
+    // read queries and must not hold a Site row lock during rendering.
+    let stage = "render";
+    try {
+      const preview=await getPartnerWebsitePreview(actor);
+      stage = "transaction";
+      return await db.transaction(async tx => {
+      const [site] = await tx.select({
         id: sites.id, name: sites.name, organizationId: sites.organizationId,
         lifecycleStatus: sites.lifecycleStatus, metadata: sites.metadata,
         updatedAt: sites.updatedAt,
@@ -186,7 +193,8 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       };
       });
     } catch (error) {
-      // Do not log content, bearer credentials, SQL or raw provider errors.\n      console.error("Website preview share creation failed", { stage, errorType: error instanceof Error ? error.name : "unknown" });
+      // Do not log content, bearer credentials, SQL or raw provider errors.
+      console.error("Website preview share creation failed", { stage, errorType: error instanceof Error ? error.name : "unknown" });
       throw error;
     }
   });
