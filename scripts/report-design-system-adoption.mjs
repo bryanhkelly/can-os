@@ -8,7 +8,7 @@ import ts from "typescript";
 const sourceRoot = fileURLToPath(new URL("../src/", import.meta.url));
 const nativeTags = new Set(["button", "input", "select", "textarea", "label"]);
 const canonicalTags = new Set([
-  "Button", "Field", "Input", "Select", "Textarea", "Checkbox", "Radio",
+  "SelectionCard", "SelectionChip", "SelectionChipGroup", "Button", "Field", "Input", "Select", "Textarea", "Checkbox", "Radio",
   "DirectoryTable", "QueryState", "WorkspaceNotice", "StatusBadge",
   "ActionDialog", "FormSection", "FormActions", "EmptyState",
   "RecordHeader", "RecordLayout", "RecordFacts", "EntityCard",
