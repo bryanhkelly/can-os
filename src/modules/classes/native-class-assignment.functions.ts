@@ -6,8 +6,7 @@ import { db } from "@/db/client";
 import {
   canonicalClasses,canonicalClassEnrollments,
   canonicalAccountGrants,canonicalAccounts,canonicalPersons,
-  participationAttributions,
-} from "@/db/canonical-v301";
+  } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -16,6 +15,7 @@ import { currentClassAuthority } from "./native-class-authority.server";
 import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
+import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
 import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
@@ -112,14 +112,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         consentVersion:null,consentSha256:null,consentedAt:null,
       }).returning({id:canonicalClassEnrollments.id});
       if(!enrollment)throw new Error("Cannot save assigned Class Enrollment");
-      await tx.insert(participationAttributions).values({
-        classEnrollmentId:enrollment.id,
-        deliverySiteId:current.siteId,reportingSiteId:current.siteId,
-        creditedOrganizationId:current.operatingOrganizationId,
-        attributionBasis:"provider_default",
-        relationshipSnapshot:{kind:"provider_default",classId:cls.id,
-          organizationId:current.operatingOrganizationId,siteId:current.siteId},
-      });
+      await writeNativeClassAttribution(tx,{enrollmentId:enrollment.id,source:current,now:new Date()});
       const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
       if(repeatAuthorization){
         await consumeNativeClassRepeatAuthorization(tx,{
