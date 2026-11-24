@@ -1,13 +1,14 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { siteGoLinks, siteMarketingPackages, sites } from "@/db/schema";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { goDestinationKindSchema, goDestinationSchema } from "@/domain/site-go-links";
+import { goLikeContainsLiteral } from "@/domain/go-link-search";
 import { goLinkManagementSchema, goLinkStatusTransition, goLinkAvailability } from "@/domain/go-link-policy";
 import { inspectGoDestination, listGoDestinationChoices } from "./go-destination-registry.server";
 import { readSiteGoLinkEvidence } from "./go-link-evidence.server";
@@ -22,10 +23,12 @@ const createSchema = packageScope.extend({
   management:goLinkManagementSchema.optional(),
 }).strict();
 const pageSchema=packageScope.extend({
-  cursor:uuid.optional(), limit:z.number().int().min(1).max(50).default(20),
+  cursor:uuid.optional(),limit:z.number().int().min(1).max(50).default(20),
+  term:z.string().trim().max(80).optional(),
 }).strict();
 const choicesSchema=packageScope.extend({
   kind:goDestinationKindSchema,
+  term:z.string().trim().max(80).optional(),
 }).strict();
 const manageSchema=packageScope.extend({
   linkId:uuid, action:z.enum(["pause","resume"]),
@@ -189,7 +192,7 @@ export const listAvailableGoDestinations = createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     const {site}=await authorizedPackage(data.siteId,data.packageId,false);
     if(site.lifecycleStatus==="closed")return [];
-    return listGoDestinationChoices(data.siteId,data.kind);
+    return listGoDestinationChoices(data.siteId,data.kind,db,data.term);
   });
 
 /** Privately test a saved link without a public redirect or analytics count. */
@@ -270,7 +273,8 @@ export const listSiteGoLinksPage=createServerFn({method:"GET"})
       status:siteGoLinks.status,name:siteGoLinks.name,channel:siteGoLinks.channel,
       startsAt:siteGoLinks.startsAt,expiresAt:siteGoLinks.expiresAt,
       packageId:siteGoLinks.packageId,createdAt:siteGoLinks.createdAt,
-    }).from(siteGoLinks).where(and(scope,older))
+    }).from(siteGoLinks).where(and(scope,older,
+      data.term?ilike(siteGoLinks.name,goLikeContainsLiteral(data.term)):undefined))
       .orderBy(desc(siteGoLinks.createdAt),desc(siteGoLinks.id))
       .limit(data.limit+1);
     const hasMore=rows.length>data.limit,items=rows.slice(0,data.limit);

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ilike } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sitePublications } from "@/db/schema";
 import { canonicalClasses, canonicalClassOfferingVersions } from "@/db/canonical-v301";
@@ -7,6 +7,7 @@ import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.s
 import { publicSiteHost } from "@/domain/public-site-address";
 import { engagementJourneys } from "@/domain/engagement-journeys";
 import { goDestinationHref, type GoDestination } from "@/domain/site-go-links";
+import { goLikeContainsLiteral } from "@/domain/go-link-search";
 
 /** Shared canonical Destination Registry for Link Management, public resolution
  * and the operator picker. No duplicate publication rules or open redirects.
@@ -92,30 +93,32 @@ export async function inspectGoDestination(
  * before this data is returned to an operator.
  */
 export async function listGoDestinationChoices(
-  siteId:string,kind:GoDestination["kind"],reader:Reader=db,
+  siteId:string,kind:GoDestination["kind"],reader:Reader=db,term?:string,
 ):Promise<GoDestinationChoice[]>{
   if(kind==="site-page"){
     if(!await publishedSiteHost(siteId,reader))return [];
     const pages=["contact","home","programs","experiences","courses","classes","academics","admissions"] as const;
     return pages.map(page=>({destination:{kind:"site-page" as const,page},
       title:page==="contact"?"Express interest / Contact":page==="home"?"Site homepage":page[0]!.toUpperCase()+page.slice(1),
-      description:"Published Site page"}));
+      description:"Published Site page"}))
+      .filter(item=>!term || item.title.toLowerCase().includes(term.toLowerCase()));
   }
   if(kind==="information"){
     return Object.values(engagementJourneys).map(journey=>({
       destination:{kind:"information" as const,journeyId:journey.id},
       title:journey.headline,description:journey.audience,
-    }));
+    })).filter(item=>!term||[item.title,item.description].some(value=>
+      value.toLowerCase().includes(term.toLowerCase())));
   }
   if(kind==="adult-training"){
-    const releases=await readEligibleSelfEnrollmentReleases(reader,undefined,{siteId,limit:50});
+    const releases=await readEligibleSelfEnrollmentReleases(reader,undefined,{siteId,limit:50,term});
     return releases.filter(item=>item.siteId===siteId).map(item=>({
       destination:{kind:"adult-training" as const,releaseId:item.id},
       title:item.title,description:item.deliveryMode==="facilitated"?"Facilitated training":"Independent training",
     }));
   }
   if(kind==="enrichment"){
-    const seasons=await readEnrichmentCatalog(siteId,reader);
+    const seasons=await readEnrichmentCatalog(siteId,reader,undefined,term);
     return seasons.filter(item=>item.registrationOpen).slice(0,50).map(item=>({
       destination:{kind:"enrichment" as const,seasonId:item.seasonId},
       title:item.name+" · "+item.seasonName,description:"Open registration",
@@ -129,7 +132,8 @@ export async function listGoDestinationChoices(
     closesAt:canonicalClassOfferingVersions.closesAt,
   }).from(canonicalClasses).innerJoin(canonicalClassOfferingVersions,
     eq(canonicalClassOfferingVersions.classId,canonicalClasses.id))
-    .where(and(eq(canonicalClasses.siteId,siteId),eq(canonicalClasses.state,"active")))
+    .where(and(eq(canonicalClasses.siteId,siteId),eq(canonicalClasses.state,"active"),
+      term?ilike(canonicalClasses.title,goLikeContainsLiteral(term)):undefined))
     .orderBy(desc(canonicalClassOfferingVersions.versionNo)).limit(200);
   const latest=new Map<string,(typeof versions)[number]>();
   for(const version of versions)if(!latest.has(version.id))latest.set(version.id,version);

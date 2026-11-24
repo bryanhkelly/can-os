@@ -1,5 +1,6 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
+import { goLikeContainsLiteral } from "@/domain/go-link-search";
 import * as s from "@/db/schema";
 import { readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { canSubmitEnrichmentRegistration, readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
@@ -17,7 +18,7 @@ const extended = ["summer_enrichment", "summer_program", "after_school_enrichmen
  * Public-safe program catalog: published/open noncredit offerings only.
  * No identity, private staffing details, student data, or draft schedules.
  */
-export async function readEnrichmentCatalog(siteId?: string, executor: Pick<typeof db, "select"> = db, seasonId?:string) {
+export async function readEnrichmentCatalog(siteId?: string, executor: Pick<typeof db, "select"> = db, seasonId?:string, term?:string) {
   const rows = await executor.select({
     seasonId: s.activitySeasons.id, name: s.activities.name,
     seasonName: s.activitySeasons.name,
@@ -46,6 +47,7 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
       // global page in memory and silently omit a smaller site's offerings.
       siteId ? eq(s.activities.siteId, siteId) : undefined,
       seasonId ? eq(s.activitySeasons.id,seasonId) : undefined,
+      term ? ilike(s.activities.name,goLikeContainsLiteral(term)) : undefined,
       eq(s.programs.organizationId, s.sites.organizationId),
       inArray(s.programs.type, extended),
       eq(s.programs.status, "active"),
