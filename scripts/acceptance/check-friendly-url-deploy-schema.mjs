@@ -105,6 +105,13 @@ const [schemaChecks] = await sql`
       conname='site_go_links_request_fingerprint_ck' AND
       pg_get_constraintdef(oid) ILIKE '%request_fingerprint IS NOT NULL%')
       AS valid_go_idempotency_constraint,
+    (SELECT count(*)=3 FROM pg_attribute
+      WHERE attrelid=to_regclass('public.site_go_link_daily_visits')
+        AND attname IN ('link_opens','page_views','redirect_responses')
+        AND atttypid='integer'::regtype AND attnotnull AND NOT attisdropped) AS typed_go_observations,
+    EXISTS(SELECT 1 FROM pg_constraint
+      WHERE conrelid=to_regclass('public.site_go_link_daily_visits')
+        AND conname='site_go_link_daily_visits_response_counts_ck' AND convalidated) AS valid_go_observation_counts,
     EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.access_sessions'::regclass
       AND conname='access_sessions_owner_delegation_ck' AND convalidated
       AND pg_get_constraintdef(oid) ILIKE '%delegated_mode IS NOT NULL%'
@@ -155,6 +162,9 @@ const [gateway] = await sql`
       AND has_column_privilege(r.oid,'public.site_go_links','code','SELECT')
       AND NOT has_column_privilege(r.oid,'public.site_go_links','created_by_person_id','SELECT')
       AND NOT has_table_privilege(r.oid,'public.site_go_link_daily_visits','DELETE,TRUNCATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','INSERT,UPDATE,SELECT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','INSERT,UPDATE,SELECT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','INSERT,UPDATE,SELECT')
   ) AS restricted_gateway,
   (SELECT count(*)=4 FROM pg_policies WHERE schemaname='public'
     AND policyname IN ('go_gateway_exact_code','go_gateway_counter_read',
