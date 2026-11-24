@@ -10,16 +10,14 @@ import { readEligibleSelfEnrollmentReleases } from "@/modules/enrollment/noncred
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { engagementJourneys } from "@/domain/engagement-journeys";
-import { goDestinationHref, goDestinationSchema, type GoDestination } from "@/domain/site-go-links";
+import { goDestinationHref, goDestinationSchema, type GoDestination, type GoDestinationChoice } from "@/domain/site-go-links";
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
 import { engagementOwnerAllowsSite, type PublicEngagementOwnerScope } from "@/domain/engagement-target-scope";
 
 /** Shared canonical Destination Registry for Link Management, public resolution
  * and the operator picker. No duplicate publication rules or open redirects.
  */
-export type GoDestinationChoice = {
-  destination: GoDestination; title: string; description: string;
-};
+export type { GoDestinationChoice } from "@/domain/site-go-links";
 export type DestinationInspection = {
   available: boolean; title: string; href: string | null;
 };
