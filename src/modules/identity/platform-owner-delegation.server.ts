@@ -72,11 +72,17 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
   return owner;
 }
 
+/** Owner-only management must not be available inside a delegated session. */
+export function assertPlatformOwnerUndelegated(owner:{delegatedGrantId:string|null}) {
+  if(owner.delegatedGrantId) throw new AuthorizationError("return to Platform Owner first");
+}
+
 /** Opaque existing grant IDs are resolved only from current verified accounts.
  * No impersonated persona, organization relationship or preview record is created.
  */
 export async function listPlatformOwnerTargets(request: Request, search: string) {
   const owner = await getVerifiedPlatformOwnerSession(request);
+  assertPlatformOwnerUndelegated(owner);
   const query = z.string().trim().min(2).max(100).parse(search);
   const escaped = query.replace(/[\\%_]/g, char => "\\" + char);
   const term = "%" + escaped + "%";
@@ -107,7 +113,7 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
         ilike(people.legalFirstName, term),
         ilike(people.legalLastName, term)),
     )).limit(26);
-  return { targets: rows.filter(row=>Object.hasOwn(roleCapabilities,row.role)).slice(0,25),
+  return { targets: rows.filter(row=>Object.hasOwn(roleCapabilities,row.role)&&!isDemoAccountEmail(row.email)).slice(0,25),
     limited: rows.length > 25 };
 }
 
@@ -119,6 +125,7 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
     throw new AuthorizationError("same-origin owner delegation");
   const data = delegationRequest.parse(raw);
   const owner = await getVerifiedPlatformOwnerSession(request);
+  assertPlatformOwnerUndelegated(owner);
   const now = new Date();
   const expiresAt = new Date(Math.min(now.getTime() + ownerDelegationLifetimeMs,
     owner.expiresAt.getTime()));
@@ -140,7 +147,7 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
       .where(eq(accountPersonGrants.id, data.grantId)).limit(1);
     if (!target || target.accountId === owner.ownerAccountId ||
         target.role === "platform_owner" || !Object.hasOwn(roleCapabilities, target.role) ||
-        !target.personActive || target.accountDisabled || !target.verifiedAt ||
+        !target.personActive || target.accountDisabled || !target.verifiedAt || isDemoAccountEmail(target.email) ||
         target.accountPersonId !== target.personId)
       throw new AuthorizationError("existing verified delegate");
     const { grants } = await readSessionGrants(target.accountId, target.email, tx);

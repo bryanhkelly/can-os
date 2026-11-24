@@ -98,13 +98,20 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  let effectiveGrant=activeGrant;
  let effectiveGrants=grants;
  let ownerDelegation: { mode:"view"|"act"; expiresAt:Date }|null=null;
- // Expiration restores the original owner's identity without granting further
- // delegated access. No GET side effect or background session refresh is needed.
+ // Expired delegation must not silently elevate a stale browser mutation.
+ // Show the owner in read-only mode until the explicit Return action clears it.
  if(session.delegatedGrantId&&session.delegatedUntil&&session.delegatedUntil<=now){
-  // The expired grant is ignored. The explicit Return action clears it.
+  const owner=await getVerifiedPlatformOwnerSession(request);
+  if(activeGrant.role!=="platform_owner"||activeGrant.id!==owner.grantId||
+     owner.delegatedGrantId!==session.delegatedGrantId || owner.delegatedUntil?.getTime()!==session.delegatedUntil.getTime())
+   return rejectSession(request,"membership_unavailable");
+  if(request.method!=="GET")throw new AuthorizationError("expired owner delegation: return to Platform Owner");
+  ownerDelegation={mode:"view",expiresAt:session.delegatedUntil};
  }else if(session.delegatedGrantId){
   const owner=await getVerifiedPlatformOwnerSession(request);
   if(activeGrant.role!=="platform_owner"||activeGrant.id!==owner.grantId||
+     owner.delegatedGrantId!==session.delegatedGrantId || owner.delegatedMode!==session.delegatedMode ||
+     owner.delegatedUntil?.getTime()!==session.delegatedUntil?.getTime() ||
      session.delegatedMode!=="view"&&session.delegatedMode!=="act"||
      !session.delegatedUntil||session.delegatedUntil<=now)
    return rejectSession(request,"membership_unavailable");
@@ -122,7 +129,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
    .where(and(eq(accountPersonGrants.id,session.delegatedGrantId),
       eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false),
       isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
-  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||
+  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||isDemoAccountEmail(target.email)||
      !target.accountPersonId||target.accountPersonId!==target.personId)
    return rejectSession(request,"membership_unavailable");
   try{await assertRawAccountPerson(target.accountId,target.personId);}
@@ -135,6 +142,13 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   effectiveGrant=exact;
   effectiveGrants=eligible.grants;
   ownerDelegation={mode:session.delegatedMode,expiresAt:session.delegatedUntil};
+ }
+ // A malformed Site membership must never expand into a different tenant.
+ if(effectiveGrant.siteId){
+  const [site]=await db.select({organizationId:schoolSites.organizationId}).from(schoolSites)
+   .where(eq(schoolSites.id,effectiveGrant.siteId)).limit(1);
+  if(!site||!effectiveGrant.organizationId||site.organizationId!==effectiveGrant.organizationId)
+   return rejectSession(request,"membership_unavailable");
  }
  const context=resolveAccessContext({
   accountId:effectiveGrant.accountId,

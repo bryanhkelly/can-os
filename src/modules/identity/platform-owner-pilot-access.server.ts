@@ -5,13 +5,13 @@ import { accessAccounts, accountPersonGrants, organizations, sites, people } fro
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { writeAudit } from "@/platform/mutation";
-import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
+import { getVerifiedPlatformOwnerSession, assertPlatformOwnerUndelegated } from "./platform-owner-delegation.server";
 import { ownerGrantRequiresSite, ownerPilotGrantInput, ownerPilotRoles } from "@/domain/platform-owner-pilot-roles";
 
 /** Pilot staffing does not create Course appointments, approvals or learner consent. */
 
 export async function readOwnerPilotLocations(request: Request) {
-  await getVerifiedPlatformOwnerSession(request);
+  assertPlatformOwnerUndelegated(await getVerifiedPlatformOwnerSession(request));
   const [orgs, locationRows] = await Promise.all([
     db.select({ id: organizations.id, name: organizations.name,
       type: organizations.type, lifecycleStatus: organizations.lifecycleStatus,
@@ -28,8 +28,7 @@ export async function provisionOwnerPilotRole(request: Request, raw: unknown) {
   if (request.headers.get("origin") !== new URL(request.url).origin)
     throw new AuthorizationError("same-origin owner role assignment");
   const owner = await getVerifiedPlatformOwnerSession(request);
-  if (owner.delegatedGrantId && owner.delegatedUntil && owner.delegatedUntil>new Date())
-    throw new AuthorizationError("return to Platform Owner before assigning roles");
+  assertPlatformOwnerUndelegated(owner);
   const data = ownerPilotGrantInput.parse(raw);
   if (ownerGrantRequiresSite(data.role)!==Boolean(data.siteId))
     throw new AuthorizationError("role requires exact Site or organization-only scope");
@@ -95,8 +94,7 @@ export async function revokeOwnerPilotRole(request:Request,raw:unknown) {
   if(request.headers.get("origin")!==new URL(request.url).origin)
     throw new AuthorizationError("same-origin owner role revocation");
   const owner=await getVerifiedPlatformOwnerSession(request);
-  if(owner.delegatedGrantId && owner.delegatedUntil && owner.delegatedUntil>new Date())
-    throw new AuthorizationError("return to Platform Owner before revocation");
+  assertPlatformOwnerUndelegated(owner);
   const input=z.object({
     grantId:z.string().uuid(),reason:z.string().trim().min(12).max(500),
   }).strict().parse(raw);

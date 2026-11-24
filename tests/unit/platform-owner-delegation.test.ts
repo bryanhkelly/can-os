@@ -43,6 +43,9 @@ describe("Platform Owner signed delegation foundation",()=>{
       "can_network_steward","safeguarding_lead","can_credential_reviewer"]){
       expect(platformOwnerMayActAs(role),role).toBe(false);
     }
+    for(const role of ["unknown_future_role","account_holder","student","guardian"]){
+      expect(platformOwnerMayActAs(role),role).toBe(false);
+    }
     expect(platformOwnerMayActAs("academic_content_creator")).toBe(true);
     expect(platformOwnerMayActAs("room_facilitator")).toBe(true);
     expect(platformOwnerMayActAs("site_admin")).toBe(true);
@@ -55,6 +58,9 @@ describe("Platform Owner signed delegation foundation",()=>{
     expect(auth).toContain("getVerifiedPlatformOwnerSession(request)");
     expect(auth).toContain("session.delegatedGrantId");
     expect(auth).toContain("session.delegatedUntil<=now");
+    expect(auth).toContain("expired owner delegation: return to Platform Owner");
+    expect(auth).toContain("site.organizationId!==effectiveGrant.organizationId");
+    expect(service).toContain("assertPlatformOwnerUndelegated(owner)");
     expect(auth).toContain('request.method!=="GET"');
     expect(auth).toContain("context.impersonatedByAccountId=session.accountId");
     expect(auth).toContain("platformOwnerMayActAs(exact.role)");

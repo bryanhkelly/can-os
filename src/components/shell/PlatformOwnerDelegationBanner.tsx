@@ -25,12 +25,13 @@ export function PlatformOwnerDelegationBanner({ mode, expiresAt, targetLabel }: 
       setLeaving(false);
     }
   }
+  const expired=Date.parse(expiresAt)<=Date.now();
   return <WorkspaceNotice tone="attention" className="w-full">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="text-sm">
-        <strong>Platform Owner delegation · {mode==="view"?"VIEW ONLY":"ACTING AS"}</strong>
+        <strong>Platform Owner delegation · {expired?"EXPIRED · RETURN REQUIRED":mode==="view"?"VIEW ONLY":"ACTING AS"}</strong>
         <p className="mt-1">
-          {targetLabel}. This is an owner-operated session, not a login by the selected user.
+          {expired?"Delegation expired. Return to Platform Owner to resume writes.":`${targetLabel}. This is an owner-operated session, not a login by the selected user.`}
           All actions are attributed to the original Platform Owner.
           Expires {new Date(expiresAt).toLocaleTimeString()}.
         </p>
