@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ActionFooter, EmptyState, WorkspaceNotice } from "@/components/workspace";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { markNativeClassLessonComplete } from "@/modules/classes/native-class-learning.functions";
 import { normalizeClientError } from "@/lib/client-error";
@@ -25,7 +26,7 @@ export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selecte
   const selected=lessons.find(lesson=>lesson.lessonId===selectedLessonId)??lessons[0];
   if(!selected)return <section className="border border-border bg-card p-5">
     <h2 className="font-serif text-xl">Course lessons</h2>
-    <p className="mt-3 text-sm">No published lesson content is available yet.</p>
+    <EmptyState className="mt-3" title="No published lesson content is available yet."/>
   </section>;
   async function complete(){
     if(working||!selected)return;
@@ -67,15 +68,15 @@ export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selecte
       </div>
     </section>}
     <div className="border-t border-border pt-4">
-      <Button type="button" variant={done?"outline":"default"}
-        disabled={working||done} onClick={()=>void complete()}>
-        {done?"Lesson completed":working?"Saving…":"Mark lesson complete"}
-      </Button>
+      <ActionFooter layout="inline" className="mt-0"><Button type="button" variant={done?"outline":"default"}
+        disabled={working||done} loading={working} loadingLabel="Saving…" onClick={()=>void complete()}>
+        {done?"Lesson completed":"Mark lesson complete"}
+      </Button></ActionFooter>
       <p className="mt-2 text-xs text-muted-foreground">
         This records an individual learning milestone, not a grade, attendance or academic credit.
       </p>
     </div>
-    {notice&&<p role="status" className="text-sm">{notice}</p>}
-    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+    {notice&&<WorkspaceNotice tone="success">{notice}</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
   </section>;
 }
