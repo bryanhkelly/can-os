@@ -50,12 +50,15 @@ export type PilotParticipantFact = {
   knowledgeResult:"pass"|"fail"|"inconclusive"|null;
   surveySubmitted:boolean;
   completionRecorded:boolean;
+  /** Source-verified, current non-superseded participation minutes only. */
+  verifiedParticipationMinutes?:number;
   baselineFraction:number|null;
   finalFraction:number|null;
 };
 
 export type PilotOutcomeSummary = {
   registrations:number;
+  verifiedParticipationMinutes:number;
   engagedParticipants:number;
   participantsWithCompletedLessons:number;
   lessonsMarkedComplete:number;
@@ -80,6 +83,10 @@ export const NONCREDIT_PILOT_COUNT_DEFINITIONS = [
     source:"noncredit_registrations + approved Site release claims",
     denominator:"Distinct canonical Person IDs",timeBasis:"registered_at",
     rule:"Deduplicated across the provider's authorized Site releases and training versions."},
+  {key:"verifiedParticipationMinutes",label:"Verified participation minutes",
+    source:"noncredit_participation_events + verified evidence_document_versions",
+    denominator:"Registration-linked, unsuperseded evidence events",timeBasis:"Registration cohort, evidence current at report generation",
+    rule:"Sum source-verified minutes; not elapsed browser time, watch time or deduplicated person time."},
   {key:"registrations",label:"Training registrations",
     source:"noncredit_registrations + noncredit_self_enrollment_claims",
     denominator:"Registration IDs",timeBasis:"registered_at",
@@ -119,7 +126,7 @@ export const NONCREDIT_PILOT_COUNT_DEFINITIONS = [
 export function summarizeNoncreditPilot(facts:readonly PilotParticipantFact[]):PilotOutcomeSummary {
   const seen=new Set<string>();
   const totals:PilotOutcomeSummary={
-    registrations:0,engagedParticipants:0,participantsWithCompletedLessons:0,
+    registrations:0,verifiedParticipationMinutes:0,engagedParticipants:0,participantsWithCompletedLessons:0,
     lessonsMarkedComplete:0,knowledgeCheckSubmissions:0,
     knowledgeCheckPasses:0,knowledgeCheckFailures:0,surveyRespondents:0,
     confirmedNoncreditCompletions:0,pairedKnowledgeChecks:0,
@@ -134,6 +141,10 @@ export function summarizeNoncreditPilot(facts:readonly PilotParticipantFact[]):P
        !Number.isSafeInteger(fact.totalLessonCount)||fact.totalLessonCount<0||
        fact.completedLessonCount>fact.totalLessonCount)
       throw new Error("Invalid noncredit lesson progress");
+    const minutes=fact.verifiedParticipationMinutes??0;
+    if(!Number.isSafeInteger(minutes)||minutes<0)throw new Error("Invalid verified participation minutes");
+    totals.verifiedParticipationMinutes+=minutes;
+    if(!Number.isSafeInteger(totals.verifiedParticipationMinutes))throw new Error("Participation minute total exceeds safe integer range");
     totals.registrations+=fact.registered?1:0;
     totals.engagedParticipants+=fact.engaged?1:0;
     totals.participantsWithCompletedLessons+=fact.completedLessonCount>0?1:0;
