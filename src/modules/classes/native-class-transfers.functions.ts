@@ -1,7 +1,7 @@
 import {createHash} from "node:crypto";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,asc,count,eq,inArray} from "drizzle-orm";
+import {and,asc,eq,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
@@ -19,6 +19,7 @@ import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {assertCurrentNativeClassLearnerForMutation} from "./native-class-learner-session.server";
 import {currentClassAuthority} from "./native-class-authority.server";
+import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import {verifiedAdultOn,assertNativeSelfEnrollmentEligible} from "@/domain/native-class-enrollment";
 import {NATIVE_SELF_TRANSFER_CREDIT_MODES} from "@/domain/native-class-transfer-choices";
 import {
@@ -151,11 +152,9 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
       eq(canonicalClassEnrollments.status,"completed"),
     )).limit(1);
    assertNativeClassRepeatEligible(completed?["completed"]:[]);
-   const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-    .where(and(eq(canonicalClassEnrollments.classId,destinationClass.id),
-      inArray(canonicalClassEnrollments.status,["pending","active"])));
+   const occupancy=await readNativeClassOccupancy(tx,destinationClass.id);
    assertNativeClassSeatAvailable({
-    method:"self",activeOrPending:occupancy?.total??0,
+    method:"self",activeOrPending:occupancy,
     classCapacity:destinationAuthority.classCapacity,offeringCapacity:terms.capacity,
    });
    const attempts=await tx.select().from(learnerCourseAttempts)
