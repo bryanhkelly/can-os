@@ -1,6 +1,8 @@
 import {sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
+import type {AccessContext} from "@/domain/access-context";
+import {LOCAL_DEMO_ADMIN} from "@/domain/local-demo-access";
 import {getIdentityContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {buildCurrentReportingMetricRegistry} from "@/domain/reporting-metric-registry";
@@ -25,6 +27,51 @@ const columns=sql`id,owner_organization_id AS "ownerOrganizationId",
   valid_through AS "validThrough",proposed_at AS "proposedAt",
   proposed_by_person_id AS "proposedByPersonId",status,
   accepted_at AS "acceptedAt",accepted_by_person_id AS "acceptedByPersonId"`;
+
+/** Only a direct, independently provisioned organization-wide membership can
+ * authorize initial relationship management. No automatic administrator grants.
+ * Recheck and lock the live identity rows inside every command transaction. */
+async function requireDirectRelationshipManager(tx:Tx,actor:AccessContext):Promise<string>{
+  const organizationId=actor.scope.organizationIds?.[0];
+  if(!organizationId||actor.scope.organizationIds?.length!==1||
+    actor.role!=="reporting_relationship_manager"||actor.grantSiteId!==null||
+    actor.impersonatedByAccountId||actor.delegatedByPlatformOwner||!actor.actorPersonId||
+    organizationId===LOCAL_DEMO_ADMIN.organizationId)
+    throw new AuthorizationError("direct organization reporting relationship manager");
+  const result=await tx.execute(sql`
+    SELECT g.id FROM public.account_person_grants g
+    JOIN public.access_accounts a ON a.id=g.account_id AND a.person_id=g.person_id
+    JOIN public.people p ON p.id=g.person_id
+    JOIN public.organizations o ON o.id=g.organization_id
+    JOIN public.access_sessions s ON s.active_grant_id=g.id AND s.account_id=a.id
+    WHERE g.id=${actor.grantId}::uuid AND g.account_id=${actor.accountId}::uuid
+      AND g.person_id=${actor.actorPersonId}::uuid AND g.organization_id=${organizationId}::uuid
+      AND g.site_id IS NULL AND g.active AND g.role='reporting_relationship_manager'
+      AND a.email_verified_at IS NOT NULL AND NOT a.disabled
+      AND lower(a.email_normalized) NOT LIKE '%.demo' AND p.active AND o.lifecycle_status='active'
+      AND s.id=${actor.sessionId}::uuid AND s.revoked_at IS NULL
+      AND s.expires_at>CURRENT_TIMESTAMP AND s.delegated_grant_id IS NULL
+      AND NOT EXISTS(SELECT 1 FROM public.demo_school_tenants d WHERE d.organization_id=o.id)
+    FOR SHARE OF g,a,p,o,s`);
+  if(result.rows.length!==1)throw new AuthorizationError("current verified reporting relationship membership");
+  return organizationId;
+}
+const recipientEligible=sql`g.role='reporting_relationship_manager' AND g.active
+  AND g.site_id IS NULL AND a.person_id=g.person_id AND a.email_verified_at IS NOT NULL
+  AND NOT a.disabled AND p.active AND lower(a.email_normalized) NOT LIKE '%.demo'
+  AND o.lifecycle_status='active' AND o.id<>${LOCAL_DEMO_ADMIN.organizationId}::uuid
+  AND NOT EXISTS(SELECT 1 FROM public.demo_school_tenants d WHERE d.organization_id=o.id)`;
+async function requireEligibleRecipient(tx:Tx,id:string){
+  const result=await tx.execute(sql`
+    SELECT g.id FROM public.organizations o
+    JOIN public.account_person_grants g ON g.organization_id=o.id
+    JOIN public.access_accounts a ON a.id=g.account_id
+    JOIN public.people p ON p.id=g.person_id
+    WHERE o.id=${id}::uuid AND ${recipientEligible}
+    ORDER BY g.id LIMIT 1 FOR SHARE OF g,a,p,o`);
+  if(!result.rows.length)throw new AuthorizationError("registered eligible relationship recipient");
+}
+
 const scopeRow=z.object({ownerOrganizationId:uuid,siteId:uuid.nullable()}).strict();
 
 /** Database-backed ownership, not a tenant or scope supplied by the browser.
@@ -64,7 +111,9 @@ export async function proposeReportingRelationship(request:Request,input:unknown
     throw new AuthorizationError("relationships.propose");
   const candidate=relationshipProposalSchema.parse(input);
   return db.transaction(async tx=>{
-    const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,actor.scope.organizationIds![0]!);
+    const ownerId=await requireDirectRelationshipManager(tx,actor);
+    const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,ownerId);
+    await requireEligibleRecipient(tx,candidate.recipientOrganizationId);
     const person=assertRelationshipActor(actor,scope.ownerOrganizationId,"relationships.propose",scope.siteId);
     const proposal=validateRelationshipProposal(candidate,scope,buildCurrentReportingMetricRegistry(),approvedMetrics,new Date());
     const result=await tx.execute(sql`
@@ -94,6 +143,7 @@ export async function decideReportingRelationship(request:Request,input:unknown)
     throw new AuthorizationError(capability);
   const organizationId=actor.scope.organizationIds[0]!;
   return db.transaction(async tx=>{
+    await requireDirectRelationshipManager(tx,actor);
     const result=await tx.execute(sql`
       SELECT ${columns} FROM public.reporting_relationship_agreements
       WHERE id=${agreementId}::uuid
@@ -142,4 +192,53 @@ export async function listIncomingReportingRelationships(request:Request,input:u
       AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
     ORDER BY id LIMIT 51`);
   return result.rows.map(row=>rowSchema.parse(row));
+}
+
+const lookupInput=z.object({query:z.string().trim().min(2).max(80),after:z.string().uuid().optional()}).strict();
+/** Bounded opt-in discovery. Only organizations with a current independent
+ * management appointment are requestable; never expose contacts or accounts. */
+export async function searchRelationshipRecipients(request:Request,input:unknown){
+  const actor=await getIdentityContext(request);
+  const {query,after}=lookupInput.parse(input);
+  return db.transaction(async tx=>{
+    const ownerId=await requireDirectRelationshipManager(tx,actor);
+    const result=await tx.execute(sql`
+      SELECT DISTINCT o.id,o.name FROM public.organizations o
+      JOIN public.account_person_grants g ON g.organization_id=o.id
+      JOIN public.access_accounts a ON a.id=g.account_id
+      JOIN public.people p ON p.id=g.person_id
+      WHERE o.id<>${ownerId}::uuid AND ${recipientEligible}
+        AND strpos(lower(o.name),lower(${query}))>0
+        AND (${after??null}::uuid IS NULL OR o.id>${after??null}::uuid)
+      ORDER BY o.id LIMIT 26`);
+    const rows=z.array(z.object({id:uuid,name:z.string()})).parse(result.rows);
+    return {items:rows.slice(0,25),next:rows.length>25?rows[24]!.id:null};
+  });
+}
+const listInput=z.object({direction:z.enum(["incoming","outgoing"]),after:uuid.optional()}).strict();
+/** Agreement metadata only; no outcome counts, underlying facts, actor IDs or
+ * access to the other party's private workspace. */
+export async function listReportingRelationships(request:Request,input:unknown){
+  const actor=await getIdentityContext(request);
+  const {direction,after}=listInput.parse(input);
+  return db.transaction(async tx=>{
+    const organizationId=await requireDirectRelationshipManager(tx,actor);
+    const party=direction==="incoming"?sql`recipient_organization_id`:sql`owner_organization_id`;
+    const result=await tx.execute(sql`
+      SELECT ${columns} FROM public.reporting_relationship_agreements
+      WHERE ${party}=${organizationId}::uuid
+      AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
+      ORDER BY id LIMIT 26`);
+    const rows=z.array(rowSchema).parse(result.rows);
+    const items=rows.slice(0,25).map(({proposedByPersonId,acceptedByPersonId,...agreement})=>{
+      const selfProposed=proposedByPersonId===actor.actorPersonId;
+      const expired=agreement.validThrough!==null&&Date.parse(agreement.validThrough)<=Date.now();
+      const allowedActions:RelationshipAction[]=agreement.status==="pending"?
+        direction==="outgoing"?["withdraw"]:selfProposed||expired?[]:["accept","decline"]:
+        agreement.status==="accepted"?["revoke"]:[];
+      void acceptedByPersonId;
+      return {agreement,allowedActions};
+    });
+    return {items,next:rows.length>25?rows[24]!.id:null};
+  });
 }
