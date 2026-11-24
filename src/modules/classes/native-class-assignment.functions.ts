@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,isNotNull,isNull,lte,inArray } from "drizzle-orm";
+import { and,eq,isNotNull,isNull,lte } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -14,6 +14,7 @@ import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canoni
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { currentClassAuthority } from "./native-class-authority.server";
+import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
@@ -81,18 +82,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         )).limit(1);
       if(!grant)throw new AuthorizationError("verified current organization-scoped learner grant");
 
-      const previous=await tx.select({
-        id:canonicalClassEnrollments.id,status:canonicalClassEnrollments.status,
-        creditMode:canonicalClassEnrollments.creditMode,
-        courseAttemptId:canonicalClassEnrollments.courseAttemptId,
-      }).from(canonicalClassEnrollments).where(and(
-        eq(canonicalClassEnrollments.classId,cls.id),
-        eq(canonicalClassEnrollments.learnerPersonId,person.id),
-        inArray(canonicalClassEnrollments.status,["pending","active"]),
-      )).limit(2);
-      if(previous.length>1)
-        throw new AuthorizationError("duplicate open Class enrollments require reconciliation");
-      const existing=previous[0];
+      const existing=await readOpenNativeClassEnrollment(tx,cls.id,person.id);
       if(existing){
         if(existing.creditMode!==data.creditMode||!existing.courseAttemptId)
           throw new AuthorizationError("conflicting Class enrollment; use approved modification workflow");
@@ -101,12 +91,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
       }
       // A last-five history window is not proof that no earlier completion
       // exists. A prior completion requires an independently approved repeat.
-      const [completed]=await tx.select({id:canonicalClassEnrollments.id})
-        .from(canonicalClassEnrollments).where(and(
-          eq(canonicalClassEnrollments.classId,cls.id),
-          eq(canonicalClassEnrollments.learnerPersonId,person.id),
-          eq(canonicalClassEnrollments.status,"completed"),
-        )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(1);
+      const completed=await readLatestCompletedNativeClassEnrollment(tx,cls.id,person.id);
       const repeatAuthorization=completed
         ?await requireNativeRepeatAuthorization(tx,cls.id,person.id,completed.id,new Date())
         :null;
