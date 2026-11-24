@@ -18,6 +18,8 @@ const fixture=z.object({
 const modules={
  enrollment:"/src/modules/enrollment/noncredit-self-enrollment.functions.ts",
  resume:"/src/modules/enrollment/noncredit-self-enrollment-resume.functions.ts",
+ onboarding:"/src/modules/classes/native-class-reviewed-onboarding.functions.ts",
+ recovery:"/src/modules/classes/native-class-session-recovery.functions.ts",
  assessments:"/src/modules/learning/noncredit-assessment.functions.ts",
  tracks:"/src/modules/learning/instructional-tracks.functions.ts",
  completion:"/src/modules/learning/noncredit-completion.functions.ts",
@@ -84,6 +86,9 @@ test("actual application RPC and canonical evidence: independent pilot",async({b
    const enrollment={releaseId:release.id,consentVersion:release.consentVersion,consentSha256:release.consentSha256,acceptedConsent:true,adultConfirmed:true,referralCode:fixture.goCode};
    await expect(rpc(visitor.page,"enrollment","enrollMyselfInNoncredit",enrollment)).rejects.toThrow();
    await expect(rpc(learner.page,"enrollment","enrollMyselfInNoncredit",{...enrollment,consentSha256:"0".repeat(64)})).rejects.toThrow();
+   // Activate the existing independent review without creating another Person.
+   expect(await rpc(learner.page,"onboarding","activateReviewedNativeClassLearner",undefined)).toMatchObject({ready:true});
+   expect(await rpc(learner.page,"recovery","resumeLinkedNativeClassLearner",undefined)).toMatchObject({ready:true});
    const first=await rpc<{registrationId:string;courseAttemptId:string;alreadyEnrolled:boolean}>(learner.page,"enrollment","enrollMyselfInNoncredit",enrollment);
    expect(first.alreadyEnrolled).toBe(false);uuid.parse(first.registrationId);uuid.parse(first.courseAttemptId);
    const retry=await rpc<typeof first>(learner.page,"enrollment","enrollMyselfInNoncredit",enrollment);
