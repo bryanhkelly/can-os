@@ -25,7 +25,8 @@ WITH legacy AS (
 ), catalog AS (
  SELECT c.id,c.site_id,cv.syllabus,
    (SELECT count(*) FROM public.course_lessons l WHERE l.course_version_id=c.course_version_id) lessons,
-   (SELECT count(*) FROM public.track_lesson_presentations t WHERE t.course_version_id=c.course_version_id) presentations
+   (SELECT count(*) FROM public.track_lesson_presentations t WHERE t.course_version_id=c.course_version_id) presentations,
+   (SELECT count(*) FROM public.track_lesson_presentations t JOIN public.instructional_track_versions v ON v.id=t.track_version_id JOIN public.content_asset_versions av ON av.id=t.asset_version_id WHERE t.course_version_id=c.course_version_id AND v.lifecycle='published' AND av.lifecycle='published') published_presentations
  FROM public.classes c LEFT JOIN public.course_versions cv ON cv.id=c.course_version_id
 ), findings AS (
  SELECT 'legacy_active_without_recovered_class' code,'P0' priority,site_id,count(*) affected
@@ -37,6 +38,7 @@ WITH legacy AS (
  UNION ALL SELECT 'class_no_lessons','P0',site_id,count(*) FROM catalog WHERE lessons=0 GROUP BY site_id
  UNION ALL SELECT 'class_minimal_lesson_inventory','P1',site_id,count(*) FROM catalog WHERE lessons BETWEEN 1 AND 3 GROUP BY site_id
  UNION ALL SELECT 'class_no_track_presentations','P1',site_id,count(*) FROM catalog WHERE presentations=0 GROUP BY site_id
+ UNION ALL SELECT 'class_no_published_track_presentations','P1',site_id,count(*) FROM catalog WHERE published_presentations=0 GROUP BY site_id
  UNION ALL SELECT 'synthetic_course_in_active_enrollment','P1',site_id,count(*) FROM native WHERE status='active' AND syllabus->>'synthetic'='true' GROUP BY site_id
  UNION ALL SELECT 'active_demo_noncredit_mode','P1',site_id,count(*) FROM native WHERE status='active' AND credit_mode='not_applicable' AND syllabus->>'synthetic'='true' GROUP BY site_id
  UNION ALL SELECT 'legacy_assessment_records_to_reconcile','P1',sec.site_id,count(*) FROM public.assessments a JOIN public.sections sec ON sec.id=a.section_id GROUP BY sec.site_id
