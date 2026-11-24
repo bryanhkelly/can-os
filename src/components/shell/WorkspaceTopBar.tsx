@@ -4,6 +4,8 @@ import { Bell, ChevronDown, Menu, MessageCircle, Search } from "lucide-react";
 import { WorkspaceAccountTrigger } from "./WorkspaceAccountMenu";
 import { PlatformOwnerDelegationBanner } from "./PlatformOwnerDelegationBanner";
 import { Button } from "@/components/ui/button";
+import { focusRingClasses } from "@/components/ui/control-styles";
+import { cn } from "@/lib/utils";
 import { WorkspaceNotice } from "@/components/workspace";
 import { formatWorkspaceRole, getWorkspaceScopeLabel } from "./workspace-scope";
 import { accessReturnToFromLocation, safeAccessReturnTo } from "@/domain/access-navigation";
@@ -60,14 +62,14 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
           className="mr-auto flex h-auto min-w-0 max-w-[22rem] shrink items-center justify-start gap-2  border-border/70 bg-background px-3 py-1.5 text-left">
           <span className="sr-only">Switch workspace:</span>{" "}
           <span className="min-w-0">
-            <span className="block text-xs font-semibold">{formatWorkspaceRole(member.role)}</span>{" "}
+            <span className="block truncate text-xs font-semibold">{formatWorkspaceRole(member.role)}</span>{" "}
             <span className="block truncate text-xs text-muted-foreground">
               {getWorkspaceScopeLabel(member, sites)}
             </span>
           </span>
           <ChevronDown className="size-4 shrink-0" aria-hidden="true" />
         </Button>
-        : <Link to="/" className="mr-auto  font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>}
+        : <Link to="/" className={cn("mr-auto font-serif text-xl font-semibold",focusRingClasses)}>CAN OS</Link>}
       {member && <>
         <Button variant="outline" size="sm" aria-label="Search workspace" aria-haspopup="dialog"
           title="Find pages and authorized records (Ctrl+K / Cmd+K)" onClick={onOpenSearch}>
