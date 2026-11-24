@@ -178,3 +178,12 @@ test("release audits include regressions committed before the latest commit", ()
   assert.equal(blocked.base, null);
   assert.match(blocked.warning, /Git base unavailable/);
 }));
+
+test("directional, logical, arbitrary and important corner utilities cannot bypass square geometry", () => {
+  const utilities = ["rounded-t", "rounded-bl-lg", "rounded-se-none",
+    "rounded-xs", "md:rounded-s-full", "hover:!rounded-tr-[3px]",
+    "rounded-(--custom-radius)", "[&>a]:rounded-b-md!", "dark:rounded-ss-4xl"];
+  const audit = analyzeSource('export const Page = () => <div className="' +
+    utilities.join(" ") + ' border-t text-sm"/>;', "/demo/src/components/workspace/panel.tsx");
+  assert.deepEqual(audit.corners.map(item => item.utility), utilities);
+});
