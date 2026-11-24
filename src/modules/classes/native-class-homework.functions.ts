@@ -156,6 +156,40 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
     });
   });
 
+/** Read a bounded page of the learner's own preserved submission states.
+ * The parent homework service owns authorization; no separate identity path. */
+export const getNativeClassHomeworkHistory=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>target.extend({
+    assignmentId:uuid,beforeRevision:z.number().int().positive().optional(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getInstructionalLearnerContext(getRequest());
+    return db.transaction(async tx=>{
+      const {cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      const result=await tx.execute(sql`
+        SELECT r.revision_no,r.status,r.response,r.submitted_at,r.recorded_at,r.source
+        FROM public.graded_submission_revisions r
+        JOIN public.graded_submissions gs ON gs.id=r.submission_id AND gs.course_version_id=r.course_version_id
+        JOIN public.graded_assignments ga ON ga.id=gs.assignment_id AND ga.course_version_id=gs.course_version_id
+        WHERE gs.course_attempt_id=${courseAttemptId}::uuid
+          AND gs.course_version_id=${cls.courseVersionId}::uuid
+          AND ga.id=${data.assignmentId}::uuid AND ga.section_id IS NULL
+          AND (${data.beforeRevision??null}::int IS NULL OR r.revision_no<${data.beforeRevision??null}::int)
+        ORDER BY r.revision_no DESC LIMIT 21
+      `);
+      const items=result.rows.slice(0,20).map(row=>{
+        const response=asRecord(row.response);
+        return {revisionNo:Number(row.revision_no),status:String(row.status),
+          responseText:typeof response.text==="string"?response.text:"",
+          practiceFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"?response.teacherFeedback:null,
+          submittedAt:row.submitted_at==null?null:new Date(String(row.submitted_at)).toISOString(),
+          recordedAt:new Date(String(row.recorded_at)).toISOString(),source:String(row.source)};
+      });
+      return {items,nextBefore:result.rows.length>20?items.at(-1)?.revisionNo??null:null};
+    });
+  });
+
 /** Persist text homework in the EXISTING graded_submissions table. A submitted
  * or graded response is never silently overwritten. Repeated identical
  * submissions return an idempotent acknowledgement. */
