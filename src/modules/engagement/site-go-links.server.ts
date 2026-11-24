@@ -6,7 +6,7 @@ import { goLinkAvailability } from "@/domain/go-link-policy";
 import { inspectGoDestination } from "./go-destination-registry.server";
 
 /** Public redirect resolution never grants access. Every operation checks
- * the current Site, package, link lifecycle and authoritative destination.
+ * the current Site, optional package, lifecycle and authoritative destination.
  * A successful redirect is observed only as an aggregated daily count.
  */
 export async function resolveSiteGoLink(code: string): Promise<string | null> {
@@ -24,14 +24,18 @@ export async function resolveSiteGoLink(code: string): Promise<string | null> {
   }).from(sites).where(eq(sites.id,link.siteId)).limit(1);
   if(!site || site.organizationId!==link.organizationId ||
       site.lifecycleStatus==="closed")return null;
-  const [pkg]=await db.select({status:siteMarketingPackages.status,
-    siteId:siteMarketingPackages.siteId,
-    organizationId:siteMarketingPackages.organizationId,
-  }).from(siteMarketingPackages).where(eq(siteMarketingPackages.id,link.packageId)).limit(1);
-  // Package archival locks editing; it does not retract already distributed
-  // collateral or navigation. Explicit pause/revoke controls govern the link.
-  if(!pkg || pkg.siteId!==link.siteId ||
+  // An outreach plan is optional. The Site owns every code, including
+  // direct Class/program links created outside the Introduce workflow.
+  if(link.packageId){
+    const [pkg]=await db.select({
+      siteId:siteMarketingPackages.siteId,
+      organizationId:siteMarketingPackages.organizationId,
+    }).from(siteMarketingPackages)
+      .where(eq(siteMarketingPackages.id,link.packageId)).limit(1);
+    // Package archival is not implicit revocation of printed collateral.
+    if(!pkg || pkg.siteId!==link.siteId ||
       pkg.organizationId!==link.organizationId)return null;
+  }
 
   const outcome=await inspectGoDestination(link.siteId,link.destination,code);
   if(!outcome.available || !outcome.href)return null;

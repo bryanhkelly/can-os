@@ -73,7 +73,7 @@ export async function inspectGoDestination(
   if(destination.kind==="enrichment"){
     // This catalog is already governed by extended-season approvals,
     // publication evidence, availability and registration checks.
-    const current=await readEnrichmentCatalog(siteId,reader);
+    const current=await readEnrichmentCatalog(siteId,reader,destination.seasonId);
     const season=current.find(item=>item.seasonId===destination.seasonId);
     if(!season || !season.registrationOpen)return unavailable;
     const href=goDestinationHref(destination,code);
