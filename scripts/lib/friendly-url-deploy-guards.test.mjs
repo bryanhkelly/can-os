@@ -4,19 +4,22 @@ import { assertFriendlyUrlDeployment } from "./friendly-url-deploy-guards.mjs";
 
 const id={projectId:"sweet-hall-62441909",branchId:"br-restless-sea-ar9ooo55",databaseName:"neondb"};
 const schema={sites:true,organizations:true,marketing_packages:true,go_links:true,
-  go_link_rls:true,site_rls:true,organization_rls:true,
+  go_link_rls:true,go_link_private:true,site_rls:true,organization_rls:true,
+  engagement_definitions:true,engagement_versions:true,
+  engagement_definitions_private:true,engagement_versions_private:true,
   unique_go_code:true,valid_go_code_constraint:true,go_link_daily_visits:true,
   go_link_daily_visits_private:true,valid_go_lifecycle_constraint:true,
   unique_go_daily_counter:true,optional_go_outreach_package:true,
   go_idempotency_key:true,unique_go_idempotent_request:true,
   go_site_page_index:true,valid_go_idempotency_constraint:true};
 const roles={count:2,unauthorizedSelects:0,applicationCanRead:true,applicationCanBypassGoRls:true,applicationCanCountRedirects:true};
-const migrations = Array.from({length:10}, (_, i) => ({
+const migrations = Array.from({length:11}, (_, i) => ({
   tag: i === 5 ? "0105_site_go_links"
     : i === 6 ? "0106_universal_engagement"
     : i === 7 ? "0107_site_go_links_private_role_access"
     : i === 8 ? "0108_site_go_link_capabilities"
     : i === 9 ? "0109_site_go_link_reuse"
+    : i === 10 ? "0110_universal_engagement_private_role_access"
     : "010" + i + "_required",
   when: 100 + i, hash: "h" + i,
 }));

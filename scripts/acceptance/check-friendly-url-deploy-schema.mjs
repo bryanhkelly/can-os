@@ -17,13 +17,14 @@ const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
 // alone to mask missing Reporting/Identity migrations from 0100 onward.
 // Every new migration added to the release journal is included automatically.
 const migrationEntries = journal.entries.filter(entry => entry.idx >= 100);
-if (migrationEntries.length < 10 ||
+if (migrationEntries.length < 11 ||
     migrationEntries[0]?.idx !== 100 ||
     !migrationEntries.some(entry => entry.tag === "0105_site_go_links") ||
     !migrationEntries.some(entry => entry.tag === "0106_universal_engagement") ||
     !migrationEntries.some(entry => entry.tag === "0107_site_go_links_private_role_access") ||
     !migrationEntries.some(entry => entry.tag === "0108_site_go_link_capabilities") ||
     !migrationEntries.some(entry => entry.tag === "0109_site_go_link_reuse") ||
+    !migrationEntries.some(entry => entry.tag === "0110_universal_engagement_private_role_access") ||
     migrationEntries.some((entry, i) => entry.idx !== i + 100))
   throw new Error("BLOCKED: incomplete or out-of-order deployment migration journal");
 const migrations = migrationEntries.map(entry => ({
@@ -44,7 +45,9 @@ const [schema] = await sql`
     to_regclass('public.sites') IS NOT NULL AS sites,
     to_regclass('public.site_marketing_packages') IS NOT NULL AS marketing_packages,
     to_regclass('public.site_go_links') IS NOT NULL AS go_links,
-    to_regclass('public.site_go_link_daily_visits') IS NOT NULL AS go_link_daily_visits
+    to_regclass('public.site_go_link_daily_visits') IS NOT NULL AS go_link_daily_visits,
+    to_regclass('public.engagement_definitions') IS NOT NULL AS engagement_definitions,
+    to_regclass('public.engagement_definition_versions') IS NOT NULL AS engagement_versions
 `;
 const names = Object.keys(schema);
 if (names.some(name => schema[name] !== true))
@@ -56,6 +59,12 @@ const [schemaChecks] = await sql`
   SELECT
     (SELECT relrowsecurity FROM pg_class
       WHERE oid=to_regclass('public.site_go_links')) AS go_link_rls,
+    (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.site_go_links')) AS go_link_private,
+    (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.engagement_definitions')) AS engagement_definitions_private,
+    (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.engagement_definition_versions')) AS engagement_versions_private,
     (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
       WHERE oid=to_regclass('public.site_go_link_daily_visits')) AS go_link_daily_visits_private,
     (SELECT relrowsecurity FROM pg_class
@@ -104,6 +113,8 @@ const [roleChecks] = await sql`
       AND (has_table_privilege(r.oid,'public.sites','SELECT')
         OR has_table_privilege(r.oid,'public.organizations','SELECT')
         OR has_table_privilege(r.oid,'public.site_go_links','SELECT')
+        OR has_table_privilege(r.oid,'public.engagement_definitions','SELECT,INSERT,UPDATE,DELETE')
+        OR has_table_privilege(r.oid,'public.engagement_definition_versions','SELECT,INSERT,UPDATE,DELETE')
         OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','SELECT')
         OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','INSERT')
         OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','UPDATE')
@@ -115,6 +126,8 @@ const [roleChecks] = await sql`
     (has_table_privilege(current_user,'public.sites','SELECT')
       AND has_table_privilege(current_user,'public.organizations','SELECT')
       AND has_table_privilege(current_user,'public.site_go_links','SELECT')
+      AND has_table_privilege(current_user,'public.engagement_definitions','SELECT')
+      AND has_table_privilege(current_user,'public.engagement_definition_versions','SELECT')
       AND has_table_privilege(current_user,'public.site_go_link_daily_visits','SELECT'))
       AS application_can_read,
     (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user)

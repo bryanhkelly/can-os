@@ -2,9 +2,9 @@ name: Cloudflare production build and regression gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "release-*"]
   push:
-    branches: [main]
+    branches: [main, "release-*"]
   workflow_dispatch:
 
 permissions:
@@ -52,6 +52,11 @@ jobs:
         run: |
           set -o pipefail
           npm run test:site:channels 2>&1 | tee site-regressions.log
+      - name: Go Links and friendly URLs regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:urls:unit 2>&1 | tee go-links-regressions.log
       - name: Native Class regression suite
         shell: bash
         run: |
@@ -67,5 +72,6 @@ jobs:
             typecheck.log
             site-regressions.log
             class-regressions.log
+            go-links-regressions.log
           if-no-files-found: warn
           retention-days: 14

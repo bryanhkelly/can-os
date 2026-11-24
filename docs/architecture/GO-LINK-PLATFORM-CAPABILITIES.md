@@ -1,6 +1,6 @@
 # Link infrastructure: Manage, Resolve, Measure
 
-Status: implemented in draft PR #363, not deployed to production.
+Status: implemented in PR #363 under release validation, not deployed to production.
 
 ## 1. Link Management
 
@@ -41,11 +41,12 @@ The link layer deliberately does not own a person, enrollment, completion or out
 
 ## Deployment safety and validation
 
-- Additive SQL migrations `0107_site_go_link_capabilities.sql` and `0108_site_go_link_reuse.sql` are recorded in the SQL-only migration ledger and Drizzle journal; 0108 makes the package reference optional and adds idempotency plus pagination indexes.
-- Both Go Link tables live in the `public` PostgreSQL schema, **not** in public database permissions. Direct access for `anonymous` and `authenticated` is denied; RLS and private-role deployment checks are required.
+- Additive SQL migrations `0105_site_go_links.sql`, `0106_universal_engagement.sql`, `0107_site_go_links_private_role_access.sql`, `0108_site_go_link_capabilities.sql`, `0109_site_go_link_reuse.sql`, and `0110_universal_engagement_private_role_access.sql` are in the reviewed SQL-only migration ledger. `0109` makes the Marketing Package reference optional and adds idempotency plus pagination indexes. `0110` enforces RLS and direct client-role denial for the universal engagement definitions and immutable versions, as well as FORCE RLS for Go Links.
+- Both Go Link tables and both universal engagement tables live in PostgreSQL's `public` schema, **not** in public database permissions. Direct access for `anonymous` and `authenticated` is denied; FORCE RLS and private-role deployment checks are required.
 - `npm run db:check:friendly-urls:deploy` is a read-only deployment gate. It checks every required migration from `0100` to the current journal tip, including new counter privacy and permission constraints. It does not apply migrations.
 - `npm run test:urls:unit` includes lifecycle, route authorization, clipboard-origin, registry, reporting and service-boundary tests.
-- Production Neon was previously verified at migration `0099`; migrations `0100` through `0108` and the Go Link tables are not confirmed applied.
-- CI and full-schema jobs have failed before runners started or steps were recorded; there are no successful repository-wide typecheck, migrated database acceptance, performance or browser test results yet.
+- Read-only Neon verification on November 23 found the production ledger at migration `0099` and none of the Go Link or universal engagement tables. Migrations `0100` through `0110` are **not** confirmed applied.
+- The disposable PostgreSQL graduation workflow now includes `tests/postgres/go-link-release-acceptance.sql` for enforced RLS, role privilege denials, unique indexes, lifecycle, immutable published versions, and package-free Site reuse. GitHub CI and full-schema jobs have failed before runner steps were recorded; this new SQL acceptance is **added but not yet executed successfully**. There are no successful repository-wide typecheck, migrated database acceptance, performance or browser test results yet.
+- Cloudflare Git-integrated builds do not necessarily invoke `npm run deploy:cloudflare`; production auto-deployment must be disabled or guarded separately until the migration and CI gates pass.
 
 Production deployment must remain blocked until a disposable database is available for the complete ordered migration chain, real role-access tests pass, and full build and browser tests are verified.
