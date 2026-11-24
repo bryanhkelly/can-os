@@ -11,8 +11,9 @@ import { requirePartnerWebsiteEditor } from "./site-website-authorization.server
 
 
 /** Single authorized canonical read used by the private brief and AI boundary. */
-export async function readAuthorizedSiteContentBrief(actor:AccessContext,siteId:string,mode:"read"|"website"|"outreach"="read"){
-  return db.transaction(async tx=>{
+type BriefTx=Parameters<Parameters<typeof db.transaction>[0]>[0];
+export async function readAuthorizedSiteContentBrief(actor:AccessContext,siteId:string,mode:"read"|"website"|"outreach"="read",executor?:BriefTx){
+  const project=async(tx:BriefTx)=>{
     const [site]=await tx.select({id:sites.id,organizationId:sites.organizationId,name:sites.name,timezone:sites.timezone,updatedAt:sites.updatedAt,metadata:sites.metadata,currentBrandVersionId:sites.currentBrandVersionId}).from(sites).where(eq(sites.id,siteId)).limit(1);
     if(!site)throw new AuthorizationError("Site intelligence scope");
     if(mode==="website"){
@@ -29,6 +30,7 @@ export async function readAuthorizedSiteContentBrief(actor:AccessContext,siteId:
     const [org]=await tx.select({name:organizations.name}).from(organizations).where(eq(organizations.id,site.organizationId)).limit(1);
     const savedBrand=brand?siteBrandConfigurationSchema.parse(brand.configuration):null;
     const brief=projectSiteContentBriefV61({siteId:site.id,siteName:site.name,timezone:site.timezone,siteRevision:site.updatedAt.toISOString(),metadata:site.metadata,brandVersionId:site.currentBrandVersionId,brandRevision:brand?.revision??null,websiteContent:copy,websiteContentRevision:website?.revision??null});
-    return {...brief,organizationName:org?.name??null,editorialBrand:savedBrand?{displayName:savedBrand.displayName,directionId:savedBrand.directionId}:null};
-  });
+    return {...brief,organizationId:site.organizationId,organizationName:org?.name??null,editorialBrand:savedBrand?{displayName:savedBrand.displayName,directionId:savedBrand.directionId}:null};
+  };
+  return executor?project(executor):db.transaction(project);
 }

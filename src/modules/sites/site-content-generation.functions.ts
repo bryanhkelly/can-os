@@ -1,43 +1,20 @@
-import {db} from "@/db/client";
-import {writeAudit} from "@/platform/mutation";
-import {createHash} from "node:crypto";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {z} from "zod";
 import {getCommandContext} from "@/modules/identity/command-context.server";
-import {AuthorizationError} from "@/domain/command-context";
-import {siteGenerationTaskSchema,buildSiteGenerationInput} from "@/domain/site-content-generation";
-import {readAuthorizedSiteContentBrief} from "./site-content-brief.server";
-import {generateWithGloo} from "./gloo-content-provider.server";
-const requestSchema=z.object({siteId:z.string().uuid(),task:siteGenerationTaskSchema}).strict();
-async function prepare(data:z.infer<typeof requestSchema>){
-  const actor=await getCommandContext(getRequest());
-  if(actor.delegationMode==="view")throw new AuthorizationError("content generation requires authoring authority");
-  const brief=await readAuthorizedSiteContentBrief(actor,data.siteId,data.task.target);
-  const input=buildSiteGenerationInput(brief,data.task);
-  const payload=JSON.stringify(input);
-  if(new TextEncoder().encode(payload).byteLength>48000)throw new Error("Content input is too large. Remove optional context.");
-  const digest=createHash("sha256").update(JSON.stringify({siteId:data.siteId,sourceRevisions:brief.sourceRevisions,input})).digest("hex");
-  return {actor,input,digest,sourceRevisions:brief.sourceRevisions};
-}
-export const previewSiteGeneration=createServerFn({method:"POST"})
-  .validator((value:unknown)=>requestSchema.parse(value))
-  .handler(async({data})=>{
-    setResponseHeader("Cache-Control","private, no-store");
-    const {input,digest,sourceRevisions}=await prepare(data);
-    return {input,digest,sourceRevisions,provider:"gloo" as const};
-  });
-export const generateSiteContent=createServerFn({method:"POST"})
-  .validator((value:unknown)=>requestSchema.extend({digest:z.string().regex(/^[a-f0-9]{64}$/),externalProcessingConfirmed:z.literal(true)}).strict().parse(value))
-  .handler(async({data})=>{
-    setResponseHeader("Cache-Control","private, no-store");
-    const before=await prepare(data);
-    if(before.digest!==data.digest)throw new Error("Saved Site information changed. Review the new input before generation.");
-    await db.transaction(tx=>writeAudit(tx,before.actor,{action:"site.content_generation.requested",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId},after:{provider:"gloo",target:data.task.target,inputDigest:before.digest,promptVersion:before.input.promptVersion,sourceRevisions:before.sourceRevisions,externalProcessingConfirmed:true}}));
-    const result=await generateWithGloo(before.input);
-    const after=await prepare(data);
-    if(after.digest!==before.digest||after.actor.actorPersonId!==before.actor.actorPersonId)
-      throw new Error("Site information or permissions changed. Generate again.");
-    await db.transaction(tx=>writeAudit(tx,after.actor,{action:"site.content_generation.completed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId},after:{provider:"gloo",model:result.model,providerResponseId:result.providerResponseId,target:data.task.target,inputDigest:before.digest,outputDigest:createHash("sha256").update(JSON.stringify(result.content)).digest("hex"),promptVersion:before.input.promptVersion,sourceRevisions:before.sourceRevisions}}));
-    return {...result,provider:"gloo" as const,sourceRevisions:before.sourceRevisions,inputDigest:before.digest,promptVersion:before.input.promptVersion,generatedAt:new Date().toISOString(),status:"draft" as const};
-  });
+import {siteGenerationOptionsSchema} from "@/domain/site-content-generation";
+import {previewSitePackage,processSitePackage,readStoredSitePackage} from "./site-content-package.server";
+const siteInput=z.object({siteId:z.string().uuid(),consumer:z.enum(["website","outreach"])}).strict();
+const request=siteInput.extend({options:siteGenerationOptionsSchema});
+export const readSiteIntelligenceContent=createServerFn({method:"GET"}).validator((v:unknown)=>siteInput.parse(v)).handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ return readStoredSitePackage(await getCommandContext(getRequest()),data.siteId,data.consumer);
+});
+export const previewSiteIntelligence=createServerFn({method:"POST"}).validator((v:unknown)=>request.parse(v)).handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ return previewSitePackage(await getCommandContext(getRequest()),data);
+});
+export const processSiteIntelligence=createServerFn({method:"POST"}).validator((v:unknown)=>request.extend({digest:z.string().regex(/^[a-f0-9]{64}$/),externalProcessingConfirmed:z.literal(true)}).parse(v)).handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ return processSitePackage(await getCommandContext(getRequest()),data);
+});

@@ -1,4 +1,5 @@
 import {z} from "zod";
+import {canonicalJson} from "@/lib/canonical-json";
 import {siteContentBriefV61Schema,type SiteContentBriefV61} from "./site-content-brief-v61";
 import {buildSiteGenerationInput,generatedText,generatedWebsiteSchema,generatedOutreachSchema,siteGenerationOptionsSchema,type SiteGenerationOptions} from "./site-content-generation";
 export const SITE_PACKAGE_VERSION=2 as const;
@@ -49,8 +50,8 @@ export function parseSiteContentPackage(raw:string,input:SitePackageInput):SiteC
 /** Old packages can remain useful when plans change. Private source withdrawal
  * or modification is conservative: withhold the generated package entirely. */
 export function privatePackageSourcesMatch(saved:SitePackageInput,current:SitePackageInput):boolean{
- return JSON.stringify([saved.story,saved.leadership,saved.publicReferences,saved.existingWebsiteCopy,saved.preferences.guidance])===
- JSON.stringify([current.story,current.leadership,current.publicReferences,current.existingWebsiteCopy,current.preferences.guidance]);
+ return canonicalJson([saved.story,saved.leadership,saved.publicReferences,saved.existingWebsiteCopy,saved.preferences.guidance])===
+ canonicalJson([current.story,current.leadership,current.publicReferences,current.existingWebsiteCopy,current.preferences.guidance]);
 }
 export const SITE_PACKAGE_INSTRUCTIONS=[
  "You are Becomuna's editorial writer. Return one JSON object only, with schemaVersion:2.",
