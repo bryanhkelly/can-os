@@ -10,10 +10,18 @@ describe("platform-wide reporting instrumentation coverage",()=>{
       .toBe(true);
   });
   it("never treats uninstrumented learning, Experiences or funding as zero",()=>{
-    for(const domain of ["noncredit_learning","native_classes","experiences","partnerships_funding"]){
+    for(const domain of ["experiences","partnerships_funding"]){
       const entry=REPORTING_DOMAIN_COVERAGE.find(row=>row.domain===domain);
       expect(entry?.instrumentedEvents).toEqual([]);
       expect(entry?.state).not.toBe("instrumented_subset");
+      expect(entry?.missingLifecycleExamples.length).toBeGreaterThan(0);
+    }
+  });
+  it("registers native Class and noncredit lifecycle evidence but retains remaining gaps",()=>{
+    for(const domain of ["noncredit_learning","native_classes"]){
+      const entry=REPORTING_DOMAIN_COVERAGE.find(row=>row.domain===domain);
+      expect(entry?.state).toBe("instrumented_subset");
+      expect(entry?.instrumentedEvents.length).toBeGreaterThan(0);
       expect(entry?.missingLifecycleExamples.length).toBeGreaterThan(0);
     }
   });

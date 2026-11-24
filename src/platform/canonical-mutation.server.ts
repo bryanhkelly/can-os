@@ -1,3 +1,4 @@
+import {recordNativeLearningReporting} from "@/modules/insights/native-learning-reporting.server";
 import type { db } from "@/db/client";
 import type { auditEvents as nativeAuditEvents, domainEvents as nativeDomainEvents } from "@/db/canonical-v301";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -78,4 +79,5 @@ export async function emitCanonicalDomainEvent(
     payload: entry.payload ?? {},
     ...(entry.occurredAt ? { occurredAt: entry.occurredAt } : {}),
   });
+  await recordNativeLearningReporting(tx,entry);
 }

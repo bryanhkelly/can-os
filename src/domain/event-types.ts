@@ -1,4 +1,7 @@
 export const EventTypes = {
+  NativeClassEnrollmentLifecycleRecorded:"NativeClassEnrollmentLifecycleRecorded",
+  NativeClassSessionLifecycleRecorded:"NativeClassSessionLifecycleRecorded",
+  NoncreditRegistrationLifecycleRecorded:"NoncreditRegistrationLifecycleRecorded",
   SiteIntelligenceProcessingRequested: "SiteIntelligenceProcessingRequested",
   SiteIntelligenceProcessingCompleted: "SiteIntelligenceProcessingCompleted",
   SiteIntelligenceProcessingFailed: "SiteIntelligenceProcessingFailed",

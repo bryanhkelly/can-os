@@ -1,3 +1,4 @@
+import {canonicalClasses,canonicalClassEnrollments,canonicalClassSessions,noncreditRegistrations,noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases} from "@/db/canonical-v301";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -57,6 +58,23 @@ export async function assertReportingSourceOwnership(
         AND c.owner_scope='site:'||e.site_id::text AND c.sender_scope='organization:'||e.organization_id::text`);
       const row=result.rows[0];
       owner=row&&typeof row.siteId==="string"&&typeof row.organizationId==="string"?{siteId:row.siteId,organizationId:row.organizationId}:null;break;
+    }
+    case "native_class_enrollment": {
+      const [row]=await reader.select({siteId:canonicalClasses.siteId,organizationId:canonicalClasses.operatingOrganizationId}).from(canonicalClassEnrollments)
+        .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId)).where(eq(canonicalClassEnrollments.id,sourceId)).limit(1);
+      owner=row?.siteId?{siteId:row.siteId,organizationId:row.organizationId}:null;break;
+    }
+    case "native_class_session": {
+      const [row]=await reader.select({siteId:canonicalClasses.siteId,organizationId:canonicalClasses.operatingOrganizationId}).from(canonicalClassSessions)
+        .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassSessions.classId)).where(eq(canonicalClassSessions.id,sourceId)).limit(1);
+      owner=row?.siteId?{siteId:row.siteId,organizationId:row.organizationId}:null;break;
+    }
+    case "noncredit_registration": {
+      const [row]=await reader.select({siteId:noncreditSelfEnrollmentClaims.siteId,organizationId:noncreditRegistrations.registeringOrganizationId}).from(noncreditRegistrations)
+       .innerJoin(noncreditSelfEnrollmentClaims,eq(noncreditSelfEnrollmentClaims.registrationId,noncreditRegistrations.id))
+       .innerJoin(noncreditSelfEnrollmentReleases,and(eq(noncreditSelfEnrollmentReleases.id,noncreditSelfEnrollmentClaims.releaseId),eq(noncreditSelfEnrollmentReleases.siteId,noncreditSelfEnrollmentClaims.siteId),eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,noncreditRegistrations.registeringOrganizationId),eq(noncreditSelfEnrollmentClaims.participantPersonId,noncreditRegistrations.participantPersonId),eq(noncreditSelfEnrollmentReleases.deploymentId,noncreditRegistrations.deploymentId),eq(noncreditSelfEnrollmentReleases.adoptionId,noncreditRegistrations.adoptionId),eq(noncreditSelfEnrollmentReleases.offeringVersionId,noncreditRegistrations.offeringVersionId),eq(noncreditSelfEnrollmentReleases.trainingVersionId,noncreditRegistrations.trainingVersionId)))
+       .where(eq(noncreditRegistrations.id,sourceId)).limit(1);
+      owner=row??null;break;
     }
     case "site_room": {
       const [row] = await reader.select({siteId:siteRooms.siteId}).from(siteRooms)

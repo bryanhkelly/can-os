@@ -14,6 +14,18 @@ const uuid = z.string().uuid();
 const revision = z.number().int().positive();
 
 export const REPORTABLE_EVENT_CATALOG = {
+  [EventTypes.NativeClassEnrollmentLifecycleRecorded]:{
+    sourceKind:"native_class_enrollment",aggregateType:"native_class_enrollment",requiredDimensions:["siteId","classId"] as const,schemaVersion:1 as const,
+    payload:z.object({stage:z.enum(["created","withdrawn","cancelled","transferred_in","transferred_out"]),method:z.enum(["self","invitation","assignment","approval"])}).strict(),
+  },
+  [EventTypes.NativeClassSessionLifecycleRecorded]:{
+    sourceKind:"native_class_session",aggregateType:"native_class_session",requiredDimensions:["siteId","classId","sessionId"] as const,schemaVersion:1 as const,
+    payload:z.object({stage:z.enum(["scheduled","schedule_changed","started","revoked"])}).strict(),
+  },
+  [EventTypes.NoncreditRegistrationLifecycleRecorded]:{
+    sourceKind:"noncredit_registration",aggregateType:"noncredit_registration",requiredDimensions:["siteId"] as const,schemaVersion:1 as const,
+    payload:z.object({stage:z.enum(["registered","withdrawn"]),releaseId:uuid}).strict(),
+  },
   [EventTypes.SiteIntelligenceProcessingRequested]: {
     sourceKind: "site_intelligence_version", aggregateType: "site_intelligence_version",
     requiredDimensions: ["siteId"] as const,

@@ -78,15 +78,15 @@ export const REPORTING_DOMAIN_COVERAGE: readonly ReportingDomainCoverage[] = [
   },
   {
     domain:"noncredit_learning",owner:"Existing noncredit participation and completion authority",
-    state:"domain_metrics_only",instrumentedEvents:[],
+    state:"instrumented_subset",instrumentedEvents:[EventTypes.NoncreditRegistrationLifecycleRecorded],
     missingLifecycleExamples:["participant identity reconciliation",
       "verified attendance decision", "completion correction and unique participant reporting"],
   },
   {
     domain:"native_classes",owner:"Existing Class and Classroom Connect authority",
-    state:"domain_metrics_only",instrumentedEvents:[],
+    state:"instrumented_subset",instrumentedEvents:[EventTypes.NativeClassEnrollmentLifecycleRecorded,EventTypes.NativeClassSessionLifecycleRecorded],
     missingLifecycleExamples:["Class/session attendance decisions",
-      "learning assessments", "transfers and withdrawals"],
+      "learning assessments", "completion and award decisions", "legacy placement and session closure coverage"],
   },
   {
     domain:"experiences",owner:"Experience offerings and enrollments",
