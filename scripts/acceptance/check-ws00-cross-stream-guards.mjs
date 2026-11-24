@@ -48,7 +48,9 @@ check("WS2 Class lifecycle retains transactional terminal and source validation"
   const s=read("src/modules/classes/native-class-lifecycle.functions.ts");
   required(s.includes('canonicalClasses')&&s.includes('for("update")'),
     "Missing parent Class row lock for seat mutation");
-  required(s.includes("assertNativeClassAttemptForExit") &&
+  const attempts=read("src/modules/classes/native-class-attempt.server.ts");
+  required(s.includes("withdrawNativeClassAttempts") &&
+           attempts.includes("assertNativeClassAttemptForExit") &&
            s.includes("assertCurrentNativeClassLearnerForMutation"),
     "Missing exact linked attempt/current learner verification");
 });
