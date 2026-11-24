@@ -12,6 +12,7 @@ import {
 } from "@/db/canonical-v301";
 import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/network-attribution";
 import {currentNoncreditCompletionStates} from "@/domain/verified-completion-projection";
+import {summarizeDistinctNoncreditParticipation} from "@/domain/noncredit-participant-rollup";
 import {summarizeVerifiedRoomAttendance} from "@/domain/classroom-attendance";
 
 /** Organization-scoped reporting. This must not infer a denomination-level
@@ -24,12 +25,19 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
     const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
-    const releases=await db.select({
+    return db.transaction(async tx=>{
+    const asOf=new Date().toISOString();
+    const releases=await tx.select({
       id:noncreditSelfEnrollmentReleases.id,
       siteId:noncreditSelfEnrollmentReleases.siteId,
       title:noncreditTrainingVersions.title,
       siteName:canonicalEnrollmentSites.name,
       deliveryMode:noncreditSelfEnrollmentReleases.deliveryMode,
+      trainingVersionId:noncreditSelfEnrollmentReleases.trainingVersionId,
+      deploymentId:noncreditSelfEnrollmentReleases.deploymentId,
+      adoptionId:noncreditSelfEnrollmentReleases.adoptionId,
+      offeringVersionId:noncreditSelfEnrollmentReleases.offeringVersionId,
+      siteOrganizationId:canonicalEnrollmentSites.organizationId,
     }).from(noncreditSelfEnrollmentReleases)
       .innerJoin(noncreditTrainingVersions,eq(
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
@@ -40,26 +48,48 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds),
       )).limit(1001);
     if(releases.length>1000)throw new Error("Organization has more than 1000 releases; use an interval report");
-    if(!releases.length)return {asOf:new Date().toISOString(),totals:{
+    if(releases.some(r=>r.siteOrganizationId!==provider.organizationId))throw new Error("Release Site ownership does not reconcile");
+    if(!releases.length)return {asOf,totals:{
       registrations:0,active:0,withdrawn:0,completed:0,
-      verifiedAttendees:0,linkedRooms:0,
+      verifiedAttendees:0,linkedRooms:0,uniquePeople:0,uniqueCompletedPeople:0,uniqueVerifiedAttendees:0,repeatRegistrations:0,
     },sites:[],cohorts:[],affiliations:[],networkUnits:[],
-      publicationSafe:{minimumCell:10,groups:[],affiliations:[]}};
+      publicationSafe:{minimumCell:10,groups:[],affiliations:[]},disclosureApproved:false as const};
     const ids=releases.map(x=>x.id);
-    const claims=await db.select({
+    const claims=await tx.select({
       releaseId:noncreditSelfEnrollmentClaims.releaseId,
       registrationId:noncreditSelfEnrollmentClaims.registrationId,
       status:noncreditRegistrations.status,
+      personId:noncreditRegistrations.participantPersonId,
+      claimPersonId:noncreditSelfEnrollmentClaims.participantPersonId,
+      siteId:noncreditSelfEnrollmentClaims.siteId,
+      trainingVersionId:noncreditRegistrations.trainingVersionId,
+      deploymentId:noncreditRegistrations.deploymentId,
+      adoptionId:noncreditRegistrations.adoptionId,
+      offeringVersionId:noncreditRegistrations.offeringVersionId,
     }).from(noncreditSelfEnrollmentClaims)
       .innerJoin(noncreditRegistrations,eq(
         noncreditRegistrations.id,noncreditSelfEnrollmentClaims.registrationId))
       .where(and(
         inArray(noncreditSelfEnrollmentClaims.releaseId,ids),
+        // Load every claim for the authorized releases, including a mismatched
+        // registration owner, so corruption is detected rather than omitted.
         eq(noncreditRegistrations.registeringOrganizationId,provider.organizationId),
       )).limit(5001);
     if(claims.length>5000)throw new Error("More than 5000 registrations; partition the organization report");
+    const releaseById=new Map(releases.map(r=>[r.id,r] as const));
     const registrationIds=claims.map(x=>x.registrationId);
-    const attributions=registrationIds.length?await db.select({
+    const allClaimRows=await tx.select({releaseId:noncreditSelfEnrollmentClaims.releaseId,registrationId:noncreditSelfEnrollmentClaims.registrationId}).from(noncreditSelfEnrollmentClaims)
+      .where(inArray(noncreditSelfEnrollmentClaims.releaseId,ids)).limit(5001);
+    if(allClaimRows.length!==claims.length||new Set(registrationIds).size!==registrationIds.length)
+      throw new Error("Claim ownership or registration identity requires reconciliation");
+    for(const claim of claims){
+      const release=releaseById.get(claim.releaseId);
+      if(!release||claim.siteId!==release.siteId||claim.claimPersonId!==claim.personId||
+        claim.trainingVersionId!==release.trainingVersionId||claim.deploymentId!==release.deploymentId||
+        claim.adoptionId!==release.adoptionId||claim.offeringVersionId!==release.offeringVersionId)
+        throw new Error("Noncredit claim does not reconcile to its exact release and participant");
+    }
+    const attributions=registrationIds.length?await tx.select({
       registrationId:participationAttributions.noncreditRegistrationId,
       creditedOrganizationId:participationAttributions.creditedOrganizationId,
       organizationName:canonicalEnrollmentOrganizations.displayName,
@@ -76,7 +106,8 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       throw new Error("Reporting requires reconciled, uniquely attributed registrations");
     const attributionByRegistration=new Map(
       attributions.map(a=>[a.registrationId,a] as const));
-    const decisions=registrationIds.length?await db.select({
+    if(attributionByRegistration.size!==registrationIds.length||registrationIds.some(id=>!attributionByRegistration.has(id)))throw new Error("Attribution source identity does not reconcile");
+    const decisions=registrationIds.length?await tx.select({
       id:noncreditCompletionDecisions.id,
       registrationId:noncreditCompletionDecisions.registrationId,
       outcome:noncreditCompletionDecisions.outcome,
@@ -91,14 +122,14 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     const completion=currentNoncreditCompletionStates(registrationIds,decisions);
     if(completion.invalidRegistrations.length)
       throw new Error("Noncredit completion history requires reconciliation");
-    const attempts=registrationIds.length?await db.select({
+    const attempts=registrationIds.length?await tx.select({
       registrationId:learnerCourseAttempts.noncreditRegistrationId,
       attemptId:learnerCourseAttempts.id,
     }).from(learnerCourseAttempts)
       .where(inArray(learnerCourseAttempts.noncreditRegistrationId,registrationIds))
       .limit(10001):[];
     if(attempts.length>10000)throw new Error("Course attempts exceed reporting bounds");
-    const roomPlans=await db.select({
+    const roomPlans=await tx.select({
       releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
       roomId:facilitatedClassroomPlans.facilitatedSessionId,
     }).from(facilitatedClassroomPlans)
@@ -107,7 +138,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     if(roomPlans.length>10000)throw new Error("Classroom rooms exceed reporting bounds");
     const roomIds=roomPlans.map(p=>p.roomId).filter((x):x is string=>x!==null);
     const attemptIds=attempts.map(a=>a.attemptId);
-    const asserted=roomIds.length&&attemptIds.length?await db.select({
+    const asserted=roomIds.length&&attemptIds.length?await tx.select({
       roomId:facilitatedRoomAttendanceAssertions.facilitatedSessionId,
       attemptId:facilitatedRoomAttendanceAssertions.courseAttemptId,
       status:facilitatedRoomAttendanceAssertions.status,
@@ -129,6 +160,13 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     for(const p of roomPlans)if(p.releaseId&&p.roomId)
       roomsByRelease.set(p.releaseId,
         [...(roomsByRelease.get(p.releaseId)??[]),p.roomId]);
+    const attendanceFor=(claim:{releaseId:string;registrationId:string})=>
+      (attemptsByRegistration.get(claim.registrationId)??[]).some(attempt=>
+        (roomsByRelease.get(claim.releaseId)??[]).some(room=>present.has(room+":"+attempt)));
+    const distinct=summarizeDistinctNoncreditParticipation(claims.map(claim=>({
+      registrationId:claim.registrationId,personId:claim.personId,siteId:claim.siteId,releaseId:claim.releaseId,
+      completed:completion.states.get(claim.registrationId)==="completed",verifiedAttendance:attendanceFor(claim),
+    })));
     const cohorts=releases.map(r=>{
       const local=claims.filter(c=>c.releaseId===r.id);
       const roomIds=roomsByRelease.get(r.id)??[];
@@ -142,7 +180,8 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         active:local.filter(x=>["registered","active"].includes(x.status)).length,
         withdrawn:local.filter(x=>x.status==="withdrawn").length,
         completed:local.filter(x=>completion.states.get(x.registrationId)==="completed").length,
-        verifiedAttendees,linkedRooms:roomIds.length,
+        verifiedAttendees,linkedRooms:new Set(roomIds).size,
+        ...(distinct.byRelease.get(r.id)??distinct.empty),
       };
     });
     const siteKeys=[...new Set(cohorts.map(c=>c.siteId))];
@@ -156,7 +195,8 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         withdrawn:local.reduce((n,x)=>n+x.withdrawn,0),
         completed:local.reduce((n,x)=>n+x.completed,0),
         verifiedAttendees:local.reduce((n,x)=>n+x.verifiedAttendees,0),
-        linkedRooms:local.reduce((n,x)=>n+x.linkedRooms,0),
+        linkedRooms:new Set(local.flatMap(x=>roomsByRelease.get(x.releaseId)??[])).size,
+        ...(distinct.bySite.get(key)??distinct.empty),
       };
     });
     const totals={
@@ -165,14 +205,12 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       withdrawn:sites.reduce((n,x)=>n+x.withdrawn,0),
       completed:sites.reduce((n,x)=>n+x.completed,0),
       verifiedAttendees:sites.reduce((n,x)=>n+x.verifiedAttendees,0),
-      linkedRooms:sites.reduce((n,x)=>n+x.linkedRooms,0),
+      linkedRooms:new Set(roomIds).size,
+      ...distinct.totals,
     };
     // Delivery Site and credited Organization are distinct dimensions.
     // Each attributed registration is one unique source fact; the same
     // fact may appear at multiple ancestor network units without duplication.
-    const attendanceFor=(claim:{releaseId:string;registrationId:string})=>
-      (attemptsByRegistration.get(claim.registrationId)??[]).some(attempt=>
-        (roomsByRelease.get(claim.releaseId)??[]).some(room=>present.has(room+":"+attempt)));
     const {affiliations,networkUnits:unitRollups,uniqueRegistrations}=rollupAttributionEvidence(
       claims.map(claim=>{
         const attribution=attributionByRegistration.get(claim.registrationId);
@@ -207,7 +245,8 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       completed:s.completed>=minimumCell?s.completed:null,
       verifiedAttendees:s.verifiedAttendees>=minimumCell?s.verifiedAttendees:null,
     }));
-    return {asOf:new Date().toISOString(),totals,sites,cohorts,
+    return {asOf,totals,sites,cohorts,
+      disclosureApproved:false as const,
       affiliations,networkUnits:unitRollups,
       publicationSafe:{minimumCell,groups:safe,
         affiliations:affiliations.filter(a=>a.registrations>=minimumCell).map(a=>({
@@ -215,5 +254,6 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
           completed:a.completed>=minimumCell?a.completed:null,
           verifiedAttendees:a.verifiedAttendees>=minimumCell?a.verifiedAttendees:null,
         }))},
-      notice:"Provider-private totals. Each completion is a supersession-validated formal noncredit decision; attendance is facilitator-attested in explicitly linked rooms. Affiliate selection is self-reported; no inferred individual church membership, watch-time, funding or accreditation claims. Network-wide reporting across other providers requires independently approved grants. Published partner reports must use the suppressed publicationSafe projection."};
+      notice:"Provider-private totals. Each completion is a supersession-validated formal noncredit decision; attendance is facilitator-attested in explicitly linked rooms. Affiliate selection is self-reported; no inferred individual church membership, watch-time, funding or accreditation claims. Network-wide reporting across other providers requires independently approved grants. The small-cell-filtered preview is not disclosure approval. External publication requires separately approved scoped disclosure, including overlapping cuts and historical differencing. Unique people are distinct canonical participant IDs within this source only; do not add Site subtotals or merge identity namespaces."};
+    },{isolationLevel:"repeatable read",accessMode:"read only"});
   });
