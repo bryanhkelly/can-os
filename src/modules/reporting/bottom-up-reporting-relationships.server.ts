@@ -5,10 +5,11 @@ import type {AccessContext} from "@/domain/access-context";
 import {LOCAL_DEMO_ADMIN} from "@/domain/local-demo-access";
 import {getIdentityContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
+import {relationshipProposalMetrics} from "@/domain/relationship-metric-policy";
 import {buildCurrentReportingMetricRegistry} from "@/domain/reporting-metric-registry";
 import {
   assertRelationshipActor,relationshipProposalSchema,transitionRelationship,validateRelationshipProposal,
-  type RelationshipAction,type RelationshipMetric,type RelationshipProposal,
+  type RelationshipAction,type RelationshipProposal,
   type ReportingRelationship,type VerifiedRelationshipScope,
 } from "@/domain/bottom-up-reporting-relationships";
 
@@ -101,11 +102,8 @@ async function resolveScope(tx:Tx,scopeKind:RelationshipProposal["scopeKind"],sc
   return {...scope.data,scopeKind,scopeId};
 }
 
-/** Internal command only. approvedMetrics must come from trusted disclosure
- * governance, not request input. No route is enabled until the capability and
- * metric policies have been independently assigned and the schema verified. */
-export async function proposeReportingRelationship(request:Request,input:unknown,
-  approvedMetrics:readonly RelationshipMetric[]):Promise<ReportingRelationship>{
+/** Proposal terms use a server-owned allowlist; accepting terms does not release numbers. */
+export async function proposeReportingRelationship(request:Request,input:unknown):Promise<ReportingRelationship>{
   const actor=await getIdentityContext(request);
   if(!actor.capabilities.has("relationships.propose")||actor.scope.organizationIds?.length!==1)
     throw new AuthorizationError("relationships.propose");
@@ -115,7 +113,7 @@ export async function proposeReportingRelationship(request:Request,input:unknown
     const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,ownerId);
     await requireEligibleRecipient(tx,candidate.recipientOrganizationId);
     const person=assertRelationshipActor(actor,scope.ownerOrganizationId,"relationships.propose",scope.siteId);
-    const proposal=validateRelationshipProposal(candidate,scope,buildCurrentReportingMetricRegistry(),approvedMetrics,new Date());
+    const proposal=validateRelationshipProposal(candidate,scope,buildCurrentReportingMetricRegistry(),relationshipProposalMetrics(candidate.scopeKind),new Date());
     const result=await tx.execute(sql`
       INSERT INTO public.reporting_relationship_agreements
         (owner_organization_id,recipient_organization_id,scope_kind,site_id,program_id,offering_id,class_id,
@@ -162,6 +160,11 @@ export async function decideReportingRelationship(request:Request,input:unknown)
       if(!(error instanceof AuthorizationError)||(action!=="withdraw"&&action!=="revoke"))throw error;
       scope={ownerOrganizationId:current.ownerOrganizationId,scopeKind:current.scopeKind,
         scopeId:current.scopeId,siteId:null};
+    }
+    if(action==="accept"){
+      const {recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough}=current;
+      validateRelationshipProposal({recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough},
+        scope,buildCurrentReportingMetricRegistry(),relationshipProposalMetrics(scopeKind),new Date());
     }
     const next=transitionRelationship(current,action as RelationshipAction,actor,new Date(),scope);
     const updated=await tx.execute(sql`
@@ -240,5 +243,26 @@ export async function listReportingRelationships(request:Request,input:unknown){
       return {agreement,allowedActions};
     });
     return {items,next:rows.length>25?rows[24]!.id:null};
+  });
+}
+
+const scopeInput=z.object({kind:relationshipProposalSchema.shape.scopeKind,after:uuid.optional()}).strict();
+/** Resource choices are independently resolved from the current owner's data. */
+export async function listRelationshipScopes(request:Request,input:unknown){
+  const actor=await getIdentityContext(request);
+  const {kind,after}=scopeInput.parse(input);
+  return db.transaction(async tx=>{
+    const owner=await requireDirectRelationshipManager(tx,actor);
+    const source=kind==="organization"?sql`SELECT id,name FROM public.organizations WHERE id=${owner}::uuid`:
+      kind==="site"?sql`SELECT id,name FROM public.sites WHERE organization_id=${owner}::uuid`:
+      kind==="program"?sql`SELECT id,name FROM public.programs WHERE organization_id=${owner}::uuid`:
+      kind==="offering"?sql`SELECT id,title AS name FROM public.offerings WHERE public.reporting_relationship_offering_owner(id,${owner}::uuid)`:
+      sql`SELECT id,title AS name FROM public.classes WHERE operating_organization_id=${owner}::uuid`;
+    const result=await tx.execute(sql`
+      SELECT id,name FROM (${source}) scope
+      WHERE (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
+      ORDER BY id LIMIT 26`);
+    const rows=z.array(z.object({id:uuid,name:z.string()})).parse(result.rows);
+    return {items:rows.slice(0,25),next:rows.length>25?rows[24]!.id:null,metrics:relationshipProposalMetrics(kind)};
   });
 }
