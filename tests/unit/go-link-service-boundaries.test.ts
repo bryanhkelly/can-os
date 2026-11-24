@@ -20,8 +20,11 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(schema).toContain("siteGoLinkDailyVisits");
     expect(schema).not.toContain("visitorPersonId");
     expect(schema).not.toContain("visitorIpAddress");
-    expect(resolver).toContain("onConflictDoUpdate");
-    expect(resolver).toContain("catch{");
+    const gateway=read("src/modules/engagement/go-public-gateway.server.ts");
+    expect(resolver).toContain("observePublicGoEntry");
+    expect(gateway).toContain("onConflictDoUpdate");
+    expect(gateway).toContain("catch{");
+    expect(gateway).toContain("SET LOCAL ROLE can_go_gateway");
   });
   it("reads verified registration claims only from the authoritative enrollment source",()=>{
     const evidence=read("src/modules/engagement/go-link-evidence.server.ts");
