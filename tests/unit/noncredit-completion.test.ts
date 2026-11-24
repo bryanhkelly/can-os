@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { evaluateNoncreditCompletion } from "@/domain/noncredit-completion";
+import { evaluateNoncreditCompletion, countVerifiedNoncreditMinutes } from "@/domain/noncredit-completion";
 const now=new Date("2026-11-14");
 const policy={trainingVersionId:"t1",effectiveAt:new Date("2026-11-01"),minParticipationMinutes:50,requireAllLessons:false,skillsAssessmentRequired:true,minimumAssessmentFraction:0.8};
 const event={id:"e1",supersedesId:null,eventKind:"lesson_completed" as const,countedMinutes:50,occurredAt:new Date("2026-11-01"),evidenceVersionId:"verified"};
 const assessment={learnerId:"learner",assessmentVersionId:"a1",resultStatus:"finalized" as const,pointsEarned:4,pointsPossible:5};
 const base={registrationStatus:"active",trainingVersionId:"t1",trainingState:"published",learnerId:"learner",assessmentVersionId:"a1",policy,participation:[event],completedLessonCount:3,totalLessonCount:3,assessment,now};
 describe("noncredit completion policy",()=>{
+ it("shares current participation evidence counting across learning and reporting",()=>{
+   const corrected={...event,id:"e2",supersedesId:"e1",eventKind:"attendance_corrected" as const,countedMinutes:0};
+   expect(countVerifiedNoncreditMinutes([event,corrected],now)).toBe(0);
+   expect(countVerifiedNoncreditMinutes([{...event,evidenceVersionId:null}],now)).toBe(0);
+   expect(countVerifiedNoncreditMinutes([event],now)).toBe(evaluateNoncreditCompletion(base).countedMinutes);
+   expect(()=>countVerifiedNoncreditMinutes([event,event],now)).toThrow("Duplicate participation event");
+ });
  it("requires separately evidenced time and finalized assessment",()=>{
    expect(evaluateNoncreditCompletion(base)).toMatchObject({eligible:true,countedMinutes:50,assessmentFraction:0.8,blockers:[]});
    expect(evaluateNoncreditCompletion({...base,assessment:{...assessment,resultStatus:"reviewed"}}).blockers).toContain("assessment_incomplete");
