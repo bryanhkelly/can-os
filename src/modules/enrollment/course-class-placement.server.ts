@@ -163,13 +163,14 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
   if(origin.deliverySiteId!==cls.siteId||origin.reportingSiteId!==cls.siteId)
     throw new AuthorizationError("Course and Class delivery attribution mismatch");
   await tx.insert(participationAttributions).values({
-    classEnrollmentId:placed.id,releaseId:args.release.id,
+    classEnrollmentId:placed.id,releaseId:null,
     deliverySiteId:origin.deliverySiteId,reportingSiteId:origin.reportingSiteId,
     creditedOrganizationId:origin.creditedOrganizationId,
     networkMembershipId:origin.networkMembershipId,
     attributionBasis:origin.attributionBasis,
     relationshipSnapshot:{
       source:"course_registration_class_placement",
+      releaseId:args.release.id,
       registrationId:args.registrationId,
       originalAttributionId:origin.id,
     },
