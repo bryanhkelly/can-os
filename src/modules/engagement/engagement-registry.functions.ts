@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -26,6 +25,7 @@ import { resolveGoExperience } from "./engagement-go.server";
 import { buildEngagementInvitation } from "@/domain/engagement-distribution";
 import { readAuthorizedGoLinkEvidence } from "./go-link-evidence.server";
 import { writeAudit } from "@/platform/mutation";
+import { issueAuthorizedEngagementGoLink, revokeAuthorizedEngagementGoLink } from "./go-link-lifecycle.server";
 
 type Reader = Pick<typeof db, "select">;
 const uuid = z.string().uuid();
@@ -222,25 +222,7 @@ export const createEngagementGoLink=createServerFn({method:"POST"})
     if(!version)throw new DomainError("UNAVAILABLE","Published engagement version unavailable.");
     const definition=engagementDefinitionSchema.parse(version.content);
     await assertDestinationReady(definition,record,tx);
-    for(let attempt=0;attempt<5;attempt++){
-      const code=randomBytes(9).toString("base64url");
-      const [link]=await tx.insert(siteGoLinks).values({
-        code,createdByPersonId:actor.actorPersonId!,
-        organizationId:record.organizationId,siteId:record.siteId,
-        engagementVersionId:version.id,destination:null,
-        packageId:null,channel:data.channel??null,
-      }).onConflictDoNothing({target:siteGoLinks.code}).returning({
-        id:siteGoLinks.id,code:siteGoLinks.code,
-      });
-      if(!link)continue;
-      await writeAudit(tx,actor,{
-        action:"engagement.go_link.create",entityType:"site_go_link",entityId:link.id,
-        scope:{organizationId:record.organizationId,siteId:record.siteId},
-        after:{engagementId:record.id,versionId:version.id,channel:data.channel??null},
-      });
-      return {linkId:link.id,code:link.code};
-    }
-    throw new DomainError("CONFLICT","Unable to allocate a Go code.");
+    return issueAuthorizedEngagementGoLink(tx,actor,record,version.id,data.channel??null);
   }));
 
 export const listEngagementGoLinks=createServerFn({method:"GET"})
@@ -305,15 +287,7 @@ export const revokeEngagementGoLink=createServerFn({method:"POST"})
         eq(engagementDefinitionVersions.engagementId,record.id),
       )).limit(1);
     if(!version)throw new AuthorizationError("exact engagement link owner");
-    if(link.status==="revoked")return {revoked:true};
-    await tx.update(siteGoLinks).set({status:"revoked",updatedAt:new Date()})
-      .where(eq(siteGoLinks.id,link.id));
-    await writeAudit(tx,actor,{
-      action:"engagement.go_link.revoke",entityType:"site_go_link",
-      entityId:link.id,scope:{organizationId:record.organizationId,siteId:record.siteId},
-      before:{status:link.status},after:{status:"revoked"},
-    });
-    return {revoked:true};
+    return revokeAuthorizedEngagementGoLink(tx,actor,record,link,version.id);
   }));
 
 /**
