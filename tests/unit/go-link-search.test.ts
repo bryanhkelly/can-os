@@ -6,7 +6,7 @@ import { goDestinationKinds, goDestinationKindSchema, goDestinationLabels,
 describe("Go Link shared input and search contracts",()=>{
   it("escapes PostgreSQL LIKE wildcard tokens rather than treating them as patterns",()=>{
     expect(goLikeContainsLiteral("  AI skills  ")).toBe("%AI skills%");
-    expect(goLikeContainsLiteral("50%")).toBe("%50\\%");
+    expect(goLikeContainsLiteral("50%")).toBe("%50\\%%");
     expect(goLikeContainsLiteral("A_B")).toBe("%A\\_B%");
     expect(goLikeContainsLiteral("\\")).toBe("%\\\\%");
     expect(goLikeContainsLiteral("x".repeat(95))).toHaveLength(82);
