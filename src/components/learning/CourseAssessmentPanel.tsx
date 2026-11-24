@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNotice } from "@/components/workspace";
+import { QueryState, WorkspaceNotice } from "@/components/workspace";
 import { LearningQuestionnaire } from "./LearningQuestionnaire";
 import {
   beginNoncreditKnowledgeCheckAttempt, getNoncreditKnowledgeCheck,
@@ -77,7 +77,7 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
         finally{setBusy(false);}
       })()}>Retry knowledge check</Button>
   </WorkspaceNotice>;
-  if(!check)return <p role="status" className="text-sm">Loading knowledge check...</p>;
+  if(!check)return <QueryState loading="Loading knowledge check…"/>;
   return <section aria-label={phase==="baseline"?"Before-course diagnostic":context==="class"?"Class knowledge check":"Noncredit knowledge check"} className="space-y-4">
     <div>
       <h3 className="font-serif text-xl font-semibold">
@@ -89,7 +89,7 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
           :"Check your understanding after learning. Neither check is a school grade or academic credit."}
       </p>
     </div>
-    {error&&<p role="alert" className="border p-3 text-sm">{error}</p>}
+    {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
     <p className="text-xs text-muted-foreground">
       {check.attemptNo>0?`Attempt ${check.attemptNo} of ${check.attemptLimit}`:
         `${check.attemptLimit} attempts available`}
@@ -97,11 +97,11 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
         " · No further attempts available"}.
     </p>
     {check.state==="not_started"&&check.canStart&&check.remainingAttempts>0&&
-      <Button onClick={()=>void begin()} disabled={busy}>
-        {busy?"Starting...":"Start knowledge check"}
+      <Button onClick={()=>void begin()} disabled={busy} loading={busy} loadingLabel="Starting…">
+        Start knowledge check
       </Button>}
     {check.state==="not_started"&&!check.canStart&&
-      <p className="text-sm" role="status">This knowledge check is not currently open.</p>}
+      <WorkspaceNotice>This knowledge check is not currently open.</WorkspaceNotice>}
     {check.state==="in_progress"&&check.attemptId&&
       <LearningQuestionnaire key={check.attemptId} title="Course knowledge questions"
         questions={check.questions} submitLabel="Submit knowledge check"
@@ -129,16 +129,10 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
        draftStatus==="failed"?"An answer could not be saved. You may retry the selection or submit your check.":
        check.draftAnswers.length>0?"Saved responses restored.":"Answers save as you select them."}
     </p>}
-    {check.state==="expired"&&<p role="status" className="border p-3 text-sm">
-      This timed knowledge check expired before submission.
-    </p>}
-    {check.state==="scored"&&<p role="status" className="border p-3 text-sm">
-      Your answers were submitted and automatically scored. Your {context==="class"?"Class":"noncredit"} result is awaiting independent provider confirmation.
-    </p>}
-    {check.state==="submitted"&&<p role="status" className="border p-3 text-sm">
-      Your knowledge check was submitted. Processing is in progress.
-    </p>}
-    {check.state==="finalized"&&<div role="status" className="border p-4 text-sm">
+    {check.state==="expired"&&<WorkspaceNotice tone="attention">This timed knowledge check expired before submission.</WorkspaceNotice>}
+    {check.state==="scored"&&<WorkspaceNotice>Your answers were submitted and automatically scored. Your {context==="class"?"Class":"noncredit"} result is awaiting independent provider confirmation.</WorkspaceNotice>}
+    {check.state==="submitted"&&<WorkspaceNotice>Your knowledge check was submitted. Processing is in progress.</WorkspaceNotice>}
+    {check.state==="finalized"&&<WorkspaceNotice tone="success">
       <p className="font-semibold">Knowledge check result confirmed</p>
       <p className="mt-2">
         {check.score?.pointsEarned??0} of {check.score?.pointsPossible??0} points
@@ -150,19 +144,15 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
         A confirmed knowledge-check result is separate from Course completion, academic grades, credentials and credit.
       </p>
       {check.canStart&&check.remainingAttempts>0&&<Button className="mt-3" variant="outline"
-        disabled={busy} onClick={()=>void begin()}>
-        {busy?"Starting...":"Retake knowledge check"}
+        disabled={busy} loading={busy} loadingLabel="Starting…" onClick={()=>void begin()}>
+        Retake knowledge check
       </Button>}
-    </div>}
+    </WorkspaceNotice>}
     {(check.state==="voided"||check.state==="expired")&&check.canStart&&check.remainingAttempts>0&&
-      <Button variant="outline" disabled={busy} onClick={()=>void begin()}>
-        {busy?"Starting...":"Start another allowed attempt"}
+      <Button variant="outline" disabled={busy} loading={busy} loadingLabel="Starting…" onClick={()=>void begin()}>
+        Start another allowed attempt
       </Button>}
-    {check.state==="closed"&&<p role="status" className="border p-3 text-sm">
-      The knowledge-check submission window is closed. Saved responses remain in your attempt history.
-    </p>}
-    {check.state==="voided"&&<p role="status" className="border p-3 text-sm">
-      This knowledge-check attempt is unavailable.
-    </p>}
+    {check.state==="closed"&&<WorkspaceNotice>The knowledge-check submission window is closed. Saved responses remain in your attempt history.</WorkspaceNotice>}
+    {check.state==="voided"&&<WorkspaceNotice tone="attention">This knowledge-check attempt is unavailable.</WorkspaceNotice>}
   </section>;
 }
