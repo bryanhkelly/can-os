@@ -5,10 +5,10 @@ import { CopyLinkButton } from "@/components/links/CopyLinkButton";
 import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
 import { GoLinkActions, type GoLinkAction } from "@/components/links/GoLinkActions";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { WorkspaceNotice } from "@/components/workspace";
+import { ActionDialog, EmptyState, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -33,9 +33,11 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
   function close() {
     setOpen(false);
+    setRevokeTarget(null);
     // Clear transient selection; saved Go codes remain in the authorized inventory.
     setCreatedUrl("");
     setCreatedCode(null);
@@ -86,15 +88,22 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
 
   async function change(shareId: string, action:GoLinkAction) {
     if (busy) return;
-    if(action==="revoke"&&!window.confirm("Revoke this preview permanently? Distributed copies will stop working."))return;
     setBusy(true);
     setError(null);
     try {
       if(action==="revoke")await revokeSitePreviewShare({ data: { siteId, shareId } });
       else await setSitePreviewSharePaused({data:{siteId,shareId,action}});
-      setShares(await listSitePreviewShares({ data: { siteId } }));
+      setRevokeTarget(null);
       setCreatedUrl("");
       setCreatedCode(null);
+      // Reflect the confirmed write even if the authoritative refresh fails.
+      setShares(current=>action==="revoke"?current.filter(share=>share.id!==shareId):
+        current.map(share=>share.id===shareId?{...share,paused:action==="pause"}:share));
+      try {
+        setShares(await listSitePreviewShares({ data: { siteId } }));
+      } catch {
+        setError("The preview link was updated, but the list could not be refreshed. Close and reopen sharing to refresh.");
+      }
     } catch (cause) {
       setError(normalizeClientError(cause, "Could not change this preview link.").message);
     } finally { setBusy(false); }
@@ -129,8 +138,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
           Sharing does not publish the Site.
         </WorkspaceNotice>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-44 flex-1 space-y-2">
-            <Label htmlFor="website-preview-expiration">Link expiration</Label>
+          <Field label="Link expiration" className="min-w-44 flex-1">
             <Select id="website-preview-expiration"
               value={expiresAfterDays === null ? "never" : String(expiresAfterDays)}
               disabled={busy} onChange={event => {
@@ -141,10 +149,10 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
               <option value="30">30 days</option>
               <option value="never">No automatic expiration</option>
             </Select>
-          </div>
+          </Field>
           <Button type="button" disabled={busy || loading || activeShares.length >= 5}
-            onClick={() => void create()}>
-            {busy ? "Saving preview…" : "Create shareable preview"}
+            loading={busy&&!revokeTarget} loadingLabel="Working…" onClick={() => void create()}>
+            Create shareable preview
           </Button>
         </div>
         {createdUrl && <div className="border p-4">
@@ -169,7 +177,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
           <p className="mt-1 text-xs text-muted-foreground">
             Up to five active links. Revoke any link to stop access to its frozen website snapshot.
           </p>
-          {loading ? <p role="status" className="mt-3 text-sm">Loading preview links…</p>
+          {loading ? <QueryState loading="Loading preview links…"/>
             : activeShares.length ? <div className="mt-3 space-y-2">
               {activeShares.map(share => <div key={share.id}
                 className="flex flex-wrap items-center justify-between gap-3 border p-3">
@@ -181,19 +189,26 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  {share.paused && <span className="text-xs">Paused</span>}
+                  {share.paused && <StatusBadge tone="attention">Paused</StatusBadge>}
                   <GoLinkActions code={share.code} status={share.paused?"paused":"active"} busy={busy}
                     onShow={()=>void (async()=>{
                       try{const origin=await getCanonicalGoLinkShareOrigin();setCreatedUrl(new URL("/go/"+share.code,origin).href);setCreatedCode(share.code);}
                       catch{setError("Could not load the approved sharing origin.");}
                     })()}
-                    onChange={action=>void change(share.id,action)}/>
+                    onChange={action=>{if(action==="revoke"){setError(null);setRevokeTarget(share.id);}else void change(share.id,action);}}/>
                 </div>
               </div>)}
-            </div> : <p className="mt-3 text-sm text-muted-foreground">No active preview links.</p>}
+            </div> : !error ? <EmptyState className="mt-3" title="No active preview links."/> : null}
         </div>
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
       </div>
     </Modal>
+    <ActionDialog open={open&&!!revokeTarget} title="Revoke website preview permanently"
+      description="Distributed copies will stop working. The saved website itself will not be changed."
+      confirmLabel="Revoke preview" pending={busy} destructive
+      confirmDisabled={!revokeTarget||!activeShares.some(share=>share.id===revokeTarget)}
+      onClose={()=>setRevokeTarget(null)} onConfirm={()=>{if(revokeTarget)void change(revokeTarget,"revoke");}}>
+      {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+    </ActionDialog>
   </>;
 }
