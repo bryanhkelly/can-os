@@ -36,7 +36,9 @@ import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
 import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 
 /** Public-safe private preview; institution-owned fields are still read-only. */
-export async function getPartnerWebsitePreview(actor: AccessContext, proposedContent?: SiteLocalContent) {
+export async function getPartnerWebsitePreview(actor: AccessContext, proposedContent?: SiteLocalContent, audience: "editor" | "external-preview" = "editor") {
+  const external = audience === "external-preview";
+  if (external && proposedContent) throw new Error("External previews require saved content");
   const site = await requirePartnerWebsiteEditor(actor);
   const [address] = await db.select({
     slug: sitePublications.slug, status: sitePublications.status,
@@ -49,9 +51,9 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const offerings = address
     ? (await readEnrichmentCatalog(site.id)).map(toPublicSiteEnrichment)
     : [];
-  const host = address ? publicSiteHost(address.slug) : null;
+  const host = address ? publicSiteHost(address.slug) : external ? "preview.can-os.com" : null;
   const local = address ? await readCurrentLocalContent(site.id) : null;
-  const history = address ? await readLocalContentHistory(site.id) : [];
+  const history = (address || external) ? await readLocalContentHistory(site.id) : [];
   const approvedPhotos = host ? await readApprovedSchoolSitePhotos(site.id) : [];
   const media = host ? projectApprovedSchoolSiteMedia(site.id,host,approvedPhotos) : {};
   // Read-only environment check: legacy databases reject status='draft'
@@ -145,7 +147,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const savedPublicContact = canonicalPublicContact(siteConfiguration?.metadata?.setupContact) !== null;
   // Show actual reviewed affiliation statuses only to Site-scoped users
   // holding network read authority; never generate public network claims.
-  const networkRows=actor.capabilities.has("network.affiliations.read")
+  const networkRows=!external && actor.capabilities.has("network.affiliations.read")
     ? await db.select({name:organizations.name,status:siteAffiliations.status})
         .from(siteAffiliations)
         .innerJoin(organizations,eq(organizations.id,siteAffiliations.denominationOrganizationId))
@@ -159,9 +161,9 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     contentConfig, {
       mode: "private", preferences: preferences.success ? preferences.data : null,
       siteSetup:{name:displaySiteName,organizationName:site.organizationName,
-        city:planningLocation.success?planningLocation.data.city:null,
-        state:planningLocation.success?planningLocation.data.state:null,
-        timezone:siteConfiguration?.timezone??null},
+        city:!external&&planningLocation.success?planningLocation.data.city:null,
+        state:!external&&planningLocation.success?planningLocation.data.state:null,
+        timezone:external?null:siteConfiguration?.timezone??null},
       networkAffiliations,networkStatusKnown:networkRows!==null,
       academicPrograms: authorizedPrograms, enrichment: offerings,
       noncredit: noncreditReleases, classes, classTimezone:siteConfiguration?.timezone??null,
@@ -175,7 +177,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const proposedExperiences=projectMissingSiteExperienceSectionsForPreview(
     contentConfig,preferences.success?preferences.data:null);
   const contentBlocks = [
-    ...websitePreviewEditorialBlocks(baseContentBlocks),
+    ...websitePreviewEditorialBlocks(baseContentBlocks).filter(block => !external || block.channel !== "site.network"),
     ...proposedPrograms,
     ...proposedExperiences,
   ];
@@ -200,6 +202,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     ])) : {};
   return {
     siteId:site.id,
+    siteConfigurationRevision:siteConfiguration.updatedAt.toISOString(),
     currentBrandVersionId:savedBrand?.version.id??null,
     currentBrandRevision:savedBrand?.version.revision??0,
     currentBrandConfiguration:savedBrand?.version.configuration??null,
