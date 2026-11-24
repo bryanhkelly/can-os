@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getJourneyById } from "@/domain/engagement-context";
 
-/** Short links are public navigation references, never authorization tokens. */
+/** Public navigation references; an unlisted preview code is also a bearer capability for its read-only artifact, not an identity grant. */
 export const goCodeSchema = z.string().regex(/^[A-Za-z0-9_-]{12}$/);
 const uuid = z.string().uuid();
 export const goPageIds = ["home", "programs", "experiences", "courses", "classes", "academics", "admissions", "contact"] as const;
@@ -36,7 +36,7 @@ export function goDestinationHref(
   const destination = goDestinationSchema.safeParse(value);
   if (!destination.success || !goCodeSchema.safeParse(code).success) return null;
   switch (destination.data.kind) {
-    case "website-preview": return "/go/" + code;
+    case "website-preview": return null; // Rendered by its provider, never a self-redirect.
     case "site-page": {
       if (!publishedSiteHost || !/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(publishedSiteHost)) return null;
       const path = destination.data.page === "home" ? "/" : "/" + destination.data.page;
