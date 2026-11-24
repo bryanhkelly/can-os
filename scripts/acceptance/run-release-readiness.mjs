@@ -27,7 +27,7 @@ if(git(["status","--porcelain"]))throw new Error("Commit or stash changes before
 const results=[];
 const sanitized={...process.env};
 for(const key of Object.keys(sanitized)){
-  if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE|GLOO_API_KEY|RESEND_API_KEY|CAN_NONCREDIT_QA_CAN_SESSION/i.test(key))delete sanitized[key];
+  if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE|GLOO_API_KEY|RESEND_API_KEY|CAN_NONCREDIT_QA_CAN_SESSION|CAN_PILOT_QA_.*(?:SESSION|FIXTURE)|CAN_ACCESS_TOKEN_PEPPER|RESEND_WEBHOOK_SECRET|CAN_CAMPAIGN_FROM_EMAIL|CAN_CAMPAIGN_POSTAL_ADDRESS/i.test(key))delete sanitized[key];
 }
 function run(name,argv,env=sanitized){
   const start=Date.now();
@@ -57,11 +57,21 @@ if(profile==="pilot"){
     "tests/unit/noncredit-completion.test.ts","tests/unit/noncredit-pilot-outcomes.test.ts",
     "tests/unit/noncredit-self-enrollment.test.ts","tests/unit/noncredit-completion-automation.test.ts",
     "tests/unit/native-publisher-release-readiness.test.ts","tests/unit/engagement-distribution.test.ts",
+    "tests/unit/campaign-policy.test.ts","tests/unit/resend-webhook.test.ts",
+    "tests/unit/platform-owner-delegation.test.ts","tests/unit/platform-owner-pilot-access.test.ts",
     "tests/unit/outbound-dispatcher.test.ts","tests/unit/gloo-content-provider.test.ts",
     "src/domain/site-content-generation.test.ts","src/domain/site-content-package.test.ts"]);
   if(enabled("--database")&&process.env.TEST_DATABASE_URL&&process.env.CAN_APPLICATION_DB_HOST){
     run("Isolated noncredit evidence and completion schema (read only)",["run","verify:pilot:noncredit-schema"],{...process.env,APP_ENV:"test",NODE_ENV:"test"});
   }else block("Isolated noncredit evidence and completion schema","Requires approved TEST_DATABASE_URL and CAN_APPLICATION_DB_HOST");
+  // Run the same guarded learner journey for either independently approved fixture.
+  // A fresh fixture and verified sessions are mandatory for each run.
+  if(enabled("--browser")&&process.env.CAN_PILOT_QA_FIXTURE_JSON&&process.env.TEST_DATABASE_URL&&process.env.CAN_PILOT_QA_BRANCH_ID){
+    run("Independent noncredit full learner journey",["run","test:e2e:noncredit:journey"],{...process.env,APP_ENV:"test",NODE_ENV:"test",CAN_RELEASE_SOURCE_SHA:sha});
+  }else block("Independent noncredit full learner journey","Requires --browser, fresh approved fixture and dedicated QA branch; run once for each pilot");
+  block("Real Platform Owner and independent reviewer acceptance","Requires verified non-demo owner, separate approver and scoped role/session audit evidence");
+  block("Live campaign delivery acceptance","Requires explicit test recipient authorization, verified sender and signed provider receipt reconciliation");
+  block("Live Gloo generation and persistence acceptance","Requires approved synthetic input, configured provider and stored package/readback evidence");
   // Registration/withdrawal smoke tests do not establish complete pilot acceptance.
   // Mutating deployed tests require separate runtime-to-disposable-database attestation.
   block("Mutating deployed noncredit journey","Requires exact-SHA preview, isolated runtime database attestation and two distinct verified QA identities; see docs/runbooks/pilot-release-acceptance.md");
