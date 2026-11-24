@@ -27,6 +27,18 @@ describe("performance regression contracts", () => {
     expect(sourceText).toContain("const classes = await classesPromise");
   });
 
+  it("loads native lesson resume without transporting full lesson or award content",()=>{
+    const dashboard=source("src/components/home/StudentHome.tsx");
+    const service=source("src/modules/classes/native-class-learning.functions.ts");
+    expect(dashboard).toContain("getNativeClassLearningResume(");
+    expect(dashboard).not.toContain("getNativeClassLearning(");
+    const summary=service.slice(service.indexOf("export const getNativeClassLearningResume"),service.indexOf("export const getNativeClassLearning="));
+    expect(summary).toContain('authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read")');
+    expect(summary).toContain("readLearnerLessons(");
+    expect(summary).not.toContain("canonicalClassOutcomes");
+    expect(summary).not.toContain("canonicalClassAwards");
+  });
+
   it("loads the homework index without sending response content or feedback",()=>{
     const index=source("src/modules/classes/native-student-homework-index.ts");
     const service=source("src/modules/classes/native-class-homework.functions.ts");
@@ -36,7 +48,7 @@ describe("performance regression contracts", () => {
     expect(service).toContain("readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,false)");
     expect(service).toContain('detail ? sql`s.response` : sql`NULL::jsonb`');
     expect(service).toContain("return {assignments:rows.map(homeworkSummary)}");
-    expect(service).toContain("await authorized(tx,actor,data.classEnrollmentId)");
+    expect(service).toContain('authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read")');
   });
 
   it("bulk-loads a student's Class memberships without bypassing Class publication authority", () => {
