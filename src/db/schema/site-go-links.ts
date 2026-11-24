@@ -57,13 +57,17 @@ export const siteGoLinks = pgTable("site_go_links", {
   )`),
 ]);
 
-/** Only anonymous aggregate redirect counts, not Person IDs or cookies. */
+/** Anonymous aggregate response counts, not Person IDs or cookies. */
 export const siteGoLinkDailyVisits=pgTable("site_go_link_daily_visits",{
   linkId:uuid("link_id").notNull().references(()=>siteGoLinks.id,{onDelete:"restrict"}),
   day:date("day").notNull(),
-  redirects:integer("redirects").notNull().default(0),
+  redirects:integer("redirects").notNull().default(0), // Legacy mixed entry count.
+  linkOpens:integer("link_opens").notNull().default(0),
+  pageViews:integer("page_views").notNull().default(0),
+  redirectResponses:integer("redirect_responses").notNull().default(0),
 },t=>[
   uniqueIndex("site_go_link_daily_visits_day_uq").on(t.linkId,t.day),
   index("site_go_link_daily_visits_day_idx").on(t.day),
   check("site_go_link_daily_visits_count_ck",sql`${t.redirects} >= 0`),
+  check("site_go_link_daily_visits_response_counts_ck",sql`${t.linkOpens}>=0 AND ${t.pageViews}>=0 AND ${t.redirectResponses}>=0 AND ${t.linkOpens}<=${t.pageViews}+${t.redirectResponses} AND ${t.redirectResponses}<=${t.linkOpens}`),
 ]);
