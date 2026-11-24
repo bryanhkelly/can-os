@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
@@ -9,11 +9,11 @@ import { buildUrlDestination } from "@/domain/url-destinations";
 import type { GoDestination } from "@/domain/site-go-links";
 import { resolveGoTargetInput } from "@/domain/go-target-input";
 import {
-  createSiteGoLink, listSiteGoLinks, revokeSiteGoLink,
+  createSiteGoLink, listSiteGoLinksPage, revokeSiteGoLink,
   listAvailableGoDestinations, inspectSavedGoLink, setSiteGoLinkPaused,
 } from "@/modules/engagement/site-go-links.functions";
 
-type GoLink=Awaited<ReturnType<typeof listSiteGoLinks>>[number];
+type GoLink=Awaited<ReturnType<typeof listSiteGoLinksPage>>["items"][number];
 type Choice=Awaited<ReturnType<typeof listAvailableGoDestinations>>[number];
 type Kind=GoDestination["kind"];
 const labels:Record<Kind,string>={
@@ -52,8 +52,12 @@ function advancedDestination(kind:Kind,value:string):GoDestination|null {
 /** Three separate responsibilities share the same canonical Site-owned link:
  * selection/management, publication-aware routing, read-only outcome evidence.
  */
-export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:string}){
+export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:string}){
   const [links,setLinks]=useState<GoLink[]>([]);
+  const [nextCursor,setNextCursor]=useState<string|null>(null);
+  const [loadingMore,setLoadingMore]=useState(false);
+  const [pageError,setPageError]=useState("");
+  const pendingSubmission=useRef<{key:string;requestId:string}|null>(null);
   const [readState,setReadState]=useState<"loading"|"ready"|"error">("loading");
   const [retry,setRetry]=useState(0);
   const [kind,setKind]=useState<Kind>("site-page");
@@ -72,9 +76,9 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:stri
 
   useEffect(()=>{
     let live=true;
-    setReadState("loading");
-    listSiteGoLinks({data:{siteId,packageId}})
-      .then(data=>{if(live){setLinks(data);setReadState("ready");}})
+    setReadState("loading");setNextCursor(null);setPageError("");
+    listSiteGoLinksPage({data:{siteId,packageId,limit:20}})
+      .then(page=>{if(live){setLinks(page.items);setNextCursor(page.nextCursor);setReadState("ready");}})
       .catch(()=>{if(live)setReadState("error");});
     return ()=>{live=false;};
   },[siteId,packageId,retry]);
@@ -96,19 +100,39 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:stri
     setBusy(true);setError("");setNotice("");
     try{
       const linkName=(name.trim()||chosen?.title||"Shared link").slice(0,120);
-      await createSiteGoLink({data:{
+      const payload={
         siteId,packageId,destination,
         management:{
           name:linkName,channel:channel||null,
           startsAt:fromLocalTime(startsAt),expiresAt:fromLocalTime(expiresAt),
         },
-      }});
+      };
+      const key=JSON.stringify(payload);
+      if(pendingSubmission.current?.key!==key){
+        pendingSubmission.current={key,requestId:crypto.randomUUID()};
+      }
+      await createSiteGoLink({data:{...payload,requestId:pendingSubmission.current.requestId}});
+      pendingSubmission.current=null;
       setName("");setStartsAt("");setExpiresAt("");
       setNotice("Go Link created. Copy it, test it, or add it to your outreach materials.");
       setRetry(n=>n+1);
     }catch(cause){setError(errorText(cause));}
     finally{setBusy(false);}
   }
+  async function loadMore(){
+    if(!nextCursor||loadingMore||readState!=="ready")return;
+    setLoadingMore(true);setPageError("");
+    try{
+      const page=await listSiteGoLinksPage({data:{siteId,packageId,limit:20,cursor:nextCursor}});
+      setLinks(previous=>{
+        const existing=new Set(previous.map(row=>row.id));
+        return [...previous,...page.items.filter(row=>!existing.has(row.id))];
+      });
+      setNextCursor(page.nextCursor);
+    }catch(cause){setPageError(errorText(cause));}
+    finally{setLoadingMore(false);}
+  }
+
   async function change(link:GoLink,action:"pause"|"resume"|"revoke"){
     if(busy || link.status==="revoked")return;
     if(action==="revoke" && !window.confirm(
@@ -235,9 +259,9 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:stri
         </p>
         {link.evidence?<p className="text-sm">
           <strong>{link.evidence.redirects30d.toLocaleString()}</strong> redirects in the last 30 days.
-          {" "}{link.evidence.registrationEvidence==="canonical_noncredit_claim"
+          {" "}{link.evidence.registrationEvidence==="referenced_noncredit_claim"
             ?<><strong>{link.evidence.referralRegistrations30d?.toLocaleString()??"0"}</strong>
-              {" "}verified training registration claims referencing this link.</>
+              {" "}training registration claims carrying this referral code (not verified click-through conversions).</>
             :<span className="text-muted-foreground">
               Verified outcome attribution is not connected for this destination.</span>}
         </p>:<p className="text-xs text-muted-foreground">
@@ -259,8 +283,14 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId:stri
           </>}
         </div>
       </article>)}
+      {nextCursor&&<div className="space-y-2">
+        <Button type="button" size="sm" variant="outline" disabled={loadingMore}
+          onClick={()=>void loadMore()}>{loadingMore?"Loading…":"Load more links"}</Button>
+        {pageError&&<p role="alert" className="text-xs text-destructive">{pageError}</p>}
+      </div>}
       <p className="text-xs text-muted-foreground">
-        Redirects are anonymous observations, not unique visitors or enrollments.
+        Redirects are unfiltered anonymous observations, which can include
+        automated requests. They are not unique visitors or enrollments.
         Training registrations are counted from canonical enrollment claims,
         not from clicks. Other destination outcome types are shown as not connected,
         never as zero conversions.
