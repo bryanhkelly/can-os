@@ -2,7 +2,7 @@ import {createFileRoute, Link, redirect} from "@tanstack/react-router";
 import {useQuery} from "@tanstack/react-query";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {ArrowUpRight, BookOpen, CalendarDays, Clock3, History, MapPin, RefreshCw, Users} from "lucide-react";
-import {WorkspaceShell, StatusBadge, QueryState, EmptyState, WorkspaceNotice} from "@/components/workspace";
+import {WorkspaceLinkNavigation, WorkspaceShell, StatusBadge, QueryState, EmptyState, WorkspaceNotice} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {NoncreditEnrollmentManagement} from "@/components/learning/NoncreditEnrollmentManagement";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
@@ -84,21 +84,19 @@ function ActivityCard({item,viewerRole,managing,onManage}: {item: ParticipationR
           {item.progress.label}: {item.progress.completed} of {item.progress.total}
         </p>}
         {item.outcome && <p className="mt-3 text-sm font-medium">{item.outcome.label}</p>}
-        {recordLinks.length>0 && <nav aria-label={"Official records for "+item.title}
-          className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+        {recordLinks.length>0 && <WorkspaceLinkNavigation label={"Official records for "+item.title} surface="plain" className="mt-4 gap-x-4 gap-y-2">
           {recordLinks.map(link=><a key={link.href} href={link.href}
             className="text-xs font-semibold text-primary underline underline-offset-4">
             {link.label}
           </a>)}
-        </nav>}
+        </WorkspaceLinkNavigation>}
       </div>
       {canManageTraining ? <Button type="button" variant="outline" onClick={onManage} aria-expanded={managing}
-        className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        className="min-h-11 whitespace-normal text-left">
         {managing?"Close registration controls":"Manage registration"}
-      </Button> : item.action && <a href={item.action.href}
-        className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      </Button> : item.action && <Button asChild variant="outline" className="min-h-11 whitespace-normal"><a href={item.action.href}>
         {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
-      </a>}
+      </a></Button>}
     </div>
     {canManageTraining&&managing&&<div className="mt-5 border-t border-border pt-4"><NoncreditEnrollmentManagement registrationId={item.refs.registrationId}/></div>}
   </article>;
@@ -120,12 +118,11 @@ function OpportunityCard({item,managing,onManage}: {item: ParticipationOpportuni
         {item.state === "invited" && expires && <p className="mt-2 text-sm text-muted-foreground">Offer expires: {expires}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        {item.state==="invited"&&item.action&&<a href={item.action.href}
-          className="inline-flex min-h-10 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary">
+        {item.state==="invited"&&item.action&&<Button asChild variant="outline" className="min-h-11 whitespace-normal"><a href={item.action.href}>
           {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
-        </a>}
+        </a></Button>}
         {(item.state==="waiting"||item.state==="invited")&&<Button type="button" variant="outline" onClick={onManage} aria-expanded={managing}
-          className="inline-flex min-h-10 items-center border border-border px-3 py-2 text-sm font-semibold text-primary">
+          className="min-h-11 whitespace-normal">
           {managing?"Close waitlist controls":"Manage waiting list"}
         </Button>}
       </div>
@@ -345,8 +342,8 @@ function MyActivityPage() {
       </section>
       {canLoadOlder&&<div className="mt-5 flex flex-wrap items-center gap-3">
         <Button type="button" variant="outline" 
-          disabled={loadingOlder} onClick={()=>void loadOlder()}>
-          {loadingOlder?"Loading older records…":"Load older activity"}
+          disabled={loadingOlder} loading={loadingOlder} loadingLabel="Loading older records…" onClick={()=>void loadOlder()}>
+          Load older activity
         </Button>
         <span className="text-xs text-muted-foreground">
           Paged across verified participation and enrollment opportunities; older history is not discarded.
