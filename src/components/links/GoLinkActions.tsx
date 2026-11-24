@@ -9,19 +9,20 @@ export type GoLinkActionsProps={
   code:string;
   status:GoLinkStatus;
   busy?:boolean;
+  allowPause?:boolean;
   onTest?:()=>void;
   onShow?:()=>void;
   onChange?:(action:GoLinkAction)=>void;
 };
 /** Composes governed link distribution controls without owning Site scope.
  * Each surface supplies its authorized server command, never a generic URL. */
-export function GoLinkActions({code,status,busy=false,onTest,onShow,onChange}:GoLinkActionsProps){
+export function GoLinkActions({code,status,busy=false,allowPause=true,onTest,onShow,onChange}:GoLinkActionsProps){
   return <div className="flex flex-wrap gap-2" role="group" aria-label="Go Link actions">
     {status!=="revoked"&&<>
       <CopyLinkButton key={code} destination={{kind:"go",code}} disabled={busy}/>
       <GoLinkQrButton key={"qr-"+code} code={code} disabled={busy}/>
       {onShow&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={onShow}>Show link</Button>}
     </>}
-    <GoLinkLifecycleActions status={status} busy={busy} onTest={onTest} onChange={onChange}/>
+    <GoLinkLifecycleActions status={status} busy={busy} allowPause={allowPause} onTest={onTest} onChange={onChange}/>
   </div>;
 }
