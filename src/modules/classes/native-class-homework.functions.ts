@@ -94,14 +94,15 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
       // Exact recovery provenance only; no title inference or new enrollment.
       const legacy = actor.role==="student" ? await tx.execute(sql`
         SELECT DISTINCT sec.id AS section_id
-        FROM public.enrollments e
+        FROM public.academic_enrollment_cutover_links link
+        JOIN public.enrollments e ON e.id=link.legacy_enrollment_id
         JOIN public.student_profiles sp ON sp.id=e.student_profile_id
         JOIN public.sections sec ON sec.id=e.section_id
         WHERE sp.person_id=${enrollment.learnerPersonId}::uuid
           AND e.kind='section' AND e.status='active'
           AND sec.site_id=${cls.siteId}::uuid
           AND e.organization_id=${cls.operatingOrganizationId}::uuid
-          AND md5('valor-v61:classenrollment:'||e.id)::uuid=${enrollment.id}::uuid
+          AND link.class_enrollment_id=${enrollment.id}::uuid
           AND md5('valor-v61:class:'||sec.code)::uuid=${cls.id}::uuid
         LIMIT 2
       `) : null;
