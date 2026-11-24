@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { isNull } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import {
   educationV30,
   educationV30Secure,
@@ -117,6 +117,8 @@ export const courseVersions = pgTable("course_versions",
   (table) => [
     uniqueIndex("course_versions_course_version_uq").on(table.courseId, table.versionNo),
     uniqueIndex("course_versions_id_course_uq").on(table.id, table.courseId),
+    uniqueIndex("course_versions_one_working_draft_uq").on(table.courseId)
+      .where(sql`${table.lifecycle} = 'draft' AND ${table.syllabus}->>'supersededByCourseVersionId' IS NULL`),
   ],
 );
 
