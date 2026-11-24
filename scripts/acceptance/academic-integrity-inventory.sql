@@ -49,7 +49,7 @@ WITH legacy AS (
  UNION ALL SELECT 'active_grant_site_org_mismatch','P0',g.site_id,count(*) FROM public.account_person_grants g JOIN public.sites s ON s.id=g.site_id WHERE g.active AND g.organization_id IS DISTINCT FROM s.organization_id GROUP BY g.site_id
  UNION ALL SELECT 'active_grant_disabled_principal','P0',g.site_id,count(*) FROM public.account_person_grants g JOIN public.access_accounts a ON a.id=g.account_id JOIN public.people pe ON pe.id=g.person_id WHERE g.active AND (a.disabled OR NOT pe.active) GROUP BY g.site_id
  UNION ALL SELECT 'site_lifecycle_unclassified','P1',id,1::bigint FROM public.sites WHERE lifecycle_status IS NULL
- UNION ALL SELECT 'site_geography_reference_missing','P1',id,1::bigint FROM public.sites WHERE geographic_area_id IS NULL
+ UNION ALL SELECT 'site_geography_reference_missing','P1',s.id,1::bigint FROM public.sites s WHERE NOT EXISTS (SELECT 1 FROM public.site_geography_versions v WHERE v.site_id=s.id AND v.organization_id=s.organization_id AND v.superseded_at IS NULL)
  UNION ALL SELECT 'site_organization_lifecycle_unclassified','P1',s.id,1::bigint FROM public.sites s JOIN public.organizations o ON o.id=s.organization_id WHERE o.lifecycle_status IS NULL
  UNION ALL SELECT 'organization_lifecycle_unclassified','P1',NULL::uuid,count(*) FROM public.organizations WHERE lifecycle_status IS NULL HAVING count(*)>0
 )
