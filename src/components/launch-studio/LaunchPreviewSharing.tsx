@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { WorkspaceNotice } from "@/components/workspace";
+import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   createSitePreviewShare, listSitePreviewShares, revokeSitePreviewShare,
@@ -55,8 +56,9 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
     setCreatedUrl("");
     setCopied(false);
     try {
+      const origin=await getCanonicalGoLinkShareOrigin();
       const result = await createSitePreviewShare({ data: { siteId, expiresAfterDays } });
-      const url = new URL(result.relativeUrl, window.location.origin);
+      const url = new URL(result.relativeUrl, origin);
       setCreatedUrl(url.toString());
       // The share has already been committed. A failed list refresh must not\n      // masquerade as a failed creation or cause the operator to issue duplicates.\n      try {\n        setShares(await listSitePreviewShares({ data: { siteId } }));\n      } catch {\n        setError("Your link was created. The active links list could not be refreshed. Copy your link before closing.");\n      }\n    } catch (cause) {\n      setError(normalizeClientError(cause,\n        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
     } finally { setBusy(false); }
@@ -138,7 +140,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
             <Check className="size-4 text-success" aria-hidden="true" /> View-only link created
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Copy this link now. The token cannot be retrieved again after you close this window.
+            Copy this Go Link now or retrieve it later from your active preview links.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Input readOnly aria-label="Created shareable website preview URL" value={createdUrl}
@@ -168,8 +170,14 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
                     {share.expiresAt ? " Expires " + new Date(share.expiresAt).toLocaleDateString() : " No expiration"}
                   </p>
                 </div>
-                <Button size="sm" variant="outline" disabled={busy}
-                  onClick={() => void revoke(share.id)}>Revoke</Button>
+                <div className="flex gap-2">
+                  {share.paused && <span className="text-xs">Paused</span>}
+                  {share.code && <Button size="sm" variant="outline" disabled={busy} onClick={async()=>{
+                    try{const origin=await getCanonicalGoLinkShareOrigin();setCreatedUrl(new URL("/go/"+share.code,origin).href);setCopied(false);}catch{setError("Could not load the approved sharing origin.");}
+                  }}>Show link</Button>}
+                  <Button size="sm" variant="outline" disabled={busy}
+                    onClick={() => void revoke(share.id)}>Revoke</Button>
+                </div>
               </div>)}
             </div> : <p className="mt-3 text-sm text-muted-foreground">No active preview links.</p>}
         </div>
