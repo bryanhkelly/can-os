@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GoLinkEvidenceReport } from "@/components/reports/GoLinkEvidenceReport";
 import { GoLinkActions } from "@/components/links/GoLinkActions";
+import { GoDestinationChoiceField } from "@/components/links/GoDestinationChoiceField";
+import { useGoDestinationChoices } from "@/hooks/use-go-destination-choices";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
 import { buildUrlDestination } from "@/domain/url-destinations";
-import { goDestinationLabels, type GoDestination } from "@/domain/site-go-links";
+import { goDestinationLabels, goDestinationSelectionKey, type GoDestination } from "@/domain/site-go-links";
 import { resolveGoTargetInput } from "@/domain/go-target-input";
 import {
   createSiteGoLink, listSiteGoLinksPage, revokeSiteGoLink,
@@ -15,7 +17,6 @@ import {
 } from "@/modules/engagement/site-go-links.functions";
 
 type GoLink=Awaited<ReturnType<typeof listSiteGoLinksPage>>["items"][number];
-type Choice=Awaited<ReturnType<typeof listAvailableGoDestinations>>[number];
 type Kind=GoDestination["kind"];
 const labels=goDestinationLabels;
 const channelChoices=["email","flyer","qr","social","partner","other"] as const;
@@ -67,9 +68,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
   const [readState,setReadState]=useState<"loading"|"ready"|"error">("loading");
   const [retry,setRetry]=useState(0);
   const [kind,setKind]=useState<Kind>("site-page");
-  const [choices,setChoices]=useState<Choice[]>([]);
-  const [choiceState,setChoiceState]=useState<"loading"|"ready"|"error">("loading");
-  const [selected,setSelected]=useState("");
+  const [selected,setSelected]=useState<GoDestination|null>(null);
   const [advanced,setAdvanced]=useState(false);
   const [target,setTarget]=useState("");
   const [name,setName]=useState("");
@@ -89,17 +88,14 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
     return ()=>{live=false;};
   },[siteId,packageId,retry,listTerm]);
 
-  useEffect(()=>{
-    let live=true;
-    setChoiceState("loading");
-    setChoices([]);setSelected("");
-    listAvailableGoDestinations({data:{siteId,packageId,kind,term:choiceTerm}})
-      .then(data=>{if(live){setChoices(data);setChoiceState("ready");}})
-      .catch(()=>{if(live)setChoiceState("error");});
-    return ()=>{live=false;};
-  },[siteId,packageId,kind,choiceTerm]);
-
-  const chosen=choices.find(item=>JSON.stringify(item.destination)===selected);
+  const catalog=useGoDestinationChoices(
+    ["site",siteId,packageId??null,kind,choiceTerm],
+    ()=>listAvailableGoDestinations({data:{siteId,packageId,kind,term:choiceTerm}}),
+  );
+  const searchPending=choiceTerm!==destinationTerm.trim();
+  const choiceState=searchPending||catalog.loading?"loading":catalog.error?"error":"ready";
+  const choices=choiceState==="ready"?catalog.choices:[];
+  const chosen=selected?choices.find(item=>goDestinationSelectionKey(item.destination)===goDestinationSelectionKey(selected)):undefined;
   const destination=advanced?advancedDestination(kind,target):chosen?.destination??null;
   async function create(){
     if(!destination || busy || readState!=="ready")return;
@@ -177,25 +173,19 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="What should people do?">
           <Select value={kind} onChange={event=>{
-            setKind(event.target.value as Kind);setTarget("");setSelected("");
-            setChoices([]);setDestinationTerm("");setAdvanced(false);
+            setKind(event.target.value as Kind);setTarget("");setSelected(null);
+            setDestinationTerm("");setAdvanced(false);
           }}>
             {Object.entries(labels).filter(([value])=>value!=="website-preview").map(([value,label])=>
               <option key={value} value={value}>{label}</option>)}
           </Select>
         </Field>
-        <Field label="Choose an available destination">
-          <Select disabled={advanced||choiceState!=="ready"||choices.length===0}
-            value={selected} onChange={event=>setSelected(event.target.value)}>
-            <option value="">Select a published destination</option>
-            {choices.map((item,index)=><option
-              key={index} value={JSON.stringify(item.destination)}>{item.title}</option>)}
-          </Select>
-        </Field>
+        <GoDestinationChoiceField label="Choose an available destination" placeholder="Select a published destination"
+          choices={choices} value={selected} onChange={setSelected} disabled={busy||advanced||choiceState!=="ready"}/>
       </div>
       <Field label="Search available destinations">
           <Input value={destinationTerm}
-          onChange={event=>setDestinationTerm(event.target.value)}
+          onChange={event=>{setDestinationTerm(event.target.value);setSelected(null);}}
           placeholder="Search published titles" maxLength={80}/>
         </Field>
       {choiceState==="loading"&&<p role="status" className="text-xs text-muted-foreground">
@@ -243,7 +233,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
         <Button type="button" disabled={busy||!destination||readState!=="ready"}
           onClick={()=>void create()}>{busy?"Working…":"Create Go Link"}</Button>
         <Button type="button" variant="outline" disabled={busy}
-          onClick={()=>{setRetry(n=>n+1);setSelected("");}}>Refresh</Button>
+          onClick={()=>{setRetry(n=>n+1);setSelected(null);catalog.retry();}}>Refresh</Button>
       </div>
     </section>
 
