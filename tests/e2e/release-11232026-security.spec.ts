@@ -20,6 +20,30 @@ test("public Go lifecycle and anonymous rendering", async ({ page, request }) =>
   const content={domain:"outreach",subject:{kind:"initiative",id:null,label:"QA invitation"},audience:["public"],interaction:"discover",expectedOutcome:"viewed",presentation:{headline,summary:"A synthetic invitation for browser acceptance only."},execution:{mode:"page",template:"invitation",action:{kind:"information",journeyId:"start-a-school"},actionLabel:"Explore"}};
   const version=await insertFixtureId(sql,"INSERT INTO engagement_definition_versions(engagement_id,version,content,created_by_person_id) VALUES($1,1,$2::jsonb,$3) RETURNING id",[definition,JSON.stringify(content),person]);
   const link=await insertFixtureId(sql,"INSERT INTO site_go_links(code,organization_id,site_id,created_by_person_id,engagement_version_id) VALUES($1,$2,$3,$4,$5) RETURNING id",[code,org,site,person,version]);
+  const siblingCode=randomBytes(9).toString("base64url");
+  const sibling=await insertFixtureId(sql,"INSERT INTO site_go_links(code,organization_id,site_id,created_by_person_id,engagement_version_id) VALUES($1,$2,$3,$4,$5) RETURNING id",[siblingCode,org,site,person,version]);
+  const [,unscoped]=await sql.transaction([
+    sql`SET LOCAL ROLE can_go_gateway`,
+    sql`SELECT count(*)::int AS total FROM public.site_go_links`,
+  ]);
+  expect(unscoped[0]?.total).toBe(0);
+  const [,,scoped]=await sql.transaction([
+    sql`SET LOCAL ROLE can_go_gateway`,
+    sql`SELECT set_config('can.go_code',${code},true)`,
+    sql`SELECT id FROM public.site_go_links`,
+  ]);
+  expect(scoped.map(row=>row.id)).toEqual([link]);
+  await expect(sql.transaction([
+    sql`SET LOCAL ROLE can_go_gateway`,
+    sql`SELECT set_config('can.go_code',${code},true)`,
+    sql`INSERT INTO public.site_go_link_daily_visits(link_id,day,redirects)
+      VALUES(${sibling},(now() AT TIME ZONE 'UTC')::date,1)`,
+  ])).rejects.toThrow();
+  await expect(sql.transaction([
+    sql`SET LOCAL ROLE can_go_gateway`,
+    sql`SELECT set_config('can.go_code',${code},true)`,
+    sql`UPDATE public.site_go_links SET status='revoked' WHERE id=${link}`,
+  ])).rejects.toThrow();
   const url="/go/"+code;
   const response=await page.goto(url);
   expect(response?.status()).toBe(200);
