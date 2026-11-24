@@ -37,11 +37,11 @@ describe("native Class guardian and minor enrollment",()=>{
   expect(service).toContain("assertNativeClassSeatAvailable");
   expect(service).toContain("consentSha256");
   expect(service).toContain('enrollmentMethod:"approval"');
-  expect(service).toContain("tx.insert(learnerCourseAttempts)");
+  expect(service).toContain("createInitialNativeClassAttempt(tx,enrollment.id,current)");
  });
  it("keeps guardian withdrawal and staff cancellation history-preserving",()=>{
   expect(service).toContain("withdrawMyGuardianNativeClassEnrollment");
-  expect(service).toContain("assertNativeClassAttemptForExit");
+  expect(service).toContain("withdrawNativeClassAttempts(tx,enrollment,cls)");
   expect(service).toContain('set({status:"withdrawn"})');
   expect(lifecycle).toContain('command.action!=="cancel"');
   expect(lifecycle).toContain("canonicalClassEnrollmentApprovalRequests.acceptedEnrollmentId");
