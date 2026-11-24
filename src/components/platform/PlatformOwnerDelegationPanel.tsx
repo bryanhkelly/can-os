@@ -1,3 +1,4 @@
+import { Radio } from "@/components/ui/choice";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,9 +66,9 @@ export function PlatformOwnerDelegationPanel() {
       {targets.length===0&&<p className="text-sm text-muted-foreground">No eligible verified accounts match this search.</p>}
       {targets.map(item=><Label key={item.grantId}
         className="flex cursor-pointer items-start gap-3 border border-border p-3 text-sm">
-        <input type="radio" checked={selected===item.grantId}
+        <Radio checked={selected===item.grantId}
           onChange={()=>setSelected(item.grantId)} name="owner-target-grant"
-          className="mt-1 accent-primary"/>
+          className="mt-1"/>
         <span>
           <span className="block font-semibold">{item.firstName} {item.lastName} · {item.role.replaceAll("_"," ")}</span>
           <span className="block text-xs text-muted-foreground">{item.email}</span>
