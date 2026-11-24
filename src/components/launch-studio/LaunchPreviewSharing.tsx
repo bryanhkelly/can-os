@@ -3,6 +3,7 @@ import { Check, ExternalLink, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
 import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
+import { GoLinkActions, type GoLinkAction } from "@/components/links/GoLinkActions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
@@ -11,7 +12,7 @@ import { WorkspaceNotice } from "@/components/workspace";
 import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  createSitePreviewShare, listSitePreviewShares, revokeSitePreviewShare,
+  createSitePreviewShare, listSitePreviewShares, revokeSitePreviewShare, setSitePreviewSharePaused,
 } from "@/modules/sites/site-preview-sharing.functions";
 
 type Share = Awaited<ReturnType<typeof listSitePreviewShares>>[number];
@@ -80,17 +81,19 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
     } finally { setBusy(false); }
   }
 
-  async function revoke(shareId: string) {
+  async function change(shareId: string, action:GoLinkAction) {
     if (busy) return;
+    if(action==="revoke"&&!window.confirm("Revoke this preview permanently? Distributed copies will stop working."))return;
     setBusy(true);
     setError(null);
     try {
-      await revokeSitePreviewShare({ data: { siteId, shareId } });
+      if(action==="revoke")await revokeSitePreviewShare({ data: { siteId, shareId } });
+      else await setSitePreviewSharePaused({data:{siteId,shareId,action}});
       setShares(await listSitePreviewShares({ data: { siteId } }));
       setCreatedUrl("");
       setCreatedCode(null);
     } catch (cause) {
-      setError(normalizeClientError(cause, "Could not revoke this preview link.").message);
+      setError(normalizeClientError(cause, "Could not change this preview link.").message);
     } finally { setBusy(false); }
   }
 
@@ -174,13 +177,14 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
                     {share.expiresAt ? " Expires " + new Date(share.expiresAt).toLocaleDateString() : " No expiration"}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="space-y-2">
                   {share.paused && <span className="text-xs">Paused</span>}
-                  {share.code && <Button size="sm" variant="outline" disabled={busy} onClick={async()=>{
-                    try{const origin=await getCanonicalGoLinkShareOrigin();setCreatedUrl(new URL("/go/"+share.code,origin).href);setCreatedCode(share.code);}catch{setError("Could not load the approved sharing origin.");}
-                  }}>Show link</Button>}
-                  <Button size="sm" variant="outline" disabled={busy}
-                    onClick={() => void revoke(share.id)}>Revoke</Button>
+                  <GoLinkActions code={share.code} status={share.paused?"paused":"active"} busy={busy}
+                    onShow={()=>void (async()=>{
+                      try{const origin=await getCanonicalGoLinkShareOrigin();setCreatedUrl(new URL("/go/"+share.code,origin).href);setCreatedCode(share.code);}
+                      catch{setError("Could not load the approved sharing origin.");}
+                    })()}
+                    onChange={action=>void change(share.id,action)}/>
                 </div>
               </div>)}
             </div> : <p className="mt-3 text-sm text-muted-foreground">No active preview links.</p>}
