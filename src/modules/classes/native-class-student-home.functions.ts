@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassEnrollments, canonicalClassOfferingVersions,
@@ -30,15 +30,26 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
     return {kind:"other" as const,classes:[]};
 
   return db.transaction(async tx=>{
-    const classes=await tx.select({
-      classId:canonicalClasses.id,title:canonicalClasses.title,
-      deliveryMode:canonicalClasses.deliveryMode,
-      courseVersionId:canonicalClasses.courseVersionId,
-    }).from(canonicalClasses).where(and(
+    const scope=and(
       eq(canonicalClasses.siteId,actor.grantSiteId!),
       eq(canonicalClasses.operatingOrganizationId,actor.scope.organizationIds![0]!),
       eq(canonicalClasses.state,"active"),
-    )).limit(100);
+    );
+    const fields={
+      classId:canonicalClasses.id,title:canonicalClasses.title,
+      deliveryMode:canonicalClasses.deliveryMode,
+      courseVersionId:canonicalClasses.courseVersionId,
+    };
+    // Assigned Classes are not subject to the discovery page cap.
+    const assigned=await tx.select(fields).from(canonicalClasses)
+      .innerJoin(canonicalClassEnrollments,and(
+        eq(canonicalClassEnrollments.classId,canonicalClasses.id),
+        eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!),
+        inArray(canonicalClassEnrollments.status,["active","pending"]),
+      )).where(scope);
+    const discovery=await tx.select(fields).from(canonicalClasses).where(scope)
+      .orderBy(asc(canonicalClasses.title),asc(canonicalClasses.id)).limit(100);
+    const classes=[...new Map([...assigned,...discovery].map(item=>[item.classId,item])).values()];
     if (!classes.length) return {kind:"student" as const,classes:[]};
     const classIds=classes.map(item=>item.classId);
     // The first query has already scoped this list to the verified Person's
@@ -49,6 +60,7 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
       classId:canonicalClassEnrollments.classId,
       id:canonicalClassEnrollments.id,
       status:canonicalClassEnrollments.status,
+      creditMode:canonicalClassEnrollments.creditMode,
       courseAttemptId:canonicalClassEnrollments.courseAttemptId,
     }).from(canonicalClassEnrollments).where(and(
       inArray(canonicalClassEnrollments.classId,classIds),
@@ -85,6 +97,7 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
         enrollmentId:enrollments[0]?.id??null,
         status:enrollments[0]?.status??"not_enrolled",
         courseAttemptId:enrollments[0]?.courseAttemptId??null,
+        creditMode:enrollments[0]?.creditMode??null,
         canJoin:offering?.enrollmentMethods.includes("approval")??false,
       });
     }
