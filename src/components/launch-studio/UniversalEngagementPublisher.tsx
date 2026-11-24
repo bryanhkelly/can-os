@@ -9,29 +9,18 @@ import {
   engagementSubjectKinds, engagementDefinitionSchema,
   type EngagementDefinition,
 } from "@/domain/engagement-definition";
-import {
-  goPageIds, type GoDestination,
-} from "@/domain/site-go-links";
+import type {GoDestination} from "@/domain/site-go-links";
+import {GovernedGoDestinationPicker} from "@/components/links/GovernedGoDestinationPicker";
 import { engagementActionAvailable } from "@/domain/engagement-action-policy";
 import {
   createEngagementDefinition, createEngagementGoLink,
   revokeEngagementGoLink,
 } from "@/modules/engagement/engagement-registry.functions";
 
-type LinkTargetKind=GoDestination["kind"];
 type Published={engagementId:string;versionId:string;version:number};
 type CreatedLink={linkId:string;code:string};
-const journeys=[
-  ["start-a-school","Church or school exploration"],
-  ["teach-with-can","Teacher recruitment interest"],
-  ["family-admissions","Family admissions information"],
-  ["school-expansion","School expansion"],
-  ["church-networks","Network partnership"],
-] as const;
-
 const labels=(id:string)=>id.replaceAll("_"," ").replaceAll("-"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
 const errorMessage=(error:unknown)=>error instanceof Error?error.message:"Unable to publish this engagement.";
-const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Site-specific consumer of the platform registry. It does not own registry
@@ -51,9 +40,7 @@ export function UniversalEngagementPublisher({
   const [template,setTemplate]=useState<"information"|"invitation"|"opportunity">("invitation");
   const [actionLabel,setActionLabel]=useState("Learn more");
   const [execution,setExecution]=useState<"page"|"redirect">("page");
-  const [targetKind,setTargetKind]=useState<LinkTargetKind>("information");
-  const [target,setTarget]=useState("start-a-school");
-  const [page,setPage]=useState<Extract<GoDestination,{kind:"site-page"}>["page"]>("contact");
+  const [target,setTarget]=useState<GoDestination|null>(null);
   const [channel,setChannel]=useState<"email"|"sms"|"qr"|"social"|"partner"|"web"|"other">("web");
   const [published,setPublished]=useState<Published|null>(null);
   const [links,setLinks]=useState<CreatedLink[]>([]);
@@ -62,13 +49,9 @@ export function UniversalEngagementPublisher({
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
 
-  const destination=():GoDestination=>{
-    if(targetKind==="site-page")return {kind:"site-page",page};
-    if(targetKind==="adult-training")return {kind:"adult-training",releaseId:target};
-    if(targetKind==="class")return {kind:"class",classId:target};
-    if(targetKind==="enrichment")return {kind:"enrichment",seasonId:target};
-    return {kind:"information",journeyId:target};
-  };
+  // A placeholder is never publishable; the real destination must be chosen
+  // from the server's current publication-aware catalog.
+  const destination=():GoDestination=>target??{kind:"information",journeyId:"start-a-school"};
   const draft:EngagementDefinition={
     domain,subject:{kind:subjectKind,id:null,label:subjectLabel.trim()},
     audience:[audience],interaction,
@@ -83,9 +66,8 @@ export function UniversalEngagementPublisher({
       : {mode:"redirect",destination:destination()},
     source:{marketingPackageId:packageId},
   };
-  const actionSupported=engagementActionAvailable(interaction,destination());
-  const ready=actionSupported && engagementDefinitionSchema.safeParse(draft).success &&
-    (targetKind==="site-page"||targetKind==="information"||uuid.test(target));
+  const actionSupported=target!==null && engagementActionAvailable(interaction,target);
+  const ready=actionSupported && engagementDefinitionSchema.safeParse(draft).success;
   async function publish(){
     if(!ready || busy || published)return;
     setError("");setNotice("");setBusy(true);
@@ -184,33 +166,10 @@ export function UniversalEngagementPublisher({
             <option value="opportunity">Opportunity</option>
           </Select>
         </label>}
-        <label className="grid gap-1 text-sm font-semibold">Next-step destination
-          <Select value={targetKind} onChange={event=>{
-            const kind=event.target.value as LinkTargetKind;setTargetKind(kind);
-            setTarget(kind==="information"?"start-a-school":"");
-          }}>
-            <option value="information">Curated information / inquiry journey</option>
-            <option value="site-page">Published Site page</option>
-            <option value="adult-training">Approved adult training release</option>
-            <option value="class">Specific Class</option>
-            <option value="enrichment">Enrichment Season</option>
-          </Select>
-        </label>
-        {targetKind==="information"
-          ? <label className="grid gap-1 text-sm font-semibold">Journey
-              <Select value={target} onChange={event=>setTarget(event.target.value)}>
-                {journeys.map(([id,label])=><option key={id} value={id}>{label}</option>)}
-              </Select>
-            </label>
-          : targetKind==="site-page"
-          ? <label className="grid gap-1 text-sm font-semibold">Published page
-              <Select value={page} onChange={event=>setPage(event.target.value as typeof page)}>
-                {goPageIds.map(id=><option value={id} key={id}>{labels(id)}</option>)}
-              </Select>
-            </label>
-          : <label className="grid gap-1 text-sm font-semibold">Exact published target ID
-              <Input value={target} placeholder="UUID" onChange={event=>setTarget(event.target.value.trim())}/>
-            </label>}
+        <div className="sm:col-span-2">
+          <GovernedGoDestinationPicker siteId={siteId} packageId={packageId}
+            value={target} onChange={setTarget} disabled={busy}/>
+        </div>
         {execution==="page"&&<label className="grid gap-1 text-sm font-semibold">Button label
           <Input maxLength={80} value={actionLabel} onChange={event=>setActionLabel(event.target.value)}/>
         </label>}
