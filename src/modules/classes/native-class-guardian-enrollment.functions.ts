@@ -1,7 +1,7 @@
 import { nativeClassConsentDigest } from "./native-class-consent.server";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,asc,desc,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
+import {and,asc,desc,eq,gt,isNull,lte,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
@@ -14,6 +14,7 @@ import {
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {currentClassAuthority} from "./native-class-authority.server";
+import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./native-class-attempt.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
@@ -96,12 +97,7 @@ export const requestNativeGuardianClassApproval=createServerFn({method:"POST"})
       (terms.opensAt&&terms.opensAt>now)||(terms.closesAt&&terms.closesAt<=now))
     throw new AuthorizationError("current Class guardian approval application");
    await requireNativeGuardianChild(tx,guardian.personId,data.learnerPersonId,new Date());
-   const [open]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,cls.id),
-      eq(canonicalClassEnrollments.learnerPersonId,data.learnerPersonId),
-      inArray(canonicalClassEnrollments.status,["pending","active"]),
-    )).limit(1);
+   const open=await readOpenNativeClassEnrollment(tx,cls.id,data.learnerPersonId);
    if(open)throw new AuthorizationError("learner already participates");
    const [replay]=await tx.select().from(canonicalClassEnrollmentApprovalRequests)
     .where(and(
@@ -248,19 +244,9 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
       eq(canonicalClassOfferings.classId,cls.id),
     )).limit(1);
    if(!offering)throw new AuthorizationError("Class Offering identity");
-   const [already]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,cls.id),
-      eq(canonicalClassEnrollments.learnerPersonId,approval.learnerPersonId),
-      inArray(canonicalClassEnrollments.status,["pending","active"]),
-    )).limit(1);
+   const already=await readOpenNativeClassEnrollment(tx,cls.id,approval.learnerPersonId);
    if(already)throw new AuthorizationError("minor already enrolled");
-   const [completed]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,cls.id),
-      eq(canonicalClassEnrollments.learnerPersonId,approval.learnerPersonId),
-      eq(canonicalClassEnrollments.status,"completed"),
-    )).limit(1);
+   const completed=await readLatestCompletedNativeClassEnrollment(tx,cls.id,approval.learnerPersonId);
    const repeatAuthorization=completed
      ?await requireNativeRepeatAuthorization(tx,cls.id,approval.learnerPersonId,
        completed.id,new Date())
