@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassEnrollments, canonicalClassSessions,
@@ -11,6 +11,7 @@ import { assertNativeClassSeatAvailable } from "@/domain/native-class-lifecycle"
 import { accessAccountNoncreditPrincipals } from "@/db/schema";
 import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
+import { readNativeClassOccupancy } from "@/modules/classes/native-class-capacity.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { emitCanonicalDomainEvent, writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
@@ -59,11 +60,9 @@ export async function listEligibleCourseClasses(
       .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
     if(cls.deliveryMode!=="self_paced"&&!upcoming.length)continue;
     if(upcoming.length>100)throw new AuthorizationError("Class schedule exceeds supported Session limit");
-    const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-      .where(and(eq(canonicalClassEnrollments.classId,cls.id),
-        inArray(canonicalClassEnrollments.status,["active","pending"])));
+    const occupancy=await readNativeClassOccupancy(tx,cls.id);
     result.push({id:cls.id,title:cls.title,deliveryMode:cls.deliveryMode,
-      seatsRemaining:cls.capacity===null?null:Math.max(0,cls.capacity-(occupancy?.total??0)),
+      seatsRemaining:cls.capacity===null?null:Math.max(0,cls.capacity-(occupancy)),
       sessions:upcoming.map(item=>({
         startsAt:item.startsAt.toISOString(),endsAt:item.endsAt.toISOString(),
       })),
@@ -140,11 +139,9 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
       inArray(canonicalClassEnrollments.status,["active","pending"]),
     )).limit(1);
   if(previous)throw new AuthorizationError("existing Class participation requires reconciliation");
-  const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-    .where(and(eq(canonicalClassEnrollments.classId,classId),
-      inArray(canonicalClassEnrollments.status,["active","pending"])));
+  const occupancy=await readNativeClassOccupancy(tx,classId);
   assertNativeClassSeatAvailable({
-    method:"self",activeOrPending:occupancy?.total??0,
+    method:"self",activeOrPending:occupancy,
     classCapacity:authority.classCapacity,offeringCapacity:null,
   });
   const [placed]=await tx.insert(canonicalClassEnrollments).values({
