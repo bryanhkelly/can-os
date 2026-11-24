@@ -6,6 +6,7 @@ import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSour
 import {
   isChurchSiteIdentityV61, isFaithBasedSiteIdentityV61, siteIdentityEditorialContextV61,
 } from "@/domain/site-identity-v61";
+import { SiteIntelligenceContentPanel } from "./SiteIntelligenceContentPanel";
 import { WebsiteCopyField, type WebsiteCopyFieldSpec } from "./WebsiteCopyField";
 import { SiteContentChannelEditor } from "./SiteContentChannelEditor";
 import { WebsiteTemplateSourceGuide } from "./WebsiteTemplateSourceGuide";
@@ -206,6 +207,7 @@ export function WebsiteSiteContentStep({
         Review Site Information
       </Link>
     </div>}
+    {canReuse&&<SiteIntelligenceContentPanel key={data.siteId+":website"} siteId={data.siteId} target="website" disabled={busy||!data.canEdit} onApply={draft=>{if(draft.website)setContent(old=>({...old,...draft.website}));}}/>}
     {primaryFields.map(renderField)}
     {canReuse&&churchSite&&<details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">

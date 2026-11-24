@@ -14,6 +14,7 @@ import {
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { siteExperienceById } from "@/domain/site-experience-interests";
 import type { readSiteMarketingSuggestionsV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
+import { SiteIntelligenceContentPanel } from "./SiteIntelligenceContentPanel";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 
 type Suggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
@@ -275,6 +276,7 @@ export function MarketingPackageWizardV61({
           <Button type="button" variant="outline" size="sm" disabled={busy}
             onClick={()=>onPatch(suggested)}>Use suggestion for this plan</Button>
         </div>
+        <SiteIntelligenceContentPanel key={siteId+":outreach"} siteId={siteId} target="outreach" plan={plan} disabled={busy} onApply={draft=>{if(draft.outreach)onPatch(draft.outreach);}}/>
         <Field label="Outreach name" required><Input value={title} maxLength={120}
           onChange={event=>onTitleChange(event.target.value)}/></Field>
         <Field label="Headline" required><Input value={content.headline} maxLength={160}
