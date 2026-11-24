@@ -20,10 +20,23 @@ describe("performance regression contracts", () => {
   it("runs independent student home reads concurrently with ordered bounded resume probes", () => {
     const sourceText = source("src/components/home/StudentHome.tsx");
     expect(sourceText).toContain("const classesPromise = safeLoader(() => getMyStudentClasses())()");
-    expect(sourceText).toContain("offset += 3");
-    expect(sourceText).toContain("const results = await Promise.all(batch.map(section =>");
-    expect(sourceText).toContain("for (let index = 0; index < batch.length; index++)");
+    expect(sourceText).toContain("orderedBatches(native,3");
+    expect(sourceText).toContain("orderedBatches(candidates,3");
+    expect(sourceText).toContain("for (const {section,result} of results)");
+    expect(sourceText).not.toContain("offset += 3");
     expect(sourceText).toContain("const classes = await classesPromise");
+  });
+
+  it("loads the homework index without sending response content or feedback",()=>{
+    const index=source("src/modules/classes/native-student-homework-index.ts");
+    const service=source("src/modules/classes/native-class-homework.functions.ts");
+    expect(index).toContain("getNativeClassHomeworkSummary(");
+    expect(index).not.toContain("getNativeClassHomework(");
+    expect(index).toContain("orderedBatches(enrolled,3");
+    expect(service).toContain("readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,false)");
+    expect(service).toContain('detail ? sql`s.response` : sql`NULL::jsonb`');
+    expect(service).toContain("return {assignments:rows.map(homeworkSummary)}");
+    expect(service).toContain("await authorized(tx,actor,data.classEnrollmentId)");
   });
 
   it("bulk-loads a student's Class memberships without bypassing Class publication authority", () => {
