@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
@@ -49,6 +49,10 @@ function advancedDestination(kind:Kind,value:string):GoDestination|null {
  */
 export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:string}){
   const [links,setLinks]=useState<GoLink[]>([]);
+  const [linkTerm,setLinkTerm]=useState("");
+  const [destinationTerm,setDestinationTerm]=useState("");
+  const listTerm=useDeferredValue(linkTerm.trim());
+  const choiceTerm=useDeferredValue(destinationTerm.trim());
   const [nextCursor,setNextCursor]=useState<string|null>(null);
   const [loadingMore,setLoadingMore]=useState(false);
   const [pageError,setPageError]=useState("");
@@ -72,21 +76,21 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
   useEffect(()=>{
     let live=true;
     setReadState("loading");setNextCursor(null);setPageError("");
-    listSiteGoLinksPage({data:{siteId,packageId,limit:20}})
+    listSiteGoLinksPage({data:{siteId,packageId,limit:20,term:listTerm}})
       .then(page=>{if(live){setLinks(page.items);setNextCursor(page.nextCursor);setReadState("ready");}})
       .catch(()=>{if(live)setReadState("error");});
     return ()=>{live=false;};
-  },[siteId,packageId,retry]);
+  },[siteId,packageId,retry,listTerm]);
 
   useEffect(()=>{
     let live=true;
     setChoiceState("loading");
     setChoices([]);setSelected("");
-    listAvailableGoDestinations({data:{siteId,packageId,kind}})
+    listAvailableGoDestinations({data:{siteId,packageId,kind,term:choiceTerm}})
       .then(data=>{if(live){setChoices(data);setChoiceState("ready");}})
       .catch(()=>{if(live)setChoiceState("error");});
     return ()=>{live=false;};
-  },[siteId,packageId,kind]);
+  },[siteId,packageId,kind,choiceTerm]);
 
   const chosen=choices.find(item=>JSON.stringify(item.destination)===selected);
   const destination=advanced?advancedDestination(kind,target):chosen?.destination??null;
@@ -118,7 +122,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
     if(!nextCursor||loadingMore||readState!=="ready")return;
     setLoadingMore(true);setPageError("");
     try{
-      const page=await listSiteGoLinksPage({data:{siteId,packageId,limit:20,cursor:nextCursor}});
+      const page=await listSiteGoLinksPage({data:{siteId,packageId,limit:20,cursor:nextCursor,term:listTerm}});
       setLinks(previous=>{
         const existing=new Set(previous.map(row=>row.id));
         return [...previous,...page.items.filter(row=>!existing.has(row.id))];
@@ -165,7 +169,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
         <label className="grid gap-1 text-sm font-medium">What should people do?
           <Select value={kind} onChange={event=>{
             setKind(event.target.value as Kind);setTarget("");setSelected("");
-            setChoices([]);setAdvanced(false);
+            setChoices([]);setDestinationTerm("");setAdvanced(false);
           }}>
             {Object.entries(labels).map(([value,label])=>
               <option key={value} value={value}>{label}</option>)}
@@ -180,6 +184,12 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
           </Select>
         </label>
       </div>
+      <label className="block text-sm font-medium">
+        Search available destinations
+        <Input className="mt-1" value={destinationTerm}
+          onChange={event=>setDestinationTerm(event.target.value)}
+          placeholder="Search published titles" maxLength={80}/>
+      </label>
       {choiceState==="loading"&&<p role="status" className="text-xs text-muted-foreground">
         Checking available destinations…</p>}
       {choiceState==="error"&&<p role="alert" className="text-xs text-destructive">
@@ -229,6 +239,12 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
       </div>
     </section>
 
+    <label className="mt-5 block text-sm font-medium">
+      Search saved links by name
+      <Input className="mt-1" value={linkTerm}
+        onChange={event=>setLinkTerm(event.target.value)}
+        placeholder="Search links across this Site or outreach plan" maxLength={80}/>
+    </label>
     {readState==="loading"&&<p role="status" className="mt-4 text-sm">Loading saved links…</p>}
     {readState==="error"&&<p role="alert" className="mt-4 text-sm text-destructive">
       Saved links are currently unavailable.</p>}
@@ -237,7 +253,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
     {readState==="ready"&&<section aria-label="Managed links" className="mt-5 space-y-3">
       <h3 className="font-semibold">Your links</h3>
       {!links.length&&<p className="text-sm text-muted-foreground">
-        No Go Links yet. Select an eligible destination above to create one.</p>}
+        {linkTerm?"No links match this search.":"No Go Links yet. Select an eligible destination above to create one."}</p>}
       {links.map(link=><article key={link.id} className="space-y-2 border p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
