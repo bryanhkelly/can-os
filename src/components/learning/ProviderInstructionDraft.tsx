@@ -2,7 +2,7 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
-import { MutationFeedback, WorkspaceShell, WorkspaceNotice, StatusBadge } from "@/components/workspace";
+import { ActionFooter, DisclosureSection, EmptyState, QueryState, MutationFeedback, WorkspaceShell, WorkspaceNotice, StatusBadge } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -22,8 +22,8 @@ export function ProviderInstructionDraft({trackVersionId,navigation}:{trackVersi
     queryFn:()=>getCreatorInstructionalDraft({data:{trackVersionId}}),
     retry:false,
   });
-  if(draft.isPending)return <WorkspaceShell eyebrow="CAN OS" title="Instructional track draft"><p role="status">Checking your current content appointment…</p></WorkspaceShell>;
-  if(draft.isError||!draft.data)return <WorkspaceShell eyebrow="CAN OS" title="Content unavailable"><p role="alert">This track is unavailable under your current verified appointment.</p></WorkspaceShell>;
+  if(draft.isPending)return <WorkspaceShell eyebrow="CAN OS" title="Instructional track draft"><QueryState loading="Checking your current content appointment…"/></WorkspaceShell>;
+  if(draft.isError||!draft.data)return <WorkspaceShell eyebrow="CAN OS" title="Content unavailable"><QueryState error="This track is unavailable under your current verified appointment." onRetry={()=>void draft.refetch()} retrying={draft.isFetching}/></WorkspaceShell>;
   return <CreatorDraftEditor key={draft.data.trackVersionId+":"+draft.data.revision}
     data={draft.data} navigation={navigation}/>;
 }
@@ -132,24 +132,23 @@ function CreatorDraftEditor({data,navigation}:{data:Draft;navigation?:ReactNode}
           </section>;
         })}
       </div>
-      {!data.lessons.length && <p role="status" className="mt-4 text-sm">This Course version has no published lessons. Instruction cannot be submitted until the Course catalog is complete.</p>}
-      {data.assetInventoryLimited && <p role="alert" className="mt-4 text-sm">Asset inventory reached its display limit. Ask the provider administrator for an appropriately scoped catalog before saving.</p>}
-      <details className="mt-6 border-t border-border pt-4">
-        <summary className="cursor-pointer font-semibold">Advanced supplemental materials</summary>
+      {!data.lessons.length && <EmptyState className="mt-4" title="This Course version has no published lessons." description="Instruction cannot be submitted until the Course catalog is complete."/>}
+      {data.assetInventoryLimited && <WorkspaceNotice tone="attention" className="mt-4">Asset inventory reached its display limit. Ask the provider administrator for an appropriately scoped catalog before saving.</WorkspaceNotice>}
+      <DisclosureSection title="Advanced supplemental materials" className="mt-6">
         <p className="mt-2 text-xs text-muted-foreground">Preserve or update the complete canonical materials array. Practice questions must meet the server's approved schema. No private answer keys may be stored here.</p>
         <Textarea className="mt-3 min-h-40 font-mono text-xs"
           value={advancedMaterials} onChange={event=>{setAdvancedMaterials(event.target.value);setDirty(true);setValidation("");pendingRequestId.current=null;}}
           aria-label="Supplemental materials JSON"/>
-      </details>
-      {validation && <p role="alert" className="mt-3 border border-destructive p-3 text-sm">{validation}</p>}
+      </DisclosureSection>
+      {validation && <WorkspaceNotice tone="danger" className="mt-3">{validation}</WorkspaceNotice>}
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Updating instructional track…"/>
-      <div className="mt-5 flex flex-wrap gap-3">
+      <ActionFooter layout="inline" className="mt-5">
         <Button onClick={()=>void save()} disabled={mutation.pending||mutation.refreshFailed||data.assetInventoryLimited||unresolved>0}>Save private draft</Button>
         <Button variant="outline" onClick={()=>void submit()}
           disabled={dirty||mutation.pending||mutation.refreshFailed||!data.lessons.length||unresolved>0||(data.trackKind==="primary"&&primaryCovered!==data.lessons.length)}>
           Submit current saved version for review
         </Button>
-      </div>
+      </ActionFooter>
       {dirty && <p role="status" className="mt-3 text-xs">Unsaved changes must be saved and reloaded before submission. This prevents reviewing a stale content manifest.</p>}
     </section>
   </WorkspaceShell>;
