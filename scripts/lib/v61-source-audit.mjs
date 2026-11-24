@@ -273,7 +273,7 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD
     ];
     paths = [...new Set(names.join("\n").split("\n").filter(Boolean))];
   } catch {
-    result.warning = "Git base unavailable; incremental regression check not run. Use --base=<commit> to compare a known base.";
+    result.warning = "Git base unavailable; incremental regression check not run. Set V61_BASE_REF to a known commit to compare the intended release range.";
     return result;
   }
   for (const path of paths) {
