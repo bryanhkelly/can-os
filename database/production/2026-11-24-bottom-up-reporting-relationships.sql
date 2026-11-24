@@ -76,6 +76,33 @@ CREATE POLICY reporting_relationship_events_owner_only ON public.reporting_relat
   FOR ALL TO neondb_owner USING (true) WITH CHECK (true);
 REVOKE ALL ON public.reporting_relationship_agreements,public.reporting_relationship_events FROM PUBLIC,anonymous,authenticated;
 
+-- An Offering is a shared catalog product. Its publisher and independently
+-- approved local operators can each consent for their own source records.
+CREATE FUNCTION public.reporting_relationship_offering_owner(p_offering uuid,p_owner uuid)
+RETURNS boolean LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $
+  SELECT EXISTS (
+    SELECT 1 FROM public.offerings o
+    WHERE o.id=p_offering AND o.status='active' AND (
+      o.publisher_organization_id=p_owner OR EXISTS (
+        SELECT 1 FROM public.program_deployments pd
+        JOIN public.education_operations op ON op.id=pd.operation_id AND op.status='active'
+        JOIN public.education_operation_organization_roles r ON r.operation_id=op.id
+          AND r.organization_id=p_owner AND r.role_code='operator' AND r.status='approved'
+          AND r.valid_from<=CURRENT_TIMESTAMP
+          AND (r.valid_through IS NULL OR r.valid_through>CURRENT_TIMESTAMP)
+        JOIN public.deployment_offering_adoptions a ON a.deployment_id=pd.id
+          AND a.offering_id=o.id AND a.approval_status='approved'
+          AND a.valid_from<=CURRENT_TIMESTAMP
+          AND (a.valid_through IS NULL OR a.valid_through>CURRENT_TIMESTAMP)
+        JOIN public.offering_versions v ON v.id=a.offering_version_id AND v.offering_id=o.id
+          AND v.lifecycle='published' AND v.published_at IS NOT NULL
+        WHERE pd.offering_id=o.id AND pd.status='active'
+      )
+    )
+  );
+$;
+REVOKE ALL ON FUNCTION public.reporting_relationship_offering_owner(uuid,uuid) FROM PUBLIC,anonymous,authenticated;
+
 -- Structural checks are defense in depth. The application must independently
 -- authenticate the actor and authorize each action; UUIDs are not credentials.
 CREATE FUNCTION public.guard_reporting_relationship_agreement() RETURNS trigger
@@ -86,7 +113,9 @@ BEGIN
   IF NEW.scope_kind='organization' THEN actual_owner:=NEW.owner_organization_id;
   ELSIF NEW.scope_kind='site' THEN SELECT organization_id INTO actual_owner FROM public.sites WHERE id=NEW.site_id FOR SHARE;
   ELSIF NEW.scope_kind='program' THEN SELECT organization_id INTO actual_owner FROM public.programs WHERE id=NEW.program_id FOR SHARE;
-  ELSIF NEW.scope_kind='offering' THEN SELECT publisher_organization_id INTO actual_owner FROM public.offerings WHERE id=NEW.offering_id FOR SHARE;
+  ELSIF NEW.scope_kind='offering' THEN
+    IF public.reporting_relationship_offering_owner(NEW.offering_id,NEW.owner_organization_id)
+    THEN actual_owner:=NEW.owner_organization_id; END IF;
   ELSIF NEW.scope_kind='class' THEN SELECT operating_organization_id INTO actual_owner FROM public.classes WHERE id=NEW.class_id FOR SHARE;
   END IF;
   IF actual_owner IS DISTINCT FROM NEW.owner_organization_id AND
