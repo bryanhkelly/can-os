@@ -34,17 +34,17 @@ export function WebsiteReviewStep({
       </Button>
       <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center border border-primary px-4 py-2 text-sm font-semibold text-primary">
-        Open full-page preview
+        Open private preview
       </a>
       {data.currentRevision>0&&<Button type="button" variant="outline" className="min-h-11 border"
         onClick={()=>void navigator.clipboard.writeText(
           new URL(privateWebsitePreviewUrl(data.siteId),window.location.origin).href,
         ).then(()=>onShareMessage("Preview link copied. Reviewers must sign in with their own authorized Site account."))
-          .catch(()=>onShareMessage("Copy the address from Open full-page preview; clipboard permission was unavailable."))}>
-        Copy preview link
+          .catch(()=>onShareMessage("Copy the address from Open private preview; clipboard permission was unavailable."))}>
+        Copy internal link
       </Button>}
     </div>
-    <p className="text-xs text-muted-foreground">This preview requires sign-in. Use Share preview to send a link to others.</p>
+    <p className="text-xs text-muted-foreground">Private preview requires sign-in. To send the website to external visitors, create a shareable preview below. No account is required.</p>
     {data.currentRevision===0&&<p className="border p-3 text-sm" role="status">
       Save your website before sharing.
     </p>}
@@ -54,7 +54,7 @@ export function WebsiteReviewStep({
       draftPreview={draftPreview?.source===content?draftPreview.rendered:null}/>
     {!dirty&&editorRevision>0&&!revisionConflict
       ?<div className="flex flex-wrap items-center justify-between gap-3 border p-4">
-          <p className="text-sm font-semibold">Share your website</p>
+          <p className="text-sm font-semibold">Share your website externally</p>
           <LaunchPreviewSharing siteId={data.siteId}/>
         </div>
       :<p role="status" className="border p-3 text-sm">
