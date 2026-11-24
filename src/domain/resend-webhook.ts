@@ -6,7 +6,10 @@ const MAX_WEBHOOK_BYTES = 64 * 1024;
 /** Bound webhook memory even when Content-Length is omitted or false. */
 export async function readBoundedResendWebhookBody(request: Request): Promise<string | null> {
  const bytes=await readBoundedRequestBytes(request,MAX_WEBHOOK_BYTES);
- return bytes===null?null:new TextDecoder().decode(bytes);
+ if(bytes===null)return null;
+ // Preserve a BOM if present so signature verification sees the exact UTF-8 bytes.
+ try{return new TextDecoder("utf-8",{fatal:true,ignoreBOM:true}).decode(bytes);}
+ catch{return null;}
 }
 
 const MAX_SIGNATURE_AGE_SECONDS = 300;
@@ -56,8 +59,8 @@ export type ResendReceiptEvent = {
 export function parseResendReceiptEvent(raw: unknown): ResendReceiptEvent | null {
   if (!raw || typeof raw !== "object") return null;
   const event = raw as Record<string, unknown>;
-  if (!["email.delivered", "email.bounced", "email.complained",
-    "email.failed", "email.suppressed"].includes(String(event.type))) return null;
+  if (typeof event.type !== "string" || !["email.delivered", "email.bounced", "email.complained",
+    "email.failed", "email.suppressed"].includes(event.type)) return null;
   const data = event.data;
   if (!data || typeof data !== "object") return null;
   const info = data as Record<string, unknown>;
@@ -66,7 +69,8 @@ export function parseResendReceiptEvent(raw: unknown): ResendReceiptEvent | null
   const values = tags as Record<string, unknown>;
   const receiptId = values.can_receipt;
   const messageId = info.email_id;
-  if (!["school_family", "noncredit_waitlist", "engagement_campaign"].includes(String(values.can_source)) ||
+  if (typeof values.can_source !== "string" ||
+      !["school_family", "noncredit_waitlist", "engagement_campaign"].includes(values.can_source) ||
       typeof receiptId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receiptId) ||
       typeof messageId !== "string" || messageId.length < 8 || messageId.length > 256)
