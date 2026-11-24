@@ -25,13 +25,14 @@ export function DashboardLayout({ wallpaper, quickActions, primary, rail, footer
   </div>;
 }
 
-export function DashboardPanel({ title, description, action, children, className, id }: {
+export function DashboardPanel({ title, description, action, children, className, id, headingLevel: Heading = "h2" }: {
   title: string;
   description?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   id?: string;
+  headingLevel?: "h2" | "h3" | "h4" | "h5" | "h6";
 }) {
   const generatedId = React.useId();
   const titleId = id ? `${id}-title` : generatedId;
@@ -39,7 +40,7 @@ export function DashboardPanel({ title, description, action, children, className
     className={cn("min-w-0 border border-border bg-card", className)}>
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-5 py-4">
       <div className="min-w-0">
-        <h2 id={titleId} className="font-serif text-section font-normal leading-tight tracking-normal text-foreground">{title}</h2>
+        <Heading id={titleId} className="font-serif text-section font-normal leading-tight tracking-normal text-foreground">{title}</Heading>
         {description && <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>}
       </div>
       {action && <div className="shrink-0 text-sm">{action}</div>}

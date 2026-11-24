@@ -1,52 +1,91 @@
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { formatReportChartValue, type ReportChartSpec } from "./report-chart-data";
+import {useState} from "react";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {formatReportAxisValue,reportChartLayout,truncateReportLabel,type ReportChartSpec} from "./report-chart-data";
+import {reportSeriesColors,reportPlotStyle} from "./report-chart-palette";
+import {ReportPatternDefinition,reportSeriesPaint,useReportPaintPrefix} from "./report-chart-marks";
+import {ReportChartTooltip} from "./report-chart-tooltip";
 
-import { reportSeriesColors } from "./report-chart-palette";
-const margin={top:8,right:16,bottom:8,left:0};
-export default function ReportChartPlot({spec}: {spec: ReportChartSpec}) {
-  const axis = {fill:"var(--muted-foreground)",fontSize:11};
-  const numberAxis = {tick:axis,tickFormatter:(n:number)=>formatReportChartValue(n,spec.format),
-    allowDecimals:(spec.format ?? "count") !== "count"};
+const margin={top:8,right:12,bottom:8,left:0};
+const axis={fill:reportPlotStyle.axisInk,fontSize:reportPlotStyle.axisFontSize,fontFamily:reportPlotStyle.axisFontFamily};
+const axisGeometry={tick:axis,axisLine:false,tickLine:false,tickMargin:8};
+const grid={stroke:reportPlotStyle.gridStroke,strokeDasharray:"3 3"};
+const bar={maxBarSize:reportPlotStyle.barHeight,isAnimationActive:false} as const;
+
+/** The ONLY Recharts runtime adapter. Domain data is already authorized and validated.
+ * Plot geometry is not a feature option; exact values live in ReportChart's table.
+ */
+export default function ReportChartPlot({spec}: {spec: ReportChartSpec}){
+  const [width,setWidth]=useState(320);
+  const prefix=useReportPaintPrefix();
+  const layout=reportChartLayout(width);
+  const labels=new Map((spec.kind==="stacked"?spec.rows:spec.points).map(p=>[p.id,p.label]));
+  const numberAxis={...axisGeometry,tickFormatter:(n:number)=>formatReportAxisValue(n,spec.format),
+    allowDecimals:(spec.format??"count")!=="count",tickCount:layout.tickCount};
+  const domain:[number,number|"auto"]=[0,spec.format==="percent"?100:"auto"];
+  const labelFor=(id:unknown)=>labels.get(String(id))??String(id??"");
+  const categoryAxis={...axisGeometry,dataKey:"id",width:layout.categoryWidth,interval:0,
+    tickFormatter:(id:unknown)=>truncateReportLabel(labelFor(id),layout.categoryLabelChars)};
+  const resize=(nextWidth:number)=>setWidth(prior=>Math.round(nextWidth)===prior?prior:Math.round(nextWidth));
+  const renderTooltip=({active,payload,label}:{active?:boolean;payload?:readonly {name?:unknown;value?:unknown}[];label?:unknown})=>{
+    if(!active||!payload?.length)return null;
+    const items=payload.map(entry=>({label:typeof entry.name==="string"?entry.name:spec.valueLabel,
+      value:typeof entry.value==="number"&&Number.isFinite(entry.value)?entry.value:null}));
+    return <ReportChartTooltip title={spec.kind==="distribution"?spec.title:labelFor(label)||spec.title} items={items} format={spec.format}/>;
+  };
+  const container={width:"100%" as const,minWidth:0,onResize:resize};
   if(spec.kind==="stacked"){
-    const rows=spec.rows.map(row=>({label:row.label,...Object.fromEntries(row.values.map((v,i)=>["s"+i,v]))}));
-    return <div aria-hidden="true" className="min-w-0 w-full">
-      <ResponsiveContainer width="100%" height={Math.max(200,rows.length*42+42)} minWidth={0}>
+    const rows=spec.rows.map(row=>({id:row.id,...Object.fromEntries(row.values.map((v,i)=>["s"+i,v]))}));
+    return <div aria-hidden="true" className="w-full min-w-0" data-report-chart-plot="stacked">
+      <ResponsiveContainer {...container} height={Math.max(reportPlotStyle.minimumHeight,rows.length*reportPlotStyle.rowHeight+48)}>
         <BarChart data={rows} layout="vertical" accessibilityLayer={false} margin={margin}>
-          <CartesianGrid stroke="var(--border)" horizontal={false}/>
-          <XAxis type="number" domain={[0,"auto"]} {...numberAxis}/>
-          <YAxis type="category" dataKey="label" tick={axis} width={120} interval={0}/>
-          {spec.series.map((s,i)=><Bar key={s.id} dataKey={"s"+i} stackId="partition" fill={reportSeriesColors[i]} maxBarSize={24} isAnimationActive={false}/>)}
+          <defs>{spec.series.map((s,i)=><ReportPatternDefinition key={s.id} prefix={prefix} index={i}/>)}</defs>
+          <CartesianGrid {...grid} horizontal={false}/>
+          <XAxis type="number" domain={domain} {...numberAxis}/>
+          <YAxis type="category" {...categoryAxis}/>
+          <Tooltip content={renderTooltip} cursor={{fill:reportPlotStyle.hover}} isAnimationActive={false}/>
+          {spec.series.map((s,i)=><Bar key={s.id} dataKey={"s"+i} name={s.label} stackId="partition"
+            fill={reportSeriesPaint(prefix,i)} stroke={reportPlotStyle.separator} strokeWidth={1} {...bar}/>)}
         </BarChart>
       </ResponsiveContainer>
     </div>;
   }
   const points=spec.points.map(p=>({...p}));
   if(spec.kind==="distribution"){
-    if(spec.total===0)return <p className="text-sm text-muted-foreground">No nonzero values to plot.</p>;
-    return <div aria-hidden="true" className="min-w-0 w-full">
-      <ResponsiveContainer width="100%" height={220} minWidth={0}>
+    return <div aria-hidden="true" className="relative w-full min-w-0" data-report-chart-plot="distribution">
+      <ResponsiveContainer {...container} height={reportPlotStyle.distributionHeight}>
         <PieChart accessibilityLayer={false}>
-          <Pie data={points} dataKey="value" nameKey="label" innerRadius="48%" outerRadius="82%" isAnimationActive={false}>
-            {points.map((p,i)=><Cell key={p.id} fill={reportSeriesColors[i]} stroke="var(--card)"/>)}
+          <defs>{points.map((p,i)=><ReportPatternDefinition key={p.id} prefix={prefix} index={i}/>)}</defs>
+          <Pie data={points} dataKey="value" nameKey="label" innerRadius="54%" outerRadius="83%" isAnimationActive={false}>
+            {points.map((p,i)=><Cell key={p.id} fill={reportSeriesPaint(prefix,i)} stroke={reportPlotStyle.separator} strokeWidth={2}/>)}
           </Pie>
+          <Tooltip content={renderTooltip} cursor={false} isAnimationActive={false}/>
         </PieChart>
       </ResponsiveContainer>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-foreground">
+        <span className="font-sans text-2xl font-semibold tabular-nums">{formatReportAxisValue(spec.total,spec.format)}</span>
+        <span className="text-xs text-muted-foreground">Total</span>
+      </div>
     </div>;
   }
-  return <div aria-hidden="true" className="min-w-0 w-full">
-    <ResponsiveContainer width="100%" height={spec.kind !== "trend" ? Math.max(200,points.length*42+42) : 240} minWidth={0}>
-      {spec.kind !== "trend"
+  return <div aria-hidden="true" className="w-full min-w-0" data-report-chart-plot={spec.kind}>
+    <ResponsiveContainer {...container} height={spec.kind==="trend"?reportPlotStyle.trendHeight:Math.max(reportPlotStyle.minimumHeight,points.length*reportPlotStyle.rowHeight+48)}>
+      {spec.kind!=="trend"
         ? <BarChart data={points} layout="vertical" accessibilityLayer={false} margin={margin}>
-            <CartesianGrid stroke="var(--border)" horizontal={false}/>
-            <XAxis type="number" domain={[0,"auto"]} {...numberAxis}/>
-            <YAxis type="category" dataKey="label" tick={axis} width={120} interval={0}/>
-            <Bar dataKey="value" fill="var(--primary)" maxBarSize={24} isAnimationActive={false}/>
+            <CartesianGrid {...grid} horizontal={false}/>
+            <XAxis type="number" domain={domain} {...numberAxis}/>
+            <YAxis type="category" {...categoryAxis}/>
+            <Tooltip content={renderTooltip} cursor={{fill:reportPlotStyle.hover}} isAnimationActive={false}/>
+            <Bar dataKey="value" name={spec.valueLabel} fill={reportSeriesColors[0]} {...bar}/>
           </BarChart>
         : <LineChart data={points} accessibilityLayer={false} margin={margin}>
-            <CartesianGrid stroke="var(--border)" vertical={false}/>
-            <XAxis dataKey="label" tick={axis} minTickGap={20}/>
-            <YAxis domain={[0,"auto"]} {...numberAxis}/>
-            <Line dataKey="value" stroke="var(--primary)" strokeWidth={2} dot={{r:3}} connectNulls={false} isAnimationActive={false}/>
+            <CartesianGrid {...grid} vertical={false}/>
+            <XAxis dataKey="id" {...axisGeometry} minTickGap={20} tickFormatter={(id:unknown)=>truncateReportLabel(labelFor(id),layout.trendLabelChars)}/>
+            <YAxis domain={domain} width={layout.numberWidth} {...numberAxis}/>
+            <Tooltip content={renderTooltip} cursor={{stroke:reportPlotStyle.gridStroke}} isAnimationActive={false}/>
+            <Line dataKey="value" name={spec.valueLabel} stroke={reportSeriesColors[0]} strokeWidth={reportPlotStyle.lineWidth}
+              dot={{r:reportPlotStyle.pointRadius,fill:reportSeriesColors[0],stroke:reportPlotStyle.separator,strokeWidth:1}}
+              activeDot={{r:4,fill:reportSeriesColors[0],stroke:reportPlotStyle.separator,strokeWidth:1}}
+              connectNulls={false} isAnimationActive={false}/>
           </LineChart>}
     </ResponsiveContainer>
   </div>;

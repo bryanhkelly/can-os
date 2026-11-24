@@ -7,3 +7,7 @@ Initial consumers: provider pilot registration outcomes (overlapping measures, n
 No new schema, public disclosure, grant or metric formulas. Supply authorized aggregate values only; never derive distinct people or suppressed values in visualization components. External impact reports require separate disclosure approval.
 
 Storybook: Foundations/V6.1 reporting charts, including comparison, trend, missing, zero, mobile and dark. Required release checks: npm ci, npm run typecheck, npm run lint, npx vitest run tests/unit/report-chart-data.test.ts, npm run test:storybook, npm run build:cloudflare, authorized pilot browser acceptance and cross-grant cache-switch acceptance. The dependency lock is reconciled from Hadalian's resolved graph; actual npm resolution and runtime acceptance remain required.
+
+## Governed V6.1 design adoption (2026-11-24)
+
+The chart uses the existing DashboardPanel with configurable heading level, canonical theme-owned analytical series tokens, color-independent patterned categorical marks, shared tooltip, measured-container axis layout, stable category IDs, compact ticks with exact tables, shared empty/error/loading states, and explicit print/table presentation. See the V6.1 design specification and the Data Visualization Storybook catalog. No change to report authorization, counting or source data. Browser, accessibility, print and visual regression acceptance remain required; no full build is implied by this commit.

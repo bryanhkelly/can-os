@@ -120,8 +120,18 @@
 
   /* Blue is reserved for primary actions, active navigation, and information. */
   --primary: #1769ef;
-  --report-series-four: #a34f17;
   --primary-foreground: #ffffff;
+
+  /* V6.1 analytical marks are independent of interaction, status and Site brand.
+     Series order is categorical, not an implied rank or outcome. */
+  --report-series-1: #344b69;
+  --report-series-2: #607b94;
+  --report-series-3: #705287;
+  --report-series-4: #276b73;
+  --report-axis: var(--muted-foreground);
+  --report-grid: var(--border);
+  --report-separator: var(--card);
+  --report-hover: var(--muted);
 
   --secondary: #eef2f7;
   --secondary-foreground: #101d39;
@@ -213,8 +223,12 @@
   --popover-foreground: #f4f7fc;
 
   --primary: #8ab4ff;
-  --report-series-four: #f3b478;
   --primary-foreground: #101d39;
+
+  --report-series-1: #a4bad7;
+  --report-series-2: #7da2bf;
+  --report-series-3: #c0a0d4;
+  --report-series-4: #75c4cb;
 
   --secondary: #243149;
   --secondary-foreground: #f4f7fc;
@@ -247,7 +261,6 @@
 
 .dark [data-can-brand="true"] {
   --primary: #8ab4ff;
-  --report-series-four: #f3b478;
   --primary-foreground: #101d39;
   --accent: #1c3157;
   --accent-foreground: #f4f7fc;

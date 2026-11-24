@@ -100,13 +100,25 @@ export function runtimeDependencySpecifiers(sourceFile, ts) {
  */
 export function featureRuntimeImportViolation(file, specifier) {
   const normalized = file.replaceAll("\\", "/");
-  if (!normalized.startsWith("src/components/")) return null;
-  if (/^recharts(?:\/|$)/.test(specifier) && normalized !== "src/components/workspace/report-chart-plot.tsx")
-    return "import Recharts only through the shared reporting plot adapter: " + specifier;
   const target = resolveSourceDependency(normalized, specifier);
+  const chartViolation=reportVisualizationImportViolation(normalized,specifier);
+  if(chartViolation)return chartViolation;
+  if (!normalized.startsWith("src/components/")) return null;
   if (target && /\.server(?:\.[cm]?[jt]sx?)?(?:\/|$)/.test(target))
     return "feature presentation must use an authorized RPC facade, not a server implementation: " + specifier;
   if (/^(?:@neondatabase\/serverless|pg|postgres|drizzle-orm)(?:\/|$)/.test(specifier))
     return "feature presentation must not own database transport or queries: " + specifier;
+  return null;
+}
+
+/** Prevent routes and other source modules from bypassing the governed chart surface. */
+export function reportVisualizationImportViolation(file,specifier){
+  const normalized=file.replaceAll("\\","/");
+  if(!normalized.startsWith("src/"))return null;
+  if(/^recharts(?:\/|$)/.test(specifier)&&normalized!=="src/components/workspace/report-chart-plot.tsx")
+    return "import Recharts only through the shared reporting plot adapter: "+specifier;
+  const target=resolveSourceDependency(normalized,specifier);
+  if(target&&/^src\/components\/workspace\/report-chart-plot(?:\.[cm]?[jt]sx?)?$/.test(target)&&normalized!=="src/components/workspace/report-chart.tsx")
+    return "consume ReportChart rather than its private Recharts adapter: "+specifier;
   return null;
 }

@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { StatCard } from "./stat-card";
 import { DashboardProgress } from "./dashboard-widgets";
-import { ReportChart } from "./report-chart";
+import { ReportChart,type ReportPresentation } from "./report-chart";
 import { formatReportChartValue, type ReportChartSpec } from "./report-chart-data";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import type { SourceMetricContract } from "@/domain/reporting-metric-registry";
@@ -16,12 +16,12 @@ export type ReportDocument = {
   definitions?:readonly SourceMetricContract[];
 };
 /** A versioned read-only view model, not a query language or disclosure grant. */
-export function ReportDocumentView({report}:{report:ReportDocument}){
+export function ReportDocumentView({report,presentation="interactive"}:{report:ReportDocument;presentation?:ReportPresentation}){
   const titleId=useId();
   if(report.version!==1||new Set(report.blocks.map(b=>b.id)).size!==report.blocks.length)
     return <p role="alert">Unsupported or invalid report definition.</p>;
-  return <section aria-labelledby={titleId} className="min-w-0 space-y-4">
-    <div><h3 id={titleId} className="font-serif text-xl font-semibold">{report.title}</h3>
+  return <section aria-labelledby={titleId} className="min-w-0 space-y-4 print:text-sm">
+    <div><h3 id={titleId} className="font-serif text-section font-normal leading-tight">{report.title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{report.scopeLabel}. {report.basis}</p></div>
     {report.blocks.map(block=>{
       switch(block.kind){
@@ -29,7 +29,7 @@ export function ReportDocumentView({report}:{report:ReportDocument}){
           {block.items.map(item=><StatCard key={item.id} label={item.label} hint={item.hint}
             value={formatReportChartValue(item.value!==null&&Number.isSafeInteger(item.value)&&item.value>=0?item.value:null)}/>)}
         </div>;
-        case "chart":return <ReportChart key={block.id} spec={block.spec}/>;
+        case "chart":return <ReportChart key={block.id} spec={block.spec} presentation={presentation} headingLevel="h4"/>;
         case "progress":return <div key={block.id} className="border border-border bg-card p-4"><DashboardProgress label={block.label}
           value={block.value??NaN} max={block.target} description={block.description}/></div>;
         case "note":return <p key={block.id} className="text-sm text-muted-foreground">{block.text}</p>;

@@ -52,3 +52,27 @@ export function formatReportChartValue(value: number | null, format: ChartFormat
   return new Intl.NumberFormat("en-US", {maximumFractionDigits: format === "count" ? 0 : 2}).format(value) +
     (format === "percent" ? "%" : "");
 }
+
+/** Plot-only compact notation. Exact-value tables retain the full formatted number. */
+export function formatReportAxisValue(value:number,format:ChartFormat="count"){
+  if(!Number.isFinite(value))return "";
+  if(format==="percent"||Math.abs(value)<1000)return formatReportChartValue(value,format);
+  return new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(value);
+}
+export function truncateReportLabel(label:string,maxChars:number){
+  const chars=Array.from(label);
+  return chars.length<=maxChars?label:chars.slice(0,Math.max(1,maxChars-1)).join("")+"…";
+}
+/** Plot responds to its measured container, not the browser viewport. */
+export function reportChartLayout(containerWidth:number){
+  const width=Number.isFinite(containerWidth)&&containerWidth>0?containerWidth:320;
+  const categoryWidth=Math.max(64,Math.min(180,Math.floor(width*0.36)));
+  return {
+    categoryWidth,categoryLabelChars:Math.max(6,Math.floor((categoryWidth-12)/7)),
+    trendLabelChars:Math.max(6,Math.min(20,Math.floor(width/5/7))),
+    numberWidth:width<400?54:72,tickCount:width<340?3:width<550?4:6,
+  };
+}
+export function hasNonzeroReportChartValues(spec:ReportChartSpec){
+  return spec.kind==="stacked"?spec.rows.some(row=>row.total>0):spec.points.some(point=>point.value!==null&&point.value>0);
+}

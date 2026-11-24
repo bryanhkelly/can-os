@@ -89,3 +89,11 @@ test("runtime feature boundaries distinguish erased types from server execution"
   assert.equal(featureRuntimeImportViolation("src/components/workspace/report-chart-plot.tsx", "recharts"), null);
   assert.equal(featureRuntimeImportViolation("src/modules/example/read.functions.ts", "drizzle-orm"), null);
 });
+
+test("all source layers must use the governed chart surface",()=>{
+  assert.match(featureRuntimeImportViolation("src/routes/reports.tsx","recharts"),/shared reporting plot adapter/);
+  assert.match(featureRuntimeImportViolation("src/components/reports/Feature.tsx","../workspace/report-chart-plot"),/consume ReportChart/);
+  assert.match(featureRuntimeImportViolation("src/routes/reports.tsx","@/components/workspace/report-chart-plot.tsx"),/consume ReportChart/);
+  assert.equal(featureRuntimeImportViolation("src/components/workspace/report-chart.tsx","./report-chart-plot"),null);
+  assert.equal(featureRuntimeImportViolation("src/routes/reports.tsx","@/components/workspace/report-chart"),null);
+});

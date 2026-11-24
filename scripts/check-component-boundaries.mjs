@@ -12,7 +12,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency, runtimeDependencySpecifiers, featureRuntimeImportViolation } from "./lib/v61-component-dependencies.mjs";
+import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency, runtimeDependencySpecifiers, featureRuntimeImportViolation, reportVisualizationImportViolation } from "./lib/v61-component-dependencies.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const failures = [];
@@ -31,12 +31,12 @@ function checkParseDiagnostics(file, source, program) {
   }
 }
 
-function collect(directory) {
+function collect(directory,output=files) {
   for (const entry of readdirSync(resolve(root, directory), { withFileTypes: true })) {
     const name = join(directory, entry.name).replaceAll("\\", "/");
-    if (entry.isDirectory()) collect(name);
+    if (entry.isDirectory()) collect(name,output);
     else if (entry.isFile() && /\.(ts|tsx)$/.test(name) &&
-      !/\.(test|spec|stories)\.(ts|tsx)$/.test(name)) files.add(name);
+      !/\.(test|spec|stories)\.(ts|tsx)$/.test(name)) output.add(name);
   }
 }
 // Every production feature component is checked, not a growing hand-maintained allowlist.
@@ -64,6 +64,21 @@ for (const file of files) {
   }
   if (/\bcreateFileRoute\s*\(/.test(source) || /\bcreateServerFn\s*\(/.test(source))
     failures.push(file + ": shared presentation must not own a route or server command");
+}
+
+// The chart dependency is forbidden outside its adapter even in routes, hooks,
+ // and other non-component source. Avoid parsing unrelated files twice.
+const chartSources=new Set();
+collect("src",chartSources);
+for(const file of chartSources){
+  if(files.has(file))continue;
+  const source=readFileSync(resolve(root,file),"utf8");
+  if(!/recharts|report-chart-plot/.test(source))continue;
+  const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,file.endsWith(".tsx")?ts.ScriptKind.TSX:ts.ScriptKind.TS);
+  for(const specifier of runtimeDependencySpecifiers(parsed,ts)){
+    const violation=reportVisualizationImportViolation(file,specifier);
+    if(violation)failures.push(file+": "+violation);
+  }
 }
 
 const owners = [
