@@ -1,3 +1,4 @@
+import { siteAudienceNames } from "./site-audiences";
 import {
   defaultSiteContentChannelConfig, resolveSiteContentBlocks,
   type SiteContentBlockProjection,
@@ -30,11 +31,9 @@ export function projectPlannedSiteProgramsForPreview(
   const timingNames:Record<string,string> = {
     weekdays:"weekdays",weekends:"weekends",daytime:"daytime sessions",evenings:"evening sessions",
   };
-  const audienceNames:Record<string,string> = {
-    children:"children",teens:"teens",adults:"adults",older_adults:"older adults",
-  };
+  const audienceNames = siteAudienceNames;
   const timing = (preferences.timingIds ?? []).map(id=>timingNames[id]??"").filter(Boolean);
-  const audiences = (preferences.audienceIds ?? []).map(id=>audienceNames[id]??"").filter(Boolean);
+  const audiences = (preferences.audienceIds ?? []).map(id=>audienceNames[id]?.toLowerCase()??"").filter(Boolean);
   const description = "We are exploring " + delivery +
     (audiences.length ? " for " + audiences.join(", ") : "") +
     (timing.length ? " with possible " + timing.join(", ") : "") +
