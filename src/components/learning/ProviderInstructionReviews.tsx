@@ -2,7 +2,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useRef, useState, type FormEvent } from "react";
-import { WorkspaceShell, MutationFeedback, WorkspaceNotice, EmptyState, StatusBadge } from "@/components/workspace";
+import { ActionFooter, QueryState, WorkspaceShell, MutationFeedback, WorkspaceNotice, EmptyState, StatusBadge } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -24,9 +24,9 @@ export function ProviderInstructionReviews({navigation}:{navigation?:ReactNode})
     queryKey:["provider-content-review-queue"],
     queryFn:()=>getProviderContentWorkspace(),retry:false,
   });
-  if(queue.isPending)return <WorkspaceShell title="Instructional content reviews"><p role="status">Checking current review appointments…</p></WorkspaceShell>;
+  if(queue.isPending)return <WorkspaceShell title="Instructional content reviews"><QueryState loading="Checking current review appointments…"/></WorkspaceShell>;
   if(queue.isError||!queue.data)return <WorkspaceShell title="Content review unavailable">
-    <WorkspaceNotice tone="danger">Review inventory cannot be verified for this account. No publisher authority is inferred.</WorkspaceNotice>
+    <QueryState error="Review inventory cannot be verified for this account. No publisher authority is inferred." onRetry={()=>void queue.refetch()} retrying={queue.isFetching}/>
   </WorkspaceShell>;
   if(queue.data.role!=="academic_content_reviewer")return <WorkspaceShell title="Reviewer access required">
     <WorkspaceNotice tone="attention">Use your independently verified academic content reviewer membership. Author and reviewer powers are never combined by this page.</WorkspaceNotice>
@@ -129,12 +129,12 @@ function ReviewEditor({track,courseName}:{track:Track;courseName:string}) {
             placeholder="Verified evidence UUID"/>
         </Field>}
       </div>
-      {invalid&&<p role="alert" className="mt-3 border border-destructive p-3 text-sm">{invalid}</p>}
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      {invalid&&<WorkspaceNotice tone="danger" className="mt-3">{invalid}</WorkspaceNotice>}
+      <ActionFooter layout="inline" className="mt-4">
         <Button type="submit" disabled={mutation.pending||mutation.refreshFailed||rationale.trim().length<10}>Record decision</Button>
         <Button type="button" variant="outline" disabled={!approved||mutation.pending||mutation.refreshFailed}
           onClick={()=>void publish()}>Publish fully approved track</Button>
-      </div>
+      </ActionFooter>
       {!approved&&<p className="mt-2 text-xs text-muted-foreground">Publication remains blocked until the latest academic, rights, accessibility, coverage and safeguarding decisions all approve this exact manifest. Review alone never grants learner delivery rights.</p>}
       <MutationFeedback className="mt-3" state={mutation} pendingMessage="Recording independent content decision…"/>
     </form>}
