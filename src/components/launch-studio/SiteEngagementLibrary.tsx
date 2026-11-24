@@ -1,3 +1,5 @@
+import { Field } from "@/components/ui/field";
+import { Label } from "@/components/ui/label";
 import { SiteCampaignEvidencePanel } from "@/components/reports/SiteCampaignEvidencePanel";
 import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
@@ -125,7 +127,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
       <p className="mt-4 text-sm text-muted-foreground">No published experiences in this workspace yet.</p>}
     {!loading&&records.length>0&&<>
       <div className="mt-4 grid gap-1">
-        <label className="text-sm font-medium" htmlFor="saved-go-engagement">Published experience</label>
+        <Label htmlFor="saved-go-engagement">Published experience</Label>
         <Select id="saved-go-engagement" disabled={busy} value={selected??""} onChange={event=>{
           setSelected(event.target.value);setLinks([]);setLinksFor(null);setLinksLoading(true);setDistribution(null);setError("");setMessage("");
         }}>
@@ -139,11 +141,11 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
           <span className="font-medium">{record.domain}</span> · {record.mode==="page"?"Rendered experience":"Direct destination"} · {record.status}
         </div>
         <div className="mt-4 flex flex-wrap items-end gap-3">
-          <label className="grid gap-1 text-sm font-medium">Channel
-            <Select value={channel} onChange={event=>setChannel(event.target.value as Channel)}>
+          <Field label="Channel">
+          <Select value={channel} onChange={event=>setChannel(event.target.value as Channel)}>
               {Object.entries(channelLabels).map(([id,label])=><option value={id} key={id}>{label}</option>)}
             </Select>
-          </label>
+        </Field>
           <Button type="button" disabled={busy||record.status!=="active"} onClick={()=>void createLink()}>
             {busy?"Working…":"Create another Go Link"}
           </Button>
