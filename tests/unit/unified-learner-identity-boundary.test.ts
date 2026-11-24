@@ -31,11 +31,12 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    const review=read("src/modules/classes/native-class-adult-review.functions.ts");
    const activation=read("src/modules/classes/native-class-reviewed-onboarding.functions.ts");
    expect(review).toContain("link.accessPersonId!==account.personId");
-   expect(review).toContain("existingPerson.birthDate!==data.verifiedBirthDate");
-   expect(activation).toContain("eq(canonicalPersons.id,linked.personId)");
+   expect(review).toContain("link.personId!==account.personId");
+   expect(activation).toContain("assertCurrentAdultReviewEvidence(tx,review,now)");
+   expect(activation).toContain("nativePersonId=owner.personId");
+   expect(activation).not.toContain("tx.insert(canonicalPersons)");
    expect(activation).toContain("existingPersonReused:Boolean(linked)");
    expect(activation).toContain("if(linked){");
-   expect(activation).toContain("isNull(canonicalPersons.birthDate)");
    expect(activation).toContain('if(Boolean(sameEmail)!==Boolean(linked)');
  });
  it("requires real independently reviewed private evidence before granting adulthood",()=>{
@@ -98,7 +99,11 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    expect(evidence).toContain("source.metadata.revokedAt!=null");
    expect(evidence).toContain("source.metadata.privateObjectVerified!==true");
    expect(evidence).toContain("source.expiresAt!==null&&source.expiresAt<=now");
-   expect(evidence).toContain("person?.birthDate!==review.verifiedBirthDate");
+   expect(evidence).toContain("review.accessPersonId!==canonicalPersonId");
+   expect(evidence).toContain("source.metadata.verifiedBirthDate!==review.verifiedBirthDate");
+   expect(evidence).toContain("current independently authorized adult reviewer");
+   expect(evidence).toContain("current independent identity evidence verifier");
+   expect(evidence).not.toContain("canonicalPersons");
    expect(reader).toContain("await assertCurrentReviewedNativeLearner(native.account_id,native.person_id)");
  });
  it("keeps review statuses redacted in platform operational reconciliation",()=>{
