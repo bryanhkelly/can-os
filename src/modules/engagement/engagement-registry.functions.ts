@@ -83,9 +83,9 @@ export async function authorizeEngagementOwner(
     return {ownerKind:"site",organizationId:site.organizationId,siteId:site.id,programId:null};
   }
   const [program]=await reader.select({
-    id:programs.id,organizationId:programs.organizationId,siteId:programs.siteId,
+    id:programs.id,organizationId:programs.organizationId,siteId:programs.siteId,status:programs.status,
   }).from(programs).where(eq(programs.id,owner.programId)).limit(1);
-  if(!program)throw new AuthorizationError("existing Program owner");
+  if(!program || program.status==="closed")throw new AuthorizationError("existing active Program owner");
   assertCapability(actor,write?"program.launch.start":"program.read");
   if(!actor.scope.programIds?.includes(program.id) ||
       !actor.scope.organizationIds?.includes(program.organizationId) ||
