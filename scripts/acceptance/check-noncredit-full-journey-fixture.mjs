@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import {neon} from "@neondatabase/serverless";
+import {neon,Pool} from "@neondatabase/serverless";
+import {createHash} from "node:crypto";
 import {verifyAdmissionsNeonBranch} from "../verify-admissions-neon-branch.mjs";
 
 // No writes. The only accepted fixture is explicitly marked for this exact
@@ -14,6 +15,43 @@ assert.match(fixture.releaseId,/^[0-9a-f-]{36}$/i);
 assert.match(fixture.goCode,/^[A-Za-z0-9_-]{12}$/);
 assert.ok(Array.isArray(fixture.lessons) && fixture.lessons.length>=1 && fixture.lessons.length<=40 && fixture.lessons.every(title=>typeof title==="string" && title.trim()) && new Set(fixture.lessons).size===fixture.lessons.length,"Distinct reviewed lesson titles required");
 const sql=neon(env.TEST_DATABASE_URL);
+// Independently attest the restricted authentication endpoint before any writes.
+const authUrl=env.CAN_CANONICAL_AUTH_DATABASE_URL;
+assert.ok(authUrl,"Dedicated restricted QA authentication URL required");
+const auth=new URL(authUrl);
+assert.ok(["postgres:","postgresql:"].includes(auth.protocol)&&auth.username==="can_os_canonical_auth_app"&&auth.password&&!["user","role","options"].some(k=>auth.searchParams.has(k)),"Restricted application authentication login required");
+assert.ok((env.CAN_ACCESS_TOKEN_PEPPER?.length??0)>=32&&(env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length??0)>=32,"Isolated session peppers required");
+assert.ok(env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED==="true"&&/^[a-f0-9]{64}$/i.test(env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX??""),"Objective assessment key and auto-finalization configuration required");
+const authPool=new Pool({connectionString:authUrl,max:1});
+let client;
+try{
+ client=await authPool.connect();
+ await client.query("BEGIN READ ONLY");
+ const {rows:[identity]}=await client.query("SELECT current_setting('neon.project_id',true) AS project,current_setting('neon.branch_id',true) AS branch,session_user AS login");
+ assert.ok(identity?.project==="sweet-hall-62441909"&&identity?.branch===branch&&identity?.login==="can_os_canonical_auth_app","Authentication connection must attest the same dedicated QA branch");
+ await client.query("SET LOCAL ROLE can_v30_canonical_auth_reader");
+ const {rows:[probe]}=await client.query("SELECT current_user AS role,has_table_privilege(current_user,'public.people','SELECT') AS people_read,(SELECT count(*)::int FROM education_v30.v301_canonical_session_context(repeat('0',64))) AS known");
+ assert.ok(probe?.role==="can_v30_canonical_auth_reader"&&!probe.people_read&&probe.known===0,"Restricted reader probe failed");
+}finally{
+ if(client){try{await client.query("ROLLBACK");}finally{client.release();}}
+ await authPool.end();
+}
+const sessionDigests=["LEARNER","OTHER","PROVIDER"].map(role=>{
+ const token=env["CAN_PILOT_QA_"+role+"_SESSION"];
+ assert.ok(/^[A-Za-z0-9_-]{40,}$/.test(token??""),"Isolated session required");
+ return createHash("sha256").update(env.CAN_ACCESS_TOKEN_PEPPER).update(":").update(token).digest("hex");
+});
+const identities=await sql`
+ SELECT a.id AS account_id,p.id AS person_id,g.role
+ FROM public.access_sessions s JOIN public.access_accounts a ON a.id=s.account_id
+ JOIN public.people p ON p.id=a.person_id
+ JOIN public.account_person_grants g ON g.id=s.active_grant_id AND g.account_id=a.id AND g.person_id=p.id
+ WHERE s.secret_hash=ANY(${sessionDigests}::text[]) AND s.revoked_at IS NULL AND s.expires_at>now()
+  AND s.updated_at>now()-interval '30 minutes' AND s.delegated_grant_id IS NULL
+  AND a.email_verified_at IS NOT NULL AND NOT a.disabled AND p.active AND g.active
+  AND p.metadata->>'qa_only'='true' AND p.metadata->>'intended_branch'=${branch}
+`;
+assert.ok(identities.length===3&&new Set(identities.map(r=>r.person_id)).size===3,"Three distinct branch-tagged current QA identities required");
 const rows=await sql`
  SELECT r.id,t.title,
   (SELECT count(*)::int FROM public.course_lessons l WHERE l.course_version_id=r.course_version_id) AS lessons,
@@ -86,7 +124,9 @@ const rows=await sql`
    AND policy.min_participation_minutes=0 AND policy.skills_assessment_required
    AND policy.minimum_assessment_fraction=0.8
    AND EXISTS(SELECT 1 FROM public.site_go_links g WHERE g.code=${fixture.goCode}
-     AND g.organization_id=r.registering_organization_id AND g.site_id=r.site_id)
+     AND g.organization_id=r.registering_organization_id AND g.site_id=r.site_id
+     AND g.status='active' AND (g.starts_at IS NULL OR g.starts_at<=now()) AND (g.expires_at IS NULL OR g.expires_at>now()))
+   AND EXISTS(SELECT 1 FROM public.classes cls WHERE cls.site_id=r.site_id AND cls.deployment_id=r.deployment_id AND cls.adoption_id=r.adoption_id AND cls.offering_version_id=r.offering_version_id AND cls.course_version_id=r.course_version_id AND cls.state='active' AND cls.delivery_mode='self_paced')
 `;
 assert.equal(rows.length,1,"Fresh independently approved QA release with branch-bound organization and policy required");
 const row=rows[0];
