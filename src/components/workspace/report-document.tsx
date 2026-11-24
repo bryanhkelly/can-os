@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { WorkspaceNotice } from "./notice";
 import {ReportMetricCard,matchReportMetricDefinition,type ReportMetricItem} from "./report-metric-card";
 import {ReportTargetAttainment} from "./report-target-attainment";
 import type {ReportValueFormat} from "@/domain/report-value-format";
@@ -20,14 +21,14 @@ export type ReportDocument = {
 export function ReportDocumentView({report,presentation="interactive"}:{report:ReportDocument;presentation?:ReportPresentation}){
   const titleId=useId();
   if(report.version!==1||new Set(report.blocks.map(b=>b.id)).size!==report.blocks.length)
-    return <p role="alert">Unsupported or invalid report definition.</p>;
+    return <WorkspaceNotice tone="danger">Unsupported or invalid report definition.</WorkspaceNotice>;
   return <section data-report-document={report.definitionId} aria-labelledby={titleId} className="min-w-0 space-y-4 print:text-sm">
-    <div><h3 id={titleId} className="font-serif text-section font-normal leading-tight">{report.title}</h3>
+    <div><h3 id={titleId} className="font-serif text-section font-normal leading-tight [overflow-wrap:anywhere]">{report.title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{report.scopeLabel}. {report.basis}</p>
       {report.asOf&&<p className="mt-1 text-xs text-muted-foreground">Evidence as of {report.asOf}</p>}</div>
     {report.blocks.map(block=>{
       switch(block.kind){
-        case "metrics":return <div key={block.id} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        case "metrics":return <div key={block.id} className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {block.items.map(item=><ReportMetricCard key={item.id} item={{...item,asOf:item.asOf??report.asOf}} definition={matchReportMetricDefinition(item,report.definitions)} print={presentation==="print"}/>)}
         </div>;
         case "chart":{
