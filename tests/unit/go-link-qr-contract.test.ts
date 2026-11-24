@@ -9,7 +9,7 @@ describe("Safe offline QR creation",()=>{
     expect(qr).toContain("QRCode.toDataURL");
     expect(qr).toContain("Download PNG");
     expect(qr).not.toMatch(/qrserver|quickchart|chart\.googleapis|fetch\(/);
-    expect(read("src/components/launch-studio/GoLinkWorkspace.tsx"))
-      .toContain("<GoLinkQrButton");
+    expect(read("src/components/links/GoLinkActions.tsx")).toContain("<GoLinkQrButton");
+    expect(read("src/components/launch-studio/GoLinkWorkspace.tsx")).toContain("<GoLinkActions");
   });
 });
