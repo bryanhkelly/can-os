@@ -14,6 +14,7 @@ describe("WS2 native Class invitation authority",()=>{
   expect(command).toContain("seatReserved:false");
   expect(command).not.toContain("tx.insert(canonicalClassEnrollments)");
   expect(command).not.toContain("tx.insert(learnerCourseAttempts)");
+  expect(command).not.toContain("createInitialNativeClassAttempt(");
  });
  it("requires the real verified recipient and current exact Site staff grant",()=>{
   for(const rule of [
