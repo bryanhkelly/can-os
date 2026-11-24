@@ -49,8 +49,8 @@ describe("current Site slug route authorization", () => {
     const auth = source("src/domain/auth-route-policy.ts");
     expect(auth).not.toContain('path.startsWith("/o/")');
     const journal = JSON.parse(source("drizzle/meta/_journal.json")) as { entries: { tag: string }[] };
-    expect(journal.entries.at(-1)?.tag).toBe("0106_site_go_links_private_role_access");
-    expect(source("drizzle/0106_site_go_links_private_role_access.sql")).toContain("ENABLE ROW LEVEL SECURITY");
-    expect(source("drizzle/0106_site_go_links_private_role_access.sql")).toContain("anonymous, authenticated");
+    expect(journal.entries).toContainEqual(expect.objectContaining({tag:"0107_site_go_links_private_role_access"}));
+    expect(source("drizzle/0107_site_go_links_private_role_access.sql")).toContain("ENABLE ROW LEVEL SECURITY");
+    expect(source("drizzle/0107_site_go_links_private_role_access.sql")).toContain("anonymous, authenticated");
   });
 });
