@@ -1,3 +1,5 @@
+import { renderSharedSitePreview } from "@/domain/site-preview-sharing";
+import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { sitePreviewSnapshotKey, readSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
 import { and, desc, eq, ilike } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -7,7 +9,7 @@ import { readEligibleSelfEnrollmentReleases } from "@/modules/enrollment/noncred
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { engagementJourneys } from "@/domain/engagement-journeys";
-import { goDestinationHref, type GoDestination } from "@/domain/site-go-links";
+import { goDestinationHref, goDestinationSchema, type GoDestination } from "@/domain/site-go-links";
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
 import { engagementOwnerAllowsSite, type PublicEngagementOwnerScope } from "@/domain/engagement-target-scope";
 
@@ -22,6 +24,28 @@ export type DestinationInspection = {
 };
 type Reader = Pick<typeof db,"select">;
 const unavailable:DestinationInspection={available:false,title:"Unavailable",href:null};
+
+/** Execution is selected by the governed destination, not the public route.
+ * Providers may render an immutable artifact or redirect to an authoritative service. */
+export type SiteGoExecution = {mode:"redirect";href:string}|{mode:"website-preview";html:string};
+type PreviewDestination=Extract<GoDestination,{kind:"website-preview"}>;
+async function previewPages(siteId:string,destination:PreviewDestination) {
+  return readSitePreviewSnapshot(sitePreviewSnapshotKey(siteId,destination.snapshotId),destination.snapshotDigest);
+}
+export async function executeSiteGoDestination(siteId:string,raw:unknown,code:string,page="/",reader:Reader=db):Promise<SiteGoExecution|null>{
+  const parsed=goDestinationSchema.safeParse(raw);
+  if(!parsed.success)return null;
+  const destination=parsed.data;
+  if(destination.kind==="website-preview"){
+    if(!isPublicSitePagePath(page))return null;
+    const pages=await previewPages(siteId,destination);
+    const html=pages?.[page];
+    if(!pages||!html)return null;
+    return {mode:"website-preview",html:renderSharedSitePreview(html,siteId,"",Object.keys(pages),false,code)};
+  }
+  const inspection=await inspectGoDestination(siteId,destination,code,reader);
+  return inspection.available&&inspection.href?{mode:"redirect",href:inspection.href}:null;
+}
 
 async function publishedSiteHost(siteId:string,reader:Reader):Promise<string|null> {
   const [published]=await reader.select({
@@ -41,7 +65,7 @@ export async function inspectGoDestination(
   reader:Reader=db,
 ):Promise<DestinationInspection>{
   if(destination.kind==="website-preview"){
-    const pages=await readSitePreviewSnapshot(sitePreviewSnapshotKey(siteId,destination.snapshotId),destination.snapshotDigest);
+    const pages=await previewPages(siteId,destination);
     return pages?.["/"]?{available:true,title:"Website preview",href:"/go/"+code}:unavailable;
   }
   if(destination.kind==="site-page"){
