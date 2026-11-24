@@ -7,7 +7,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { selectCourseClass } from "@/domain/course-class-registration";
-import { assertNativeClassSeatAvailable } from "@/domain/native-class-lifecycle";
+import { assertNativeClassSeatAvailable, nativeClassCapacity } from "@/domain/native-class-lifecycle";
 import { accessAccountNoncreditPrincipals } from "@/db/schema";
 import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
@@ -62,7 +62,7 @@ export async function listEligibleCourseClasses(
     if(upcoming.length>100)throw new AuthorizationError("Class schedule exceeds supported Session limit");
     const occupancy=await readNativeClassOccupancy(tx,cls.id);
     result.push({id:cls.id,title:cls.title,deliveryMode:cls.deliveryMode,
-      seatsRemaining:cls.capacity===null?null:Math.max(0,cls.capacity-(occupancy)),
+      seatsRemaining:nativeClassCapacity({method:"self",activeOrPending:occupancy,classCapacity:cls.capacity}).remainingSeats,
       sessions:upcoming.map(item=>({
         startsAt:item.startsAt.toISOString(),endsAt:item.endsAt.toISOString(),
       })),
