@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { goDestinationSchema } from "./site-go-links";
-import { containsProtectedInstitutionalClaim } from "./site-local-content";
+import { containsProtectedInstitutionalClaim } from "./public-claims-policy";
 
 /**
  * Cross-domain public engagement vocabulary. This models an invitation and
