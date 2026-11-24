@@ -1,0 +1,9 @@
+# V6.1 reporting visualization foundation
+
+Recharts 3.8.1 is pinned to Hadalian's resolved version and confined to the shared plot adapter. Domain projections and server authorization remain authoritative. ReportChart uses V6.1 tokens and Table, exact values, missing-value handling, stable identifiers, no animation, lazy plot loading and bounded data.
+
+Initial consumers: provider pilot registration outcomes (overlapping measures, not a funnel) and operator Site registration comparison (up to 20 Sites; existing detailed table remains). The network reporting cache includes the active grant, role, context and owner delegation, and hides results on missing session or error.
+
+No new schema, public disclosure, grant or metric formulas. Supply authorized aggregate values only; never derive distinct people or suppressed values in visualization components. External impact reports require separate disclosure approval.
+
+Storybook: Foundations/V6.1 reporting charts, including comparison, trend, missing, zero, mobile and dark. Required release checks: npm ci, npm run typecheck, npm run lint, npx vitest run tests/unit/report-chart-data.test.ts, npm run test:storybook, npm run build:cloudflare, authorized pilot browser acceptance and cross-grant cache-switch acceptance. The dependency lock is reconciled from Hadalian's resolved graph; actual npm resolution and runtime acceptance remain required.

@@ -1,5 +1,6 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
+import { ReportChart } from "@/components/workspace/report-chart";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState, StatCard, WorkspaceNotice } from "@/components/workspace";
@@ -63,6 +64,14 @@ export function NoncreditPilotOutcomesPanel(){
         <StatCard label="Recorded participant hours" value={(summary.verifiedParticipationMinutes/60).toLocaleString(undefined,{maximumFractionDigits:1})} hint="Verified minutes divided by 60; not unique person time"/>
         <StatCard label="Delivery Sites with registrations" value={count(report!.deliverySites)} hint="Authorized Sites, not a count of congregations"/>
       </div>
+      <ReportChart spec={{
+        title:"Registration outcomes",description:"Authorized registration counts for this window. Measures overlap; do not add them or treat them as a sequential funnel.",
+        valueLabel:"Registrations",kind:"comparison",format:"count",points:[
+          {id:"registered",label:"Registered",value:summary.registrations},
+          {id:"engaged",label:"Engaged",value:summary.engagedParticipants},
+          {id:"passed",label:"Passed check",value:summary.knowledgeCheckPasses},
+          {id:"completed",label:"Completed",value:summary.confirmedNoncreditCompletions},
+        ]}}/>
       <WorkspaceNotice>Only source-verified participation minutes are counted. Lesson ticks, playback and registrations are not evidence of attendance. National congregation reach requires independently authorized network attribution.</WorkspaceNotice>
       <div className="border border-border bg-card p-4">
         <h3 className="font-semibold">Demonstrated learning improvement</h3>

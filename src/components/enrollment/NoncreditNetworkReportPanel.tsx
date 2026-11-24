@@ -1,18 +1,25 @@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {useQuery} from "@tanstack/react-query";
+import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
+import { ReportChart } from "@/components/workspace/report-chart";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
 
 /** Exact authorized operating-organization aggregation. Publishing a national
  * report requires separate network membership authority and disclosure review. */
 export function NoncreditNetworkReportPanel(){
+  const {session,error:sessionError}=useWorkspaceSession();
+  const authorizedSession=session?.authenticated&&!sessionError?session:null;
+  const scope=authorizedSession?JSON.stringify([authorizedSession.activeGrantId,authorizedSession.role,authorizedSession.activeContext,authorizedSession.ownerDelegation??null]):null;
   const report=useQuery({
-    queryKey:["noncredit-operator-network-report"],
+    queryKey:["noncredit-operator-network-report",scope],
+    enabled:scope!==null,
     queryFn:()=>getNoncreditOperatorNetworkSummary(),
     retry:false,staleTime:30_000,
   });
-  const data=report.data;
+  const data=scope!==null&&!report.isError?report.data:undefined;
   const totals=data?.totals;
+  if(scope===null)return null;
   return <section className="mt-7 border border-border bg-card p-5" aria-label="Noncredit program impact">
     <h2 className="font-serif text-2xl">Program participation & outcomes</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -39,6 +46,11 @@ export function NoncreditNetworkReportPanel(){
             <dd className="mt-2 font-serif text-3xl tabular-nums">{value.toLocaleString()}</dd>
           </div>)}
       </dl>
+      {data!.sites.length>0&&data!.sites.length<=20&&<div className="mt-5">
+        <ReportChart spec={{title:"Registrations by delivery Site",description:"Authorized Site totals, not a national cross-organization report.",
+          valueLabel:"Registrations",kind:"comparison",format:"count",
+          points:data!.sites.map(site=>({id:site.siteId,label:site.siteName,value:site.registrations}))}}/>
+      </div>}
       <div className="mt-5 border border-border">
         <Table scrollLabel="Site participation totals" aria-label="Site participation totals" className="text-left"><TableCaption className="sr-only">Site participation totals</TableCaption>
           <TableHeader><TableRow className="border-b border-border bg-muted/30">
