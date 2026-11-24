@@ -1,6 +1,7 @@
 import {describe,expect,it} from "vitest";
 import { engagementDefinitionSchema, engagementRequiresClaimReview } from "@/domain/engagement-definition";
 import { renderEngagementPage } from "@/domain/engagement-page-renderer";
+import { resolveSiteTheme } from "@/domain/site-theme";
 
 const definition=engagementDefinitionSchema.parse({
   domain:"partnerships",
@@ -30,6 +31,16 @@ describe("immutable public engagement page renderer",()=>{
     expect(html).toContain('href="/next/church-networks"');
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<form");
+  });
+  it("uses canonical saved Site Brand palette and typography tokens",()=>{
+    const theme=resolveSiteTheme("oxford","traditional");
+    const html=renderEngagementPage({
+      mode:"page",definition,ownerName:"The Oxford Community",
+      href:"/next/church-networks",theme,
+    });
+    expect(html).toContain("color:"+theme.ink+";background:"+theme.canvas);
+    expect(html).toContain("font-family:"+theme.displayFont);
+    expect(html).not.toContain("<script");
   });
   it("flags unverified institution-level claims for separate review",()=>{
     expect(engagementRequiresClaimReview(
