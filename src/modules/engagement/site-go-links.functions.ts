@@ -4,8 +4,8 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { siteGoLinks, siteMarketingPackages, sites } from "@/db/schema";
-import { assertSiteSetupScope } from "@/domain/site-setup-scope";
+import { programs, siteGoLinks, siteMarketingPackages, sites } from "@/db/schema";
+import { assertSiteSetupScope, assertWholeSiteReportingScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { goDestinationKindSchema, goDestinationSchema } from "@/domain/site-go-links";
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
@@ -45,6 +45,14 @@ async function authorizedPackage(
     lifecycleStatus:sites.lifecycleStatus,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
   assertSiteSetupScope(actor, site, write ? "program.launch.start" : "program.read");
+  // An unscoped Site inventory includes all its campaigns and offerings.
+  // A partial Program grant must not allow browsing sibling Program links.
+  if(!packageId){
+    const attached=await reader.select({id:programs.id}).from(programs)
+      .where(and(eq(programs.siteId,siteId),
+        eq(programs.organizationId,site!.organizationId)));
+    assertWholeSiteReportingScope(actor,site,attached.map(item=>item.id));
+  }
   const [pkg]=packageId?await reader.select({
     id:siteMarketingPackages.id,status:siteMarketingPackages.status,
     organizationId:siteMarketingPackages.organizationId,
