@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { EmptyState, StatCard, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { projectPublisherReleaseNextStep, projectNoncreditPilotBlockers,
   type NativePublisherReleaseRecord,
   type PublisherReleaseNextStep } from "@/domain/native-publisher-release-readiness";
@@ -47,18 +47,9 @@ export function PlatformReleaseCenter({records,limited}:{
   return <WorkspacePanel title="Release Center" className="mt-6"
     description="One place to triage real publisher prerequisites and navigate to the authorized owner. This is operational coordination, not blanket approval authority.">
     <div className="mt-2 grid gap-3 sm:grid-cols-3">
-      <div className="border border-border p-3">
-        <p className="text-xs text-muted-foreground">Offering versions inspected</p>
-        <p className="text-2xl font-semibold tabular-nums">{items.length}</p>
-      </div>
-      <div className="border border-border p-3">
-        <p className="text-xs text-muted-foreground">Require publisher follow-up</p>
-        <p className="text-2xl font-semibold tabular-nums">{blocked}</p>
-      </div>
-      <div className="border border-border p-3">
-        <p className="text-xs text-muted-foreground">Past basic publication gates</p>
-        <p className="text-2xl font-semibold tabular-nums">{items.length-blocked}</p>
-      </div>
+      <StatCard label="Offering versions inspected" value={items.length}/>
+      <StatCard label="Require publisher follow-up" value={blocked}/>
+      <StatCard label="Past basic publication gates" value={items.length-blocked}/>
     </div>
     <WorkspaceNotice className="mt-4">
       Inventory is limited to the first 25 Offering versions and cannot prove that any
