@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -35,7 +35,8 @@ async function requireAssignedNativeDraft(tx:Tx,actor:Actor,courseVersionId:stri
   }).from(courseVersions)
     .innerJoin(courses,eq(courses.id,courseVersions.courseId))
     .where(and(eq(courseVersions.id,courseVersionId),
-      eq(courseVersions.lifecycle,"draft")));
+      eq(courseVersions.lifecycle,"draft"),
+      sql`${courseVersions.syllabus}->>'supersededByCourseVersionId' IS NULL`));
   const [course]=await (lock?query.for("update"):query).limit(1);
   if(!course)throw new AuthorizationError("unpublished publisher Course draft");
   // An authenticated organization role is not a Course appointment.

@@ -137,6 +137,7 @@ export async function saveCurriculumDraft(actor: Actor, input: {
     const course = await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
     const [version] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).for("update").limit(1);
     if (!version || version.status !== "draft") throw new Error("Published curriculum is immutable. Create a new draft.");
+    if (version.curriculum?.supersededByCourseVersionId) throw new Error("This curriculum has moved to native Course authoring.");
     const teacherGuides = input.teacherGuides === undefined
       ? readClassTeacherGuides(version.curriculum)
       : input.teacherGuides === null ? null : assertTeacherGuidesMatchCourse(content, input.teacherGuides, course.code);
@@ -174,6 +175,7 @@ export async function saveCurriculumLesson(actor: Actor, input: {
   const [version]=await tx.select().from(courseTemplateVersions)
     .where(eq(courseTemplateVersions.id,input.versionId)).for("update").limit(1);
   if(!version||version.status!=="draft")throw new Error("Published curriculum is immutable. Create a new draft.");
+  if(version.curriculum?.supersededByCourseVersionId)throw new Error("This curriculum has moved to native Course authoring.");
   if(revision(version.curriculum)!==input.expectedRevision)
     throw new Error("This draft changed. Reload before saving your lesson.");
   const content=readClassContent(version.curriculum);
@@ -218,6 +220,7 @@ export async function publishCurriculumDraft(actor: Actor, input: {
     const [version] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).for("update").limit(1);
     if (!version || revision(version.curriculum) !== input.expectedRevision)
       throw new Error("This draft changed. Reload and review before publishing.");
+    if (version.curriculum?.supersededByCourseVersionId) throw new Error("This curriculum has moved to native Course authoring.");
     if (version.status === "published") {
       const [audit] = await tx.select({ after: auditEvents.after }).from(auditEvents)
         .where(and(eq(auditEvents.resourceId, version.id), eq(auditEvents.action, "curriculum.publish"))).limit(1);

@@ -66,6 +66,7 @@ export const getProviderContentWorkspace = createServerFn({ method: "GET" }).han
       tx.select({
         id: courseVersions.id, courseId: courseVersions.courseId,
         versionNo: courseVersions.versionNo, lifecycle: courseVersions.lifecycle,
+        syllabus: courseVersions.syllabus,
       }).from(courseVersions).where(inArray(courseVersions.courseId, allowedIds)),
       tx.select({
         id: instructionalTrackVersions.id,
@@ -125,7 +126,8 @@ export const getProviderContentWorkspace = createServerFn({ method: "GET" }).han
         // Reviewer users do not browse unpublished drafts through this feed.
         draftVersions: role === "academic_content_creator"
           ? versions.filter(version => version.courseId === course.id &&
-              version.lifecycle === "draft")
+              version.lifecycle === "draft" &&
+              !(version.syllabus as Record<string,unknown> | null)?.supersededByCourseVersionId)
               .sort((a,b) => b.versionNo - a.versionNo)
               .map(version => ({id:version.id, versionNo:version.versionNo}))
           : [],
