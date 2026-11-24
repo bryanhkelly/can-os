@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   engagementDefinitions, engagementDefinitionVersions, organizations, programs,
-  siteGoLinks, siteMarketingPackages, sitePublications, sites,
+  siteGoLinks, siteMarketingPackages, sitePublications, siteBrandVersions, sites,
 } from "@/db/schema";
 import {
   engagementDefinitionSchema, engagementOwnerSchema,
@@ -157,12 +157,38 @@ export const createEngagementDefinition=createServerFn({method:"POST"})
           pkg.organizationId!==owner.organizationId)
         throw new AuthorizationError("owned marketing package attribution");
     }
+    // Pin the current, Site-owned immutable Brand version at publication.
+    // A client-supplied Brand pointer never establishes ownership.
+    let brandVersionId:string|undefined;
+    if(owner.siteId){
+      const [site]=await tx.select({brandId:sites.currentBrandVersionId})
+        .from(sites).where(eq(sites.id,owner.siteId)).limit(1);
+      if(site?.brandId){
+        const [brand]=await tx.select({id:siteBrandVersions.id})
+          .from(siteBrandVersions).where(and(
+            eq(siteBrandVersions.id,site.brandId),
+            eq(siteBrandVersions.siteId,owner.siteId),
+          )).limit(1);
+        if(!brand)throw new DomainError("UNAVAILABLE","Current Site Brand version is not accessible.");
+        brandVersionId=brand.id;
+      }
+    }
+    const content={
+      ...data.definition,
+      presentation:{
+        headline:data.definition.presentation.headline,
+        summary:data.definition.presentation.summary,
+        ...(data.definition.presentation.detail
+          ?{detail:data.definition.presentation.detail}:{}),
+        ...(brandVersionId?{brandVersionId}:{}),
+      },
+    };
     const [record]=await tx.insert(engagementDefinitions).values({
       ...owner,createdByPersonId:actor.actorPersonId!,
     }).returning({id:engagementDefinitions.id});
     if(!record)throw new DomainError("UNAVAILABLE","Unable to create engagement.");
     const [version]=await tx.insert(engagementDefinitionVersions).values({
-      engagementId:record.id,version:1,content:data.definition,
+      engagementId:record.id,version:1,content,
       createdByPersonId:actor.actorPersonId!,
     }).returning({id:engagementDefinitionVersions.id});
     if(!version)throw new DomainError("UNAVAILABLE","Unable to publish engagement.");
