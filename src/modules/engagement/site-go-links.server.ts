@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteMarketingPackages, sites, organizations } from "@/db/schema";
 import { requireCurrentNetworkAgreement } from "@/modules/networks/network-agreement.server";
-import { readPublicGoLink, observePublicGoEntry, type PublicGoLink } from "./go-public-gateway.server";
+import { readPublicGoLink, observePublicGoResponse, type PublicGoLink } from "./go-public-gateway.server";
 import { goLinkAvailability } from "@/domain/go-link-policy";
 import { executeSiteGoDestination, type SiteGoExecution } from "./go-destination-registry.server";
 
@@ -47,7 +47,7 @@ export async function resolveLoadedSiteGoExperience(code:string,link:PublicGoLin
 
   // Best-effort observational counter. No IP, cookie, headers, Person, unique
   // visitor claim, or fabricated enrollment. Metrics never block navigation.
-  if(observe&&(outcome.mode==="redirect"||page==="/"))await observePublicGoEntry(code,link.id);
+  if(observe)await observePublicGoResponse(code,link.id,outcome.mode==="redirect"?"redirect":"page",page==="/");
   return outcome;
 }
 
