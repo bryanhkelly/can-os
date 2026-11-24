@@ -11,8 +11,13 @@ test("matches raw hashes, bounded historical CRLF and contiguous pending suffix"
  assert.equal(r.ready,true);assert.equal(r.legacy.length,1);assert.equal(r.pending[0].idx,2);
 });
 test("rejects malformed hashes, non-allowlisted CRLF, unknown rows, gaps and duplicates",()=>{
- for(const rows of [[row(1,"abc")],[row(1),row(2),row(3,h("SELECT 1;\r\n"))],[row(9)],[row(2)],[row(1),row(1)]])
+ for(const rows of [[row(1,"abc")],[row(9)],[row(2)],[row(1),row(1)]])
  assert.equal(assessProductionLedger(entries,rows,source).ready,false);
+});
+test("rejects CRLF on a nonhistorical index",()=>{
+ const journal=Array.from({length:5},(_,idx)=>({idx,tag:String(idx).padStart(4,"0")+"_test",when:idx+1}));
+ const rows=journal.map(e=>row(e.when,e.idx===4?h("SELECT 1;\r\n"):h(source())));
+ assert.equal(assessProductionLedger(journal,rows,source).ready,false);
 });
 test("production identity is exact",()=>{
  const identity={project_id:"sweet-hall-62441909",branch_id:"br-restless-sea-ar9ooo55",database_name:"neondb",role:"neondb_owner"};

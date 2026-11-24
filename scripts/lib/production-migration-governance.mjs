@@ -14,9 +14,10 @@ export function assessProductionLedger(entries,rows,readSql){
  }
  const seen=new Set();let gap=false;let previous=-1;
  for(const [index,e] of entries.entries()){
-  if(e.idx!==index||!Number.isSafeInteger(e.when)||e.when<=previous||!e.tag.startsWith(String(index).padStart(4,"0")+"_"))
+  const historicalOrder=(index===20&&e.when===1792222017787&&previous===1792222200000&&e.tag==="0020_purple_wolverine");
+  if(e.idx!==index||!Number.isSafeInteger(e.when)||(e.when<=previous&&!historicalOrder)||seen.has(String(e.when))||!e.tag.startsWith(String(index).padStart(4,"0")+"_"))
    throw Error("Invalid ordered migration journal");
-  previous=e.when;
+  previous=Math.max(previous,e.when);
   const time=String(e.when);seen.add(time);
   const bytes=readSql(e.tag);const expected=digest(bytes);
   const row=byTime.get(time);
