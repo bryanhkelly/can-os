@@ -36,7 +36,7 @@ export const Route=createFileRoute("/go/$code")({
       try{
         const query=new URL(request.url).searchParams;
         if(query.getAll("page").length>1)return unavailable(404);
-        const experience=await resolveGoExperience(params.code,query.get("page")??"/");
+        const experience=await resolveGoExperience(params.code,query.get("page")??"/",true,!query.has("page"));
         if(!experience)return unavailable(404);
         if(experience.mode==="website-preview")return new Response(experience.html,{status:200,headers:sitePreviewShareHeaders});
         if(experience.mode==="redirect"){
