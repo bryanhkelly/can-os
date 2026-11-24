@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { siteGoLinks, siteMarketingPackages, sites } from "@/db/schema";
@@ -258,10 +258,13 @@ export const listSiteGoLinksPage=createServerFn({method:"GET"})
     }).from(siteGoLinks).where(and(scope,eq(siteGoLinks.id,data.cursor))).limit(1):[];
     if(data.cursor && !cursor)
       throw new DomainError("UNAVAILABLE","Go Link page cursor is invalid for this Site.");
-    const older=cursor?or(
-      lt(siteGoLinks.createdAt,cursor.createdAt),
-      and(eq(siteGoLinks.createdAt,cursor.createdAt),lt(siteGoLinks.id,cursor.id)),
-    ):undefined;
+    // Compare against the exact Postgres timestamp, not a JavaScript Date:
+    // Date rounds timestamptz microseconds to milliseconds and could skip
+    // records created in the same millisecond as the cursor.
+    const older=cursor?sql`(${siteGoLinks.createdAt},${siteGoLinks.id}) <
+      (SELECT created_at,id FROM public.site_go_links WHERE id=${cursor.id}
+        AND site_id=${data.siteId}
+        ${data.packageId?sql`AND package_id=${data.packageId}`:sql``})`:undefined;
     const rows=await db.select({
       id:siteGoLinks.id,code:siteGoLinks.code,destination:siteGoLinks.destination,
       status:siteGoLinks.status,name:siteGoLinks.name,channel:siteGoLinks.channel,
