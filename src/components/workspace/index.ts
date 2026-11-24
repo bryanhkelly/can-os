@@ -41,3 +41,5 @@ export {ReportDocumentView,type ReportDocument,type ReportBlock} from "./report-
 export {ReportDateFilter} from "./report-date-filter";
 
 export {ReportMetricComparison,type ReportComparisonItem} from "./report-period-comparison";
+
+export {ReportGeographyFilter} from "./report-geography-filter";

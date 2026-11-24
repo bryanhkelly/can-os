@@ -1,4 +1,6 @@
-import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import {geographyFilterSchema} from "@/domain/geographic-reporting";
+import {geographyFactPredicate} from "@/modules/geography/reporting-geography.server";
+import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -28,6 +30,7 @@ import { currentNoncreditCompletionStates } from "@/domain/verified-completion-p
  * and raw questionnaire answers are never returned.
  */
 const params=z.object({
+  geography:geographyFilterSchema,
   from:z.string().datetime({offset:true}).optional(),
   to:z.string().datetime({offset:true}).optional(),
 }).strict();
@@ -77,6 +80,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       registeringOrganizationId:noncreditRegistrations.registeringOrganizationId,
       registeredAt:noncreditRegistrations.registeredAt,
       siteId:noncreditSelfEnrollmentClaims.siteId,
+      geographyMatches:sql<boolean>`${geographyFactPredicate(data.geography,sql`${noncreditSelfEnrollmentClaims.siteId}`,sql`${noncreditSelfEnrollmentReleases.registeringOrganizationId}`,sql`${noncreditRegistrations.registeredAt}`)}`,
     }).from(noncreditRegistrations)
       // A local Site operator cannot see registrations from unrelated Sites.
       // Claim + release establish the exact authorized Site for this pilot.
@@ -308,19 +312,23 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
       };
     });
-    const personByRegistration=new Map(registrations.map(r=>[r.id,r.participantPersonId]));
+    // Resolve evidence and feedback ambiguity across the full authorized cohort first.
+    const selectedRegistrations=registrations.filter(r=>r.geographyMatches);
+    const selectedIds=new Set(selectedRegistrations.map(r=>r.id));
+    const selectedFacts=facts.filter(f=>selectedIds.has(f.registrationId));
+    const personByRegistration=new Map(selectedRegistrations.map(r=>[r.id,r.participantPersonId]));
     const byTraining=trainings.map(t=>{
-      const subset=facts.filter(f=>f.trainingVersionId===t.id);
+      const subset=selectedFacts.filter(f=>f.trainingVersionId===t.id);
       if(!subset.length)return null;
       const summary=summarizeNoncreditPilot(subset);
       return {trainingVersionId:t.id,title:t.title,summary,
         publicationSafe:publicationSafePilotSummary(summary,10,buildPilotDisclosureEvidence(subset,personByRegistration))};
     }).filter((r):r is NonNullable<typeof r>=>r!==null);
-    const totals=summarizeNoncreditPilot(facts);
+    const totals=summarizeNoncreditPilot(selectedFacts);
     return {from:from.toISOString(),to:to.toISOString(),
-      participantCount:registrations.length,
-      deliverySites:new Set(registrations.map(r=>r.siteId)).size,
-      distinctLearners:countDistinctNoncreditLearners(registrations.map(r=>r.participantPersonId)),
+      participantCount:selectedRegistrations.length,
+      deliverySites:new Set(selectedRegistrations.map(r=>r.siteId)).size,
+      distinctLearners:countDistinctNoncreditLearners(selectedRegistrations.map(r=>r.participantPersonId)),
       totals,byTraining,
-      publicationSafe:publicationSafePilotSummary(totals,10,buildPilotDisclosureEvidence(facts,personByRegistration))};
+      publicationSafe:publicationSafePilotSummary(totals,10,buildPilotDisclosureEvidence(selectedFacts,personByRegistration))};
   });

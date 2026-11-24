@@ -1,6 +1,9 @@
 import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray} from "drizzle-orm";
+import {z} from "zod";
+import {geographyFilterSchema} from "@/domain/geographic-reporting";
+import {geographyFactPredicate} from "@/modules/geography/reporting-geography.server";
+import {and,desc,eq,inArray,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {sites as operatingSites} from "@/db/schema";
 import {
@@ -22,7 +25,8 @@ import {summarizeVerifiedRoomAttendance} from "@/domain/classroom-attendance";
  * approved portfolio delegation; this endpoint intentionally cannot do it.
  */
 export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
-  .handler(async()=>{
+  .validator((value:unknown)=>z.object({geography:geographyFilterSchema}).strict().optional().parse(value)??{geography:""})
+  .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
     const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
@@ -46,6 +50,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       .where(and(
         eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
         inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds),
+        geographyFactPredicate(data.geography,sql`${operatingSites.id}`,sql`${operatingSites.organizationId}`,sql`${asOf}::timestamptz`),
       )).limit(1001);
     if(releases.length>1000)throw new Error("Organization has more than 1000 releases; use an interval report");
     if(releases.some(r=>r.siteOrganizationId!==provider.organizationId))throw new Error("Release Site ownership does not reconcile");

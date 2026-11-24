@@ -1,3 +1,5 @@
+import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
+import {getReportingGeographyOptions} from "@/modules/geography/reporting-geography.functions";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import {useMemo,useState} from "react";
@@ -28,8 +30,10 @@ function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filena
 export function NoncreditProviderEvidencePanel(){
   const scope=usePrivateReportScope();
   const [requestedSite,setRequestedSite]=useState("");
+  const [geography,setGeography]=useState("");
+  const geographyOptions=usePrivateReportQuery({scope,key:["geography-options","current"],read:()=>getReportingGeographyOptions({data:{basis:"current"}})});
   const [showDefinitions,setShowDefinitions]=useState(false);
-  const {query:response,data}=usePrivateReportQuery({scope,key:["provider-delivery"],read:()=>getNoncreditOperatorNetworkSummary()});
+  const {query:response,data}=usePrivateReportQuery({scope,key:["provider-delivery",geography],read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
   const siteId=site?.siteId??"";
   const selectedCohorts=useMemo(()=>data?.cohorts.filter(c=>!siteId||c.siteId===siteId)??[],
@@ -56,10 +60,10 @@ export function NoncreditProviderEvidencePanel(){
       ["Site","Training","Release ID","Delivery","Registrations","Active registrations",
         "Withdrawn registrations","Confirmed noncredit completions",
         "Registrations with host-attested attendance","Linked rooms","As of UTC",
-        "Data classification"],
+        "Delivery geography filter","Data classification"],
       ...selectedCohorts.map(c=>[
         c.siteName,c.trainingTitle,c.releaseId,c.deliveryMode,c.registrations,c.active,
-        c.withdrawn,c.completed,c.verifiedAttendees,c.linkedRooms,data.asOf,
+        c.withdrawn,c.completed,c.verifiedAttendees,c.linkedRooms,data.asOf,geography||"all",
         "PRIVATE OPERATOR EVIDENCE - NOT APPROVED FOR PUBLICATION",
       ]),
     ];
@@ -87,6 +91,7 @@ export function NoncreditProviderEvidencePanel(){
       The current account cannot access this provider report, or reporting exceeds
       the service's safe result bounds. No partial totals are displayed.
     </p>}
+    <ReportGeographyFilter value={geography} options={geographyOptions.data??[]} onChange={value=>{setGeography(value);setRequestedSite("");}} basis="current" loading={geographyOptions.query.isFetching} error={geographyOptions.query.isError}/>
     {data&&<>
       <div className="grid gap-3 border border-border bg-card p-4 md:grid-cols-[minmax(0,18rem)_1fr]">
         <Label className="block text-sm font-medium">
