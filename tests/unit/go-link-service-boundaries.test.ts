@@ -21,7 +21,7 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(schema).not.toContain("visitorPersonId");
     expect(schema).not.toContain("visitorIpAddress");
     const gateway=read("src/modules/engagement/go-public-gateway.server.ts");
-    expect(resolver).toContain("observePublicGoEntry");
+    expect(resolver).toContain("observePublicGoResponse");
     expect(gateway).toContain("onConflictDoUpdate");
     expect(gateway).toContain("catch{");
     expect(gateway).toContain("SET LOCAL ROLE can_go_gateway");
