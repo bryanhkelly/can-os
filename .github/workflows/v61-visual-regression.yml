@@ -1,0 +1,34 @@
+name: V6.1 visual regression acceptance
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  push:
+    branches: [release-11232026]
+permissions:
+  contents: read
+jobs:
+  visual:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:storybook
+      - run: npm run build-storybook
+      - name: Compare rendered stories against reviewed Chromatic baselines
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: |
+          if [ -z "$CHROMATIC_PROJECT_TOKEN" ]; then
+            echo "::error::Chromatic project token missing; visual acceptance blocked"
+            exit 1
+          fi
+          npx --no-install chromatic --storybook-build-dir=storybook-static --exit-zero-on-changes=false --auto-accept-changes=false
