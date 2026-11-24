@@ -24,7 +24,9 @@ describe("Go Link Site reuse and scaled operations",()=>{
   it("uses bounded, stable keyset pages and scoped server search",()=>{
     const api=read("src/modules/engagement/site-go-links.functions.ts");
     expect(api).toContain("listSiteGoLinksPage");
-    expect(api).toContain("eq(siteGoLinks.siteId,data.siteId)");
+    expect(api).toContain("eq(siteGoLinks.siteId,site.id)");
+    expect(api).toContain("eq(siteGoLinks.organizationId,site.organizationId)");
+    expect(api).toContain("const scope=directSiteLinkScope(site,data.packageId)");
     expect(api).toContain("goLikeContainsLiteral(data.term)");
     expect(api).toContain("created_at,id FROM public.site_go_links");
     expect(api).toContain("data.limit+1");
