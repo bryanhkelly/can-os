@@ -167,6 +167,16 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  // exclusion that turns demo data into a different application.
  if(!ownerDelegation && demoAccountSwitching && activeGrant.accountId!==session.accountId)
   context.impersonatedByAccountId=session.accountId;
+ // A relationship manager has consent-workflow authority only, not implicit
+ // Site, Program or learner-record access. Resource choices are resolved by
+ // the dedicated relationship service; ordinary academic scopes stay empty.
+ if(context.role==="reporting_relationship_manager"){
+  if(context.grantSiteId!==null||context.scope.organizationIds?.length!==1)
+   throw new AuthorizationError("organization-wide reporting relationship appointment");
+  context.scope.siteIds=[];
+  context.scope.programIds=[];
+  return context;
+ }
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
  const grantSites=context.scope.siteIds??[];
