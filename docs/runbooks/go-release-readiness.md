@@ -37,6 +37,12 @@ Before enabling the updated runtime, apply the reviewed migration chain to the d
 
 The isolated browser acceptance fixture now tests unscoped reads, exact-code visibility, cross-code counter writes and attempts to mutate the registry under the restricted role.
 
+## Response evidence (0114)
+
+Link opens, rendered page views and redirect responses are independently classified. A preview URL without a page selector is an entry; following a preview page link, including a home-page link, adds a page view only. The mixed historical redirects column is retained for old measurement definitions, and unclassified entries are explicitly exposed rather than backfilled into invented response types. Counters may include automated requests and do not represent unique people or verified outcomes.
+
+Apply 0114 before deploying the new gateway writer. Confirm the typed columns and role privileges with the deployment guard. Check the isolated fixture's successful page response and verify the counters match. The new domain tests cover all four entry/response combinations and legacy classification.
+
 ## Release decision
 
 A skipped build is not a pass. A source-only validation, unknown-code 404 or successful snapshot rendering does not prove issuance, revocation or tenant isolation. Do not mark the release ready until the exact deployed build, database permission checks and operator acceptance are recorded.
