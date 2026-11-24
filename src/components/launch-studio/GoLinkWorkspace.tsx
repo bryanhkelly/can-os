@@ -161,7 +161,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
       setNotice(result.navigable
         ? "Ready: "+result.title+". The destination is currently available."
         : "Unavailable: "+(result.availability!=="available"
-          ?readableState[result.availability]:"The destination is no longer open or published.")+
+          ?readableState[result.availability]:"The destination is no longer available.")+
           ". Test Link does not record a visit.");
     }catch(cause){setError(errorText(cause));}
     finally{setBusy(false);}
@@ -273,7 +273,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
           {link.expiresAt?" · Expires "+new Date(link.expiresAt).toLocaleString():""}
         </p>
         {link.evidence?<p className="text-sm">
-          <strong>{link.evidence.redirects30d.toLocaleString()}</strong> redirects in the last 30 days.
+          <strong>{link.evidence.redirects30d.toLocaleString()}</strong> successful link opens in the last 30 days.
           {" "}{link.evidence.registrationEvidence==="referenced_noncredit_claim"
             ?<><strong>{link.evidence.referralRegistrations30d?.toLocaleString()??"0"}</strong>
               {" "}training registration claims carrying this referral code (not verified click-through conversions).</>
