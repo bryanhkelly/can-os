@@ -23,3 +23,6 @@ export type ReportCatalogId=typeof REPORT_CATALOG[number]["id"];
 export function reportCatalogEntry(id:string){return REPORT_CATALOG.find(entry=>entry.id===id)??null;}
 export function reportDefinitionId(id:ReportCatalogId){const entry=reportCatalogEntry(id);if(!entry)throw Error("Unknown report");return entry.id+"-v"+entry.version;}
 export const reportCenterEntries=REPORT_CATALOG.filter(entry=>entry.placement==="report_center");
+
+/** Capability discovery remains separate from authorization and source execution. */
+export {PROVIDER_REPORT_FILTER_CAPABILITIES} from "./report-filter-state";

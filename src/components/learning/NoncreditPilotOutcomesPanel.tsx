@@ -1,9 +1,10 @@
-import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
-import {useReportGeography} from "@/hooks/use-report-geography";
+import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
+import {useProviderReportOptions} from "@/hooks/use-provider-report-options";
+import {resolveProviderOutcomeSelection} from "@/domain/report-filter-state";
+import {ProviderReportFilters} from "@/components/reports/ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
 import {ReportDateFilter} from "@/components/workspace/report-date-filter";
-import {previousCompleteUtcDays,resolveReportDateRange} from "@/components/workspace/report-date-range";
 import {reportDefinitionId} from "@/domain/report-catalog";
 import { ReportDocumentView } from "@/components/workspace/report-document";
 import { bindRegisteredCounts,pilotOutcomeDefinitions } from "@/domain/reporting-view-definitions";
@@ -21,14 +22,14 @@ const count=(n:number)=>formatReportValue(n);
 export function NoncreditPilotOutcomesPanel(){
   const [showDefinitions,setShowDefinitions]=useState(false);
   const scope=usePrivateReportScope();
-  const [geography,setGeography]=useState("");
-  const geographyOptions=useReportGeography(scope,"historical");
-  const [range,setRange]=useState(()=>previousCompleteUtcDays(90,new Date()));
-  const [rolling,setRolling]=useState(true);
-  const period=rolling?null:resolveReportDateRange(range,366,new Date());
+  const controller=useProviderReportFilters(scope);
+  const {geography,siteId,outcomePeriod:{range}}=controller.filters;
+  const options=useProviderReportOptions(scope,"historical",controller.filters);
+  const selection=resolveProviderOutcomeSelection(controller.filters,new Date());
+  const {rolling}=selection;
   const {query,data:report}=usePrivateReportQuery({
-    scope,key:["noncredit-registration-outcomes",rolling?"rolling-90-days":"closed-utc",period?.from??null,period?.to??null,geography],
-    enabled:rolling||period!==null,read:()=>getNoncreditPilotOutcomes({data:{...(rolling?{}:period!),geography}}),
+    scope,key:selection.key,
+    enabled:options.ready&&selection.valid,read:()=>getNoncreditPilotOutcomes({data:selection.input}),
   });
   const summary=report?.totals;
   if(scope===null)return <WorkspaceNotice tone="attention">A current verified provider session is required to view program evidence.</WorkspaceNotice>;
@@ -45,32 +46,33 @@ export function NoncreditPilotOutcomesPanel(){
           Reporting window (UTC): {report.from} inclusive to {report.to} exclusive.
         </p>}
       </div>
-      <Button type="button" size="sm" variant="outline" disabled={query.isFetching}
+      <Button type="button" size="sm" variant="outline" disabled={!options.ready||!selection.valid||query.isFetching}
         loading={query.isFetching} onClick={()=>void query.refetch()}>
         Refresh evidence
       </Button>
     </div>
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">{rolling?"Showing the last 90 days through the current time (including today).":"Showing a selected closed UTC cohort."}</p>
-      {!rolling&&<Button type="button" variant="outline" size="sm" disabled={query.isFetching} onClick={()=>setRolling(true)}>Use rolling 90 days</Button>}
-      <ReportGeographyFilter value={geography} options={geographyOptions.data??[]} onChange={setGeography} basis="historical" loading={geographyOptions.query.isFetching} error={geographyOptions.query.isError}/>
-      <ReportDateFilter initial={range} maxDays={366} onApply={next=>{
-        if(!rolling&&next.fromDay===range.fromDay&&next.untilDay===range.untilDay)void query.refetch();else {setRange(next);setRolling(false);}
+      {!rolling&&<Button type="button" variant="outline" size="sm" disabled={query.isFetching} onClick={()=>controller.dispatch({type:"rolling"})}>Use rolling 90 days</Button>}
+      <ProviderReportFilters controller={controller} options={options} basis="historical"/>
+      <ReportDateFilter key={range.fromDay+":"+range.untilDay} initial={range} maxDays={366} onApply={next=>{
+        if(!rolling&&next.fromDay===range.fromDay&&next.untilDay===range.untilDay){if(options.ready)void query.refetch();}else controller.dispatch({type:"closed",range:next});
       }} disabled={query.isFetching}/>
     </div>
-    <QueryState loading={query.isPending||query.isFetching?"Loading verified program evidence…":undefined}
+    {options.ready&&selection.valid&&<QueryState loading={query.isPending||query.isFetching?"Loading verified program evidence…":undefined}
       error={query.isError?"Program evidence is unavailable or exceeds the bounded report size.":undefined}
-      retrying={query.isFetching} onRetry={()=>void query.refetch()}/>
+      retrying={query.isFetching} onRetry={()=>void query.refetch()}/>}
+    {options.ready&&!selection.valid&&<WorkspaceNotice tone="attention">Choose a valid completed UTC reporting period.</WorkspaceNotice>}
     {summary?.registrations===0&&<EmptyState
       title="No registrations in this reporting window"
-      description="Publish approved training and an enrollment release. Results appear here after learners register and participate."/>}
+      description="No registrations match the selected Site, historical geography and reporting period."/>}
     {summary&&summary.registrations>0&&<>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {NONCREDIT_PILOT_COUNT_DEFINITIONS.map(def=>{
           const value=def.key==="distinctLearners"
             ?report!.distinctLearners
             :summary[def.key];
-          return <ReportMetricCard key={def.key} item={{id:def.key,label:def.label,value}}/>;
+          return <ReportMetricCard key={def.key} item={{id:def.key,label:def.label,value,asOf:report!.asOf}}/>;
         })}
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -78,7 +80,7 @@ export function NoncreditPilotOutcomesPanel(){
         <ReportMetricCard item={{id:"delivery-sites",label:"Delivery Sites with registrations",value:report!.deliverySites,hint:"Authorized Sites, not a count of congregations"}}/>
       </div>
       <ReportDocumentView report={{version:1,definitionId:reportDefinitionId("noncredit-registration-outcomes"),title:"Registration outcomes",
-        scopeLabel:"Authorized provider Sites · "+(geographyOptions.data?.find(option=>option.code===geography)?.name??(geography||"All delivery geographies")),basis:"Registration cohort; evidence current at report generation",
+        scopeLabel:(options.sites.data?.find(option=>option.id===siteId)?.label??(siteId||"All authorized Sites"))+" · "+(options.geography.data?.find(option=>option.code===geography)?.name??(geography||"All delivery geographies")),asOf:report!.asOf,basis:"Registration cohort; evidence current at report generation",
         definitions:pilotOutcomeDefinitions(),blocks:[{id:"outcomes",kind:"chart",spec:{
           title:"Registration outcome counts",description:"Measures overlap; do not add them or treat them as a sequential funnel.",
           valueLabel:"Registrations",kind:"comparison",format:"count",

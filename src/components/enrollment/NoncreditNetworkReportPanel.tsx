@@ -1,4 +1,6 @@
-import {useState} from "react";
+import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
+import {providerDeliveryQueryKey} from "@/domain/report-filter-state";
+import {hasGeographyFilterOption} from "@/domain/geographic-reporting";
 import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
 import {useReportGeography} from "@/hooks/use-report-geography";
 import { Button } from "@/components/ui/button";
@@ -11,9 +13,11 @@ import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit
  * report requires separate network membership authority and disclosure review. */
 export function NoncreditNetworkReportPanel(){
   const scope=usePrivateReportScope();
-  const [geography,setGeography]=useState("");
+  const controller=useProviderReportFilters(scope);
+  const geography=controller.filters.geography;
   const options=useReportGeography(scope,"current");
-  const {query:report,data}=usePrivateReportQuery({scope,key:["provider-delivery",geography],read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
+  const ready=!geography||!!options.data&&hasGeographyFilterOption(geography,options.data);
+  const {query:report,data}=usePrivateReportQuery({scope,key:providerDeliveryQueryKey(geography),enabled:ready,read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const totals=data?.totals;
   if(scope===null)return null;
   return <section className="mt-7 border border-border bg-card p-5" aria-label="Noncredit program impact">
@@ -22,9 +26,10 @@ export function NoncreditNetworkReportPanel(){
       Across enrollment releases owned by the current authorized operating organization,
       including authorized Sites. This is not a national cross-organization report.
     </p>
-    <div className="mt-4"><ReportGeographyFilter value={geography} options={options.data??[]} onChange={setGeography} basis="current" loading={options.query.isFetching} error={options.query.isError}/></div>
-    {(report.isPending||report.isFetching)&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
-    {report.isError&&<p role="alert" className="mt-4 text-sm">
+    <div className="mt-4"><ReportGeographyFilter value={geography} options={options.data??[]} onChange={value=>controller.dispatch({type:"geography",value})} basis="current" loading={options.query.isFetching} error={options.query.isError}/></div>
+    {!ready&&<p role="status" className="mt-4 text-sm text-muted-foreground">Selected geography must be verified before displaying report results. <Button type="button" size="sm" variant="outline" onClick={()=>controller.dispatch({type:"geography",value:""})}>Clear geography</Button></p>}
+    {ready&&(report.isPending||report.isFetching)&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
+    {ready&&report.isError&&<p role="alert" className="mt-4 text-sm">
       Reporting is unavailable or its bounded dataset needs partitioning.
       <Button variant="ghost" type="button" className="ml-2 text-primary underline" onClick={()=>void report.refetch()}>Retry</Button>
     </p>}

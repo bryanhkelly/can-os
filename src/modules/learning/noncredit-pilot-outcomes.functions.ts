@@ -1,3 +1,4 @@
+import {authorizedReportSite,selectProviderOutcomeCohort} from "@/domain/report-filter-state";
 import {geographyFilterSchema} from "@/domain/geographic-reporting";
 import {geographyFactPredicate} from "@/modules/geography/reporting-geography.server";
 import { and, asc, desc, eq, gte, inArray, lt, sql, count, notExists } from "drizzle-orm";
@@ -31,6 +32,7 @@ import { currentNoncreditCompletionStates } from "@/domain/verified-completion-p
  */
 const params=z.object({
   geography:geographyFilterSchema,
+  siteId:z.string().uuid().optional(),
   from:z.string().datetime({offset:true}).optional(),
   to:z.string().datetime({offset:true}).optional(),
 }).strict();
@@ -48,10 +50,11 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const {organizationId,siteIds}=await requireCanonicalLabProvider("noncredit.enrollment.read");
+    const selectedSite=authorizedReportSite(data.siteId,siteIds);
     const generatedAt=new Date();
     const to=data.to?new Date(data.to):generatedAt;
     const from=data.from?new Date(data.from):new Date(to.getTime()-90*86400000);
-    if(!(to>from)||to.getTime()-from.getTime()>366*86400000)
+    if(!(to>from)||to>generatedAt||to.getTime()-from.getTime()>366*86400000)
       throw new Error("Pilot reporting must use a positive range of no more than 366 days");
     // The operator may deliver a Course published by a different authorized
     // provider. Scope through the operator's approved Site releases, never
@@ -70,7 +73,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       .orderBy(asc(noncreditTrainingVersions.title)).limit(take);
     checkBound(trainings.length,"Published pilot training versions");
     if(!trainings.length)return {
-      from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
+      from:from.toISOString(),to:to.toISOString(),asOf:generatedAt.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
       totals:summarizeNoncreditPilot([]),byTraining:[],
       publicationSafe:publicationSafePilotSummary(summarizeNoncreditPilot([])),
     };
@@ -109,7 +112,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const registrationIds=registrations.map(r=>r.id);
     if(!registrationIds.length){
       const empty=summarizeNoncreditPilot([]);
-      return {from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
+      return {from:from.toISOString(),to:to.toISOString(),asOf:generatedAt.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
         totals:empty,byTraining:[],publicationSafe:publicationSafePilotSummary(empty)};
     }
     const attempts=await db.select({
@@ -341,7 +344,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       };
     });
     // Resolve evidence and feedback ambiguity across the full authorized cohort first.
-    const selectedRegistrations=registrations.filter(r=>r.geographyMatches);
+    const selectedRegistrations=selectProviderOutcomeCohort(registrations,selectedSite);
     const selectedIds=new Set(selectedRegistrations.map(r=>r.id));
     const selectedFacts=facts.filter(f=>selectedIds.has(f.registrationId));
     const personByRegistration=new Map(selectedRegistrations.map(r=>[r.id,r.participantPersonId]));
@@ -353,7 +356,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         publicationSafe:publicationSafePilotSummary(summary,10,buildPilotDisclosureEvidence(subset,personByRegistration))};
     }).filter((r):r is NonNullable<typeof r>=>r!==null);
     const totals=summarizeNoncreditPilot(selectedFacts);
-    return {from:from.toISOString(),to:to.toISOString(),
+    return {from:from.toISOString(),to:to.toISOString(),asOf:generatedAt.toISOString(),
       participantCount:selectedRegistrations.length,
       deliverySites:new Set(selectedRegistrations.map(r=>r.siteId)).size,
       distinctLearners:countDistinctNoncreditLearners(selectedRegistrations.map(r=>r.participantPersonId)),

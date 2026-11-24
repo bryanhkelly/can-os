@@ -1,10 +1,10 @@
-import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
-import {useReportGeography} from "@/hooks/use-report-geography";
+import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
+import {useProviderReportOptions} from "@/hooks/use-provider-report-options";
+import {providerDeliveryQueryKey} from "@/domain/report-filter-state";
+import {ProviderReportFilters} from "./ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import { Label } from "@/components/ui/label";
 import {useMemo,useState} from "react";
 import {Button} from "@/components/ui/button";
-import {Select} from "@/components/ui/select";
 import {ReportMetricCard} from "@/components/workspace/report-metric-card";
 import {ReportRankedComparison} from "@/components/workspace/report-ranked-comparison";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
@@ -30,11 +30,11 @@ function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filena
  */
 export function NoncreditProviderEvidencePanel(){
   const scope=usePrivateReportScope();
-  const [requestedSite,setRequestedSite]=useState("");
-  const [geography,setGeography]=useState("");
-  const geographyOptions=useReportGeography(scope,"current");
+  const controller=useProviderReportFilters(scope);
+  const {geography,siteId:requestedSite}=controller.filters;
+  const options=useProviderReportOptions(scope,"current",controller.filters);
   const [showDefinitions,setShowDefinitions]=useState(false);
-  const {query:response,data}=usePrivateReportQuery({scope,key:["provider-delivery",geography],read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
+  const {query:response,data}=usePrivateReportQuery({scope,key:providerDeliveryQueryKey(geography),enabled:options.ready,read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
   const selectionUnavailable=!!requestedSite&&!site;
   const siteId=site?.siteId??"";
@@ -62,10 +62,10 @@ export function NoncreditProviderEvidencePanel(){
       ["Site","Training","Release ID","Delivery","Registrations","Active registrations",
         "Withdrawn registrations","Confirmed noncredit completions",
         "Registrations with host-attested attendance","Linked rooms","As of UTC",
-        "Delivery geography filter","Data classification"],
+        "Delivery geography filter","Site filter","Geography basis","Data classification"],
       ...selectedCohorts.map(c=>[
         c.siteName,c.trainingTitle,c.releaseId,c.deliveryMode,c.registrations,c.active,
-        c.withdrawn,c.completed,c.verifiedAttendees,c.linkedRooms,data.asOf,geography||"all",
+        c.withdrawn,c.completed,c.verifiedAttendees,c.linkedRooms,data.asOf,geography||"all",requestedSite||"all","current",
         "PRIVATE OPERATOR EVIDENCE - NOT APPROVED FOR PUBLICATION",
       ]),
     ];
@@ -86,34 +86,22 @@ export function NoncreditProviderEvidencePanel(){
         Export private evidence CSV
       </Button>
     </div>
-    {scope!==null&&(response.isPending||response.isFetching)&&<p role="status" className="border border-border p-4 text-sm">
+    {scope!==null&&options.ready&&(response.isPending||response.isFetching)&&<p role="status" className="border border-border p-4 text-sm">
       Reconciling authorized releases and canonical outcomes…
     </p>}
-    {scope!==null&&response.isError&&<p role="alert" className="border border-border p-4 text-sm">
+    {scope!==null&&options.ready&&response.isError&&<p role="alert" className="border border-border p-4 text-sm">
       The current account cannot access this provider report, or reporting exceeds
       the service's safe result bounds. No partial totals are displayed.
     </p>}
-    <ReportGeographyFilter value={geography} options={geographyOptions.data??[]} onChange={value=>{setGeography(value);setRequestedSite("");}} basis="current" loading={geographyOptions.query.isFetching} error={geographyOptions.query.isError}/>
+    {scope!==null&&<ProviderReportFilters controller={controller} options={options} basis="current"/>}
     {data&&<>
-      <div className="grid gap-3 border border-border bg-card p-4 md:grid-cols-[minmax(0,18rem)_1fr]">
-        <Label className="block text-sm font-medium">
-          Delivery Site
-          <Select className="mt-2"
-            value={requestedSite} onChange={e=>setRequestedSite(e.target.value)}>
-            <option value="">All authorized Sites</option>
-            {selectionUnavailable&&<option value={requestedSite}>Selected Site unavailable</option>}
-            {data.sites.map(s=><option key={s.siteId} value={s.siteId}>{s.siteName}</option>)}
-          </Select>
-        </Label>
-        <div className="text-xs text-muted-foreground md:self-end md:pb-3">
-          <p>As of {new Date(data.asOf).toLocaleString()}</p>
-          <p>Lifetime registered releases in this authorized Organization. Historical
-            time-window selection requires a versioned source lifecycle projection.</p>
-        </div>
+      <div className="border border-border bg-card p-4 text-xs text-muted-foreground">
+        <p>As of {data.asOf}</p>
+        <p>Lifetime registered releases. Historical time-window selection requires a versioned source lifecycle projection.</p>
       </div>
-      {selectionUnavailable&&<p role="status" className="text-sm text-muted-foreground">The selected Site is not available in this scope. Select another Site or explicitly return to all authorized Sites.</p>}
+      {selectionUnavailable&&<p role="status" className="text-sm text-muted-foreground">No release evidence matches the selected Site and current geography. The selection remains applied.</p>}
       {data.sites.length>0&&data.sites.length<=60&&<ReportRankedComparison title="Registrations by authorized Site" description="Select a Site to filter the metrics, release chart and release evidence below. This does not open a new reporting scope."
-        rows={data.sites.map(s=>({id:s.siteId,label:s.siteName,value:s.registrations}))} selectedId={siteId} onSelect={setRequestedSite}/>}
+        rows={data.sites.map(s=>({id:s.siteId,label:s.siteName,value:s.registrations}))} selectedId={requestedSite} onSelect={value=>controller.dispatch({type:"site",value})}/>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {([
           ["Registrations",totals?.registrations],
@@ -155,7 +143,7 @@ export function NoncreditProviderEvidencePanel(){
             <TableCell className="p-3 tabular-nums">{c.completed.toLocaleString()}</TableCell>
           </TableRow>)}
           {!selectedCohorts.length&&<TableRow><TableCell colSpan={5} className="p-4 text-muted-foreground">
-            No releases in this authorized Site scope.
+            No releases match the selected Site and geography.
           </TableCell></TableRow>}
           </TableBody>
         </Table>

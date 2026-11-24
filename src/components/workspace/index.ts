@@ -47,3 +47,6 @@ export {ReportGeographyFilter} from "./report-geography-filter";
 export {ReportMetricCard,type ReportMetricItem} from "./report-metric-card";
 export {ReportTargetAttainment} from "./report-target-attainment";
 export {ReportRankedComparison,type ReportRankedRow} from "./report-ranked-comparison";
+
+export {ReportSiteFilter} from "./report-site-filter";
+export {ProviderReportFilterBar} from "./provider-report-filter-bar";
