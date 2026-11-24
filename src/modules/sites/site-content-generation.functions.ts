@@ -16,5 +16,6 @@ export const previewSiteIntelligence=createServerFn({method:"POST"}).validator((
 });
 export const processSiteIntelligence=createServerFn({method:"POST"}).validator((v:unknown)=>request.extend({digest:z.string().regex(/^[a-f0-9]{64}$/),externalProcessingConfirmed:z.literal(true)}).parse(v)).handler(async({data})=>{
  setResponseHeader("Cache-Control","private, no-store");
- return processSitePackage(await getCommandContext(getRequest()),data);
+ const request=getRequest();
+ return processSitePackage(await getCommandContext(request),data,()=>getCommandContext(request));
 });

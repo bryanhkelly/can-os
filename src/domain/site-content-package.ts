@@ -50,8 +50,8 @@ export function parseSiteContentPackage(raw:string,input:SitePackageInput):SiteC
 /** Old packages can remain useful when plans change. Private source withdrawal
  * or modification is conservative: withhold the generated package entirely. */
 export function privatePackageSourcesMatch(saved:SitePackageInput,current:SitePackageInput):boolean{
- return canonicalJson([saved.story,saved.leadership,saved.publicReferences,saved.existingWebsiteCopy,saved.preferences.guidance])===
- canonicalJson([current.story,current.leadership,current.publicReferences,current.existingWebsiteCopy,current.preferences.guidance]);
+ return canonicalJson([saved.story,saved.leadership,saved.publicReferences,saved.preferences.guidance])===
+ canonicalJson([current.story,current.leadership,current.publicReferences,current.preferences.guidance]);
 }
 export const SITE_PACKAGE_INSTRUCTIONS=[
  "You are Becomuna's editorial writer. Return one JSON object only, with schemaVersion:2.",

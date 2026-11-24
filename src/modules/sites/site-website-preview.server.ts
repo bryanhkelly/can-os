@@ -30,6 +30,7 @@ import { canonicalPublicContact, publicIdentityReviewStatuses } from "@/domain/p
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
+import { readStoredSitePackage } from "./site-content-package.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
@@ -88,8 +89,16 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   });
   // Website suggestions share the same explicit consented Story projection
   // used for Introduce. Raw private answers remain editable in Site Information.
-  const storyCandidates=siteBrief.story
-    ? suggestWebsiteCopyFromStory(siteBrief.story,site.name):[];
+  // Only the private editor may read generated drafts. External previews
+  // continue to render saved, reviewed website content, never AI suggestions.
+  const generated=!external&&!proposedContent&&site.canEdit&&actor.delegationMode!=="view"&&siteBrief.consent.contentReuseAllowed
+    ? (await readStoredSitePackage(actor,site.id,"website")).package:null;
+  const generatedWebsite=generated&&!generated.stale?generated.website:null;
+  const storyCandidates=generatedWebsite
+    ? (["heroHeadline","welcomeMessage","localDescription","schoolVision","communityOutreach"] as const).map(field=>({
+      field,text:generatedWebsite[field],reason:"Stored Site Intelligence v"+generated!.revision+"; review before use.",sourceFields:[],
+    }))
+    : siteBrief.story?suggestWebsiteCopyFromStory(siteBrief.story,site.name):[];
   // The saved identity comes ONLY from site_brand_versions. Website history
   // stores the structural wireframe, not colors, logo, fonts or direction.
   const editingContent:SiteLocalContent|null=rawEditingContent && savedBrand
