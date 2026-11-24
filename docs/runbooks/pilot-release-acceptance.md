@@ -32,3 +32,19 @@ Supply only approved test and deployment configuration. Never expose secrets in 
 7. Record independent partner authorization and rights-withdrawal handling before any live rollout. Never fabricate a partner approval, participant or verified outcome.
 
 A source commit alone satisfies none of the runtime or partner gates.
+
+## Independent training rehearsal
+
+Use a new dedicated Neon QA branch, never production or retired test01. Mark the independently authorized synthetic publisher and operator organizations with metadata qa_only=true and intended_branch=<exact branch ID>. Author and review a fresh training through existing publisher workflows; use seven short native MP4 recordings, separate five-question baseline and final forms, a matching identified five-question feedback campaign, an independently approved automatic completion policy (all lessons, final threshold 0.8, no verified minutes required for short QA), a single authorized Site, and a Go invitation. Do not reuse real partner approvals or publish a synthetic pilot in production.
+
+Set APP_ENV=test, NODE_ENV=test, CAN_TEST_DB_WRITES_ENABLED=true, TEST_DATABASE_URL, CAN_APPLICATION_DB_HOST, CAN_PILOT_QA_BRANCH_ID, CAN_RELEASE_SOURCE_SHA (clean checked-out SHA) and CAN_PILOT_QA_LEARNER_SESSION, CAN_PILOT_QA_OTHER_SESSION, CAN_PILOT_QA_PROVIDER_SESSION (three distinct verified isolated accounts; never log session values). Set CAN_PILOT_QA_FIXTURE_JSON with releaseId, goCode, optional goActionLabel, trainingTitle, instructorTitle, lessons (seven distinct exact titles), baselineAnswers and finalAnswers (five exact option labels each), surveyTitle. The baseline answer set should deliberately score below the final set in this synthetic exercise. Choose an actual approved automatic-finalization assessment policy. The local browser test uses a newly started application and refuses an unverified database, a used fixture or a production URL.
+
+```sh
+npm run test:e2e:noncredit:journey
+```
+
+The test covers Go referral, consent, enrollment, cross-Person denial, real short-video playback, persistent lesson progress, two objective assessments, feedback, governed completion and the exact provider report row. It does not replace publisher review or prove actual COGIC training hours. Fixture preflight is read-only. An unavailable environment or missing approved fixture is a blocker, never a pass.
+
+### 2026-11-24 discovery
+
+Neon main returned SQLSTATE 42883 for min(uuid) on assessment_administrations.id. Migration 0117 replaces the unsupported aggregate while preserving the exact-one-administration gate. A read-only zero/one/multiple-candidate query confirmed the corrected expression; the migration and full browser scenario require isolated acceptance. Neon rejected creation of pilot1-acceptance-20261124 with branches limit exceeded. No real pilot records were changed.
