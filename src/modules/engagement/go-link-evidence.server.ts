@@ -4,8 +4,8 @@ import { siteGoLinks, siteGoLinkDailyVisits, sites } from "@/db/schema";
 import type { GoDestination } from "@/domain/site-go-links";
 import { noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 
-/** These are two distinct metrics:
- * (1) observed redirects (NOT visitors or people),
+/** Traffic counts and registration claims are separate evidence families:
+ * (1) successful classified entries, rendered pages, redirects and legacy entries (NOT visitors or people),
  * (2) canonical noncredit enrollment claims carrying this exact referral code
  *     and matching the exact Site + training release (NOT causally proven).
  * No visitor/person/guardian IDs or raw requests enter the Go Link layer.
