@@ -79,7 +79,7 @@ REVOKE ALL ON public.reporting_relationship_agreements,public.reporting_relation
 -- An Offering is a shared catalog product. Its publisher and independently
 -- approved local operators can each consent for their own source records.
 CREATE FUNCTION public.reporting_relationship_offering_owner(p_offering uuid,p_owner uuid)
-RETURNS boolean LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $
+RETURNS boolean LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $offering$
   SELECT EXISTS (
     SELECT 1 FROM public.offerings o
     WHERE o.id=p_offering AND o.status='active' AND (
@@ -100,7 +100,7 @@ RETURNS boolean LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $
       )
     )
   );
-$;
+$offering$;
 REVOKE ALL ON FUNCTION public.reporting_relationship_offering_owner(uuid,uuid) FROM PUBLIC,anonymous,authenticated;
 
 -- Structural checks are defense in depth. The application must independently
@@ -144,7 +144,7 @@ BEGIN
        OR NEW.last_action_at<OLD.last_action_at OR NEW.last_action_at>CURRENT_TIMESTAMP
     THEN RAISE EXCEPTION 'Relationship terms are immutable'; END IF;
     IF OLD.status='pending' AND NEW.status IN ('accepted','declined') THEN
-      IF NEW.last_action_organization_id<>OLD.recipient_organization_id
+      IF (NEW.status='accepted' AND (NOT EXISTS(SELECT 1 FROM public.organizations WHERE id=NEW.owner_organization_id AND lifecycle_status='active') OR NOT EXISTS(SELECT 1 FROM public.organizations WHERE id=NEW.recipient_organization_id AND lifecycle_status='active'))) OR NEW.last_action_organization_id<>OLD.recipient_organization_id
         OR NEW.last_action_by_person_id=OLD.proposed_by_person_id
         OR (OLD.valid_through IS NOT NULL AND OLD.valid_through<=CURRENT_TIMESTAMP)
         OR (NEW.status='accepted' AND (NEW.accepted_at IS DISTINCT FROM NEW.last_action_at
