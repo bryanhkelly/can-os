@@ -10,7 +10,7 @@ import {
 } from "@/db/schema";
 import {
   engagementDefinitionSchema, engagementOwnerSchema,
-  engagementContextSummary, type EngagementOwner,
+  engagementContextSummary, engagementRequiresClaimReview, type EngagementOwner,
 } from "@/domain/engagement-definition";
 import { goDestinationHref } from "@/domain/site-go-links";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -139,6 +139,9 @@ export const createEngagementDefinition=createServerFn({method:"POST"})
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     const owner=await authorizeEngagementOwner(data.owner,actor,true,tx);
+    if(engagementRequiresClaimReview(data.definition))
+      throw new DomainError("VALIDATION_FAILED",
+        "Public claims about licensing, funding, admissions, affiliation or institutional approval require separate authoritative review.");
     await assertDestinationReady(data.definition,owner.siteId,tx);
     if(data.definition.source?.marketingPackageId){
       const [pkg]=await tx.select({
