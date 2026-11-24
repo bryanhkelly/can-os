@@ -785,6 +785,13 @@
       "when": 1795462005000,
       "tag": "0111_delegation_and_go_link_null_invariants",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1795462006000,
+      "tag": "0112_site_intelligence_packages",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ import type {SiteContentBriefV61} from "./site-content-brief-v61";
 
 export const CONTENT_CONTRACT_VERSION=1 as const;
 export const CONTENT_PROMPT_VERSION="site-editorial-v1" as const;
-const options=z.object({
+export const siteGenerationOptionsSchema=z.object({
   tone:z.enum(["welcoming","professional","community","inspiring"]).default("welcoming"),
   language:z.enum(["en","es"]).default("en"),
   guidance:z.string().trim().max(600).optional(),
@@ -15,25 +15,25 @@ const options=z.object({
   includePublicReferences:z.boolean().default(false),
 }).strict();
 export const siteGenerationTaskSchema=z.discriminatedUnion("target",[
-  z.object({target:z.literal("website"),options}).strict(),
-  z.object({target:z.literal("outreach"),options,plan:outreachPlanSchemaV61}).strict(),
+  z.object({target:z.literal("website"),options:siteGenerationOptionsSchema}).strict(),
+  z.object({target:z.literal("outreach"),options:siteGenerationOptionsSchema,plan:outreachPlanSchemaV61}).strict(),
 ]);
 export type SiteGenerationTask=z.infer<typeof siteGenerationTaskSchema>;
-export type SiteGenerationOptions=z.infer<typeof options>;
-const text=(max:number)=>z.string().trim().min(1).max(max).refine(v=>!/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v),"Plain text required").refine(v=>!v.includes("—"),"Use punctuation other than em dashes").refine(v=>!containsProtectedInstitutionalClaim(v),"Protected institutional claim requires independent review").refine(v=>!/(?:https?:\/\/|www\.|\b\S+@\S+\.[a-z]{2,}\b)/i.test(v),"Links and addresses must be supplied by governed destination services");
-const website=z.object({
-  heroHeadline:text(siteLocalContentLimits.heroHeadline),
-  welcomeMessage:text(siteLocalContentLimits.welcomeMessage),
-  localDescription:text(siteLocalContentLimits.localDescription),
-  schoolVision:text(siteLocalContentLimits.schoolVision),
-  communityOutreach:text(siteLocalContentLimits.communityOutreach),
+export type SiteGenerationOptions=z.infer<typeof siteGenerationOptionsSchema>;
+export const generatedText=(max:number)=>z.string().trim().min(1).max(max).refine(v=>!/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v),"Plain text required").refine(v=>!v.includes("—"),"Use punctuation other than em dashes").refine(v=>!containsProtectedInstitutionalClaim(v),"Protected institutional claim requires independent review").refine(v=>!/(?:https?:\/\/|www\.|\b\S+@\S+\.[a-z]{2,}\b)/i.test(v),"Links and addresses must be supplied by governed destination services");
+export const generatedWebsiteSchema=z.object({
+  heroHeadline:generatedText(siteLocalContentLimits.heroHeadline),
+  welcomeMessage:generatedText(siteLocalContentLimits.welcomeMessage),
+  localDescription:generatedText(siteLocalContentLimits.localDescription),
+  schoolVision:generatedText(siteLocalContentLimits.schoolVision),
+  communityOutreach:generatedText(siteLocalContentLimits.communityOutreach),
 }).strict();
-const outreach=z.object({headline:text(160),message:text(1600),callToAction:text(100)}).strict();
+export const generatedOutreachSchema=z.object({headline:generatedText(160),message:generatedText(1600),callToAction:generatedText(100)}).strict();
 export const generatedContentSchema=z.object({
   schemaVersion:z.literal(CONTENT_CONTRACT_VERSION),
   target:z.enum(["website","outreach"]),
-  website:website.nullable(),
-  outreach:outreach.nullable(),
+  website:generatedWebsiteSchema.nullable(),
+  outreach:generatedOutreachSchema.nullable(),
   reviewNotes:z.array(z.string().trim().max(240).refine(v=>!/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v))).max(8),
 }).strict().superRefine((v,ctx)=>{
   if(v.target==="website"?(!v.website||v.outreach!==null):(!v.outreach||v.website!==null))
