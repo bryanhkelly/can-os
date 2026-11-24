@@ -7,7 +7,7 @@ import {
   canonicalClasses,canonicalClassEnrollments,
   canonicalClassEnrollmentRepeatAuthorizations,
   canonicalAccountGrants,canonicalAccounts,canonicalPersons,
-  learnerCourseAttempts,participationAttributions,
+  participationAttributions,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
@@ -15,6 +15,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
+import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
@@ -134,18 +135,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         relationshipSnapshot:{kind:"provider_default",classId:cls.id,
           organizationId:current.operatingOrganizationId,siteId:current.siteId},
       });
-      const [attempt]=await tx.insert(learnerCourseAttempts).values({
-        classEnrollmentId:enrollment.id,enrollmentId:null,
-        noncreditRegistrationId:null,sectionId:null,
-        deploymentId:current.deploymentId,adoptionId:current.adoptionId,
-        offeringVersionId:current.offeringVersionId,
-        courseVersionId:current.courseVersionId,
-        attemptNo:1,status:"active",
-      }).returning({id:learnerCourseAttempts.id});
-      if(!attempt)throw new Error("Cannot save Class Course Attempt");
-      await tx.update(canonicalClassEnrollments)
-        .set({courseAttemptId:attempt.id})
-        .where(eq(canonicalClassEnrollments.id,enrollment.id));
+      const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
       if(repeatAuthorization){
         await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
           .set({consumedByEnrollmentId:enrollment.id})
