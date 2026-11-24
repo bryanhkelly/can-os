@@ -1,12 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { canonicalClassEnrollments, canonicalClasses } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
-import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
+import { authorizeNativeLearnerClass } from "./native-learner-class-access.server";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
 const uuid = z.string().uuid();
@@ -16,38 +15,10 @@ const submit = target.extend({
   responseText: z.string().trim().min(5).max(20000),
 }).strict();
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type Actor = Awaited<ReturnType<typeof getInstructionalLearnerContext>>;
 
 function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
   setResponseHeader("Referrer-Policy", "no-referrer");
-}
-
-/** Homework belongs to an exact active Class Enrollment and one Course Attempt.
- * No legacy Section lookup, surrogate student identity or extra submission table. */
-async function authorized(tx: Tx, actor: Actor, classEnrollmentId: string) {
-  if (!actor.actorPersonId ||
-      !(actor.role === "student" && actor.capabilities.has("student:read") ||
-        actor.role === "learner" && actor.capabilities.has("learning.participate"))) {
-    throw new AuthorizationError("own authenticated Course learner");
-  }
-  const [enrollment] = await tx.select().from(canonicalClassEnrollments)
-    .where(and(eq(canonicalClassEnrollments.id, classEnrollmentId),
-      eq(canonicalClassEnrollments.learnerPersonId, actor.actorPersonId),
-      eq(canonicalClassEnrollments.status, "active")))
-    .for("update").limit(1);
-  if (!enrollment?.courseAttemptId) throw new AuthorizationError("active Class Enrollment and Course Attempt");
-  const [cls] = await tx.select().from(canonicalClasses)
-    .where(eq(canonicalClasses.id, enrollment.classId)).limit(1);
-  if (!cls || cls.state !== "active") throw new AuthorizationError("current Class");
-  if (actor.role === "student" && (actor.scope.siteIds?.[0] !== cls.siteId ||
-      !actor.scope.organizationIds?.includes(cls.operatingOrganizationId))) {
-    throw new AuthorizationError("own CAN student Site");
-  }
-  const access = await authorizeCanonicalCourseAttempt(tx, actor, enrollment.courseAttemptId);
-  if (access.source !== "class" || access.courseVersionId !== cls.courseVersionId)
-    throw new AuthorizationError("own canonical Class Course Attempt");
-  return { enrollment, cls, courseAttemptId: access.courseAttemptId };
 }
 
 type HomeworkRow = {
@@ -104,7 +75,7 @@ export const getNativeClassHomeworkSummary=createServerFn({method:"GET"})
     noStore();
     const actor=await getInstructionalLearnerContext(getRequest());
     return db.transaction(async tx=>{
-      const {cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      const {cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
       const rows=await readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,false);
       return {assignments:rows.map(homeworkSummary)};
     });
@@ -116,7 +87,7 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
     noStore();
     const actor = await getInstructionalLearnerContext(getRequest());
     return db.transaction(async tx => {
-      const {cls,enrollment,courseAttemptId} = await authorized(tx,actor,data.classEnrollmentId);
+      const {cls,enrollment,courseAttemptId} = await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
       const rows = await readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,true);
       // Preserve access to original academic evidence during the cutover.
       // Exact recovery provenance only; no title inference or new enrollment.
@@ -166,7 +137,7 @@ export const getNativeClassHomeworkHistory=createServerFn({method:"GET"})
     noStore();
     const actor=await getInstructionalLearnerContext(getRequest());
     return db.transaction(async tx=>{
-      const {cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      const {cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
       const result=await tx.execute(sql`
         SELECT r.revision_no,r.status,r.response,r.submitted_at,r.recorded_at,r.source
         FROM public.graded_submission_revisions r
@@ -202,7 +173,7 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
          actor.role==="learner"&&actor.capabilities.has("learning.participate")))
       throw new AuthorizationError("own homework submission capability");
     return db.transaction(async tx=>{
-      const {enrollment,cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      const {enrollment,cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_write");
       // Ordinary non-credit Class assignments may receive private, unscored
       // teacher feedback. This is determined by the current Enrollment's
       // credit mode, never by a synthetic Site/Person marker or demo email.
