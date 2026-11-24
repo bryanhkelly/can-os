@@ -51,6 +51,13 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    ])expect(review).toContain(required);
    expect(review).not.toContain('data.evidenceReference.startsWith("https:")');
  });
+ it("reuses the verified public Person for ordinary noncredit enrollment",()=>{
+   const source=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
+   expect(source).toContain("canonicalPersonId:owner.personId");
+   expect(source).toContain("link.canonicalPersonId!==owner.personId");
+   expect(source).toContain("currentPerson?.active");
+   expect(source).not.toContain("tx.insert(canonicalPersons)");
+ });
  it("does not interrupt Course enrollment while an existing Person awaits Class age activation",()=>{
    const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
    const auth=read("src/modules/identity/canonical-command-context.server.ts");
