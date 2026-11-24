@@ -72,7 +72,8 @@ describe("Go Link Site reuse and scaled operations",()=>{
     const page=read("src/routes/go.$code.ts");
     expect(page).toContain('Content-Security-Policy');
     expect(page).toContain('private, no-store');
-    expect(page).toContain('href="/landing"');
+    expect(page).toContain('renderUnavailableEngagementPage(status)');
+    expect(read("src/domain/engagement-page-renderer.ts")).toContain('href:"/landing"');
     expect(page).not.toContain("params.code}</");
   });
 });
