@@ -1,7 +1,8 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readFileSync } from "node:fs";
+import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { analyzeSource, discoverTsx } from "./lib/v61-source-audit.mjs";
 
 // Inventory only. Never rewrite feature source or treat raw controls as a
 // reliable count of noncompliance without reviewing the specific interaction.
@@ -37,20 +38,11 @@ const canonicalTags = new Set([
   "OperationsActionCard",
   "ExtendedSeasonDraftForm", "ExtendedSeasonReadinessRequests",
 ]);
-const files = [];
-function walk(directory) {
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) walk(path);
-    else if (entry.name.endsWith(".tsx") &&
-      !/\.(?:stories|test|spec)\.tsx$/.test(entry.name) &&
-      entry.name !== "routeTree.gen.tsx") files.push(path);
-  }
-}
-walk(sourceRoot);
+const files = discoverTsx(sourceRoot).filter(path => !path.endsWith("routeTree.gen.tsx"));
 
 const families = {};
 const sites = [];
+const violations = [];
 function familyFor(path) {
   const file = relative(sourceRoot, path).replaceAll("\\", "/");
   if (file.startsWith("components/ui/")) return "primitives";
@@ -77,18 +69,34 @@ for (const path of files) {
     ts.forEachChild(child, visit);
   }
   visit(node);
-  const row = families[family] ??= { files: 0, native: {}, canonical: {} };
+  const audit = analyzeSource(source, path);
+  const row = families[family] ??= { files: 0, native: {}, canonical: {}, auditedNative: 0, auditedCorners: 0, syntaxErrors: 0 };
   row.files++;
+  row.auditedNative += audit.native.length;
+  row.auditedCorners += audit.corners.length;
+  row.syntaxErrors += audit.syntaxErrors.length;
+  if (audit.native.length || audit.corners.length || audit.syntaxErrors.length) {
+    violations.push({ file, family, native: audit.native, corners: audit.corners, syntaxErrors: audit.syntaxErrors });
+  }
   for (const [tag,count] of Object.entries(native)) row.native[tag] = (row.native[tag] ?? 0) + count;
   for (const [tag,count] of Object.entries(canonical)) row.canonical[tag] = (row.canonical[tag] ?? 0) + count;
   const nativeTotal = Object.values(native).reduce((a,b)=>a+b,0);
   if (nativeTotal) sites.push({file, family, nativeTotal, tags:native});
 }
 sites.sort((a,b)=>b.nativeTotal-a.nativeTotal || a.file.localeCompare(b.file));
+violations.sort((a,b)=>b.syntaxErrors.length-a.syntaxErrors.length ||
+  (b.native.length+b.corners.length)-(a.native.length+a.corners.length) || a.file.localeCompare(b.file));
 console.log(JSON.stringify({
   contract: "CAN OS V6.1 component adoption inventory",
   sourceFiles: files.length,
   families,
   leadingNativeControlConsumers: sites.slice(0,30),
-  note: "Inventory is diagnostic, not a compliance percentage. Specialized native controls and legacy routes require individual migration review.",
+  auditedDebt: {
+    affectedFiles: violations.length,
+    native: violations.reduce((sum,row)=>sum+row.native.length,0),
+    corners: violations.reduce((sum,row)=>sum+row.corners.length,0),
+    syntaxErrors: violations.reduce((sum,row)=>sum+row.syntaxErrors.length,0),
+    files: violations,
+  },
+  note: "Inventory is diagnostic, not a compliance percentage. Raw usage counts are retained for continuity; auditedDebt uses the same analyzer and exemptions as the V6.1 source gate. Visual and behavioral acceptance require separate evidence.",
 }, null, 2));
