@@ -64,7 +64,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm run typecheck 2>&1 | tee typecheck.log
+          npm run typecheck:full 2>&1 | tee typecheck.log
       - name: Site enrollment and website regression suite
         shell: bash
         run: |
@@ -80,6 +80,39 @@ jobs:
         run: |
           set -o pipefail
           npm run test:classes:unit 2>&1 | tee class-regressions.log
+      - name: Full ESLint and V6.1 coverage
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint.log
+      - name: Prevent new lint warnings on changed source
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -o pipefail
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            export CAN_LINT_BASE="$PR_BASE_SHA"
+          elif [[ "$GITHUB_REF" == refs/heads/release-* ]]; then
+            export CAN_LINT_BASE="origin/main"
+          elif [[ -n "$PUSH_BEFORE_SHA" && ! "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+            export CAN_LINT_BASE="$PUSH_BEFORE_SHA"
+          else
+            export CAN_LINT_BASE="$(git rev-parse HEAD^)"
+          fi
+          npm run test:lint-regressions
+          npm run check:lint-regressions 2>&1 | tee lint-regressions.log
+      - name: Full unit regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee unit-regressions.log
+      - name: Production dependency security audit
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run audit:production 2>&1 | tee dependency-audit.log
       - name: Retain diagnostics for first failure at this exact SHA
         if: always()
         uses: actions/upload-artifact@v4
@@ -92,5 +125,9 @@ jobs:
             site-regressions.log
             class-regressions.log
             go-links-regressions.log
+            lint.log
+            lint-regressions.log
+            unit-regressions.log
+            dependency-audit.log
           if-no-files-found: warn
           retention-days: 14
