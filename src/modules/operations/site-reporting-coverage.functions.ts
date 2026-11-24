@@ -1,3 +1,4 @@
+import {readSiteCampaignDeliveryMetrics} from "@/modules/insights/campaign-delivery-metrics.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -18,3 +19,11 @@ export const getSiteReportingSourceCoverage = createServerFn({ method:"GET" })
     const actor = await getCommandContext(getRequest());
     return readSiteReportingSourceCoverage(actor, data);
   });
+
+/** Same current-cohort delivery metrics used by the native campaign workspace. */
+export const getSiteCampaignDeliveryMetrics=createServerFn({method:"GET"})
+ .validator((value:unknown)=>params.parse(value))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  return readSiteCampaignDeliveryMetrics(await getCommandContext(getRequest()),data);
+ });

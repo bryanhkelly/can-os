@@ -1,3 +1,4 @@
+import {CAMPAIGN_METRIC_DEFINITIONS} from "@/domain/campaign-metrics";
 import { describe, expect, it } from "vitest";
 import {
   buildCurrentReportingMetricRegistry, requireMetricContract,
@@ -11,7 +12,7 @@ describe("source-owned metric registry",()=>{
   const all = buildCurrentReportingMetricRegistry();
   it("reuses every established domain metric instead of duplicating definitions",()=>{
     expect(all).toHaveLength(CLASS_METRIC_DEFINITIONS.length +
-      NONCREDIT_PILOT_COUNT_DEFINITIONS.length + GO_LINK_METRIC_DEFINITIONS.length);
+      NONCREDIT_PILOT_COUNT_DEFINITIONS.length + GO_LINK_METRIC_DEFINITIONS.length + CAMPAIGN_METRIC_DEFINITIONS.length);
     expect(new Set(all.map(m=>m.metricKey)).size).toBe(all.length);
     expect(all.every(m=>m.source&&m.denominator&&m.rule&&m.timeBasis))
       .toBe(true);
@@ -64,6 +65,11 @@ describe("source-owned metric registry",()=>{
     expect(()=>validateMeasurementPlanAgainstRegistry({
       ...plan, metrics:[{...plan.metrics[0],sourceAuthority:"native_class"}],
     },all)).toThrow("source authority");
+  });
+  it("distinguishes provider acceptance from delivery and human reach",()=>{
+    expect(all.find(m=>m.metricKey==="campaign.accepted")?.rule).toContain("later bounces");
+    expect(all.find(m=>m.metricKey==="campaign.delivered")?.rule).toContain("receipt");
+    expect(all.find(m=>m.metricKey==="campaign.total")?.denominator).toContain("not distinct people");
   });
   it("does not silently upgrade private counts into published impact metrics",()=>{
     expect(all.every(m=>m.disclosure==="private_operational")).toBe(true);

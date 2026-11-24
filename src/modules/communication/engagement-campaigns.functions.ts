@@ -1,5 +1,6 @@
 import {EventTypes} from "@/domain/event-types";
 import {emitReportableChange} from "@/platform/reportable-event";
+import {campaignDeliveryCountColumns} from "@/modules/insights/campaign-delivery-metrics.server";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {sql,eq} from "drizzle-orm";
@@ -33,15 +34,7 @@ export const readEngagementCampaignWorkspace=createServerFn({method:"GET"})
  FROM public.campaign_recipient_lists l LEFT JOIN public.campaign_list_members m ON m.list_id=l.id
  WHERE l.owner_scope=${s.ownerScope} GROUP BY l.id ORDER BY l.name LIMIT 100`);
  const campaigns=await campaignRows<CampaignRow>(db,sql`SELECT c.id,c.subject,c.scheduled_at,c.cancelled_at,
- count(d.id)::int total,count(*) FILTER(WHERE d.status IN ('pending','processing'))::int pending,
- count(*) FILTER(WHERE d.accepted_at IS NOT NULL)::int accepted,
- count(*) FILTER(WHERE d.delivered_at IS NOT NULL AND d.provider_failure IS NULL)::int delivered,
- count(*) FILTER(WHERE d.provider_failure='email.bounced')::int bounced,
- count(*) FILTER(WHERE d.provider_failure='email.complained')::int complained,
- count(*) FILTER(WHERE (d.status='failed' AND NOT d.outcome_unconfirmed) OR d.provider_failure='email.failed')::int failed,
- count(*) FILTER(WHERE d.status='failed' AND d.outcome_unconfirmed)::int unconfirmed,
- count(*) FILTER(WHERE d.status='suppressed' OR d.provider_failure='email.suppressed')::int suppressed,
- count(*) FILTER(WHERE d.status='cancelled')::int cancelled
+ ${campaignDeliveryCountColumns}
  FROM public.engagement_campaigns c JOIN public.campaign_deliveries d ON d.campaign_id=c.id
  WHERE c.owner_scope=${s.ownerScope} AND c.engagement_id=${data.engagementId} AND c.link_id=${data.linkId}
  GROUP BY c.id ORDER BY c.created_at DESC LIMIT 50`);
