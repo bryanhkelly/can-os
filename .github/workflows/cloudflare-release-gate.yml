@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24.22.1'
@@ -32,10 +34,26 @@ jobs:
           npm --version
       - name: Reproducible clean dependency install
         run: npm ci
-      - name: Drizzle migration journal, snapshots and identity-release source gates
+      - name: Engineering architecture and V6.1 source governance
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
-          npm run verify:reporting:sql
-          npm run db:check:journal
+          set -o pipefail
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            export V61_BASE_REF="$PR_BASE_SHA"
+          elif [[ "$GITHUB_REF" == refs/heads/release-* ]]; then
+            export V61_BASE_REF="$(git merge-base HEAD origin/main)"
+          elif [[ -n "$PUSH_BEFORE_SHA" && ! "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+            export V61_BASE_REF="$PUSH_BEFORE_SHA"
+          else
+            export V61_BASE_REF="$(git rev-parse HEAD^)"
+          fi
+          git cat-file -e "$V61_BASE_REF^{commit}"
+          npm run verify:architecture 2>&1 | tee architecture-governance.log
+      - name: Identity-release regression gates
+        run: |
           npx vitest run tests/unit/one-person-release-gate.test.ts tests/unit/access-context.test.ts tests/unit/personal-can-identity.test.ts tests/unit/canonical-can-sso.test.ts
       - name: Cloudflare production bundle (client AND server)
         shell: bash
@@ -68,6 +86,7 @@ jobs:
         with:
           name: cloudflare-release-gate-${{ github.sha }}
           path: |
+            architecture-governance.log
             cloudflare-build.log
             typecheck.log
             site-regressions.log
