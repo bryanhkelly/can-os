@@ -21,6 +21,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:design-audit
+      - run: node --test scripts/lib/v61-visual-evidence.test.mjs
       - name: Verify V6.1 source against the full release range
         run: |
           git fetch origin main
