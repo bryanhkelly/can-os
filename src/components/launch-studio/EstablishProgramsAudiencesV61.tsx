@@ -1,9 +1,10 @@
+import { siteAudienceGroups } from "@/domain/site-audiences";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Users, Heart, House, Globe2, HandHeart, Accessibility } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GuidedSetupShell } from "@/components/workflow";
-import { ActionFooter, SelectionCard, WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, SelectionCard, SelectionChip, SelectionChipGroup, WorkspaceNotice } from "@/components/workspace";
 import {
   reconcileSiteExperienceAssociationsV61, siteProgramsAudiencesV61SaveSchema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
@@ -49,12 +50,7 @@ const times = [
   { id: "daytime", label: "Daytime", detail: "Morning, afternoon, or full day" },
   { id: "evenings", label: "Evenings", detail: "After-work or evening learning" },
 ] as const;
-const audienceChoices = [
-  { id: "children", label: "Children", detail: "Elementary-age learners" },
-  { id: "teens", label: "Teens", detail: "Middle and high school ages" },
-  { id: "adults", label: "Adults", detail: "Career skills and enrichment" },
-  { id: "older_adults", label: "Older adults", detail: "Lifelong learning and community" },
-] as const;
+const audienceIcons = [Users, Heart, House, Globe2, HandHeart, Accessibility] as const;
 
 const guidance = [
   {
@@ -235,17 +231,17 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
   const sections = [
     { id: "interests", title: "Programs", description: "What you want to offer",
       status: step === 0 ? "current" as const : "upcoming" as const },
-    { id: "audiences", title: "Audiences", description: "Who you hope to serve",
+    { id: "audiences", title: "Audiences", description: "Who you desire to serve",
       status: step === 1 ? "current" as const : "upcoming" as const },
     { id: "experiences", title: "Experiences", description: "What people could learn, do or enjoy",
       status: step === 2 ? "current" as const : "upcoming" as const },
   ];
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
     <GuidedSetupShell title={step === 0 ? "What would you like to bring to your community?" :
-      step === 1 ? "Who do you hope to serve?" : "Experiences"}
+      step === 1 ? "Who do you desire to serve?" : "Experiences"}
       description={step === 0
         ? "Choose the program ideas you want to explore. You will select how to deliver them in Prepare."
-        : step === 1 ? "Choose any groups you're considering. This is optional."
+        : step === 1 ? "Identify the people and communities you have a heart to serve, even if you do not currently have the programs or resources to reach them."
         : "Imagine what people could learn, do or enjoy. Details and approvals come later in Prepare."}
       showHeader={step !== 2}
       steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : id === "audiences" ? 1 : 2)} navigationDisabled={disabled}>
@@ -335,14 +331,25 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
           </div>
         </section>
       </> : step === 1 ? <>
-        <fieldset className="space-y-3">
-          <legend className="sr-only">Audiences you hope to serve (optional)</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {audienceChoices.map(choice => <SelectionCard key={choice.id} kind="checkbox"
-              value={choice.id} title={choice.label} detail={choice.detail} className="min-h-24"
-              checked={draft.audienceIds.includes(choice.id)} disabled={disabled}
-              onChange={checked => toggleAudience(choice.id, checked)} />)}
+        <fieldset className="space-y-4">
+          <legend className="sr-only">Audiences you desire to serve (optional)</legend>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Select all that apply. Optional.</span>
+            <span role="status">{draft.audienceIds.length} selected</span>
           </div>
+          {siteAudienceGroups.map((group,index)=>{
+            const Icon=audienceIcons[index];
+            return <fieldset key={group.id} className="space-y-2 border-b pb-3 last:border-0">
+              <legend className="flex items-center gap-2 text-sm font-semibold">
+                <Icon className="size-4 text-muted-foreground" aria-hidden="true"/>{group.label}
+              </legend>
+              <SelectionChipGroup>
+                {group.items.map(item=><SelectionChip key={item.id} selected={draft.audienceIds.includes(item.id)}
+                  disabled={disabled} onChange={checked=>toggleAudience(item.id,checked)}>{item.label}</SelectionChip>)}
+              </SelectionChipGroup>
+            </fieldset>;
+          })}
+          <WorkspaceNotice tone="info">Your selections express your aspirations, not current capabilities or commitments to deliver programs.</WorkspaceNotice>
         </fieldset>
       </> : <>
         <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled}
