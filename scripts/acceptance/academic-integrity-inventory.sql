@@ -6,8 +6,9 @@ WITH legacy AS (
  FROM public.enrollments e
  JOIN public.sections sec ON sec.id=e.section_id
  JOIN public.student_profiles sp ON sp.id=e.student_profile_id
+ LEFT JOIN public.academic_enrollment_cutover_links link ON link.legacy_enrollment_id=e.id
  LEFT JOIN public.class_enrollments ce
-   ON ce.id=md5('valor-v61:classenrollment:'||e.id)::uuid
+   ON ce.id=link.class_enrollment_id
    AND ce.learner_person_id=sp.person_id
    AND EXISTS (SELECT 1 FROM public.classes c WHERE c.id=ce.class_id
      AND c.site_id=sec.site_id AND c.id=md5('valor-v61:class:'||sec.code)::uuid)
