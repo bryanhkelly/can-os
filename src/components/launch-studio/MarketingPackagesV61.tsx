@@ -382,8 +382,8 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     subtitle={context.subtitle}
     width="wide" rail={rail}>
     <div className="mt-6 space-y-5">
-      {error&&<p role="alert" className="border border-destructive bg-card p-4 text-sm text-destructive">{error}</p>}
-      {notice&&<p role="status" className="border bg-card p-4 text-sm">{notice}</p>}
+      {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+      {notice&&<WorkspaceNotice>{notice}</WorkspaceNotice>}
       {intentUnavailable&&<WorkspaceNotice tone="attention">
         We couldn't load your saved programs, audiences, or experiences. Refresh before choosing what to highlight.
       </WorkspaceNotice>}
