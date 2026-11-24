@@ -38,7 +38,7 @@ describe("WS2 native Class invitation authority",()=>{
     "invitation.creditMode!==data.creditMode",
     "assertCurrentNativeClassLearnerForMutation(tx,request,actor)",
     "assertNativeClassSeatAvailable",
-    "consentSha256=createHash",
+    "consentSha256=nativeClassConsentDigest",
     'enrollmentMethod:invitation?"invitation":"self"',
     'state:"accepted",respondedAt:now,acceptedEnrollmentId:enrollment.id',
     'eventType:"ClassInvitationAccepted"',
