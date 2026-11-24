@@ -18,6 +18,7 @@ import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {assertCurrentNativeClassLearnerForMutation} from "./native-class-learner-session.server";
 import {currentClassAuthority} from "./native-class-authority.server";
+import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./native-class-attempt.server";
 import {verifiedAdultOn,assertNativeSelfEnrollmentEligible} from "@/domain/native-class-enrollment";
@@ -138,19 +139,9 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
     throw new AuthorizationError("destination participation mode");
    await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
 
-   const [already]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,destinationClass.id),
-      eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
-      inArray(canonicalClassEnrollments.status,["pending","active"]),
-    )).limit(1);
+   const already=await readOpenNativeClassEnrollment(tx,destinationClass.id,actor.actorPersonId);
    if(already)throw new AuthorizationError("destination already has open participation");
-   const [completed]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,destinationClass.id),
-      eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
-      eq(canonicalClassEnrollments.status,"completed"),
-    )).limit(1);
+   const completed=await readLatestCompletedNativeClassEnrollment(tx,destinationClass.id,actor.actorPersonId);
    assertNativeClassRepeatEligible(completed?["completed"]:[]);
    const occupancy=await readNativeClassOccupancy(tx,destinationClass.id);
    assertNativeClassSeatAvailable({
