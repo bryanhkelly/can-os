@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import {describe,expect,it} from "vitest";
 import {siteMediaUploadSchema,siteMediaReviewSchema,
   suggestSiteMediaTags,siteMediaDecorativeAlt} from "@/domain/site-media-folder";
@@ -38,8 +39,9 @@ describe("school media folder end-to-end contracts",()=>{
     expect(()=>siteMediaReviewSchema.parse({...review,documentIds:[image,image]})).toThrow();
     expect(()=>siteMediaReviewSchema.parse({...review,subjectRelease:"unknown"})).toThrow();
   });
-  it("makes only same-tenant UUID media URLs reachable on tenant-origin GET",()=>{
+  it("accepts legacy and compact media URLs only on authorized tenant-origin GET",()=>{
     expect(isPublicSiteReadPath("/media/"+image)).toBe(true);
+    expect(isPublicSiteReadPath("/media/"+encodeUuidForPath(image))).toBe(true);
     expect(isPublicSiteReadPath("/media/../../admin")).toBe(false);
     expect(isPublicSiteReadPath("/media/private-key")).toBe(false);
     const host="https://example-school.can-os.com";
@@ -55,12 +57,12 @@ describe("school media folder end-to-end contracts",()=>{
       mediaReviewStatus:"approved",sourceRevision:"1",visualFamily:"heritage"};
     const media=projectApprovedSchoolSiteMedia(site,"example-school.can-os.com",[approved]);
     expect(media.hero?.assetId).toBe(image);
-    expect(media.hero?.src).toBe("https://example-school.can-os.com/media/"+image);
+    expect(media.hero?.src).toBe("https://example-school.can-os.com/media/"+encodeUuidForPath(image));
     expect(media.academics).toBeUndefined();
     const page={host:"example-school.can-os.com",site:{name:"Example School",organizationName:"Church"},
       offerings:[],localContent:emptySiteLocalContent,media};
     const home=renderPublicSiteHtml(page);
-    expect(home).toContain('src="https://example-school.can-os.com/media/'+image+'"');
+    expect(home).toContain('src="https://example-school.can-os.com/media/'+encodeUuidForPath(image)+'"');
     const about=renderPublicSiteHtml({...page,localContent:{
       ...emptySiteLocalContent,localDescription:"A local community story.",
     }},{path:"/about"});

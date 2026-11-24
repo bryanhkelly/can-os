@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 import type {ParticipationRecord} from "./participation-read-model";
 
 /** Secondary navigation to source-owned outcomes. Links are NOT entitlements:
@@ -27,7 +28,7 @@ export function activityEvidenceLinks(
  }
  if(record.source==="native_class"&&record.status==="active"&&
     record.subject.kind==="self"&&record.refs.classId){
-  const prefix="/class/"+encodeURIComponent(record.refs.classId);
+  const prefix=shortUuidHref("/class/", record.refs.classId);
   links.push({label:"Assessments",href:prefix+"?view=learn&tab=assignments"});
   links.push({label:"Session attendance",href:prefix+"?view=learn&tab=sessions"});
  }

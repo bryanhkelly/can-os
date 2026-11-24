@@ -1,3 +1,4 @@
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 import type { summarizeFullFlowOperations } from "./full-flow-operational-snapshot";
 import { activeProgramOperationsHref } from "./launch-operations-handoff";
 import { plural } from "@/lib/format";
@@ -32,8 +33,8 @@ export type GuidedStep = {
  * Suggested role is not a permission grant or staff assignment. */
 export function guidedSchoolJourney(program: SchoolProgramRecord, journey: LaunchJourneyRecord): GuidedStep[] {
   const c=program.counts;
-  const encoded=encodeURIComponent(program.id);
-  const site=program.siteId?encodeURIComponent(program.siteId):"";
+  const encoded=compactUuidUrlValue(program.id);
+  const site=program.siteId?compactUuidUrlValue(program.siteId):"";
   const programActive=program.status==="active";
   const operations=programActive?activeProgramOperationsHref({programId:program.id,siteId:program.siteId,status:program.status}):
     `/home?programId=${encoded}${site?`&siteId=${site}`:""}`;

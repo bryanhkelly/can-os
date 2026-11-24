@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import {planSchoolSiteMedia,type SiteMediaPhoto,type SchoolSiteMediaSlot}
   from "./school-site-media-selection";
 import {slugFromPublicSiteHost} from "./public-site-address";
@@ -21,7 +22,7 @@ export function projectApprovedSchoolSiteMedia(
     const photo=byId.get(assignment.assetId);
     if(!photo)continue;
     result[assignment.slot]={
-      src:`https://${schoolHost}/media/${assignment.assetId}`,
+      src:`https://${schoolHost}/media/${encodeUuidForPath(assignment.assetId)}`,
       altText:photo.altText,
       assetId:assignment.assetId,
       sourceRevision:assignment.sourceRevision,

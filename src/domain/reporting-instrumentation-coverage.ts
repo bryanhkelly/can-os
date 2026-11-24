@@ -42,6 +42,15 @@ export const REPORTING_DOMAIN_COVERAGE: readonly ReportingDomainCoverage[] = [
       "verified conversion attribution"],
   },
   {
+    domain:"go_link_engagement",owner:"Go Links and canonical enrollment attribution",
+    state:"domain_metrics_only",instrumentedEvents:[],
+    missingLifecycleExamples:[
+      "verified source-specific outcomes for Class, enrichment and public interest",
+      "consented person-level touchpoint reconciliation",
+      "cross-channel deduplicated reach",
+    ],
+  },
+  {
     domain:"facilities",owner:"Site room operations",
     state:"instrumented_subset",
     instrumentedEvents:[EventTypes.SiteRoomCreated,EventTypes.SiteRoomUpdated,

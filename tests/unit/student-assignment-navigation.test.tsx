@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { studentAssignmentHref, studentAssignmentDetailRoute } from "@/domain/student-assignment-navigation";
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { StudentAssignmentLink } from "@/components/student/StudentAssignmentLink";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -29,6 +30,14 @@ describe("canonical student assignment navigation", () => {
     expect(studentAssignmentHref("essay 1/?", {
       sectionId: "class one", filter: "feedback",
     })).toBe("/student/assignments/essay%201%2F%3F?section=class+one&filter=feedback");
+  });
+
+  it("compacts persisted UUID assignment and Section IDs in raw notification links", () => {
+    const assignment = "550e8400-e29b-41d4-a716-446655440000";
+    const section = "6f3c2a81-91b4-47e6-a8c2-5b29d0137f64";
+    expect(studentAssignmentHref(assignment, { sectionId: section, filter: "feedback" }))
+      .toBe("/student/assignments/" + encodeUuidForPath(assignment) +
+        "?section=" + encodeUuidForPath(section) + "&filter=feedback");
   });
 
   it("renders a real detail link with class context and accessible anchor props", () => {

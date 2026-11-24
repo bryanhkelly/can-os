@@ -1,3 +1,4 @@
+import { decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
@@ -13,6 +14,7 @@ import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { SiteGuideV61, type SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
+import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
@@ -72,7 +74,7 @@ const websiteGuideSteps: readonly SiteGuideContentV61[] = [
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
   // an invalid Site and open the editor under a different active membership.
-  siteId:z.string().optional(),
+  siteId:z.preprocess(value => typeof value === "string" ? decodeUuidPathParam(value) ?? value : value, z.string().optional()),
   programId:z.string().optional(),
   returnGrantId:z.string().optional(),
   returnToHub:z.boolean().optional(),
@@ -113,10 +115,11 @@ function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare
   </section>;
 }
 
-export function WebsiteHome({ outcome, selection, studio = false, onStepChange }: {
+export function WebsiteHome({ outcome, selection, studio = false, friendlyIdentity, onStepChange }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
   selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] };
   studio?: boolean;
+  friendlyIdentity?: FriendlySiteIdentity;
   onStepChange?: (step:number)=>void;
 }) {
   const [localStep,setLocalStep]=useState(0);
@@ -125,6 +128,8 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   const changeStep=onStepChange??setLocalStep;
   const returnToLaunch=selection.returnToSettings && selection.siteId
     ? <Link to="/settings" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Settings</Link>
+    : selection.returnToHub && friendlyIdentity
+    ? <Link to="/o/$organizationSlug/$siteSlug/launch" params={friendlyIdentity} className="font-semibold text-primary">Back to Launch Studio</Link>
     : selection.returnToHub && selection.siteId
     ? <Link to="/launch/site" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Launch Studio</Link>
     : selection.siteId&&selection.programId&&selection.returnGrantId
@@ -139,7 +144,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     {id:"content",title:"Your Content"}, {id:"review",title:"Review & Finish"},
   ];
   if (studio) return <LaunchSiteFrame
-    site={{id:data.siteId,name:data.siteName}} active="website-brand"
+    site={{id:data.siteId,name:data.siteName}} identity={friendlyIdentity} active="website-brand"
     previewAvailable={Boolean(data.host)}
     previewHref={privateWebsitePreviewUrl(data.siteId)}>
     <PageFrame width="wide" className="launch-studio-page">

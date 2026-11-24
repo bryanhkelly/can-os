@@ -1,3 +1,4 @@
+import { compactUuidUrlValue, decodeUuidPathParam, encodeUuidForPath } from "@/domain/opaque-url-id";
 /** Canonical student assignment destination. Legacy query links redirect here. */
 export const studentAssignmentDetailRoute = "/student/assignments/$assessmentId" as const;
 
@@ -10,8 +11,11 @@ export function studentAssignmentHref(assessmentId: string, options: {
   filter?: StudentAssignmentFilter;
 } = {}): string {
   const search = new URLSearchParams();
-  if (options.sectionId) search.set("section", options.sectionId);
+  if (options.sectionId) {
+    const canonical = decodeUuidPathParam(options.sectionId);
+    search.set("section", canonical ? encodeUuidForPath(canonical) : options.sectionId);
+  }
   if (options.filter) search.set("filter", options.filter);
   const suffix = search.toString();
-  return `/student/assignments/${encodeURIComponent(assessmentId)}${suffix ? `?${suffix}` : ""}`;
+  return `/student/assignments/${compactUuidUrlValue(assessmentId)}${suffix ? `?${suffix}` : ""}`;
 }

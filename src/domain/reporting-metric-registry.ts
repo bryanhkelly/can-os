@@ -1,5 +1,6 @@
 import { CLASS_REPORT_CONTRACT_VERSION, CLASS_METRIC_DEFINITIONS } from "@/domain/participation-reporting";
 import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
+import { GO_LINK_METRIC_DEFINITIONS, GO_LINK_EVIDENCE_VERSION } from "@/domain/go-link-evidence-metrics";
 
 /**
  * One read-only registry for existing evidence metrics. It ADAPTS their
@@ -16,7 +17,7 @@ export const NONCREDIT_PILOT_DEFINITION_VERSION = "1.0.0" as const;
 export type SourceMetricContract = {
   metricKey: string;
   definitionVersion: string;
-  sourceDomain: "native_class" | "noncredit_pilot";
+  sourceDomain: "native_class" | "noncredit_pilot" | "go_link";
   sourceMetricKey: string;
   label: string;
   source: string;
@@ -27,7 +28,7 @@ export type SourceMetricContract = {
 };
 
 function makeMetricContract(
-  namespace: "class" | "noncredit",
+  namespace: "class" | "noncredit" | "go",
   domain: SourceMetricContract["sourceDomain"],
   version: string,
   def: { key: string; label: string; source: string;
@@ -56,6 +57,8 @@ export function buildCurrentReportingMetricRegistry(): readonly SourceMetricCont
     ...NONCREDIT_PILOT_COUNT_DEFINITIONS.map(def =>
       makeMetricContract("noncredit", "noncredit_pilot",
         NONCREDIT_PILOT_DEFINITION_VERSION, def)),
+    ...GO_LINK_METRIC_DEFINITIONS.map(def=>
+      makeMetricContract("go","go_link",GO_LINK_EVIDENCE_VERSION,def)),
   ];
   if (new Set(combined.map(m => m.metricKey)).size !== combined.length) {
     throw new Error("Repeated cross-module metric identifier");

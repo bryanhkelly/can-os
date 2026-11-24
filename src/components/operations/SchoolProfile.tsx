@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { Link, type AnyRouter, type LinkComponentProps, type LinkOptions } from "@tanstack/react-router";
 import type { getSchoolProfile } from "@/modules/operations/school-profile.functions";
 import type { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
@@ -62,9 +63,10 @@ function ManageLink({ title, description, children }: { title: string; descripti
  * /guardian/experiences; only the server-confirmed secured modules differ.
  * It edits nothing itself; Site Today is the daily view.
  */
-export function SchoolProfile({ data, tab = "overview", tabLink }: {
+export function SchoolProfile({ data, tab = "overview", tabLink, friendlyIdentity }: {
   data: SchoolProfileData;
   tab?: SchoolRecordTab;
+  friendlyIdentity?: FriendlySiteIdentity;
   /** Route-local tab targets, because the same record renders on several routes. */
   tabLink?: (tab: SchoolRecordTab) => LinkOptions & { to: string };
 }) {
@@ -86,7 +88,9 @@ export function SchoolProfile({ data, tab = "overview", tabLink }: {
     subtitle={[site.organization.name, site.timezone].filter(Boolean).join(" · ")}
     breadcrumbs={canManageSchool && (siteCount === null || siteCount > 1) ? <Link to="/sites" className="underline">All schools</Link> : undefined}
     actions={<div className="flex items-start gap-4">
-      {canOpenSiteToday && <Link to="/sites/$siteId" params={{ siteId: site.id }} className={secondaryActionClassName}>Open today</Link>}
+      {canOpenSiteToday && (friendlyIdentity
+        ? <Link to="/o/$organizationSlug/$siteSlug" params={friendlyIdentity} className={secondaryActionClassName}>Open today</Link>
+        : <Link to="/sites/$siteId" params={{ siteId: site.id }} className={secondaryActionClassName}>Open today</Link>)}
       {experiences && (experiences.connected
         ? <StatusBadge tone="success">School updates connected</StatusBadge>
         : <StatusBadge tone="attention">School updates unavailable</StatusBadge>)}

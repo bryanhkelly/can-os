@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { type FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { Building2, CheckCircle2 } from "lucide-react";
 import { completedLaunchStageV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { siteLaunchModules, siteLaunchStagesV61, type SiteLaunchStageV61 } from 
 
 export type LaunchSiteNavigationProps = {
   site: { id: string; name: string };
+  identity?: FriendlySiteIdentity;
   active?: string;
   statusLabel?: string;
   completion?: LaunchModuleCompletion;
@@ -21,7 +23,7 @@ export type LaunchSiteNavigationProps = {
  * only: caller owns navigation state and the route owns Site authorization.
  */
 export function LaunchSiteNavigation({
-  site, active, statusLabel, completion = {}, expanded, instance, stagePanelBaseId,
+  site, identity, active, statusLabel, completion = {}, expanded, instance, stagePanelBaseId,
   onToggleStage, onNavigate,
 }: LaunchSiteNavigationProps) {
   return <div className="flex h-full flex-col bg-card">
@@ -36,9 +38,13 @@ export function LaunchSiteNavigation({
       <p className="mt-1 text-xs text-muted-foreground">{statusLabel ?? "Site setup"}</p>
     </div>
     <nav aria-label="Launch Studio navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-3">
-      <Link to="/launch/site" search={{ siteId: site.id }} onClick={onNavigate}
+      {identity ? <Link to="/o/$organizationSlug/$siteSlug/launch" params={identity}
+        onClick={onNavigate}
         className={"block border-b px-3 py-3 text-sm font-semibold " + (!active ? "text-primary" : "")}
         aria-current={!active ? "page" : undefined}>Overview</Link>
+      : <Link to="/launch/site" search={{ siteId: site.id }} onClick={onNavigate}
+        className={"block border-b px-3 py-3 text-sm font-semibold " + (!active ? "text-primary" : "")}
+        aria-current={!active ? "page" : undefined}>Overview</Link>}
       {siteLaunchStagesV61.map((stage, index) => (
         <div key={stage} className="border-b py-1">
           <Button type="button" variant="ghost" aria-expanded={expanded === stage}
@@ -53,28 +59,40 @@ export function LaunchSiteNavigation({
           </Button>
           <div id={`${stagePanelBaseId}-${instance}-${stage}`} hidden={expanded !== stage}
             className="space-y-1 pb-2 pl-4">
-            {siteLaunchModules.filter(item => item.stage === stage).map(item => (
-              <Link key={item.id} to="/launch/site"
-                search={{ siteId: site.id, module: item.id }}
-                onClick={onNavigate} aria-current={active === item.id ? "page" : undefined}
-                className={"flex min-h-11 items-center justify-between gap-2 border-l-2 px-3 py-2 text-xs " +
-                  (active === item.id
-                    ? "border-primary bg-accent font-bold text-primary"
-                    : "border-transparent text-muted-foreground hover:bg-muted")}>
+            {siteLaunchModules.filter(item => item.stage === stage).map(item => {
+              const navClass = "flex min-h-11 items-center justify-between gap-2 border-l-2 px-3 py-2 text-xs " +
+                (active === item.id
+                  ? "border-primary bg-accent font-bold text-primary"
+                  : "border-transparent text-muted-foreground hover:bg-muted");
+              const label = <>
                 <span>{item.title}</span>
-                {completion[item.id]==="complete"&&<CheckCircle2 aria-label={item.title+" saved setup complete"}
-                  className="size-4 shrink-0 text-success" />}
-              </Link>
-            ))}
+                {completion[item.id] === "complete" &&
+                  <CheckCircle2 aria-label={item.title + " saved setup complete"}
+                    className="size-4 shrink-0 text-success" />}
+              </>;
+              return identity
+                ? <Link key={item.id} to="/o/$organizationSlug/$siteSlug/launch"
+                    params={identity} search={{ module: item.id }} onClick={onNavigate}
+                    aria-current={active === item.id ? "page" : undefined}
+                    className={navClass}>{label}</Link>
+                : <Link key={item.id} to="/launch/site"
+                    search={{ siteId: site.id, module: item.id }} onClick={onNavigate}
+                    aria-current={active === item.id ? "page" : undefined}
+                    className={navClass}>{label}</Link>;
+            })}
           </div>
         </div>
       ))}
     </nav>
     <div className="m-3 border p-3">
       <Button asChild variant="ghost" className="w-full justify-start">
-        <Link to="/sites/$siteId" params={{ siteId: site.id }} onClick={onNavigate}>
-          <Building2 className="size-4"/> Site Workspace
-        </Link>
+        {identity
+          ? <Link to="/o/$organizationSlug/$siteSlug" params={identity} onClick={onNavigate}>
+              <Building2 className="size-4"/> Site Workspace
+            </Link>
+          : <Link to="/sites/$siteId" params={{ siteId: site.id }} onClick={onNavigate}>
+              <Building2 className="size-4"/> Site Workspace
+            </Link>}
       </Button>
     </div>
   </div>;

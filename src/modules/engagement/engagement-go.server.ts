@@ -1,14 +1,16 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   engagementDefinitions, engagementDefinitionVersions, organizations,
-  programs, siteGoLinks, sitePublications, sites,
+  programs, siteGoLinks, siteGoLinkDailyVisits, sitePublications, sites,
 } from "@/db/schema";
 import {
   engagementDefinitionSchema, type EngagementDefinition,
 } from "@/domain/engagement-definition";
 import { goCodeSchema, goDestinationHref, type GoDestination } from "@/domain/site-go-links";
 import { publicSiteHost } from "@/domain/public-site-address";
+import { goLinkAvailability } from "@/domain/go-link-policy";
+import { resolveSiteGoLink } from "./site-go-links.server";
 
 export type GoExperience =
   | {mode:"redirect";href:string}
@@ -67,24 +69,38 @@ async function resolveDestination(
   return goDestinationHref(destination,code,host);
 }
 
-/** Single public resolver; both legacy links and universal engagement links use this code store. */
+/** One best-effort aggregate observation shared by direct and universal links.
+ * Redirects include automated requests; an observation is not an identity.
+ */
+async function observeUniversalGoVisit(linkId:string):Promise<void>{
+  try{
+    await db.insert(siteGoLinkDailyVisits).values({
+      linkId,day:new Date().toISOString().slice(0,10),redirects:1,
+    }).onConflictDoUpdate({
+      target:[siteGoLinkDailyVisits.linkId,siteGoLinkDailyVisits.day],
+      set:{redirects:sql`${siteGoLinkDailyVisits.redirects}+1`},
+    });
+  }catch{
+    console.error("Universal Go Link observation unavailable",{kind:"daily_counter"});
+  }
+}
+
+/** Single public resolver; Site and universal engagement links share code store. */
 export async function resolveGoExperience(code:string):Promise<GoExperience|null>{
   if(!goCodeSchema.safeParse(code).success)return null;
   const [link]=await db.select({
+    id:siteGoLinks.id,
+    startsAt:siteGoLinks.startsAt,expiresAt:siteGoLinks.expiresAt,
     destination:siteGoLinks.destination,status:siteGoLinks.status,
     siteId:siteGoLinks.siteId,organizationId:siteGoLinks.organizationId,
     engagementVersionId:siteGoLinks.engagementVersionId,
   }).from(siteGoLinks).where(eq(siteGoLinks.code,code)).limit(1);
-  if(!link || link.status!=="active")return null;
+  if(!link || goLinkAvailability(link)!=="available")return null;
 
   if(!link.engagementVersionId){
-    if(!link.siteId || !link.organizationId || !link.destination)return null;
-    const owner=await validOwner({
-      ownerKind:"site",organizationId:link.organizationId,
-      siteId:link.siteId,programId:null,
-    });
-    if(!owner)return null;
-    const href=await resolveDestination(link.destination,code,link.siteId);
+    // Reuse the destination registry that enforces exact Site ownership,
+    // current publication, optional Marketing Package and program eligibility.
+    const href=await resolveSiteGoLink(code);
     return href?{mode:"redirect",href}:null;
   }
   const [version]=await db.select({
@@ -107,6 +123,7 @@ export async function resolveGoExperience(code:string):Promise<GoExperience|null
     ? definition.execution.destination:definition.execution.action;
   const href=await resolveDestination(destination,code,owner.siteId);
   if(!href)return null;
+  await observeUniversalGoVisit(link.id);
   return definition.execution.mode==="redirect"
     ? {mode:"redirect",href}
     : {mode:"page",definition,href,ownerName:owner.name};

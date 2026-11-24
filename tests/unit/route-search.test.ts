@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { describe, expect, it, vi } from "vitest";
 import {
   groupSessionSelectionSchema, optionalSearchString, optionalSearchUuid,
@@ -53,6 +54,10 @@ describe("shared selection fields", () => {
     expect(siteProgramHref("/admissions", { siteId: "school one", programId: "program" }))
       .toBe("/admissions?siteId=school+one&programId=program");
     expect(siteProgramHref("/home", { siteId: "school" })).toBe("/home?siteId=school");
+    const uuid = "550e8400-e29b-41d4-a716-446655440000";
+    expect(siteProgramHref("/admissions", { siteId: uuid, programId: uuid }))
+      .toBe("/admissions?siteId=" + encodeUuidForPath(uuid) +
+        "&programId=" + encodeUuidForPath(uuid));
     expect(siteProgramHref("/admissions/capacity", {})).toBe("/admissions/capacity");
   });
   it.each([undefined, null, false, 1, [], ["site"], {}, { id: "site" }])("does not coerce malformed %j", value => {

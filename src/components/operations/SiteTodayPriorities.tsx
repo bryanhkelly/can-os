@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { StatusBadge, WorkspacePanel } from "@/components/workspace";
 import type { DailyAttentionItem } from "@/domain/daily-operations";
@@ -31,7 +32,7 @@ export function SiteTodayPriorities({
   const [nextAction, ...otherItems] = items;
   const nextActionHref = nextAction
     ? ownedActionIds.includes(nextAction.id)
-      ? `/sites/${encodeURIComponent(siteId)}#site-owned-follow-ups`
+      ? shortUuidHref("/sites/", siteId) + "#site-owned-follow-ups"
       : nextAction.href
     : undefined;
   const formatDueDate = (date: string) => formatTimestamp(date, siteTimezone, { dateStyle: "medium" });

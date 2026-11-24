@@ -1,3 +1,4 @@
+import { decodeUuidPathParam, encodeUuidForPath } from "@/domain/opaque-url-id";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { AuthorizationError } from "@/domain/command-context";
@@ -7,7 +8,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requirePartnerWebsiteEditor } from "@/modules/sites/site-website-authorization.server";
 
 const querySchema=z.object({
-  siteId:z.string().uuid(),
+  siteId:z.preprocess(value => typeof value === "string" ? decodeUuidPathParam(value) ?? value : value, z.string().uuid()),
   view:z.enum(["landing","survey","email-confirmation","email-update","email-survey"]),
 }).strict();
 const headers={
@@ -53,7 +54,7 @@ export const Route=createFileRoute("/brand-preview")({
     const context=await readSiteFamilyBrand(site.id);
     const selection=(name:string)=>{
       const href=new URL("/brand-preview",url);
-      href.searchParams.set("siteId",input.data.siteId);
+      href.searchParams.set("siteId",encodeUuidForPath(input.data.siteId));
       href.searchParams.set("view",name);
       return href.pathname+href.search;
     };
