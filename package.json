@@ -143,6 +143,7 @@
     "test:e2e:release-security": "playwright test tests/e2e/release-11232026-security.spec.ts",
     "test:e2e:live-go": "playwright test --config playwright.live.config.ts go-release.spec.ts",
     "verify:pilot:noncredit-schema": "node scripts/acceptance/check-noncredit-pilot-readiness.mjs",
+    "verify:pilot:noncredit-regression": "node scripts/acceptance/test-noncredit-assessment-provisioning-qa.mjs",
     "verify:release": "node scripts/acceptance/run-release-readiness.mjs"
   },
   "dependencies": {
