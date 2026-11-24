@@ -23,7 +23,7 @@ export function resolveR2Config(): R2Config {
 }
 
 export interface SignPrivateObjectOptions {
-  method: "PUT" | "HEAD" | "GET";
+  method: "PUT" | "HEAD" | "GET" | "DELETE";
   key: string;
   /** Domain key policy; signing is refused unless the key matches. */
   keyPattern: RegExp;
