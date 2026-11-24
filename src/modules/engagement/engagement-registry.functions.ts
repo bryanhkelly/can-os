@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -272,3 +272,53 @@ export const revokeEngagementGoLink=createServerFn({method:"POST"})
     });
     return {revoked:true};
   }));
+
+/**
+ * Site-scoped, package-scoped engagement library. A saved published engagement
+ * survives leaving the editor; only the verified Site operator can see it.
+ * The JSON source is attribution, never a new authority grant.
+ */
+export const listSiteEngagementDefinitions=createServerFn({method:"GET"})
+  .validator((input:unknown)=>z.object({
+    siteId:uuid,packageId:uuid,
+  }).strict().parse(input))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    await authorizeEngagementOwner({kind:"site",siteId:data.siteId},actor,false,db);
+    const [pkg]=await db.select({id:siteMarketingPackages.id})
+      .from(siteMarketingPackages).where(and(
+        eq(siteMarketingPackages.id,data.packageId),
+        eq(siteMarketingPackages.siteId,data.siteId),
+      )).limit(1);
+    if(!pkg)throw new DomainError("UNAVAILABLE","Outreach package unavailable.");
+    const rows=await db.select({
+      engagementId:engagementDefinitions.id,
+      versionId:engagementDefinitionVersions.id,
+      version:engagementDefinitionVersions.version,
+      status:engagementDefinitions.status,
+      publishedAt:engagementDefinitionVersions.publishedAt,
+      content:engagementDefinitionVersions.content,
+    }).from(engagementDefinitions)
+      .innerJoin(engagementDefinitionVersions,
+        eq(engagementDefinitionVersions.engagementId,engagementDefinitions.id))
+      .where(and(
+        eq(engagementDefinitions.ownerKind,"site"),
+        eq(engagementDefinitions.siteId,data.siteId),
+        eq(sql<string>`${engagementDefinitionVersions.content} #>> '{source,marketingPackageId}'`,data.packageId),
+      ))
+      .orderBy(desc(engagementDefinitionVersions.publishedAt))
+      .limit(100);
+    return rows.flatMap(row=>{
+      const parsed=engagementDefinitionSchema.safeParse(row.content);
+      if(!parsed.success)return [];
+      return [{
+        engagementId:row.engagementId,versionId:row.versionId,
+        version:row.version,status:row.status,
+        headline:parsed.data.presentation.headline,
+        domain:parsed.data.domain,
+        mode:parsed.data.execution.mode,
+        publishedAt:row.publishedAt.toISOString(),
+      }];
+    });
+  });
