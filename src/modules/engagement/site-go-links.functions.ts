@@ -10,7 +10,7 @@ import { DomainError } from "@/domain/errors";
 import { goDestinationKindSchema, goDestinationSchema } from "@/domain/site-go-links";
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
 import { goLinkManagementSchema, goLinkAvailability } from "@/domain/go-link-policy";
-import { inspectGoDestination, listGoDestinationChoices } from "./go-destination-registry.server";
+import { goDestinationAuthoring, inspectGoDestination, listGoDestinationChoices } from "./go-destination-registry.server";
 import { readSiteGoLinkEvidence } from "./go-link-evidence.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { findGoIssuance, goRequestFingerprint, issueAuthorizedGoLink, transitionAuthorizedGoLink } from "./go-link-lifecycle.server";
@@ -82,7 +82,7 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
   .handler(async ({ data }) => db.transaction(async tx => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { actor, site, pkg } = await authorizedPackage(data.siteId, data.packageId, true, tx);
-    if(data.destination.kind==="website-preview")throw new DomainError("FORBIDDEN","Create website previews from Website & Brand.");
+    if(goDestinationAuthoring(data.destination.kind)!=="catalog")throw new DomainError("FORBIDDEN","Create website previews from Website & Brand.");
     const requestId=data.requestId??randomUUID();
     // Fingerprint the requested semantics, not a mutable Site or destination
     // title. Retrying after publication closes returns the same original code.
@@ -185,7 +185,7 @@ export const inspectSavedGoLink = createServerFn({method:"GET"})
     )).limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link not found.");
     const availability=goLinkAvailability(link);
-    const destination=availability==="available" && site.lifecycleStatus!=="closed"
+    const destination=availability==="available" && site.lifecycleStatus!=="closed" && link.siteId && link.destination
       ?await inspectGoDestination(link.siteId,link.destination,link.code):null;
     return {
       availability,destinationAvailable:destination?.available??false,
