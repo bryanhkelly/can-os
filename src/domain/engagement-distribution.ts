@@ -19,7 +19,7 @@ const validEmail=/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9.-]*[A-Z0-9])
  * address uploads, or automatic marketing-list subscription. */
 export function parseInvitationRecipients(raw:string){
   const parts=raw.split(/[;,\s]+/).filter(Boolean);
-  const invalid=parts.filter(value=>value.length>254||!validEmail.test(value)||value.includes("..")||value.endsWith(".demo")||value.endsWith(".test"));
+  const invalid=parts.filter(value=>value.length>254||!validEmail.test(value)||value.includes("..")||value.toLowerCase().endsWith(".demo")||value.toLowerCase().endsWith(".test"));
   const recipients=[...new Set(parts.map(value=>value.toLowerCase()))];
   return {recipients,invalid,tooMany:recipients.length>20};
 }

@@ -267,7 +267,7 @@ export const listEngagementGoLinks=createServerFn({method:"GET"})
     let evidence:Awaited<ReturnType<typeof readAuthorizedGoLinkEvidence>>=[];
     try{evidence=await readAuthorizedGoLinkEvidence(owned.map(link=>{
       const parsed=definitions.get(link.engagementVersionId??"");
-      return {id:link.id,code:link.code,siteId:link.siteId,destination:parsed?.success?engagementDestination(parsed.data):null};
+      return {id:link.id,code:link.code,siteId:link.siteId,organizationId:link.organizationId,destination:parsed?.success?engagementDestination(parsed.data):null};
     }));}catch{console.error("Engagement outcome evidence unavailable",{kind:"operational_analytics"});}
     const byId=new Map(evidence.map(item=>[item.linkId,item]));
     return owned.map(({siteId:_siteId,organizationId:_organizationId,...link})=>({...link,createdAt:link.createdAt.toISOString(),evidence:byId.get(link.id)??null}));
@@ -328,7 +328,7 @@ export const listSiteEngagementDefinitions=createServerFn({method:"GET"})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
-    await authorizeEngagementOwner({kind:"site",siteId:data.siteId},actor,false,db);
+    const owner=await authorizeEngagementOwner({kind:"site",siteId:data.siteId},actor,false,db);
     const [pkg]=await db.select({id:siteMarketingPackages.id})
       .from(siteMarketingPackages).where(and(
         eq(siteMarketingPackages.id,data.packageId),
@@ -348,6 +348,7 @@ export const listSiteEngagementDefinitions=createServerFn({method:"GET"})
       .where(and(
         eq(engagementDefinitions.ownerKind,"site"),
         eq(engagementDefinitions.siteId,data.siteId),
+        eq(engagementDefinitions.organizationId,owner.organizationId!),
         eq(sql<string>`${engagementDefinitionVersions.content} #>> '{source,marketingPackageId}'`,data.packageId),
       ))
       .orderBy(desc(engagementDefinitionVersions.publishedAt))

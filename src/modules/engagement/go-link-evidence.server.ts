@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { siteGoLinks, siteGoLinkDailyVisits } from "@/db/schema";
+import { siteGoLinks, siteGoLinkDailyVisits, sites } from "@/db/schema";
 import type { GoDestination } from "@/domain/site-go-links";
 import { noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 
@@ -35,7 +35,7 @@ export async function readSiteGoLinkEvidence(
 
 /** Call only with rows selected by a separately authorized owner query. */
 export async function readAuthorizedGoLinkEvidence(
-  links:readonly {id:string;code:string;destination:GoDestination|null;siteId:string|null}[],
+  links:readonly {id:string;code:string;destination:GoDestination|null;siteId:string|null;organizationId?:string|null}[],
   reader:Pick<typeof db,"select">=db,
 ):Promise<GoLinkEvidence[]>{
   if(!links.length)return [];
@@ -59,8 +59,14 @@ export async function readAuthorizedGoLinkEvidence(
   const releases=releaseIds.length?await reader.select({id:noncreditSelfEnrollmentReleases.id,siteId:noncreditSelfEnrollmentReleases.siteId})
     .from(noncreditSelfEnrollmentReleases).where(inArray(noncreditSelfEnrollmentReleases.id,releaseIds)):[];
   const sitesByRelease=new Map(releases.map(row=>[row.id,row.siteId]));
-  const connected=referenced.filter(link=>sitesByRelease.has(link.releaseId)&&
-    (!link.siteId||sitesByRelease.get(link.releaseId)===link.siteId));
+  const releaseSiteIds=[...new Set(releases.map(row=>row.siteId))];
+  const owners=releaseSiteIds.length?await reader.select({id:sites.id,organizationId:sites.organizationId}).from(sites).where(inArray(sites.id,releaseSiteIds)):[];
+  const orgBySite=new Map(owners.map(site=>[site.id,site.organizationId]));
+  const connected=referenced.filter(link=>{
+    const site=sitesByRelease.get(link.releaseId);
+    return !!site&&(!link.siteId||site===link.siteId)&&
+      (!link.organizationId||orgBySite.get(site)===link.organizationId);
+  });
   const byLink=new Map(connected.map(link=>[link.id,link]));
   const claims=connected.length?await reader.select({
     code:noncreditSelfEnrollmentClaims.referralCode,
