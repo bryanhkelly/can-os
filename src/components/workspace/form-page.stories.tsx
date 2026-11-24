@@ -145,3 +145,27 @@ export const StepNavigationActions: Story = {
     await expect(previous).toBeEnabled();
   },
 };
+
+export const NarrowFormAndValidation: Story = {
+  render: () => <div data-testid="narrow-form" className="w-full max-w-72">
+    <FormSection title="CommunityLearningCenterRegistration" columns={1}
+      description="Review the information before saving the registration.">
+      <Field label="Full name of the organization responsible for this learning experience" required
+        description="Use the legal name of the organization."
+        error="OrganizationRegistrationIdentifierMustBeUnique">
+        <Input defaultValue="Example learning center"/>
+      </Field>
+    </FormSection>
+  </div>,
+  play: async ({canvasElement}) => {
+    const canvas = within(canvasElement);
+    const root = canvas.getByTestId("narrow-form");
+    const field = canvas.getByRole("textbox",{name:/Full name of the organization/});
+    await expect(field).toBeRequired();
+    await expect(field).toHaveAttribute("aria-invalid","true");
+    await expect(field).toHaveAccessibleDescription("Use the legal name of the organization. OrganizationRegistrationIdentifierMustBeUnique");
+    await expect(canvas.getByRole("alert")).toBeVisible();
+    await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth+1);
+    await expect(field.getBoundingClientRect().right).toBeLessThanOrEqual(root.getBoundingClientRect().right+1);
+  },
+};
