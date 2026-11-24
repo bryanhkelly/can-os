@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { ReportDocumentView } from "@/components/workspace/report-document";
-import { pilotOutcomeDefinitions,pilotOutcomeKeys } from "@/domain/reporting-view-definitions";
+import { bindRegisteredCounts,pilotOutcomeDefinitions } from "@/domain/reporting-view-definitions";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState, StatCard, WorkspaceNotice } from "@/components/workspace";
@@ -70,7 +70,7 @@ export function NoncreditPilotOutcomesPanel(){
         blocks:[{id:"outcomes",kind:"chart",spec:{
           title:"Registration outcome counts",description:"Measures overlap; do not add them or treat them as a sequential funnel.",
           valueLabel:"Registrations",kind:"comparison",format:"count",
-          points:pilotOutcomeDefinitions().map((def,i)=>({id:def.metricKey,label:def.label,value:summary[pilotOutcomeKeys[i]!] })),
+          points:bindRegisteredCounts(pilotOutcomeDefinitions(),summary),
         }}]}}/>
       <WorkspaceNotice>Only source-verified participation minutes are counted. Lesson ticks, playback and registrations are not evidence of attendance. National congregation reach requires independently authorized network attribution.</WorkspaceNotice>
       <div className="border border-border bg-card p-4">

@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { GoLinkEvidenceReport } from "@/components/reports/GoLinkEvidenceReport";
 import { GoLinkActions } from "@/components/links/GoLinkActions";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
@@ -282,6 +283,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
         </p>:<p className="text-xs text-muted-foreground">
           Outcome evidence is temporarily unavailable. Link controls remain accessible.
         </p>}
+        {link.evidence&&<GoLinkEvidenceReport evidence={link.evidence}/>}
         <GoLinkActions code={link.code} status={link.status} busy={busy}
           onTest={()=>void inspect(link)} onChange={action=>void change(link,action)}/>
 

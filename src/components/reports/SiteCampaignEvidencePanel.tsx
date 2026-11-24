@@ -6,7 +6,7 @@ import {QueryState} from "@/components/workspace/query-state";
 import {ReportDocumentView,type ReportDocument} from "@/components/workspace/report-document";
 import {ReportDateFilter} from "@/components/workspace/report-date-filter";
 import {previousCompleteUtcDays,resolveReportDateRange} from "@/components/workspace/report-date-range";
-import {campaignReportDefinitions,campaignReportKeys} from "@/domain/reporting-view-definitions";
+import {bindRegisteredCounts,campaignReportDefinitions} from "@/domain/reporting-view-definitions";
 import {getSiteCampaignDeliveryMetrics} from "@/modules/operations/site-reporting-coverage.functions";
 
 function CampaignReport({siteId,scope}:{siteId:string;scope:string}){
@@ -19,7 +19,7 @@ function CampaignReport({siteId,scope}:{siteId:string;scope:string}){
   });
   const data=!query.isError&&!query.isFetching?query.data:undefined;
   const definitions=campaignReportDefinitions();
-  const items=definitions.map((d,i)=>({id:d.metricKey,label:d.label,value:data?.counts[campaignReportKeys[i]!]??null}));
+  const items=bindRegisteredCounts(definitions,data?.counts??{});
   const report:ReportDocument|null=data?{version:1,definitionId:"site-campaign-delivery-v1",title:"Site email delivery evidence",
     scopeLabel:"Current authorized Site, across its Site- and Program-owned campaigns",
     basis:"Campaigns created "+data.from+" through "+data.to+" (exclusive); current state checked "+data.asOf,

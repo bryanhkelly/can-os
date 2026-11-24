@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {validateReportChart,type ReportChartSpec} from "@/components/workspace/report-chart-data";
 import {previousCompleteUtcDays,resolveReportDateRange} from "@/components/workspace/report-date-range";
-import {campaignReportDefinitions,pilotOutcomeDefinitions} from "@/domain/reporting-view-definitions";
+import {bindRegisteredCounts,campaignReportDefinitions,pilotOutcomeDefinitions,goReportDefinitions} from "@/domain/reporting-view-definitions";
 const common={title:"Fixture",description:"Synthetic",valueLabel:"Events",format:"count" as const,population:"One cohort"};
 describe("governed report views",()=>{
   it("requires a complete reconciled distribution, never suppresses or imputes missing values",()=>{
@@ -20,6 +20,11 @@ describe("governed report views",()=>{
   it("uses registered versioned metrics rather than local counting rules",()=>{
     expect(campaignReportDefinitions().map(d=>d.metricKey)).toContain("campaign.delivered");
     expect(pilotOutcomeDefinitions().map(d=>d.metricKey)).toContain("noncredit.confirmedNoncreditCompletions");
+    const definitions=goReportDefinitions();
+    const values=bindRegisteredCounts(definitions,{linkOpens30d:0,pageViews30d:NaN,referralNoncreditRegistrations30d:null});
+    expect(values.find(v=>v.id==="go.linkOpens30d")?.value).toBe(0);
+    expect(values.find(v=>v.id==="go.pageViews30d")?.value).toBeNull();
+    expect(values.find(v=>v.id==="go.referralNoncreditRegistrations30d")?.value).toBeNull();
   });
   it("validates exclusive UTC dates, calendar validity, duration and future boundaries",()=>{
     const now=new Date("2026-11-24T09:00:00Z");
