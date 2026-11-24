@@ -199,28 +199,36 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
     }
   });
 
-/** Revocation is immediate for all pages because each anonymous GET checks
- * the stored share state. Never return the token or immutable HTML to callers.
- */
-export const revokeSitePreviewShare = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({
-    siteId: siteIdSchema, shareId: shareIdentifier,
-  }).strict().parse(value))
-  .handler(async ({ data }) => {
-    setResponseHeader("Cache-Control", "private, no-store");
-    const { actor } = await authorizedShareSite(data.siteId);
-    return db.transaction(async tx => {
-      const [site] = await tx.select().from(sites)
-        .where(eq(sites.id, data.siteId)).for("update").limit(1);
-      if (!site) throw new AuthorizationError("Site preview sharing scope");
-      await assertPreviewSharingScope(actor, site, tx);
-      const [link]=await tx.select().from(siteGoLinks).where(and(eq(siteGoLinks.id,data.shareId),eq(siteGoLinks.siteId,site.id))).for("update").limit(1);
-      if(link?.destination?.kind==="website-preview"){
-        if(link.status==="revoked")return {changed:false};
-        await transitionAuthorizedGoLink(tx,actor,site,link,"revoked");
-        await emitEvent(tx,{eventType:EventTypes.SiteWebsitePreviewRevoked,aggregateType:"site",aggregateId:site.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,payload:{shareId:link.id,revokedAt:new Date().toISOString()}});
-        return {changed:true};
-      }
-      throw new DomainError("UNAVAILABLE", "This preview link no longer exists.");
-    });
+/** Every lifecycle transition uses exact Website & Brand authority and the
+ * canonical Go state machine. A revoked preview cannot be resumed. */
+const previewShareStateParams=z.object({siteId:siteIdSchema,shareId:shareIdentifier}).strict();
+async function changePreviewState(data:z.infer<typeof previewShareStateParams>,desired:"active"|"paused"|"revoked"){
+  setResponseHeader("Cache-Control","private, no-store");
+  const {actor}=await authorizedShareSite(data.siteId);
+  return db.transaction(async tx=>{
+    const [site]=await tx.select().from(sites).where(eq(sites.id,data.siteId)).for("update").limit(1);
+    if(!site)throw new AuthorizationError("Site preview sharing scope");
+    await assertPreviewSharingScope(actor,site,tx);
+    const [link]=await tx.select().from(siteGoLinks).where(and(
+      eq(siteGoLinks.id,data.shareId),eq(siteGoLinks.siteId,site.id),
+      eq(siteGoLinks.organizationId,site.organizationId),
+    )).for("update").limit(1);
+    if(link?.destination?.kind!=="website-preview")
+      throw new DomainError("UNAVAILABLE","This preview link no longer exists.");
+    if(desired==="active"&&(site.lifecycleStatus==="closed"||(link.expiresAt&&link.expiresAt<=new Date())))
+      throw new DomainError("UNAVAILABLE","This preview is no longer eligible to resume.");
+    const result=await transitionAuthorizedGoLink(tx,actor,site,link,desired);
+    const changed=result.status!==link.status;
+    if(changed&&desired==="revoked")
+      await emitEvent(tx,{eventType:EventTypes.SiteWebsitePreviewRevoked,aggregateType:"site",aggregateId:site.id,
+        actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,
+        payload:{shareId:link.id,revokedAt:new Date().toISOString()}});
+    return {changed,status:result.status};
   });
+}
+export const revokeSitePreviewShare=createServerFn({method:"POST"})
+  .validator((value:unknown)=>previewShareStateParams.parse(value))
+  .handler(({data})=>changePreviewState(data,"revoked"));
+export const setSitePreviewSharePaused=createServerFn({method:"POST"})
+  .validator((value:unknown)=>previewShareStateParams.extend({action:z.enum(["pause","resume"])}).parse(value))
+  .handler(({data})=>changePreviewState(data,data.action==="pause"?"paused":"active"));
