@@ -66,6 +66,14 @@ async function authorizedPackage(
   return {actor,site:site!,pkg:pkg??null};
 }
 
+/** One exact tenant predicate for direct links, shared by reads and mutations.
+ * An omitted package selects the authorized whole Site, not an Organization. */
+function directSiteLinkScope(site:{id:string;organizationId:string},packageId?:string){
+  return and(eq(siteGoLinks.siteId,site.id),eq(siteGoLinks.organizationId,site.organizationId),
+    isNull(siteGoLinks.engagementVersionId),
+    packageId?eq(siteGoLinks.packageId,packageId):undefined);
+}
+
 function toGoLinkView(link:typeof siteGoLinks.$inferSelect) {
   return {
     id:link.id,code:link.code,destination:goDestinationSchema.parse(link.destination),
@@ -118,17 +126,14 @@ export const listSiteGoLinks = createServerFn({ method: "GET" })
   .validator((value: unknown) => packageScope.parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    await authorizedPackage(data.siteId, data.packageId, false);
+    const {site}=await authorizedPackage(data.siteId, data.packageId, false);
     const links = await db.select({
       id: siteGoLinks.id, code: siteGoLinks.code,
       destination: siteGoLinks.destination, status: siteGoLinks.status,
       name:siteGoLinks.name,channel:siteGoLinks.channel,
       startsAt:siteGoLinks.startsAt,expiresAt:siteGoLinks.expiresAt,
       createdAt: siteGoLinks.createdAt,
-    }).from(siteGoLinks).where(and(
-      eq(siteGoLinks.siteId, data.siteId),isNull(siteGoLinks.engagementVersionId),
-      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
-    )).orderBy(desc(siteGoLinks.createdAt)).limit(500);
+    }).from(siteGoLinks).where(directSiteLinkScope(site,data.packageId)).orderBy(desc(siteGoLinks.createdAt)).limit(500);
     // Reporting reads must never take down authorized link management.
     // A missing observation is unavailable evidence, not zero activity.
     let evidence:Awaited<ReturnType<typeof readSiteGoLinkEvidence>>=[];
@@ -154,9 +159,7 @@ export const revokeSiteGoLink = createServerFn({ method: "POST" })
     setResponseHeader("Cache-Control", "private, no-store");
     const { actor, site } = await authorizedPackage(data.siteId, data.packageId, true, tx);
     const [link] = await tx.select().from(siteGoLinks).where(and(
-      eq(siteGoLinks.id, data.linkId), eq(siteGoLinks.siteId, site.id),
-      isNull(siteGoLinks.engagementVersionId),
-      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
+      eq(siteGoLinks.id,data.linkId),directSiteLinkScope(site,data.packageId),
     )).for("update").limit(1);
     if (!link) throw new DomainError("UNAVAILABLE", "Go link not found in this outreach plan.");
     return transitionAuthorizedGoLink(tx,actor,site,link,"revoked");
@@ -179,9 +182,7 @@ export const inspectSavedGoLink = createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     const {site}=await authorizedPackage(data.siteId,data.packageId,false);
     const [link]=await db.select().from(siteGoLinks).where(and(
-      eq(siteGoLinks.id,data.linkId),eq(siteGoLinks.siteId,data.siteId),
-      isNull(siteGoLinks.engagementVersionId),
-      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
+      eq(siteGoLinks.id,data.linkId),directSiteLinkScope(site,data.packageId),
     )).limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link not found.");
     const availability=goLinkAvailability(link);
@@ -203,9 +204,7 @@ export const setSiteGoLinkPaused = createServerFn({method:"POST"})
     setResponseHeader("Cache-Control","private, no-store");
     const {actor,site}=await authorizedPackage(data.siteId,data.packageId,true,tx);
     const [link]=await tx.select().from(siteGoLinks).where(and(
-      eq(siteGoLinks.id,data.linkId),eq(siteGoLinks.siteId,site.id),
-      isNull(siteGoLinks.engagementVersionId),
-      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
+      eq(siteGoLinks.id,data.linkId),directSiteLinkScope(site,data.packageId),
     )).for("update").limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link unavailable.");
     const desired=data.action==="pause"?"paused" as const:"active" as const;
@@ -220,10 +219,8 @@ export const listSiteGoLinksPage=createServerFn({method:"GET"})
   .validator((value:unknown)=>pageSchema.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    await authorizedPackage(data.siteId,data.packageId,false);
-    const scope=and(eq(siteGoLinks.siteId,data.siteId),
-      isNull(siteGoLinks.engagementVersionId),
-      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined);
+    const {site}=await authorizedPackage(data.siteId,data.packageId,false);
+    const scope=directSiteLinkScope(site,data.packageId);
     const [cursor]=data.cursor?await db.select({
       createdAt:siteGoLinks.createdAt,id:siteGoLinks.id,
     }).from(siteGoLinks).where(and(scope,eq(siteGoLinks.id,data.cursor))).limit(1):[];
@@ -234,7 +231,8 @@ export const listSiteGoLinksPage=createServerFn({method:"GET"})
     // records created in the same millisecond as the cursor.
     const older=cursor?sql`(${siteGoLinks.createdAt},${siteGoLinks.id}) <
       (SELECT created_at,id FROM public.site_go_links WHERE id=${cursor.id}
-        AND site_id=${data.siteId}
+        AND site_id=${site.id} AND organization_id=${site.organizationId}
+        AND engagement_version_id IS NULL
         ${data.packageId?sql`AND package_id=${data.packageId}`:sql``})`:undefined;
     const rows=await db.select({
       id:siteGoLinks.id,code:siteGoLinks.code,destination:siteGoLinks.destination,
