@@ -62,8 +62,9 @@ describe("WS2 native Class transaction and integration invariants",()=>{
 
   it("keeps public seat estimates behind the same current authority",()=>{
     expect(self).toContain("await currentClassAuthority(tx,row.classId,now)");
-    expect(self).toContain("remainingSeats:");
-    expect(self).toContain("Math.max(0,capacity-");
+    expect(self.match(/nativeClassCapacity\(\{/g)).toHaveLength(2);
+    expect(self).toContain("offeringCapacity:row.capacity");
+    expect(read("src/domain/native-class-lifecycle.ts")).toContain("Math.max(0,capacity-input.activeOrPending)");
     const ui=read("src/routes/class.tsx");
     expect(ui).toContain("item.remainingSeats===0");
     expect(ui).toContain("disabled={!adult||!consent||busy||full}");
