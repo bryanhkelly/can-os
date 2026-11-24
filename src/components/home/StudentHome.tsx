@@ -5,7 +5,7 @@ import { getQuickWinActions } from "@/modules/actions/student-actions.functions"
 import { getStudentReportCard } from "@/modules/learning/report-cards.functions";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getClassWorkspace } from "@/modules/learning/class-workspace.functions";
-import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
+import { getNativeClassLearningResume } from "@/modules/classes/native-class-learning.functions";
 import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { DataUnavailableError, safeLoader } from "@/lib/safe-loader";
@@ -74,17 +74,12 @@ export async function loadStudentToday() {
       let fallback: LearningResume | null = null;
       // Reuse the authorized native lesson service. Never infer a Class from a Section title.
       for await (const results of orderedBatches(native,3,item =>
-        safeLoader(() => getNativeClassLearning({data:{classEnrollmentId:item.enrollmentId!}}))())) {
+        safeLoader(() => getNativeClassLearningResume({data:{classEnrollmentId:item.enrollmentId!}}))())) {
         for (const result of results) {
           if (!result.ok) continue;
-          const view = result.data;
-          const lessons = view.lessons.filter(lesson => lesson.lessonBody.trim().length > 0 || lesson.videoResources.length > 0);
-          if (!lessons.length) continue;
-          const completed = lessons.filter(lesson => lesson.progressStatus === "completed" || lesson.progressStatus === "waived").length;
-          const next = lessons.find(lesson => lesson.progressStatus !== "completed" && lesson.progressStatus !== "waived");
-          const resume: LearningResume = {classId:view.classId,title:view.classTitle,
-            lesson:next ? {id:next.lessonId,title:next.lessonTitle} : null,completed,total:lessons.length};
-          if (next) return resume;
+          const resume: LearningResume = result.data;
+          if (!result.data.total) continue;
+          if (resume.lesson) return resume;
           fallback ??= resume;
         }
       }
