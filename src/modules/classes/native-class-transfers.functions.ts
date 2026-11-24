@@ -12,7 +12,6 @@ import {
   canonicalClassOfferings,
   canonicalClassEnrollmentTransferRequests,
   canonicalPersons,
-  learnerCourseAttempts,
   participationAttributions,
 } from "@/db/canonical-v301";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
@@ -20,11 +19,11 @@ import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-c
 import {assertCurrentNativeClassLearnerForMutation} from "./native-class-learner-session.server";
 import {currentClassAuthority} from "./native-class-authority.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
-import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
+import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./native-class-attempt.server";
 import {verifiedAdultOn,assertNativeSelfEnrollmentEligible} from "@/domain/native-class-enrollment";
 import {NATIVE_SELF_TRANSFER_CREDIT_MODES} from "@/domain/native-class-transfer-choices";
 import {
- assertNativeClassSeatAvailable,assertNativeClassAttemptForExit,
+ assertNativeClassSeatAvailable,
  assertOperationalClassOfferingTerms,assertNativeClassRepeatEligible,
 } from "@/domain/native-class-lifecycle";
 
@@ -158,28 +157,8 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
     method:"self",activeOrPending:occupancy,
     classCapacity:destinationAuthority.classCapacity,offeringCapacity:terms.capacity,
    });
-   const attempts=await tx.select().from(learnerCourseAttempts)
-    .where(eq(learnerCourseAttempts.classEnrollmentId,source.id))
-    .for("update");
-   const selected=attempts.find(a=>a.id===source.courseAttemptId);
-   if(!selected)throw new AuthorizationError("source Course Attempt pointer");
-   assertNativeClassAttemptForExit({
-    attempt:selected,enrollment:source,classInstance:sourceClass,
-   });
-   const live=attempts.filter(a=>a.status==="active");
-   for(const attempt of live){
-    assertNativeClassAttemptForExit({
-      attempt,enrollment:source,classInstance:sourceClass,requireSelectedPointer:false,
-    });
-   }
    const consentSha256=nativeClassConsentDigest(terms.consentVersion!,terms.consentText!);
-
-   // Source Attempt changes precede its source Enrollment state change because
-   // the canonical DB trigger insists the parent remains active during exit.
-   for(const attempt of live){
-    await tx.update(learnerCourseAttempts).set({status:"withdrawn"})
-      .where(eq(learnerCourseAttempts.id,attempt.id));
-   }
+   const closedAttemptIds=await withdrawNativeClassAttempts(tx,source,sourceClass);
    await tx.update(canonicalClassEnrollments).set({status:"withdrawn"})
     .where(eq(canonicalClassEnrollments.id,source.id));
    const [destination]=await tx.insert(canonicalClassEnrollments).values({
@@ -213,7 +192,7 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
    if(!transfer)throw new Error("transfer intent not saved");
    const payload={sourceClassId:sourceClass.id,destinationClassId:destinationClass.id,
     sourceEnrollmentId:source.id,destinationEnrollmentId:destination.id,
-    sourceAttemptIdsClosed:live.map(x=>x.id),destinationCourseAttemptId:attempt.id,
+    sourceAttemptIdsClosed:closedAttemptIds,destinationCourseAttemptId:attempt.id,
     sourceSiteId:sourceAuthority.siteId,destinationSiteId:destinationAuthority.siteId,
     consentVersion:terms.consentVersion,consentSha256};
    await writeCanonicalAudit(tx,{actorPersonId:actor.actorPersonId,
