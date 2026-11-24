@@ -8,7 +8,9 @@ describe("Site link sharing integration contracts", () => {
     const go = read("src/components/launch-studio/GoLinkWorkspace.tsx");
     const sharing = read("src/components/launch-studio/SiteLinkSharing.tsx");
     expect(frame).toContain("<SiteLinkSharing");
-    expect(go).toContain("<CopyLinkButton");
+    expect(go).toContain("<GoLinkActions");
+    expect(read("src/components/links/GoLinkActions.tsx")).toContain("<CopyLinkButton");
+    expect(read("src/components/launch-studio/LaunchPreviewSharing.tsx")).toContain("<GoLinkActions");
     expect(sharing).toContain("buildUrlDestination");
     expect(sharing).toContain("Private Site workspace");
     expect(sharing).toContain("Revocable outreach / Go link");
