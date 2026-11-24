@@ -20,8 +20,8 @@ function loadApprovedOrigin(){
 
 /** One accessible copy interaction for governed, typed URL destinations.
  * No generic input that could inadvertently share private preview tokens. */
-export function CopyLinkButton({ destination, label = "Copy link", className }: {
-  destination: UrlDestination; label?: string; className?: string;
+export function CopyLinkButton({ destination, label = "Copy link", className, disabled=false }: {
+  destination: UrlDestination; label?: string; className?: string; disabled?:boolean;
 }) {
   const [state, setState] = useState<CopyState>("idle");
   const resolved = buildUrlDestination(destination);
@@ -58,7 +58,7 @@ export function CopyLinkButton({ destination, label = "Copy link", className }: 
   }
   return <div className={className}>
     <Button type="button" size="sm" variant="outline"
-      disabled={destination.kind==="go"&&!goOrigin} onClick={() => void copy()}>
+      disabled={disabled||(destination.kind==="go"&&!goOrigin)} onClick={() => void copy()}>
       {state === "copied" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       {state === "copied" ? "Copied" : label}
     </Button>
