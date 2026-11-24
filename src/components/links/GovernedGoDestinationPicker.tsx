@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import {useEffect,useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
@@ -49,19 +51,14 @@ export function GovernedGoDestinationPicker({
   const selected=value?JSON.stringify(value):"";
   const current=choices.some(item=>JSON.stringify(item.destination)===selected);
   return <div className="grid gap-3 sm:grid-cols-2">
-    <label className="grid gap-1 text-sm font-medium">Destination type
-      <Select value={kind} disabled={disabled} onChange={event=>{
+    <Field label="Destination type"><Select value={kind} disabled={disabled} onChange={event=>{
         setKind(event.target.value as Kind);setSearch("");onChange(null);
       }}>
         {Object.entries(kindLabels).map(([id,label])=><option key={id} value={id}>{label}</option>)}
-      </Select>
-    </label>
-    <label className="grid gap-1 text-sm font-medium">Find a published destination
-      <Input type="search" disabled={disabled} value={search} maxLength={90}
-        onChange={event=>setSearch(event.target.value)} placeholder="Search available opportunities" />
-    </label>
-    <label className="grid gap-1 text-sm font-medium sm:col-span-2">Where should this link lead?
-      <Select disabled={disabled||loading||error||choices.length===0}
+      </Select></Field>
+    <Field label="Find a published destination"><Input type="search" disabled={disabled} value={search} maxLength={90}
+        onChange={event=>setSearch(event.target.value)} placeholder="Search available opportunities" /></Field>
+    <Field label="Where should this link lead?" className="sm:col-span-2"><Select disabled={disabled||loading||error||choices.length===0}
         value={current?selected:""} onChange={event=>{
           const item=choices.find(option=>JSON.stringify(option.destination)===event.target.value);
           onChange(item?.destination??null);
@@ -69,15 +66,14 @@ export function GovernedGoDestinationPicker({
         <option value="">Choose an available destination</option>
         {choices.map(item=><option key={JSON.stringify(item.destination)}
           value={JSON.stringify(item.destination)}>{item.title}</option>)}
-      </Select>
-    </label>
+      </Select></Field>
     {loading&&<p className="text-sm text-muted-foreground sm:col-span-2" role="status">Checking available destinations…</p>}
     {!loading&&!error&&choices.length===0&&<p className="text-sm text-muted-foreground sm:col-span-2">
       No currently published opportunities match this selection.
     </p>}
     {error&&<div className="sm:col-span-2">
       <p className="text-sm text-destructive" role="alert">Destinations could not be loaded.</p>
-      <button type="button" disabled={disabled} className="mt-2 text-sm underline" onClick={()=>setRetry(n=>n+1)}>Retry</button>
+      <Button type="button" variant="outline" size="sm" disabled={disabled} className="mt-2" onClick={()=>setRetry(n=>n+1)}>Retry</Button>
     </div>}
   </div>;
 }
