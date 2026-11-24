@@ -1,12 +1,12 @@
 import { canonicalJson } from "@/lib/canonical-json";
 import type { PartnerLocalContentTx } from "./site-local-content.server";
-import { readSitePreviewShares } from "@/domain/site-preview-sharing";
+import { transitionAuthorizedGoLink } from "@/modules/engagement/go-link-lifecycle.server";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { createHash } from "node:crypto";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { sites, siteBrandVersions, siteBrandAssets } from "@/db/schema";
+import { sites, siteBrandVersions, siteBrandAssets, siteGoLinks } from "@/db/schema";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -191,19 +191,18 @@ export async function revokeSiteBrandAssetServer(data: {siteId:string;assetId:st
     // A shared preview is a frozen HTML snapshot, possibly embedding the old
     // logo. Revoke all active preview links for this Site on rights withdrawal.
     // This is safer than guessing which historical share carries the asset.
-    const [siteRecord]=await tx.select({metadata:sites.metadata,updatedAt:sites.updatedAt})
+    const [siteRecord]=await tx.select({updatedAt:sites.updatedAt})
       .from(sites).where(eq(sites.id,site.id)).for("update").limit(1);
-    if(siteRecord){
-      const shares=readSitePreviewShares(siteRecord.metadata);
-      const active=shares.filter(share=>!share.revokedAt);
-      if(active.length){
-        await tx.update(sites).set({
-          metadata:{...siteRecord.metadata,websitePreviewSharesV1:shares.map(share=>
-            share.revokedAt?share:{...share,revokedAt:timestamp.toISOString()})},
-          updatedAt:nextSiteConfigurationRevision(siteRecord.updatedAt),
-        }).where(eq(sites.id,site.id));
-      }
-    }
+    if(!siteRecord)throw new DomainError("UNAVAILABLE","Site unavailable.");
+    // Advance the Site revision even when no preview exists: an in-flight
+    // renderer may have read the now-withdrawn asset before this transaction.
+    await tx.update(sites).set({updatedAt:nextSiteConfigurationRevision(siteRecord.updatedAt)})
+      .where(eq(sites.id,site.id));
+    const links=await tx.select().from(siteGoLinks).where(and(
+      eq(siteGoLinks.siteId,site.id),eq(siteGoLinks.organizationId,site.organizationId),
+      sql`${siteGoLinks.destination}->>'kind'='website-preview'`,ne(siteGoLinks.status,"revoked"),
+    )).for("update");
+    for(const link of links)await transitionAuthorizedGoLink(tx,actor,site,link,"revoked");
     await writeAudit(tx,actor,{
       action:"site.brand.asset.rights_withdrawn",entityType:"site",entityId:site.id,
       scope:{siteId:site.id,organizationId:site.organizationId},
