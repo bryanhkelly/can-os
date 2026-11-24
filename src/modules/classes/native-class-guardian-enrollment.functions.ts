@@ -1,4 +1,4 @@
-import {createHash} from "node:crypto";
+import { nativeClassConsentDigest } from "./native-class-consent.server";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,asc,desc,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
@@ -269,8 +269,7 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
    assertNativeClassSeatAvailable({method:"approval",activeOrPending:seats,
     classCapacity:current.classCapacity,offeringCapacity:terms.capacity});
    const admissionAt=new Date();
-   const consentSha256=createHash("sha256")
-    .update(terms.consentVersion).update("\u0000").update(terms.consentText).digest("hex");
+   const consentSha256=nativeClassConsentDigest(terms.consentVersion,terms.consentText);
    const [enrollment]=await tx.insert(canonicalClassEnrollments).values({
     classId:cls.id,classOfferingVersionId:terms.id,
     learnerPersonId:approval.learnerPersonId,enrolledByPersonId:guardian.personId,
