@@ -12,6 +12,7 @@ export const protectedOwnerActRoles = [
   "app_admin",
   "platform_owner",
   "network_admin",
+  "reporting_relationship_manager",
   "safeguarding_responder",
   "safeguarding_lead",
 ] as const;
