@@ -26,18 +26,22 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
   });
   it("cannot claim an existing canonical account by email or reuse an operator identity",()=>{
     expect(activation).toContain("accessAccountCanonicalPrincipals");
-    expect(activation).toContain('if(operator||linked&&linked.accessPersonId!==owner.personId)');
+    expect(activation).toContain('if(operator||linked&&(linked.accessPersonId!==owner.personId||linked.personId!==owner.personId))');
     expect(activation).toContain('if(Boolean(sameEmail)!==Boolean(linked)');
     expect(activation).toContain('assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx)');
     expect(activation).toContain('can.personId!==owner.personId');
   });
-  it("provisions one native Person and one learner grant inside one audited transaction",()=>{
+  it("reuses the authoritative Person and provisions only a native account and learner grant inside one audited transaction",()=>{
     expect(activation).toContain('db.transaction(async tx=>');
     expect(activation).toContain('pg_advisory_xact_lock(hashtext(');
     expect(activation).toContain('tx.insert(canonicalAccounts)');
-    expect(activation).toContain('tx.insert(canonicalPersons)');
-    expect(activation).toContain('birthDate:review.verifiedBirthDate');
-    expect(activation).toContain('eq(canonicalPersons.id,linked.personId)');
+    expect(activation).not.toContain('tx.insert(canonicalPersons)');
+    expect(activation).toContain('nativePersonId=owner.personId');
+    expect(activation).toContain('canonicalPersonId:owner.personId');
+    expect(activation).toContain('assertCurrentAdultReviewEvidence(tx,review,now)');
+    const evidence=read('src/modules/identity/reviewed-learning-evidence.server.ts');
+    expect(evidence).toContain('source.metadata.verifiedBirthDate!==review.verifiedBirthDate');
+    expect(evidence).toContain('current authoritative reviewed Person');
     expect(activation).toContain('existingPersonReused:Boolean(linked)');
     expect(activation).toContain('tx.insert(accessAccountNoncreditPrincipals)');
     expect(activation).toContain('tx.insert(canonicalAccountGrants)');
