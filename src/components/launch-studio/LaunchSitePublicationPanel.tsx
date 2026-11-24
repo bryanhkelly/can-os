@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspaceNotice, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { QueryState, WorkspaceNotice, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { readLaunchSitePublication, reviewLaunchSiteWebsiteCopy } from "@/modules/sites/launch-site-publication.functions";
 import { setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
@@ -173,7 +173,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
   return <WorkspacePanel title="Final website checks"
     description="Review the copy, images, program listings and website address. Publishing does not open registration.">
     {loading || (publicationSnapshot !== null && publicationSnapshot.siteId !== siteId)
-      ? <p role="status" className="text-sm text-muted-foreground">Checking your website's publication status…</p>
+      ? <QueryState loading="Checking your website’s publication status…"/>
       : state ? <div className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3 border bg-background p-4">
           <div className="min-w-0">
@@ -249,8 +249,8 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
               Program approvals and registration are handled separately.
             </WorkspaceNotice>
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="outline" disabled={checking || busy} onClick={() => void checkLive()}>
-                <Globe2 className="size-4" /> {checking ? "Checking…" : "Verify public website"}
+              <Button variant="outline" disabled={busy} loading={checking} loadingLabel="Checking…" onClick={() => void checkLive()}>
+                {!checking && <Globe2 aria-hidden="true" />} Verify public website
               </Button>
               {reachability === "live" && <a className="text-sm font-semibold text-primary underline"
                 href={`https://${state.address.host}/`} target="_blank" rel="noopener noreferrer">
