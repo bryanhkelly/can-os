@@ -13,6 +13,20 @@ const editable={title:"Ask Better Questions",
   segments:[{title:"Welcome",minutes:5},{title:"Practice",minutes:25}]};
 
 describe("native Course draft authoring",()=>{
+  it("keeps superseded drafts out of native and legacy authoring and enforces one working draft",()=>{
+    const native=source("src/modules/learning/native-course-draft.functions.ts");
+    const inventory=source("src/modules/learning/provider-content-workspace.functions.ts");
+    const legacy=source("src/modules/learning/curriculum-authoring.server.ts");
+    const schema=source("src/db/canonical-v301/learning.ts");
+    const migration=source("database/production/2026-11-24-one-native-course-working-draft.sql");
+    expect(native).toContain("supersededByCourseVersionId' IS NULL");
+    expect(inventory).toContain("supersededByCourseVersionId");
+    expect(legacy).toContain("!release.curriculum.supersededByCourseVersionId");
+    expect(legacy).toContain("This curriculum has moved to native Course authoring.");
+    expect(schema).toContain("course_versions_one_working_draft_uq");
+    expect(migration).toContain("CREATE UNIQUE INDEX");
+    expect(migration).toContain("supersededByCourseVersionId' IS NULL");
+  });
   it("reads existing structured lessons without discarding other publisher metadata",()=>{
     expect(readEditableNativeLesson(editable.title,{
       ...editable,synthetic:true,mediaStatus:"not_uploaded",
