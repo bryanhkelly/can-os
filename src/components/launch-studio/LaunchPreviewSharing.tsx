@@ -17,7 +17,7 @@ import {
 type Share = Awaited<ReturnType<typeof listSitePreviewShares>>[number];
 
 /** Website design can be shared in Establish without a Site publication or
- * enrollment claim. One-time bearer URL is never rehydrated from storage.
+ * enrollment claim. Authorized operators may retrieve saved Go codes.
  */
 export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
   const [open, setOpen] = useState(false);
@@ -32,7 +32,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
 
   function close() {
     setOpen(false);
-    // The raw bearer URL is intentionally shown only in this creation session.
+    // Clear transient selection; saved Go codes remain in the authorized inventory.
     setCreatedUrl("");
     setCreatedCode(null);
   }
@@ -67,7 +67,13 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
       setCreatedCode(result.relativeUrl.split("/").at(-1)??null);
       const url = new URL(result.relativeUrl, origin);
       setCreatedUrl(url.toString());
-      // The share has already been committed. A failed list refresh must not\n      // masquerade as a failed creation or cause the operator to issue duplicates.\n      try {\n        setShares(await listSitePreviewShares({ data: { siteId } }));\n      } catch {\n        setError("Your link was created. The active links list could not be refreshed. Copy your link before closing.");\n      }\n    } catch (cause) {\n      setError(normalizeClientError(cause,\n        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
+      // The share has already been committed. A failed list refresh must not
+      // masquerade as a failed creation or cause the operator to issue duplicates.
+      try {
+        setShares(await listSitePreviewShares({ data: { siteId } }));
+      } catch {
+        setError("Your link was created. The active links list could not be refreshed. Copy your link before closing.");
+      }\n    } catch (cause) {\n      setError(normalizeClientError(cause,\n        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
     } finally { setBusy(false); }
   }
 
