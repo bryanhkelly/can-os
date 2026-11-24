@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, ActionFooter, QueryState, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { searchPlatformOwnerTargets } from "@/modules/identity/platform-owner-delegation.functions";
 import { getPlatformOwnerPilotLocations, grantPlatformOwnerPilotRole, revokePlatformOwnerPilotRole } from "@/modules/identity/platform-owner-pilot-access.functions";
@@ -26,6 +26,7 @@ export function PlatformOwnerPilotAccessPanel() {
   const [role,setRole]=useState<(typeof ownerPilotRoles)[number]>("academic_content_creator");
   const [reason,setReason]=useState("");
   const [busy,setBusy]=useState(false);
+  const [revocation,setRevocation]=useState<{grantId:string;label:string;reason:string}|null>(null);
   const [searched,setSearched]=useState(false);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
@@ -39,10 +40,10 @@ export function PlatformOwnerPilotAccessPanel() {
     item.siteId===(needsSite?siteId:null));
   async function search() {
     if(busy||query.trim().length<2)return;
-    setBusy(true);setError("");setNotice("");setSearched(true);setTargetAccount("");
+    setBusy(true);setError("");setNotice("");setSearched(false);setTargetAccount("");setTargets([]);
     try{
       const data=await searchPlatformOwnerTargets({data:{search:query.trim()}});
-      setTargets(data.targets);
+      setTargets(data.targets);setSearched(true);
     }catch(cause){setError(normalizeClientError(cause,"Unable to search pilot members.").message);}
     finally{setBusy(false);}
   }
@@ -67,14 +68,15 @@ export function PlatformOwnerPilotAccessPanel() {
     finally{setBusy(false);}
   }
   async function revoke(){
-    if(!existingGrant||reason.trim().length<12||busy)return;
-    if(!window.confirm("Revoke this person's selected pilot role? Their active session may immediately lose access."))return;
+    if(!revocation||busy)return;
+    const target=revocation;
     setBusy(true);setNotice("");setError("");
     try{
       await revokePlatformOwnerPilotRole({data:{
-        grantId:existingGrant.grantId,reason:reason.trim(),
+        grantId:target.grantId,reason:target.reason,
       }});
-      setTargets(previous=>previous.filter(item=>item.grantId!==existingGrant.grantId));
+      setTargets(previous=>previous.filter(item=>item.grantId!==target.grantId));
+      setRevocation(null);
       setNotice("Scoped pilot membership revoked and audited.");
     }catch(cause){setError(normalizeClientError(cause,"Pilot role could not be revoked.").message);}
     finally{setBusy(false);}
@@ -108,10 +110,7 @@ export function PlatformOwnerPilotAccessPanel() {
         No eligible matching account. A separate verified Person must exist before granting a real publisher role.
       </p>}
     </div>}
-    {locations.isPending&&<p role="status" className="mt-3 text-sm">Reading authorized Organizations and Sites…</p>}
-    {locations.isError&&<WorkspaceNotice tone="danger" className="mt-3">
-      Organization and Site inventory is unavailable. No role can be provisioned.
-    </WorkspaceNotice>}
+    <QueryState loading={locations.isPending&&"Reading authorized Organizations and Sites…"} error={locations.isError&&"Organization and Site inventory is unavailable. No role can be provisioned."} onRetry={()=>void locations.refetch()} retrying={locations.isFetching}/>
     {locations.isSuccess&&<div className="mt-4 grid gap-4 sm:grid-cols-2">
       <div>
         <Label htmlFor="pilot-role" className="mb-2 block">Pilot role</Label>
@@ -146,15 +145,21 @@ export function PlatformOwnerPilotAccessPanel() {
         <p className="text-xs text-muted-foreground sm:col-span-2">
           Inventory is truncated. If the correct Site is missing, use the existing governed identity tools instead.
         </p>}
-      <div className="sm:col-span-2">
+      <ActionFooter layout="inline" className="sm:col-span-2 mt-0">
         <Button type="button" disabled={busy||!targetAccount||!orgId||(needsSite&&!siteId)||reason.trim().length<12}
           onClick={()=>void grant()}>{busy?"Verifying and saving…":"Grant scoped pilot role"}</Button>
-        {existingGrant&&<Button type="button" variant="outline" className="ml-2"
+        {existingGrant&&<Button type="button" variant="outline"
           disabled={busy||reason.trim().length<12}
-          onClick={()=>void revoke()}>Revoke selected pilot role</Button>}
-      </div>
+          onClick={()=>{setError("");setRevocation({grantId:existingGrant.grantId,label:`${existingGrant.firstName} ${existingGrant.lastName} · ${existingGrant.role.replaceAll("_"," ")} · ${orgs.find(org=>org.id===orgId)?.name??orgId}${needsSite?" · "+(locationSites.find(site=>site.id===siteId)?.name??siteId):""}`,reason:reason.trim()});}}>Revoke selected pilot role</Button>}
+      </ActionFooter>
     </div>}
     {notice&&<WorkspaceNotice className="mt-3">{notice}</WorkspaceNotice>}
-    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {error&&!revocation&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    <ActionDialog open={revocation!==null} title="Revoke selected pilot role?"
+      description={<><p>{revocation?.label}</p><p className="mt-2">Their active session may immediately lose access. This scoped revocation will be audited.</p><p className="mt-2">Reason: {revocation?.reason}</p></>}
+      confirmLabel="Revoke pilot role" destructive pending={busy&&revocation!==null} pendingLabel="Revoking…"
+      onClose={()=>{setRevocation(null);setError("");}} onConfirm={()=>void revoke()}>
+      {error&&revocation&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+    </ActionDialog>
   </WorkspacePanel>;
 }
