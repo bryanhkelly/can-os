@@ -38,21 +38,30 @@ export function siteSetupReadableProgramIds(actor:AccessContext):string[]|null {
   return ids??null;
 }
 
-// A site-wide reporting source summary includes all Programs at that Site.
-// A Site-specific grant constrained to only some Programs must not see
-// sibling Program activity through a broad Site reporting endpoint.
+/** Shared whole-Site visibility rule for resources spanning Programs.
+ * A verified Site-level registrar constrained to some Programs may not read
+ * or manage links, reports or other Site-wide collections for sibling Programs.
+ * Callers first enforce their own role and operation capability.
+ */
+export function assertWholeSiteProgramsInScope(
+  actor:AccessContext, attachedProgramIds:readonly string[],
+  context:"Site reporting"|"Site link management",
+):void {
+  if(actor.grantSiteId!==null){
+    const allowed=new Set(actor.scope.programIds??[]);
+    if(attachedProgramIds.some(id=>!allowed.has(id)))
+      throw new AuthorizationError(context+" requires authority over every attached Program");
+  }
+}
+
+/** Reporting must not reveal sibling Program evidence through Site summary. */
 export function assertWholeSiteReportingScope(
   actor: AccessContext,
   site: { id: string; organizationId: string } | null | undefined,
   attachedProgramIds: readonly string[],
 ): void {
-  assertSiteSetupScope(actor, site, "program.read");
-  if (actor.grantSiteId !== null) {
-    const allowed = new Set(actor.scope.programIds ?? []);
-    if (attachedProgramIds.some(id => !allowed.has(id))) {
-      throw new AuthorizationError("Site reporting requires authority over every attached Program");
-    }
-  }
+  assertSiteSetupScope(actor,site,"program.read");
+  assertWholeSiteProgramsInScope(actor,attachedProgramIds,"Site reporting");
 }
 
 /**

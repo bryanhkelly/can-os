@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { describe, expect, it } from "vitest";
 import { emptySiteLocalContent } from "@/domain/site-local-content";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
@@ -63,8 +64,8 @@ describe("authenticated school full-page preview", () => {
       '<a href="/admissions">Admissions</a></body></html>';
     const html=renderPrivateWebsitePreviewHtml(siteHtml,siteId,
       ["/","/courses","/classes"],true,"site");
-    expect(html).toContain('href="/launch/site-preview?siteId='+siteId+'&page=%2Fcourses"');
-    expect(html).toContain('href="/launch/site-preview?siteId='+siteId+'&page=%2Fclasses"');
+    expect(html).toContain('href="/launch/site-preview?siteId='+encodeUuidForPath(siteId)+'&page=%2Fcourses"');
+    expect(html).toContain('href="/launch/site-preview?siteId='+encodeUuidForPath(siteId)+'&page=%2Fclasses"');
     expect(html).not.toContain('href="/admissions"');
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("<script");

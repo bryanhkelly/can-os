@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 import {
   activityBucket, activityStatus, sortParticipation,
   type ParticipationRecord, type ParticipationStatus, type ParticipationOpportunity,
@@ -90,7 +91,7 @@ export function projectNativeClasses(
       progress: null,
       outcome: item.officialOutcome ?? null,
       action: hasLearningAccess ? {
-        label: "Open class", href: "/class/" + hrefId(item.classId) + "?view=learn&tab=lessons",
+        label: "Open class", href: shortUuidHref("/class/", item.classId) + "?view=learn&tab=lessons",
       } : null,
     }, now);
   });

@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -8,6 +9,7 @@ import {
 import { listEnrichmentCatalog } from "@/modules/activities/enrichment-family.functions";
 
 export const Route = createFileRoute("/enrichment_/$seasonId")({
+  params: opaqueUuidPathParam("seasonId"),
   loader: safeLoader(() => listEnrichmentCatalog()),
   component: EnrichmentOfferingDetailPage,
 });

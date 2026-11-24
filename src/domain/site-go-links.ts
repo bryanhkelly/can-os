@@ -15,6 +15,19 @@ export const goDestinationSchema = z.discriminatedUnion("kind", [
 ]);
 export type GoDestination = z.infer<typeof goDestinationSchema>;
 
+/** One versioned presentation/validation contract shared by the authoring UI
+ * and the server. A Go Link is deliberately narrower than private navigation.
+ */
+export const goDestinationKinds=[
+  "site-page","adult-training","class","enrichment","information",
+] as const;
+export const goDestinationKindSchema=z.enum(goDestinationKinds);
+export const goDestinationLabels:Record<GoDestination["kind"],string>={
+  "site-page":"Site page or express interest",
+  "adult-training":"Training registration",
+  class:"Class",enrichment:"Program or camp",information:"Curated information",
+};
+
 export function goDestinationHref(
   value: unknown, code: string, publishedSiteHost: string | null = null,
 ): string | null {

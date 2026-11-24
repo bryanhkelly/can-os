@@ -750,6 +750,27 @@
       "when": 1795462000000,
       "tag": "0106_universal_engagement",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1795462001000,
+      "tag": "0107_site_go_links_private_role_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1795462002000,
+      "tag": "0108_site_go_link_capabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1795462003000,
+      "tag": "0109_site_go_link_reuse",
+      "breakpoints": true
     }
   ]
 }

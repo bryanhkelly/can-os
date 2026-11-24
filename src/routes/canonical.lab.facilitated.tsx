@@ -1,3 +1,4 @@
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { Label } from "@/components/ui/label";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -214,7 +215,7 @@ function FacilitatedLabContent({data,preferredSiteId}:{
       <p className="text-sm font-semibold">Share this code or QR with authorized learners</p>
       <ClassroomConnectQr code={code.code} expiresAt={code.expiresAt}/>
       <Button asChild variant="outline" size="sm" className="mt-3">
-        <a href={`/classroom/${code.roomId}/presentation#pair=${code.code.replaceAll("-", "")}&expires=${encodeURIComponent(code.expiresAt)}`}
+        <a href={`/classroom/${compactUuidUrlValue(code.roomId)}/presentation#pair=${code.code.replaceAll("-", "")}&expires=${encodeURIComponent(code.expiresAt)}`}
           target="_blank" rel="noopener noreferrer">
           Launch projector with joining QR
         </a>

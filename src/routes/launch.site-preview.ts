@@ -1,3 +1,4 @@
+import { decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute } from "@tanstack/react-router";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -51,10 +52,12 @@ export const Route=createFileRoute("/launch/site-preview")({
       const url=new URL(request.url);
       const ids=url.searchParams.getAll("siteId");
       const pages=url.searchParams.getAll("page");
+      const canonicalSiteId = decodeUuidPathParam(ids[0] ?? "");
       const path=pages[0]??"/";
       if(ids.length!==1 || pages.length>1 ||
           [...url.searchParams.keys()].some(k=>k!=="siteId"&&k!=="page") ||
-          !/^[a-f\d]{8}-[a-f\d]{4}-[1-8a-f\d]{4}-[89ab\d]{4}-[a-f\d]{12}$/i.test(ids[0]??"") ||
+          !canonicalSiteId ||
+          !/^[a-f\d]{8}-[a-f\d]{4}-[1-8a-f\d]{4}-[89ab\d]{4}-[a-f\d]{12}$/i.test(canonicalSiteId) ||
           !isPublicSitePagePath(path))
         return failure(404,"Site preview unavailable","Select an authorized Site and website page in Launch Studio.");
 
@@ -64,7 +67,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           id:sites.id, organizationId:sites.organizationId, name:sites.name,slug:sites.slug,
           timezone:sites.timezone, metadata:sites.metadata, organizationName:organizations.name,
         }).from(sites).innerJoin(organizations,eq(organizations.id,sites.organizationId))
-          .where(eq(sites.id,ids[0]!)).limit(1);
+          .where(eq(sites.id,canonicalSiteId!)).limit(1);
         // A private read-only preview needs exact Site read authority, not permission
         // to launch or mutate Programs. Publication and enrollment stay separate.
         assertSiteSetupScope(actor,site,"program.read");

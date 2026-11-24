@@ -243,7 +243,8 @@ export async function changeSitePublicIdentity(
     const [siteConflict] = await tx.select({ id: sites.id }).from(sites).where(and(
       eq(sites.organizationId, site.organizationId), eq(sites.slug, slug), ne(sites.id, site.id),
     )).limit(1);
-    if (publicConflict || siteConflict) throw new DomainError("CONFLICT", "The requested school address is already reserved.");
+    if (publicConflict || siteConflict)
+      throw new DomainError("CONFLICT", "The requested school address is already reserved.");
     const updatedAt = new Date(Math.max(Date.now(), address.updatedAt.getTime() + 1));
     await tx.update(sites).set({ name, slug, updatedAt }).where(eq(sites.id, site.id));
     await tx.update(sitePublications).set({ slug, updatedAt }).where(eq(sitePublications.siteId, site.id));

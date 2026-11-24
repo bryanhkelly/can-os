@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import {describe,expect,it} from "vitest";
 import {linkPrivateSitePreviewPages} from "@/domain/site-private-preview-navigation";
 const id="11111111-1111-4111-8111-111111111111";
@@ -8,11 +9,11 @@ describe("Authenticated Site-first multipage navigation",()=>{
       '<a href="/classes">Classes</a><a href="/programs">Programs</a>'+
       '<a href="/admissions">Admissions</a></nav>';
     const output=linkPrivateSitePreviewPages(html,id);
-    expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fcourses');
-    expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2F"');
-    expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fclasses');
-    expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fprograms');
-    expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fadmissions');
+    expect(output).toContain('/launch/site-preview?siteId='+encodeUuidForPath(id)+'&amp;page=%2Fcourses');
+    expect(output).toContain('/launch/site-preview?siteId='+encodeUuidForPath(id)+'&amp;page=%2F"');
+    expect(output).toContain('/launch/site-preview?siteId='+encodeUuidForPath(id)+'&amp;page=%2Fclasses');
+    expect(output).toContain('/launch/site-preview?siteId='+encodeUuidForPath(id)+'&amp;page=%2Fprograms');
+    expect(output).toContain('/launch/site-preview?siteId='+encodeUuidForPath(id)+'&amp;page=%2Fadmissions');
     expect(output).not.toContain('href="/courses"');
   });
   it("never rewrites existing approved registration actions, external links or forms",()=>{

@@ -1,3 +1,4 @@
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 /**
  * V6.1 Prepare to Open is a Site-scoped orchestration surface, not an approval
  * engine. The actual Site, Blueprint, Class and admissions services own writes.
@@ -46,7 +47,7 @@ type ModulePlan = {
   handoffs: readonly Handoff[];
 };
 
-const scoped = (siteId: string) => encodeURIComponent(siteId);
+const scoped = (siteId: string) => compactUuidUrlValue(siteId);
 /** These destinations are existing authorized operations, not new task stores. */
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {

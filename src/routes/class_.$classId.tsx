@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useState } from "react";
@@ -73,6 +74,7 @@ const searchSchema=z.object({
 }).strip();
 
 export const Route=createFileRoute("/class_/$classId")({
+  params: opaqueUuidPathParam("classId"),
   validateSearch:(raw:Record<string,unknown>)=>searchSchema.parse(raw),
   component:OneClassWorkspace,
 });
