@@ -8,6 +8,27 @@ on:
 permissions:
   contents: read
 jobs:
+  source-compliance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:design-audit
+      - name: Verify V6.1 source against the full release range
+        run: |
+          git fetch origin main
+          export V61_BASE_REF="$(git merge-base HEAD origin/main)"
+          node scripts/check-design-system.mjs
+      - run: npm run check:component-boundaries
+      - name: Require source coverage and reviewed independent render evidence
+        run: node scripts/check-v61-coverage.mjs --strict
   visual:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
