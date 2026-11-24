@@ -6,6 +6,13 @@ import { containsProtectedInstitutionalClaim } from "./public-claims-policy";
  * Cross-domain public engagement vocabulary. This models an invitation and
  * experience, NEVER the permission to operate a business workflow.
  */
+export const engagementChannels=["web","email","sms","qr","social","partner","other"] as const;
+export const engagementChannelSchema=z.enum(engagementChannels);
+export type EngagementChannel=z.infer<typeof engagementChannelSchema>;
+export const engagementChannelLabels:Record<EngagementChannel,string>={
+  web:"Website / sharing",email:"Email",sms:"Text message",qr:"QR code",
+  social:"Social",partner:"Partner",other:"Other",
+};
 export const engagementDomains = [
   "outreach", "learning", "employment", "partnerships", "events",
   "funding", "research", "community",
