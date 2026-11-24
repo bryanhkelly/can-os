@@ -6,7 +6,6 @@ import {z} from "zod";
 import {db} from "@/db/client";
 import {
  canonicalClasses,canonicalClassOfferings,
- canonicalClassEnrollmentRepeatAuthorizations,
  canonicalClassOfferingVersions,canonicalClassEnrollments,
  canonicalClassEnrollmentApprovalRequests,canonicalPersons,
  guardianAuthorities,learnerProfiles,participationAttributions,
@@ -18,6 +17,7 @@ import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} 
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./native-class-attempt.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
+import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import {requireNativeGuardian,requireNativeGuardianChild} from
  "./native-class-guardian-authority.server";
 import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable} from "@/domain/native-class-lifecycle";
@@ -273,20 +273,12 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
    });
    const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
    if(repeatAuthorization){
-    await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
-     .set({consumedByEnrollmentId:enrollment.id})
-     .where(and(
-       eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
-       isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
-     ));
-    await emitCanonicalDomainEvent(tx,{
-     eventType:"ClassRepeatAuthorizationConsumed",
-     aggregateType:"class_repeat_authorization",aggregateId:repeatAuthorization.id,
-     actorPersonId:guardian.personId,
-     payload:{classId:cls.id,priorEnrollmentId:completed!.id,
-       classEnrollmentId:enrollment.id,courseAttemptId:attempt.id},
-    });
-   }
+        await consumeNativeClassRepeatAuthorization(tx,{
+          authorizationId:repeatAuthorization.id,classId:cls.id,learnerPersonId:approval.learnerPersonId,
+          priorEnrollmentId:completed!.id,classEnrollmentId:enrollment.id,
+          courseAttemptId:attempt.id,actorPersonId:guardian.personId,
+        });
+      }
    await tx.update(canonicalClassEnrollmentApprovalRequests)
     .set({acceptedEnrollmentId:enrollment.id})
     .where(and(eq(canonicalClassEnrollmentApprovalRequests.id,approval.id),
