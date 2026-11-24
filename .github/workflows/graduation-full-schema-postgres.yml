@@ -13,6 +13,7 @@ on:
     paths:
       - "drizzle/**"
       - "tests/postgres/graduation-full-schema-acceptance.sql"
+      - "tests/postgres/go-link-release-acceptance.sql"
       - "tests/postgres/fullflow-post0056-acceptance.sql"
       - ".github/workflows/graduation-full-schema-postgres.yml"
       - "scripts/review-fullflow-migrations.mjs"
@@ -106,6 +107,12 @@ jobs:
         run: |
           docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
             < tests/postgres/reporting-source-foundation-acceptance.sql
+      - name: Go Link private role and lifecycle acceptance
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
+            < tests/postgres/go-link-release-acceptance.sql
       - name: Assert 0057-0059 curriculum, finance and evidence SQL on disposable PostgreSQL
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
