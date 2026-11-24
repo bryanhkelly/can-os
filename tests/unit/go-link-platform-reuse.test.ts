@@ -5,7 +5,7 @@ const read=(path:string)=>readFileSync(new URL("../../"+path,import.meta.url),"u
 describe("Go Link Site reuse and scaled operations",()=>{
   it("allows a Site to own links without a marketing campaign",()=>{
     const schema=read("src/db/schema/site-go-links.ts");
-    expect(schema).toContain('packageId: uuid("package_id").references');
+    expect(schema).toMatch(/packageId:\\s*uuid\\("package_id"\\)\\.references/);
     expect(schema).not.toContain('packageId: uuid("package_id").notNull()');
     const migration=read("drizzle/0109_site_go_link_reuse.sql");
     expect(migration).toContain('ALTER COLUMN "package_id" DROP NOT NULL');
