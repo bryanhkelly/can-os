@@ -1,6 +1,6 @@
 import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
-import { useCallback, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -36,8 +36,8 @@ type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHi
  * enrollment, official assignments, or grades. Lesson completion updates only
  * the canonical Course-attempt progress shared across recorded presenters.
  */
-export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", initialLessonId }: {
-  courseAttemptId: string; mode?: "training" | "native";initialLessonId?:string|null;
+export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", initialLessonId, classEnrollmentId }: {
+  courseAttemptId: string; mode?: "training" | "native";initialLessonId?:string|null;classEnrollmentId?:string;
 }) {
   const release = useQuery({
     queryKey: ["canonical-learning-release"],
@@ -54,18 +54,20 @@ export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", 
   // A missing release-status response fails closed for optional telemetry.
   if (enabled) return <CanonicalLearningActivityProvider key={courseAttemptId} courseAttemptId={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
+      activityEnabled facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId} classEnrollmentId={classEnrollmentId}/>
   </CanonicalLearningActivityProvider>;
   return <DisabledCanonicalLearningActivityProvider key={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled={false} facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
+      activityEnabled={false} facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId} classEnrollmentId={classEnrollmentId}/>
   </DisabledCanonicalLearningActivityProvider>;
 }
 
-function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled, mode, initialLessonId }: {
+function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled, mode, initialLessonId, classEnrollmentId }: {
   courseAttemptId: string; activityEnabled: boolean; facilitatedEnabled: boolean;
-  mode: "training" | "native";initialLessonId?:string|null;
+  mode: "training" | "native";initialLessonId?:string|null;classEnrollmentId?:string;
 }) {
+  const client=useQueryClient();
+  const appliedDeepLink=useRef<string|null>(null);
   const { selectLesson, observe, observeNativeVideo } = useCanonicalLearningActivity();
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
   const [instruction, setInstruction] = useState<SelectedInstruction | null>(null);
@@ -107,7 +109,9 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
   // A deep link may select a published lesson, but it never changes
   // the learner's saved instructor, evidence or completion state.
   useEffect(()=>{
-    if(initialLessonId && instruction?.lessons.some(lesson=>lesson.id===initialLessonId)){
+    if(!initialLessonId){appliedDeepLink.current=null;return;}
+    if(appliedDeepLink.current!==initialLessonId && instruction?.lessons.some(lesson=>lesson.id===initialLessonId)){
+      appliedDeepLink.current=initialLessonId;
       setLessonId(initialLessonId);
     }
   },[initialLessonId,instruction]);
@@ -149,6 +153,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
       const nextLessonId = nextRecordedLessonId(instruction.lessons, lessonId);
       if (nextLessonId) setLessonId(nextLessonId);
       await reload();
+      if(mode==="native"&&classEnrollmentId)await client.invalidateQueries({queryKey:["native-unified-class-progress",classEnrollmentId]});
       setLessonProgressRevision(revision=>revision+1);
       setNotice(nextLessonId
         ? "Lesson completed. Continue with your next unfinished lesson."
