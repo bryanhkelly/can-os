@@ -1,3 +1,4 @@
+import {readBoundedResponseText} from "@/domain/bounded-request-body";
 import type { PhysicalSiteAddress } from "@/domain/site-setup-configuration";
 import {censusEstimate,communityIndicators,type CommunityProfile,type GeographicAreaFact,type GeographicResolution,type GeographyKind} from "@/domain/geographic-intelligence";
 
@@ -9,6 +10,7 @@ type Row=Record<string,unknown>;
 const object=(value:unknown):Row=>value!==null&&typeof value==="object"&&!Array.isArray(value)?value as Row:{};
 const string=(value:unknown)=>typeof value==="string"?value:"";
 export const CENSUS_GEOGRAPHY_YEAR=2024;
+const MAX_CENSUS_RESPONSE_BYTES=1024*1024;
 const layers:readonly [string,GeographyKind,string,RegExp][]=[
   ["Counties","county","COUNTY",/^\d{5}$/],
   ["Census Tracts","tract","TRACT",/^\d{11}$/],
@@ -93,9 +95,10 @@ export function parseTigerMarket(raw:unknown,kind:"metro"|"micro"):GeographicAre
 export function createCensusGeographyProvider(options:{fetcher?:typeof fetch;apiKey?:string}={}):GeographyProvider {
   const fetcher=options.fetcher??fetch;
   async function json(url:URL){
-    const response=await fetcher(url,{signal:AbortSignal.timeout(12000)});
+    const response=await fetcher(url,{redirect:"error",signal:AbortSignal.timeout(12000)});
     if(!response.ok)throw new Error("geography_provider_unavailable");
-    return response.json() as Promise<unknown>;
+    try{return JSON.parse(await readBoundedResponseText(response,MAX_CENSUS_RESPONSE_BYTES)) as unknown;}
+    catch{throw new Error("geography_provider_invalid_response");}
   }
   async function boundaryMarket(result:GeographicResolution,kind:"metro"|"micro"){
     const layer=kind==="metro"?93:91;
