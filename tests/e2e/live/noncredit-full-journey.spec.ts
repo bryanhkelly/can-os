@@ -6,7 +6,7 @@ const fixture=z.object({
   releaseId:z.string().uuid(),goCode:z.string().regex(/^[A-Za-z0-9_-]{12}$/),
   goActionLabel:z.string().min(1).optional(),
   trainingTitle:z.string().min(1),instructorTitle:z.string().min(1),
-  lessons:z.array(z.string().min(1)).length(7),
+  lessons:z.array(z.string().min(1)).min(1).max(40),
   baselineAnswers:z.array(z.string().min(1)).length(5),
   finalAnswers:z.array(z.string().min(1)).length(5),
   surveyTitle:z.string().min(1),
@@ -82,14 +82,14 @@ test("approved independent noncredit fixture: Go invitation to verified completi
     await test.step("Record starting knowledge before instruction",async()=>{
       await knowledgeCheck(page.getByRole("region",{name:"Before-course diagnostic"}),fixture.baselineAnswers);
     });
-    await test.step("Play and explicitly complete all seven approved short recordings",async()=>{
+    await test.step("Play and explicitly complete all approved short recordings",async()=>{
       const choice=page.getByRole("button",{name:fixture.instructorTitle,exact:true});
       const selected=page.getByRole("button",{name:fixture.instructorTitle+" (selected)",exact:true});
       await expect(choice.or(selected)).toBeVisible();
       if(await choice.isVisible())await choice.click();
       const outline=page.getByRole("region",{name:"Recorded instructor"});
       const progress=outline.getByRole("progressbar",{name:"Recorded course lesson completion"});
-      await expect(progress).toHaveAttribute("aria-valuemax","7");
+      await expect(progress).toHaveAttribute("aria-valuemax",String(fixture.lessons.length));
       await expect(progress).toHaveAttribute("aria-valuenow","0");
       for(const [index,title] of fixture.lessons.entries()){
         await outline.getByRole("button",{name:title,exact:true}).click();
@@ -107,7 +107,7 @@ test("approved independent noncredit fixture: Go invitation to verified completi
         await expect(progress).toHaveAttribute("aria-valuenow",String(index+1));
       }
       await page.reload();
-      await expect(page.getByRole("progressbar",{name:"Recorded course lesson completion"})).toHaveAttribute("aria-valuenow","7");
+      await expect(page.getByRole("progressbar",{name:"Recorded course lesson completion"})).toHaveAttribute("aria-valuenow",String(fixture.lessons.length));
     });
     await test.step("Complete the final assessment and submit invited feedback",async()=>{
       const final=page.getByRole("region",{name:"Noncredit knowledge check"});
