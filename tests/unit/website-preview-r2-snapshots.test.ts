@@ -1,6 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {readFileSync} from "node:fs";
-import {readSitePreviewShares,sitePreviewShareSchema,createPreviewShareToken,activePreviewShare} from "@/domain/site-preview-sharing";
+import {readSitePreviewShares,sitePreviewShareSchema,createPreviewShareToken,activePreviewShare,renderSharedSitePreview} from "@/domain/site-preview-sharing";
 import {encodeSitePreviewSnapshot,sitePreviewSnapshotDigest,sitePreviewSnapshotKey} from "@/platform/storage/site-preview-snapshots.server";
 const site="11111111-1111-4111-8111-111111111111";
 const id="22222222-2222-4222-8222-222222222222";
@@ -42,5 +42,17 @@ describe("immutable Website R2 preview snapshots",()=>{
     expect(reader).toContain("readSitePreviewSnapshot");
     expect(bucket).toContain("etagDoesNotMatch");
     expect(bucket).toContain("sitePreviewSnapshotDigest(text)!==digest");
+  });
+  it("keeps external navigation within one Go code and disables private or live actions",()=>{
+    const code="K7x2p9AaB3cD";
+    const html='<html><head><title>Test</title></head><body><a href="/programs">Programs</a><a href="/admin">Admin</a><a href="https://example.org/enroll">Enroll</a><a href="#main">Skip</a><form action="/enroll"><input name="email"></form></body></html>';
+    const out=renderSharedSitePreview(html,site,"",["/","/programs"],false,code);
+    expect(out).toContain('/go/'+code+'?page=%2Fprograms');
+    expect(out).not.toContain('/site-preview-share?');
+    expect(out).not.toContain('href="/admin"');
+    expect(out).not.toContain('href="https://example.org/enroll"');
+    expect(out).not.toContain('<form');
+    expect(out).toContain('href="#main"');
+    expect(out).toContain('noindex,nofollow');
   });
 });
