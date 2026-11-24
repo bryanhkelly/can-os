@@ -228,19 +228,34 @@ export async function listReportingRelationships(request:Request,input:unknown){
     const organizationId=await requireDirectRelationshipManager(tx,actor);
     const party=direction==="incoming"?sql`recipient_organization_id`:sql`owner_organization_id`;
     const result=await tx.execute(sql`
-      SELECT ${columns} FROM public.reporting_relationship_agreements
-      WHERE ${party}=${organizationId}::uuid
-      AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
-      ORDER BY id LIMIT 26`);
-    const rows=z.array(rowSchema).parse(result.rows);
-    const items=rows.slice(0,25).map(({proposedByPersonId,acceptedByPersonId,...agreement})=>{
+      SELECT r.*,
+        (SELECT name FROM public.organizations WHERE id=CASE WHEN ${direction}='incoming'
+          THEN r."ownerOrganizationId" ELSE r."recipientOrganizationId" END) AS "organizationName",
+        CASE r."scopeKind"
+          WHEN 'organization' THEN (SELECT name FROM public.organizations WHERE id=r."scopeId")
+          WHEN 'site' THEN (SELECT name FROM public.sites WHERE id=r."scopeId")
+          WHEN 'program' THEN (SELECT name FROM public.programs WHERE id=r."scopeId")
+          WHEN 'offering' THEN (SELECT title FROM public.offerings WHERE id=r."scopeId")
+          WHEN 'class' THEN (SELECT title FROM public.classes WHERE id=r."scopeId")
+        END AS "scopeName"
+      FROM (SELECT ${columns} FROM public.reporting_relationship_agreements
+        WHERE ${party}=${organizationId}::uuid
+        AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
+        ORDER BY id LIMIT 26) r ORDER BY r.id`);
+    const rows=z.array(rowSchema.extend({organizationName:z.string(),scopeName:z.string()})).parse(result.rows);
+    const registry=buildCurrentReportingMetricRegistry();
+    const items=rows.slice(0,25).map(({proposedByPersonId,acceptedByPersonId,organizationName,scopeName,...agreement})=>{
       const selfProposed=proposedByPersonId===actor.actorPersonId;
       const expired=agreement.validThrough!==null&&Date.parse(agreement.validThrough)<=Date.now();
       const allowedActions:RelationshipAction[]=agreement.status==="pending"?
         direction==="outgoing"?["withdraw"]:selfProposed||expired?[]:["accept","decline"]:
         agreement.status==="accepted"?["revoke"]:[];
       void acceptedByPersonId;
-      return {agreement,allowedActions};
+      const metricLabels=agreement.metrics.map(m=>{
+        const definition=registry.find(d=>d.metricKey===m.metricKey&&d.definitionVersion===m.definitionVersion);
+        return (definition?.label??m.metricKey)+" ("+m.metricKey+", v"+m.definitionVersion+")";
+      });
+      return {agreement,allowedActions,organizationName,scopeName,metricLabels};
     });
     return {items,next:rows.length>25?rows[24]!.id:null};
   });
