@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/ui/field";
-import { WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, QueryState, WorkspaceNotice } from "@/components/workspace";
 import { getClassroomAttendanceRoster } from "@/modules/learning/classroom-attendance.functions";
 import { getClassroomHostActivity } from "@/modules/learning/classroom-evidence.functions";
 import { recordClassroomAssistedActivity } from "@/modules/learning/classroom-assisted-activity.functions";
@@ -72,12 +72,9 @@ export function ClassroomAssistedActivityPanel({facilitatedSessionId}:{
       the learner personally submitted a digital response, and never creates
       academic grades or completion.
     </p>
-    {(roster.isError||releases.isError)&&<p role="alert" className="mt-3 text-sm text-destructive">
-      Current room or registered learner authority could not be verified.
-    </p>}
-    {(roster.isPending||releases.isPending)&&<p role="status" className="mt-3 text-sm">
-      Checking the Course roster and released activities…
-    </p>}
+    <QueryState error={(roster.isError||releases.isError)&&"Current room or registered learner authority could not be verified."}
+      loading={!(roster.isError||releases.isError)&&(roster.isPending||releases.isPending)&&"Checking the Course roster and released activities…"}
+      onRetry={()=>{void roster.refetch();void releases.refetch();}} retrying={roster.isFetching||releases.isFetching}/>
     {roster.isSuccess&&releases.isSuccess&&<div className="mt-4 grid gap-3 sm:grid-cols-2">
       <Field label="Registered learner">
         <Select className="mt-2"
@@ -123,13 +120,13 @@ export function ClassroomAssistedActivityPanel({facilitatedSessionId}:{
           placeholder="Collected this answer directly from the learner on a printed response sheet…"
           className="mt-2"/>
       </Field>
-      <div className="sm:col-span-2">
+      <ActionFooter layout="inline" className="sm:col-span-2 mt-0">
         <Button type="button" size="sm" disabled={busy||!chosen||!activity||
           !answer.trim()||evidenceNote.trim().length<15||!roster.data.attestationsOpen}
-          onClick={()=>void save()}>{busy?"Saving…":"Record assisted practice"}</Button>
-      </div>
+          loading={busy} loadingLabel="Saving…" onClick={()=>void save()}>Record assisted practice</Button>
+      </ActionFooter>
     </div>}
     {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
-    {success&&<WorkspaceNotice tone="info" className="mt-3">{success}</WorkspaceNotice>}
+    {success&&<WorkspaceNotice tone="success" className="mt-3">{success}</WorkspaceNotice>}
   </section>;
 }
