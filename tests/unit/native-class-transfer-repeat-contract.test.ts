@@ -26,8 +26,10 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(transfer).toContain("writeNativeClassAttribution(tx,");
   expect(transfer).toContain('eventType:"ClassEnrollmentTransferred"');
   expect(transfer).toContain("sourceAttemptIdsClosed:closedAttemptIds");
-  expect(learner).toContain("transferMyNativeClassEnrollment");
-  expect(learner).toContain("I accept the destination Class terms");
+  expect(learner).toContain("<EnrolledClassCard");
+  const card=read("src/components/learning/native-class/EnrolledClassCard.tsx");
+  expect(card).toContain("transferMyNativeClassEnrollment");
+  expect(card).toContain("I accept the destination Class terms");
  });
  it("blocks completed destination repeats without an independent authorization",()=>{
   expect(transfer).toContain('assertNativeClassRepeatEligible(completed?["completed"]:[])');
