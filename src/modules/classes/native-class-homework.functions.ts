@@ -1,3 +1,4 @@
+import {readHistoricalClassWork} from "./historical-class-work.server";
 import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -236,3 +237,16 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
       return {submissionId:created.id,alreadySubmitted:false};
     });
   });
+
+/** Historical school work is not available through adult learner placement grants. */
+export const getNativeClassHistoricalWork=createServerFn({method:"GET"})
+ .validator((raw:unknown)=>target.extend({beforeId:uuid.optional()}).strict().parse(raw))
+ .handler(async({data})=>{
+  noStore();
+  const actor=await getInstructionalLearnerContext(getRequest());
+  if(actor.role!=="student")throw new AuthorizationError("own school records");
+  return db.transaction(async tx=>{
+   const {cls,enrollment}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+   return readHistoricalClassWork(tx,{classId:cls.id,classEnrollmentId:enrollment.id,beforeId:data.beforeId});
+  });
+ });

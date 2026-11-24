@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { HistoricalClassWork } from "./HistoricalClassWork";
 import { SubmissionRevisionHistory } from "./SubmissionRevisionHistory";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getNativeClassHomework, getNativeClassHomeworkHistory, submitNativeClassHomework } from
+import { getNativeClassHomework, getNativeClassHomeworkHistory, getNativeClassHistoricalWork, submitNativeClassHomework } from
   "@/modules/classes/native-class-homework.functions";
 import { normalizeClientError } from "@/lib/client-error";
 
@@ -59,6 +60,7 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
       <p className="text-sm">Original school assignments and feedback remain in your recovered Section until historical records are reconciled.</p>
       <Button asChild variant="outline" size="sm"><Link to="/student/assignments" search={{section:query.data.legacySectionId}}>View original school assignments</Link></Button>
     </div>}
+    {query.data?.legacySectionId&&<HistoricalClassWork key={classEnrollmentId} queryScope={["historical-class-work",classEnrollmentId]} loadPage={beforeId=>getNativeClassHistoricalWork({data:{classEnrollmentId,beforeId}})}/>}
     {query.data?.assignments.length===0&&
       <p className="text-sm">No written assignments are available for this Course yet.</p>}
     {query.data?.assignments.map(item=>{

@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { HistoricalClassWork } from "./HistoricalClassWork";
 import { SubmissionRevisionHistory } from "./SubmissionRevisionHistory";
-import { getNativeClassTeacherHomework, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherAssessments,
+import { getNativeClassTeacherHomework, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherHistoricalWork, getNativeClassTeacherAssessments,
   returnNativeClassPracticeFeedback } from
   "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
     </p>}
     {queue.data&&<>
       <p className="text-xs text-muted-foreground">{queue.data.notice}</p>
+      <HistoricalClassWork key={classId} queryScope={["teacher-historical-class-work",classId]} loadPage={beforeId=>getNativeClassTeacherHistoricalWork({data:{classId,beforeId}})}/>
       {queue.data.items.length===0&&
         <p className="text-sm">No submitted, returned or graded homework is available for this Class.</p>}
       <ul className="divide-y divide-border">

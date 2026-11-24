@@ -46,3 +46,5 @@ export * from "./ws3-class-completion";
 export * from "./ws3-evidence-review";
 
 export * from "./submission-revisions";
+
+export * from "./academic-cutover";

@@ -1,3 +1,4 @@
+import {readHistoricalClassWork} from "./historical-class-work.server";
 import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -253,4 +254,16 @@ export const getNativeClassTeacherAssessments=createServerFn({method:"GET"})
          item.administration_status==="open",
      })),partial:rows.length>50};
    });
+ });
+
+/** Teachers may inspect submitted school work for current learners in their exact Class. */
+export const getNativeClassTeacherHistoricalWork=createServerFn({method:"GET"})
+ .validator((raw:unknown)=>input.extend({beforeId:z.string().uuid().optional()}).strict().parse(raw))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  setResponseHeader("Referrer-Policy","no-referrer");
+  return db.transaction(async tx=>{
+   const {cls}=await authorizedTeacher(tx,data.classId);
+   return readHistoricalClassWork(tx,{classId:cls.id,classEnrollmentId:null,beforeId:data.beforeId});
+  });
  });
