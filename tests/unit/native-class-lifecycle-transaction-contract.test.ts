@@ -56,7 +56,8 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(verifier).toContain("v301_canonical_session_context");
     expect(verifier).toContain("canonicalSessionDigestFromRequest(request)");
     expect(verifier).toContain("assertNativeClassLearnerSessionForExit(");
-    expect(verifier).toContain("actor.scope.organizationIds[0]");
+    expect(verifier).toContain("actor.scope.organizationIds?.length!==1");
+    expect(verifier).toContain('actor.scope.organizationIds?.[0]??""');
     expect(verifier).not.toContain("operatingOrganizationId");
     expect(self).toContain("await assertCurrentNativeClassLearnerForMutation(tx,request,actor)");
     expect(exit).toContain("await assertCurrentNativeClassLearnerForMutation(tx,request,actor)");
@@ -67,7 +68,9 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(self.match(/nativeClassCapacity\(\{/g)).toHaveLength(2);
     expect(self).toContain("offeringCapacity:row.capacity");
     expect(read("src/domain/native-class-lifecycle.ts")).toContain("Math.max(0,capacity-input.activeOrPending)");
-    const ui=read("src/routes/class.tsx");
+    const route=read("src/routes/class.tsx");
+    expect(route).toContain("<OfferingCard");
+    const ui=read("src/components/learning/native-class/OfferingCard.tsx");
     expect(ui).toContain("item.remainingSeats===0");
     expect(ui).toContain("disabled={!adult||!consent||busy||full}");
   });
@@ -80,7 +83,7 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(self).toContain("HH24:MI:SS.US");
     expect(self).toContain("enrolledAt:last.enrolledAtCursor");
     expect(self).not.toContain("new Date(data.cursor.enrolledAt)");
-    expect(self).toContain("lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)");
+    expect(self).toContain("lt(canonicalClassEnrollments.id,cursor.classEnrollmentId)");
     expect(self).toContain("eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId)");
     expect(self).toContain("desc(canonicalClassEnrollments.id)).limit(51)");
     expect(self).toContain("const items=rows.slice(0,50)");
