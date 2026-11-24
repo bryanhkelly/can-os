@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
 import { assertWholeSiteSnapshotAuthoringScope, assertWholeSiteReportingScope,
-  assertSiteLocationProgramScope, assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
+  assertSiteLocationProgramScope, assertWholeSiteProgramsInScope,
+  assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 
 const site={id:"site-one",organizationId:"church-one"};
 const actor:AccessContext={
@@ -57,6 +58,20 @@ describe("Agent S verified Site and Program access",()=>{
     expect(()=>assertWholeSiteReportingScope(orgWide,{
       id:"sibling",organizationId:"other-organization",
     },[])).toThrow();
+  });
+  it("guards Site-owned Go Link inventory across all attached Programs",()=>{
+    expect(()=>assertWholeSiteProgramsInScope(actor,["program-one"],"Site link management"))
+      .not.toThrow();
+    expect(()=>assertWholeSiteProgramsInScope(
+      actor,["program-one","sibling-program"],"Site link management"))
+      .toThrow("Site link management requires authority over every attached Program");
+    expect(()=>assertWholeSiteProgramsInScope({
+      ...actor,scope:{organizationIds:["church-one"],siteIds:["site-one"],programIds:[]},
+    },["program-one"],"Site link management")).toThrow();
+    const orgWide={...actor,role:"registrar" as const,grantSiteId:null,
+      scope:{organizationIds:["church-one"]}};
+    expect(()=>assertWholeSiteProgramsInScope(
+      orgWide,["program-one","sibling-program"],"Site link management")).not.toThrow();
   });
   it("requires write capability to seal a private source snapshot",()=>{
     expect(()=>assertWholeSiteSnapshotAuthoringScope(actor,site,["program-one"]))
