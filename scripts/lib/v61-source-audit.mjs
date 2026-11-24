@@ -258,11 +258,22 @@ function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
-export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD^") {
+export function checkChangedFiles(root, base = process.env.V61_BASE_REF) {
   const src = resolve(root);
-  const result = { base, checked: 0, errors: [], warning: null };
+  const result = { base: base || null, checked: 0, errors: [], warning: null };
   let paths;
   try {
+    // A release can contain hundreds of commits. Comparing only HEAD^
+    // silently omits earlier changes. Explicit CI/operator bases take priority.
+    if (!base) {
+      const branch = git(src, ["branch", "--show-current"]);
+      if (branch.startsWith("release-")) {
+        base = git(src, ["merge-base", "HEAD", "origin/main"]);
+      } else {
+        base = "HEAD^";
+      }
+    }
+    result.base = base;
     // Include committed changes and the developer's current working tree.
     // A pre-commit lint run must detect staged, unstaged and new files too.
     const names = [
