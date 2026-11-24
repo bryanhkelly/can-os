@@ -7,7 +7,7 @@ const obj=(x:unknown):Record<string,unknown>=>x&&typeof x==="object"&&!Array.isA
 const str=(x:unknown)=>typeof x==="string"?x:null;
 const num=(x:unknown)=>typeof x==="number"&&Number.isFinite(x)?String(x):typeof x==="string"&&/^-?\d+(\.\d+)?$/.test(x)?x:null;
 /** Explicit allowlist; never expose metadata, staff identifiers, draft feedback or raw JSON. */
-export function projectHistoricalAcademicPage(rows:readonly Record<string,unknown>[]):HistoricalAcademicPage{
+export function projectHistoricalAcademicPage(rows:readonly Record<string,unknown>[],audience?:"guardian"):HistoricalAcademicPage{
  const items=rows.slice(0,20).map(row=>{
   const src=obj(row.source_record),grade=row.record_kind==="section_grade";
   const reviewed=src.status==="graded"||src.status==="returned";
@@ -15,7 +15,7 @@ export function projectHistoricalAcademicPage(rows:readonly Record<string,unknow
    title:grade?"Historical finalized section grade":str(row.assignment_title)??"Historical assignment",
    learnerName:str(row.learner_name),status:str(src.status)??"unknown",
    attempt:!grade&&typeof src.attempt_number==="number"?src.attempt_number:null,
-   response:grade?null:str(obj(src.response).text),
+   response:grade||audience==="guardian"?null:str(obj(src.response).text),
    feedback:!grade&&reviewed?str(obj(src.feedback).comment):null,
    score:!grade&&reviewed?num(src.score):null,maximum:grade?null:num(row.points_possible),
    letterGrade:grade?str(src.letter_grade):null,submittedAt:grade?null:str(src.submitted_at),
