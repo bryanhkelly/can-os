@@ -14,6 +14,9 @@ import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.fun
 import { PlatformCatalogManager } from "@/components/platform/PlatformCatalogManager";
 import { PlatformOwnerDelegationPanel } from "@/components/platform/PlatformOwnerDelegationPanel";
 import { PlatformOwnerPilotAccessPanel } from "@/components/platform/PlatformOwnerPilotAccessPanel";
+import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
+import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
+import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { PlatformReleaseCenter } from "@/components/platform/PlatformReleaseCenter";
 
 export const Route = createFileRoute("/platform")({
@@ -37,6 +40,7 @@ function PlatformAdministration() {
     </WorkspaceShell>;
   }
   const summary = result.data;
+  const engagementSurface:OwnerEngagementSurface={owner:{kind:"platform"},sites:summary.siteReadiness.map(site=>({id:site.siteId,name:site.siteName}))};
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Platform"
     title="Platform administration"
     subtitle="Aggregate platform inventory. School operations and independent approvals retain their own permissions.">
@@ -72,6 +76,7 @@ function PlatformAdministration() {
     <PlatformReleaseCenter records={summary.publisherReleaseReadiness}
       limited={summary.publisherReleasesLimited}/>
 
+    {summary.platformOwner&&<section className="mt-6 space-y-4"><h2 className="font-serif text-xl">Platform invitations and distribution</h2><p className="text-sm text-muted-foreground">Platform-owned invitations do not establish an institutional partnership or approve training. Only already eligible registration destinations appear.</p><UniversalEngagementPublisher ownerSurface={engagementSurface}/><SiteEngagementLibrary ownerSurface={engagementSurface}/></section>}
     <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady} cases={summary.reviewCases}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>

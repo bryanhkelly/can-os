@@ -12,7 +12,10 @@ import {
   engagementDefinitionSchema, engagementOwnerSchema,
   engagementContextSummary, engagementRequiresClaimReview, type EngagementOwner,
 } from "@/domain/engagement-definition";
-import { inspectEngagementDestination } from "./go-destination-registry.server";
+import { requireCurrentNetworkAgreement } from "@/modules/networks/network-agreement.server";
+import { engagementOwnerAllowsSite } from "@/domain/engagement-target-scope";
+import { engagementJourneys } from "@/domain/engagement-journeys";
+import { listGoDestinationChoices, inspectEngagementDestination } from "./go-destination-registry.server";
 import { engagementActionAvailable, engagementDestination } from "@/domain/engagement-action-policy";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
@@ -70,11 +73,12 @@ export async function authorizeEngagementOwner(
   }
   if(owner.kind === "organization"){
     const [org]=await reader.select({
-      id:organizations.id,status:organizations.lifecycleStatus,
+      id:organizations.id,status:organizations.lifecycleStatus,type:organizations.type,
     }).from(organizations).where(eq(organizations.id,owner.organizationId)).limit(1);
     if(!org || org.status==="closed" || org.status==="inactive")
       throw new AuthorizationError("active organization owner");
     assertOrganizationAuthor(actor,org.id,write);
+    if(actor.role==="network_admin"||org.type==="denomination")await requireCurrentNetworkAgreement(reader,org.id);
     return {ownerKind:"organization",organizationId:org.id,siteId:null,programId:null};
   }
   if(owner.kind === "site"){
@@ -112,10 +116,12 @@ async function authorizedDefinition(
   const [record]=await reader.select().from(engagementDefinitions)
     .where(eq(engagementDefinitions.id,engagementId)).limit(1);
   if(!record)throw new DomainError("UNAVAILABLE","Engagement unavailable.");
-  await authorizeEngagementOwner(ownerFromRow({
+  const current=await authorizeEngagementOwner(ownerFromRow({
     ownerKind:record.ownerKind,organizationId:record.organizationId,
     siteId:record.siteId,programId:record.programId,
   }),actor,write,reader);
+  if(current.organizationId!==record.organizationId||current.siteId!==record.siteId||current.programId!==record.programId)
+    throw new AuthorizationError("unchanged exact engagement ownership");
   return record;
 }
 async function assertDestinationReady(
@@ -369,7 +375,9 @@ export const prepareEngagementEmailDraft=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     const record=await authorizedDefinition(data.engagementId,actor,true,db);
-    assertCapability(actor,"communication.send");
+    if(record.ownerKind==="organization"&&actor.role==="network_admin")assertCapability(actor,"network.sites.manage");
+    else if(record.ownerKind==="platform")assertCapability(actor,"platform.admin");
+    else assertCapability(actor,"communication.send");
     if(record.status!=="active")throw new DomainError("UNAVAILABLE","Engagement is retired.");
     const [link]=await db.select().from(siteGoLinks).where(eq(siteGoLinks.id,data.linkId)).limit(1);
     if(!link?.engagementVersionId||link.channel!=="email"||
@@ -386,4 +394,36 @@ export const prepareEngagementEmailDraft=createServerFn({method:"GET"})
     const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
     if(!origin)throw new DomainError("UNAVAILABLE","Approved public sharing origin is not configured.");
     return buildEngagementInvitation(definition,link.code,origin);
+  });
+
+/** An owner workspace may publish a national invitation without fabricating
+ * a local marketing package. Only directly owned Sites are eligible. */
+export const listOwnerEngagementDestinations=createServerFn({method:"GET"})
+  .validator((input:unknown)=>z.object({owner:engagementOwnerSchema,siteId:uuid.optional(),kind:z.enum(["information","adult-training"]),term:z.string().trim().max(90).optional()}).strict().parse(input))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const owner=await authorizeEngagementOwner(data.owner,actor,false,db);
+    if(!["platform","organization"].includes(owner.ownerKind))throw new AuthorizationError("organization or platform engagement");
+    if(data.kind==="information")return Object.values(engagementJourneys).filter(journey=>!data.term||journey.headline.toLowerCase().includes(data.term.toLowerCase())).map(journey=>({destination:{kind:"information" as const,journeyId:journey.id},title:journey.headline,description:journey.audience}));
+    if(!data.siteId)return [];
+    const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,status:sites.lifecycleStatus}).from(sites).where(eq(sites.id,data.siteId)).limit(1);
+    if(!site||!engagementOwnerAllowsSite(owner,site))throw new AuthorizationError("directly owned delivery Site");
+    return listGoDestinationChoices(site.id,"adult-training",db,data.term);
+  });
+
+export const listOwnerEngagementDefinitions=createServerFn({method:"GET"})
+  .validator((input:unknown)=>z.object({owner:engagementOwnerSchema}).strict().parse(input))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const owner=await authorizeEngagementOwner(data.owner,actor,false,db);
+    if(!["platform","organization"].includes(owner.ownerKind))throw new AuthorizationError("organization or platform engagement");
+    const rows=await db.select({engagementId:engagementDefinitions.id,versionId:engagementDefinitionVersions.id,version:engagementDefinitionVersions.version,status:engagementDefinitions.status,publishedAt:engagementDefinitionVersions.publishedAt,content:engagementDefinitionVersions.content})
+      .from(engagementDefinitions).innerJoin(engagementDefinitionVersions,eq(engagementDefinitionVersions.engagementId,engagementDefinitions.id))
+      .where(and(eq(engagementDefinitions.ownerKind,owner.ownerKind),
+        owner.organizationId?eq(engagementDefinitions.organizationId,owner.organizationId):sql`${engagementDefinitions.organizationId} IS NULL`))
+      .orderBy(desc(engagementDefinitionVersions.publishedAt)).limit(100);
+    return rows.flatMap(row=>{const parsed=engagementDefinitionSchema.safeParse(row.content);if(!parsed.success)return [];
+      return [{engagementId:row.engagementId,versionId:row.versionId,version:row.version,status:row.status,headline:parsed.data.presentation.headline,domain:parsed.data.domain,mode:parsed.data.execution.mode,publishedAt:row.publishedAt.toISOString()}];});
   });

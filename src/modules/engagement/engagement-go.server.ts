@@ -1,3 +1,4 @@
+import { requireCurrentNetworkAgreement } from "@/modules/networks/network-agreement.server";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -51,10 +52,11 @@ async function validOwner(
     return {name:"Becomuna",siteId:null};
   if(!owner.organizationId)return null;
   const [organization]=await db.select({
-    id:organizations.id,name:organizations.name,
+    id:organizations.id,name:organizations.name,type:organizations.type,
     status:organizations.lifecycleStatus,
   }).from(organizations).where(eq(organizations.id,owner.organizationId)).limit(1);
   if(!organization || organization.status==="inactive" || organization.status==="closed")return null;
+  if(organization.type==="denomination"){try{await requireCurrentNetworkAgreement(db,organization.id);}catch{return null;}}
   if(owner.ownerKind==="organization" && !owner.siteId && !owner.programId)
     return {name:organization.name,siteId:null};
   if(owner.ownerKind==="site" && owner.siteId && !owner.programId){

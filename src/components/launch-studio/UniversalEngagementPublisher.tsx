@@ -1,4 +1,5 @@
-import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
+import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import { OwnerEngagementDestinationPicker, type OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { WorkspacePanel } from "@/components/workspace";
 import {
   engagementDomains, engagementAudienceKinds, engagementInteractions,
   engagementSubjectKinds, engagementDefinitionSchema,
-  type EngagementDefinition,
+  type EngagementDefinition, type EngagementOwner,
 } from "@/domain/engagement-definition";
 import type {GoDestination} from "@/domain/site-go-links";
 import {GovernedGoDestinationPicker} from "@/components/links/GovernedGoDestinationPicker";
@@ -28,8 +29,9 @@ const errorMessage=(error:unknown)=>error instanceof Error?error.message:"Unable
  * data and does not create a separate outreach/contact/admissions service.
  */
 export function UniversalEngagementPublisher({
-  siteId,packageId,
-}:{siteId:string;packageId:string}){
+  siteId,packageId,ownerSurface,
+}:{siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface}){
+  const owner:EngagementOwner=ownerSurface?.owner??{kind:"site",siteId:siteId!};
   const [domain,setDomain]=useState<EngagementDefinition["domain"]>("outreach");
   const [subjectKind,setSubjectKind]=useState<EngagementDefinition["subject"]["kind"]>("initiative");
   const [subjectLabel,setSubjectLabel]=useState("");
@@ -65,7 +67,7 @@ export function UniversalEngagementPublisher({
     execution:execution==="page"
       ? {mode:"page",template,action:destination(),actionLabel:actionLabel.trim()}
       : {mode:"redirect",destination:destination()},
-    source:{marketingPackageId:packageId},
+    ...(packageId?{source:{marketingPackageId:packageId}}:{}),
   };
   const actionSupported=target!==null && engagementActionAvailable(interaction,target);
   const ready=actionSupported && engagementDefinitionSchema.safeParse(draft).success;
@@ -74,7 +76,7 @@ export function UniversalEngagementPublisher({
     setError("");setNotice("");setBusy(true);
     try{
       const saved=await createEngagementDefinition({
-        data:{owner:{kind:"site",siteId},definition:draft},
+        data:{owner,definition:draft},
       });
       setPublished(saved);
       setNotice("Published immutable engagement v1. You can create independent links for each channel.");
@@ -105,12 +107,6 @@ export function UniversalEngagementPublisher({
       setNotice("The link was revoked.");
     }catch(error){setError(errorMessage(error));}
     finally{setBusy(false);}
-  }
-  async function copy(code:string){
-    try{
-      await navigator.clipboard.writeText(new URL("/go/"+code,await getCanonicalGoLinkShareOrigin()).href);
-      setError("");setNotice("Copied Go Link.");
-    }catch{setError("Unable to copy. Select the link text and copy manually.");}
   }
   return <WorkspacePanel title="Context-aware engagement"
     description="Publish a reusable invitation or opportunity experience, then generate channel-specific Go Links. No application, employment, partnership or enrollment is created here.">
@@ -168,8 +164,8 @@ export function UniversalEngagementPublisher({
           </Select>
         </label>}
         <div className="sm:col-span-2">
-          <GovernedGoDestinationPicker siteId={siteId} packageId={packageId}
-            value={target} onChange={setTarget} disabled={busy}/>
+          {ownerSurface?<OwnerEngagementDestinationPicker surface={ownerSurface} value={target} onChange={setTarget} disabled={busy}/>:siteId?<GovernedGoDestinationPicker siteId={siteId} packageId={packageId}
+            value={target} onChange={setTarget} disabled={busy}/>:null}
         </div>
         {execution==="page"&&<label className="grid gap-1 text-sm font-semibold">Button label
           <Input maxLength={80} value={actionLabel} onChange={event=>setActionLabel(event.target.value)}/>
@@ -204,8 +200,7 @@ export function UniversalEngagementPublisher({
             {revoked.has(link.linkId)&&<p className="text-xs text-muted-foreground">Revoked</p>}
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={revoked.has(link.linkId)}
-              onClick={()=>void copy(link.code)}>Copy link</Button>
+            {!revoked.has(link.linkId)&&<CopyLinkButton destination={{kind:"go",code:link.code}}/>}
             <Button size="sm" variant="outline" disabled={busy||revoked.has(link.linkId)}
               onClick={()=>void revoke(link)}>Revoke</Button>
           </div>

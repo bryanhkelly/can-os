@@ -1,12 +1,13 @@
 import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
-import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
+import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
 import {
   createEngagementGoLink, listEngagementGoLinks,
-  listSiteEngagementDefinitions, retireEngagementDefinition,
+  listSiteEngagementDefinitions, listOwnerEngagementDefinitions, retireEngagementDefinition,
   revokeEngagementGoLink,
 } from "@/modules/engagement/engagement-registry.functions";
 
@@ -24,8 +25,8 @@ const problem=(error:unknown)=>error instanceof Error?error.message:"Action unav
  * authoring state must never be the only way to manage a distributed link.
  */
 export function SiteEngagementLibrary({
-  siteId,packageId,
-}:{siteId:string;packageId:string}){
+  siteId,packageId,ownerSurface,
+}:{siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface}){
   const [records,setRecords]=useState<Entry[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [links,setLinks]=useState<Link[]>([]);
@@ -41,7 +42,7 @@ export function SiteEngagementLibrary({
   useEffect(()=>{
     let active=true;
     setLoading(true);
-    listSiteEngagementDefinitions({data:{siteId,packageId}})
+    (ownerSurface?listOwnerEngagementDefinitions({data:{owner:ownerSurface.owner}}):listSiteEngagementDefinitions({data:{siteId:siteId!,packageId:packageId!}}))
       .then(rows=>{
         if(!active)return;
         setRecords(rows);
@@ -53,7 +54,7 @@ export function SiteEngagementLibrary({
         if(active){setError("Unable to load published engagements.");setLoading(false);}
       });
     return ()=>{active=false;};
-  },[siteId,packageId,refresh]);
+  },[siteId,packageId,ownerSurface?.owner.kind,ownerSurface?.owner.kind==="organization"?ownerSurface.owner.organizationId:null,refresh]);
 
   useEffect(()=>{
     let active=true;
@@ -106,12 +107,6 @@ export function SiteEngagementLibrary({
     }catch(error){setError(problem(error));}
     finally{setBusy(false);}
   }
-  async function copy(link:Link){
-    try{
-      await navigator.clipboard.writeText(new URL("/go/"+link.code,await getCanonicalGoLinkShareOrigin()).href);
-      setMessage("Go Link copied.");setError("");
-    }catch{setError("Unable to copy automatically. Select and copy the displayed link.");}
-  }
   return <WorkspacePanel
     title="Published engagement library"
     description="Saved invitations and links remain manageable after you leave this page. Each published engagement is an immutable version.">
@@ -121,7 +116,7 @@ export function SiteEngagementLibrary({
     </div>
     {loading&&<p role="status" className="mt-4 text-sm">Loading published engagements…</p>}
     {!loading&&!records.length&&
-      <p className="mt-4 text-sm text-muted-foreground">No published experiences in this outreach package yet.</p>}
+      <p className="mt-4 text-sm text-muted-foreground">No published experiences in this workspace yet.</p>}
     {!loading&&records.length>0&&<>
       <div className="mt-4 grid gap-1">
         <label className="text-sm font-medium" htmlFor="saved-go-engagement">Published experience</label>
@@ -162,9 +157,7 @@ export function SiteEngagementLibrary({
             {link.evidence?<p className="mt-1 text-xs text-muted-foreground">{link.evidence.redirects30d} observed requests · {link.evidence.registrationEvidence==="referenced_noncredit_claim"?`${link.evidence.referralRegistrations30d??0} matching registration claims`:"Outcome not connected"} (30 days; not unique people or causal conversions)</p>:<p className="mt-1 text-xs text-muted-foreground">Outcome evidence unavailable.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline"
-              disabled={link.status==="revoked"||record?.status!=="active"}
-              onClick={()=>void copy(link)}>Copy</Button>
+            {link.status==="active"&&record?.status==="active"&&<CopyLinkButton destination={{kind:"go",code:link.code}}/>}
             {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>Prepare email</Button>}
             {link.status==="active"&&record?.status==="active"&&
               <Button type="button" size="sm" variant="outline" disabled={busy}
