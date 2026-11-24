@@ -15,6 +15,19 @@ export const goDestinationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("information"), journeyId: z.string().regex(/^[a-z][a-z0-9-]{1,60}$/) }).strict(),
 ]);
 export type GoDestination = z.infer<typeof goDestinationSchema>;
+export type GoDestinationChoice = {destination:GoDestination;title:string;description:string};
+
+/** Stable selection identity independent of object property insertion order. */
+export function goDestinationSelectionKey(destination:GoDestination):string{
+  switch(destination.kind){
+    case "information":return "information:"+destination.journeyId;
+    case "site-page":return "site-page:"+destination.page;
+    case "adult-training":return "adult-training:"+destination.releaseId;
+    case "class":return "class:"+destination.classId;
+    case "enrichment":return "enrichment:"+destination.seasonId;
+    case "website-preview":return JSON.stringify(["website-preview",destination.snapshotId,destination.snapshotDigest,destination.sourceRevision,destination.brandVersionId]);
+  }
+}
 
 /** One versioned presentation/validation contract shared by the authoring UI
  * and the server. A Go Link is deliberately narrower than private navigation.
