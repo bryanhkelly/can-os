@@ -33,6 +33,6 @@ export default defineConfig({
   webServer:{
     command:"npm run dev -- --host localhost --port 5183 --strictPort",
     url:baseURL,reuseExistingServer:false,timeout:180000,
-    env:{...env as Record<string,string>,DATABASE_URL:env.TEST_DATABASE_URL,APP_ENV:"test",NODE_ENV:"test",CAN_TEST_DB_WRITES_ENABLED:"true"},
+    env:{...env as Record<string,string>,DATABASE_URL:env.TEST_DATABASE_URL,CAN_ADMISSIONS_TEST_BRANCH_ID:branch,APP_ENV:"test",NODE_ENV:"test",CAN_TEST_DB_WRITES_ENABLED:"true",RESEND_API_KEY:"",RESEND_WEBHOOK_SECRET:"",GLOO_API_KEY:"",CAN_CAMPAIGN_FROM_EMAIL:""},
   },
 });
