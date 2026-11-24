@@ -82,6 +82,7 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
   .handler(async ({ data }) => db.transaction(async tx => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { actor, site, pkg } = await authorizedPackage(data.siteId, data.packageId, true, tx);
+    if(data.destination.kind==="website-preview")throw new DomainError("FORBIDDEN","Create website previews from Website & Brand.");
     const requestId=data.requestId??randomUUID();
     // Fingerprint the requested semantics, not a mutable Site or destination
     // title. Retrying after publication closes returns the same original code.
