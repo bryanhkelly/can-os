@@ -4,6 +4,7 @@ import { SiteCampaignEvidencePanel } from "@/components/reports/SiteCampaignEvid
 import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
 import { GoLinkActions } from "@/components/links/GoLinkActions";
 import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
+import { engagementChannels, engagementChannelLabels, type EngagementChannel } from "@/domain/engagement-definition";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -17,11 +18,6 @@ import {
 
 type Entry=Awaited<ReturnType<typeof listSiteEngagementDefinitions>>[number];
 type Link=Awaited<ReturnType<typeof listEngagementGoLinks>>[number];
-type Channel="web"|"email"|"sms"|"qr"|"social"|"partner"|"other";
-const channelLabels:Record<Channel,string>={
-  web:"Website / sharing",email:"Email",sms:"Text message",qr:"QR code",
-  social:"Social",partner:"Partner",other:"Other",
-};
 const problem=(error:unknown)=>error instanceof Error?error.message:"Action unavailable.";
 
 /**
@@ -42,7 +38,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
   const [loading,setLoading]=useState(true);
   const [linksLoading,setLinksLoading]=useState(false);
   const [refresh,setRefresh]=useState(0);
-  const [channel,setChannel]=useState<Channel>("web");
+  const [channel,setChannel]=useState<EngagementChannel>("web");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
@@ -142,8 +138,8 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
         </div>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <Field label="Channel">
-          <Select value={channel} onChange={event=>setChannel(event.target.value as Channel)}>
-              {Object.entries(channelLabels).map(([id,label])=><option value={id} key={id}>{label}</option>)}
+          <Select value={channel} onChange={event=>setChannel(event.target.value as EngagementChannel)}>
+              {engagementChannels.map(id=><option value={id} key={id}>{engagementChannelLabels[id]}</option>)}
             </Select>
         </Field>
           <Button type="button" disabled={busy||record.status!=="active"} onClick={()=>void createLink()}>
