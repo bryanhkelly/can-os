@@ -40,7 +40,7 @@ async function assertPreviewSharingScope(
   executor: Pick<typeof db, "select"> = db,
 ) {
   const editor = await requirePartnerWebsiteEditor(actor, executor, "site.website.draft.write");
-  if (editor.id !== site?.id || editor.organizationId !== site.organizationId)
+  if (!site || editor.id !== site.id || editor.organizationId !== site.organizationId)
     throw new AuthorizationError("website sharing Site scope");
 }
 
