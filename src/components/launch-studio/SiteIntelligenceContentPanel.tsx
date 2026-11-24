@@ -89,8 +89,12 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
      <summary className="cursor-pointer text-sm font-semibold">Process or refresh Site Intelligence</summary>
      <p className="text-xs text-muted-foreground">One Gloo processing run creates both website and outreach content, with reusable descriptions for audiences, programs and experiences. The validated result is stored before it is available to any editor.</p>
      <div className="grid gap-3 sm:grid-cols-2">
-       <label className="grid gap-1 text-sm font-medium">Tone<Select value={options.tone} disabled={!canUse} onChange={e=>change({tone:e.target.value as SiteGenerationOptions["tone"]})}><option value="welcoming">Welcoming</option><option value="professional">Professional</option><option value="community">Community-centered</option><option value="inspiring">Inspiring</option></Select></label>
-       <label className="grid gap-1 text-sm font-medium">Language<Select value={options.language} disabled={!canUse} onChange={e=>change({language:e.target.value as SiteGenerationOptions["language"]})}><option value="en">English</option><option value="es">Spanish</option></Select></label>
+       <Field label="Tone">
+          <Select value={options.tone} disabled={!canUse} onChange={e=>change({tone:e.target.value as SiteGenerationOptions["tone"]})}><option value="welcoming">Welcoming</option><option value="professional">Professional</option><option value="community">Community-centered</option><option value="inspiring">Inspiring</option></Select>
+        </Field>
+       <Field label="Language">
+          <Select value={options.language} disabled={!canUse} onChange={e=>change({language:e.target.value as SiteGenerationOptions["language"]})}><option value="en">English</option><option value="es">Spanish</option></Select>
+        </Field>
      </div>
      <Field label="Additional editorial guidance (optional)"><Textarea rows={2} maxLength={600} value={options.guidance??""} disabled={!canUse} onChange={e=>change({guidance:e.target.value})} placeholder="Public-facing context only. Do not enter confidential information."/></Field>
      <fieldset className="space-y-2"><legend className="text-sm font-medium">Optional sources</legend>
