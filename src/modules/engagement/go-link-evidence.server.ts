@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteGoLinks, siteGoLinkDailyVisits, sites } from "@/db/schema";
+import { unclassifiedGoEntries } from "@/domain/go-response-observation";
 import type { GoDestination } from "@/domain/site-go-links";
 import { noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 
@@ -93,7 +94,7 @@ export async function readAuthorizedGoLinkEvidence(
     linkOpens30d:Number(visitsByLink.get(link.id)?.opens??0),
     pageViews30d:Number(visitsByLink.get(link.id)?.views??0),
     redirectResponses30d:Number(visitsByLink.get(link.id)?.redirects??0),
-    unclassifiedEntries30d:Math.max(0,Number(visitsByLink.get(link.id)?.visits??0)-Number(visitsByLink.get(link.id)?.opens??0)),
+    unclassifiedEntries30d:unclassifiedGoEntries(Number(visitsByLink.get(link.id)?.visits??0),Number(visitsByLink.get(link.id)?.opens??0)),
     referralRegistrations30d:byLink.has(link.id)
       ?claimsByKey.get(link.code+":"+byLink.get(link.id)!.releaseId+":"+sitesByRelease.get(byLink.get(link.id)!.releaseId))??0:null,
     registrationEvidence:byLink.has(link.id)
