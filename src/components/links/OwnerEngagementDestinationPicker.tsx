@@ -1,3 +1,4 @@
+import { Field } from "@/components/ui/field";
 import {useEffect,useState} from "react";
 import {Select} from "@/components/ui/select";
 import {Input} from "@/components/ui/input";
@@ -24,10 +25,10 @@ export function OwnerEngagementDestinationPicker({surface,value,onChange,disable
     return()=>{active=false;};
   },[surface.owner.kind,ownerId,kind,siteId,term]);
   return <div className="grid gap-3 sm:grid-cols-2">
-    <label className="grid gap-1 text-sm font-medium">Destination type<Select value={kind} disabled={disabled} onChange={e=>{setKind(e.target.value as typeof kind);onChange(null);}}><option value="information">Information or inquiry</option><option value="adult-training">Published adult training</option></Select></label>
-    {kind==="adult-training"&&<label className="grid gap-1 text-sm font-medium">Delivery Site<Select value={siteId} disabled={disabled} onChange={e=>{setSiteId(e.target.value);onChange(null);}}><option value="">Choose a delivery Site</option>{surface.sites.map(site=><option value={site.id} key={site.id}>{site.name}</option>)}</Select></label>}
-    <label className="grid gap-1 text-sm font-medium">Search eligible destinations<Input value={term} maxLength={90} disabled={disabled} onChange={e=>{setTerm(e.target.value);onChange(null);}}/></label>
-    <label className="grid gap-1 text-sm font-medium sm:col-span-2">Where should this link lead?<Select disabled={disabled||loading||error||!choices.length} value={value?JSON.stringify(value):""} onChange={e=>onChange(choices.find(choice=>JSON.stringify(choice.destination)===e.target.value)?.destination??null)}><option value="">Choose an available destination</option>{choices.map(choice=><option key={JSON.stringify(choice.destination)} value={JSON.stringify(choice.destination)}>{choice.title}</option>)}</Select></label>
+    <Field label="Destination type"><Select value={kind} disabled={disabled} onChange={e=>{setKind(e.target.value as typeof kind);onChange(null);}}><option value="information">Information or inquiry</option><option value="adult-training">Published adult training</option></Select></Field>
+    {kind==="adult-training"&&<Field label="Delivery Site"><Select value={siteId} disabled={disabled} onChange={e=>{setSiteId(e.target.value);onChange(null);}}><option value="">Choose a delivery Site</option>{surface.sites.map(site=><option value={site.id} key={site.id}>{site.name}</option>)}</Select></Field>}
+    <Field label="Search eligible destinations"><Input value={term} maxLength={90} disabled={disabled} onChange={e=>{setTerm(e.target.value);onChange(null);}}/></Field>
+    <Field label="Where should this link lead?" className="sm:col-span-2"><Select disabled={disabled||loading||error||!choices.length} value={value?JSON.stringify(value):""} onChange={e=>onChange(choices.find(choice=>JSON.stringify(choice.destination)===e.target.value)?.destination??null)}><option value="">Choose an available destination</option>{choices.map(choice=><option key={JSON.stringify(choice.destination)} value={JSON.stringify(choice.destination)}>{choice.title}</option>)}</Select></Field>
     {loading&&<p role="status" className="text-sm">Checking eligible destinations…</p>}
     {error&&<p role="alert" className="text-sm text-destructive">Could not verify destination authority.</p>}
     {!loading&&!error&&!choices.length&&<p className="text-sm text-muted-foreground">No eligible published destinations match. Draft training is not enrollable.</p>}
