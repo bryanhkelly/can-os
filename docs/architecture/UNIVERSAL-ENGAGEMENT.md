@@ -60,3 +60,15 @@ Status: foundation source on `release-11232026`. Source is **not** a deployed, e
 - Netlify deploy-preview #364 was skipped with the provider message `Skipped due to account builds usage exceeded`. It is not a compiler failure, but also supplies no build evidence.
 - GitHub's workflow run collection for the release branch returned no CI runs at inspection time. No claim of passing TypeScript, Vitest, Cloudflare build or browser tests can be made.
 - Before merging: restore CI/build capacity; run the full workflow at the exact head SHA; test platform, Organization, Site and Program ownership with real verified grants; verify the browser runtime through a staging database with both migrations applied; test revocation, retirement and Brand-version persistence; then explicitly plan production migration.
+
+## Acceptance follow-up: destination and access boundaries
+
+- Universal engagements now call the same published Destination Registry as direct Site Go Links at both definition publication and Go Link issuance. The public resolver performs these checks again on each visit.
+- National Organization engagements can link to an eligible training, Class or enrichment offering from one of their own Sites, without a manufactured Site/Marketing Package owner. Platform engagements can target eligible published offerings across Sites. This is a navigation scope, not a Program enrollment permission.
+- Site-owned engagements require a full, verified Site grant, including attached Program scope checks. Program-owned links cannot target unproven sibling Program Classes or noncredit releases. Enrichment Program ownership is checked explicitly.
+- Public resource ownership is separately testable through `engagement-target-scope.test.ts`. Publisher and renderer use governed catalog choices, never an arbitrary typed destination UUID.
+- An archived outreach package cannot originate new universal engagements.
+- Noncredit `/learn/enroll?release=...&ref=...` remains the authoritative participant journey. It carries the attribution code to the existing registration command. Opening /go is not registration.
+- A scoped SQL lifecycle smoke test ran in a transaction on the isolated Neon validation branch. It created a platform definition, immutable version and Go Link, verified read relationships, verified that a version update raises the immutable-version exception, revoked the link and rolled back all fixture records. Final fixture residue was **zero**.
+- No published noncredit training releases or engagement records currently exist in the isolated validation branch. Thus a genuine COGIC end-to-end participant registration and verified attribution remains **unproven**.
+- The Netlify preview has been skipped by account build usage limits, and GitHub Actions has returned no runs for this branch. None of the new source tests have CI pass evidence.
