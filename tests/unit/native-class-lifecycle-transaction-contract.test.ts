@@ -14,8 +14,10 @@ describe("WS2 native Class transaction and integration invariants",()=>{
 
   it("checks all open enrollments instead of five recent history rows",()=>{
     for(const source of [self,assigned]){
-      expect(source).toContain('inArray(canonicalClassEnrollments.status,["pending","active"])');
-      expect(source).toContain("duplicate open Class enrollments require reconciliation");
+      expect(source).toContain("readOpenNativeClassEnrollment(tx,");
+      const history=read("src/modules/classes/native-class-enrollment-history.server.ts");
+      expect(history).toContain('inArray(canonicalClassEnrollments.status,["pending","active"])');
+      expect(history).toContain("duplicate open Class enrollments require reconciliation");
       expect(source).not.toContain(".limit(5)");
       expect(source).toContain("assertNativeClassSeatAvailable(");
     }
