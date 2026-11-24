@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GoLinkWorkspace } from "@/components/launch-studio/GoLinkWorkspace";
+import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
+import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
 import { NativeEngagementCampaigns } from "@/components/launch-studio/NativeEngagementCampaigns";
 import { CampaignListMembers } from "@/components/launch-studio/CampaignListMembers";
@@ -17,6 +19,23 @@ describe("Engagement component session isolation", () => {
     const org = (organizationId:string) => SiteEngagementLibrary({ownerSurface:{owner:{kind:"organization",organizationId},sites:[]}});
     expect(SiteEngagementLibrary({siteId:"site-a",packageId:"package-a"}).key).toBe(local.key);
     expect(new Set([local.key,platform.key,org("org-a").key,org("org-b").key]).size).toBe(4);
+  });
+  it("shares the exact owner scope contract between publisher and library", () => {
+    const scopes=[
+      {siteId:"site-a",packageId:"package-a"},
+      {siteId:"site-a",packageId:"package-b"},
+      {siteId:"site-b",packageId:"package-a"},
+      {ownerSurface:{owner:{kind:"platform" as const},sites:[]}},
+      {ownerSurface:{owner:{kind:"organization" as const,organizationId:"org-a"},sites:[]}},
+      {ownerSurface:{owner:{kind:"organization" as const,organizationId:"org-b"},sites:[]}},
+    ];
+    const keys=scopes.map(props=>UniversalEngagementPublisher(props).key);
+    expect(new Set(keys).size).toBe(scopes.length);
+    scopes.forEach((props,index)=>expect(SiteEngagementLibrary(props).key).toBe(keys[index]));
+  });
+  it("isolates preview shares, pending requests and created URLs by Site", () => {
+    expect(LaunchPreviewSharing({siteId:"site-a"}).key).toBe(LaunchPreviewSharing({siteId:"site-a"}).key);
+    expect(LaunchPreviewSharing({siteId:"site-b"}).key).not.toBe(LaunchPreviewSharing({siteId:"site-a"}).key);
   });
   it("never reuses campaign draft, consent or request state for another engagement or link", () => {
     const props={engagementId:"engagement-a",linkId:"link-a",invitationReady:true};
