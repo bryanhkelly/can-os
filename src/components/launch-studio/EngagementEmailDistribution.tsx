@@ -4,7 +4,7 @@ import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/choice";
 import {Field} from "@/components/ui/field";
 import {Textarea} from "@/components/ui/textarea";
-import {QueryState, WorkspaceNotice} from "@/components/workspace";
+import {ActionFooter, QueryState, WorkspaceNotice} from "@/components/workspace";
 import {prepareEngagementEmailDraft} from "@/modules/engagement/engagement-registry.functions";
 import {buildInvitationMailto,parseInvitationRecipients,type EngagementInvitation} from "@/domain/engagement-distribution";
 
@@ -68,11 +68,11 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
         <Textarea value={recipients} maxLength={6000} rows={3} disabled={busy||copying} placeholder="Enter one address per line" onChange={e=>{setRecipients(e.target.value);setAuthorized(false);}}/>
       </Field>
       <label className="mt-3 flex items-start gap-2 text-sm"><Checkbox disabled={busy||copying} checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/>I have permission to contact these recipients for this invitation and will honor their communication preferences.</label>
-      <div className="mt-3 flex flex-wrap gap-2"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></div>
+      <ActionFooter layout="inline"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></ActionFooter>
     </>}
     {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
     <NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady={!!draft}/>
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {draft&&error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
+    {draft&&error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
   </section>;
 }
