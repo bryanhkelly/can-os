@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { readRestrictedCanonicalSession } from "./restricted-canonical-session-reader.server";
+import { assertUnambiguousAdultAccount } from "./unambiguous-adult-account.server";
 import { assertCurrentReviewedNativeLearner } from "./reviewed-learning-evidence.server";
 import { accessAccounts, accessAccountNoncreditPrincipals, accessAdultLearningReviews } from "@/db/schema";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -189,6 +190,9 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
     if (!source?.verified || source.disabled || isDemoAccountEmail(source.email)) {
       throw new AuthorizationError("current verified CAN learner account");
     }
+    await assertUnambiguousAdultAccount(actor.accountId,actor.actorPersonId);
+    if(native.person_id!==actor.actorPersonId)
+      throw new AuthorizationError("one authoritative CAN learner Person");
     const links = await db.select({
       personId: accessAccountNoncreditPrincipals.accessPersonId,
       nativeAccountId: accessAccountNoncreditPrincipals.canonicalAccountId,
