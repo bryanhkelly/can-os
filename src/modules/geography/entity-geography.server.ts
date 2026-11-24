@@ -6,7 +6,7 @@ import {requireReportingPlatformAdministrator} from "@/modules/identity/reportin
 import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
 import {loadAuthorizedSiteReportingScope} from "@/modules/insights/site-reporting-source-scope.server";
 import {readScopedSiteGeography} from "./site-geography-read.server";
-import {privateGeography,assignablePersonalArea,requireEntityGeographyConsent,type GeographyEntity} from "@/domain/entity-geography";
+import {geographyEntitySchema,entityGeographyAreaCode,privateGeography,assignablePersonalArea,requireEntityGeographyConsent,type GeographyEntity} from "@/domain/entity-geography";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 const columns={organization:"organization_id",person:"person_id",program:"program_id",offering:"offering_id",campaign:"campaign_id",
  partner:"partner_organization_id",funding_opportunity:"funding_opportunity_id",learning_activity:"noncredit_activity_id"} as const;
@@ -16,7 +16,7 @@ async function rows<T>(tx:Tx,query:SQL){return (await tx.execute(query)).rows as
 async function requireAuthority(request:Request,entity:GeographyEntity,tx:Tx,write:boolean){
  if(privateGeography(entity)){
   const actor=await getCommandContext(request);
-  if(!actor.actorPersonId||actor.delegationMode||actor.sessionAccountId)throw new AuthorizationError("Direct Person geography consent");
+  if(!actor.actorPersonId||actor.delegationMode||actor.sessionAccountId||actor.impersonatedByAccountId)throw new AuthorizationError("Direct Person geography consent");
   if(entity.entityKind==="person"){
    if(actor.actorPersonId!==entity.entityId)throw new AuthorizationError("Own Person geography only");
   }else{
@@ -27,8 +27,9 @@ async function requireAuthority(request:Request,entity:GeographyEntity,tx:Tx,wri
   return actor.actorPersonId;
  }
  if(entity.entityKind==="learning_activity"){
+  if(write) return (await requireReportingPlatformAdministrator(request)).actorPersonId!;
   const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
-  if(!provider.actor.actorPersonId||(write&&provider.actor.delegationMode))throw new AuthorizationError("Verified activity delivery geography");
+  if(!provider.actor.actorPersonId)throw new AuthorizationError("Verified activity delivery geography");
   const siteIds=sql.join(provider.siteIds.map(id=>sql`${id}::uuid`),sql`,`);
   const owned=await rows<{id:string}>(tx,sql`SELECT e.id FROM public.noncredit_participation_events e
     JOIN public.noncredit_registrations r ON r.id=e.registration_id
@@ -47,6 +48,7 @@ async function requireAuthority(request:Request,entity:GeographyEntity,tx:Tx,wri
  return (await requireReportingPlatformAdministrator(request)).actorPersonId!;
 }
 export async function listEntityGeography(request:Request,entity:GeographyEntity){
+ geographyEntitySchema.parse(entity);
  return db.transaction(async tx=>{
   if(entity.entityKind==="site"){
    const actor=await getCommandContext(request);
@@ -62,6 +64,7 @@ export async function listEntityGeography(request:Request,entity:GeographyEntity
  },{isolationLevel:"repeatable read",accessMode:"read only"});
 }
 export async function changeEntityGeography(request:Request,entity:GeographyEntity,areaCode:string,operation:"assign"|"withdraw",consent?:boolean){
+ geographyEntitySchema.parse(entity);entityGeographyAreaCode.parse(areaCode);
  if(entity.entityKind==="site")throw new Error("Site geography is derived, not assigned");
  if(operation==="assign")requireEntityGeographyConsent(entity,consent);
  return db.transaction(async tx=>{

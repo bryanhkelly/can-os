@@ -8,7 +8,7 @@ import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit
  * report requires separate network membership authority and disclosure review. */
 export function NoncreditNetworkReportPanel(){
   const scope=usePrivateReportScope();
-  const {query:report,data}=usePrivateReportQuery({scope,key:["provider-delivery"],read:()=>getNoncreditOperatorNetworkSummary()});
+  const {query:report,data}=usePrivateReportQuery({scope,key:["provider-delivery"],read:()=>getNoncreditOperatorNetworkSummary({data:{}})});
   const totals=data?.totals;
   if(scope===null)return null;
   return <section className="mt-7 border border-border bg-card p-5" aria-label="Noncredit program impact">

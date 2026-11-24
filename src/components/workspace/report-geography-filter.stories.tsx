@@ -1,5 +1,5 @@
 import type {Meta,StoryObj} from "@storybook/react-vite";
-import {useState} from "react";
+import {useState,type ComponentProps} from "react";
 import {expect,within,userEvent} from "storybook/test";
 import {ReportGeographyFilter} from "./report-geography-filter";
 const meta={title:"Foundations/V6.1 reporting geography filter",component:ReportGeographyFilter,args:{
@@ -7,7 +7,7 @@ const meta={title:"Foundations/V6.1 reporting geography filter",component:Report
  },parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"}}}}} satisfies Meta<typeof ReportGeographyFilter>;
 export default meta;
 type Story=StoryObj<typeof meta>;
-function Controlled(args:React.ComponentProps<typeof ReportGeographyFilter>){
+function Controlled(args:ComponentProps<typeof ReportGeographyFilter>){
  const [value,setValue]=useState(args.value);return <ReportGeographyFilter {...args} value={value} onChange={setValue}/>;
 }
 export const MarketSelection:Story={render:args=><Controlled {...args}/>,play:async({canvasElement})=>{
