@@ -47,11 +47,12 @@ async function claimCampaignDelivery(){
  });
 }
 async function settle(work:Work,status:string,providerId:string|null=null,unconfirmed=false){
- await db.execute(sql`UPDATE public.campaign_deliveries SET status=${status},outcome_unconfirmed=${unconfirmed},lease_id=NULL,lease_until=NULL,
+ const rows=await campaignRows<{id:string}>(db,sql`UPDATE public.campaign_deliveries SET status=${status},outcome_unconfirmed=${unconfirmed},lease_id=NULL,lease_until=NULL,
  next_attempt_at=now()+interval '15 minutes',
  provider_message_id=coalesce(provider_message_id,${providerId}),
  accepted_at=CASE WHEN ${status}='accepted' THEN coalesce(accepted_at,now()) ELSE accepted_at END
- WHERE id=${work.id} AND lease_id=${work.lease_id} AND status='processing'`);
+ WHERE id=${work.id} AND lease_id=${work.lease_id} AND status='processing' RETURNING id`);
+ return rows.length===1;
 }
 async function stillEligible(work:Work){
  const [row]=await campaignRows<{eligible:boolean}>(db,sql`SELECT EXISTS(
@@ -75,16 +76,16 @@ export async function processEngagementCampaignDeliveries(limit=10){
    if(parsed.invalid.length||parsed.recipients.length!==1||work.sender_from!==sender.from||work.sender_address!==sender.address||
      url.origin!==new URL(sender.origin).origin||url.pathname!=="/go/"+work.code||url.search||url.hash||
      await isDemoTenantOrganization(work.organization_id)){
-    await settle(work,"suppressed");counts.suppressed++;continue;
+    if(await settle(work,"suppressed"))counts.suppressed++;continue;
    }
    const experience=await resolveGoExperience(work.code,"/",false);
    if(!experience||experience.mode==="website-preview"||!await stillEligible(work)){
-    await settle(work,"suppressed");counts.suppressed++;continue;
+    if(await settle(work,"suppressed"))counts.suppressed++;continue;
    }
    const unsubscribe=new URL("/api/campaigns/unsubscribe",sender.origin);
    unsubscribe.searchParams.set("token",work.unsubscribe_token);
    const response=await fetch("https://api.resend.com/emails",{
-    method:"POST",signal:AbortSignal.timeout(20000),headers:{Authorization:"Bearer "+sender.key,
+    method:"POST",redirect:"error",signal:AbortSignal.timeout(20000),headers:{Authorization:"Bearer "+sender.key,
      "Content-Type":"application/json","Idempotency-Key":"engagement-campaign/"+work.id},
     body:JSON.stringify({from:sender.from,to:[work.email],subject:work.subject,
      text:work.body+"\n\nSent by "+sender.from+"\n"+sender.address+"\nUnsubscribe: "+unsubscribe.href,
@@ -94,13 +95,13 @@ export async function processEngagementCampaignDeliveries(limit=10){
    if(response.ok){
     const result=await response.json() as {id?:unknown};
     if(typeof result.id!=="string"||!result.id)throw new Error("missing provider receipt");
-    await settle(work,"accepted",result.id);counts.accepted++;continue;
+    if(await settle(work,"accepted",result.id))counts.accepted++;continue;
    }
    if(response.status===429||response.status===408||response.status===409||response.status>=500)throw new Error("retryable provider result");
-   await settle(work,"failed");counts.failed++;
+   if(await settle(work,"failed"))counts.failed++;
   }catch{
    const retry=campaignRetryable(work.attempts,work.first_attempt_at);
-   await settle(work,retry?"pending":"failed",null,true);counts[retry?"retry":"unconfirmed"]++;
+   if(await settle(work,retry?"pending":"failed",null,true))counts[retry?"retry":"unconfirmed"]++;
   }
  }
  return counts;
