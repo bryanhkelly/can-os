@@ -16,7 +16,7 @@ const index = (...paths) => {
 };
 test("detects copied function bodies with different names and formatting",()=>{
   const result=index("src/a.ts");
-  indexSource("src/b.ts",source("renamed",body.replaceAll(" ","\n").replace("const","/* comment */ const")),result);
+  indexSource("src/b.ts",source("renamed",body.replaceAll("; ",";\n  ").replace("const","/* comment */ const")),result);
   assert.equal(crossFileDuplicates(result).length,1);
   assert.equal(newDuplicateGroups(result,index("src/a.ts"))[0].addedCopies,1);
 });
