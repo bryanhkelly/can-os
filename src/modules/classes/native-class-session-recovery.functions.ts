@@ -9,14 +9,13 @@ import {
 } from "@/db/schema";
 import {
   canonicalAccounts,
-  canonicalPersons,
   canonicalAccountGrants,
   canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { DomainError } from "@/domain/errors";
-import { verifiedAdultOn } from "@/domain/native-class-enrollment";
+import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import {
   requireVerifiedAdultAccount, issueNativeLearnerSession,
@@ -51,7 +50,7 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
       const links=await tx.select().from(accessAccountNoncreditPrincipals).where(
         eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId),
       ).limit(2);
-      if(links.length!==1||links[0]!.accessPersonId!==owner.personId)
+      if(links.length!==1||links[0]!.accessPersonId!==owner.personId||links[0]!.canonicalPersonId!==owner.personId)
         throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
       const link=links[0]!;
       const [operatorLink]=await tx.select({id:accessAccountCanonicalPrincipals.id})
@@ -65,15 +64,11 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
         email:canonicalAccounts.emailNormalized,
         verified:canonicalAccounts.emailVerifiedAt,
         disabledAt:canonicalAccounts.disabledAt,
-        birthDate:canonicalPersons.birthDate,
-      }).from(canonicalAccounts).innerJoin(canonicalPersons,
-        eq(canonicalPersons.id,link.canonicalPersonId),
-      ).where(eq(canonicalAccounts.id,link.canonicalAccountId)).limit(1);
+      }).from(canonicalAccounts).where(eq(canonicalAccounts.id,link.canonicalAccountId)).limit(1);
       const now=new Date();
       if(!native||native.email!==owner.email||!native.verified||native.disabledAt)
         throw new AuthorizationError("current independently linked native Person");
-      if(!verifiedAdultOn(native.birthDate,now))
-        throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
+      await assertCurrentReviewedNativeLearner(link.canonicalAccountId,owner.personId,now,tx,true);
       // Legacy approved links remain usable before the additive migration;
       // a present but non-FORCE-RLS evidence ledger is never trusted.
       const reviewedSchema=await tx.execute(sql`
@@ -99,8 +94,7 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
       if(review&&(review.status!=="approved"||!review.consumedAt||
          review.accessPersonId!==owner.personId||
          review.canonicalAccountId!==link.canonicalAccountId||
-         review.canonicalPersonId!==link.canonicalPersonId||
-         review.verifiedBirthDate!==native.birthDate))
+         review.canonicalPersonId!==link.canonicalPersonId))
         throw new AuthorizationError("revoked or conflicting adult identity review");
       const grants=await tx.select({
         id:canonicalAccountGrants.id,organizationId:canonicalAccountGrants.organizationId,
