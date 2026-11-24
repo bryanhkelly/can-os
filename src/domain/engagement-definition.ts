@@ -62,6 +62,8 @@ export const engagementDefinitionSchema = z.object({
     headline:z.string().trim().min(3).max(160),
     summary:z.string().trim().min(10).max(1200),
     detail:z.string().trim().max(3000).optional(),
+    /** Exact governed Site Brand identity copied server-side when publishing. */
+    brandVersionId:z.string().uuid().optional(),
   }).strict(),
   execution:engagementExecutionSchema,
   /** Optional attribution, never an authorization/affiliation assertion. */
