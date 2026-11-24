@@ -1,7 +1,7 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { siteGoLinks, siteMarketingPackages, sites } from "@/db/schema";
@@ -15,9 +15,14 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid = z.string().uuid();
-const packageScope = z.object({ siteId: uuid, packageId: uuid }).strict();
+/** Site ownership is mandatory; a marketing-package relationship is optional. */
+const packageScope = z.object({ siteId: uuid, packageId: uuid.optional() }).strict();
 const createSchema = packageScope.extend({
-  destination:goDestinationSchema,management:goLinkManagementSchema.optional(),
+  requestId:uuid.optional(),destination:goDestinationSchema,
+  management:goLinkManagementSchema.optional(),
+}).strict();
+const pageSchema=packageScope.extend({
+  cursor:uuid.optional(), limit:z.number().int().min(1).max(50).default(20),
 }).strict();
 const choicesSchema=packageScope.extend({
   kind:z.enum(["site-page","adult-training","class","enrichment","information"]),
@@ -28,7 +33,7 @@ const manageSchema=packageScope.extend({
 const revokeSchema = packageScope.extend({ linkId: uuid }).strict();
 
 async function authorizedPackage(
-  siteId: string, packageId: string, write: boolean,
+  siteId: string, packageId: string | undefined, write: boolean,
   reader: Pick<typeof db, "select"> = db,
 ) {
   const actor = await getCommandContext(getRequest());
@@ -37,22 +42,36 @@ async function authorizedPackage(
     lifecycleStatus:sites.lifecycleStatus,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
   assertSiteSetupScope(actor, site, write ? "program.launch.start" : "program.read");
-  const [pkg] = await reader.select({
-    id: siteMarketingPackages.id, status: siteMarketingPackages.status,
+  const [pkg]=packageId?await reader.select({
+    id:siteMarketingPackages.id,status:siteMarketingPackages.status,
+    organizationId:siteMarketingPackages.organizationId,
   }).from(siteMarketingPackages).where(and(
-    eq(siteMarketingPackages.id, packageId), eq(siteMarketingPackages.siteId, siteId),
-  )).limit(1);
-  if (!pkg) throw new DomainError("UNAVAILABLE", "Outreach plan unavailable for this Site.");
-  return { actor, site: site!, pkg };
+    eq(siteMarketingPackages.id,packageId),
+    eq(siteMarketingPackages.siteId,siteId),
+    eq(siteMarketingPackages.organizationId,site!.organizationId),
+  )).limit(1):[];
+  if(packageId && !pkg)
+    throw new DomainError("UNAVAILABLE","Outreach plan unavailable for this Site.");
+  return {actor,site:site!,pkg:pkg??null};
 }
 
-/** Create only immutable, scoped, public navigation. Editing an existing link is forbidden. */
+function toGoLinkView(link:typeof siteGoLinks.$inferSelect) {
+  return {
+    id:link.id,code:link.code,destination:link.destination,
+    status:link.status,name:link.name,channel:link.channel,
+    startsAt:link.startsAt?.toISOString()??null,
+    expiresAt:link.expiresAt?.toISOString()??null,
+    createdAt:link.createdAt.toISOString(),
+  };
+}
+
+/** Create immutable Site-owned navigation, optionally linked to Introduce. */
 export const createSiteGoLink = createServerFn({ method: "POST" })
   .validator((value: unknown) => createSchema.parse(value))
   .handler(async ({ data }) => db.transaction(async tx => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { actor, site, pkg } = await authorizedPackage(data.siteId, data.packageId, true, tx);
-    if (pkg.status !== "draft")
+    if (pkg && pkg.status !== "draft")
       throw new DomainError("CONFLICT", "Restore the outreach plan before creating a link.");
     if(site.lifecycleStatus==="closed")
       throw new DomainError("UNAVAILABLE","Closed Sites cannot create public Go Links.");
@@ -63,34 +82,49 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
       throw new DomainError("UNAVAILABLE",
         "This destination is not currently published or eligible for public sharing.");
     const name=data.management?.name ?? inspection.title.slice(0,120);
+    const requestId=data.requestId??randomUUID();
     const channel=data.management?.channel ?? null;
     const startsAt=data.management?.startsAt?new Date(data.management.startsAt):null;
     const expiresAt=data.management?.expiresAt?new Date(data.management.expiresAt):null;
     if(expiresAt && expiresAt<=new Date())
       throw new DomainError("VALIDATION_FAILED","Expiration must be in the future.");
+    // A repeated mutation can only return its original immutable meaning.
+    const fingerprint=createHash("sha256").update(JSON.stringify({
+      siteId:site.id,packageId:pkg?.id??null,destination:data.destination,
+      name,channel,startsAt:startsAt?.toISOString()??null,
+      expiresAt:expiresAt?.toISOString()??null,
+    })).digest("hex");
+    // Serialize requests for the same actor + Site + request UUID.
+    const lockKey=[site.id,actor.actorPersonId,requestId].join(":");
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [prior]=await tx.select().from(siteGoLinks).where(and(
+      eq(siteGoLinks.siteId,site.id),
+      eq(siteGoLinks.createdByPersonId,actor.actorPersonId!),
+      eq(siteGoLinks.requestId,requestId),
+    )).limit(1);
+    if(prior){
+      if(prior.requestFingerprint!==fingerprint)
+        throw new DomainError("CONFLICT","This request ID was already used for a different link.");
+      return toGoLinkView(prior);
+    }
     // Schedule and destination are immutable. Reissue or pause instead of
     // changing the meaning of a code already printed in a physical flyer.
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = randomBytes(9).toString("base64url");
       const [created] = await tx.insert(siteGoLinks).values({
         code, siteId: site.id, organizationId: site.organizationId,
-        packageId: pkg.id, createdByPersonId: actor.actorPersonId!,
+        packageId: pkg?.id??null,createdByPersonId:actor.actorPersonId!,
         destination:data.destination,name,channel,startsAt,expiresAt,
+        requestId,requestFingerprint:fingerprint,
       }).onConflictDoNothing({ target: siteGoLinks.code }).returning();
       if (!created) continue;
       await writeAudit(tx, actor, {
         action: "site.go_link.create", entityType: "site_go_link", entityId: created.id,
         scope: { siteId: site.id, organizationId: site.organizationId },
-        after: { packageId: pkg.id, destination: data.destination.kind,
+        after: { packageId: pkg?.id??null, destination: data.destination.kind,
           status: created.status, name,channel,startsAt,expiresAt },
       });
-      return {
-        id: created.id, code: created.code, destination: created.destination,
-        status:created.status,name:created.name,channel:created.channel,
-        startsAt:created.startsAt?.toISOString()??null,
-        expiresAt:created.expiresAt?.toISOString()??null,
-        createdAt:created.createdAt.toISOString(),
-      };
+      return toGoLinkView(created);
     }
     throw new DomainError("CONFLICT", "Unable to create a unique link. Try again.");
   }));
@@ -107,7 +141,8 @@ export const listSiteGoLinks = createServerFn({ method: "GET" })
       startsAt:siteGoLinks.startsAt,expiresAt:siteGoLinks.expiresAt,
       createdAt: siteGoLinks.createdAt,
     }).from(siteGoLinks).where(and(
-      eq(siteGoLinks.siteId, data.siteId), eq(siteGoLinks.packageId, data.packageId),
+      eq(siteGoLinks.siteId, data.siteId),
+      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
     )).orderBy(desc(siteGoLinks.createdAt)).limit(500);
     // Reporting reads must never take down authorized link management.
     // A missing observation is unavailable evidence, not zero activity.
@@ -134,7 +169,7 @@ export const revokeSiteGoLink = createServerFn({ method: "POST" })
     const { actor, site } = await authorizedPackage(data.siteId, data.packageId, true, tx);
     const [link] = await tx.select().from(siteGoLinks).where(and(
       eq(siteGoLinks.id, data.linkId), eq(siteGoLinks.siteId, site.id),
-      eq(siteGoLinks.packageId, data.packageId),
+      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
     )).for("update").limit(1);
     if (!link) throw new DomainError("UNAVAILABLE", "Go link not found in this outreach plan.");
     if (link.status === "revoked") return { id: link.id, status: "revoked" as const };
@@ -167,7 +202,7 @@ export const inspectSavedGoLink = createServerFn({method:"GET"})
     const {site}=await authorizedPackage(data.siteId,data.packageId,false);
     const [link]=await db.select().from(siteGoLinks).where(and(
       eq(siteGoLinks.id,data.linkId),eq(siteGoLinks.siteId,data.siteId),
-      eq(siteGoLinks.packageId,data.packageId),
+      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
     )).limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link not found.");
     const availability=goLinkAvailability(link);
@@ -190,7 +225,7 @@ export const setSiteGoLinkPaused = createServerFn({method:"POST"})
     const {actor,site}=await authorizedPackage(data.siteId,data.packageId,true,tx);
     const [link]=await tx.select().from(siteGoLinks).where(and(
       eq(siteGoLinks.id,data.linkId),eq(siteGoLinks.siteId,site.id),
-      eq(siteGoLinks.packageId,data.packageId),
+      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined,
     )).for("update").limit(1);
     if(!link)throw new DomainError("UNAVAILABLE","Go link unavailable.");
     const desired=data.action==="pause"?"paused" as const:"active" as const;
@@ -208,3 +243,53 @@ export const setSiteGoLinkPaused = createServerFn({method:"POST"})
     }
     return {id:link.id,status};
   }));
+
+/** Stable keyset pagination by (created_at, id). The cursor is a scoped
+ * existing link ID, not a grant or a timestamp rounded to milliseconds.
+ * This avoids missing/repeating ties when new links are issued concurrently.
+ */
+export const listSiteGoLinksPage=createServerFn({method:"GET"})
+  .validator((value:unknown)=>pageSchema.parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    await authorizedPackage(data.siteId,data.packageId,false);
+    const scope=and(eq(siteGoLinks.siteId,data.siteId),
+      data.packageId?eq(siteGoLinks.packageId,data.packageId):undefined);
+    const [cursor]=data.cursor?await db.select({
+      createdAt:siteGoLinks.createdAt,id:siteGoLinks.id,
+    }).from(siteGoLinks).where(and(scope,eq(siteGoLinks.id,data.cursor))).limit(1):[];
+    if(data.cursor && !cursor)
+      throw new DomainError("UNAVAILABLE","Go Link page cursor is invalid for this Site.");
+    const older=cursor?or(
+      lt(siteGoLinks.createdAt,cursor.createdAt),
+      and(eq(siteGoLinks.createdAt,cursor.createdAt),lt(siteGoLinks.id,cursor.id)),
+    ):undefined;
+    const rows=await db.select({
+      id:siteGoLinks.id,code:siteGoLinks.code,destination:siteGoLinks.destination,
+      status:siteGoLinks.status,name:siteGoLinks.name,channel:siteGoLinks.channel,
+      startsAt:siteGoLinks.startsAt,expiresAt:siteGoLinks.expiresAt,
+      packageId:siteGoLinks.packageId,createdAt:siteGoLinks.createdAt,
+    }).from(siteGoLinks).where(and(scope,older))
+      .orderBy(desc(siteGoLinks.createdAt),desc(siteGoLinks.id))
+      .limit(data.limit+1);
+    const hasMore=rows.length>data.limit,items=rows.slice(0,data.limit);
+    let evidence:Awaited<ReturnType<typeof readSiteGoLinkEvidence>>|null=null;
+    try {
+      evidence=await readSiteGoLinkEvidence(
+        data.siteId,data.packageId,db,items.map(item=>item.id),
+      );
+    }catch{
+      console.error("Go Link page evidence unavailable",{kind:"operational_analytics"});
+    }
+    const evidenceById=new Map((evidence??[]).map(value=>[value.linkId,value]));
+    return {
+      items:items.map(item=>({
+        ...item,createdAt:item.createdAt.toISOString(),
+        startsAt:item.startsAt?.toISOString()??null,
+        expiresAt:item.expiresAt?.toISOString()??null,
+        availability:goLinkAvailability(item),
+        evidence:evidence?evidenceById.get(item.id)??null:null,
+      })),
+      nextCursor:hasMore?items.at(-1)?.id??null:null,
+    };
+  });
