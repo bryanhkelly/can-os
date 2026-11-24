@@ -1,8 +1,7 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CopyLinkButton } from "@/components/links/CopyLinkButton";
-import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
+import { GoLinkActions } from "@/components/links/GoLinkActions";
 import { Select } from "@/components/ui/select";
 import { WorkspacePanel } from "@/components/workspace";
 import { buildUrlDestination } from "@/domain/url-destinations";
@@ -282,21 +281,9 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
         </p>:<p className="text-xs text-muted-foreground">
           Outcome evidence is temporarily unavailable. Link controls remain accessible.
         </p>}
-        <div className="flex flex-wrap gap-2">
-          {link.status!=="revoked"&&<>
-            <CopyLinkButton destination={{kind:"go",code:link.code}}/>
-            <GoLinkQrButton code={link.code}/>
-          </>}
-          <Button type="button" size="sm" variant="outline" disabled={busy}
-            onClick={()=>void inspect(link)}>Test link</Button>
-          {link.status!=="revoked"&&<>
-            <Button type="button" size="sm" variant="outline" disabled={busy}
-              onClick={()=>void change(link,link.status==="paused"?"resume":"pause")}>
-              {link.status==="paused"?"Resume":"Pause"}</Button>
-            <Button type="button" size="sm" variant="outline" disabled={busy}
-              onClick={()=>void change(link,"revoke")}>Revoke</Button>
-          </>}
-        </div>
+        <GoLinkActions code={link.code} status={link.status} busy={busy}
+          onTest={()=>void inspect(link)} onChange={action=>void change(link,action)}/>
+
       </article>)}
       {nextCursor&&<div className="space-y-2">
         <Button type="button" size="sm" variant="outline" disabled={loadingMore}
