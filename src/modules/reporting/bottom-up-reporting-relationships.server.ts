@@ -126,3 +126,20 @@ export async function decideReportingRelationship(request:Request,input:unknown)
     return rowSchema.parse(updated.rows[0]);
   });
 }
+
+/** Direct organization inbox: no inherited or delegated visibility. Bounded
+ * keyset pagination; site-scoped grants must use a future exact-resource reader.
+ * Internal only until independently ratified capability mapping is enabled. */
+export async function listIncomingReportingRelationships(request:Request,input:unknown):Promise<ReportingRelationship[]>{
+  const actor=await getIdentityContext(request);
+  const organizationId=actor.scope.organizationIds?.length===1?actor.scope.organizationIds[0]:undefined;
+  if(!organizationId)throw new AuthorizationError("relationship recipient scope");
+  assertRelationshipActor(actor,organizationId,"relationships.decide");
+  const {after}=z.object({after:uuid.optional()}).strict().parse(input);
+  const result=await db.execute(sql`
+    SELECT ${columns} FROM public.reporting_relationship_agreements
+    WHERE recipient_organization_id=${organizationId}::uuid
+      AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
+    ORDER BY id LIMIT 51`);
+  return result.rows.map(row=>rowSchema.parse(row));
+}
