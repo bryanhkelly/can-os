@@ -38,14 +38,14 @@ export function DashboardPanel({ title, description, action, children, className
   const titleId = id ? `${id}-title` : generatedId;
   return <section id={id} aria-labelledby={titleId}
     className={cn("min-w-0 border border-border bg-card", className)}>
-    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-5 py-4">
-      <div className="min-w-0">
+    <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5">
+      <div className="min-w-0 [overflow-wrap:anywhere]">
         <Heading id={titleId} className="font-serif text-section font-normal leading-tight tracking-normal text-foreground">{title}</Heading>
         {description && <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>}
       </div>
-      {action && <div className="shrink-0 text-sm">{action}</div>}
+      {action && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 text-sm">{action}</div>}
     </header>
-    <div className="min-w-0 p-5">{children}</div>
+    <div className="min-w-0 p-4 sm:p-5">{children}</div>
   </section>;
 }
 
