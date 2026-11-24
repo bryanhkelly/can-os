@@ -9,7 +9,7 @@ import {
   siteGoLinks, siteMarketingPackages, siteBrandVersions, sites,
 } from "@/db/schema";
 import {
-  engagementDefinitionSchema, engagementOwnerSchema,
+  engagementDefinitionSchema, engagementOwnerSchema, engagementChannelSchema,
   engagementContextSummary, engagementRequiresClaimReview, type EngagementOwner,
 } from "@/domain/engagement-definition";
 import { requireCurrentNetworkAgreement } from "@/modules/networks/network-agreement.server";
@@ -36,7 +36,7 @@ const createDefinitionInput = z.object({
 const engagementInput = z.object({engagementId:uuid}).strict();
 const createLinkInput = engagementInput.extend({
   versionId:uuid,
-  channel:z.enum(["email","sms","qr","social","partner","web","other"]).optional(),
+  channel:engagementChannelSchema.optional(),
 }).strict();
 const linkInput = engagementInput.extend({linkId:uuid}).strict();
 
