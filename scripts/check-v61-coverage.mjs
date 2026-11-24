@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
+import { hasReviewedVisualEvidence } from "./lib/v61-visual-evidence.mjs";
 import { join, relative } from "node:path";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createInventory, discoverTsx } from "./lib/v61-source-audit.mjs";
@@ -123,23 +123,7 @@ try {
   console.error("V6.1 visual-evidence manifest unreadable: " + String(error));
   process.exitCode = 1;
 }
-const evidenceViewports = ["mobile", "tablet", "desktop"];
-function hasReviewedEvidence(file) {
-  const entry = manifest.reviews.find(review => review.path === file);
-  if (!entry || entry.status !== "reviewed" || typeof entry.reviewer !== "string" ||
-      !entry.reviewer.trim() || !Number.isFinite(Date.parse(entry.reviewedAt)) ||
-      !/^[a-f0-9]{64}$/.test(entry.sourceSha256 ?? "")) return false;
-  const source = join(root, file);
-  if (!existsSync(source) || createHash("sha256").update(readFileSync(source))
-    .digest("hex") !== entry.sourceSha256) return false;
-  return evidenceViewports.every(viewport => {
-    const item = entry.screenshots?.find(image => image.viewport === viewport);
-    const filePath = item?.path;
-    return typeof filePath === "string" &&
-      /^docs\/verification\/screenshots\/[a-zA-Z0-9/_-]+\.png$/.test(filePath) &&
-      existsSync(join(root, filePath));
-  });
-}
+const hasReviewedEvidence = file => hasReviewedVisualEvidence(root, manifest.reviews, file);
 const reviewedVisuals = independent.filter(hasReviewedEvidence);
 const pendingVisuals = independent.filter(file => !hasReviewedEvidence(file));
 report.independentlyReviewedRequired.manifest = "docs/verification/v61-visual-evidence.json";
