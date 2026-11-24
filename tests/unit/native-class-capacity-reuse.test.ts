@@ -3,7 +3,7 @@ import {createHash} from "node:crypto";
 import {describe,expect,it,vi} from "vitest";
 import {nativeClassConsentDigest} from "@/modules/classes/native-class-consent.server";
 
-const mocks=vi.hoisted(()=>({count:vi.fn(()=> "count"),eq:vi.fn((field,value)=>({field,value})),inArray:vi.fn((field,values)=>({field,values})),and:vi.fn((...conditions)=>conditions)}));
+const mocks=vi.hoisted(()=>({count:vi.fn(()=> "count"),eq:vi.fn((field:string,value:unknown)=>({field,value})),inArray:vi.fn((field:string,values:unknown)=>({field,values})),and:vi.fn((...conditions:unknown[])=>conditions)}));
 vi.mock("drizzle-orm",()=>mocks);
 vi.mock("@/db/canonical-v301",()=>({canonicalClassEnrollments:{classId:"classId",status:"status"}}));
 import {readNativeClassOccupancy} from "@/modules/classes/native-class-capacity.server";
