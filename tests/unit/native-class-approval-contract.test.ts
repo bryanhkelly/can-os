@@ -27,6 +27,7 @@ describe("native Class adult approval source contract",()=>{
  it("does not create a Class Enrollment or Course Attempt on approval",()=>{
   expect(command).not.toContain("tx.insert(canonicalClassEnrollments)");
   expect(command).not.toContain("tx.insert(learnerCourseAttempts)");
+  expect(command).not.toContain("createInitialNativeClassAttempt(");
   expect(migration).toContain("ws2_approval_acceptance_only_after_review");
   expect(migration).toContain("accepted_enrollment_id IS NULL OR");
  });
