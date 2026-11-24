@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { getProviderContentWorkspace } from "@/modules/learning/provider-content-workspace.functions";
 import { decideRecordedInstructionReview, publishRecordedInstruction } from "@/modules/learning/instructional-tracks.functions";
+import { RecordedVideoReviewPanel } from "@/components/learning/RecordedVideoReviewPanel";
 import { NativeOfferingReleaseReviewPanel } from "@/components/learning/NativeOfferingReleaseReviewPanel";
 
 type Queue = Awaited<ReturnType<typeof getProviderContentWorkspace>>;
@@ -42,6 +43,7 @@ export function ProviderInstructionReviews({navigation}:{navigation?:ReactNode})
       title="No independently verified Course review appointments"
       description="An Organization reviewer membership alone does not authorize decisions. Your specific Course needs an active professional reviewer appointment and independently verified evidence."
     />}
+    <RecordedVideoReviewPanel versions={courses.flatMap(course=>course.publishedVersions.map(version=>({id:version.id,label:course.title+" · v"+version.versionNo})))}/>
     <div className="mt-6 grid gap-4">
       {tracks.map(track => <ReviewEditor key={track.id} track={track}
         courseName={courses.find(course=>course.id===track.courseId)?.title??"Assigned Course"}/>)}
