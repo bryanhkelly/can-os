@@ -1,6 +1,6 @@
 import {useState} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {useWorkspaceSession,workspaceSessionIdentity} from "@/components/shell/WorkspaceSession";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import {reportDefinitionId} from "@/domain/report-catalog";
 import {Button} from "@/components/ui/button";
 import {QueryState} from "@/components/workspace/query-state";
 import {ReportDocumentView,type ReportDocument} from "@/components/workspace/report-document";
@@ -12,15 +12,13 @@ import {getSiteCampaignDeliveryMetrics} from "@/modules/operations/site-reportin
 function CampaignReport({siteId,scope}:{siteId:string;scope:string}){
   const [range,setRange]=useState(()=>previousCompleteUtcDays(30,new Date()));
   const period=resolveReportDateRange(range,90,new Date());
-  const query=useQuery({
-    queryKey:["site-campaign-delivery-evidence",scope,siteId,period?.from,period?.to],
-    enabled:period!==null,queryFn:()=>getSiteCampaignDeliveryMetrics({data:{siteId,...period!}}),
-    retry:false,staleTime:0,gcTime:0,
+  const {query,data}=usePrivateReportQuery({
+    scope,key:["site-campaign-delivery",siteId,period?.from??null,period?.to??null],
+    enabled:period!==null,read:()=>getSiteCampaignDeliveryMetrics({data:{siteId,...period!}}),
   });
-  const data=!query.isError&&!query.isFetching?query.data:undefined;
   const definitions=campaignReportDefinitions();
   const items=bindRegisteredCounts(definitions,data?.counts??{});
-  const report:ReportDocument|null=data?{version:1,definitionId:"site-campaign-delivery-v1",title:"Site email delivery evidence",
+  const report:ReportDocument|null=data?{version:1,definitionId:reportDefinitionId("site-campaign-delivery"),title:"Site email delivery evidence",
     scopeLabel:"Current authorized Site, across its Site- and Program-owned campaigns",
     basis:"Campaigns created "+data.from+" through "+data.to+" (exclusive); current state checked "+data.asOf,
     definitions,blocks:[
@@ -40,8 +38,7 @@ function CampaignReport({siteId,scope}:{siteId:string;scope:string}){
 }
 /** Whole-Site scope is explicit and independently verified on each server read. */
 export function SiteCampaignEvidencePanel({siteId}:{siteId:string}){
-  const session=useWorkspaceSession();
-  const scope=session.session?.authenticated&&!session.error?workspaceSessionIdentity(session):null;
+  const scope=usePrivateReportScope();
   const [open,setOpen]=useState(false);
   if(!scope)return null;
   return <section className="mt-5 space-y-3 border border-border bg-card p-4" aria-label="Site-wide email delivery">

@@ -1,23 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import {useQuery} from "@tanstack/react-query";
-import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
 import { ReportChart } from "@/components/workspace/report-chart";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
 
 /** Exact authorized operating-organization aggregation. Publishing a national
  * report requires separate network membership authority and disclosure review. */
 export function NoncreditNetworkReportPanel(){
-  const {session,error:sessionError}=useWorkspaceSession();
-  const authorizedSession=session?.authenticated&&!sessionError?session:null;
-  const scope=authorizedSession?JSON.stringify([authorizedSession.activeGrantId,authorizedSession.role,authorizedSession.activeContext,authorizedSession.ownerDelegation??null]):null;
-  const report=useQuery({
-    queryKey:["noncredit-operator-network-report",scope],
-    enabled:scope!==null,
-    queryFn:()=>getNoncreditOperatorNetworkSummary(),
-    retry:false,staleTime:30_000,
-  });
-  const data=scope!==null&&!report.isError?report.data:undefined;
+  const scope=usePrivateReportScope();
+  const {query:report,data}=usePrivateReportQuery({scope,key:["provider-delivery"],read:()=>getNoncreditOperatorNetworkSummary()});
   const totals=data?.totals;
   if(scope===null)return null;
   return <section className="mt-7 border border-border bg-card p-5" aria-label="Noncredit program impact">
@@ -26,7 +17,7 @@ export function NoncreditNetworkReportPanel(){
       Across enrollment releases owned by the current authorized operating organization,
       including authorized Sites. This is not a national cross-organization report.
     </p>
-    {report.isPending&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
+    {(report.isPending||report.isFetching)&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
     {report.isError&&<p role="alert" className="mt-4 text-sm">
       Reporting is unavailable or its bounded dataset needs partitioning.
       <Button variant="ghost" type="button" className="ml-2 text-primary underline" onClick={()=>void report.refetch()}>Retry</Button>
@@ -107,8 +98,8 @@ export function NoncreditNetworkReportPanel(){
           </Table>
         </div>
       </section>}
-      <p className="mt-3 text-xs leading-6 text-muted-foreground">{report.data?.notice}</p>
-      <p className="mt-2 text-xs text-muted-foreground">Public-safe site totals suppress counts below {report.data?.publicationSafe.minimumCell}. The exact figures above are private to the authorized operator.</p>
+      <p className="mt-3 text-xs leading-6 text-muted-foreground">{data?.notice}</p>
+      <p className="mt-2 text-xs text-muted-foreground">Public-safe site totals suppress counts below {data?.publicationSafe.minimumCell}. The exact figures above are private to the authorized operator.</p>
     </>}
   </section>;
 }

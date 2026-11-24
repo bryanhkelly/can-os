@@ -16,3 +16,11 @@ export function previousCompleteUtcDays(days:number,now:Date):ReportDateRange{
   const untilDay=now.toISOString().slice(0,10);
   return {untilDay,fromDay:new Date(Date.parse(untilDay+"T00:00:00.000Z")-days*dayMs).toISOString().slice(0,10)};
 }
+
+/** Equal-duration preceding complete UTC window. No overlap or invented historical state. */
+export function priorReportDateRange(range:ReportDateRange,maxDays:number,now:Date):ReportDateRange|null{
+  const period=resolveReportDateRange(range,maxDays,now);
+  if(!period)return null;
+  const from=Date.parse(period.from),to=Date.parse(period.to);
+  return {fromDay:new Date(from-(to-from)).toISOString().slice(0,10),untilDay:range.fromDay};
+}

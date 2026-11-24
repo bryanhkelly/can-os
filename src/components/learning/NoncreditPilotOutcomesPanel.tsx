@@ -1,31 +1,28 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import { useQuery } from "@tanstack/react-query";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import {ReportDateFilter} from "@/components/workspace/report-date-filter";
+import {previousCompleteUtcDays,resolveReportDateRange} from "@/components/workspace/report-date-range";
+import {reportDefinitionId} from "@/domain/report-catalog";
 import { ReportDocumentView } from "@/components/workspace/report-document";
 import { bindRegisteredCounts,pilotOutcomeDefinitions } from "@/domain/reporting-view-definitions";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState, StatCard, WorkspaceNotice } from "@/components/workspace";
-import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getNoncreditPilotOutcomes } from "@/modules/learning/noncredit-pilot-outcomes.functions";
 import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
-type Report=Awaited<ReturnType<typeof getNoncreditPilotOutcomes>>;
 
 const count=(n:number)=>n.toLocaleString("en-US");
 
 /** Reusable, provider-only learning-outcomes panel, using Design System 6.1. */
 export function NoncreditPilotOutcomesPanel(){
   const [showDefinitions,setShowDefinitions]=useState(false);
-  const {session,error:sessionError}=useWorkspaceSession();
-  const authorizedSession=session?.authenticated&&!sessionError?session:null;
-  const scope=authorizedSession?JSON.stringify([authorizedSession.activeGrantId,authorizedSession.role,authorizedSession.activeContext,authorizedSession.ownerDelegation??null]):null;
-  const query=useQuery<Report>({
-    queryKey:["noncredit-pilot-outcomes",scope],
-    enabled:scope!==null,
-    queryFn:()=>getNoncreditPilotOutcomes({data:{}}),
-    retry:false,
-    staleTime:30_000,
+  const scope=usePrivateReportScope();
+  const [range,setRange]=useState(()=>previousCompleteUtcDays(90,new Date()));
+  const period=resolveReportDateRange(range,366,new Date());
+  const {query,data:report}=usePrivateReportQuery({
+    scope,key:["noncredit-registration-outcomes",period?.from??null,period?.to??null],
+    enabled:period!==null,read:()=>getNoncreditPilotOutcomes({data:period!}),
   });
-  const report=scope!==null&&!query.isError?query.data:undefined;
   const summary=report?.totals;
   if(scope===null)return <WorkspaceNotice tone="attention">A current verified provider session is required to view program evidence.</WorkspaceNotice>;
   return <section aria-label="Noncredit program evidence" className="space-y-4">
@@ -33,7 +30,7 @@ export function NoncreditPilotOutcomesPanel(){
       <div className="space-y-1">
         <h2 className="font-serif text-2xl font-semibold">Program evidence</h2>
         <p className="text-sm text-muted-foreground">
-          Private provider-scoped outcomes for the previous 90 days.
+          Private provider-scoped outcomes for the selected registration cohort.
           Unique learner reach is deduplicated across authorized Sites and training
           registrations. Learning, feedback and completion are tracked per registration.
         </p>
@@ -46,7 +43,10 @@ export function NoncreditPilotOutcomesPanel(){
         Refresh evidence
       </Button>
     </div>
-    <QueryState loading={query.isPending?"Loading verified program evidence…":undefined}
+    <ReportDateFilter initial={range} maxDays={366} onApply={next=>{
+      if(next.fromDay===range.fromDay&&next.untilDay===range.untilDay)void query.refetch();else setRange(next);
+    }} disabled={query.isFetching}/>
+    <QueryState loading={query.isPending||query.isFetching?"Loading verified program evidence…":undefined}
       error={query.isError?"Program evidence is unavailable or exceeds the bounded report size.":undefined}
       retrying={query.isFetching} onRetry={()=>void query.refetch()}/>
     {summary?.registrations===0&&<EmptyState
@@ -65,7 +65,7 @@ export function NoncreditPilotOutcomesPanel(){
         <StatCard label="Recorded participant hours" value={(summary.verifiedParticipationMinutes/60).toLocaleString(undefined,{maximumFractionDigits:1})} hint="Verified minutes divided by 60; not unique person time"/>
         <StatCard label="Delivery Sites with registrations" value={count(report!.deliverySites)} hint="Authorized Sites, not a count of congregations"/>
       </div>
-      <ReportDocumentView report={{version:1,definitionId:"noncredit-registration-outcomes-v1",title:"Registration outcomes",
+      <ReportDocumentView report={{version:1,definitionId:reportDefinitionId("noncredit-registration-outcomes"),title:"Registration outcomes",
         scopeLabel:"Current authorized provider Sites",basis:"Registration cohort; evidence current at report generation",
         blocks:[{id:"outcomes",kind:"chart",spec:{
           title:"Registration outcome counts",description:"Measures overlap; do not add them or treat them as a sequential funnel.",

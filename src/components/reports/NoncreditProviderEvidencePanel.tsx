@@ -4,9 +4,9 @@ import {useMemo,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Select} from "@/components/ui/select";
 import {StatCard} from "@/components/workspace";
-import {useQuery} from "@tanstack/react-query";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import {ReportChart} from "@/components/workspace/report-chart";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
-import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
 import {reportingCsvRow} from "@/domain/reporting-csv";
 
 /** Private operator CSV shares the formula-safe serializer with Class reports. */
@@ -26,15 +26,10 @@ function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filena
  * canonical principal, role and scoped permitted Sites on every request.
  */
 export function NoncreditProviderEvidencePanel(){
-  const grantKey=useActiveWorkspaceMember()?.id??"unbound-canonical-session";
+  const scope=usePrivateReportScope();
   const [requestedSite,setRequestedSite]=useState("");
   const [showDefinitions,setShowDefinitions]=useState(false);
-  const response=useQuery({
-    queryKey:["ws6-private-noncredit-report",grantKey],
-    queryFn:()=>getNoncreditOperatorNetworkSummary(),retry:false,
-    staleTime:0,gcTime:0,refetchOnMount:"always",
-  });
-  const data=response.data;
+  const {query:response,data}=usePrivateReportQuery({scope,key:["provider-delivery"],read:()=>getNoncreditOperatorNetworkSummary()});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
   const siteId=site?.siteId??"";
   const selectedCohorts=useMemo(()=>data?.cohorts.filter(c=>!siteId||c.siteId===siteId)??[],
@@ -85,10 +80,10 @@ export function NoncreditProviderEvidencePanel(){
         Export private evidence CSV
       </Button>
     </div>
-    {response.isPending&&<p role="status" className="border border-border p-4 text-sm">
+    {scope!==null&&(response.isPending||response.isFetching)&&<p role="status" className="border border-border p-4 text-sm">
       Reconciling authorized releases and canonical outcomes…
     </p>}
-    {response.isError&&<p role="alert" className="border border-border p-4 text-sm">
+    {scope!==null&&response.isError&&<p role="alert" className="border border-border p-4 text-sm">
       The current account cannot access this provider report, or reporting exceeds
       the service's safe result bounds. No partial totals are displayed.
     </p>}
@@ -120,6 +115,11 @@ export function NoncreditProviderEvidencePanel(){
           <StatCard key={label} label={label} value={value?.toLocaleString()??"Unavailable"}/>
         )}
       </div>
+      {selectedCohorts.length>0&&selectedCohorts.length<=20&&<ReportChart spec={{
+        title:"Registration counts by release",description:"The selected authorized Site filter applies to both this chart and the release detail table.",
+        kind:"comparison",format:"count",valueLabel:"Registrations",
+        points:selectedCohorts.map(c=>({id:c.releaseId,label:c.trainingTitle+" · "+c.siteName,value:c.registrations})),
+      }}/>}
       <div className="border border-border bg-card">
         <Table scrollLabel="Release-level evidence drill-down" aria-label="Release-level evidence drill-down" className="w-full min-w-[40rem] text-left text-sm">
           <TableCaption className="p-4 text-left font-semibold">Release-level evidence drill-down</TableCaption>

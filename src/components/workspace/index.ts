@@ -39,3 +39,5 @@ export {ReportChart} from "./report-chart";
 export type {ReportChartSpec} from "./report-chart-data";
 export {ReportDocumentView,type ReportDocument,type ReportBlock} from "./report-document";
 export {ReportDateFilter} from "./report-date-filter";
+
+export {ReportMetricComparison,type ReportComparisonItem} from "./report-period-comparison";
