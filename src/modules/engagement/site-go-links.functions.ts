@@ -71,30 +71,13 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
   .handler(async ({ data }) => db.transaction(async tx => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { actor, site, pkg } = await authorizedPackage(data.siteId, data.packageId, true, tx);
-    if (pkg && pkg.status !== "draft")
-      throw new DomainError("CONFLICT", "Restore the outreach plan before creating a link.");
-    if(site.lifecycleStatus==="closed")
-      throw new DomainError("UNAVAILABLE","Closed Sites cannot create public Go Links.");
-
-    const inspection=await inspectGoDestination(
-      site.id,data.destination,"000000000000",tx);
-    if(!inspection.available)
-      throw new DomainError("UNAVAILABLE",
-        "This destination is not currently published or eligible for public sharing.");
-    const name=data.management?.name ?? inspection.title.slice(0,120);
     const requestId=data.requestId??randomUUID();
-    const channel=data.management?.channel ?? null;
-    const startsAt=data.management?.startsAt?new Date(data.management.startsAt):null;
-    const expiresAt=data.management?.expiresAt?new Date(data.management.expiresAt):null;
-    if(expiresAt && expiresAt<=new Date())
-      throw new DomainError("VALIDATION_FAILED","Expiration must be in the future.");
-    // A repeated mutation can only return its original immutable meaning.
+    // Fingerprint the requested semantics, not a mutable Site or destination
+    // title. Retrying after publication closes returns the same original code.
     const fingerprint=createHash("sha256").update(JSON.stringify({
       siteId:site.id,packageId:pkg?.id??null,destination:data.destination,
-      name,channel,startsAt:startsAt?.toISOString()??null,
-      expiresAt:expiresAt?.toISOString()??null,
+      management:data.management??null,
     })).digest("hex");
-    // Serialize requests for the same actor + Site + request UUID.
     const lockKey=[site.id,actor.actorPersonId,requestId].join(":");
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
     const [prior]=await tx.select().from(siteGoLinks).where(and(
@@ -107,6 +90,21 @@ export const createSiteGoLink = createServerFn({ method: "POST" })
         throw new DomainError("CONFLICT","This request ID was already used for a different link.");
       return toGoLinkView(prior);
     }
+    if (pkg && pkg.status !== "draft")
+      throw new DomainError("CONFLICT","Restore the outreach plan before creating a link.");
+    if(site.lifecycleStatus==="closed")
+      throw new DomainError("UNAVAILABLE","Closed Sites cannot create public Go Links.");
+    const inspection=await inspectGoDestination(
+      site.id,data.destination,"000000000000",tx);
+    if(!inspection.available)
+      throw new DomainError("UNAVAILABLE",
+        "This destination is not currently published or eligible for public sharing.");
+    const name=data.management?.name??inspection.title.slice(0,120);
+    const channel=data.management?.channel??null;
+    const startsAt=data.management?.startsAt?new Date(data.management.startsAt):null;
+    const expiresAt=data.management?.expiresAt?new Date(data.management.expiresAt):null;
+    if(expiresAt&&expiresAt<=new Date())
+      throw new DomainError("VALIDATION_FAILED","Expiration must be in the future.");
     // Schedule and destination are immutable. Reissue or pause instead of
     // changing the meaning of a code already printed in a physical flyer.
     for (let attempt = 0; attempt < 5; attempt++) {
