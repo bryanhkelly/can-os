@@ -28,8 +28,8 @@ const columns=sql`id,owner_organization_id AS "ownerOrganizationId",
 const scopeRow=z.object({ownerOrganizationId:uuid,siteId:uuid.nullable()}).strict();
 
 /** Database-backed ownership, not a tenant or scope supplied by the browser.
- * Offering means the publisher's own evidence, never all adopting hosts. */
-async function resolveScope(tx:Tx,scopeKind:RelationshipProposal["scopeKind"],scopeId:string):Promise<VerifiedRelationshipScope>{
+ * Offering authorization is per contributing organization, never all adopting hosts. */
+async function resolveScope(tx:Tx,scopeKind:RelationshipProposal["scopeKind"],scopeId:string,ownerHint:string):Promise<VerifiedRelationshipScope>{
   let query;
   switch(scopeKind){
     case "organization":
@@ -42,8 +42,8 @@ async function resolveScope(tx:Tx,scopeKind:RelationshipProposal["scopeKind"],sc
       query=sql`SELECT organization_id AS "ownerOrganizationId",site_id AS "siteId"
         FROM public.programs WHERE id=${scopeId}::uuid FOR SHARE`;break;
     case "offering":
-      query=sql`SELECT publisher_organization_id AS "ownerOrganizationId",NULL::uuid AS "siteId"
-        FROM public.offerings WHERE id=${scopeId}::uuid FOR SHARE`;break;
+      query=sql`SELECT ${ownerHint}::uuid AS "ownerOrganizationId",NULL::uuid AS "siteId"
+        WHERE public.reporting_relationship_offering_owner(${scopeId}::uuid,${ownerHint}::uuid)`;break;
     case "class":
       query=sql`SELECT operating_organization_id AS "ownerOrganizationId",site_id AS "siteId"
         FROM public.classes WHERE id=${scopeId}::uuid FOR SHARE`;break;
@@ -60,11 +60,11 @@ async function resolveScope(tx:Tx,scopeKind:RelationshipProposal["scopeKind"],sc
 export async function proposeReportingRelationship(request:Request,input:unknown,
   approvedMetrics:readonly RelationshipMetric[]):Promise<ReportingRelationship>{
   const actor=await getIdentityContext(request);
-  if(!actor.capabilities.has("relationships.propose"))
+  if(!actor.capabilities.has("relationships.propose")||actor.scope.organizationIds?.length!==1)
     throw new AuthorizationError("relationships.propose");
   const candidate=relationshipProposalSchema.parse(input);
   return db.transaction(async tx=>{
-    const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId);
+    const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,actor.scope.organizationIds![0]!);
     const person=assertRelationshipActor(actor,scope.ownerOrganizationId,"relationships.propose",scope.siteId);
     const proposal=validateRelationshipProposal(candidate,scope,buildCurrentReportingMetricRegistry(),approvedMetrics,new Date());
     const result=await tx.execute(sql`
@@ -101,7 +101,18 @@ export async function decideReportingRelationship(request:Request,input:unknown)
       FOR UPDATE`);
     if(!result.rows[0])throw new AuthorizationError("relationship party");
     const current=rowSchema.parse(result.rows[0]);
-    const scope=await resolveScope(tx,current.scopeKind,current.scopeId);
+    // A prior owner may terminate its own agreement even after a source transfer
+    // or expired adoption. Without current source authority require an org-wide grant.
+    let scope:VerifiedRelationshipScope;
+    try {
+      scope=await resolveScope(tx,current.scopeKind,current.scopeId,current.ownerOrganizationId);
+      if(scope.ownerOrganizationId!==current.ownerOrganizationId)
+        throw new AuthorizationError("current relationship source owner");
+    } catch(error) {
+      if(!(error instanceof AuthorizationError)||(action!=="withdraw"&&action!=="revoke"))throw error;
+      scope={ownerOrganizationId:current.ownerOrganizationId,scopeKind:current.scopeKind,
+        scopeId:current.scopeId,siteId:null};
+    }
     const next=transitionRelationship(current,action as RelationshipAction,actor,new Date(),scope);
     const updated=await tx.execute(sql`
       UPDATE public.reporting_relationship_agreements
