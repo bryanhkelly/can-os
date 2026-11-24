@@ -1,0 +1,271 @@
+import { randomBytes } from "node:crypto";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db/client";
+import {
+  engagementDefinitions, engagementDefinitionVersions, organizations, programs,
+  siteGoLinks, siteMarketingPackages, sitePublications, sites,
+} from "@/db/schema";
+import {
+  engagementDefinitionSchema, engagementOwnerSchema,
+  engagementContextSummary, type EngagementOwner,
+} from "@/domain/engagement-definition";
+import { goDestinationHref } from "@/domain/site-go-links";
+import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import type { AccessContext } from "@/domain/access-context";
+import { assertSiteSetupScope } from "@/domain/site-setup-scope";
+import { publicSiteHost } from "@/domain/public-site-address";
+import { DomainError } from "@/domain/errors";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { writeAudit } from "@/platform/mutation";
+
+type Reader = Pick<typeof db, "select">;
+const uuid = z.string().uuid();
+const createDefinitionInput = z.object({
+  owner: engagementOwnerSchema,
+  definition: engagementDefinitionSchema,
+}).strict();
+const engagementInput = z.object({engagementId:uuid}).strict();
+const createLinkInput = engagementInput.extend({
+  versionId:uuid,
+  channel:z.enum(["email","sms","qr","social","partner","web","other"]).optional(),
+}).strict();
+const linkInput = engagementInput.extend({linkId:uuid}).strict();
+
+type OwnerRecord = {
+  ownerKind:"platform"|"organization"|"site"|"program";
+  organizationId:string|null;siteId:string|null;programId:string|null;
+};
+
+function isReadOnlyDelegation(actor:AccessContext) {
+  return actor.delegationMode === "view";
+}
+function requireCurrentOperator(actor:AccessContext,write:boolean){
+  if(!actor.actorPersonId || (write && isReadOnlyDelegation(actor)))
+    throw new AuthorizationError("active authoring identity");
+}
+function assertOrganizationAuthor(actor:AccessContext,organizationId:string,write:boolean){
+  requireCurrentOperator(actor,write);
+  if(actor.grantSiteId !== null || !actor.scope.organizationIds?.includes(organizationId))
+    throw new AuthorizationError("exact organization-wide engagement scope");
+  if(!(actor.capabilities.has("program.launch.start") || actor.capabilities.has("network.sites.manage")))
+    throw new AuthorizationError("organization engagement authoring");
+}
+
+/** Runtime account identity, not a request-supplied creator or implicit Site grant. */
+export async function authorizeEngagementOwner(
+  owner:EngagementOwner, actor:AccessContext, write:boolean,reader:Reader,
+):Promise<OwnerRecord>{
+  requireCurrentOperator(actor,write);
+  if(owner.kind === "platform"){
+    assertCapability(actor,"platform.admin");
+    if(actor.role !== "app_admin" && actor.role !== "platform_owner")
+      throw new AuthorizationError("verified platform engagement owner");
+    return {ownerKind:"platform",organizationId:null,siteId:null,programId:null};
+  }
+  if(owner.kind === "organization"){
+    const [org]=await reader.select({
+      id:organizations.id,status:organizations.lifecycleStatus,
+    }).from(organizations).where(eq(organizations.id,owner.organizationId)).limit(1);
+    if(!org || org.status==="closed" || org.status==="inactive")
+      throw new AuthorizationError("active organization owner");
+    assertOrganizationAuthor(actor,org.id,write);
+    return {ownerKind:"organization",organizationId:org.id,siteId:null,programId:null};
+  }
+  if(owner.kind === "site"){
+    const [site]=await reader.select({
+      id:sites.id,organizationId:sites.organizationId,status:sites.lifecycleStatus,
+    }).from(sites).where(eq(sites.id,owner.siteId)).limit(1);
+    if(!site || site.status==="closed")throw new AuthorizationError("active Site owner");
+    assertSiteSetupScope(actor,site,write?"program.launch.start":"program.read");
+    return {ownerKind:"site",organizationId:site.organizationId,siteId:site.id,programId:null};
+  }
+  const [program]=await reader.select({
+    id:programs.id,organizationId:programs.organizationId,siteId:programs.siteId,
+  }).from(programs).where(eq(programs.id,owner.programId)).limit(1);
+  if(!program)throw new AuthorizationError("existing Program owner");
+  assertCapability(actor,write?"program.launch.start":"program.read");
+  if(!actor.scope.programIds?.includes(program.id) ||
+      !actor.scope.organizationIds?.includes(program.organizationId) ||
+      (program.siteId && !actor.scope.siteIds?.includes(program.siteId) && actor.grantSiteId!==null))
+    throw new AuthorizationError("exact Program engagement scope");
+  return {ownerKind:"program",organizationId:program.organizationId,siteId:program.siteId,programId:program.id};
+}
+function ownerFromRow(row:OwnerRecord):EngagementOwner{
+  if(row.ownerKind==="platform")return {kind:"platform"};
+  if(row.ownerKind==="organization")return {kind:"organization",organizationId:row.organizationId!};
+  if(row.ownerKind==="site")return {kind:"site",siteId:row.siteId!};
+  return {kind:"program",programId:row.programId!};
+}
+async function authorizedDefinition(
+  engagementId:string,actor:AccessContext,write:boolean,reader:Reader,
+){
+  const [record]=await reader.select().from(engagementDefinitions)
+    .where(eq(engagementDefinitions.id,engagementId)).limit(1);
+  if(!record)throw new DomainError("UNAVAILABLE","Engagement unavailable.");
+  await authorizeEngagementOwner(ownerFromRow({
+    ownerKind:record.ownerKind,organizationId:record.organizationId,
+    siteId:record.siteId,programId:record.programId,
+  }),actor,write,reader);
+  return record;
+}
+async function assertDestinationReady(
+  definition:z.infer<typeof engagementDefinitionSchema>,
+  siteId:string|null,reader:Reader,
+){
+  const destination=definition.execution.mode==="page"
+    ? definition.execution.action : definition.execution.destination;
+  let host:string|null=null;
+  if(destination.kind==="site-page"){
+    if(!siteId)throw new DomainError("VALIDATION_FAILED","A published Site page needs an exact Site owner.");
+    const [site]=await reader.select({
+      slug:sitePublications.slug,status:sitePublications.status,
+      publishedAt:sitePublications.publishedAt,
+    }).from(sitePublications).where(eq(sitePublications.siteId,siteId)).limit(1);
+    if(!site || site.status!=="published" || !site.publishedAt)
+      throw new DomainError("UNAVAILABLE","This Site has no published website.");
+    host=publicSiteHost(site.slug);
+  }
+  if(!goDestinationHref(destination,"0123456789ab",host))
+    throw new DomainError("VALIDATION_FAILED","This engagement action is not an authorized navigation destination.");
+}
+
+/** Publishes one immutable, source-neutral definition. No enrollment or contact record. */
+export const createEngagementDefinition=createServerFn({method:"POST"})
+  .validator((input:unknown)=>createDefinitionInput.parse(input))
+  .handler(async({data})=>db.transaction(async tx=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const owner=await authorizeEngagementOwner(data.owner,actor,true,tx);
+    await assertDestinationReady(data.definition,owner.siteId,tx);
+    if(data.definition.source?.marketingPackageId){
+      const [pkg]=await tx.select({
+        id:siteMarketingPackages.id,siteId:siteMarketingPackages.siteId,
+        organizationId:siteMarketingPackages.organizationId,
+      }).from(siteMarketingPackages).where(eq(
+        siteMarketingPackages.id,data.definition.source.marketingPackageId,
+      )).limit(1);
+      if(!pkg || !owner.siteId || pkg.siteId!==owner.siteId ||
+          pkg.organizationId!==owner.organizationId)
+        throw new AuthorizationError("owned marketing package attribution");
+    }
+    const [record]=await tx.insert(engagementDefinitions).values({
+      ...owner,createdByPersonId:actor.actorPersonId!,
+    }).returning({id:engagementDefinitions.id});
+    if(!record)throw new DomainError("UNAVAILABLE","Unable to create engagement.");
+    const [version]=await tx.insert(engagementDefinitionVersions).values({
+      engagementId:record.id,version:1,content:data.definition,
+      createdByPersonId:actor.actorPersonId!,
+    }).returning({id:engagementDefinitionVersions.id});
+    if(!version)throw new DomainError("UNAVAILABLE","Unable to publish engagement.");
+    await writeAudit(tx,actor,{
+      action:"engagement.definition.publish",entityType:"engagement_definition",entityId:record.id,
+      scope:{organizationId:owner.organizationId,siteId:owner.siteId},
+      after:{version:1,ownerKind:owner.ownerKind,...engagementContextSummary(data.definition)},
+    });
+    return {engagementId:record.id,versionId:version.id,version:1};
+  }));
+
+/** Multiple channels can use distinct links to the very same immutable version. */
+export const createEngagementGoLink=createServerFn({method:"POST"})
+  .validator((input:unknown)=>createLinkInput.parse(input))
+  .handler(async({data})=>db.transaction(async tx=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const record=await authorizedDefinition(data.engagementId,actor,true,tx);
+    if(record.status!=="active")throw new DomainError("CONFLICT","This engagement is retired.");
+    const [version]=await tx.select({
+      id:engagementDefinitionVersions.id,content:engagementDefinitionVersions.content,
+    }).from(engagementDefinitionVersions).where(and(
+      eq(engagementDefinitionVersions.engagementId,record.id),
+      eq(engagementDefinitionVersions.id,data.versionId),
+    )).limit(1);
+    if(!version)throw new DomainError("UNAVAILABLE","Published engagement version unavailable.");
+    const definition=engagementDefinitionSchema.parse(version.content);
+    await assertDestinationReady(definition,record.siteId,tx);
+    for(let attempt=0;attempt<5;attempt++){
+      const code=randomBytes(9).toString("base64url");
+      const [link]=await tx.insert(siteGoLinks).values({
+        code,createdByPersonId:actor.actorPersonId!,
+        organizationId:record.organizationId,siteId:record.siteId,
+        engagementVersionId:version.id,destination:null,
+        packageId:null,channel:data.channel??null,
+      }).onConflictDoNothing({target:siteGoLinks.code}).returning({
+        id:siteGoLinks.id,code:siteGoLinks.code,
+      });
+      if(!link)continue;
+      await writeAudit(tx,actor,{
+        action:"engagement.go_link.create",entityType:"site_go_link",entityId:link.id,
+        scope:{organizationId:record.organizationId,siteId:record.siteId},
+        after:{engagementId:record.id,versionId:version.id,channel:data.channel??null},
+      });
+      return {linkId:link.id,code:link.code};
+    }
+    throw new DomainError("CONFLICT","Unable to allocate a Go code.");
+  }));
+
+export const listEngagementGoLinks=createServerFn({method:"GET"})
+  .validator((input:unknown)=>engagementInput.parse(input))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const record=await authorizedDefinition(data.engagementId,actor,false,db);
+    const versions=await db.select({id:engagementDefinitionVersions.id})
+      .from(engagementDefinitionVersions).where(eq(
+        engagementDefinitionVersions.engagementId,record.id));
+    const versionIds=new Set(versions.map(v=>v.id));
+    if(!versionIds.size)return [];
+    const links=await db.select({
+      id:siteGoLinks.id,code:siteGoLinks.code,channel:siteGoLinks.channel,
+      status:siteGoLinks.status,engagementVersionId:siteGoLinks.engagementVersionId,
+      createdAt:siteGoLinks.createdAt,
+    }).from(siteGoLinks).orderBy(desc(siteGoLinks.createdAt)).limit(500);
+    // Bounded selection; do not expose any other owner's link in the return.
+    return links.filter(link=>versionIds.has(link.engagementVersionId??""))
+      .map(link=>({...link,createdAt:link.createdAt.toISOString()}));
+  });
+
+export const retireEngagementDefinition=createServerFn({method:"POST"})
+  .validator((input:unknown)=>engagementInput.parse(input))
+  .handler(async({data})=>db.transaction(async tx=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const record=await authorizedDefinition(data.engagementId,actor,true,tx);
+    if(record.status==="retired")return {retired:true};
+    await tx.update(engagementDefinitions).set({status:"retired",updatedAt:new Date()})
+      .where(eq(engagementDefinitions.id,record.id));
+    await writeAudit(tx,actor,{
+      action:"engagement.definition.retire",entityType:"engagement_definition",
+      entityId:record.id,scope:{organizationId:record.organizationId,siteId:record.siteId},
+      before:{status:record.status},after:{status:"retired"},
+    });
+    return {retired:true};
+  }));
+
+export const revokeEngagementGoLink=createServerFn({method:"POST"})
+  .validator((input:unknown)=>linkInput.parse(input))
+  .handler(async({data})=>db.transaction(async tx=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const record=await authorizedDefinition(data.engagementId,actor,true,tx);
+    const [link]=await tx.select().from(siteGoLinks).where(
+      eq(siteGoLinks.id,data.linkId)).for("update").limit(1);
+    if(!link?.engagementVersionId)throw new DomainError("UNAVAILABLE","Link unavailable.");
+    const [version]=await tx.select({id:engagementDefinitionVersions.id})
+      .from(engagementDefinitionVersions).where(and(
+        eq(engagementDefinitionVersions.id,link.engagementVersionId),
+        eq(engagementDefinitionVersions.engagementId,record.id),
+      )).limit(1);
+    if(!version)throw new AuthorizationError("exact engagement link owner");
+    if(link.status==="revoked")return {revoked:true};
+    await tx.update(siteGoLinks).set({status:"revoked",updatedAt:new Date()})
+      .where(eq(siteGoLinks.id,link.id));
+    await writeAudit(tx,actor,{
+      action:"engagement.go_link.revoke",entityType:"site_go_link",
+      entityId:link.id,scope:{organizationId:record.organizationId,siteId:record.siteId},
+      before:{status:link.status},after:{status:"revoked"},
+    });
+    return {revoked:true};
+  }));
