@@ -40,9 +40,7 @@ function run(name,argv,env=sanitized){
 }
 function block(name,reason){results.push({name,status:"blocked",reason});}
 if(enabled("--install"))run("Locked dependency installation",["ci"]);
-run("Source syntax",["run","check:build-source-syntax"]);
-run("Local import/export boundaries",["run","check:local-import-exports"]);
-run("Component boundaries",["run","check:component-boundaries"]);
+run("Engineering architecture, migration safety and V6.1 source governance",["run","verify:architecture"]);
 run("Cloudflare production bundle",["run","build:cloudflare"]);
 run("TypeScript",["run","typecheck:full"]);
 run("Go URL and reporting contracts",["run","test:urls:unit"]);
@@ -53,7 +51,7 @@ run("Go preview regressions",["exec","--","vitest","run",
 run("Site regression suite",["run","test:site:channels"]);
 if(profile==="pilot"){
   run("Lint and V6.1 design-system coverage",["run","lint"]);
-  run("Design-system architecture tests",["run","test:design-audit"]);
+  run("V6.1 independent visual evidence",["run","design:coverage","--","--strict"]);
   run("Canonical reporting foundation",["run","test:reporting:foundation"]);
   run("Pilot publication, participant outcomes, distribution and Site Intelligence",["exec","--","vitest","run",
     "tests/unit/release-11232026-training-launch-contract.test.ts",
