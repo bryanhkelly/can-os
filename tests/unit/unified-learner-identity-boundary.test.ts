@@ -76,7 +76,8 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    expect(flow).toContain("await resumeLinkedNativeClassLearner()");
    expect(flow).toContain("await activateReviewedNativeClassLearner()");
    expect(flow).toContain("return enrollInNativeClass(input)");
-   expect(read("src/routes/class.tsx")).toContain("enrollCurrentPersonInClass");
+   expect(read("src/routes/class.tsx")).toContain("<OfferingCard");
+   expect(read("src/components/learning/native-class/OfferingCard.tsx")).toContain("enrollCurrentPersonInClass");
    const missing=normalizeClientError(new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED"));
    expect(missing.kind).toBe("authentication");
    expect(missing.retryable).toBe(false);
