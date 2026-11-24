@@ -2,7 +2,7 @@
 /**
  * On-demand release evidence. Never deploys, migrates, seeds production,
  * or treats a skipped integration check as a pass.
- * Usage: npm run verify:release -- --profile=go [--database] [--browser] [--live]
+ * Usage: npm run verify:release -- --profile=go|--profile=pilot [--database] [--browser] [--live]
  */
 import {spawnSync} from "node:child_process";
 import {mkdirSync,writeFileSync} from "node:fs";
@@ -10,9 +10,11 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 
 const args=process.argv.slice(2);
-const allowed=new Set(["--profile=go","--database","--browser","--live","--install"]);
+const allowed=new Set(["--profile=go","--profile=pilot","--database","--browser","--live","--install"]);
 if(args.some(a=>!allowed.has(a)))throw new Error("Unknown release gate option");
 const enabled=flag=>args.includes(flag);
+if(enabled("--profile=go")&&enabled("--profile=pilot"))throw new Error("Select one release profile");
+const profile=enabled("--profile=pilot")?"pilot":"go";
 const npm=process.platform==="win32"?"npm.cmd":"npm";
 function git(args){
   const r=spawnSync("git",args,{encoding:"utf8"});
@@ -25,7 +27,7 @@ if(git(["status","--porcelain"]))throw new Error("Commit or stash changes before
 const results=[];
 const sanitized={...process.env};
 for(const key of Object.keys(sanitized)){
-  if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE/i.test(key))delete sanitized[key];
+  if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE|GLOO_API_KEY|RESEND_API_KEY|CAN_NONCREDIT_QA_CAN_SESSION/i.test(key))delete sanitized[key];
 }
 function run(name,argv,env=sanitized){
   const start=Date.now();
@@ -46,6 +48,30 @@ run("Go preview regressions",["exec","--","vitest","run",
   "tests/unit/website-preview-r2-snapshots.test.ts","tests/unit/site-preview-presentation.test.ts",
   "tests/unit/site-brand-rpc-boundary.test.ts","tests/unit/global-auth-redirect.test.ts"]);
 run("Site regression suite",["run","test:site:channels"]);
+if(profile==="pilot"){
+  run("Lint and V6.1 design-system coverage",["run","lint"]);
+  run("Design-system architecture tests",["run","test:design-audit"]);
+  run("Canonical reporting foundation",["run","test:reporting:foundation"]);
+  run("Pilot publication, participant outcomes, distribution and Site Intelligence",["exec","--","vitest","run",
+    "tests/unit/release-11232026-training-launch-contract.test.ts",
+    "tests/unit/noncredit-completion.test.ts","tests/unit/noncredit-pilot-outcomes.test.ts",
+    "tests/unit/noncredit-self-enrollment.test.ts","tests/unit/noncredit-completion-automation.test.ts",
+    "tests/unit/native-publisher-release-readiness.test.ts","tests/unit/engagement-distribution.test.ts",
+    "tests/unit/outbound-dispatcher.test.ts","tests/unit/gloo-content-provider.test.ts",
+    "src/domain/site-content-generation.test.ts","src/domain/site-content-package.test.ts"]);
+  if(enabled("--database")&&process.env.TEST_DATABASE_URL&&process.env.CAN_APPLICATION_DB_HOST){
+    run("Isolated noncredit evidence and completion schema (read only)",["run","verify:pilot:noncredit-schema"],{...process.env,APP_ENV:"test",NODE_ENV:"test"});
+  }else block("Isolated noncredit evidence and completion schema","Requires approved TEST_DATABASE_URL and CAN_APPLICATION_DB_HOST");
+  // The legacy noncredit browser suite covers registration and withdrawal, not
+  // full instruction and reporting. A missing mutation fixture must not pass.
+  const env=process.env;
+  if(enabled("--browser")&&env.CAN_RELEASE_SOURCE_SHA===sha&&env.CAN_RELEASE_DEPLOYED_SHA===sha&&env.CAN_RELEASE_E2E_URL&&env.CAN_NONCREDIT_E2E_WRITES==="1"&&env.APP_ENV==="test"&&env.CAN_TEST_DB_WRITES_ENABLED==="true"&&env.CAN_NONCREDIT_QA_RELEASE_ID&&env.CAN_NONCREDIT_QA_CAN_SESSION_1&&env.CAN_NONCREDIT_QA_CAN_SESSION_2&&env.CAN_NONCREDIT_QA_CAN_SESSION_1!==env.CAN_NONCREDIT_QA_CAN_SESSION_2&&env.TEST_DATABASE_URL&&env.CAN_APPLICATION_DB_HOST){
+    // Verify the isolated branch before any mutating browser run. The preview
+    // must also be independently attested to use this exact branch.
+    block("Mutating deployed noncredit journey","Requires separate runtime-to-database attestation before any preview mutation; see pilot acceptance runbook");
+  }else block("Mutating deployed noncredit journey","Requires exact-SHA preview, isolated branch attestation and two distinct verified QA identities");
+  block("Full pilot learning and impact acceptance","Requires actual approved fixture media, assessments, feedback, authoritative completion, corrected attendance and report reconciliation; registration smoke is insufficient");
+}
 if(enabled("--database")&&process.env.DATABASE_URL){
   run("Deployment database schema and privileges (read only)",["run","db:check:friendly-urls:deploy"],process.env);
 }else block("Deployment database schema and privileges","Requires --database and exact deployment DATABASE_URL");
@@ -59,7 +85,7 @@ if(git(["rev-parse","HEAD"])!==sha||git(["status","--porcelain"])){
   block("Source attestation","Working tree or revision changed while checking");
 }
 const passed=results.every(r=>r.status==="passed");
-const report={schemaVersion:1,profile:"go",branch,sha,recordedAt:new Date().toISOString(),
+const report={schemaVersion:1,profile,branch,sha,recordedAt:new Date().toISOString(),
   status:passed?"checks_passed":"no_go",results,
   limitation:"Live fixture creation, rights-withdrawal and deployment provenance still require separate operator evidence."};
 const dir=join(tmpdir(),"becomuna-release-evidence");
