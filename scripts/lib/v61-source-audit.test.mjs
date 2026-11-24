@@ -153,3 +153,28 @@ test("shared-layer geometry rules follow new components without a manifest", () 
   ]);
   assert.equal(inventory.totals.directlyCleanComponents, 0);
 }));
+
+test("release audits include regressions committed before the latest commit", () => temp(({root, write}) => {
+  const git = (...args) => execFileSync("git", args, {cwd:root, stdio:"pipe", encoding:"utf8"}).trim();
+  git("init", "-q");
+  git("config", "user.name", "V61 test");
+  git("config", "user.email", "test@example.invalid");
+  write("src/routes/page.tsx", "export const Page = () => <Button/>;");
+  git("add", "."); git("commit", "-qm", "main base");
+  const base = git("rev-parse", "HEAD");
+  git("update-ref", "refs/remotes/origin/main", base);
+  git("checkout", "-qb", "release-test");
+  write("src/routes/page.tsx", "export const Page = () => <button/>;");
+  git("add", "."); git("commit", "-qm", "earlier regression");
+  write("src/routes/other.tsx", "export const Other = () => <Button/>;");
+  git("add", "."); git("commit", "-qm", "unrelated change");
+  const result = checkChangedFiles(root, "");
+  assert.equal(result.base, base);
+  assert.equal(result.checked, 2);
+  assert.match(result.errors.join("\n"), /page\.tsx: native increased \(button\)/);
+  assert.equal(checkChangedFiles(root, "HEAD^").errors.length, 0);
+  git("update-ref", "-d", "refs/remotes/origin/main");
+  const blocked = checkChangedFiles(root, "");
+  assert.equal(blocked.base, null);
+  assert.match(blocked.warning, /Git base unavailable/);
+}));
