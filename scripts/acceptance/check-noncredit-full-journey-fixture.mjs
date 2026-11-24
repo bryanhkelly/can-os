@@ -12,6 +12,7 @@ await verifyAdmissionsNeonBranch({...env,CAN_ADMISSIONS_TEST_BRANCH_ID:branch});
 const fixture=JSON.parse(env.CAN_PILOT_QA_FIXTURE_JSON??"{}");
 assert.match(fixture.releaseId,/^[0-9a-f-]{36}$/i);
 assert.match(fixture.goCode,/^[A-Za-z0-9_-]{12}$/);
+assert.ok(Array.isArray(fixture.lessons) && fixture.lessons.length>=1 && fixture.lessons.length<=40 && fixture.lessons.every(title=>typeof title==="string" && title.trim()) && new Set(fixture.lessons).size===fixture.lessons.length,"Distinct reviewed lesson titles required");
 const sql=neon(env.TEST_DATABASE_URL);
 const rows=await sql`
  SELECT r.id,t.title,
@@ -86,7 +87,7 @@ const rows=await sql`
 `;
 assert.equal(rows.length,1,"Fresh independently approved QA release with branch-bound organization and policy required");
 const row=rows[0];
-for(const [key,value] of Object.entries({lessons:7,registrations:0,published_trainings:1,baseline:1,final_check:1,surveys:1}))
+for(const [key,value] of Object.entries({lessons:fixture.lessons.length,registrations:0,published_trainings:1,baseline:1,final_check:1,surveys:1}))
  assert.equal(row[key],value,"Fixture check failed: "+key);
 const [definition]=await sql`SELECT pg_get_functiondef('education_v30.v301_provision_noncredit_knowledge_access(uuid)'::regprocedure) AS definition`;
 assert.ok(definition.definition.includes("min(ad.id::text)::uuid"),"Apply verified UUID compatibility migration first");
