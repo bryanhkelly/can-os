@@ -11,7 +11,8 @@ import { noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims } from "
  * No visitor/person/guardian IDs or raw requests enter the Go Link layer.
  */
 export type GoLinkEvidence = {
-  linkId:string; redirects30d:number;
+  linkId:string; redirects30d:number; // Deprecated mixed entry count, retained for existing clients.
+  linkOpens30d:number; pageViews30d:number; redirectResponses30d:number; unclassifiedEntries30d:number;
   referralRegistrations30d:number|null;
   registrationEvidence:"referenced_noncredit_claim"|"not_connected";
   observationQuality:"unfiltered_automated_traffic";
@@ -47,12 +48,15 @@ export async function readAuthorizedGoLinkEvidence(
   const traffic=await reader.select({
     linkId:siteGoLinkDailyVisits.linkId,
     visits:sql<string>`sum(${siteGoLinkDailyVisits.redirects})::text`,
+    opens:sql<string>`sum(${siteGoLinkDailyVisits.linkOpens})::text`,
+    views:sql<string>`sum(${siteGoLinkDailyVisits.pageViews})::text`,
+    redirects:sql<string>`sum(${siteGoLinkDailyVisits.redirectResponses})::text`,
   }).from(siteGoLinkDailyVisits).where(and(
     inArray(siteGoLinkDailyVisits.linkId,links.map(link=>link.id)),
     gte(siteGoLinkDailyVisits.day,firstDay),
     lte(siteGoLinkDailyVisits.day,today),
   )).groupBy(siteGoLinkDailyVisits.linkId);
-  const visitsByLink=new Map(traffic.map(item=>[item.linkId,Number(item.visits)]));
+  const visitsByLink=new Map(traffic.map(item=>[item.linkId,item]));
   const referenced=links.flatMap(link=>link.destination?.kind==="adult-training"
     ?[{...link,releaseId:link.destination.releaseId}]:[]);
   const releaseIds=[...new Set(referenced.map(link=>link.releaseId))];
@@ -85,7 +89,11 @@ export async function readAuthorizedGoLinkEvidence(
     item.code+":"+item.releaseId+":"+item.siteId,Number(item.claims),
   ]));
   return links.map(link=>({
-    linkId:link.id,redirects30d:visitsByLink.get(link.id)??0,
+    linkId:link.id,redirects30d:Number(visitsByLink.get(link.id)?.visits??0),
+    linkOpens30d:Number(visitsByLink.get(link.id)?.opens??0),
+    pageViews30d:Number(visitsByLink.get(link.id)?.views??0),
+    redirectResponses30d:Number(visitsByLink.get(link.id)?.redirects??0),
+    unclassifiedEntries30d:Math.max(0,Number(visitsByLink.get(link.id)?.visits??0)-Number(visitsByLink.get(link.id)?.opens??0)),
     referralRegistrations30d:byLink.has(link.id)
       ?claimsByKey.get(link.code+":"+byLink.get(link.id)!.releaseId+":"+sitesByRelease.get(byLink.get(link.id)!.releaseId))??0:null,
     registrationEvidence:byLink.has(link.id)
