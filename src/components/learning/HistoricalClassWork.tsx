@@ -1,18 +1,18 @@
 import {useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
-import {WorkspaceNotice,StatusBadge} from "@/components/workspace";
+import {DisclosureSection,EmptyState,PageNavigation,QueryState,WorkspaceNotice,StatusBadge} from "@/components/workspace";
 import type {HistoricalAcademicPage} from "@/domain/historical-academic-evidence";
 export function HistoricalClassWork({queryScope,loadPage}:{queryScope:readonly string[];loadPage:(beforeId?:string)=>Promise<HistoricalAcademicPage>}){
  const [open,setOpen]=useState(false),[before,setBefore]=useState<string|undefined>();
  const query=useQuery({queryKey:[...queryScope,before],queryFn:()=>loadPage(before),enabled:open,retry:false,staleTime:0});
- return <section aria-label="Historical school work" className="space-y-3 border-t border-border pt-4">
-  <Button type="button" variant="outline" aria-expanded={open} onClick={()=>{setOpen(!open);setBefore(undefined);}}>{open?"Hide historical school work":"View historical school work"}</Button>
-  {open&&<>
+ return <DisclosureSection title={open?"Hide historical school work":"View historical school work"} open={open}
+   onOpenChange={next=>{setOpen(next);setBefore(undefined);}}>
+  {open&&<div className="space-y-3">
    <WorkspaceNotice>Read-only preserved school records. These are not new assignments, current grade decisions or awards of credit.</WorkspaceNotice>
-   {query.isPending&&<p role="status" className="text-sm">Loading historical records…</p>}
-   {query.isError&&<p role="alert" className="text-sm">Historical records could not be verified. <Button type="button" variant="outline" size="sm" onClick={()=>void query.refetch()}>Retry</Button></p>}
-   {query.data?.items.length===0&&<p className="text-sm text-muted-foreground">No currently verified historical records in this view.</p>}
+   <QueryState loading={query.isPending&&"Loading historical records…"} error={query.isError&&"Historical records could not be verified."}
+    onRetry={()=>void query.refetch()} retrying={query.isFetching} isEmpty={query.data?.items.length===0}
+    empty={<EmptyState title="No currently verified historical records in this view."/>}/>
    {query.data?.items.map(item=><article key={item.id} className="space-y-2 border border-border p-3">
     <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="font-semibold">{item.title}</h3><StatusBadge tone="neutral">{item.status}</StatusBadge></div>
     {item.learnerName&&<p className="text-xs text-muted-foreground">{item.learnerName}</p>}
@@ -22,10 +22,9 @@ export function HistoricalClassWork({queryScope,loadPage}:{queryScope:readonly s
     {item.score!==null&&<p className="text-sm">Original score: {item.score}{item.maximum!==null?" / "+item.maximum:""}</p>}
     {item.kind==="section_grade"&&<p className="text-sm">Original letter grade: {item.letterGrade??"Not recorded"}{item.finalizedAt?" · "+new Date(item.finalizedAt).toLocaleDateString():""}</p>}
    </article>)}
-   <div className="flex flex-wrap gap-2">
-    {before!==undefined&&<Button type="button" variant="outline" size="sm" onClick={()=>setBefore(undefined)}>First page</Button>}
-    {query.data?.nextBefore&&<Button type="button" variant="outline" size="sm" onClick={()=>setBefore(query.data?.nextBefore??undefined)}>More records</Button>}
-   </div>
-  </>}
- </section>;
+   {(before!==undefined||query.data?.nextBefore)&&<PageNavigation label="Historical records pages"
+    previous={before!==undefined&&<Button type="button" variant="outline" size="sm" onClick={()=>setBefore(undefined)}>First page</Button>}
+    next={query.data?.nextBefore&&<Button type="button" variant="outline" size="sm" onClick={()=>setBefore(query.data?.nextBefore??undefined)}>More records</Button>}/>}
+  </div>}
+ </DisclosureSection>;
 }
