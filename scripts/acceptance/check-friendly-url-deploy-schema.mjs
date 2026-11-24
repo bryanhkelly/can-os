@@ -17,11 +17,12 @@ const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
 // alone to mask missing Reporting/Identity migrations from 0100 onward.
 // Every new migration added to the release journal is included automatically.
 const migrationEntries = journal.entries.filter(entry => entry.idx >= 100);
-if (migrationEntries.length < 8 ||
+if (migrationEntries.length < 9 ||
     migrationEntries[0]?.idx !== 100 ||
     !migrationEntries.some(entry => entry.tag === "0105_site_go_links") ||
     !migrationEntries.some(entry => entry.tag === "0106_site_go_links_private_role_access") ||
     !migrationEntries.some(entry => entry.tag === "0107_site_go_link_capabilities") ||
+    !migrationEntries.some(entry => entry.tag === "0108_site_go_link_reuse") ||
     migrationEntries.some((entry, i) => entry.idx !== i + 100))
   throw new Error("BLOCKED: incomplete or out-of-order deployment migration journal");
 const migrations = migrationEntries.map(entry => ({
@@ -73,7 +74,25 @@ const [schemaChecks] = await sql`
       AS valid_go_lifecycle_constraint,
     EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
       AND indexname='site_go_link_daily_visits_day_uq' AND indexdef ILIKE '%UNIQUE INDEX%')
-      AS unique_go_daily_counter
+      AS unique_go_daily_counter,
+    EXISTS(SELECT 1 FROM pg_attribute
+      WHERE attrelid=to_regclass('public.site_go_links')
+        AND attname='package_id' AND attnotnull=false AND NOT attisdropped)
+      AS optional_go_outreach_package,
+    EXISTS(SELECT 1 FROM pg_attribute
+      WHERE attrelid=to_regclass('public.site_go_links')
+        AND attname='request_id' AND atttypid='uuid'::regtype AND NOT attisdropped)
+      AS go_idempotency_key,
+    EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+      AND indexname='site_go_links_request_uq' AND indexdef ILIKE '%UNIQUE INDEX%')
+      AS unique_go_idempotent_request,
+    EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+      AND indexname='site_go_links_site_page_idx')
+      AS go_site_page_index,
+    EXISTS(SELECT 1 FROM pg_constraint WHERE
+      conrelid=to_regclass('public.site_go_links') AND
+      conname='site_go_links_request_fingerprint_ck')
+      AS valid_go_idempotency_constraint
 `;
 const [roleChecks] = await sql`
   SELECT

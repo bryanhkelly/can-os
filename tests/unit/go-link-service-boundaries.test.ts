@@ -27,7 +27,7 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(evidence).toContain("noncreditSelfEnrollmentClaims.referralCode");
     expect(evidence).toContain("noncreditSelfEnrollmentClaims.siteId");
     expect(evidence).toContain("noncreditSelfEnrollmentClaims.releaseId");
-    expect(evidence).toContain('"canonical_noncredit_claim"');
+    expect(evidence).toContain('"referenced_noncredit_claim"');
     expect(evidence).toContain('"not_connected"');
     expect(evidence).not.toContain("participantPersonId");
     const editor=read("src/components/launch-studio/GoLinkWorkspace.tsx");
@@ -45,11 +45,19 @@ describe("Go Link service boundary and privacy contracts",()=>{
   it("registers the new private aggregate table in ordered SQL migration",()=>{
     const journal=JSON.parse(read("drizzle/meta/_journal.json"));
     const last=journal.entries.at(-1);
-    expect(last).toMatchObject({idx:107,tag:"0107_site_go_link_capabilities"});
+    expect(last).toMatchObject({idx:108,tag:"0108_site_go_link_reuse"});
     const migration=read("drizzle/0107_site_go_link_capabilities.sql");
     expect(migration).toContain("ENABLE ROW LEVEL SECURITY");
     expect(migration).toContain("FORCE ROW LEVEL SECURITY");
     expect(migration).toContain("REVOKE ALL");
     expect(migration).toContain("site_go_link_daily_visits");
+    const reuse=read("drizzle/0108_site_go_link_reuse.sql");
+    expect(reuse).toContain('ALTER COLUMN "package_id" DROP NOT NULL');
+    expect(reuse).toContain("site_go_links_request_uq");
+    expect(reuse).toContain("site_go_links_site_page_idx");
+    const operations=read("src/modules/engagement/site-go-links.functions.ts");
+    expect(operations).toContain("listSiteGoLinksPage");
+    expect(operations).toContain("requestFingerprint");
+    expect(operations).toContain("pg_advisory_xact_lock");
   });
 });
