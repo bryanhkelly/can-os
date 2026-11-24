@@ -13,7 +13,7 @@
 
 ## Deployment order and guards
 
-1. Ensure the preceding SQL migrations (including 0105 Site Go Links and 0106 private-role hardening) have been independently reviewed and applied on the chosen environment. Do **not** run automatic production migrations.
+1. Ensure the preceding SQL migrations (including 0105 Site Go Links, 0106 private-role hardening, 0107 lifecycle/evidence, and 0108 reusable Site links) have been independently reviewed and applied on the chosen environment. Do **not** run automatic production migrations.
 2. Run `npm run db:check:friendly-urls:deploy` using the exact deployment `DATABASE_URL`. The gate checks **all recorded migrations from 0100 through the current release tip**, not only Go Links; production was observed at 0099 on November 23, 2026. The read-only preflight checks the Neon project/branch, required tables, Go Link unique code index, RLS, and no anonymous/authenticated direct SQL privilege. It fails closed.
 3. Run `npm run deploy:cloudflare`, whose script includes this preflight before the Cloudflare build/deployment. Netlify production builds remain disabled by the repo's existing production ignore configuration.
 4. Roll back application deployment to the last known good build if needed. The additive Go Link table migrations are not reverted automatically; rolling back the database is unnecessary for a code rollback.
@@ -36,7 +36,7 @@ Exact-SHA TypeScript, unit/integration tests, production build, Cloudflare CI, b
 - `src/components/links/CopyLinkButton.tsx` standardizes clipboard behavior, audience labeling, sign-in disclosure and manual-copy fallback, rather than accepting arbitrary pasted URLs.
 - `src/components/launch-studio/SiteLinkSharing.tsx` surfaces **Copy & Share** in the Launch Studio header. A public website link appears only when the authorized Site directory reports its publication as `published`.
 - `GoLinkWorkspace` reuses CopyLinkButton for approved, revocable /go codes. The Site directory supplies a Copy profile link only when the caller independently granted profile navigation.
-- Outreach creation remains the existing Introduce / Go Links workflow. A private Site workspace URL is not a public invitation or a capability token.
+- Go Link management is available both directly from the Site's friendly URL at `/o/:organizationSlug/:siteSlug/go-links` and from the existing Introduce outreach workflow. The Site is the authoritative owner; the package relationship is optional. A private Site workspace URL is not a public invitation or a capability token.
 - Dedicated private preview sharing remains a separate expiring/revocable server workflow. Do not interchange those token-bearing URLs with ordinary copy controls.
 
 Focused acceptance: `npm run test:urls:unit` and `npm run db:check:journal`.
@@ -53,6 +53,6 @@ Focused acceptance: `npm run test:urls:unit` and `npm run db:check:journal`.
 
 ## Three linked services
 
-For the managed Go Link capability, see [Link infrastructure: Manage, Resolve, Measure](./GO-LINK-PLATFORM-CAPABILITIES.md). It defines the link lifecycle, reusable destination registry, privacy-minimized outcome evidence and additive `0107` migration.
+For the managed Go Link capability, see [Link infrastructure: Manage, Resolve, Measure](./GO-LINK-PLATFORM-CAPABILITIES.md). It defines the link lifecycle, reusable destination registry, privacy-minimized outcome evidence and additive `0107` and `0108` migrations.
 
 Public short-link copying requires a verified `CAN_ACCESS_PUBLIC_ORIGIN`; a staging or preview hostname is never silently distributed.
