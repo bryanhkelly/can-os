@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lastGeneratedSnapshotIndex": 86,
-  "currentSqlTipIndex": 118,
+  "currentSqlTipIndex": 119,
   "modelParityVerified": false,
   "note": "Reviewed immutable SQL-only migration suffix. Generated Drizzle model parity is NOT claimed. Generate and push remain prohibited until a verified new modeled baseline exists.",
   "sqlOnlyMigrations": [
@@ -164,6 +164,11 @@
       "idx": 118,
       "tag": "0118_noncredit_assessment_grant_variable",
       "gitBlobSha": "1adba2eea8ca6b1bbfd8a546259a4018933497bf"
+    },
+    {
+      "idx": 119,
+      "tag": "0119_noncredit_feedback_invitation",
+      "gitBlobSha": "3fa8c2db538edf218d2ed781d13b04297d99ec5c"
     }
   ]
 }
