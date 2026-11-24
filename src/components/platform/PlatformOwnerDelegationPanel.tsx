@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { EmptyState, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
 import {
@@ -28,7 +28,7 @@ export function PlatformOwnerDelegationPanel() {
   const [searched,setSearched]=useState(false);
   async function search() {
     if(query.trim().length<2||busy)return;
-    setBusy(true);setError("");
+    setBusy(true);setError("");setSelected("");setTargets([]);setLimited(false);setSearched(false);
     try{
       const result=await searchPlatformOwnerTargets({data:{search:query.trim()}});
       setTargets(result.targets);setLimited(result.limited);setSelected("");setSearched(true);
@@ -36,12 +36,12 @@ export function PlatformOwnerDelegationPanel() {
     finally{setBusy(false);}
   }
   async function start() {
-    if(!selected||reason.trim().length<12||busy)return;
+    if(!target||reason.trim().length<12||busy)return;
     setBusy(true);setError("");
     try{
       await beginPlatformOwnerDelegation({data:{grantId:selected,mode,reason:reason.trim()}});
       // Force a full document navigation to drop every previous user cache.
-      window.location.replace(getWorkspaceHome(target!.role)??"/home");
+      window.location.replace(getWorkspaceHome(target.role)??"/home");
     }catch(cause){setError(normalizeClientError(cause,"Delegation was not authorized.").message);setBusy(false);}
   }
   const target=targets.find(item=>item.grantId===selected);
@@ -63,7 +63,7 @@ export function PlatformOwnerDelegationPanel() {
         onClick={()=>void search()}>Find users</Button>
     </div>
     {searched&&<div className="mt-4 space-y-2" role="group" aria-label="Available verified user roles">
-      {targets.length===0&&<p className="text-sm text-muted-foreground">No eligible verified accounts match this search.</p>}
+      {targets.length===0&&<EmptyState kind="matches" title="No eligible verified accounts match this search."/>}
       {targets.map(item=><Label key={item.grantId}
         className="flex cursor-pointer items-start gap-3 border border-border p-3 text-sm">
         <Radio checked={selected===item.grantId}
