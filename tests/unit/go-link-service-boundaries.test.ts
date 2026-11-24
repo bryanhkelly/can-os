@@ -14,6 +14,26 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(create).toContain("inspectSavedGoLink");
     expect(create).toContain("setSiteGoLinkPaused");
   });
+  it("uses one transactional Go allocator and status transition while preserving exact ownership",()=>{
+    const lifecycle=read("src/modules/engagement/go-link-lifecycle.server.ts");
+    const direct=read("src/modules/engagement/site-go-links.functions.ts");
+    const engagement=read("src/modules/engagement/engagement-registry.functions.ts");
+    expect(lifecycle.match(/randomBytes\(9\)/g)).toHaveLength(1);
+    expect(lifecycle.match(/tx\.update\(siteGoLinks\)/g)).toHaveLength(1);
+    expect(lifecycle).toContain('actor.delegationMode==="view"');
+    expect(lifecycle).toContain("link.organizationId!==scope.organizationId");
+    expect(lifecycle).toContain("link.siteId!==scope.siteId");
+    expect(lifecycle).toContain("link.engagementVersionId!==versionId");
+    expect(lifecycle).toContain('action:"site.go_link.create"');
+    expect(lifecycle).toContain('action:"engagement.go_link.create"');
+    expect(engagement).not.toContain("randomBytes(");
+    expect(engagement).toContain("issueAuthorizedEngagementGoLink(tx,actor,record,version.id");
+    expect(engagement).toContain("revokeAuthorizedEngagementGoLink(tx,actor,record,link,version.id)");
+    expect(engagement).toContain("eq(engagementDefinitionVersions.engagementId,record.id)");
+    expect(direct.match(/directSiteLinkScope\(site,data.packageId\)/g)).toHaveLength(5);
+    expect(direct).toContain("readAuthorizedGoLinkEvidence(items.map(");
+    expect(direct).not.toContain("readSiteGoLinkEvidence(");
+  });
   it("keeps public redirect observation anonymous and non-blocking",()=>{
     const schema=read("src/db/schema/site-go-links.ts");
     const resolver=read("src/modules/engagement/site-go-links.server.ts");
