@@ -46,6 +46,8 @@ const baseRoleCapabilities = {
  // It must be explicitly assigned to a real CAN Person through an organization-wide grant.
  can_credential_reviewer: ["credential.issuer.review"],
  can_jurisdiction_reviewer: ["jurisdiction.profile.verify"],
+ // Explicit independent relationship appointment, not inherited from school or platform administration.
+ reporting_relationship_manager: ["relationships.propose","relationships.decide","relationships.revoke","relationships.report"],
  network_admin: ["network.sites.read", "network.sites.manage", "network.affiliations.read", "network.affiliations.review"],
  // Partner website review is deliberately NOT registration, academic approval,
  // institutional publication, Site operations or access to family records.
