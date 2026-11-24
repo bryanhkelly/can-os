@@ -129,6 +129,30 @@ export async function proposeReportingRelationship(request:Request,input:unknown
     return rowSchema.parse(result.rows[0]);
   });
 }
+/** Exact outgoing scope reader. The same ownership resolution used for
+ * proposals protects this view; a recipient or sibling Site cannot enumerate
+ * the owner's other agreements. Fetch one extra row for a stable next cursor. */
+export async function listOutgoingReportingRelationships(request:Request,input:unknown){
+  const actor=await getIdentityContext(request);
+  const organizationId=actor.scope.organizationIds?.length===1?actor.scope.organizationIds[0]:undefined;
+  if(!organizationId)throw new AuthorizationError("relationship owner scope");
+  const {scopeKind,scopeId,after}=relationshipProposalSchema.pick({scopeKind:true,scopeId:true})
+    .extend({after:uuid.optional()}).strict().parse(input);
+  return db.transaction(async tx=>{
+    const scope=await resolveScope(tx,scopeKind,scopeId,organizationId);
+    assertRelationshipActor(actor,scope.ownerOrganizationId,"relationships.propose",scope.siteId);
+    const result=await tx.execute(sql`
+      SELECT ${columns} FROM public.reporting_relationship_agreements
+      WHERE owner_organization_id=${scope.ownerOrganizationId}::uuid
+        AND scope_kind=${scopeKind} AND scope_id=${scopeId}::uuid
+        AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
+      ORDER BY id LIMIT 51`);
+    const rows=result.rows.map(row=>rowSchema.parse(row));
+    const entries=rows.slice(0,50);
+    return {entries,nextCursor:rows.length>50?entries[49]!.id:null};
+  });
+}
+
 const actionInput=z.object({agreementId:uuid,action:z.enum(["accept","decline","withdraw","revoke"])}).strict();
 
 /** Serialize decisions on the immutable proposal. The DB trigger records the
@@ -183,7 +207,7 @@ export async function decideReportingRelationship(request:Request,input:unknown)
 /** Direct organization inbox: no inherited or delegated visibility. Bounded
  * keyset pagination; site-scoped grants must use a future exact-resource reader.
  * Internal only until independently ratified capability mapping is enabled. */
-export async function listIncomingReportingRelationships(request:Request,input:unknown):Promise<ReportingRelationship[]>{
+export async function listIncomingReportingRelationships(request:Request,input:unknown):Promise<{entries:ReportingRelationship[];nextCursor:string|null}>{
   const actor=await getIdentityContext(request);
   const organizationId=actor.scope.organizationIds?.length===1?actor.scope.organizationIds[0]:undefined;
   if(!organizationId)throw new AuthorizationError("relationship recipient scope");
@@ -194,7 +218,9 @@ export async function listIncomingReportingRelationships(request:Request,input:u
     WHERE recipient_organization_id=${organizationId}::uuid
       AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
     ORDER BY id LIMIT 51`);
-  return result.rows.map(row=>rowSchema.parse(row));
+  const rows=result.rows.map(row=>rowSchema.parse(row));
+  const entries=rows.slice(0,50);
+  return {entries,nextCursor:rows.length>50?entries[49]!.id:null};
 }
 
 const lookupInput=z.object({query:z.string().trim().min(2).max(80),after:z.string().uuid().optional()}).strict();
