@@ -8,11 +8,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, WorkspaceNotice } from "@/components/workspace";
 import {
   closeNoncreditSelfEnrollment,getNoncreditEnrollmentPublisher,
   publishNoncreditSelfEnrollment,publishNoncreditAcrossAuthorizedSites,
 } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
+import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { normalizeClientError } from "@/lib/client-error";
 import { NoncreditReleaseOperations } from "@/components/enrollment/NoncreditReleaseOperations";
 import { NoncreditNetworkReportPanel } from "@/components/enrollment/NoncreditNetworkReportPanel";
@@ -41,10 +42,17 @@ function candidateKey(candidate:Candidate){
 
 /** Actual provider enrollment release, not the Capability Lab prototype. */
 function NoncreditPublicationPage(){
+  const {session,error}=useWorkspaceSession();
+  const {publicSiteId,offeringCode}=Route.useSearch();
+  if(!session?.authenticated||error)return <WorkspaceShell eyebrow="Program operations" title="Noncredit enrollment" width="wide"><WorkspaceNotice tone="attention">A verified provider session is required. Sign in with the authorized role to manage enrollment.</WorkspaceNotice><Button asChild className="mt-4"><Link to="/access">Sign in</Link></Button></WorkspaceShell>;
+  const scope=JSON.stringify([session.activeGrantId,session.role,session.activeContext,session.ownerDelegation??null]);
+  return <NoncreditPublicationSession key={JSON.stringify([scope,publicSiteId,offeringCode])} scope={scope}/>;
+}
+function NoncreditPublicationSession({scope}:{scope:string}){
   const client=useQueryClient();
   const {publicSiteId,offeringCode}=Route.useSearch();
   const preferredSiteId=publicSiteId??null;
-  const query=useQuery({queryKey:["noncredit-publisher-releases"],
+  const query=useQuery({queryKey:["noncredit-publisher-releases",scope],
     queryFn:()=>getNoncreditEnrollmentPublisher(),retry:false,staleTime:15_000});
   const [choice,setChoice]=useState("");
   const [deliveryMode,setDeliveryMode]=useState<"independent"|"facilitated">("independent");
@@ -59,15 +67,18 @@ function NoncreditPublicationPage(){
   const [message,setMessage]=useState("");
   const [created,setCreated]=useState("");
   const [managedRelease,setManagedRelease]=useState<string|null>(null);
-  const candidates=(query.data?.candidates??[]).filter(candidate=>
+  const currentData=query.isError?undefined:query.data;
+  const candidates=(currentData?.candidates??[]).filter(candidate=>
     (!offeringCode||candidate.offeringCode===offeringCode)&&
     (!publicSiteId||(preferredSiteId!==null&&[
       ...candidate.siteOptions,...candidate.digitalSiteOptions,
     ].some(site=>site.id===preferredSiteId))));
   const selected=candidates.find(item=>candidateKey(item)===choice);
-  const valid=selected&&opensAt&&closesAt&&maxParticipants&&additionalSites.length<=49&&consentVersion.trim().length>=3&&
-    consentText.trim().length>=25&&siteId&&
-    (!publicSiteId||(preferredSiteId!==null&&siteId===preferredSiteId));
+  const eligibleSites=deliveryMode==="facilitated"?selected?.siteOptions:selected?.digitalSiteOptions;
+  const published=(currentData?.published??[]).filter(row=>(!publicSiteId||row.siteId===publicSiteId)&&(!offeringCode||row.offeringCode===offeringCode));
+  const capacity=Number(maxParticipants);
+  const opens=Date.parse(opensAt),closes=Date.parse(closesAt);
+  const valid=!!selected&&Number.isFinite(opens)&&Number.isFinite(closes)&&opens<closes&&closes>Date.now()&&Number.isInteger(capacity)&&capacity>=1&&capacity<=1000000&&additionalSites.length<=49&&new Set([siteId,...additionalSites]).size===additionalSites.length+1&&additionalSites.every(id=>deliveryMode==="facilitated"&&!!eligibleSites?.some(site=>site.id===id))&&consentVersion.trim().length>=3&&consentVersion.trim().length<=80&&consentText.trim().length>=25&&consentText.trim().length<=4000&&!!eligibleSites?.some(site=>site.id===siteId)&&(!publicSiteId||(preferredSiteId!==null&&siteId===preferredSiteId&&additionalSites.length===0));
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();if(!selected||!valid||busy)return;
     setBusy(true);setMessage("");setCreated("");
@@ -126,7 +137,7 @@ function NoncreditPublicationPage(){
       Enrollment management is unavailable for this Site. Sign in with a currently authorized provider or Site role, then retry. No Site identity bridge is required.
       <Button variant="ghost" type="button" className="ml-2 font-semibold text-primary underline" onClick={()=>void query.refetch()}>Retry</Button>
     </p>}
-    {query.data&&<div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(15rem,.8fr)]">
+    {currentData&&<div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(15rem,.8fr)]">
       <section className="border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">Publish enrollment</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -257,9 +268,9 @@ function NoncreditPublicationPage(){
       </section>
       <section className="border border-border bg-card p-5 self-start">
         <h2 className="font-serif text-2xl">Published releases</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Current enrollment windows for your operating organization.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Enrollment windows for your current authorized scope.</p>
         <div className="mt-4 divide-y divide-border">
-          {query.data.published.map(row=><div key={row.id} className="space-y-2 py-4 first:pt-0">
+          {published.map(row=><div key={row.id} className="space-y-2 py-4 first:pt-0">
             <p className="text-sm font-semibold">{row.title}</p>
             <p className="text-xs text-muted-foreground">
               {row.deliveryMode==="facilitated"?"Facilitated":"Independent"} · {row.status} · capacity {row.maxParticipants}
@@ -279,11 +290,11 @@ function NoncreditPublicationPage(){
                 className="text-xs font-semibold text-destructive underline underline-offset-4">Close registration</Button>}
             </div>
           </div>)}
-          {!query.data.published.length&&<p className="py-4 text-sm text-muted-foreground">Nothing has been published yet.</p>}
+          {!published.length&&<p className="py-4 text-sm text-muted-foreground">No published releases match this selection.</p>}
         </div>
       </section>
     </div>}
-    {managedRelease&&<NoncreditReleaseOperations key={managedRelease} releaseId={managedRelease}/>} 
+    {managedRelease&&published.some(row=>row.id===managedRelease)&&<NoncreditReleaseOperations key={managedRelease} releaseId={managedRelease}/>} 
     {query.isSuccess&&<>
       <NoncreditNetworkReportPanel/>
       <div className="mt-8"><NoncreditPilotOutcomesPanel/></div>
