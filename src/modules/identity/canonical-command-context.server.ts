@@ -10,6 +10,7 @@ import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connect
 import { accessSessionCookie } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { getIdentityContext } from "./command-context.server";
+import { studentSiteScope } from "@/domain/student-site-scope";
 import { resolveCanonicalSiteStaffFromCan } from "./can-site-staff-authority.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -137,10 +138,7 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
     // Course Attempt and Class Enrollment authorizers independently verify
     // Person, Site, Course and active participation on every request.
     if (actor.role === "student") {
-      if (!actor.actorPersonId ||
-          !actor.grantSiteId || actor.scope.siteIds?.length !== 1 ||
-          actor.scope.organizationIds?.length !== 1 ||
-          !actor.capabilities.has("student:read")) {
+      if (!studentSiteScope(actor)) {
         throw new AuthorizationError("current direct CAN student Site membership");
       }
       return actor;
