@@ -792,6 +792,13 @@
       "when": 1795462006000,
       "tag": "0112_site_intelligence_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1795462007000,
+      "tag": "0113_go_gateway_scoped_access",
+      "breakpoints": true
     }
   ]
 }
