@@ -96,6 +96,7 @@
     "db:canonical:noncredit:integration": "node scripts/acceptance/test-noncredit-self-enrollment-test01.mjs",
     "test:e2e:noncredit": "playwright test --config=playwright.noncredit-self-enrollment.config.ts",
     "test:e2e:noncredit:journey": "playwright test --config=playwright.noncredit-pilot-journey.config.ts",
+    "test:e2e:noncredit:api": "playwright test --config=playwright.noncredit-pilot-api.config.ts",
     "db:check:main": "node scripts/acceptance/check-production-drizzle-parity.mjs",
     "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
     "test:site:channels": "node scripts/run-unit-suite.mjs site",
