@@ -8,7 +8,7 @@ import {
   accessAdultLearningReviews, people,
 } from "@/db/schema";
 import {
-  canonicalAccounts, canonicalAccountGrants, canonicalPersons,
+  canonicalAccounts, canonicalAccountGrants,
   canonicalClasses,canonicalClassEnrollments,canonicalClassSessions,
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
@@ -21,6 +21,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -84,13 +85,8 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
       disabledAt:canonicalAccounts.disabledAt,verifiedAt:canonicalAccounts.emailVerifiedAt,
     }).from(canonicalAccounts)
       .where(eq(canonicalAccounts.id,link.canonicalAccountId)).limit(1);
-    // Preserve the stricter existing reviewed-Class evidence gate. Do not
-    // infer a birth date from self-attestation or fabricate a legacy Person.
-    const [person]=adultReview?await tx.select({id:canonicalPersons.id,birthDate:canonicalPersons.birthDate})
-      .from(canonicalPersons).where(eq(canonicalPersons.id,link.canonicalPersonId)).limit(1):[];
-    if(adultReview&&((adultReview.consumedAt||person?.birthDate)&&
-       person?.birthDate!==adultReview.verifiedBirthDate))
-      throw new AuthorizationError("canonical adult date of birth differs from approved evidence");
+    if(adultReview?.consumedAt)
+      await assertCurrentReviewedNativeLearner(link.canonicalAccountId,owner.personId,now,tx,true);
     if(!native || native.disabledAt || !native.verifiedAt ||
        native.email!==owner.email)
       throw new AuthorizationError("verified native identity unavailable");
