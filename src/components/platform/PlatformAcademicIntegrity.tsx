@@ -13,6 +13,7 @@ const remediation: Record<string, {label:string; owner:string}> = {
   pending_without_verified_student_grant: {label:"Pending placement lacks verified student grant",owner:"Identity administration"},
   class_no_lessons: {label:"Class has no lesson records",owner:"Course publisher"},
   class_minimal_lesson_inventory: {label:"Class has one to three lesson records",owner:"Course publisher"},
+  class_no_published_track_presentations: {label:"Class has no published track and asset presentation links",owner:"Instructional content reviewer"},
   class_no_track_presentations: {label:"Class has no linked track presentations",owner:"Instructional content reviewer"},
   synthetic_course_in_active_enrollment: {label:"Active synthetic curriculum enrollment",owner:"Academic readiness reviewer"},
   legacy_assessment_records_to_reconcile: {label:"Legacy assessment inventory",owner:"Academic data migration"},
