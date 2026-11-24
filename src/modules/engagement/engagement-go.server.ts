@@ -8,15 +8,12 @@ import {
 import {
   engagementDefinitionSchema, type EngagementDefinition,
 } from "@/domain/engagement-definition";
-import { sitePreviewSnapshotKey, readSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
-import { renderSharedSitePreview } from "@/domain/site-preview-sharing";
-import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { goCodeSchema } from "@/domain/site-go-links";
 import { inspectEngagementDestination } from "./go-destination-registry.server";
 import { siteBrandConfigurationSchema } from "@/domain/site-brand";
 import { resolveSiteTheme, type SiteTheme } from "@/domain/site-theme";
 import { goLinkAvailability } from "@/domain/go-link-policy";
-import { resolveSiteGoLink } from "./site-go-links.server";
+import { resolveSiteGoExperience } from "./site-go-links.server";
 
 export type GoExperience =
   | {mode:"website-preview";html:string}
@@ -111,22 +108,8 @@ export async function resolveGoExperience(code:string,page:string="/",observe=tr
   }).from(siteGoLinks).where(eq(siteGoLinks.code,code)).limit(1);
   if(!link || goLinkAvailability(link)!=="available")return null;
 
-  if(!link.engagementVersionId && link.destination?.kind==="website-preview"){
-    if(!link.siteId||!link.organizationId||!isPublicSitePagePath(page))return null;
-    const [site]=await db.select({organizationId:sites.organizationId,status:sites.lifecycleStatus}).from(sites).where(eq(sites.id,link.siteId)).limit(1);
-    if(!site||site.organizationId!==link.organizationId||site.status==="closed")return null;
-    const destination=link.destination;
-    const pages=await readSitePreviewSnapshot(sitePreviewSnapshotKey(link.siteId,destination.snapshotId),destination.snapshotDigest);
-    const html=pages?.[page];
-    if(!pages||!html)return null;
-    if(observe&&page==="/")await observeUniversalGoVisit(link.id);
-    return {mode:"website-preview",html:renderSharedSitePreview(html,link.siteId,"",Object.keys(pages),false,code)};
-  }
   if(!link.engagementVersionId){
-    // Reuse the destination registry that enforces exact Site ownership,
-    // current publication, optional Marketing Package and program eligibility.
-    const href=await resolveSiteGoLink(code,observe);
-    return href?{mode:"redirect",href}:null;
+    return resolveSiteGoExperience(code,observe,page);
   }
   const [version]=await db.select({
     content:engagementDefinitionVersions.content,
