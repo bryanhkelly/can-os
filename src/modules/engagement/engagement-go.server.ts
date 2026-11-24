@@ -83,13 +83,13 @@ async function validOwner(
 }
 
 /** Single public resolver; Site and universal engagement links share code store. */
-export async function resolveGoExperience(code:string,page:string="/",observe=true):Promise<GoExperience|null>{
+export async function resolveGoExperience(code:string,page:string="/",observe=true,entry=page==="/"):Promise<GoExperience|null>{
   if(!goCodeSchema.safeParse(code).success)return null;
   const link=await readPublicGoLink(code);
   if(!link || goLinkAvailability(link)!=="available")return null;
 
   if(!link.engagementVersionId){
-    return resolveLoadedSiteGoExperience(code,link,observe,page);
+    return resolveLoadedSiteGoExperience(code,link,observe,page,entry);
   }
   const [version]=await db.select({
     content:engagementDefinitionVersions.content,
