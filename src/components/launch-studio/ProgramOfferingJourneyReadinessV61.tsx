@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { RecordFacts, StatusBadge, WorkspaceLinkNavigation, WorkspaceNotice } from "@/components/workspace";
 import type { ProgramOfferingJourney } from "@/domain/program-offering-journey-v61";
 import type { LaunchReadinessContext, ReadinessRecord, LaunchReadinessIntent, LaunchReadinessSolutions, LaunchReadinessNoncredit } from "./launch-readiness-types-v61";
 
@@ -39,25 +39,19 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
                 {journey.offeringPublished?"Available learning content":"Content not yet published"}
               </StatusBadge>
             </div>
-            <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div><dt className="text-xs text-muted-foreground">Program</dt>
-                <dd className="text-sm font-medium">Selected in Shape</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Solution</dt>
-                <dd className="text-sm font-medium">{journey.solution
-                  ? "Available solution v"+journey.solution.versionNo : "Choose a solution"}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Your site plan</dt>
-                <dd className="text-sm font-medium">{journey.savedPlan
-                  ? (journey.savedPlan.lifecycle==="frozen"?"Submitted for review":"Saved private plan")
-                  : "Not planned yet"}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Noncredit enrollment</dt>
-                <dd className="text-sm font-medium">
-                  {context==="prepare"||noncredit.state!=="ready"
-                    ? "Check registration requirements"
-                    : (journey.publisherCandidateCount??0)>0
-                      ? "Eligible for registration setup"
-                      : "Registration setup not available yet"}
-                </dd></div>
-            </dl>
+            <RecordFacts className="mt-3" items={[
+              {label:"Program",value:"Selected in Shape"},
+              {label:"Solution",value:journey.solution
+                ? "Available solution v"+journey.solution.versionNo : "Choose a solution"},
+              {label:"Your site plan",value:journey.savedPlan
+                ? (journey.savedPlan.lifecycle==="frozen"?"Submitted for review":"Saved private plan")
+                : "Not planned yet"},
+              {label:"Noncredit enrollment",value:context==="prepare"||noncredit.state!=="ready"
+                ? "Check registration requirements"
+                : (journey.publisherCandidateCount??0)>0
+                  ? "Eligible for registration setup"
+                  : "Registration setup not available yet"},
+            ]}/>
             {journey.facilitatedFourSessions && <p className="mt-3 text-xs leading-5 text-muted-foreground">
               This solution includes four scheduled sessions. Choose dates, connect them
               to the approved registration, and record attendance for each one.
@@ -67,7 +61,7 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
               {" · "}{journey.openRegistrationCount??0} within a current published registration window.
               Registration does not prove attendance, assessment or completion.
             </p>}
-            <div className="mt-3 flex flex-wrap gap-4 text-xs">
+            <WorkspaceLinkNavigation label="Program delivery actions" surface="plain" className="mt-3 text-xs">
               <Link to="/launch/site" search={{siteId,module:"program-catalog",
                 ...(journey.savedPlan ? {solutionPlanId:journey.savedPlan.configurationId} : {})}}
                 className="font-semibold text-primary underline">
@@ -82,7 +76,7 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
                   className="font-semibold text-primary underline">
                   Manage approved registration for this Site (provider only)
                 </Link>}
-            </div>
+            </WorkspaceLinkNavigation>
           </li>)}
         </ul>}
       </section>;
