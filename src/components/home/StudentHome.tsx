@@ -9,6 +9,7 @@ import { getNativeClassLearning } from "@/modules/classes/native-class-learning.
 import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { DataUnavailableError, safeLoader } from "@/lib/safe-loader";
+import { orderedBatches } from "@/lib/ordered-batches";
 import type { LearningResume, StudentDashboardData } from "@/components/student/student-dashboard-data";
 import {
   deriveStudentSuccessSupportTasks,
@@ -72,9 +73,8 @@ export async function loadStudentToday() {
     if (native.length) {
       let fallback: LearningResume | null = null;
       // Reuse the authorized native lesson service. Never infer a Class from a Section title.
-      for (let offset = 0; offset < native.length; offset += 3) {
-        const results = await Promise.all(native.slice(offset, offset + 3).map(item =>
-          safeLoader(() => getNativeClassLearning({data:{classEnrollmentId:item.enrollmentId!}}))()));
+      for await (const results of orderedBatches(native,3,item =>
+        safeLoader(() => getNativeClassLearning({data:{classEnrollmentId:item.enrollmentId!}}))())) {
         for (const result of results) {
           if (!result.ok) continue;
           const view = result.data;
@@ -100,13 +100,11 @@ export async function loadStudentToday() {
     // Bound fan-out to three authorized reads at a time. Preserve ordered
     // selection: the preferred urgent-work Section still wins whenever it has
     // a next lesson, and completed fallbacks still use the earliest candidate.
-    for (let offset = 0; offset < candidates.length; offset += 3) {
-      const batch = candidates.slice(offset, offset + 3);
-      const results = await Promise.all(batch.map(section =>
-        safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))()));
-      for (let index = 0; index < batch.length; index++) {
-        const section = batch[index]!;
-        const result = results[index]!;
+    for await (const results of orderedBatches(candidates,3,async section => ({
+      section,
+      result:await safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))(),
+    }))) {
+      for (const {section,result} of results) {
         if (!result.ok || !result.data.curriculumAccess.available) continue;
         const workspace = result.data;
         const content = workspace.content;
