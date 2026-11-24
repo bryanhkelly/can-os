@@ -2,7 +2,7 @@
 /**
  * On-demand release evidence. Never deploys, migrates, seeds production,
  * or treats a skipped integration check as a pass.
- * Usage: npm run verify:release -- --profile=go|--profile=pilot [--database] [--browser] [--live]
+ * Usage: npm run verify:release -- --profile=go|--profile=pilot|--profile=engineering [--database] [--browser] [--live]
  */
 import {spawnSync} from "node:child_process";
 import {mkdirSync,writeFileSync} from "node:fs";
@@ -10,11 +10,13 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 
 const args=process.argv.slice(2);
-const allowed=new Set(["--profile=go","--profile=pilot","--database","--browser","--live","--install"]);
+const allowed=new Set(["--profile=go","--profile=pilot","--profile=engineering","--database","--browser","--live","--install"]);
 if(args.some(a=>!allowed.has(a)))throw new Error("Unknown release gate option");
 const enabled=flag=>args.includes(flag);
-if(enabled("--profile=go")&&enabled("--profile=pilot"))throw new Error("Select one release profile");
-const profile=enabled("--profile=pilot")?"pilot":"go";
+const profiles=args.filter(arg=>arg.startsWith("--profile="));
+if(profiles.length>1)throw new Error("Select one release profile");
+const profile=profiles[0]?.slice("--profile=".length)??"go";
+if(profile==="engineering"&&["--database","--browser","--live"].some(enabled))throw new Error("Engineering validation is source-only; use the pilot or go profile for runtime acceptance.");
 const npm=process.platform==="win32"?"npm.cmd":"npm";
 function git(args){
   const r=spawnSync("git",args,{encoding:"utf8"});
@@ -43,6 +45,13 @@ if(enabled("--install"))run("Locked dependency installation",["ci"]);
 run("Engineering architecture, migration safety and V6.1 source governance",["run","verify:architecture"]);
 run("Cloudflare production bundle",["run","build:cloudflare"]);
 run("TypeScript",["run","typecheck:full"]);
+if(profile==="engineering"){
+  run("Full ESLint and V6.1 source coverage",["run","lint"]);
+  run("Lint warning ratchet tests",["run","test:lint-regressions"]);
+  run("Lint warning ratchet",["run","check:lint-regressions"]);
+  run("Full unit regression suite",["test"]);
+  run("Production dependency security audit",["run","audit:production"]);
+} else {
 run("Go URL and reporting contracts",["run","test:urls:unit"]);
 run("Go preview regressions",["exec","--","vitest","run",
   "tests/unit/site-go-links.test.ts","tests/unit/go-response-observation.test.ts","tests/unit/go-destination-provider.test.ts","tests/unit/site-preview-sharing.test.ts",
@@ -92,13 +101,14 @@ if(enabled("--browser")&&process.env.TEST_DATABASE_URL){
 if(enabled("--live")&&/^[A-Za-z0-9_-]{12}$/.test(process.env.CAN_LIVE_PREVIEW_CODE??"")){
   run("Anonymous live Go preview",["run","test:e2e:live-go"],process.env);
 }else block("Anonymous live Go preview","Requires --live and a dedicated revocable preview code");
+}
 if(git(["rev-parse","HEAD"])!==sha||git(["status","--porcelain"])){
   block("Source attestation","Working tree or revision changed while checking");
 }
 const passed=results.every(r=>r.status==="passed");
 const report={schemaVersion:1,profile,branch,sha,recordedAt:new Date().toISOString(),
-  status:passed?"checks_passed":"no_go",results,
-  limitation:"Live fixture creation, rights-withdrawal and deployment provenance still require separate operator evidence."};
+  status:passed?(profile==="engineering"?"engineering_checks_passed":"checks_passed"):"no_go",results,
+  limitation:profile==="engineering"?"Source engineering checks only. This does not establish database, browser, visual, deployment, provider or partner acceptance.":"Live fixture creation, rights-withdrawal and deployment provenance still require separate operator evidence."};
 const dir=join(tmpdir(),"becomuna-release-evidence");
 mkdirSync(dir,{recursive:true});
 const file=join(dir,sha+"-"+Date.now()+".json");
