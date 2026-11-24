@@ -295,7 +295,7 @@ function ProgramsAudiencesBody({ siteId, initial, existingPrograms, onBack, onEx
   const [guide, setGuide] = useState<SiteGuideContentV61 | null>(null);
   return <WorkspaceShell title="Programs & Audiences"
     eyebrow="Shape / Programs & Audiences"
-    subtitle="Explore what you want to offer, who you hope to serve and the experiences that bring your vision to life."
+    subtitle="Explore what you want to offer, who you desire to serve and the experiences that bring your vision to life."
     width="wide" rail={<ProgramsAudiencesV61Guidance step={step} guide={guide} />}>
     <EstablishProgramsAudiencesV61 key={siteId + ":" + initial.revision}
       siteId={siteId} initial={initial} existingPrograms={existingPrograms}
