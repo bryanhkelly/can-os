@@ -11,7 +11,7 @@ import { goDestinationKindSchema, goDestinationSchema } from "@/domain/site-go-l
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
 import { goLinkManagementSchema, goLinkAvailability } from "@/domain/go-link-policy";
 import { goDestinationAuthoring, inspectGoDestination, listGoDestinationChoices } from "./go-destination-registry.server";
-import { readSiteGoLinkEvidence } from "./go-link-evidence.server";
+import { readAuthorizedGoLinkEvidence } from "./go-link-evidence.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { findGoIssuance, goRequestFingerprint, issueAuthorizedGoLink, transitionAuthorizedGoLink } from "./go-link-lifecycle.server";
 
@@ -136,9 +136,9 @@ export const listSiteGoLinks = createServerFn({ method: "GET" })
     }).from(siteGoLinks).where(directSiteLinkScope(site,data.packageId)).orderBy(desc(siteGoLinks.createdAt)).limit(500);
     // Reporting reads must never take down authorized link management.
     // A missing observation is unavailable evidence, not zero activity.
-    let evidence:Awaited<ReturnType<typeof readSiteGoLinkEvidence>>=[];
+    let evidence:Awaited<ReturnType<typeof readAuthorizedGoLinkEvidence>>=[];
     try{
-      evidence=await readSiteGoLinkEvidence(data.siteId,data.packageId);
+      evidence=await readAuthorizedGoLinkEvidence(links.map(link=>({...link,siteId:site.id,organizationId:site.organizationId})));
     }catch{
       console.error("Go Link evidence read unavailable",{kind:"operational_analytics"});
     }
@@ -244,11 +244,9 @@ export const listSiteGoLinksPage=createServerFn({method:"GET"})
       .orderBy(desc(siteGoLinks.createdAt),desc(siteGoLinks.id))
       .limit(data.limit+1);
     const hasMore=rows.length>data.limit,items=rows.slice(0,data.limit);
-    let evidence:Awaited<ReturnType<typeof readSiteGoLinkEvidence>>|null=null;
+    let evidence:Awaited<ReturnType<typeof readAuthorizedGoLinkEvidence>>|null=null;
     try {
-      evidence=await readSiteGoLinkEvidence(
-        data.siteId,data.packageId,db,items.map(item=>item.id),
-      );
+      evidence=await readAuthorizedGoLinkEvidence(items.map(link=>({...link,siteId:site.id,organizationId:site.organizationId})));
     }catch{
       console.error("Go Link page evidence unavailable",{kind:"operational_analytics"});
     }
