@@ -32,6 +32,16 @@ describe("source-owned metric registry",()=>{
     expect(registrations?.source).toContain("noncredit_self_enrollment_claims");
     expect(registrations?.denominator).toContain("No click-to-enrollment");
   });
+  it("distinguishes Go response types and unclassified historical entries",()=>{
+    const opens=all.find(m=>m.metricKey==="go.linkOpens30d");
+    const pages=all.find(m=>m.metricKey==="go.pageViews30d");
+    const redirects=all.find(m=>m.metricKey==="go.redirectResponses30d");
+    const legacy=all.find(m=>m.metricKey==="go.unclassifiedEntries30d");
+    expect(opens?.rule).toContain("link_opens");
+    expect(pages?.rule).toContain("page_views");
+    expect(redirects?.rule).toContain("redirect_responses");
+    expect(legacy?.rule).toContain("do not infer");
+  });
   it("requires exact metric definition versions before reuse",()=>{
     const metric=all.find(m=>m.metricKey==="class.registrations")!;
     expect(requireMetricContract(all,metric.metricKey,metric.definitionVersion)).toBe(metric);
