@@ -46,9 +46,9 @@ async function validOwner(
   }
   if(owner.ownerKind==="program" && owner.programId){
     const [program]=await db.select({
-      organizationId:programs.organizationId,siteId:programs.siteId,name:programs.name,
+      organizationId:programs.organizationId,siteId:programs.siteId,name:programs.name,status:programs.status,
     }).from(programs).where(eq(programs.id,owner.programId)).limit(1);
-    if(!program || program.organizationId!==organization.id || program.siteId!==owner.siteId)return null;
+    if(!program || program.organizationId!==organization.id || program.siteId!==owner.siteId || program.status==="closed")return null;
     if(program.siteId){
       const [site]=await db.select({
         organizationId:sites.organizationId,status:sites.lifecycleStatus,
