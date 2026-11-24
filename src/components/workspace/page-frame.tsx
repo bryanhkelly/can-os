@@ -37,13 +37,13 @@ export function PageHeader({ eyebrow, title, titleId, subtitle, actions, breadcr
   return <>
     {breadcrumbs && <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">{breadcrumbs}</nav>}
     <header className={cn("can-workspace-header border-b border-border/60", className)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 [overflow-wrap:anywhere]">
           {eyebrow && <PageEyebrow>{eyebrow}</PageEyebrow>}
           <PageTitle id={titleId} className="mt-2">{title}</PageTitle>
           {subtitle && <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{subtitle}</div>}
         </div>
-        {actions}
+        {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
       </div>
       {children}
     </header>
