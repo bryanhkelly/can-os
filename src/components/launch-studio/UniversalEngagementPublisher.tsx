@@ -12,6 +12,7 @@ import {
 import {
   goPageIds, type GoDestination,
 } from "@/domain/site-go-links";
+import { engagementActionAvailable } from "@/domain/engagement-action-policy";
 import {
   createEngagementDefinition, createEngagementGoLink,
   revokeEngagementGoLink,
@@ -82,7 +83,8 @@ export function UniversalEngagementPublisher({
       : {mode:"redirect",destination:destination()},
     source:{marketingPackageId:packageId},
   };
-  const ready=engagementDefinitionSchema.safeParse(draft).success &&
+  const actionSupported=engagementActionAvailable(interaction,destination());
+  const ready=actionSupported && engagementDefinitionSchema.safeParse(draft).success &&
     (targetKind==="site-page"||targetKind==="information"||uuid.test(target));
   async function publish(){
     if(!ready || busy || published)return;
@@ -213,6 +215,9 @@ export function UniversalEngagementPublisher({
           <Input maxLength={80} value={actionLabel} onChange={event=>setActionLabel(event.target.value)}/>
         </label>}
       </div>
+      {!actionSupported&&<p role="status" className="mt-3 text-sm text-muted-foreground">
+        This destination cannot complete the selected interaction. Use Discover or Respond for informational journeys; Register requires an eligible training release or enrichment Season. Application, payment, agreement and verified resume integrations are not yet available.
+      </p>}
       <p className="mt-3 text-xs text-muted-foreground">Publishing creates an immutable, publicly accessible definition. Review content before continuing. This is not a formal program approval or registration.</p>
       <Button type="button" className="mt-4" disabled={busy||!ready} onClick={()=>void publish()}>
         {busy?"Publishing…":"Publish engagement"}
