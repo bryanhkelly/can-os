@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -215,16 +215,16 @@ export const listEngagementGoLinks=createServerFn({method:"GET"})
     const versions=await db.select({id:engagementDefinitionVersions.id})
       .from(engagementDefinitionVersions).where(eq(
         engagementDefinitionVersions.engagementId,record.id));
-    const versionIds=new Set(versions.map(v=>v.id));
-    if(!versionIds.size)return [];
+    const versionIds=versions.map(v=>v.id);
+    if(!versionIds.length)return [];
     const links=await db.select({
       id:siteGoLinks.id,code:siteGoLinks.code,channel:siteGoLinks.channel,
       status:siteGoLinks.status,engagementVersionId:siteGoLinks.engagementVersionId,
       createdAt:siteGoLinks.createdAt,
-    }).from(siteGoLinks).orderBy(desc(siteGoLinks.createdAt)).limit(500);
-    // Bounded selection; do not expose any other owner's link in the return.
-    return links.filter(link=>versionIds.has(link.engagementVersionId??""))
-      .map(link=>({...link,createdAt:link.createdAt.toISOString()}));
+    }).from(siteGoLinks)
+      .where(inArray(siteGoLinks.engagementVersionId,versionIds))
+      .orderBy(desc(siteGoLinks.createdAt)).limit(500);
+    return links.map(link=>({...link,createdAt:link.createdAt.toISOString()}));
   });
 
 export const retireEngagementDefinition=createServerFn({method:"POST"})
