@@ -584,7 +584,7 @@ function LocalWebsiteCopyEditor({
       {step===4&&<WebsiteSiteContentStep data={data} content={content}
         setContent={setContent} busy={busy} allowPublication={allowPublication}
         onContentBlocksSaved={()=>{void router.invalidate();}}
-        onContentBlocksDirty={setContentBlocksDirty}/>}
+        onContentBlocksDirty={setContentBlocksDirty} onSavePrivateDraft={()=>void saveDraft("stay")}/>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
         setContent={setContent} onSelectArtwork={selectArtwork}/>}

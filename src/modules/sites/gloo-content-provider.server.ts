@@ -18,8 +18,9 @@ export async function generateWithGloo(input:SiteGenerationInput,send:typeof fet
     headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},
     body:JSON.stringify({model,instructions:SITE_CONTENT_INSTRUCTIONS,input:JSON.stringify(input),max_output_tokens:3000})});
   if(!response.ok)throw new Error("Gloo AI could not generate an eligible draft ("+response.status+").");
-  const value=responseSchema.parse(JSON.parse(await boundedText(response)));
+  let value:z.infer<typeof responseSchema>;
+  try{value=responseSchema.parse(JSON.parse(await boundedText(response)));}catch{throw new Error("Gloo returned an invalid response.");}
   if(value.status&&value.status!=="completed")throw new Error("Gloo AI returned an incomplete draft.");
   const raw=value.output.filter(item=>item.type==="message").flatMap(item=>item.content??[]).filter(c=>c.type==="output_text").map(c=>c.text??"").join("");
-  return {content:parseGeneratedSiteContent(raw,input.target),model:value.model??model,providerResponseId:value.id??null};
+  try{return {content:parseGeneratedSiteContent(raw,input.target),model:value.model??model,providerResponseId:value.id??null};}catch{throw new Error("Gloo draft did not satisfy the content contract.");}
 }

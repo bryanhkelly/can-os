@@ -1,3 +1,5 @@
+import {db} from "@/db/client";
+import {writeAudit} from "@/platform/mutation";
 import {createHash} from "node:crypto";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
@@ -31,9 +33,11 @@ export const generateSiteContent=createServerFn({method:"POST"})
     setResponseHeader("Cache-Control","private, no-store");
     const before=await prepare(data);
     if(before.digest!==data.digest)throw new Error("Saved Site information changed. Review the new input before generation.");
+    await db.transaction(tx=>writeAudit(tx,before.actor,{action:"site.content_generation.requested",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId},after:{provider:"gloo",target:data.task.target,inputDigest:before.digest,promptVersion:before.input.promptVersion,sourceRevisions:before.sourceRevisions,externalProcessingConfirmed:true}}));
     const result=await generateWithGloo(before.input);
     const after=await prepare(data);
     if(after.digest!==before.digest||after.actor.actorPersonId!==before.actor.actorPersonId)
       throw new Error("Site information or permissions changed. Generate again.");
+    await db.transaction(tx=>writeAudit(tx,after.actor,{action:"site.content_generation.completed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId},after:{provider:"gloo",model:result.model,providerResponseId:result.providerResponseId,target:data.task.target,inputDigest:before.digest,outputDigest:createHash("sha256").update(JSON.stringify(result.content)).digest("hex"),promptVersion:before.input.promptVersion,sourceRevisions:before.sourceRevisions}}));
     return {...result,provider:"gloo" as const,sourceRevisions:before.sourceRevisions,inputDigest:before.digest,promptVersion:before.input.promptVersion,generatedAt:new Date().toISOString(),status:"draft" as const};
   });

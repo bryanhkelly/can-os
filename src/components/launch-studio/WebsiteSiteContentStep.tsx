@@ -37,13 +37,13 @@ const contentFields:ReadonlyArray<WebsiteCopyFieldSpec>=[
  * document. No second editor, source field store or Brand implementation. */
 export function WebsiteSiteContentStep({
   data,content,setContent,busy,allowPublication,onContentBlocksSaved,
-  onContentBlocksDirty,
+  onContentBlocksDirty,onSavePrivateDraft,
 }:{
   data:Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
   content:SiteLocalContent;
   setContent:Dispatch<SetStateAction<SiteLocalContent>>;
   busy:boolean;allowPublication:boolean;
-  onContentBlocksSaved:()=>void;onContentBlocksDirty:(dirty:boolean)=>void;
+  onContentBlocksSaved:()=>void;onContentBlocksDirty:(dirty:boolean)=>void;onSavePrivateDraft?:()=>void;
 }){
   const canReuse=content.contentReuseConsent === "granted";
   const canApplyExperienceWelcome=canReuse &&
@@ -207,7 +207,8 @@ export function WebsiteSiteContentStep({
         Review Site Information
       </Link>
     </div>}
-    {canReuse&&<SiteIntelligenceContentPanel key={data.siteId+":website"} siteId={data.siteId} target="website" disabled={busy||!data.canEdit} onApply={draft=>{if(draft.website)setContent(old=>({...old,...draft.website}));}}/>}
+    {canReuse&&data.editingContent?.contentReuseConsent!=="granted"&&onSavePrivateDraft&&<WorkspaceNotice tone="info"><p>Save your private website draft to record your content reuse choice before using Gloo. Nothing will be published.</p><Button type="button" variant="outline" size="sm" className="mt-2" disabled={busy||!data.canEdit||!data.draftStorageReady} onClick={onSavePrivateDraft}>Save private draft</Button></WorkspaceNotice>}
+    {canReuse&&<SiteIntelligenceContentPanel key={data.siteId+":website:"+data.currentRevision} siteId={data.siteId} target="website" disabled={busy||!data.canEdit} onApply={draft=>{if(draft.website)setContent(old=>({...old,...draft.website}));}}/>}
     {primaryFields.map(renderField)}
     {canReuse&&churchSite&&<details className="border p-4">
       <summary className="cursor-pointer text-sm font-semibold">

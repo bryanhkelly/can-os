@@ -20,7 +20,7 @@ export const siteGenerationTaskSchema=z.discriminatedUnion("target",[
 ]);
 export type SiteGenerationTask=z.infer<typeof siteGenerationTaskSchema>;
 export type SiteGenerationOptions=z.infer<typeof options>;
-const text=(max:number)=>z.string().trim().min(1).max(max).refine(v=>!/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v),"Plain text required").refine(v=>!containsProtectedInstitutionalClaim(v),"Protected institutional claim requires independent review").refine(v=>!/(?:https?:\/\/|www\.|\b\S+@\S+\.[a-z]{2,}\b)/i.test(v),"Links and addresses must be supplied by governed destination services");
+const text=(max:number)=>z.string().trim().min(1).max(max).refine(v=>!/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v),"Plain text required").refine(v=>!v.includes("—"),"Use punctuation other than em dashes").refine(v=>!containsProtectedInstitutionalClaim(v),"Protected institutional claim requires independent review").refine(v=>!/(?:https?:\/\/|www\.|\b\S+@\S+\.[a-z]{2,}\b)/i.test(v),"Links and addresses must be supplied by governed destination services");
 const website=z.object({
   heroHeadline:text(siteLocalContentLimits.heroHeadline),
   welcomeMessage:text(siteLocalContentLimits.welcomeMessage),
@@ -34,7 +34,7 @@ export const generatedContentSchema=z.object({
   target:z.enum(["website","outreach"]),
   website:website.nullable(),
   outreach:outreach.nullable(),
-  reviewNotes:z.array(z.string().trim().max(240)).max(8),
+  reviewNotes:z.array(z.string().trim().max(240).refine(v=>!/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v))).max(8),
 }).strict().superRefine((v,ctx)=>{
   if(v.target==="website"?(!v.website||v.outreach!==null):(!v.outreach||v.website!==null))
     ctx.addIssue({code:"custom",message:"Only the requested output block may be populated"});
@@ -43,7 +43,7 @@ export type GeneratedContent=z.infer<typeof generatedContentSchema>;
 
 /** External projection, not the full internal brief. No internal identifiers,
  * EIN, tax status, contact directory, session, metadata, evidence or raw brand. */
-export function buildSiteGenerationInput(brief:SiteContentBriefV61,task:SiteGenerationTask){
+export function buildSiteGenerationInput(brief:SiteContentBriefV61 & {organizationName?:string|null;editorialBrand?:{displayName:string;directionId:string|null}|null},task:SiteGenerationTask){
   if(!brief.consent.contentReuseAllowed)throw new Error("Save Site content reuse permission before generating.");
   const {options}=task;
   const hosting=brief.hosting;
@@ -54,7 +54,7 @@ export function buildSiteGenerationInput(brief:SiteContentBriefV61,task:SiteGene
   return {
     schemaVersion:CONTENT_CONTRACT_VERSION,promptVersion:CONTENT_PROMPT_VERSION,
     target:task.target,
-    site:{name:brief.site.name,timezone:brief.site.timezone,identity:brief.identity,
+    site:{name:brief.site.name,organizationName:brief.organizationName??null,brand:brief.editorialBrand??null,timezone:brief.site.timezone,identity:brief.identity,
       hosting:hosting?{mode:hosting.hostingMode,hostName:hosting.separateHostName,hostType:hosting.separateHostType}:null,
       environment:brief.environment},
     planning:{classification:"proposed_only",programInterests:brief.planning?.interestIds??[],

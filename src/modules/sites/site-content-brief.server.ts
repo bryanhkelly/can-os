@@ -1,8 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { siteBrandVersions, siteLocalContentVersions, sites, programs } from "@/db/schema";
+import { siteBrandVersions, siteLocalContentVersions, sites, programs, organizations } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertSiteSetupScope, assertWholeSiteProgramsInScope } from "@/domain/site-setup-scope";
+import { siteBrandConfigurationSchema } from "@/domain/site-brand";
 import { projectSiteContentBriefV61 } from "@/domain/site-content-brief-v61";
 import { normalizeSiteLocalContent } from "@/domain/site-local-content";
 import type { AccessContext } from "@/domain/access-context";
@@ -22,9 +23,12 @@ export async function readAuthorizedSiteContentBrief(actor:AccessContext,siteId:
     // Website editor authority is independently checked against the exact Site.
     if(mode!=="website")assertWholeSiteProgramsInScope(actor,attached.map(p=>p.id),"Site reporting");
     const [website]=await tx.select({revision:siteLocalContentVersions.revision,content:siteLocalContentVersions.content}).from(siteLocalContentVersions).where(eq(siteLocalContentVersions.siteId,site.id)).orderBy(desc(siteLocalContentVersions.revision)).limit(1);
-    const [brand]=site.currentBrandVersionId?await tx.select({revision:siteBrandVersions.revision,siteId:siteBrandVersions.siteId}).from(siteBrandVersions).where(eq(siteBrandVersions.id,site.currentBrandVersionId)).limit(1):[];
+    const [brand]=site.currentBrandVersionId?await tx.select({revision:siteBrandVersions.revision,siteId:siteBrandVersions.siteId,configuration:siteBrandVersions.configuration}).from(siteBrandVersions).where(eq(siteBrandVersions.id,site.currentBrandVersionId)).limit(1):[];
     if(site.currentBrandVersionId&&brand?.siteId!==site.id)throw new AuthorizationError("Site Brand ownership");
     const copy=website?normalizeSiteLocalContent(website.content,{allowIncompleteImage:true}):null;
-    return projectSiteContentBriefV61({siteId:site.id,siteName:site.name,timezone:site.timezone,siteRevision:site.updatedAt.toISOString(),metadata:site.metadata,brandVersionId:site.currentBrandVersionId,brandRevision:brand?.revision??null,websiteContent:copy,websiteContentRevision:website?.revision??null});
+    const [org]=await tx.select({name:organizations.name}).from(organizations).where(eq(organizations.id,site.organizationId)).limit(1);
+    const savedBrand=brand?siteBrandConfigurationSchema.parse(brand.configuration):null;
+    const brief=projectSiteContentBriefV61({siteId:site.id,siteName:site.name,timezone:site.timezone,siteRevision:site.updatedAt.toISOString(),metadata:site.metadata,brandVersionId:site.currentBrandVersionId,brandRevision:brand?.revision??null,websiteContent:copy,websiteContentRevision:website?.revision??null});
+    return {...brief,organizationName:org?.name??null,editorialBrand:savedBrand?{displayName:savedBrand.displayName,directionId:savedBrand.directionId}:null};
   });
 }
