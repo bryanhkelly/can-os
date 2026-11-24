@@ -23,7 +23,7 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(transfer).toContain('set({status:"withdrawn"})');
   expect(transfer).toContain("tx.insert(canonicalClassEnrollments)");
   expect(transfer).toContain("createInitialNativeClassAttempt(tx,destination.id,destinationAuthority)");
-  expect(transfer).toContain("tx.insert(participationAttributions)");
+  expect(transfer).toContain("writeNativeClassAttribution(tx,");
   expect(transfer).toContain('eventType:"ClassEnrollmentTransferred"');
   expect(transfer).toContain("sourceAttemptIdsClosed:closedAttemptIds");
   expect(learner).toContain("transferMyNativeClassEnrollment");
@@ -37,10 +37,14 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(repeat).toContain("isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId)");
  });
  it("consumes authorized repeat only inside successful Class admission",()=>{
+  const consumption=read("src/modules/classes/native-class-repeat-consumption.server.ts");
+  expect(consumption).toContain("ClassRepeatAuthorizationConsumed");
+  expect(consumption).toContain("consumedByEnrollmentId:input.classEnrollmentId");
+  expect(consumption).toContain("if(!consumed)throw");
   for(const source of [enrollment,assignment,guardian]){
    expect(source).toContain("requireNativeRepeatAuthorization");
-   expect(source).toContain("ClassRepeatAuthorizationConsumed");
-   expect(source).toContain("consumedByEnrollmentId:enrollment.id");
+   expect(source).toContain("consumeNativeClassRepeatAuthorization(tx,");
+   expect(source.indexOf("consumeNativeClassRepeatAuthorization(tx,")).toBeGreaterThan(source.indexOf("await createInitialNativeClassAttempt("));
   }
  });
 });
