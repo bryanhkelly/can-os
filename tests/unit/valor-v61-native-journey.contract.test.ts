@@ -11,21 +11,25 @@ describe("CAN V6.1 canonical student Class experience in any Site",()=>{
  const homework=read("src/modules/classes/native-class-homework.functions.ts");
  const access=read("src/modules/classes/native-learner-class-access.server.ts");
  const canonical=read("src/modules/learning/canonical-course-participation.server.ts");
+ const membership=read("src/domain/student-site-scope.ts");
  const route=read("src/routes/class.tsx");
  const detail=read("src/routes/class_.$classId.tsx");
 
  it("allows server-authorized demo-admin student switching without bypassing Person or Class checks",()=>{
    expect(session).toContain('if (actor.role === "student")');
    expect(session).not.toContain('if (!actor.actorPersonId || actor.sessionAccountId ||');
-   expect(session).toContain('actor.grantSiteId');
-   expect(session).toContain('actor.capabilities.has("student:read")');
+   expect(session).toContain('studentSiteScope(actor)');
+   expect(membership).toContain('actor.capabilities.has("student:read")');
    expect(classWorkspace).toContain('canonicalClassEnrollments');
  });
  it("uses an authorized current CAN student Site grant, not a synthetic ID",()=>{
    expect(session).toContain('actor.role === "student"');
-   expect(session).toContain('actor.capabilities.has("student:read")');
-   expect(list).toContain('actor.role!=="student"');
-   expect(list).toContain("actor.grantSiteId");
+   expect(membership).toContain('actor.capabilities.has("student:read")');
+   expect(list).toContain('studentSiteScope(actor)');
+   expect(list).toContain("membership.siteId");
+   expect(canonical).toContain("studentSiteScope(context)");
+   expect(canonical).toContain("membership.siteId!==classInstance.siteId");
+   expect(canonical).toContain("membership.organizationId!==classInstance.operatingOrganizationId");
    expect(list).toContain("currentClassAuthority");
    expect(list).not.toContain("VALOR_SITE");
    expect(list).not.toContain('metadata @> \'{"synthetic":true}\'');
