@@ -14,7 +14,7 @@ export const Comparison: Story = {play:async({canvasElement})=>{
   const canvas=within(canvasElement);
   await expect(canvas.getByRole("table",{name:"Pilot participation exact values"})).toBeVisible();
   await expect(canvas.getByRole("rowheader",{name:"Completed"})).toBeVisible();
-  await expect(canvas.getByText("69",{exact:true})).toBeVisible();
+  await expect(within(canvas.getByRole("table",{name:"Pilot participation exact values"})).getByText("69",{exact:true})).toBeVisible();
   await waitFor(()=>expect(canvasElement.querySelector("[data-report-chart-plot] .recharts-surface")).not.toBeNull());
 }};
 export const Trend: Story = {args:{spec:{...fixture,title:"Monthly participation",kind:"trend",
@@ -31,7 +31,7 @@ export const Distribution: Story={args:{spec:{title:"Receipt mix",description:"S
 export const Stacked: Story={args:{spec:{title:"Receipt states by source",description:"Synthetic disjoint groups.",valueLabel:"Events",
   kind:"stacked",format:"count",population:"Eligible events per source",series:[{id:"a",label:"Accepted"},{id:"b",label:"Pending"}],
   rows:[{id:"x",label:"Source A",total:50,values:[42,8]},{id:"y",label:"Source B",total:20,values:[18,2]}]}},
-  play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByRole("columnheader",{name:"Accepted"})).toBeVisible();await expect(canvas.getByText("42",{exact:true})).toBeVisible();}};
+  play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByRole("columnheader",{name:"Accepted"})).toBeVisible();await expect(within(canvas.getByRole("table",{name:"Receipt states by source exact values"})).getByText("42",{exact:true})).toBeVisible();}};
 export const Funnel: Story={args:{spec:{title:"Nested cohort",description:"Synthetic fixture with verified nesting; no implied causal attribution.",valueLabel:"Registrations",
   kind:"funnel",format:"count",population:"Same registration cohort",nestedCohort:true,
   points:[{id:"a",label:"Eligible",value:100},{id:"b",label:"Started",value:70},{id:"c",label:"Completed",value:40}]}}};
@@ -53,6 +53,7 @@ const categoricalFixture={title:"Delivery pathways",description:"Synthetic parti
   rows:[{id:"first",label:"Site 1",total:100,values:[25,25,25,25]},{id:"second",label:"Site 2",total:100,values:[40,20,30,10]}]} satisfies ReportChartSpec;
 export const CategoricalFourSeries:Story={args:{spec:categoricalFixture},play:async({canvasElement})=>{
   await waitFor(()=>expect(canvasElement.querySelectorAll("[data-report-chart-plot] pattern").length).toBe(3));
+  await waitFor(()=>expect(canvasElement.querySelectorAll("[data-report-chart-plot] .recharts-bar-rectangle [fill^=\"url(#report-paint-\"]").length).toBeGreaterThan(0));
   await expect(within(canvasElement).getByRole("columnheader",{name:"Pathway D"})).toBeVisible();
 }};
 export const CategoricalDark:Story={args:{spec:categoricalFixture},globals:{theme:"dark"}};
@@ -61,4 +62,14 @@ export const CategoricalMobile:Story={args:{spec:categoricalFixture},render:args
 export const PrintExactValues:Story={args:{spec:categoricalFixture,presentation:"print"},play:async({canvasElement})=>{
   await expect(within(canvasElement).getByRole("table",{name:"Delivery pathways exact values"})).toBeVisible();
   expect(canvasElement.querySelector("[data-report-chart-plot]")).toBeNull();
+}};
+
+/** Nested theme scopes must resolve aliases from the active theme, not :root. */
+export const DarkTokenResolution:Story={args:{spec:categoricalFixture},globals:{theme:"dark"},play:async({canvasElement})=>{
+  await waitFor(()=>expect(canvasElement.querySelector("[data-report-chart-plot]")).not.toBeNull());
+  const plot=canvasElement.querySelector("[data-report-chart-plot]")!;
+  const tokens=getComputedStyle(plot);
+  expect(tokens.getPropertyValue("--report-axis").trim()).toBe(tokens.getPropertyValue("--muted-foreground").trim());
+  expect(tokens.getPropertyValue("--report-grid").trim()).toBe(tokens.getPropertyValue("--border").trim());
+  expect(tokens.getPropertyValue("--report-separator").trim()).toBe(tokens.getPropertyValue("--card").trim());
 }};

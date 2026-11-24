@@ -13,7 +13,7 @@ class PlotBoundary extends Component<{children:ReactNode},{failed:boolean}>{
   render(){return this.state.failed?<WorkspaceNotice tone="attention">Chart unavailable. Exact values are below.</WorkspaceNotice>:this.props.children;}
 }
 function SeriesLabel({label,index}:{label:string;index:number}){
-  return <span className="inline-flex items-center gap-2 break-words"><ReportSeriesMark index={index}/>{label}</span>;
+  return <span className="inline-flex items-center gap-2 break-words [overflow-wrap:anywhere]"><ReportSeriesMark index={index}/>{label}</span>;
 }
 function ReportExactValues({spec}:{spec:ReportChartSpec}){
   const label=spec.title+" exact values";
@@ -24,7 +24,7 @@ function ReportExactValues({spec}:{spec:ReportChartSpec}){
       <TableHeader><TableRow><TableHead scope="col">Category</TableHead>
         {spec.series.map((s,i)=><TableHead key={s.id} scope="col" className="text-right"><SeriesLabel label={s.label} index={i}/></TableHead>)}
         <TableHead scope="col" className="text-right">Total</TableHead></TableRow></TableHeader>
-      <TableBody>{spec.rows.map(row=><TableRow key={row.id}><TableRowHead className="break-words">{row.label}</TableRowHead>
+      <TableBody>{spec.rows.map(row=><TableRow key={row.id}><TableRowHead className="break-words [overflow-wrap:anywhere]">{row.label}</TableRowHead>
         {row.values.map((v,i)=><TableCell key={spec.series[i]!.id} className="text-right tabular-nums">{formatReportChartValue(v,spec.format)}</TableCell>)}
         <TableCell className="text-right tabular-nums">{formatReportChartValue(row.total,spec.format)}</TableCell></TableRow>)}</TableBody>
     </Table>;
@@ -48,7 +48,7 @@ export function ReportChart({spec,presentation="interactive",headingLevel="h3"}:
 }){
   const valid=validateReportChart(spec);
   const categorical=spec.kind==="stacked"?spec.series:spec.kind==="distribution"?spec.points:null;
-  return <div data-report-chart={spec.kind} className="min-w-0 print:break-inside-avoid">
+  return <div data-report-chart={spec.kind} className="min-w-0">
     <DashboardPanel title={spec.title} description={spec.description} headingLevel={headingLevel}>
       <div className="min-w-0 space-y-4">
         {!valid?<WorkspaceNotice tone="attention">Invalid or unbounded chart data. Use the source report.</WorkspaceNotice>:<>

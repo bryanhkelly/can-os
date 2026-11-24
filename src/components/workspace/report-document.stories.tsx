@@ -3,6 +3,7 @@ import {expect,within} from "storybook/test";
 import {ReportDocumentView,type ReportDocument} from "./report-document";
 const report:ReportDocument={version:1,definitionId:"synthetic-impact-review-v1",title:"Community learning impact review",
   scopeLabel:"Illustrative internal review",basis:"Synthetic values for design acceptance only; not an approved external publication",
+  definitions:[{metricKey:"fixture.registrations",definitionVersion:"1",sourceDomain:"noncredit_pilot",sourceMetricKey:"registrations",label:"Registrations",source:"Synthetic fixture",denominator:"Registration IDs",rule:"One fixture count per registration",timeBasis:"Synthetic cohort",disclosure:"private_operational"}],
   blocks:[
     {id:"metrics",kind:"metrics",items:[{id:"registrations",label:"Registrations",value:1250},{id:"people",label:"Unique participants",value:1080},{id:"hours",label:"Verified participant hours",value:875},{id:"outcome",label:"Verified outcomes",value:null}]},
     {id:"trend",kind:"chart",spec:{kind:"trend",title:"Monthly registrations",description:"Synthetic monthly cohort counts; unavailable months are not interpolated.",valueLabel:"Registrations",points:[{id:"jan",label:"January",value:120},{id:"feb",label:"February",value:190},{id:"mar",label:"March",value:null},{id:"apr",label:"April",value:270}]}},
@@ -19,5 +20,6 @@ export const PrintReview:Story={args:{presentation:"print"},play:async({canvasEl
   const canvas=within(canvasElement);
   await expect(canvas.getByRole("table",{name:"Monthly registrations exact values"})).toBeVisible();
   await expect(canvas.getByRole("table",{name:"Registrations by Site exact values"})).toBeVisible();
+  await expect(canvas.getByRole("table",{name:"Community learning impact review metric definitions"})).toBeVisible();
   expect(canvasElement.querySelector("[data-report-chart-plot]")).toBeNull();
 }};

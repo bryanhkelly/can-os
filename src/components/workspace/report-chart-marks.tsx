@@ -1,7 +1,7 @@
 import {useId} from "react";
 import {reportSeriesColors,reportSeriesPatterns,reportPlotStyle} from "./report-chart-palette";
 
-/** SVG paint IDs must be unique across charts, legends and React roots. */
+/** SVG paint IDs must be unique across charts and legends in the application root. */
 export function useReportPaintPrefix(){
   const id=useId();
   return "report-paint-"+Array.from(id,c=>c.codePointAt(0)!.toString(16)).join("-");
@@ -30,7 +30,7 @@ export function ReportSeriesMark({index}:{index:number}){
 export function ReportSeriesLegend({items}:{items:readonly {id:string;label:string}[]}){
   return <ul aria-label="Chart series" className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-sans text-foreground print:hidden">
     {items.map((item,index)=><li key={item.id} className="flex min-w-0 items-start gap-2">
-      <ReportSeriesMark index={index}/><span className="break-words">{item.label}</span>
+      <ReportSeriesMark index={index}/><span className="min-w-0 break-words [overflow-wrap:anywhere]">{item.label}</span>
     </li>)}
   </ul>;
 }

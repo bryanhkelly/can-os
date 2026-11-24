@@ -20,7 +20,7 @@ export function ReportDocumentView({report,presentation="interactive"}:{report:R
   const titleId=useId();
   if(report.version!==1||new Set(report.blocks.map(b=>b.id)).size!==report.blocks.length)
     return <p role="alert">Unsupported or invalid report definition.</p>;
-  return <section aria-labelledby={titleId} className="min-w-0 space-y-4 print:text-sm">
+  return <section data-report-document={report.definitionId} aria-labelledby={titleId} className="min-w-0 space-y-4 print:text-sm">
     <div><h3 id={titleId} className="font-serif text-section font-normal leading-tight">{report.title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{report.scopeLabel}. {report.basis}</p></div>
     {report.blocks.map(block=>{
@@ -35,7 +35,7 @@ export function ReportDocumentView({report,presentation="interactive"}:{report:R
         case "note":return <p key={block.id} className="text-sm text-muted-foreground">{block.text}</p>;
       }
     })}
-    {!!report.definitions?.length&&<details className="border border-border bg-card p-4">
+    {!!report.definitions?.length&&<details open={presentation==="print"?true:undefined} className="border border-border bg-card p-4">
       <summary className="cursor-pointer font-semibold text-sm">Metric definitions and evidence sources</summary>
       <Table scrollLabel={report.title+" metric definitions"} aria-label={report.title+" metric definitions"}>
         <TableCaption className="sr-only">Metric definitions and versions</TableCaption>

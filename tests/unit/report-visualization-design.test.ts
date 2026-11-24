@@ -18,6 +18,9 @@ describe("V6.1 data visualization foundation",()=>{
   it("requires every categorical color to contrast against card, canvas and texture ink in both modes",()=>{
     for(const source of [block(":root"),block(".dark")]){
       const card=token(source,"card"),canvas=token(source,"background");
+      for(const [alias,target] of [["axis","muted-foreground"],["grid","border"],["separator","card"],["hover","muted"]]){
+        expect(source).toContain("--report-"+alias+": var(--"+target+");");
+      }
       for(let i=1;i<=4;i++){
         const mark=token(source,"report-series-"+i);
         expect(contrastRatio(mark,card)).toBeGreaterThanOrEqual(3);

@@ -229,6 +229,11 @@
   --report-series-2: #7da2bf;
   --report-series-3: #c0a0d4;
   --report-series-4: #75c4cb;
+  /* Resolve aliases again in nested dark theme scopes, including Storybook. */
+  --report-axis: var(--muted-foreground);
+  --report-grid: var(--border);
+  --report-separator: var(--card);
+  --report-hover: var(--muted);
 
   --secondary: #243149;
   --secondary-foreground: #f4f7fc;
@@ -587,3 +592,28 @@
   line-height:1.5; overflow-wrap:anywhere;
 }
 .launch-field-help[data-align="end"] [role="tooltip"] { left:auto; right:0; }
+
+/* V6.1 reporting print uses a light, exact-value reading surface.
+   Do not clip scrollable tables or keep a multi-page chart table together. */
+@media print {
+  [data-report-document], [data-report-chart] {
+    color-scheme: light;
+    --foreground: #101d39;
+    --card: #ffffff;
+    --muted-foreground: #52627c;
+    --muted: #eef2f7;
+    --border: #e2e8f0;
+    color: var(--foreground);
+    background: var(--card);
+  }
+  [data-report-chart] [role="region"], [data-report-document] [role="region"] {
+    overflow: visible !important;
+  }
+  [data-report-chart] table, [data-report-document] table {
+    width: 100%;
+    table-layout: auto;
+  }
+  [data-report-chart] thead, [data-report-document] thead { display: table-header-group; }
+  [data-report-chart] tr, [data-report-document] tr { break-inside: avoid; }
+  [data-report-chart] header { break-after: avoid; }
+}
