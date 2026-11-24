@@ -758,3 +758,21 @@ Nested dark theme scopes explicitly resolve analytical axis, grid, separator and
 - `ReportMetricCard` composes StatCard and accepts source-provided freshness and exact metric definition metadata. `ReportTargetAttainment` composes DashboardProgress with neutral analytical ink; actual attainment can exceed 100%, but the visual bar is capped and labeled. `ReportRankedComparison` composes DashboardPanel, Table and Button, preserves unavailable values, uses one shared scale and emits only IDs from its supplied bounded authorized rows.
 - Provider Site comparison filters the same already-authorized cohort rows, cards and chart. It does not navigate or acquire additional permission. An unavailable prior selection no longer silently broadens the report. Cross-organization drilldown still requires an independently authorized reader and source-defined dimensions. Never compute distinct-person totals by adding Site aggregates.
 - Storybook: V6.1 foundations / Data Visualization / Analytical components, Reserved series slots and Fixed shared axis. Browser and screenshot acceptance remain mandatory.
+
+### Independent rendered-output evidence (release gate)
+
+The strict coverage command `node scripts/check-v61-coverage.mjs --strict`
+requires one reviewed record per independently rendered source in
+`docs/verification/v61-visual-evidence.json`. Bind each record to the source
+SHA-256 and to three distinct screenshot files under
+`docs/verification/screenshots/`. Each screenshot record contains
+`viewport`, `path`, and `sha256`. Capture mobile at 390 px, tablet at 768 px,
+and desktop at 1440 px, with device scale factor 1. Keep screenshots and source
+hashes current; a change to reviewed source or a screenshot invalidates the
+record. Record the actual reviewer and review timestamp only after inspection.
+
+The validator checks PNG headers, exact byte hashes, unique viewport entries
+and path containment. It does not decode all image content, authenticate the
+reviewer, prove correct rendering, or replace accessibility and authenticated
+journey acceptance. Use actual browser evidence; never populate the manifest
+with synthetic fixtures or placeholder screenshots.
