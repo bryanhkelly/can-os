@@ -9,13 +9,37 @@ import {
 } from "@/domain/engagement-definition";
 import { goCodeSchema, goDestinationHref, type GoDestination } from "@/domain/site-go-links";
 import { publicSiteHost } from "@/domain/public-site-address";
+import { siteBrandConfigurationSchema } from "@/domain/site-brand";
+import { resolveSiteTheme, type SiteTheme } from "@/domain/site-theme";
 import { goLinkAvailability } from "@/domain/go-link-policy";
 import { resolveSiteGoLink } from "./site-go-links.server";
 
 export type GoExperience =
   | {mode:"redirect";href:string}
-  | {mode:"page";definition:EngagementDefinition;href:string;ownerName:string};
+  | {mode:"page";definition:EngagementDefinition;href:string;ownerName:string;theme?:SiteTheme|null};
 
+/** Use only a stored, same-Site, immutable Brand version. No caller CSS or external fonts. */
+async function publishedExperienceBrand(
+  siteId:string|null,brandVersionId:string|undefined,
+):Promise<{name:string;theme:SiteTheme}|null>{
+  if(!siteId||!brandVersionId)return null;
+  const [row]=await db.select({configuration:siteBrandVersions.configuration})
+    .from(siteBrandVersions).where(and(
+      eq(siteBrandVersions.siteId,siteId),
+      eq(siteBrandVersions.id,brandVersionId),
+    )).limit(1);
+  if(!row)return null;
+  const parsed=siteBrandConfigurationSchema.safeParse(row.configuration);
+  if(!parsed.success)return null;
+  const brand=parsed.data;
+  return {
+    name:brand.displayName,
+    theme:resolveSiteTheme(
+      brand.paletteId,brand.typographyId,
+      brand.headingFontId??undefined,brand.bodyFontId??undefined,
+    ),
+  };
+}
 async function publishedSiteHost(siteId:string|null):Promise<string|null>{
   if(!siteId)return null;
   const [publication]=await db.select({
@@ -124,7 +148,10 @@ export async function resolveGoExperience(code:string):Promise<GoExperience|null
   const href=await resolveDestination(destination,code,owner.siteId);
   if(!href)return null;
   await observeUniversalGoVisit(link.id);
-  return definition.execution.mode==="redirect"
-    ? {mode:"redirect",href}
-    : {mode:"page",definition,href,ownerName:owner.name};
+  if(definition.execution.mode==="redirect")return {mode:"redirect",href};
+  const identity=await publishedExperienceBrand(
+    owner.siteId,definition.presentation.brandVersionId,
+  );
+  return {mode:"page",definition,href,
+    ownerName:identity?.name??owner.name,theme:identity?.theme??null};
 }
