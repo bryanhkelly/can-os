@@ -100,7 +100,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
     // read queries and must not hold a Site row lock during rendering.
     let stage = "render";
     try {
-      const preview=await getPartnerWebsitePreview(actor);
+      const preview=await getPartnerWebsitePreview(actor,undefined,"external-preview");
       stage = "transaction";
       return await db.transaction(async tx => {
       const [site] = await tx.select({
@@ -145,6 +145,7 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       // second website or silently suppress its setup/network sections.
       stage = "revision-check";
       if(preview.siteId!==site.id ||
+        preview.siteConfigurationRevision!==site.updatedAt.toISOString() ||
         preview.currentRevision!==latest.revision ||
         preview.currentBrandVersionId!==brand.version.id ||
         !preview.previewPages["/"])
