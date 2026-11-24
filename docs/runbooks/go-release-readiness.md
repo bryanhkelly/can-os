@@ -31,7 +31,11 @@ Run with --live and CAN_LIVE_PREVIEW_CODE set to a dedicated revocable Go previe
 
 ## Database boundary
 
-The existing deployment schema guard expects a trusted server connection with BYPASSRLS. Anonymous and authenticated database roles must not receive direct access. This is not the same as a least-privilege runtime role. A restricted Go runtime connection and scoped policies/functions require a separate reviewed migration and acceptance test; never simply revoke the current application's privileges on production.
+Migration 0113 introduces the NOLOGIN, NOBYPASSRLS role can_go_gateway. The public registry and entry counter always run under SET LOCAL ROLE in a short transaction. Its RLS scope is a single validated Go code; it cannot read the creator, change a link, enumerate unscoped codes, or update another link's counter. Destination catalog and authenticated management still use their existing authorization and database access paths. This is a scoped registry boundary, not full database-wide least privilege.
+
+Before enabling the updated runtime, apply the reviewed migration chain to the deployment database and have an authorized database operator grant membership in can_go_gateway to the exact server runtime principal (not anonymous, authenticated or a user-facing login). Do not grant membership to other roles. Verify the role can be assumed using the actual deployment connection and that its unscoped SELECT returns no rows. The release gate now enforces this. A missing role or membership fails closed; there is no owner fallback for registry lookup. Do not deploy before these checks pass.
+
+The isolated browser acceptance fixture now tests unscoped reads, exact-code visibility, cross-code counter writes and attempts to mutate the registry under the restricted role.
 
 ## Release decision
 
