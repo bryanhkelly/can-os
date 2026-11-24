@@ -8,9 +8,8 @@ import {ReportDateFilter} from "@/components/workspace/report-date-filter";
 import {reportDefinitionId} from "@/domain/report-catalog";
 import { ReportDocumentView } from "@/components/workspace/report-document";
 import { bindRegisteredCounts,pilotOutcomeDefinitions } from "@/domain/reporting-view-definitions";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { EmptyState, QueryState, WorkspaceNotice } from "@/components/workspace";
+import { DisclosureSection, EmptyState, QueryState, WorkspaceNotice } from "@/components/workspace";
 import { getNoncreditPilotOutcomes } from "@/modules/learning/noncredit-pilot-outcomes.functions";
 import {ReportMetricCard} from "@/components/workspace/report-metric-card";
 import {formatReportValue} from "@/domain/report-value-format";
@@ -20,7 +19,6 @@ const count=(n:number)=>formatReportValue(n);
 
 /** Reusable, provider-only learning-outcomes panel, using Design System 6.1. */
 export function NoncreditPilotOutcomesPanel(){
-  const [showDefinitions,setShowDefinitions]=useState(false);
   const scope=usePrivateReportScope();
   const controller=useProviderReportFilters(scope);
   const {geography,siteId,outcomePeriod:{range}}=controller.filters;
@@ -100,14 +98,8 @@ export function NoncreditPilotOutcomesPanel(){
           proof of verified participation minutes.
         </p>
       </div>
-      <section className="border border-border bg-card p-4">
-        <Button type="button" variant="ghost" aria-expanded={showDefinitions}
-          onClick={()=>setShowDefinitions(v=>!v)}
-          className="flex w-full justify-between gap-4 px-0 text-left">
-          Metric definitions and evidence sources
-          <span aria-hidden="true">{showDefinitions?"−":"+"}</span>
-        </Button>
-        {showDefinitions&&<Table scrollLabel="Pilot metric definitions" aria-label="Pilot metric definitions"
+      <DisclosureSection title="Metric definitions and evidence sources">
+        <Table scrollLabel="Pilot metric definitions" aria-label="Pilot metric definitions"
           className="mt-3 w-full min-w-[36rem] text-left text-sm">
           <TableCaption className="sr-only">Pilot metric definitions and authoritative sources</TableCaption>
           <TableHeader className="border-b border-border">
@@ -123,8 +115,8 @@ export function NoncreditPilotOutcomesPanel(){
               <TableCell className="p-3 font-mono text-xs">{def.source}</TableCell>
               <TableCell className="p-3">{def.denominator}. {def.rule} {def.timeBasis}.</TableCell>
             </TableRow>)}</TableBody>
-        </Table>}
-      </section>
+        </Table>
+      </DisclosureSection>
       {!!report?.byTraining.length&&<div className="border border-border bg-card">
         <Table scrollLabel="Training participation and outcome counts" aria-label="Training participation and outcome counts" className="w-full text-left text-sm"><TableCaption className="sr-only">Training participation and outcome counts</TableCaption>
           <TableHeader className="border-b bg-muted/40 text-xs text-muted-foreground">
