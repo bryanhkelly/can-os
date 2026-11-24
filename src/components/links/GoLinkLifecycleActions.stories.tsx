@@ -40,3 +40,14 @@ export const Busy:Story={
     for(const button of within(canvasElement).getAllByRole("button"))await expect(button).toBeDisabled();
   },
 };
+
+export const RevokeOnly:Story={
+  args:{allowPause:false,onTest:undefined},
+  play:async({canvasElement,args})=>{
+    const canvas=within(canvasElement);
+    await expect(canvas.queryByRole("button",{name:"Pause"})).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("button",{name:"Resume"})).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button",{name:"Revoke"}));
+    await expect(args.onChange).toHaveBeenCalledWith("revoke");
+  },
+};
