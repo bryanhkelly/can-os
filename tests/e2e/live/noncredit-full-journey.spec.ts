@@ -128,7 +128,7 @@ test("approved independent noncredit fixture: Go invitation to verified completi
       await open(operator,"/programs/noncredit/enrollment");
       const evidence=operator.getByRole("region",{name:"Noncredit program evidence"});
       const table=evidence.getByRole("table",{name:"Training participation and outcome counts"});
-      const row=table.getByRole("row").filter({has:table.getByRole("rowheader",{name:fixture.trainingTitle,exact:true})});
+      const row=table.getByRole("row").filter({has:operator.getByRole("rowheader",{name:fixture.trainingTitle,exact:true})});
       // The fixture training is fresh and belongs only to this run. A result
       // from another training, earlier run or an arbitrary first row cannot pass.
       await expect(row).toHaveCount(1);
