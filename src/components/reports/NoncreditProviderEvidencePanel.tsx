@@ -10,17 +10,7 @@ import {ReportRankedComparison} from "@/components/workspace/report-ranked-compa
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
 import {ReportChart} from "@/components/workspace/report-chart";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
-import {reportingCsvRow} from "@/domain/reporting-csv";
-
-/** Private operator CSV shares the formula-safe serializer with Class reports. */
-function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filename:string){
-  const source=rows.map(reportingCsvRow).join("\r\n");
-  const blob=new Blob([source],{type:"text/csv;charset=utf-8"});
-  const url=URL.createObjectURL(blob);
-  const link=document.createElement("a");
-  link.href=url;link.download=filename;
-  document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
-}
+import {downloadReportingCsv} from "@/lib/reporting-download";
 
 /**
  * Existing one-operator noncredit evidence service remains the source of
@@ -70,7 +60,7 @@ export function NoncreditProviderEvidencePanel(){
         "PRIVATE OPERATOR EVIDENCE - NOT APPROVED FOR PUBLICATION",
       ]),
     ];
-    savePrivateCsv(rows,"can-os-private-noncredit-evidence-"+data.asOf.slice(0,10)+".csv");
+    downloadReportingCsv(rows,"can-os-private-noncredit-evidence-"+data.asOf.slice(0,10)+".csv");
   }
   return <section aria-label="Authorized Program and Site reporting" className="space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4">
