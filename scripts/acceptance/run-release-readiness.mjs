@@ -49,8 +49,8 @@ run("Site regression suite",["run","test:site:channels"]);
 if(enabled("--database")&&process.env.DATABASE_URL){
   run("Deployment database schema and privileges (read only)",["run","db:check:friendly-urls:deploy"],process.env);
 }else block("Deployment database schema and privileges","Requires --database and exact deployment DATABASE_URL");
-if(enabled("--browser")&&process.env.TEST_DATABASE_URL&&process.env.TEST_DATABASE_URL===process.env.DATABASE_URL){
-  run("Isolated browser security acceptance",["run","test:e2e:release-security"],process.env);
+if(enabled("--browser")&&process.env.TEST_DATABASE_URL){
+  run("Isolated browser security acceptance",["run","test:e2e:release-security"],{...process.env,DATABASE_URL:process.env.TEST_DATABASE_URL});
 }else block("Isolated browser security acceptance","Requires --browser and attested disposable test database; never use production");
 if(enabled("--live")&&/^[A-Za-z0-9_-]{12}$/.test(process.env.CAN_LIVE_PREVIEW_CODE??"")){
   run("Anonymous live Go preview",["run","test:e2e:live-go"],process.env);
