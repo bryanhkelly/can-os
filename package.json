@@ -141,6 +141,7 @@
     "test:urls:unit": "node --test scripts/lib/friendly-url-deploy-guards.test.mjs && vitest run tests/unit/site-setup-scope.test.ts tests/unit/go-link-search.test.ts tests/unit/go-link-platform-reuse.test.ts tests/unit/go-link-qr-contract.test.ts tests/unit/go-link-share-origin-contract.test.ts tests/unit/reporting-metric-registry.test.ts tests/unit/reporting-instrumentation-coverage.test.ts tests/unit/go-link-policy.test.ts tests/unit/go-link-service-boundaries.test.ts tests/unit/url-sharing-contract.test.ts tests/unit/go-target-input.test.ts tests/unit/url-destinations.test.ts tests/unit/friendly-route-access-contract.test.ts tests/unit/friendly-site-urls.test.ts tests/unit/opaque-url-id.test.ts tests/unit/compact-url-search.test.ts",
     "test:e2e:release-security": "playwright test tests/e2e/release-11232026-security.spec.ts",
     "test:e2e:live-go": "playwright test --config playwright.live.config.ts go-release.spec.ts",
+    "verify:pilot:noncredit-schema": "node scripts/acceptance/check-noncredit-pilot-readiness.mjs",
     "verify:release": "node scripts/acceptance/run-release-readiness.mjs"
   },
   "dependencies": {
