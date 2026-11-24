@@ -45,10 +45,13 @@ describe("native Class adult approval source contract",()=>{
   ])expect(enrollment).toContain(guard);
  });
  it("offers adult request, independent staff review and fresh learner consent",()=>{
-  expect(learner).toContain("requestNativeClassApproval");
+  expect(learner).toContain("<OfferingCard");
+  expect(learner).toContain("<ApprovedClassCard");
+  expect(read("src/components/learning/native-class/OfferingCard.tsx")).toContain("requestNativeClassApproval");
   expect(learner).toContain("getMyNativeClassApprovals");
-  expect(learner).toContain("approvalRequestId:item.approvalRequestId");
-  expect(learner).toContain("I accept the current Class participation");
+  const card=read("src/components/learning/native-class/ApprovedClassCard.tsx");
+  expect(card).toContain("approvalRequestId:item.approvalRequestId");
+  expect(card).toContain("I accept the current Class participation");
   expect(manager).toContain("getNativeClassApprovalQueue");
   expect(manager).toContain("decideNativeClassApproval");
   expect(manager).toContain("reviewReason.trim()");
