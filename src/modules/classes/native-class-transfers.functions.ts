@@ -12,8 +12,7 @@ import {
   canonicalClassOfferings,
   canonicalClassEnrollmentTransferRequests,
   canonicalPersons,
-  participationAttributions,
-} from "@/db/canonical-v301";
+  } from "@/db/canonical-v301";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {assertCurrentNativeClassLearnerForMutation} from "./native-class-learner-session.server";
@@ -21,6 +20,7 @@ import {currentClassAuthority} from "./native-class-authority.server";
 import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./native-class-attempt.server";
+import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import {verifiedAdultOn,assertNativeSelfEnrollmentEligible} from "@/domain/native-class-enrollment";
 import {NATIVE_SELF_TRANSFER_CREDIT_MODES} from "@/domain/native-class-transfer-choices";
 import {
@@ -159,16 +159,7 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
     consentVersion:terms.consentVersion,consentSha256,consentedAt:now,
    }).returning({id:canonicalClassEnrollments.id});
    if(!destination)throw new Error("destination Class Enrollment not saved");
-   await tx.insert(participationAttributions).values({
-    classEnrollmentId:destination.id,
-    deliverySiteId:destinationAuthority.siteId,
-    reportingSiteId:destinationAuthority.siteId,
-    creditedOrganizationId:destinationAuthority.operatingOrganizationId,
-    attributionBasis:"provider_default",
-    relationshipSnapshot:{kind:"provider_default",classId:destinationClass.id,
-      organizationId:destinationAuthority.operatingOrganizationId,
-      siteId:destinationAuthority.siteId},
-   });
+   await writeNativeClassAttribution(tx,{enrollmentId:destination.id,source:destinationAuthority,now:now});
    const attempt=await createInitialNativeClassAttempt(tx,destination.id,destinationAuthority);
    const [transfer]=await tx.insert(canonicalClassEnrollmentTransferRequests).values({
     sourceEnrollmentId:source.id,targetClassId:destinationClass.id,
