@@ -33,6 +33,23 @@ describe("Go Link Site reuse and scaled operations",()=>{
     expect(ui).toContain("Search saved links by name");
     expect(ui).toContain("Search available destinations");
   });
+  it("uses one catalog field and private catalog query across all authoring surfaces",()=>{
+    for(const path of [
+      "src/components/links/GovernedGoDestinationPicker.tsx",
+      "src/components/links/OwnerEngagementDestinationPicker.tsx",
+      "src/components/launch-studio/GoLinkWorkspace.tsx",
+    ]){
+      const source=read(path);
+      expect(source).toContain("<GoDestinationChoiceField");
+      expect(source).toContain("useGoDestinationChoices(");
+      expect(source).not.toContain("setChoices(");
+    }
+    const hook=read("src/hooks/use-go-destination-choices.ts");
+    expect(hook).toContain("workspaceSessionIdentity(session)");
+    expect(hook).toContain('queryKey:["go-destination-choices",scope,...key]');
+    expect(hook).toContain("gcTime:0");
+    expect(hook).toContain("query.isPlaceholderData");
+  });
   it("enforces exactly-once creation semantics for repeated request IDs",()=>{
     const schema=read("src/db/schema/site-go-links.ts");
     expect(schema).toContain("site_go_links_request_uq");
