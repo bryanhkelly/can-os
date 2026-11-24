@@ -8,7 +8,7 @@ import {ReportDateFilter} from "@/components/workspace/report-date-filter";
 import {utcDaysThroughToday,priorReportDateRange,resolveReportDateRange,type ReportDateRange} from "@/components/workspace/report-date-range";
 import {ReportMetricComparison} from "@/components/workspace/report-period-comparison";
 import {getNativeClassReport} from "@/modules/reporting/native-class-report.functions";
-import {reportingCsvRow} from "@/domain/reporting-csv";
+import {downloadReportingCsv} from "@/lib/reporting-download";
 
 function exportReport(report:NonNullable<ReturnType<typeof useClassReport>["data"]>){
   // Stable metric keys, availability and source lineage for future Insights reuse.
@@ -25,12 +25,7 @@ function exportReport(report:NonNullable<ReturnType<typeof useClassReport>["data
       "PRIVATE OPERATOR EVIDENCE - NOT APPROVED FOR PUBLICATION",
     ]),
   ];
-  const file=new Blob([rows.map(reportingCsvRow).join("\r\n")],{type:"text/csv;charset=utf-8"});
-  const url=URL.createObjectURL(file);
-  const link=document.createElement("a");
-  link.href=url;link.download="can-os-class-evidence-"+report.classId+"-"+report.period.from.slice(0,10)+".csv";
-  document.body.appendChild(link);link.click();link.remove();
-  URL.revokeObjectURL(url);
+  downloadReportingCsv(rows,"can-os-class-evidence-"+report.classId+"-"+report.period.from.slice(0,10)+".csv");
 }
 function useClassReport(classId:string,range:ReportDateRange|null,scope:string|null,enabled=true){
   return usePrivateReportQuery({
