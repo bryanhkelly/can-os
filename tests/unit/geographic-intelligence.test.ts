@@ -54,3 +54,21 @@ describe("Geographic intelligence",()=>{
   expect(fetcher).not.toHaveBeenCalled();
  });
 });
+
+describe("Census provider transport",()=>{
+ it("rejects redirects and keeps the request timeout",async()=>{
+  const fetcher=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(payload({"Metropolitan Statistical Areas":[],"Micropolitan Statistical Areas":[]}))));
+  await createCensusGeographyProvider({fetcher}).resolve(address);
+  expect(fetcher).toHaveBeenCalledWith(expect.any(URL),expect.objectContaining({redirect:"error",signal:expect.any(AbortSignal)}));
+ });
+ it("rejects oversized streamed and declared provider responses",async()=>{
+  const oversized=new Uint8Array(1024*1024+1);
+  const stream=new ReadableStream<Uint8Array>({start(controller){controller.enqueue(oversized);controller.close();}});
+  const fetcher=vi.fn<typeof fetch>()
+   .mockResolvedValueOnce(new Response(stream))
+   .mockResolvedValueOnce(new Response("{}",{headers:{"content-length":"1048577"}}))
+   .mockResolvedValueOnce(new Response(new Uint8Array([0xff])));
+  const provider=createCensusGeographyProvider({fetcher});
+  for(let i=0;i<3;i++)await expect(provider.resolve(address)).rejects.toThrow("geography_provider_invalid_response");
+ });
+});
