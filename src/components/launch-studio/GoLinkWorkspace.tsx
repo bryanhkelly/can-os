@@ -52,6 +52,8 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
   const [linkTerm,setLinkTerm]=useState("");
   const [destinationTerm,setDestinationTerm]=useState("");
   const listTerm=useDeferredValue(linkTerm.trim());
+  const activeListTermRef=useRef(listTerm);
+  activeListTermRef.current=listTerm;
   const choiceTerm=useDeferredValue(destinationTerm.trim());
   const [nextCursor,setNextCursor]=useState<string|null>(null);
   const [loadingMore,setLoadingMore]=useState(false);
@@ -107,10 +109,10 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
         },
       };
       const key=JSON.stringify(payload);
-      if(pendingSubmission.current?.key!==key){
-        pendingSubmission.current={key,requestId:crypto.randomUUID()};
-      }
-      await createSiteGoLink({data:{...payload,requestId:pendingSubmission.current.requestId}});
+      const submission=pendingSubmission.current?.key===key
+        ?pendingSubmission.current:{key,requestId:crypto.randomUUID()};
+      pendingSubmission.current=submission;
+      await createSiteGoLink({data:{...payload,requestId:submission.requestId}});
       pendingSubmission.current=null;
       setName("");setStartsAt("");setExpiresAt("");
       setNotice("Go Link created. Copy it, test it, or add it to your outreach materials.");
@@ -122,7 +124,9 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
     if(!nextCursor||loadingMore||readState!=="ready")return;
     setLoadingMore(true);setPageError("");
     try{
-      const page=await listSiteGoLinksPage({data:{siteId,packageId,limit:20,cursor:nextCursor,term:listTerm}});
+      const queryTerm=listTerm;
+      const page=await listSiteGoLinksPage({data:{siteId,packageId,limit:20,cursor:nextCursor,term:queryTerm}});
+      if(queryTerm!==activeListTermRef.current)return;
       setLinks(previous=>{
         const existing=new Set(previous.map(row=>row.id));
         return [...previous,...page.items.filter(row=>!existing.has(row.id))];
