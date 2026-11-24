@@ -42,7 +42,7 @@ run("Cloudflare production bundle",["run","build:cloudflare"]);
 run("TypeScript",["run","typecheck:full"]);
 run("Go URL and reporting contracts",["run","test:urls:unit"]);
 run("Go preview regressions",["exec","--","vitest","run",
-  "tests/unit/site-go-links.test.ts","tests/unit/site-preview-sharing.test.ts",
+  "tests/unit/site-go-links.test.ts","tests/unit/go-destination-provider.test.ts","tests/unit/site-preview-sharing.test.ts",
   "tests/unit/website-preview-r2-snapshots.test.ts","tests/unit/site-preview-presentation.test.ts",
   "tests/unit/site-brand-rpc-boundary.test.ts","tests/unit/global-auth-redirect.test.ts"]);
 run("Site regression suite",["run","test:site:channels"]);
