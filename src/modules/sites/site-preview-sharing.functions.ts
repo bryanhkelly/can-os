@@ -1,12 +1,12 @@
 import { readSavedBrandVersion } from "./site-brand.server";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { siteLocalContentVersions, sites } from "@/db/schema";
+import { siteLocalContentVersions, sites, siteGoLinks } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
 import { DomainError } from "@/domain/errors";
@@ -15,8 +15,10 @@ import {
   classifySiteLocalContent, normalizeSiteLocalContent,
 } from "@/domain/site-local-content";
 import {
-  createPreviewShareToken, readSitePreviewShares, type SitePreviewShare,
+  readSitePreviewShares, type SitePreviewShare,
 } from "@/domain/site-preview-sharing";
+import { goLinkAvailability } from "@/domain/go-link-policy";
+import { buildUrlDestination } from "@/domain/url-destinations";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { getPartnerWebsitePreview } from "./site-website-preview.server";
 import { sitePreviewSnapshotKey, writeSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
@@ -57,11 +59,14 @@ async function authorizedShareSite(siteId: string) {
   return { actor, site };
 }
 
+async function previewLinks(siteId:string, reader:Pick<typeof db,"select">=db) {
+  return reader.select().from(siteGoLinks).where(and(eq(siteGoLinks.siteId,siteId),sql`${siteGoLinks.destination}->>'kind'='website-preview'`)).orderBy(desc(siteGoLinks.createdAt));
+}
 function overview(shares: readonly SitePreviewShare[]) {
   return shares.map(share => ({
     id: share.id, createdAt: share.createdAt, expiresAt: share.expiresAt,
     revokedAt: share.revokedAt, sourceRevision: share.sourceRevision,
-    brandVersionId:share.brandVersionId??null,
+    brandVersionId:share.brandVersionId??null, code:null as string|null, paused:false,
   }));
 }
 
@@ -71,7 +76,12 @@ export const listSitePreviewShares = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { site } = await authorizedShareSite(data.siteId);
-    return overview(readSitePreviewShares(site.metadata));
+    const links=await previewLinks(site.id);
+    return [...links.flatMap(link=>link.destination?.kind==="website-preview"?[{
+      id:link.id,code:link.code,createdAt:link.createdAt.toISOString(),expiresAt:link.expiresAt?.toISOString()??null,
+      revokedAt:link.status==="revoked"?link.updatedAt.toISOString():null,paused:link.status==="paused",
+      sourceRevision:link.destination.sourceRevision,brandVersionId:link.destination.brandVersionId,
+    }]:[]),...overview(readSitePreviewShares(site.metadata))];
   });
 
 /** An immutable, sanitized website snapshot is captured when the URL is
@@ -98,7 +108,8 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       const now = new Date();
       const active = existing.filter(share => !share.revokedAt
         && (!share.expiresAt || Date.parse(share.expiresAt) > now.getTime()));
-      if (active.length >= 5)
+      const links=await previewLinks(site.id,tx);
+      if (active.length + links.filter(link=>goLinkAvailability(link)==="available" || goLinkAvailability(link)==="paused").length >= 5)
         throw new DomainError("UNAVAILABLE", "Revoke an unused preview link before creating another.");
 
       const [latest] = await tx.select({
@@ -137,35 +148,27 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       const snapshot=await writeSitePreviewSnapshot(
         sitePreviewSnapshotKey(site.id,shareId),preview.previewPages);
 
-      const { token, tokenDigest } = createPreviewShareToken();
-      const entry: SitePreviewShare = {
-        id: shareId, tokenDigest,
-        createdAt: now.toISOString(),
-        expiresAt: data.expiresAfterDays === null ? null
-          : new Date(now.getTime() + data.expiresAfterDays * 86_400_000).toISOString(),
-        revokedAt: null, sourceRevision: latest.revision,
-        brandVersionId:brand.version.id,
-        snapshotKey:snapshot.key,snapshotDigest:snapshot.digest,
-        snapshotPaths:snapshot.paths,
-      };
-      // Keep a bounded number of recorded links. Old revocations remain in
-      // the canonical audit trail, not unlimited Site metadata.
-      const keep = [...existing].reverse().filter(item => active.some(a => a.id === item.id))
-        .slice(0, 5).reverse();
-      const revision = nextSiteConfigurationRevision(site.updatedAt);
+      const expiresAt=data.expiresAfterDays===null?null:new Date(now.getTime()+data.expiresAfterDays*86_400_000);
       stage = "share-persistence";
-      await tx.update(sites).set({
-        metadata: { ...site.metadata, websitePreviewSharesV1: [...keep, entry] },
-        updatedAt: revision,
-      }).where(eq(sites.id, site.id));
+      let entry:typeof siteGoLinks.$inferSelect|undefined;
+      for(let attempt=0;attempt<5;attempt++){
+        [entry]=await tx.insert(siteGoLinks).values({
+          code:randomBytes(9).toString("base64url"),siteId:site.id,organizationId:site.organizationId,
+          createdByPersonId:actor.actorPersonId!,name:"Website preview · Revision "+latest.revision,
+          expiresAt,destination:{kind:"website-preview",snapshotId:shareId,snapshotDigest:snapshot.digest,
+            sourceRevision:latest.revision,brandVersionId:brand.version.id},
+        }).onConflictDoNothing({target:siteGoLinks.code}).returning();
+        if(entry)break;
+      }
+      if(!entry)throw new DomainError("CONFLICT","Unable to issue a unique Go link.");
       stage = "audit";
       await writeAudit(tx, actor, {
         action: "site.website.preview_share.created",
         entityType: "site", entityId: site.id,
         scope: { organizationId: site.organizationId, siteId: site.id },
-        after: { shareId: entry.id, sourceRevision: entry.sourceRevision,
+        after: { shareId: entry.id, sourceRevision: latest.revision,
           brandVersionId:brand.version.id,
-          expiresAt: entry.expiresAt, proposed: true, officialPublication: false },
+          expiresAt: expiresAt?.toISOString()??null, proposed: true, officialPublication: false },
       });
       stage = "event";
       await emitEvent(tx, {
@@ -173,15 +176,13 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
         aggregateType: "site", aggregateId: site.id,
         actorPersonId: actor.actorPersonId, siteId: site.id,
         organizationId: site.organizationId,
-        payload: { shareId: entry.id, sourceRevision: entry.sourceRevision,
-          expiresAt: entry.expiresAt },
+        payload: { shareId: entry.id, sourceRevision: latest.revision,
+          expiresAt: expiresAt?.toISOString()??null },
       });
       return {
-        shareId: entry.id, token,
-        relativeUrl: "/site-preview-share?" + new URLSearchParams({
-          siteId: site.id, token,
-        }).toString(),
-        expiresAt: entry.expiresAt, sourceRevision: entry.sourceRevision,
+        shareId: entry.id,
+        relativeUrl: buildUrlDestination({kind:"go",code:entry.code}).href,
+        expiresAt: expiresAt?.toISOString()??null, sourceRevision: latest.revision,
       };
       });
     } catch (error) {
@@ -205,6 +206,14 @@ export const revokeSitePreviewShare = createServerFn({ method: "POST" })
         .where(eq(sites.id, data.siteId)).for("update").limit(1);
       if (!site) throw new AuthorizationError("Site preview sharing scope");
       await assertPreviewSharingScope(actor, site, tx);
+      const [link]=await tx.select().from(siteGoLinks).where(and(eq(siteGoLinks.id,data.shareId),eq(siteGoLinks.siteId,site.id))).for("update").limit(1);
+      if(link?.destination?.kind==="website-preview"){
+        if(link.status==="revoked")return {changed:false};
+        await tx.update(siteGoLinks).set({status:"revoked",updatedAt:new Date()}).where(eq(siteGoLinks.id,link.id));
+        await writeAudit(tx,actor,{action:"site.go_link.revoke",entityType:"site_go_link",entityId:link.id,scope:{siteId:site.id,organizationId:site.organizationId},before:{status:link.status},after:{status:"revoked"}});
+        await emitEvent(tx,{eventType:EventTypes.SiteWebsitePreviewRevoked,aggregateType:"site",aggregateId:site.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,payload:{shareId:link.id,revokedAt:new Date().toISOString()}});
+        return {changed:true};
+      }
       const shares = readSitePreviewShares(site.metadata);
       const match = shares.find(entry => entry.id === data.shareId);
       if (!match) throw new DomainError("UNAVAILABLE", "This preview link no longer exists.");
