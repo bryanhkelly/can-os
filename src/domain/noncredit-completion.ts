@@ -62,16 +62,7 @@ export function evaluateNoncreditCompletion(input: {
        p.minimumAssessmentFraction < 0 || p.minimumAssessmentFraction > 1))) {
     blockers.push("policy_unavailable");
   }
-  const superseded = new Set(input.participation.map(e => e.supersedesId).filter((id): id is string => !!id));
-  // A progress tick, media click or elapsed page time is never counted evidence.
-  // Database provenance rules require an attributable evidence version for counted minutes.
-  const countedMinutes = input.participation.reduce((sum, event) => {
-    if (superseded.has(event.id) || event.eventKind === "attendance_corrected" ||
-        !event.evidenceVersionId || !Number.isSafeInteger(event.countedMinutes) ||
-        event.countedMinutes < 0 || !Number.isFinite(event.occurredAt.getTime()) ||
-        event.occurredAt > input.now) return sum;
-    return sum + event.countedMinutes;
-  }, 0);
+  const countedMinutes = countVerifiedNoncreditMinutes(input.participation,input.now);
   if (p && countedMinutes < p.minParticipationMinutes) blockers.push("participation_incomplete");
   const completedLessons = Number.isSafeInteger(input.completedLessonCount)
     && input.completedLessonCount >= 0 ? input.completedLessonCount : 0;
@@ -94,4 +85,21 @@ export function evaluateNoncreditCompletion(input: {
     completedLessons, totalLessons, lessonsRequired: p?.requireAllLessons ?? false,
     assessmentFraction, blockers,
   };
+}
+
+/** Shared projection of currently valid, source-verified participation events.
+ * Callers must first resolve evidence validity and exact registration ownership. */
+export function countVerifiedNoncreditMinutes(participation:readonly NoncreditParticipationEvidence[],now:Date):number {
+  if(!Number.isFinite(now.getTime()))throw new Error("Invalid participation evidence time");
+  if(new Set(participation.map(event=>event.id)).size!==participation.length)throw new Error("Duplicate participation event");
+  const superseded = new Set(participation.map(e => e.supersedesId).filter((id): id is string => !!id));
+  // A progress tick, media click or elapsed page time is never counted evidence.
+  // Database provenance rules require an attributable evidence version for counted minutes.
+  return participation.reduce((sum, event) => {
+    if (superseded.has(event.id) || event.eventKind === "attendance_corrected" ||
+        !event.evidenceVersionId || !Number.isSafeInteger(event.countedMinutes) ||
+        event.countedMinutes < 0 || !Number.isFinite(event.occurredAt.getTime()) ||
+        event.occurredAt > now) return sum;
+    return sum + event.countedMinutes;
+  }, 0);
 }
