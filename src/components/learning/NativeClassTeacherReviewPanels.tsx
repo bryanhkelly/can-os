@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getNativeClassTeacherHomework, getNativeClassTeacherAssessments,
+import { SubmissionRevisionHistory } from "./SubmissionRevisionHistory";
+import { getNativeClassTeacherHomework, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherAssessments,
   returnNativeClassPracticeFeedback } from
   "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,10 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
         classId,submissionId,feedback:(feedback[submissionId]??item?.teacherFeedback??"").trim(),practiceScore,
       }});
       setNotice("Practice feedback returned to the learner. No official grade was issued.");
-      await client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]});
+      await Promise.all([
+        client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]}),
+        client.invalidateQueries({queryKey:["native-teacher-homework-history",classId,submissionId]}),
+      ]);
     }catch(failure){setError(normalizeClientError(failure,"Unable to return practice feedback.").message);}
     finally{setBusy(null);}
   }
@@ -75,6 +79,8 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
           {item.practiceScore!==null&&<p className="text-xs text-muted-foreground">
             Practice score: {item.practiceScore} / {item.practiceScoreMax??10}. Not an official grade.
           </p>}
+          <SubmissionRevisionHistory queryScope={["native-teacher-homework-history",classId,item.id]}
+            loadPage={beforeRevision=>getNativeClassTeacherHomeworkHistory({data:{classId,submissionId:item.id,beforeRevision}})}/>
           {queue.data.canReturnPracticeFeedback&&item.isPracticeSubmission&&<div className="space-y-3 border-t border-border pt-3">
             <label className="block space-y-1">
               <span className="text-xs font-semibold">Return practice feedback</span>

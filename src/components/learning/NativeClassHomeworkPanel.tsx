@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SubmissionRevisionHistory } from "./SubmissionRevisionHistory";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -88,8 +89,9 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
             Practice score: {item.practiceScore} / {item.practiceScoreMax??10} (not an official grade)
           </p>}
         </section>}
-        {item.submitted&&<HomeworkHistory key={item.id+":"+String(item.submittedAt)+":"+item.status+":"+String(item.practiceFeedback)}
-          classEnrollmentId={classEnrollmentId} assignmentId={item.id}/>}
+        {item.submitted&&<SubmissionRevisionHistory key={item.id}
+          queryScope={["native-homework-history",classEnrollmentId,item.id]}
+          loadPage={beforeRevision=>getNativeClassHomeworkHistory({data:{classEnrollmentId,assignmentId:item.id,beforeRevision}})}/>}
         {!submitted?<Button type="button" disabled={!!submitting||current.trim().length<5}
           onClick={()=>void submit(item.id,current.trim())}>
           {submitting===item.id?"Submitting…":"Submit homework"}
@@ -104,33 +106,3 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
   </section>;
 }
 
-/** Keep history retrieval lazy and scoped to the selected assignment. */
-function HomeworkHistory({classEnrollmentId,assignmentId}:{classEnrollmentId:string;assignmentId:string}){
-  const [open,setOpen]=useState(false);
-  const [before,setBefore]=useState<number|undefined>(undefined);
-  const query=useQuery({
-    queryKey:["native-homework-history",classEnrollmentId,assignmentId,before],
-    queryFn:()=>getNativeClassHomeworkHistory({data:{classEnrollmentId,assignmentId,beforeRevision:before}}),
-    enabled:open,retry:false,staleTime:0,
-  });
-  return <section className="space-y-3 border-t border-border pt-3" aria-label="Submission revision history">
-    <Button type="button" variant="outline" size="sm" aria-expanded={open}
-      onClick={()=>{setOpen(!open);setBefore(undefined);}}>{open?"Hide submission history":"View submission history"}</Button>
-    {open&&<>
-      <p className="text-xs text-muted-foreground">Preserved states of your submission and feedback. A baseline is the first recorded snapshot, not proof of an original submission date.</p>
-      {query.isPending&&<p role="status" className="text-sm">Loading history…</p>}
-      {query.isError&&<p role="alert" className="text-sm">History unavailable. <Button type="button" variant="outline" size="sm" onClick={()=>void query.refetch()}>Retry</Button></p>}
-      {query.data?.items.length===0&&<p className="text-sm text-muted-foreground">No preserved states are available.</p>}
-      <ol className="space-y-3">{query.data?.items.map(item=><li key={item.revisionNo} className="space-y-1 border border-border p-3">
-        <p className="text-sm font-semibold">Revision {item.revisionNo} · {item.status.replaceAll("_"," ")}{item.source==="baseline"?" · Baseline":""}</p>
-        <p className="text-xs text-muted-foreground">Recorded {new Date(item.recordedAt).toLocaleString()}{item.submittedAt?" · Submitted "+new Date(item.submittedAt).toLocaleString():""}</p>
-        {item.responseText&&<p className="whitespace-pre-wrap text-sm">{item.responseText}</p>}
-        {item.practiceFeedback&&<p className="whitespace-pre-wrap text-sm">Practice feedback: {item.practiceFeedback}</p>}
-      </li>)}</ol>
-      <div className="flex flex-wrap gap-2">
-        {before!==undefined&&<Button type="button" variant="outline" size="sm" onClick={()=>setBefore(undefined)}>Newest revisions</Button>}
-        {query.data?.nextBefore!=null&&<Button type="button" variant="outline" size="sm" onClick={()=>setBefore(query.data?.nextBefore??undefined)}>Older revisions</Button>}
-      </div>
-    </>}
-  </section>;
-}

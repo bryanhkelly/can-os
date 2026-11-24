@@ -1,3 +1,4 @@
+import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
@@ -122,6 +123,35 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
  });
 
 
+
+/** Exact active Class appointment, active learner enrollment and native attempt.
+ * No history is disclosed on the basis of a submission UUID alone. */
+export const getNativeClassTeacherHomeworkHistory=createServerFn({method:"GET"})
+ .validator((value:unknown)=>input.extend({
+   submissionId:z.string().uuid(),beforeRevision:z.number().int().positive().optional(),
+ }).strict().parse(value))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   setResponseHeader("Referrer-Policy","no-referrer");
+   return db.transaction(async tx=>{
+     const {cls}=await authorizedTeacher(tx,data.classId);
+     const result=await tx.execute(sql`
+       SELECT r.revision_no,r.status,r.response,r.submitted_at,r.recorded_at,r.source
+       FROM public.graded_submission_revisions r
+       JOIN public.graded_submissions gs ON gs.id=r.submission_id AND gs.course_version_id=r.course_version_id
+       JOIN public.learner_course_attempts ca ON ca.id=gs.course_attempt_id AND ca.course_version_id=gs.course_version_id
+       JOIN public.class_enrollments ce ON ce.id=ca.class_enrollment_id AND ce.course_attempt_id=ca.id
+       JOIN public.graded_assignments ga ON ga.id=gs.assignment_id AND ga.course_version_id=gs.course_version_id
+       WHERE gs.id=${data.submissionId}::uuid AND ce.class_id=${cls.id}::uuid
+         AND ce.status='active' AND ca.status='active' AND ca.section_id IS NULL
+         AND ca.course_version_id=${cls.courseVersionId}::uuid AND ga.section_id IS NULL
+         AND gs.status IN ('submitted','returned','graded')
+         AND (${data.beforeRevision??null}::int IS NULL OR r.revision_no<${data.beforeRevision??null}::int)
+       ORDER BY r.revision_no DESC LIMIT 21
+     `);
+     return projectSubmissionRevisionPage(result.rows);
+   });
+ });
 
 const practiceFeedbackInput=input.extend({
   submissionId:z.string().uuid(),

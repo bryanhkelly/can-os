@@ -1,3 +1,4 @@
+import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { sql } from "drizzle-orm";
@@ -149,15 +150,7 @@ export const getNativeClassHomeworkHistory=createServerFn({method:"GET"})
           AND (${data.beforeRevision??null}::int IS NULL OR r.revision_no<${data.beforeRevision??null}::int)
         ORDER BY r.revision_no DESC LIMIT 21
       `);
-      const items=result.rows.slice(0,20).map(row=>{
-        const response=asRecord(row.response);
-        return {revisionNo:Number(row.revision_no),status:String(row.status),
-          responseText:typeof response.text==="string"?response.text:"",
-          practiceFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"?response.teacherFeedback:null,
-          submittedAt:row.submitted_at==null?null:new Date(String(row.submitted_at)).toISOString(),
-          recordedAt:new Date(String(row.recorded_at)).toISOString(),source:String(row.source)};
-      });
-      return {items,nextBefore:result.rows.length>20?items.at(-1)?.revisionNo??null:null};
+      return projectSubmissionRevisionPage(result.rows);
     });
   });
 
