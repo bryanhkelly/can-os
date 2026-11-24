@@ -147,6 +147,7 @@ function OneClassWorkspace(){
 }
 function LearnerClass({workspace}:{workspace:Workspace}){
   const learner=workspace.learner!;
+  const [delivery,setDelivery]=useState<"course"|"recorded">("course");
   const record=useQuery({
     queryKey:["native-unified-class-progress",learner.classEnrollmentId],
     queryFn:()=>getNativeClassLearning({data:{classEnrollmentId:learner.classEnrollmentId}}),
@@ -175,7 +176,7 @@ function LearnerClass({workspace}:{workspace:Workspace}){
           Your progress is being verified.
         </p>}
       </section>
-      {data&&<section className="border border-border bg-card p-4">
+      {data&&!(workspace.tab==="lessons"&&delivery==="recorded"&&learner.status==="active")&&<section className="border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Published lessons</h2>
         <div className="mt-3 max-h-96 overflow-y-auto">
           <UnifiedLessonOutline selectedId={workspace.selectedLessonId}
@@ -193,15 +194,20 @@ function LearnerClass({workspace}:{workspace:Workspace}){
     {record.isError&&<p role="alert" className="border border-border bg-card p-5 text-sm">
       Class progress is unavailable under your current learner permissions.
     </p>}
-    {workspace.tab==="lessons"&&(!data
-      ?<p role="status" className="border border-border bg-card p-5 text-sm">Loading your Course lessons…</p>
-      :data.lessons.some(lesson=>lesson.lessonBody.trim().length>0 ||
-          lesson.videoResources.length>0)
-        ?<NativeClassLessonContentPanel classEnrollmentId={learner.classEnrollmentId}
-          lessons={data.lessons} selectedLessonId={workspace.selectedLessonId}/>
-        :<RecordedInstructorWorkspace
-          key={learner.courseAttemptId} courseAttemptId={learner.courseAttemptId}
-          initialLessonId={workspace.selectedLessonId} mode="native"/> )}
+    {workspace.tab==="lessons"&&data&&<div className="space-y-4">
+      <DetailNavigation label="Lesson delivery" variant="record">
+        <Button type="button" variant={delivery==="course"?"default":"outline"} size="sm"
+          aria-pressed={delivery==="course"} onClick={()=>setDelivery("course")}>Course lesson</Button>
+        {learner.status==="active"&&<Button type="button" variant={delivery==="recorded"?"default":"outline"} size="sm"
+          aria-pressed={delivery==="recorded"} onClick={()=>setDelivery("recorded")}>Recorded instruction</Button>}
+      </DetailNavigation>
+      {delivery==="recorded"&&learner.status==="active"
+        ?<RecordedInstructorWorkspace key={learner.courseAttemptId} courseAttemptId={learner.courseAttemptId}
+          initialLessonId={workspace.selectedLessonId} mode="native"/>
+        :<NativeClassLessonContentPanel classEnrollmentId={learner.classEnrollmentId}
+          lessons={data.lessons} selectedLessonId={workspace.selectedLessonId}/>}
+    </div>}
+    {workspace.tab==="lessons"&&record.isPending&&<p role="status" className="border border-border bg-card p-5 text-sm">Loading your Course lessons…</p>}
     {workspace.tab==="progress"&&<section className="border border-border bg-card p-5">
       <h2 className="font-serif text-2xl">My progress and outcomes</h2>
       {!data?<p className="mt-4 text-sm">Checking verified learning records…</p>:<>
