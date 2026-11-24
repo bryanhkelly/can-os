@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { auditEvents } from "@/db/schema";
 import { contentAssets, contentAssetVersions, contentWithdrawals, courses, courseVersions,
   evidenceDocuments, evidenceDocumentVersions, publishedAssetReviews } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
@@ -66,6 +67,20 @@ async function latestReviews(tx:Tx,id:string){
  if(rows.length>1000)blocked("Asset review history exceeds supported limit.");
  return kinds.map(kind=>({kind,review:rows.find(r=>r.reviewKind===kind)}));
 }
+// The canonical decision row identifies the version; the existing audit
+// ledger additionally pins the exact SHA-256 reviewed by the actor.
+async function hasExactReviewReceipt(tx:Tx,assetVersionId:string,expectedHash:string,review:typeof publishedAssetReviews.$inferSelect){
+ const [receipt]=await tx.select({id:auditEvents.id}).from(auditEvents)
+ .where(and(eq(auditEvents.action,"instructional.video.review_decided"),
+ eq(auditEvents.resourceType,"content_asset_version"),eq(auditEvents.resourceId,assetVersionId),
+ eq(auditEvents.actorPersonId,review.reviewerPersonId),
+ sql`${auditEvents.after}->>'reviewId' = ${review.id}`,
+ sql`${auditEvents.after}->>'sha256' = ${expectedHash}`,
+ sql`${auditEvents.after}->>'kind' = ${review.reviewKind}`,
+ sql`${auditEvents.after}->>'decision' = ${review.decision}`,
+ sql`${auditEvents.after}->>'evidenceVersionId' = ${review.evidenceVersionId}`)).limit(1);
+ return !!receipt;
+}
 async function requireEvidence(tx:Tx,id:string,organizationId:string,kind:string,author:string){
  const [e]=await tx.select({kind:evidenceDocuments.kindCode,verifiedAt:evidenceDocumentVersions.verifiedAt,
  verifiedByPersonId:evidenceDocumentVersions.verifiedByPersonId,validFrom:evidenceDocumentVersions.validFrom,
@@ -124,7 +139,7 @@ export const decideRecordedVideoReview=createServerFn({method:"POST"}).validator
  await requireEvidence(tx,data.evidenceVersionId,asset.publisher.organizationId,data.kind,asset.author);
  await verifyMedia(asset);
  const prior=(await latestReviews(tx,data.assetVersionId)).find(r=>r.kind===data.kind)?.review;
- if(prior?.decision===data.decision&&prior.evidenceVersionId===data.evidenceVersionId&&prior.reviewerPersonId===actor.actorPersonId)return {recorded:true};
+ if(prior?.decision===data.decision&&prior.evidenceVersionId===data.evidenceVersionId&&prior.reviewerPersonId===actor.actorPersonId&&await hasExactReviewReceipt(tx,data.assetVersionId,data.expectedHash,prior))return {recorded:true};
  const [review]=await tx.insert(publishedAssetReviews).values({assetVersionId:data.assetVersionId,reviewKind:data.kind,decision:data.decision,
  reviewerPersonId:actor.actorPersonId!,evidenceVersionId:data.evidenceVersionId}).returning({id:publishedAssetReviews.id});
  if(!review)throw new Error("Asset review not recorded");
@@ -139,6 +154,7 @@ export const publishReviewedRecordedVideo=createServerFn({method:"POST"}).valida
  for(const {kind,review} of await latestReviews(tx,data.assetVersionId)){
  if(!review||review.decision!=="approved"||review.reviewerPersonId===asset.author||!review.evidenceVersionId)
  blocked("Every mandatory category requires current independent approval.");
+ if(!await hasExactReviewReceipt(tx,data.assetVersionId,data.expectedHash,review))blocked("Review receipt does not match the exact recording; record a new independent review.");
  await requireEvidence(tx,review.evidenceVersionId,asset.publisher.organizationId,kind,asset.author);
  }
  await verifyMedia(asset);
