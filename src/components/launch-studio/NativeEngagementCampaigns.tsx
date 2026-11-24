@@ -5,7 +5,7 @@ import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
 import {Textarea} from "@/components/ui/textarea";
-import {QueryState,WorkspaceNotice} from "@/components/workspace";
+import {EmptyState,QueryState,WorkspaceNotice} from "@/components/workspace";
 import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagementCampaign,cancelEngagementCampaign} from "@/modules/communication/engagement-campaigns.functions";
 import {CampaignListMembers} from "./CampaignListMembers";
 import {parseCampaignRecipients} from "@/domain/campaign-policy";
@@ -43,9 +43,9 @@ function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignPro
  <label className="flex items-start gap-2 text-sm"><Checkbox checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/>Queue the displayed invitation for this list. Recipients with opt-outs will be suppressed.</label>
  <Button type="button" disabled={!invitationReady||!data.senderReady||!list||!confirmed||busy} onClick={()=>void run(async()=>{requestId.current??={id:crypto.randomUUID(),scheduledAt:when?new Date(when).toISOString():new Date().toISOString()};await queueEngagementCampaign({data:{...scope,listId:list,requestId:requestId.current.id,scheduledAt:requestId.current.scheduledAt,confirmed:true}});requestId.current=null;setConfirmed(false);setNotice("Campaign queued. Delivery is not yet confirmed.");})}>{when?"Schedule campaign":"Queue campaign"}</Button>
  <div className="flex items-center justify-between"><h4 className="text-sm font-semibold">Campaign history</h4><Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setRefresh(v=>v+1)}>Refresh</Button></div>
- {data.campaigns.length===0&&<p className="text-sm">No campaigns yet.</p>}
+ {data.campaigns.length===0&&<EmptyState title="No campaigns yet."/>}
  {data.campaigns.map(c=><div key={c.id} className="space-y-2 border p-3 text-sm"><p className="font-semibold">{c.subject}</p><p>{new Date(c.scheduled_at).toLocaleString()} · {c.cancelled_at?"Cancelled":c.pending?"Queued / processing":"Queue settled"}</p><p>{c.total} recipients · {c.pending} pending · {c.accepted} provider accepted · {c.delivered} delivered · {c.bounced} bounced · {c.complained} complaints · {c.failed} failed · {c.unconfirmed} unconfirmed · {c.suppressed} suppressed · {c.cancelled} cancelled</p>{c.pending>0&&!c.cancelled_at&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await cancelEngagementCampaign({data:{...scope,campaignId:c.id}});setNotice("Remaining queued messages cancelled. In-flight messages may still arrive.");})}>Cancel remaining</Button>}</div>)}
  </>}
- {notice&&<p role="status" className="text-sm">{notice}</p>}{data&&error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+ {notice&&<WorkspaceNotice tone="success">{notice}</WorkspaceNotice>}{data&&error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
  </section>;
 }
