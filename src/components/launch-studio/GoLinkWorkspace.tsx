@@ -1,3 +1,4 @@
+import { Field } from "@/components/ui/field";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,7 +175,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
     description="Create a shareable entry point. The platform verifies the destination, manages the link and reports observed activity without collecting visitor identities.">
     <section aria-label="Create Go Link" className="mt-4 space-y-4 border p-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1 text-sm font-medium">What should people do?
+        <Field label="What should people do?">
           <Select value={kind} onChange={event=>{
             setKind(event.target.value as Kind);setTarget("");setSelected("");
             setChoices([]);setDestinationTerm("");setAdvanced(false);
@@ -182,22 +183,21 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
             {Object.entries(labels).filter(([value])=>value!=="website-preview").map(([value,label])=>
               <option key={value} value={value}>{label}</option>)}
           </Select>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">Choose an available destination
+        </Field>
+        <Field label="Choose an available destination">
           <Select disabled={advanced||choiceState!=="ready"||choices.length===0}
             value={selected} onChange={event=>setSelected(event.target.value)}>
             <option value="">Select a published destination</option>
             {choices.map((item,index)=><option
               key={index} value={JSON.stringify(item.destination)}>{item.title}</option>)}
           </Select>
-        </label>
+        </Field>
       </div>
-      <label className="block text-sm font-medium">
-        Search available destinations
-        <Input className="mt-1" value={destinationTerm}
+      <Field label="Search available destinations">
+          <Input value={destinationTerm}
           onChange={event=>setDestinationTerm(event.target.value)}
           placeholder="Search published titles" maxLength={80}/>
-      </label>
+        </Field>
       {choiceState==="loading"&&<p role="status" className="text-xs text-muted-foreground">
         Checking available destinations…</p>}
       {choiceState==="error"&&<p role="alert" className="text-xs text-destructive">
@@ -212,32 +212,32 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
           onClick={()=>setAdvanced(value=>!value)}>
           {advanced?"Choose from the catalog":"Have an existing link or ID?"}
         </Button>
-        {advanced&&<label className="mt-2 grid gap-1 text-sm font-medium">Existing internal link or ID
+        {advanced&&<Field label="Existing internal link or ID" className="mt-2">
           <Input value={target} onChange={event=>setTarget(event.target.value.trim())}
             placeholder={kind==="information"?"Enter journey key":"Paste a same-origin link or compact ID"}/>
-        </label>}
+        </Field>}
       </div>}
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1 text-sm font-medium">Link name (for your team)
+        <Field label="Link name (for your team)">
           <Input value={name} maxLength={120} onChange={event=>setName(event.target.value)}
             placeholder={chosen?.title??"Example: Sunday bulletin"}/>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">Sharing channel
+        </Field>
+        <Field label="Sharing channel">
           <Select value={channel}
             onChange={event=>setChannel(event.target.value as typeof channel)}>
             <option value="">Not specified</option>
             {channelChoices.map(value=><option key={value} value={value}>
               {value[0]!.toUpperCase()+value.slice(1)}</option>)}
           </Select>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">Activate on (optional)
+        </Field>
+        <Field label="Activate on (optional)">
           <Input type="datetime-local" value={startsAt}
             onChange={event=>setStartsAt(event.target.value)}/>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">Expire on (optional)
+        </Field>
+        <Field label="Expire on (optional)">
           <Input type="datetime-local" value={expiresAt}
             onChange={event=>setExpiresAt(event.target.value)}/>
-        </label>
+        </Field>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={busy||!destination||readState!=="ready"}
@@ -247,12 +247,11 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
       </div>
     </section>
 
-    <label className="mt-5 block text-sm font-medium">
-      Search saved links by name
-      <Input className="mt-1" value={linkTerm}
+    <Field label="Search saved links by name" className="mt-5">
+          <Input value={linkTerm}
         onChange={event=>setLinkTerm(event.target.value)}
         placeholder="Search links across this Site or outreach plan" maxLength={80}/>
-    </label>
+        </Field>
     {readState==="loading"&&<p role="status" className="mt-4 text-sm">Loading saved links…</p>}
     {readState==="error"&&<p role="alert" className="mt-4 text-sm text-destructive">
       Saved links are currently unavailable.</p>}
