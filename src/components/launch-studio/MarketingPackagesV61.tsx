@@ -34,7 +34,6 @@ import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketingPackageZip } from "./marketing-output-download";
 import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
 import { MarketingPackageReleaseControlsV61 } from "./MarketingPackageReleaseControlsV61";
-import { GoLinkWorkspace } from "./GoLinkWorkspace";
 import { UniversalEngagementPublisher } from "./UniversalEngagementPublisher";
 import { SiteEngagementLibrary } from "./SiteEngagementLibrary";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
@@ -596,7 +595,6 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </WorkspacePanel>
         <UniversalEngagementPublisher key={"engagement:"+record.id} siteId={siteId} packageId={record.id} />
         <SiteEngagementLibrary key={"library:"+record.id} siteId={siteId} packageId={record.id} />
-        <GoLinkWorkspace key={record.id} siteId={siteId} packageId={record.id} />
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
       {view==="followup"&&record&&<>
