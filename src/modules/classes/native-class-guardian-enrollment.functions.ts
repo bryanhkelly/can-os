@@ -15,6 +15,7 @@ import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canoni
 import {AuthorizationError} from "@/domain/command-context";
 import {currentClassAuthority} from "./native-class-authority.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
+import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
 import {requireNativeGuardian,requireNativeGuardianChild} from
  "./native-class-guardian-authority.server";
@@ -285,15 +286,7 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
     relationshipSnapshot:{kind:"provider_default",classId:cls.id,
       siteId:current.siteId,organizationId:current.operatingOrganizationId},
    });
-   const [attempt]=await tx.insert(learnerCourseAttempts).values({
-    classEnrollmentId:enrollment.id,enrollmentId:null,noncreditRegistrationId:null,
-    sectionId:null,deploymentId:current.deploymentId,adoptionId:current.adoptionId,
-    offeringVersionId:current.offeringVersionId,courseVersionId:current.courseVersionId,
-    attemptNo:1,status:"active",
-   }).returning({id:learnerCourseAttempts.id});
-   if(!attempt)throw new Error("guardian Course Attempt not saved");
-   await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
-    .where(eq(canonicalClassEnrollments.id,enrollment.id));
+   const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
    if(repeatAuthorization){
     await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
      .set({consumedByEnrollmentId:enrollment.id})
