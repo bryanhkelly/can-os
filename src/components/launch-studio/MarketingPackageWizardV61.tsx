@@ -274,9 +274,9 @@ export function MarketingPackageWizardV61({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Suggested message</h3>
           <Button type="button" variant="outline" size="sm" disabled={busy}
-            onClick={()=>onPatch(suggested)}>Use suggestion for this plan</Button>
+            onClick={()=>onPatch(suggested)}>Use basic plan suggestion</Button>
         </div>
-        <SiteIntelligenceContentPanel key={siteId+":outreach"} siteId={siteId} target="outreach" plan={plan} disabled={busy} onApply={draft=>{if(draft.outreach)onPatch(draft.outreach);}}/>
+        <SiteIntelligenceContentPanel key={siteId+":outreach"} siteId={siteId} target="outreach" purpose={content.purpose} disabled={busy} onApply={draft=>{if(draft.outreach)onPatch(draft.outreach);}}/>
         <Field label="Outreach name" required><Input value={title} maxLength={120}
           onChange={event=>onTitleChange(event.target.value)}/></Field>
         <Field label="Headline" required><Input value={content.headline} maxLength={160}
