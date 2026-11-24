@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   engagementDefinitions, engagementDefinitionVersions, organizations,
-  programs, siteGoLinks, siteGoLinkDailyVisits, sitePublications, sites,
+  programs, siteGoLinks, siteGoLinkDailyVisits, sitePublications, siteBrandVersions, sites,
 } from "@/db/schema";
 import {
   engagementDefinitionSchema, type EngagementDefinition,
