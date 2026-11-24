@@ -80,6 +80,9 @@ export async function runScheduledJobs(): Promise<{
   await import("@/modules/communication/campaign-store.server")
     .then(m=>m.processEngagementCampaignDeliveries())
     .catch(()=>console.error("engagement_campaign_dispatch_unavailable"));
+  await import("@/modules/geography/geographic-intelligence-store.server")
+    .then(m=>m.processGeographicIntelligence())
+    .catch(()=>console.error("geographic_intelligence_processing_unavailable"));
   const sessionDeviceRetention=await runSessionDeviceRetention();
   return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, reportingReplayed, recovered, reminders, deliveries, schoolFamilyDeliveries, noncreditWaitlistEmails, classParticipantEmails, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails, sessionDeviceRetention };
 }

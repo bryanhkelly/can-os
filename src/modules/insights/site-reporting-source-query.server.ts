@@ -1,3 +1,4 @@
+import {readScopedSiteGeography} from "@/modules/geography/site-geography-read.server";
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { AccessContext } from "@/domain/access-context";
@@ -102,7 +103,7 @@ export async function querySiteReportingSourceCoverageInTx(
     Number(corrections?.count ?? 0),
   );
   return {
-    siteId: site.id, from: from.toISOString(), to: to.toISOString(), asOf: asOf.toISOString(),
+    siteId: site.id, geography: await readScopedSiteGeography(tx,site,asOf), from: from.toISOString(), to: to.toISOString(), asOf: asOf.toISOString(),
     ...result, outcomeMetricsAvailable: false as const,
     // Even a complete projection stream is NOT proof of full module
     // instrumentation, Person reconciliation, or verified training outcomes.
