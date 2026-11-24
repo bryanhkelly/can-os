@@ -1,7 +1,8 @@
 /** Presentation-only contract. Source readers own all counting and authorization. */
 export type ReportChartPoint = { id: string; label: string; value: number | null };
-type ChartFormat = "count" | "decimal" | "percent";
-type ChartBase = { title: string; description: string; valueLabel: string; format?: ChartFormat };
+import {isReportValue,formatReportValue,formatReportAxis,type ReportValueFormat} from "@/domain/report-value-format";
+export type ChartFormat=ReportValueFormat;
+type ChartBase = { title: string; description: string; valueLabel: string; format?: ChartFormat; axisMax?:number; seriesOrder?:readonly string[] };
 export type ReportSingleChartSpec = ChartBase & (
   | {kind: "comparison" | "trend"; points: readonly ReportChartPoint[]}
   | {kind: "distribution"; points: readonly ReportChartPoint[]; total: number; population: string}
@@ -14,10 +15,7 @@ export type ReportStackedChartSpec = ChartBase & {
 };
 export type ReportChartSpec = ReportSingleChartSpec | ReportStackedChartSpec;
 
-function validValue(value: number, format: ChartFormat = "count") {
-  return Number.isFinite(value) && value >= 0 &&
-    (format !== "count" || Number.isSafeInteger(value)) && (format !== "percent" || value <= 100);
-}
+const validValue=isReportValue;
 function uniqueLabels(items: readonly {id:string;label:string}[], maximum: number) {
   return items.length <= maximum && new Set(items.map(item=>item.id)).size===items.length &&
     items.every(item=>!!item.id.trim()&&!!item.label.trim());
@@ -29,6 +27,7 @@ function reconciles(values: readonly number[], total:number, format:ChartFormat=
 }
 export function validateReportChart(spec: ReportChartSpec): boolean {
   if (!spec.title.trim() || !spec.description.trim() || !spec.valueLabel.trim()) return false;
+  if(!validReportChartPresentation(spec))return false;
   if(spec.kind==="stacked"){
     return !!spec.population.trim()&&spec.series.length>=2&&uniqueLabels(spec.series,4)&&uniqueLabels(spec.rows,30)&&
       spec.rows.every(row=>row.values.length===spec.series.length&&reconciles(row.values,row.total,spec.format));
@@ -47,18 +46,8 @@ export function validateReportChart(spec: ReportChartSpec): boolean {
 export function hasReportChartValues(spec:ReportChartSpec):boolean {
   return spec.kind==="stacked"?spec.rows.length>0:spec.points.some(p=>p.value!==null);
 }
-export function formatReportChartValue(value: number | null, format: ChartFormat = "count"): string {
-  if (value === null) return "Unavailable";
-  return new Intl.NumberFormat("en-US", {maximumFractionDigits: format === "count" ? 0 : 2}).format(value) +
-    (format === "percent" ? "%" : "");
-}
-
-/** Plot-only compact notation. Exact-value tables retain the full formatted number. */
-export function formatReportAxisValue(value:number,format:ChartFormat="count"){
-  if(!Number.isFinite(value))return "";
-  if(format==="percent"||Math.abs(value)<1000)return formatReportChartValue(value,format);
-  return new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(value);
-}
+export const formatReportChartValue=formatReportValue;
+export const formatReportAxisValue=formatReportAxis;
 export function truncateReportLabel(label:string,maxChars:number){
   const chars=Array.from(label);
   return chars.length<=maxChars?label:chars.slice(0,Math.max(1,maxChars-1)).join("")+"…";
@@ -75,4 +64,25 @@ export function reportChartLayout(containerWidth:number){
 }
 export function hasNonzeroReportChartValues(spec:ReportChartSpec){
   return spec.kind==="stacked"?spec.rows.some(row=>row.total>0):spec.points.some(point=>point.value!==null&&point.value>0);
+}
+
+/** Stable category family order is source-owned, not derived from a filtered
+ * result. Reserved slots may be absent; they must not be reassigned. */
+export function reportSeriesSlot(spec:ReportChartSpec,id:string,index:number){
+  return spec.seriesOrder?spec.seriesOrder.indexOf(id):index;
+}
+function validReportChartPresentation(spec:ReportChartSpec){
+  const categories=spec.kind==="stacked"?spec.series:spec.kind==="distribution"?spec.points:null;
+  if(spec.seriesOrder){
+    if(!categories||spec.seriesOrder.length>4||new Set(spec.seriesOrder).size!==spec.seriesOrder.length||
+      spec.seriesOrder.some(id=>!id.trim())||categories.some(item=>!spec.seriesOrder!.includes(item.id)))return false;
+  }
+  if(spec.axisMax===undefined)return true;
+  if(spec.kind==="distribution"||!validValue(spec.axisMax,spec.format)||spec.axisMax<=0||
+    (spec.format==="percent"&&spec.axisMax!==100))return false;
+  const values=spec.kind==="stacked"?spec.rows.map(r=>r.total):spec.points.map(p=>p.value);
+  return values.every(value=>value===null||value<=spec.axisMax!);
+}
+export function reportChartDomain(spec:ReportChartSpec):[number,number|"auto"]{
+  return [0,spec.format==="percent"?100:spec.axisMax??"auto"];
 }

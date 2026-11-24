@@ -1,6 +1,6 @@
 import {useState} from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import {formatReportAxisValue,reportChartLayout,truncateReportLabel,type ReportChartSpec} from "./report-chart-data";
+import {formatReportAxisValue,reportChartLayout,truncateReportLabel,reportChartDomain,reportSeriesSlot,type ReportChartSpec} from "./report-chart-data";
 import {reportSeriesColors,reportPlotStyle} from "./report-chart-palette";
 import {ReportPatternDefinition,reportSeriesPaint,useReportPaintPrefix} from "./report-chart-marks";
 import {ReportChartTooltip} from "./report-chart-tooltip";
@@ -21,7 +21,7 @@ export default function ReportChartPlot({spec}: {spec: ReportChartSpec}){
   const labels=new Map((spec.kind==="stacked"?spec.rows:spec.points).map(p=>[p.id,p.label]));
   const numberAxis={...axisGeometry,tickFormatter:(n:number)=>formatReportAxisValue(n,spec.format),
     allowDecimals:(spec.format??"count")!=="count",tickCount:layout.tickCount};
-  const domain:[number,number|"auto"]=[0,spec.format==="percent"?100:"auto"];
+  const domain=reportChartDomain(spec);
   const labelFor=(id:unknown)=>labels.get(String(id))??String(id??"");
   const categoryAxis={...axisGeometry,dataKey:"id",width:layout.categoryWidth,interval:0,
     tickFormatter:(id:unknown)=>truncateReportLabel(labelFor(id),layout.categoryLabelChars)};
@@ -38,13 +38,13 @@ export default function ReportChartPlot({spec}: {spec: ReportChartSpec}){
     return <div aria-hidden="true" className="w-full min-w-0" data-report-chart-plot="stacked">
       <ResponsiveContainer {...container} height={Math.max(reportPlotStyle.minimumHeight,rows.length*reportPlotStyle.rowHeight+48)}>
         <BarChart data={rows} layout="vertical" accessibilityLayer={false} margin={margin}>
-          <defs>{spec.series.map((s,i)=><ReportPatternDefinition key={s.id} prefix={prefix} index={i}/>)}</defs>
+          <defs>{spec.series.map((s,i)=><ReportPatternDefinition key={s.id} prefix={prefix} index={reportSeriesSlot(spec,s.id,i)}/>)}</defs>
           <CartesianGrid {...grid} horizontal={false}/>
           <XAxis type="number" domain={domain} {...numberAxis}/>
           <YAxis type="category" {...categoryAxis}/>
           <Tooltip content={renderTooltip} cursor={{fill:reportPlotStyle.hover}} isAnimationActive={false}/>
           {spec.series.map((s,i)=><Bar key={s.id} dataKey={"s"+i} name={s.label} stackId="partition"
-            fill={reportSeriesPaint(prefix,i)} stroke={reportPlotStyle.separator} strokeWidth={1} {...bar}/>)}
+            fill={reportSeriesPaint(prefix,reportSeriesSlot(spec,s.id,i))} stroke={reportPlotStyle.separator} strokeWidth={1} {...bar}/>)}
         </BarChart>
       </ResponsiveContainer>
     </div>;
@@ -54,9 +54,9 @@ export default function ReportChartPlot({spec}: {spec: ReportChartSpec}){
     return <div aria-hidden="true" className="relative w-full min-w-0" data-report-chart-plot="distribution">
       <ResponsiveContainer {...container} height={reportPlotStyle.distributionHeight}>
         <PieChart accessibilityLayer={false}>
-          <defs>{points.map((p,i)=><ReportPatternDefinition key={p.id} prefix={prefix} index={i}/>)}</defs>
+          <defs>{points.map((p,i)=><ReportPatternDefinition key={p.id} prefix={prefix} index={reportSeriesSlot(spec,p.id,i)}/>)}</defs>
           <Pie data={points} dataKey="value" nameKey="label" innerRadius="54%" outerRadius="83%" isAnimationActive={false}>
-            {points.map((p,i)=><Cell key={p.id} fill={reportSeriesPaint(prefix,i)} stroke={reportPlotStyle.separator} strokeWidth={2}/>)}
+            {points.map((p,i)=><Cell key={p.id} fill={reportSeriesPaint(prefix,reportSeriesSlot(spec,p.id,i))} stroke={reportPlotStyle.separator} strokeWidth={2}/>)}
           </Pie>
           <Tooltip content={renderTooltip} cursor={false} isAnimationActive={false}/>
         </PieChart>

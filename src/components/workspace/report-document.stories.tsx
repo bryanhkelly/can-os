@@ -5,9 +5,10 @@ const report:ReportDocument={version:1,definitionId:"synthetic-impact-review-v1"
   scopeLabel:"Illustrative internal review",basis:"Synthetic values for design acceptance only; not an approved external publication",
   definitions:[{metricKey:"fixture.registrations",definitionVersion:"1",sourceDomain:"noncredit_pilot",sourceMetricKey:"registrations",label:"Registrations",source:"Synthetic fixture",denominator:"Registration IDs",rule:"One fixture count per registration",timeBasis:"Synthetic cohort",disclosure:"private_operational"}],
   blocks:[
-    {id:"metrics",kind:"metrics",items:[{id:"registrations",label:"Registrations",value:1250},{id:"people",label:"Unique participants",value:1080},{id:"hours",label:"Verified participant hours",value:875},{id:"outcome",label:"Verified outcomes",value:null}]},
+    {id:"metrics",kind:"metrics",items:[{id:"fixture.registrations",label:"Registrations",value:1250,definitionVersion:"1"},{id:"people",label:"Unique participants",value:1080},{id:"hours",label:"Verified participant hours",value:875,format:"hours"},{id:"outcome",label:"Verified outcomes",value:null}]},
     {id:"trend",kind:"chart",spec:{kind:"trend",title:"Monthly registrations",description:"Synthetic monthly cohort counts; unavailable months are not interpolated.",valueLabel:"Registrations",points:[{id:"jan",label:"January",value:120},{id:"feb",label:"February",value:190},{id:"mar",label:"March",value:null},{id:"apr",label:"April",value:270}]}},
     {id:"sites",kind:"chart",spec:{kind:"comparison",title:"Registrations by Site",description:"Synthetic site counts.",valueLabel:"Registrations",points:[{id:"a",label:"Community learning center",value:750},{id:"b",label:"Independent partner campus",value:500}]}},
+    {id:"target",kind:"progress",label:"Participant-hour target",value:875,target:800,format:"hours",description:"Illustrative target, not an approved commitment."},
     {id:"notes",kind:"note",text:"Registrations, distinct people and recorded outcomes have different counting rules. This is a presentation fixture, not verified impact."},
   ]};
 const meta={title:"V6.1 templates/Reporting/Impact review",component:ReportDocumentView,args:{report},

@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import {useMemo,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Select} from "@/components/ui/select";
-import {StatCard} from "@/components/workspace";
+import {ReportMetricCard} from "@/components/workspace/report-metric-card";
+import {ReportRankedComparison} from "@/components/workspace/report-ranked-comparison";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
 import {ReportChart} from "@/components/workspace/report-chart";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
@@ -35,10 +36,11 @@ export function NoncreditProviderEvidencePanel(){
   const [showDefinitions,setShowDefinitions]=useState(false);
   const {query:response,data}=usePrivateReportQuery({scope,key:["provider-delivery",geography],read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
+  const selectionUnavailable=!!requestedSite&&!site;
   const siteId=site?.siteId??"";
-  const selectedCohorts=useMemo(()=>data?.cohorts.filter(c=>!siteId||c.siteId===siteId)??[],
-    [data,siteId]);
-  const totals=site??data?.totals;
+  const selectedCohorts=useMemo(()=>selectionUnavailable?[]:data?.cohorts.filter(c=>!siteId||c.siteId===siteId)??[],
+    [data,siteId,selectionUnavailable]);
+  const totals=selectionUnavailable?undefined:site??data?.totals;
   const definitions=[
     {label:"Registrations",source:"noncredit_self_enrollment_claims + noncredit_registrations",
       grain:"Unique canonical registration",meaning:"Counts registrations including later withdrawals; not distinct people"},
@@ -97,8 +99,9 @@ export function NoncreditProviderEvidencePanel(){
         <Label className="block text-sm font-medium">
           Delivery Site
           <Select className="mt-2"
-            value={siteId} onChange={e=>setRequestedSite(e.target.value)}>
+            value={requestedSite} onChange={e=>setRequestedSite(e.target.value)}>
             <option value="">All authorized Sites</option>
+            {selectionUnavailable&&<option value={requestedSite}>Selected Site unavailable</option>}
             {data.sites.map(s=><option key={s.siteId} value={s.siteId}>{s.siteName}</option>)}
           </Select>
         </Label>
@@ -108,6 +111,9 @@ export function NoncreditProviderEvidencePanel(){
             time-window selection requires a versioned source lifecycle projection.</p>
         </div>
       </div>
+      {selectionUnavailable&&<p role="status" className="text-sm text-muted-foreground">The selected Site is not available in this scope. Select another Site or explicitly return to all authorized Sites.</p>}
+      {data.sites.length>0&&data.sites.length<=60&&<ReportRankedComparison title="Registrations by authorized Site" description="Select a Site to filter the metrics, release chart and release evidence below. This does not open a new reporting scope."
+        rows={data.sites.map(s=>({id:s.siteId,label:s.siteName,value:s.registrations}))} selectedId={siteId} onSelect={setRequestedSite}/>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {([
           ["Registrations",totals?.registrations],
@@ -117,7 +123,7 @@ export function NoncreditProviderEvidencePanel(){
           ["Registrations with host-attested attendance",totals?.verifiedAttendees],
           ["Linked rooms (not delivery proof)",totals?.linkedRooms],
         ] as const).map(([label,value])=>
-          <StatCard key={label} label={label} value={value?.toLocaleString()??"Unavailable"}/>
+          <ReportMetricCard key={label} item={{id:label,label,value:value??null,asOf:data.asOf}}/>
         )}
       </div>
       {selectedCohorts.length>0&&selectedCohorts.length<=20&&<ReportChart spec={{

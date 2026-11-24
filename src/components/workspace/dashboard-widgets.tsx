@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /** Reusable dashboard progress: server-computed values only. */
-export function DashboardProgress({ label, value, max = 100, description, className }: {
+export function DashboardProgress({ label, value, max = 100, description, className, appearance="primary" }: {
   label: string;
   value: number;
   max?: number;
   description?: string;
   className?: string;
+  appearance?:"primary"|"analytical";
 }) {
   const valid = Number.isFinite(value) && Number.isFinite(max) && max > 0 && value >= 0 && value <= max;
   const progress = valid ? Math.min(100, Math.max(0, value / max * 100)) : 0;
@@ -18,7 +19,7 @@ export function DashboardProgress({ label, value, max = 100, description, classN
     </div>
     {valid ? <div role="progressbar" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}
       className="h-1.5 w-full overflow-hidden bg-muted">
-      <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+      <div className={cn("h-full",appearance==="analytical"?"bg-[var(--report-series-1)]":"bg-primary")} style={{ width: `${progress}%` }} />
     </div> : <div role="status" className="text-xs text-muted-foreground">Progress cannot be verified.</div>}
     {description && <p className="text-xs text-muted-foreground">{description}</p>}
   </div>;

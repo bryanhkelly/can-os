@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, type ReactNode } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import { formatReportChartValue, hasReportChartValues, hasNonzeroReportChartValues, validateReportChart, type ReportChartSpec } from "./report-chart-data";
+import { formatReportChartValue, hasReportChartValues, hasNonzeroReportChartValues, validateReportChart, reportSeriesSlot, type ReportChartSpec } from "./report-chart-data";
 import {DashboardPanel} from "./dashboard-layout";
 import {EmptyState} from "./empty-state";
 import {WorkspaceNotice} from "./notice";
@@ -22,7 +22,7 @@ function ReportExactValues({spec}:{spec:ReportChartSpec}){
     return <Table scrollLabel={label} aria-label={label} className="print:text-xs">
       <TableCaption className="sr-only">{label}</TableCaption>
       <TableHeader><TableRow><TableHead scope="col">Category</TableHead>
-        {spec.series.map((s,i)=><TableHead key={s.id} scope="col" className="text-right"><SeriesLabel label={s.label} index={i}/></TableHead>)}
+        {spec.series.map((s,i)=><TableHead key={s.id} scope="col" className="text-right"><SeriesLabel label={s.label} index={reportSeriesSlot(spec,s.id,i)}/></TableHead>)}
         <TableHead scope="col" className="text-right">Total</TableHead></TableRow></TableHeader>
       <TableBody>{spec.rows.map(row=><TableRow key={row.id}><TableRowHead className="break-words [overflow-wrap:anywhere]">{row.label}</TableRowHead>
         {row.values.map((v,i)=><TableCell key={spec.series[i]!.id} className="text-right tabular-nums">{formatReportChartValue(v,spec.format)}</TableCell>)}
@@ -34,7 +34,7 @@ function ReportExactValues({spec}:{spec:ReportChartSpec}){
     <TableCaption className="sr-only">{label}</TableCaption>
     <TableHeader><TableRow><TableHead scope="col">Category</TableHead><TableHead scope="col" className="text-right">{spec.valueLabel}</TableHead></TableRow></TableHeader>
     <TableBody>{spec.points.map((p,i)=><TableRow key={p.id}>
-      <TableRowHead className="break-words">{spec.kind==="distribution"?<SeriesLabel label={p.label} index={i}/>:p.label}</TableRowHead>
+      <TableRowHead className="break-words">{spec.kind==="distribution"?<SeriesLabel label={p.label} index={reportSeriesSlot(spec,p.id,i)}/>:p.label}</TableRowHead>
       <TableCell className="text-right tabular-nums">{formatReportChartValue(p.value,spec.format)}</TableCell>
     </TableRow>)}</TableBody>
   </Table>;
@@ -52,10 +52,11 @@ export function ReportChart({spec,presentation="interactive",headingLevel="h3"}:
     <DashboardPanel title={spec.title} description={spec.description} headingLevel={headingLevel}>
       <div className="min-w-0 space-y-4">
         {!valid?<WorkspaceNotice tone="attention">Invalid or unbounded chart data. Use the source report.</WorkspaceNotice>:<>
+          {spec.axisMax!==undefined&&<p className="text-xs text-muted-foreground">Shared axis: 0 to {formatReportChartValue(spec.axisMax,spec.format)}.</p>}
           {"population" in spec&&<p className="text-xs text-muted-foreground">Population: {spec.population}{spec.kind==="distribution"?". Total: "+formatReportChartValue(spec.total,spec.format):""}</p>}
           {hasReportChartValues(spec)?<>
             {presentation==="interactive"&&<div className="min-w-0 space-y-3 print:hidden">
-              {categorical&&<ReportSeriesLegend items={categorical}/>}
+              {categorical&&<ReportSeriesLegend items={categorical.map((item,index)=>({...item,slot:reportSeriesSlot(spec,item.id,index)}))}/>}
               {hasNonzeroReportChartValues(spec)?<>
                 <PlotBoundary key={spec.kind+":"+spec.title}>
                   <Suspense fallback={<QueryState loading="Loading chart… Exact values are below."/>}>

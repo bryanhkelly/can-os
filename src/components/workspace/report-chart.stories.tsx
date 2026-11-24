@@ -26,10 +26,10 @@ export const Mobile: Story = {parameters:{chromatic:{viewports:[390]}},render:ar
 export const Dark: Story = {globals:{theme:"dark"},parameters:{chromatic:{viewports:[390,1440]}}};
 
 export const Distribution: Story={args:{spec:{title:"Receipt mix",description:"Synthetic mutually exclusive fixture.",valueLabel:"Events",
-  kind:"distribution",format:"count",population:"100 eligible events",total:100,
+  kind:"distribution",format:"count",population:"100 eligible events",total:100,seriesOrder:["a","b","c","d"],
   points:[{id:"a",label:"Accepted",value:80},{id:"b",label:"Pending",value:15},{id:"c",label:"Failed",value:5}]}}};
 export const Stacked: Story={args:{spec:{title:"Receipt states by source",description:"Synthetic disjoint groups.",valueLabel:"Events",
-  kind:"stacked",format:"count",population:"Eligible events per source",series:[{id:"a",label:"Accepted"},{id:"b",label:"Pending"}],
+  kind:"stacked",format:"count",population:"Eligible events per source",seriesOrder:["a","b","c","d"],series:[{id:"a",label:"Accepted"},{id:"b",label:"Pending"}],
   rows:[{id:"x",label:"Source A",total:50,values:[42,8]},{id:"y",label:"Source B",total:20,values:[18,2]}]}},
   play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByRole("columnheader",{name:"Accepted"})).toBeVisible();await expect(within(canvas.getByRole("table",{name:"Receipt states by source exact values"})).getByText("42",{exact:true})).toBeVisible();}};
 export const Funnel: Story={args:{spec:{title:"Nested cohort",description:"Synthetic fixture with verified nesting; no implied causal attribution.",valueLabel:"Registrations",
@@ -48,7 +48,7 @@ export const LongLabelsAndLargeValues:Story={args:{spec:{...fixture,points:[
   await expect(within(canvasElement).getByText("12,500,000",{exact:true})).toBeVisible();
 }};
 export const Dense:Story={args:{spec:{...fixture,points:Array.from({length:30},(_,i)=>({id:String(i),label:"Delivery Site "+(i+1),value:(i+1)*13}))}}};
-const categoricalFixture={title:"Delivery pathways",description:"Synthetic partition; each series has a different non-color texture.",valueLabel:"Registrations",kind:"stacked",format:"count",population:"One disjoint group per Site",
+const categoricalFixture={title:"Delivery pathways",description:"Synthetic partition; each series has a different non-color texture.",valueLabel:"Registrations",kind:"stacked",format:"count",population:"One disjoint group per Site",seriesOrder:["a","b","c","d"],
   series:[{id:"a",label:"Pathway A"},{id:"b",label:"Pathway B"},{id:"c",label:"Pathway C"},{id:"d",label:"Pathway D"}],
   rows:[{id:"first",label:"Site 1",total:100,values:[25,25,25,25]},{id:"second",label:"Site 2",total:100,values:[40,20,30,10]}]} satisfies ReportChartSpec;
 export const CategoricalFourSeries:Story={args:{spec:categoricalFixture},play:async({canvasElement})=>{
@@ -72,4 +72,10 @@ export const DarkTokenResolution:Story={args:{spec:categoricalFixture},globals:{
   expect(tokens.getPropertyValue("--report-axis").trim()).toBe(tokens.getPropertyValue("--muted-foreground").trim());
   expect(tokens.getPropertyValue("--report-grid").trim()).toBe(tokens.getPropertyValue("--border").trim());
   expect(tokens.getPropertyValue("--report-separator").trim()).toBe(tokens.getPropertyValue("--card").trim());
+}};
+
+export const FixedSharedAxis:Story={args:{spec:{...fixture,axisMax:200}}};
+export const ReservedSeriesSlots:Story={args:{spec:{title:"Filtered categorical family",description:"Stable reserved slots even after filtering and reordering.",valueLabel:"Registrations",kind:"distribution",population:"Synthetic disjoint population",total:100,seriesOrder:["a","b","c","d"],points:[{id:"d",label:"Pathway D",value:70},{id:"b",label:"Pathway B",value:30}]}},play:async({canvasElement})=>{
+  await waitFor(()=>expect(canvasElement.querySelector("[data-report-chart-plot]")).not.toBeNull());
+  await waitFor(()=>expect(canvasElement.querySelectorAll("[data-report-chart-plot] pattern").length).toBe(2));
 }};

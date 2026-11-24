@@ -27,10 +27,10 @@ export function ReportSeriesMark({index}:{index:number}){
     <rect x=".5" y=".5" width="15" height="15" fill={reportSeriesPaint(prefix,index)} stroke={reportPlotStyle.separator}/>
   </svg>;
 }
-export function ReportSeriesLegend({items}:{items:readonly {id:string;label:string}[]}){
+export function ReportSeriesLegend({items}:{items:readonly {id:string;label:string;slot?:number}[]}){
   return <ul aria-label="Chart series" className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-sans text-foreground print:hidden">
     {items.map((item,index)=><li key={item.id} className="flex min-w-0 items-start gap-2">
-      <ReportSeriesMark index={index}/><span className="min-w-0 break-words [overflow-wrap:anywhere]">{item.label}</span>
+      <ReportSeriesMark index={item.slot??index}/><span className="min-w-0 break-words [overflow-wrap:anywhere]">{item.label}</span>
     </li>)}
   </ul>;
 }

@@ -9,11 +9,13 @@ import { ReportDocumentView } from "@/components/workspace/report-document";
 import { bindRegisteredCounts,pilotOutcomeDefinitions } from "@/domain/reporting-view-definitions";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { EmptyState, QueryState, StatCard, WorkspaceNotice } from "@/components/workspace";
+import { EmptyState, QueryState, WorkspaceNotice } from "@/components/workspace";
 import { getNoncreditPilotOutcomes } from "@/modules/learning/noncredit-pilot-outcomes.functions";
+import {ReportMetricCard} from "@/components/workspace/report-metric-card";
+import {formatReportValue} from "@/domain/report-value-format";
 import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
 
-const count=(n:number)=>n.toLocaleString("en-US");
+const count=(n:number)=>formatReportValue(n);
 
 /** Reusable, provider-only learning-outcomes panel, using Design System 6.1. */
 export function NoncreditPilotOutcomesPanel(){
@@ -68,16 +70,16 @@ export function NoncreditPilotOutcomesPanel(){
           const value=def.key==="distinctLearners"
             ?report!.distinctLearners
             :summary[def.key];
-          return <StatCard key={def.key} label={def.label} value={count(value)}/>;
+          return <ReportMetricCard key={def.key} item={{id:def.key,label:def.label,value}}/>;
         })}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Recorded participant hours" value={(summary.verifiedParticipationMinutes/60).toLocaleString(undefined,{maximumFractionDigits:1})} hint="Verified minutes divided by 60; not unique person time"/>
-        <StatCard label="Delivery Sites with registrations" value={count(report!.deliverySites)} hint="Authorized Sites, not a count of congregations"/>
+        <ReportMetricCard item={{id:"participant-hours",label:"Recorded participant hours",value:summary.verifiedParticipationMinutes/60,format:"hours",hint:"Verified minutes divided by 60; not unique person time"}}/>
+        <ReportMetricCard item={{id:"delivery-sites",label:"Delivery Sites with registrations",value:report!.deliverySites,hint:"Authorized Sites, not a count of congregations"}}/>
       </div>
       <ReportDocumentView report={{version:1,definitionId:reportDefinitionId("noncredit-registration-outcomes"),title:"Registration outcomes",
         scopeLabel:"Authorized provider Sites · "+(geographyOptions.data?.find(option=>option.code===geography)?.name??(geography||"All delivery geographies")),basis:"Registration cohort; evidence current at report generation",
-        blocks:[{id:"outcomes",kind:"chart",spec:{
+        definitions:pilotOutcomeDefinitions(),blocks:[{id:"outcomes",kind:"chart",spec:{
           title:"Registration outcome counts",description:"Measures overlap; do not add them or treat them as a sequential funnel.",
           valueLabel:"Registrations",kind:"comparison",format:"count",
           points:bindRegisteredCounts(pilotOutcomeDefinitions(),summary),
