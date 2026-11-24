@@ -21,6 +21,9 @@ type Share = Awaited<ReturnType<typeof listSitePreviewShares>>[number];
  * enrollment claim. Authorized operators may retrieve saved Go codes.
  */
 export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
+  return <LaunchPreviewSharingSession key={siteId} siteId={siteId}/>;
+}
+function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
   const [open, setOpen] = useState(false);
   const [shares, setShares] = useState<Share[]>([]);
   const [expiresAfterDays, setExpiresAfterDays] = useState<7 | 30 | null>(7);
