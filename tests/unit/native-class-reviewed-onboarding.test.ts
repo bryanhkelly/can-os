@@ -72,7 +72,8 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(entry).toContain('CANONICAL_LEARNER_SESSION_REQUIRED');
     expect(entry).toContain('CANONICAL_LEARNER_ONBOARDING_REQUIRED');
     expect(entry).toContain('activateReviewedNativeClassLearner()');
-    expect(route).toContain('enrollCurrentPersonInClass');
+    expect(route).toContain('<OfferingCard');
+    expect(read('src/components/learning/native-class/OfferingCard.tsx')).toContain('enrollCurrentPersonInClass');
     const activationOffset=entry.indexOf('await activateReviewedNativeClassLearner()');
     expect(entry.indexOf('return enrollInNativeClass(input);',activationOffset))
       .toBeGreaterThan(activationOffset);
