@@ -81,3 +81,20 @@ describe("signed Resend source receipt callbacks", () => {
     } })).toBeNull();
   });
 });
+
+describe("Strict webhook wire format",()=>{
+  it("rejects malformed UTF-8 and preserves a signed BOM",async()=>{
+    const request=(bytes:Uint8Array)=>new Request("https://example.test/webhook",{method:"POST",body:Uint8Array.from(bytes).buffer});
+    expect(await readBoundedResendWebhookBody(request(new Uint8Array([0xff])))).toBeNull();
+    const withBom="\uFEFF"+body;
+    const received=await readBoundedResendWebhookBody(request(new TextEncoder().encode(withBom)));
+    expect(received).toBe(withBom);
+    expect(verifyResendWebhookSignature(received!,headers(withBom),secret,Number(timestamp)*1000)).toBe(true);
+    expect(verifyResendWebhookSignature(received!,headers(body),secret,Number(timestamp)*1000)).toBe(false);
+  });
+  it("rejects arrays that coerce to recognized receipt discriminators",()=>{
+    const event=JSON.parse(body);
+    expect(parseResendReceiptEvent({...event,type:["email.delivered"]})).toBeNull();
+    expect(parseResendReceiptEvent({...event,data:{...event.data,tags:{...event.data.tags,can_source:["engagement_campaign"]}}})).toBeNull();
+  });
+});
