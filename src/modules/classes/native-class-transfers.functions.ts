@@ -20,6 +20,7 @@ import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-c
 import {assertCurrentNativeClassLearnerForMutation} from "./native-class-learner-session.server";
 import {currentClassAuthority} from "./native-class-authority.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
+import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import {verifiedAdultOn,assertNativeSelfEnrollmentEligible} from "@/domain/native-class-enrollment";
 import {NATIVE_SELF_TRANSFER_CREDIT_MODES} from "@/domain/native-class-transfer-choices";
 import {
@@ -198,18 +199,7 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
       organizationId:destinationAuthority.operatingOrganizationId,
       siteId:destinationAuthority.siteId},
    });
-   const [attempt]=await tx.insert(learnerCourseAttempts).values({
-    classEnrollmentId:destination.id,enrollmentId:null,
-    noncreditRegistrationId:null,sectionId:null,
-    deploymentId:destinationAuthority.deploymentId,
-    adoptionId:destinationAuthority.adoptionId,
-    offeringVersionId:destinationAuthority.offeringVersionId,
-    courseVersionId:destinationAuthority.courseVersionId,
-    attemptNo:1,status:"active",
-   }).returning({id:learnerCourseAttempts.id});
-   if(!attempt)throw new Error("destination Course Attempt not saved");
-   await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
-    .where(eq(canonicalClassEnrollments.id,destination.id));
+   const attempt=await createInitialNativeClassAttempt(tx,destination.id,destinationAuthority);
    const [transfer]=await tx.insert(canonicalClassEnrollmentTransferRequests).values({
     sourceEnrollmentId:source.id,targetClassId:destinationClass.id,
     targetOfferingVersionId:terms.id,learnerPersonId:actor.actorPersonId,
