@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteGoLinks, siteGoLinkDailyVisits } from "@/db/schema";
 import { goCodeSchema } from "@/domain/site-go-links";
+import { goResponseCounts, type GoResponseKind } from "@/domain/go-response-observation";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -31,10 +32,8 @@ export async function readPublicGoLink(code:string){
 export type PublicGoLink=NonNullable<Awaited<ReturnType<typeof readPublicGoLink>>>;
 
 /** Anonymous aggregate only. Failure cannot block a valid destination. */
-export async function observePublicGoResponse(code:string,linkId:string,response:"redirect"|"page",entry=true):Promise<void>{
-  const opens=entry||response==="redirect"?1:0;
-  const views=response==="page"?1:0;
-  const redirects=response==="redirect"?1:0;
+export async function observePublicGoResponse(code:string,linkId:string,response:GoResponseKind,entry=true):Promise<void>{
+  const {linkOpens:opens,pageViews:views,redirectResponses:redirects}=goResponseCounts(response,entry);
   try{
     await withGoCode(code,async tx=>{
       await tx.insert(siteGoLinkDailyVisits).values({
