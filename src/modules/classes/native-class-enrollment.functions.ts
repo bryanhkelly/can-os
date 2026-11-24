@@ -26,7 +26,7 @@ import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canoni
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
   assertOperationalClassOfferingTerms,
-  assertNativeClassSeatAvailable,
+  assertNativeClassSeatAvailable, nativeClassCapacity,
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
@@ -100,11 +100,8 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
         });
         // All enrollment methods share one occupied-seat count. The optional
         // publication limit narrows only self-registration, not assignment.
-        const limits=[row.capacity,authority.classCapacity]
-          .filter((n):n is number=>n!==null);
-        const capacity=limits.length?Math.min(...limits):null;
-        allowed.push({...row,capacity,
-          remainingSeats:capacity===null?null:Math.max(0,capacity-openSeats)});
+        allowed.push({...row,...nativeClassCapacity({method:"self",activeOrPending:openSeats,
+          classCapacity:authority.classCapacity,offeringCapacity:row.capacity})});
       }catch(e){if(!(e instanceof AuthorizationError))throw e;}
     }
     return allowed;
@@ -166,12 +163,8 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
           assertOperationalClassOfferingTerms(row);
           const authority=await currentClassAuthority(tx,row.classId,now);
           const occupancy=await readNativeClassOccupancy(tx,row.classId);
-          const limits=[row.capacity,authority.classCapacity]
-            .filter((n):n is number=>n!==null);
-          const capacity=limits.length?Math.min(...limits):null;
-          items.push({...row,capacity,
-            remainingSeats:capacity===null?null:
-              Math.max(0,capacity-(occupancy))});
+          items.push({...row,...nativeClassCapacity({method:"self",activeOrPending:occupancy,
+            classCapacity:authority.classCapacity,offeringCapacity:row.capacity})});
         }catch(error){
           if(!(error instanceof AuthorizationError))throw error;
         }
