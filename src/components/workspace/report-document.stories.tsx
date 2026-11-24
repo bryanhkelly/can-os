@@ -24,3 +24,16 @@ export const PrintReview:Story={args:{presentation:"print"},play:async({canvasEl
   await expect(canvas.getByRole("table",{name:"Community learning impact review metric definitions"})).toBeVisible();
   expect(canvasElement.querySelector("[data-report-chart-plot]")).toBeNull();
 }};
+
+export const InvalidDefinition:Story={args:{report:{...report,blocks:[report.blocks[0],report.blocks[0]]}},play:async({canvasElement})=>{
+  const canvas=within(canvasElement);
+  await expect(canvas.getByRole("alert")).toHaveTextContent("Unsupported or invalid report definition.");
+  await expect(canvasElement.querySelector("[data-report-document]")).toBeNull();
+}};
+export const NarrowMetrics:Story={render:()=> <div data-testid="narrow-report" className="w-full max-w-72">
+  <ReportDocumentView report={{...report,title:"CommunityLearningCenterImpactReview",blocks:[report.blocks[0]]}}/>
+</div>,play:async({canvasElement})=>{
+  const root=within(canvasElement).getByTestId("narrow-report");
+  await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth+1);
+  await expect(within(root).getByText("Verified outcomes")).toBeVisible();
+}};
