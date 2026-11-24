@@ -1,6 +1,6 @@
 import {geographyFilterSchema} from "@/domain/geographic-reporting";
 import {geographyFactPredicate} from "@/modules/geography/reporting-geography.server";
-import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, sql, count, notExists } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -10,7 +10,7 @@ import {
   learnerLessonProgress,courseLessons,assessmentAccess,
   assessmentExecutionAttempts,assessmentExecutionResults,
   assessmentFormAdministrations,noncreditCompletionDecisions,
-  surveyInvitations,surveyCampaigns,surveyResponses,noncreditParticipationEvents,
+  surveyInvitations,surveyCampaigns,surveyResponses,noncreditParticipationEvents,canonicalClassSurveyCampaigns,
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,evidenceDocumentVersions,
 } from "@/db/canonical-v301";
 import {
@@ -36,6 +36,10 @@ const params=z.object({
 }).strict();
 const uuidSet=(values:(string|null)[])=>[...new Set(values.filter((x):x is string=>!!x))];
 const take=5001;
+const evidenceTake=20001;
+function checkEvidenceBound(n:number,name:string){
+  if(n>=evidenceTake)throw new Error(name+" exceeds interactive evidence limit; use partitioned reporting");
+}
 function checkBound(n:number,name:string){
   if(n>=take)throw new Error(name+" exceeds interactive report limit; use partitioned reporting");
 }
@@ -121,17 +125,17 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const versions=uuidSet(attempts.map(row=>row.courseVersionId));
     const [lessons,progress,grants,decisions,participationEvents]=await Promise.all([
       versions.length?db.select({id:courseLessons.id,courseVersionId:courseLessons.courseVersionId})
-        .from(courseLessons).where(inArray(courseLessons.courseVersionId,versions)):[],
+        .from(courseLessons).where(inArray(courseLessons.courseVersionId,versions)).limit(evidenceTake):[],
       courseIds.length?db.select({
         courseAttemptId:learnerLessonProgress.courseAttemptId,
         lessonId:learnerLessonProgress.lessonId,status:learnerLessonProgress.status,
         observedAt:learnerLessonProgress.observedAt,
       }).from(learnerLessonProgress)
-        .where(inArray(learnerLessonProgress.courseAttemptId,courseIds)):[],
+        .where(inArray(learnerLessonProgress.courseAttemptId,courseIds)).limit(evidenceTake):[],
       courseIds.length?db.select({
         id:assessmentAccess.id,courseAttemptId:assessmentAccess.courseAttemptId,
       }).from(assessmentAccess)
-        .where(inArray(assessmentAccess.courseAttemptId,courseIds)):[],
+        .where(inArray(assessmentAccess.courseAttemptId,courseIds)).limit(evidenceTake):[],
       db.select({
         id:noncreditCompletionDecisions.id,
         registrationId:noncreditCompletionDecisions.registrationId,
@@ -152,6 +156,9 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       }).from(noncreditParticipationEvents)
         .where(inArray(noncreditParticipationEvents.registrationId,registrationIds)).limit(20001),
     ]);
+    checkEvidenceBound(lessons.length,"Course lessons");
+    checkEvidenceBound(progress.length,"Lesson progress");
+    checkEvidenceBound(grants.length,"Assessment access grants");
     if(participationEvents.length>20000)throw new Error("Participation evidence exceeds the safe report limit");
     const evidenceIds=uuidSet(participationEvents.map(e=>e.evidenceVersionId));
     const evidence=evidenceIds.length?await db.select({id:evidenceDocumentVersions.id,verifiedAt:evidenceDocumentVersions.verifiedAt,verifiedByPersonId:evidenceDocumentVersions.verifiedByPersonId,validFrom:evidenceDocumentVersions.validFrom,validThrough:evidenceDocumentVersions.validThrough}).from(evidenceDocumentVersions).where(inArray(evidenceDocumentVersions.id,evidenceIds)):[];
@@ -171,7 +178,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       state:assessmentExecutionAttempts.state,
       submittedAt:assessmentExecutionAttempts.submittedAt,
     }).from(assessmentExecutionAttempts)
-      .where(inArray(assessmentExecutionAttempts.accessGrantId,grantIds)):[];
+      .where(inArray(assessmentExecutionAttempts.accessGrantId,grantIds)).limit(evidenceTake):[];
+    checkEvidenceBound(checkAttempts.length,"Assessment attempts");
     const checkIds=checkAttempts.map(a=>a.id);
     const adminIds=uuidSet(checkAttempts.map(a=>a.administrationId));
     const [results,administrations]=await Promise.all([
@@ -185,13 +193,14 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         revision:assessmentExecutionResults.resultRevision,
         supersedesId:assessmentExecutionResults.supersedesId,
       }).from(assessmentExecutionResults)
-        .where(inArray(assessmentExecutionResults.attemptId,checkIds)):[],
+        .where(inArray(assessmentExecutionResults.attemptId,checkIds)).limit(evidenceTake):[],
       adminIds.length?db.select({
         id:assessmentFormAdministrations.id,
         assessmentVersionId:assessmentFormAdministrations.assessmentVersionId,
       }).from(assessmentFormAdministrations)
         .where(inArray(assessmentFormAdministrations.id,adminIds)):[],
     ]);
+    checkEvidenceBound(results.length,"Assessment results");
     // A deployment may contain multiple independent training Offerings.
     // An identified response is attributable only when its approved campaign
     // explicitly names the same Offering as the participant's registration.
@@ -221,19 +230,38 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         inArray(surveyCampaigns.deploymentId,deployments),
         inArray(surveyCampaigns.offeringId,offeringIds),
         eq(surveyResponses.respondentMode,"identified"),
+        eq(surveyCampaigns.operatingOrganizationId,organizationId),
+        notExists(db.select({id:canonicalClassSurveyCampaigns.campaignId}).from(canonicalClassSurveyCampaigns)
+          .where(eq(canonicalClassSurveyCampaigns.campaignId,surveyCampaigns.id))),
       )).limit(take):[];
     checkBound(surveys.length,"Survey responses");
-    // Only one in-window registration for a Person, Deployment and Offering
-    // may claim an invited response. A retake or duplicate registration needs
-    // explicit registration-to-invitation provenance rather than guesswork.
+    // Ambiguity is evaluated over every registration in the authorized operator,
+    // including other Sites, training versions and dates. Filtering a report
+    // must never turn a shared Person/Offering invitation into unique evidence.
+    // Only aggregate cardinalities are used; no out-of-scope participant
+    // records or Site identities are returned to the report consumer.
     const registrationCounts=new Map<string,number>();
     const feedbackKey=(personId:string,deploymentId:string,offeringId:string,organizationId:string)=>
       [personId,deploymentId,offeringId,organizationId].join(":");
-    for(const r of registrations){
-      const offeringId=offeringByVersion.get(r.offeringVersionId);
-      if(!offeringId)continue;
-      const key=feedbackKey(r.participantPersonId,r.deploymentId,offeringId,r.registeringOrganizationId);
-      registrationCounts.set(key,(registrationCounts.get(key)??0)+1);
+    if(surveys.length){
+      const cardinalities=await db.select({
+        personId:noncreditRegistrations.participantPersonId,
+        deploymentId:noncreditRegistrations.deploymentId,
+        offeringId:offeringVersions.offeringId,
+        organizationId:noncreditRegistrations.registeringOrganizationId,
+        registrations:count(),
+      }).from(noncreditRegistrations)
+        .innerJoin(offeringVersions,eq(offeringVersions.id,noncreditRegistrations.offeringVersionId))
+        .where(and(
+          eq(noncreditRegistrations.registeringOrganizationId,organizationId),
+          inArray(noncreditRegistrations.participantPersonId,people),
+          inArray(noncreditRegistrations.deploymentId,deployments),
+          inArray(offeringVersions.offeringId,offeringIds),
+        )).groupBy(noncreditRegistrations.participantPersonId,noncreditRegistrations.deploymentId,
+          offeringVersions.offeringId,noncreditRegistrations.registeringOrganizationId).limit(evidenceTake);
+      checkEvidenceBound(cardinalities.length,"Feedback attribution scope");
+      for(const row of cardinalities)registrationCounts.set(
+        feedbackKey(row.personId,row.deploymentId,row.offeringId,row.organizationId),Number(row.registrations));
     }
     const surveyTimestamps=new Map<string,Date>();
     for(const s of surveys){
@@ -242,11 +270,11 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       const previous=surveyTimestamps.get(key);
       if(!previous||previous<s.submittedAt)surveyTimestamps.set(key,s.submittedAt);
     }
-    const attemptById=new Map(attempts.map(a=>[a.id,a]));
     const grantsById=new Map(grants.map(g=>[g.id,g]));
     const adminById=new Map(administrations.map(a=>[a.id,a]));
     const supersededResults=new Set(results.flatMap(r=>r.supersedesId?[r.supersedesId]:[]));
-    const latestResults=results.filter(r=>!supersededResults.has(r.id)&&r.status==="finalized");
+    const finalizedAttemptIds=new Set(checkAttempts.filter(a=>a.state==="finalized").map(a=>a.id));
+    const latestResults=results.filter(r=>!supersededResults.has(r.id)&&r.status==="finalized"&&finalizedAttemptIds.has(r.attemptId));
     const trainingById=new Map(trainings.map(t=>[t.id,t]));
     const facts:PilotParticipantFact[]=registrations.map(reg=>{
       const ownAttempts=attempts.filter(a=>a.registrationId===reg.id);
@@ -292,7 +320,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       const offeringId=offeringByVersion.get(reg.offeringVersionId);
       const surveyKey=offeringId?feedbackKey(reg.participantPersonId,reg.deploymentId,offeringId,reg.registeringOrganizationId):null;
       const feedbackSubmittedAt=surveyKey?surveyTimestamps.get(surveyKey):undefined;
-      const hasSubmitted=finalCheck.some(c=>c.submittedAt!==null);
+      const hasSubmitted=finalCheck.some(c=>c.submittedAt!==null&&["submitted","scored","finalized"].includes(c.state));
       return {
         registrationId:reg.id,trainingVersionId:reg.trainingVersionId,registered:true,
         engaged:doneLessons.size>0||hasSubmitted||
