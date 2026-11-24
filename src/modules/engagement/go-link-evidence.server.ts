@@ -1,7 +1,8 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteGoLinks, siteGoLinkDailyVisits } from "@/db/schema";
-import { noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
+import type { GoDestination } from "@/domain/site-go-links";
+import { noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 
 /** These are two distinct metrics:
  * (1) observed redirects (NOT visitors or people),
@@ -29,6 +30,14 @@ export async function readSiteGoLinkEvidence(
     packageId?eq(siteGoLinks.packageId,packageId):undefined,
     linkIds?inArray(siteGoLinks.id,[...linkIds]):undefined,
   )).orderBy(desc(siteGoLinks.createdAt),desc(siteGoLinks.id)).limit(500);
+  return readAuthorizedGoLinkEvidence(links.map(link=>({...link,siteId})),reader);
+}
+
+/** Call only with rows selected by a separately authorized owner query. */
+export async function readAuthorizedGoLinkEvidence(
+  links:readonly {id:string;code:string;destination:GoDestination|null;siteId:string|null}[],
+  reader:Pick<typeof db,"select">=db,
+):Promise<GoLinkEvidence[]>{
   if(!links.length)return [];
   const now=new Date();
   const today=now.toISOString().slice(0,10);
@@ -44,27 +53,36 @@ export async function readSiteGoLinkEvidence(
     lte(siteGoLinkDailyVisits.day,today),
   )).groupBy(siteGoLinkDailyVisits.linkId);
   const visitsByLink=new Map(traffic.map(item=>[item.linkId,Number(item.visits)]));
-  const referenced=links.filter(link=>link.destination?.kind==="adult-training");
-  const claims=referenced.length?await reader.select({
+  const referenced=links.flatMap(link=>link.destination?.kind==="adult-training"
+    ?[{...link,releaseId:link.destination.releaseId}]:[]);
+  const releaseIds=[...new Set(referenced.map(link=>link.releaseId))];
+  const releases=releaseIds.length?await reader.select({id:noncreditSelfEnrollmentReleases.id,siteId:noncreditSelfEnrollmentReleases.siteId})
+    .from(noncreditSelfEnrollmentReleases).where(inArray(noncreditSelfEnrollmentReleases.id,releaseIds)):[];
+  const sitesByRelease=new Map(releases.map(row=>[row.id,row.siteId]));
+  const connected=referenced.filter(link=>sitesByRelease.has(link.releaseId)&&
+    (!link.siteId||sitesByRelease.get(link.releaseId)===link.siteId));
+  const byLink=new Map(connected.map(link=>[link.id,link]));
+  const claims=connected.length?await reader.select({
     code:noncreditSelfEnrollmentClaims.referralCode,
     releaseId:noncreditSelfEnrollmentClaims.releaseId,
+    siteId:noncreditSelfEnrollmentClaims.siteId,
     claims:sql<string>`count(*)::text`,
   }).from(noncreditSelfEnrollmentClaims).where(and(
-    eq(noncreditSelfEnrollmentClaims.siteId,siteId),
+    inArray(noncreditSelfEnrollmentClaims.releaseId,connected.map(link=>link.releaseId)),
     inArray(noncreditSelfEnrollmentClaims.referralCode,
-      referenced.map(link=>link.code)),
+      connected.map(link=>link.code)),
     gte(noncreditSelfEnrollmentClaims.createdAt,start),
     lt(noncreditSelfEnrollmentClaims.createdAt,tomorrow),
   )).groupBy(noncreditSelfEnrollmentClaims.referralCode,
-    noncreditSelfEnrollmentClaims.releaseId):[];
+    noncreditSelfEnrollmentClaims.releaseId,noncreditSelfEnrollmentClaims.siteId):[];
   const claimsByKey=new Map(claims.map(item=>[
-    item.code+":"+item.releaseId,Number(item.claims),
+    item.code+":"+item.releaseId+":"+item.siteId,Number(item.claims),
   ]));
   return links.map(link=>({
     linkId:link.id,redirects30d:visitsByLink.get(link.id)??0,
-    referralRegistrations30d:link.destination.kind==="adult-training"
-      ?claimsByKey.get(link.code+":"+link.destination.releaseId)??0:null,
-    registrationEvidence:link.destination.kind==="adult-training"
+    referralRegistrations30d:byLink.has(link.id)
+      ?claimsByKey.get(link.code+":"+byLink.get(link.id)!.releaseId+":"+sitesByRelease.get(byLink.get(link.id)!.releaseId))??0:null,
+    registrationEvidence:byLink.has(link.id)
       ?"referenced_noncredit_claim" as const:"not_connected" as const,
     observationQuality:"unfiltered_automated_traffic" as const,
     periodStart:firstDay,periodEnd:today,

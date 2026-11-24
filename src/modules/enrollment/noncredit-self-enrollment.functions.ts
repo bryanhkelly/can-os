@@ -25,6 +25,7 @@ import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-ad
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
+import { verifyNoncreditGoReferral } from "@/modules/engagement/engagement-go.server";
 import { placeCourseRegistrationInClass } from "./course-class-placement.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -158,6 +159,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
     const owner=await requireVerifiedAdultAccount();
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure native learning access is temporarily unavailable");
+    const verifiedReferral=await verifyNoncreditGoReferral(data.referralCode,data.releaseId);
     const outcome=await db.transaction(async tx=>{
       // Serialize capacity and duplicate checks for one published release.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+data.releaseId}))`);
@@ -278,7 +280,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           canonicalAccountId:native.accountId,siteId:release.siteId,
           consentVersion:release.consentVersion,
           consentSha256:release.consentSha256,adultAttested:data.adultConfirmed,
-          referralCode:data.referralCode||null,
+          referralCode:verifiedReferral,
         });
         // Directory visibility validates the institution, not the learner's
         // personal affiliation. Self-selection is explicitly self-reported.

@@ -6,11 +6,11 @@ export const GO_LINK_EVIDENCE_VERSION="1.0.0" as const;
 export const GO_LINK_METRIC_DEFINITIONS=[
   {
     key:"observedRedirects30d",
-    label:"Observed redirects (30 days)",
+    label:"Observed Go requests (30 days)",
     source:"public.site_go_link_daily_visits",
-    denominator:"None; a redirect is an individual request, not a unique visitor",
+    denominator:"None; a redirect or rendered page is an individual request, not a unique visitor",
     rule:"Sum daily redirect counters for the exact Go Link in the 30 UTC calendar days including today",
-    timeBasis:"UTC day of successful GET redirect",
+    timeBasis:"UTC day of successful public GET resolution",
   },
   {
     key:"referralNoncreditRegistrations30d",

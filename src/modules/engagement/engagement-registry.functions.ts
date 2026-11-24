@@ -19,6 +19,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { assertSiteSetupScope, assertWholeSiteProgramsInScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { readAuthorizedGoLinkEvidence } from "./go-link-evidence.server";
 import { writeAudit } from "@/platform/mutation";
 
 type Reader = Pick<typeof db, "select">;
@@ -240,7 +241,7 @@ export const listEngagementGoLinks=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     const record=await authorizedDefinition(data.engagementId,actor,false,db);
-    const versions=await db.select({id:engagementDefinitionVersions.id})
+    const versions=await db.select({id:engagementDefinitionVersions.id,content:engagementDefinitionVersions.content})
       .from(engagementDefinitionVersions).where(eq(
         engagementDefinitionVersions.engagementId,record.id));
     const versionIds=versions.map(v=>v.id);
@@ -248,11 +249,20 @@ export const listEngagementGoLinks=createServerFn({method:"GET"})
     const links=await db.select({
       id:siteGoLinks.id,code:siteGoLinks.code,channel:siteGoLinks.channel,
       status:siteGoLinks.status,engagementVersionId:siteGoLinks.engagementVersionId,
-      createdAt:siteGoLinks.createdAt,
+      createdAt:siteGoLinks.createdAt,siteId:siteGoLinks.siteId,
+      organizationId:siteGoLinks.organizationId,
     }).from(siteGoLinks)
       .where(inArray(siteGoLinks.engagementVersionId,versionIds))
       .orderBy(desc(siteGoLinks.createdAt)).limit(500);
-    return links.map(link=>({...link,createdAt:link.createdAt.toISOString()}));
+    const owned=links.filter(link=>link.siteId===record.siteId&&link.organizationId===record.organizationId);
+    const definitions=new Map(versions.map(version=>[version.id,engagementDefinitionSchema.safeParse(version.content)]));
+    let evidence:Awaited<ReturnType<typeof readAuthorizedGoLinkEvidence>>=[];
+    try{evidence=await readAuthorizedGoLinkEvidence(owned.map(link=>{
+      const parsed=definitions.get(link.engagementVersionId??"");
+      return {id:link.id,code:link.code,siteId:link.siteId,destination:parsed?.success?engagementDestination(parsed.data):null};
+    }));}catch{console.error("Engagement outcome evidence unavailable",{kind:"operational_analytics"});}
+    const byId=new Map(evidence.map(item=>[item.linkId,item]));
+    return owned.map(({siteId:_siteId,organizationId:_organizationId,...link})=>({...link,createdAt:link.createdAt.toISOString(),evidence:byId.get(link.id)??null}));
   });
 
 export const retireEngagementDefinition=createServerFn({method:"POST"})

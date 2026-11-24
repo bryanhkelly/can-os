@@ -9,7 +9,7 @@ import { inspectGoDestination } from "./go-destination-registry.server";
  * the current Site, optional package, lifecycle and authoritative destination.
  * A successful redirect is observed only as an aggregated daily count.
  */
-export async function resolveSiteGoLink(code: string): Promise<string | null> {
+export async function resolveSiteGoLink(code: string, observe=true): Promise<string | null> {
   if (!goCodeSchema.safeParse(code).success) return null;
   const [link] = await db.select({
     id:siteGoLinks.id,destination:siteGoLinks.destination,status:siteGoLinks.status,
@@ -43,7 +43,7 @@ export async function resolveSiteGoLink(code: string): Promise<string | null> {
 
   // Best-effort observational counter. No IP, cookie, headers, Person, unique
   // visitor claim, or fabricated enrollment. Metrics never block navigation.
-  try {
+  if(observe)try {
     const day=new Date().toISOString().slice(0,10);
     await db.insert(siteGoLinkDailyVisits).values({
       linkId:link.id,day,redirects:1,

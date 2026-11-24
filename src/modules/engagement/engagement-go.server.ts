@@ -98,7 +98,7 @@ async function observeUniversalGoVisit(linkId:string):Promise<void>{
 }
 
 /** Single public resolver; Site and universal engagement links share code store. */
-export async function resolveGoExperience(code:string,page:string="/"):Promise<GoExperience|null>{
+export async function resolveGoExperience(code:string,page:string="/",observe=true):Promise<GoExperience|null>{
   if(!goCodeSchema.safeParse(code).success)return null;
   const [link]=await db.select({
     id:siteGoLinks.id,
@@ -117,13 +117,13 @@ export async function resolveGoExperience(code:string,page:string="/"):Promise<G
     const pages=await readSitePreviewSnapshot(sitePreviewSnapshotKey(link.siteId,destination.snapshotId),destination.snapshotDigest);
     const html=pages?.[page];
     if(!pages||!html)return null;
-    if(page==="/")await observeUniversalGoVisit(link.id);
+    if(observe&&page==="/")await observeUniversalGoVisit(link.id);
     return {mode:"website-preview",html:renderSharedSitePreview(html,link.siteId,"",Object.keys(pages),false,code)};
   }
   if(!link.engagementVersionId){
     // Reuse the destination registry that enforces exact Site ownership,
     // current publication, optional Marketing Package and program eligibility.
-    const href=await resolveSiteGoLink(code);
+    const href=await resolveSiteGoLink(code,observe);
     return href?{mode:"redirect",href}:null;
   }
   const [version]=await db.select({
@@ -152,11 +152,23 @@ export async function resolveGoExperience(code:string,page:string="/"):Promise<G
   },destination,code);
   if(!result.available||!result.href)return null;
   const href=result.href;
-  await observeUniversalGoVisit(link.id);
+  if(observe)await observeUniversalGoVisit(link.id);
   if(definition.execution.mode==="redirect")return {mode:"redirect",href};
   const identity=await publishedExperienceBrand(
     owner.siteId,definition.presentation.brandVersionId,
   );
   return {mode:"page",definition,href,
     ownerName:identity?.name??owner.name,theme:identity?.theme??null};
+}
+
+/** Referral is optional attribution, never access. Reuse current destination
+ * resolution without recording a second visit or trusting a caller's code. */
+export async function verifyNoncreditGoReferral(code:string|undefined,releaseId:string):Promise<string|null>{
+  if(!code||!goCodeSchema.safeParse(code).success)return null;
+  try{
+    const resolved=await resolveGoExperience(code,"/",false);
+    if(!resolved||resolved.mode==="website-preview")return null;
+    const expected="/learn/enroll?release="+encodeURIComponent(releaseId)+"&ref="+encodeURIComponent(code);
+    return resolved.href===expected?code:null;
+  }catch{return null;}
 }

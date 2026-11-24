@@ -156,6 +156,7 @@ export function SiteEngagementLibrary({
             <p className="text-xs text-muted-foreground">
               {link.channel??"Unspecified channel"} · {record?.status==="retired"?"Engagement retired":link.status}
             </p>
+            {link.evidence?<p className="mt-1 text-xs text-muted-foreground">{link.evidence.redirects30d} observed requests · {link.evidence.registrationEvidence==="referenced_noncredit_claim"?`${link.evidence.referralRegistrations30d??0} matching registration claims`:"Outcome not connected"} (30 days; not unique people or causal conversions)</p>:<p className="mt-1 text-xs text-muted-foreground">Outcome evidence unavailable.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline"
