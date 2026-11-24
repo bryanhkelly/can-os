@@ -34,3 +34,8 @@ export type { TimelineEntry, DashboardPreviewItem } from "./dashboard-widgets";
 export { SelectionCard, type SelectionCardProps } from "./selection-card";
 
 export { SelectionChip, SelectionChipGroup, type SelectionChipProps } from "./selection-chip";
+
+export {ReportChart} from "./report-chart";
+export type {ReportChartSpec} from "./report-chart-data";
+export {ReportDocumentView,type ReportDocument,type ReportBlock} from "./report-document";
+export {ReportDateFilter} from "./report-date-filter";

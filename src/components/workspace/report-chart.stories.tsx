@@ -22,3 +22,14 @@ export const Missing: Story = {args:{spec:{...meta.args.spec,points:[{id:"missin
 export const Zero: Story = {args:{spec:{...meta.args.spec,points:[{id:"zero",label:"Registered",value:0}]}}};
 export const Mobile: Story = {parameters:{chromatic:{viewports:[390]}},render:args=><div className="max-w-[390px]"><ReportChart {...args}/></div>};
 export const Dark: Story = {globals:{theme:"dark"},parameters:{chromatic:{viewports:[390,1440]}}};
+
+export const Distribution: Story={args:{spec:{title:"Receipt mix",description:"Synthetic mutually exclusive fixture.",valueLabel:"Events",
+  kind:"distribution",format:"count",population:"100 eligible events",total:100,
+  points:[{id:"a",label:"Accepted",value:80},{id:"b",label:"Pending",value:15},{id:"c",label:"Failed",value:5}]}}};
+export const Stacked: Story={args:{spec:{title:"Receipt states by source",description:"Synthetic disjoint groups.",valueLabel:"Events",
+  kind:"stacked",format:"count",population:"Eligible events per source",series:[{id:"a",label:"Accepted"},{id:"b",label:"Pending"}],
+  rows:[{id:"x",label:"Source A",total:50,values:[42,8]},{id:"y",label:"Source B",total:20,values:[18,2]}]}},
+  play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByRole("columnheader",{name:"Accepted"})).toBeVisible();await expect(canvas.getByText("42",{exact:true})).toBeVisible();}};
+export const Funnel: Story={args:{spec:{title:"Nested cohort",description:"Synthetic fixture with verified nesting; no implied causal attribution.",valueLabel:"Registrations",
+  kind:"funnel",format:"count",population:"Same registration cohort",nestedCohort:true,
+  points:[{id:"a",label:"Eligible",value:100},{id:"b",label:"Started",value:70},{id:"c",label:"Completed",value:40}]}}};

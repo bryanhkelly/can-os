@@ -1,3 +1,4 @@
+import { SiteCampaignEvidencePanel } from "@/components/reports/SiteCampaignEvidencePanel";
 import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
@@ -167,6 +168,7 @@ export function SiteEngagementLibrary({
       </div>}
       {distribution&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
     </>}
+    {siteId&&!ownerSurface&&<SiteCampaignEvidencePanel key={siteId} siteId={siteId}/>}
     {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
     {message&&<p role="status" className="mt-4 text-sm">{message}</p>}
   </WorkspacePanel>;

@@ -120,6 +120,7 @@
 
   /* Blue is reserved for primary actions, active navigation, and information. */
   --primary: #1769ef;
+  --report-series-four: #a34f17;
   --primary-foreground: #ffffff;
 
   --secondary: #eef2f7;
@@ -212,6 +213,7 @@
   --popover-foreground: #f4f7fc;
 
   --primary: #8ab4ff;
+  --report-series-four: #f3b478;
   --primary-foreground: #101d39;
 
   --secondary: #243149;
@@ -245,6 +247,7 @@
 
 .dark [data-can-brand="true"] {
   --primary: #8ab4ff;
+  --report-series-four: #f3b478;
   --primary-foreground: #101d39;
   --accent: #1c3157;
   --accent-foreground: #f4f7fc;

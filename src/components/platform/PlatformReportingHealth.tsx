@@ -1,4 +1,5 @@
 import {useEffect,useState} from "react";
+import {ReportChart} from "@/components/workspace/report-chart";
 import {Button} from "@/components/ui/button";
 import {StatCard,WorkspaceNotice} from "@/components/workspace";
 import {getReportingProjectionHealth,replayReportingProjectionBatch} from "@/modules/insights/reporting-projection-health.functions";
@@ -10,7 +11,7 @@ export function PlatformReportingHealth(){
  const [message,setMessage]=useState("");
  async function refresh(){
   setBusy(true);setError("");
-  try{setHealth(await getReportingProjectionHealth());}catch{setError("Reporting health could not be loaded.");}finally{setBusy(false);}
+  try{setHealth(await getReportingProjectionHealth());}catch{setHealth(null);setError("Reporting health could not be loaded.");}finally{setBusy(false);}
  }
  useEffect(()=>{void refresh();},[]);
  async function replay(){
@@ -18,7 +19,7 @@ export function PlatformReportingHealth(){
   setBusy(true);setError("");setMessage("");
   try{const result=await replayReportingProjectionBatch({data:{confirmed:true}});
    setHealth(result.health);setMessage("Replayed "+result.result.processed+" source events. Accepted: "+result.result.accepted+"; legacy: "+result.result.legacy+"; retry pending: "+result.result.retryPending+"; dead letters: "+result.result.deadLettered+".");
-  }catch{setError("Replay did not complete. Refresh to check durable receipt state.");}
+  }catch{setHealth(null);setError("Replay did not complete. Refresh to check durable receipt state.");}
   finally{setBusy(false);}
  }
  return <section className="mt-6 space-y-4 border border-border bg-card p-5" aria-label="Reporting infrastructure">
@@ -28,6 +29,13 @@ export function PlatformReportingHealth(){
   {health.counts&&<div className="grid gap-3 sm:grid-cols-3">
    {([["Eligible source events",health.counts.eligible],["Accepted receipts",health.counts.accepted],["Unprojected",health.counts.missing],["Legacy events",health.counts.legacy],["Retry pending",health.counts.retryPending],["Dead letters",health.counts.deadLetter],["Duplicate deliveries",health.counts.duplicate],["Normalized but missing",health.counts.normalizedMissing],["Due retries",health.counts.dueRetries]] as const).map(([label,value])=><StatCard key={label} label={label} value={value}/>)}
   </div>}
+  {health.counts&&<ReportChart spec={{
+    title:"Source event receipt states",description:"Infrastructure counts, not participants. Review reconciliation status above.",
+    valueLabel:"Source events",kind:"comparison",format:"count",
+    points:[{id:"accepted",label:"Accepted",value:health.counts.accepted},{id:"duplicate",label:"Duplicate",value:health.counts.duplicate},
+      {id:"legacy",label:"Legacy",value:health.counts.legacy},{id:"missing",label:"Unprojected",value:health.counts.missing},
+      {id:"retry",label:"Retry pending",value:health.counts.retryPending},{id:"dead",label:"Dead letters",value:health.counts.deadLetter}],
+  }}/>} 
   <p className="text-xs text-muted-foreground">Checked {health.asOf}. {health.oldestMissingAt?"Oldest unprojected event: "+health.oldestMissingAt:""} Full lifecycle coverage is not certified by these counts.</p></>}
   {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
   {message&&<p role="status" className="text-sm">{message}</p>}

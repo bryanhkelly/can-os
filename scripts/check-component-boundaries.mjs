@@ -48,6 +48,8 @@ for (const file of files) {
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   checkParseDiagnostics(file, source, program);
   for (const importPath of sourceDependencySpecifiers(program, ts)) {
+    if(importPath==="recharts"&&file!=="src/components/workspace/report-chart-plot.tsx")
+      failures.push(file+": import Recharts only through the shared reporting plot adapter");
     const dependencyProblem = sharedUiImportViolation(file, importPath);
     if (dependencyProblem) failures.push(file + ": " + dependencyProblem);
     const target = resolveSourceDependency(file, importPath);
