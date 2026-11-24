@@ -15,9 +15,9 @@ export function indexCommittedSources(root, base) {
   const entries = git(root,["ls-tree","-r","-z",base,"--","src"]).toString().split("\0")
     .filter(Boolean).map(row=>{
       const tab=row.indexOf("\t");
-      const [,type,sha]=row.slice(0,tab).split(" ");
-      return {type,sha,path:row.slice(tab+1)};
-    }).filter(row=>row.type==="blob"&&isProductionSource(row.path));
+      const [mode,type,sha]=row.slice(0,tab).split(" ");
+      return {mode,type,sha,path:row.slice(tab+1)};
+    }).filter(row=>row.type==="blob"&&row.mode.startsWith("100")&&isProductionSource(row.path));
   const index = new Map();
   for(let start=0;start<entries.length;start+=100){
     const batch=entries.slice(start,start+100);
