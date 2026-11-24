@@ -37,8 +37,9 @@ describe("Go Link Site reuse and scaled operations",()=>{
     const schema=read("src/db/schema/site-go-links.ts");
     expect(schema).toContain("site_go_links_request_uq");
     const server=read("src/modules/engagement/site-go-links.functions.ts");
-    expect(server).toContain("pg_advisory_xact_lock");
-    expect(server).toContain("prior.requestFingerprint!==fingerprint");
+    const lifecycle=read("src/modules/engagement/go-link-lifecycle.server.ts");
+    expect(lifecycle).toContain("pg_advisory_xact_lock");
+    expect(lifecycle).toContain("prior.requestFingerprint!==fingerprint");
     expect(server).toContain("return toGoLinkView(prior)");
     const ui=read("src/components/launch-studio/GoLinkWorkspace.tsx");
     expect(ui).toContain("pendingSubmission.current");
@@ -47,7 +48,7 @@ describe("Go Link Site reuse and scaled operations",()=>{
   it("serves an unavailable page without disclosing a private link or Site",()=>{
     const page=read("src/routes/go.$code.ts");
     expect(page).toContain('Content-Security-Policy');
-    expect(page).toContain('no-store, private');
+    expect(page).toContain('private, no-store');
     expect(page).toContain('href="/landing"');
     expect(page).not.toContain("params.code}</");
   });
