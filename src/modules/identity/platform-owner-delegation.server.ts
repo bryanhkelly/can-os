@@ -166,6 +166,7 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
       eq(accessSessions.id, owner.sessionId),
       eq(accessSessions.accountId, owner.ownerAccountId),
       eq(accessSessions.activeGrantId, owner.grantId),
+      isNull(accessSessions.delegatedGrantId),
       isNull(accessSessions.revokedAt),
       gt(accessSessions.expiresAt, now),
     )).returning({ id: accessSessions.id });

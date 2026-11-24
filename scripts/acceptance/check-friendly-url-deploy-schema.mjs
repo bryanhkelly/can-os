@@ -17,7 +17,7 @@ const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
 // alone to mask missing Reporting/Identity migrations from 0100 onward.
 // Every new migration added to the release journal is included automatically.
 const migrationEntries = journal.entries.filter(entry => entry.idx >= 100);
-if (migrationEntries.length < 11 ||
+if (migrationEntries.length < 12 ||
     migrationEntries[0]?.idx !== 100 ||
     !migrationEntries.some(entry => entry.tag === "0105_site_go_links") ||
     !migrationEntries.some(entry => entry.tag === "0106_universal_engagement") ||
@@ -25,6 +25,7 @@ if (migrationEntries.length < 11 ||
     !migrationEntries.some(entry => entry.tag === "0108_site_go_link_capabilities") ||
     !migrationEntries.some(entry => entry.tag === "0109_site_go_link_reuse") ||
     !migrationEntries.some(entry => entry.tag === "0110_universal_engagement_private_role_access") ||
+    !migrationEntries.some(entry => entry.tag === "0111_delegation_and_go_link_null_invariants") ||
     migrationEntries.some((entry, i) => entry.idx !== i + 100))
   throw new Error("BLOCKED: incomplete or out-of-order deployment migration journal");
 const migrations = migrationEntries.map(entry => ({
@@ -101,8 +102,15 @@ const [schemaChecks] = await sql`
       AS go_site_page_index,
     EXISTS(SELECT 1 FROM pg_constraint WHERE
       conrelid=to_regclass('public.site_go_links') AND
-      conname='site_go_links_request_fingerprint_ck')
-      AS valid_go_idempotency_constraint
+      conname='site_go_links_request_fingerprint_ck' AND
+      pg_get_constraintdef(oid) ILIKE '%request_fingerprint IS NOT NULL%')
+      AS valid_go_idempotency_constraint,
+    EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.access_sessions'::regclass
+      AND conname='access_sessions_owner_delegation_ck' AND convalidated
+      AND pg_get_constraintdef(oid) ILIKE '%delegated_mode IS NOT NULL%'
+      AND pg_get_constraintdef(oid) ILIKE '%delegated_reason IS NOT NULL%') AS strict_owner_delegation_shape,
+    EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.access_sessions'::regclass
+      AND conname='access_sessions_delegated_grant_id_fkey' AND confdeltype='r' AND convalidated) AS owner_delegation_restrict_delete
 `;
 const [roleChecks] = await sql`
   SELECT
@@ -139,7 +147,7 @@ const [roleChecks] = await sql`
 const recorded = await sql`
   SELECT hash, created_at FROM drizzle.__drizzle_migrations
   WHERE created_at >= ${migrations[0].when}
-    AND created_at <= ${migrations.at(-1).when}
+
 `;
 assertFriendlyUrlDeployment(
   {projectId:identity.project_id,branchId:identity.branch_id,databaseName:identity.database_name},

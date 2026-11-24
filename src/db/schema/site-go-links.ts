@@ -53,7 +53,7 @@ export const siteGoLinks = pgTable("site_go_links", {
   check("site_go_links_request_fingerprint_ck",sql`(
     ${t.requestId} IS NULL AND ${t.requestFingerprint} IS NULL
   ) OR (
-    ${t.requestId} IS NOT NULL AND ${t.requestFingerprint} ~ '^[0-9a-f]{64}$'
+    ${t.requestId} IS NOT NULL AND ${t.requestFingerprint} IS NOT NULL AND ${t.requestFingerprint} ~ '^[0-9a-f]{64}$'
   )`),
 ]);
 
