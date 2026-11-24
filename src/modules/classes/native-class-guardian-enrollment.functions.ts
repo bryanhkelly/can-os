@@ -1,7 +1,7 @@
 import {createHash} from "node:crypto";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,asc,count,desc,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
+import {and,asc,desc,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
@@ -14,6 +14,7 @@ import {
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {currentClassAuthority} from "./native-class-authority.server";
+import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
 import {requireNativeGuardian,requireNativeGuardianChild} from
  "./native-class-guardian-authority.server";
@@ -264,10 +265,8 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
      ?await requireNativeRepeatAuthorization(tx,cls.id,approval.learnerPersonId,
        completed.id,new Date())
      :null;
-   const [seats]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-    .where(and(eq(canonicalClassEnrollments.classId,cls.id),
-      inArray(canonicalClassEnrollments.status,["pending","active"])));
-   assertNativeClassSeatAvailable({method:"approval",activeOrPending:seats?.total??0,
+   const seats=await readNativeClassOccupancy(tx,cls.id);
+   assertNativeClassSeatAvailable({method:"approval",activeOrPending:seats,
     classCapacity:current.classCapacity,offeringCapacity:terms.capacity});
    const admissionAt=new Date();
    const consentSha256=createHash("sha256")
