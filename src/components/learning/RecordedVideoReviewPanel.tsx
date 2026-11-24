@@ -7,7 +7,7 @@ import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
 import {Textarea} from "@/components/ui/textarea";
 import {ClassVideoPlayer} from "@/components/learning/ClassVideoPlayer";
-import {WorkspacePanel,WorkspaceNotice,EmptyState,MutationFeedback,StatusBadge} from "@/components/workspace";
+import {WorkspacePanel,WorkspaceNotice,EmptyState,MutationFeedback,StatusBadge,QueryState} from "@/components/workspace";
 import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {listRecordedVideoReviews,previewRecordedVideoForReview,decideRecordedVideoReview,publishReviewedRecordedVideo} from "@/modules/learning/recorded-video-review.functions";
 type Item=Awaited<ReturnType<typeof listRecordedVideoReviews>>["items"][number];
@@ -28,8 +28,8 @@ export function RecordedVideoReviewPanel({versions}:{versions:readonly {id:strin
 function ReviewQueue({courseVersionId,identity}:{courseVersionId:string;identity:string}){
  const queue=useQuery({queryKey:["recorded-asset-review",identity,courseVersionId],
  queryFn:()=>listRecordedVideoReviews({data:{courseVersionId}}),retry:false});
- if(queue.isPending)return <p role="status">Checking submitted recordings…</p>;
- if(queue.isError||!queue.data)return <WorkspaceNotice tone="danger">Recording review inventory is unavailable.</WorkspaceNotice>;
+ if(queue.isPending)return <QueryState loading="Checking submitted recordings…"/>;
+ if(queue.isError||!queue.data)return <QueryState error="Recording review inventory is unavailable." onRetry={()=>void queue.refetch()} retrying={queue.isFetching}/>;
  return <div className="mt-4 space-y-4">
  {queue.data.limited&&<WorkspaceNotice tone="attention">Showing up to 50 submitted recordings. Complete the current queue before relying on it as exhaustive.</WorkspaceNotice>}
  {!queue.data.items.length&&<EmptyState title="No submitted recordings" description="Creator submissions appear here after private upload and verification."/>}
