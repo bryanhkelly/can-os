@@ -9,13 +9,13 @@ import {
 } from "@/db/schema";
 import {
   canonicalAccounts,
-  canonicalPersons,
   canonicalAccountGrants,
   canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { DomainError } from "@/domain/errors";
+import { assertCurrentAdultReviewEvidence } from "@/modules/identity/reviewed-learning-evidence.server";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import {
@@ -62,7 +62,7 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
     }).from(accessAccountNoncreditPrincipals).where(
       eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId),
     ).limit(1);
-    if(operator||linked&&linked.accessPersonId!==owner.personId)
+    if(operator||linked&&(linked.accessPersonId!==owner.personId||linked.personId!==owner.personId))
       throw new AuthorizationError("existing canonical identity requires separate reconciliation");
     const [review]=await tx.select().from(accessAdultLearningReviews)
       .where(eq(accessAdultLearningReviews.accessAccountId,owner.accountId))
@@ -75,6 +75,7 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
        review.reviewedAt.getTime()>now.getTime()||
        now.getTime()-review.reviewedAt.getTime()>365*86400000)
       throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
+    await assertCurrentAdultReviewEvidence(tx,review,now);
     const [reviewer]=await tx.select({
       verified:accessAccounts.emailVerifiedAt,disabled:accessAccounts.disabled,
     }).from(accessAccounts)
@@ -102,34 +103,17 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
     let nativePersonId:string;
     if(linked){
       nativeAccountId=linked.accountId;
-      nativePersonId=linked.personId;
-      const [existingPerson]=await tx.select({
-        id:canonicalPersons.id,birthDate:canonicalPersons.birthDate,
-      }).from(canonicalPersons).where(
-        eq(canonicalPersons.id,linked.personId),
-      ).for("update").limit(1);
-      if(!existingPerson||existingPerson.birthDate&&
-         existingPerson.birthDate!==review.verifiedBirthDate)
-        throw new AuthorizationError("verified date of birth conflicts with canonical Person");
-      if(!existingPerson.birthDate){
-        await tx.update(canonicalPersons).set({
-          birthDate:review.verifiedBirthDate,
-        }).where(and(eq(canonicalPersons.id,linked.personId),
-          isNull(canonicalPersons.birthDate)));
-      }
+      nativePersonId=owner.personId;
     }else{
       const [account]=await tx.insert(canonicalAccounts).values({
         emailNormalized:owner.email,emailVerifiedAt:now,
       }).returning({id:canonicalAccounts.id});
-      const [person]=await tx.insert(canonicalPersons).values({
-        preferredName:owner.preferredName,birthDate:review.verifiedBirthDate,
-      }).returning({id:canonicalPersons.id});
-      if(!account||!person)throw new Error("native learner identity unavailable");
+      if(!account)throw new Error("native learner account unavailable");
       nativeAccountId=account.id;
-      nativePersonId=person.id;
+      nativePersonId=owner.personId;
       await tx.insert(accessAccountNoncreditPrincipals).values({
         accessAccountId:owner.accountId,accessPersonId:owner.personId,
-        canonicalAccountId:account.id,canonicalPersonId:person.id,
+        canonicalAccountId:account.id,canonicalPersonId:owner.personId,
         linkageMethod:"verified_existing_can_session",
       });
     }
