@@ -1,3 +1,4 @@
+import {projectProgramLaunchWebsiteBlocks} from "./program-website-contributions";
 import {orderEligibleWebsitePages} from "./website-composition";
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import type { SiteContentBlockProjection } from "./site-content-channels";
@@ -854,7 +855,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     : "";
   // Site channels are composed as native template sections. Preview routes
   // supply data; they do not splice a second page into the rendered HTML.
-  const contentBlocks = page.contentBlocks ?? [];
+  const contentBlocks = projectProgramLaunchWebsiteBlocks(page.contentBlocks??[],opportunities,Boolean(options?.localPreview||options?.templateGallery));
   const homeBlocks=contentBlocks.filter(block=>(block.page??"/")==="/");
   const hasContentChannel = (channel: SiteContentBlockProjection["channel"]) =>
     homeBlocks.some(block => block.channel === channel && block.items.length > 0);

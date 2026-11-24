@@ -1,0 +1,13 @@
+# Website composition and Program launch contributions
+
+## Architectural boundaries
+
+Site Intelligence processes a standard package; the Gloo input now includes the registered public paths and home-section slots. The provider returns a nested versioned composition recommendation, validated against the manifest. Existing package v2 records remain readable; the new prompt requires composition. The same stored package contains the copy and composition. Applying current generated website wording also picks the initial recommended composition. The normal Website & Brand experience has no page/block arrangement editor. The selected composition is stored in the existing immutable website content revision; the public reader uses the website release's approved revision. The seven templates retain their own visual shells and wrappers. Unavailable paths are filtered, and newly eligible pages and sections are retained. There is no arbitrary HTML, CSS, raw URL or component execution.
+
+## Program launch
+
+The internal Program contribution recipe is selected from the canonical Program type, not by the operator. The existing scoped launch website preparation view now includes the exact Program's proposed noncredit preview, existing saved Brand, published sibling opportunities and native Course/Class feeds. Pending Program copy is private and has no action. A public academic Program still needs independent reviewed marketing and institutional authorization. Enrichment Seasons, native Course releases and Classes still use their separate published catalog readers. The shared renderer automatically adds eligible native Course/Class homepage blocks that are not already represented, with exact ID deduplication. Existing academic and enrichment template slots use the same authorized feeds. Revoking a source removes its contribution on subsequent reads; changes to registration are governed by existing enrollment projections. No AI call occurs during rendering, and routine operational changes do not require full-site regeneration.
+
+## Scope and next engineering work
+
+This phase uses registered existing page types and home slots; it is not a general per-page component composition engine. The broader Program Intelligence content package, Gloo processing/persistence for Program-specific editorial text, Blueprint version-bound contributions, launch deliverable integration for native deployments, and release-manifest provenance are remaining work. Do not authorize publication based on generated copy or a contribution recipe. Validate build, existing preview and publication routes, authorization, template screenshots, generated-package persistence, and native launch/depublication scenarios before release.
