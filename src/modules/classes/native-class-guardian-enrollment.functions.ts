@@ -9,18 +9,17 @@ import {
  canonicalClassEnrollmentRepeatAuthorizations,
  canonicalClassOfferingVersions,canonicalClassEnrollments,
  canonicalClassEnrollmentApprovalRequests,canonicalPersons,
- guardianAuthorities,learnerProfiles,learnerCourseAttempts,participationAttributions,
+ guardianAuthorities,learnerProfiles,participationAttributions,
 } from "@/db/canonical-v301";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {currentClassAuthority} from "./native-class-authority.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
-import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
+import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./native-class-attempt.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
 import {requireNativeGuardian,requireNativeGuardianChild} from
  "./native-class-guardian-authority.server";
-import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable,
- assertNativeClassAttemptForExit} from "@/domain/native-class-lifecycle";
+import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable} from "@/domain/native-class-lifecycle";
 
 const uuid=z.string().uuid();
 const requestSchema=z.object({
@@ -348,16 +347,7 @@ export const withdrawMyGuardianNativeClassEnrollment=createServerFn({method:"POS
    if(enrollment.status!=="active"||!enrollment.courseAttemptId||
       cls.state!=="active")
     throw new AuthorizationError("currently active Class participation");
-   const attempts=await tx.select().from(learnerCourseAttempts)
-    .where(eq(learnerCourseAttempts.classEnrollmentId,enrollment.id)).for("update");
-   const selected=attempts.find(a=>a.id===enrollment.courseAttemptId);
-   if(!selected)throw new AuthorizationError("selected canonical Course Attempt");
-   assertNativeClassAttemptForExit({attempt:selected,enrollment,classInstance:cls});
-   for(const attempt of attempts.filter(a=>a.status==="active")){
-    assertNativeClassAttemptForExit({attempt,enrollment,classInstance:cls,requireSelectedPointer:false});
-    await tx.update(learnerCourseAttempts).set({status:"withdrawn"})
-     .where(eq(learnerCourseAttempts.id,attempt.id));
-   }
+   await withdrawNativeClassAttempts(tx,enrollment,cls);
    await tx.update(canonicalClassEnrollments).set({status:"withdrawn"})
     .where(eq(canonicalClassEnrollments.id,enrollment.id));
    const payload={classId:cls.id,classEnrollmentId:enrollment.id,
