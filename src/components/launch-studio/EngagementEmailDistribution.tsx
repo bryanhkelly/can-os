@@ -1,5 +1,6 @@
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {Button} from "@/components/ui/button";
+import {Checkbox} from "@/components/ui/choice";
 import {Field} from "@/components/ui/field";
 import {Textarea} from "@/components/ui/textarea";
 import {QueryState, WorkspaceNotice} from "@/components/workspace";
@@ -21,6 +22,9 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
   const [busy,setBusy]=useState(false);
   const [revision,setRevision]=useState(0);
   const [copying,setCopying]=useState(false);
+  const active=useRef(false);
+  const pending=useRef(false);
+  useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
   useEffect(()=>{let active=true;setDraft(null);setRecipients("");setAuthorized(false);setError("");setNotice("");
     prepareEngagementEmailDraft({data:{engagementId,linkId}})
       .then(value=>{if(active)setDraft(value);})
@@ -30,26 +34,28 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
   const parsed=parseInvitationRecipients(recipients);
   const ready=!!draft&&authorized&&parsed.recipients.length>0&&!parsed.invalid.length&&!parsed.tooMany;
   async function handoff(){
-    if(!ready||busy)return;setBusy(true);setError("");setNotice("");
+    if(!ready||pending.current)return;pending.current=true;setBusy(true);setError("");setNotice("");
     try{
       // Revalidate current link and permissions immediately before preparing
       // the external draft; no stale revoked link is silently distributed.
       const current=await prepareEngagementEmailDraft({data:{engagementId,linkId}});
+      if(!active.current)return;
       const url=buildInvitationMailto(current,parsed.recipients);
       if(url.length>7000){setError("This draft is too long for a reliable email-client handoff. Copy the invitation instead.");return;}
       window.location.href=url;
       setNotice("Email draft requested from your email application. Sending and delivery have not been verified.");
     }catch{setError("The invitation is no longer available for distribution.");}
-    finally{setBusy(false);}
+    finally{pending.current=false;if(active.current)setBusy(false);}
   }
   async function copy(){
-    if(copying||busy)return;
-    setCopying(true);setError("");setNotice("");
+    if(pending.current)return;
+    pending.current=true;setCopying(true);setError("");setNotice("");
     try{const current=await prepareEngagementEmailDraft({data:{engagementId,linkId}});
+      if(!active.current)return;
       await navigator.clipboard.writeText(current.subject+"\n\n"+current.body);
       setNotice("Invitation copied. No email sent.");
     }catch{setError("Could not copy a currently eligible invitation.");}
-    finally{setCopying(false);}
+    finally{pending.current=false;if(active.current)setCopying(false);}
   }
   return <section className="mt-4 border p-4" aria-label="Email invitation distribution">
     <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Prepare email invitation</h3><Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button></div>
@@ -60,7 +66,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
         error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"Limit is 20 addresses.":undefined}>
         <Textarea value={recipients} maxLength={6000} rows={3} disabled={busy||copying} placeholder="Enter one address per line" onChange={e=>{setRecipients(e.target.value);setAuthorized(false);}}/>
       </Field>
-      <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/>I have permission to contact these recipients for this invitation and will honor their communication preferences.</label>
+      <label className="mt-3 flex items-start gap-2 text-sm"><Checkbox disabled={busy||copying} checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/>I have permission to contact these recipients for this invitation and will honor their communication preferences.</label>
       <div className="mt-3 flex flex-wrap gap-2"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></div>
     </>}
     {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
