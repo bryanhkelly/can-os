@@ -13,7 +13,7 @@ export const GO_LINK_METRIC_DEFINITIONS=[
     timeBasis:"UTC day of successful public GET resolution",
   },
   ...[
-    {key:"linkOpens30d",label:"Classified Go link opens (30 days)",column:"link_opens",rule:"Count classified successful entry requests; preview subpage navigation is excluded"},
+    {key:"linkOpens30d",label:"Classified Go link opens (30 days)",column:"link_opens",rule:"Count classified successful entry requests; preview navigation using a page selector is excluded, including home navigation"},
     {key:"pageViews30d",label:"Go-rendered page views (30 days)",column:"page_views",rule:"Count successful rendered Go pages, including preview subpages"},
     {key:"redirectResponses30d",label:"Go redirect responses (30 days)",column:"redirect_responses",rule:"Count successful redirect responses, not confirmed arrival at the destination"},
     {key:"unclassifiedEntries30d",label:"Unclassified Go entries (30 days)",column:"redirects minus link_opens",rule:"Count legacy entry requests not classified by response type; do not infer historical page views or redirects"},
