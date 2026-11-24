@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
-import { EmptyState, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { DisclosureSection, EmptyState, WorkspaceLinkNavigation, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
 import { StudentAssignmentLink } from "./StudentAssignmentLink";
@@ -51,9 +51,8 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
     </article>;
    })}</div>
   </WorkspacePanel>}
-  <details className="mt-6 border bg-card p-4">
-  <summary className="cursor-pointer text-sm font-semibold">More learning details and school links</summary>
-  <nav aria-label="Student workspace" className="mt-4 flex flex-wrap gap-2 text-sm">
+  <DisclosureSection title="More learning details and school links" headingLevel="h2" className="mt-6">
+  <WorkspaceLinkNavigation label="Student workspace" surface="plain" className="gap-2">
    <Button asChild variant="outline" size="sm"><Link to="/student/assignments">Assignments</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/student/courses">Courses</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/student/support">Support</Link></Button>
@@ -62,7 +61,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
    <Button asChild variant="outline" size="sm"><Link to="/profiles">My profile</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/student/report-card">Report card</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/calendar">Calendar</Link></Button>
-  </nav>
+  </WorkspaceLinkNavigation>
   {nativeUnavailable?<WorkspaceNotice tone="attention">Your native Classes could not be verified. Retry from My Classes.</WorkspaceNotice>:
    nativeClasses.length>0?<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{nativeClasses.map(item=><Link key={item.classId} to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"lessons"}} className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
@@ -102,7 +101,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
    </WorkspacePanel>
     </div>
   </div>
-  </details>
+  </DisclosureSection>
     <WorkspacePanel title="Other open actions" description="Support or follow-ups outside your assignment list.">
     <div className="space-y-3">{otherOpenActions.map(action=><article key={action.id} className=" border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
