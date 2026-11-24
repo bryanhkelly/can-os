@@ -30,7 +30,8 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
   const [createdUrl, setCreatedUrl] = useState("");
   const [createdCode,setCreatedCode]=useState<string|null>(null);
   const pending=useRef<{siteId:string;expires:7|30|null;id:string}|null>(null);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"create"|"change"|null>(null);
+  const busy = operation !== null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
@@ -60,7 +61,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
 
   async function create() {
     if (busy) return;
-    setBusy(true);
+    setOperation("create");
     setError(null);
     setCreatedUrl("");
     setCreatedCode(null);
@@ -83,12 +84,12 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
     } catch (cause) {
       setError(normalizeClientError(cause,
         "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
-    } finally { setBusy(false); }
+    } finally { setOperation(null); }
   }
 
   async function change(shareId: string, action:GoLinkAction) {
     if (busy) return;
-    setBusy(true);
+    setOperation("change");
     setError(null);
     try {
       if(action==="revoke")await revokeSitePreviewShare({ data: { siteId, shareId } });
@@ -106,7 +107,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
       }
     } catch (cause) {
       setError(normalizeClientError(cause, "Could not change this preview link.").message);
-    } finally { setBusy(false); }
+    } finally { setOperation(null); }
   }
 
   const activeShares = shares.filter(share => !share.revokedAt &&
@@ -151,7 +152,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
             </Select>
           </Field>
           <Button type="button" disabled={busy || loading || activeShares.length >= 5}
-            loading={busy&&!revokeTarget} loadingLabel="Working…" onClick={() => void create()}>
+            loading={operation==="create"} loadingLabel="Saving preview…" onClick={() => void create()}>
             Create shareable preview
           </Button>
         </div>
