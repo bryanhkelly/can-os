@@ -20,7 +20,7 @@ const loadCourseRegistration=async(section?:string)=>{
  const registration=await getCourseRegistration();
  const enrolled=registration.viewerRole==="student"&&registration.sections.some(item=>item.id===section&&item.enrollmentStatus==="active");
  const classwork=enrolled?(await getAssignments()).assignments.filter(item=>item.sectionId===section):[];
- const native = registration.viewerRole==="student" ? await getMyStudentClasses() : null;
+ const native = registration.viewerRole==="student" ? await safeLoader(() => getMyStudentClasses())() : null;
  return {...registration,classwork,native};
 };
 export const Route=createFileRoute("/student/courses")({
@@ -38,7 +38,18 @@ function CourseRegistrationPage(){
  const search=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="Academics" title="Choose your classes." outcome={outcome}/>;
  if(outcome.data.viewerRole==="student"&&search.view!=="catalog") {
-   if(!search.section && outcome.data.native?.kind==="student") return <NativeStudentClassHome classes={outcome.data.native.classes} navigation={<Button asChild variant="outline"><Link to="/student/courses" search={{view:"catalog"}}>Course catalog / registration</Link></Button>}/>;
+   if(!search.section && outcome.data.native?.ok && outcome.data.native.data.kind==="student" &&
+     outcome.data.native.data.classes.some(item=>item.status==="active" || item.status==="pending")) {
+     const requests=outcome.data.requests.filter(item=>["open","in_progress","waiting"].includes(item.status));
+     return <NativeStudentClassHome classes={outcome.data.native.data.classes} navigation={<>
+       <Button asChild variant="outline"><Link to="/student/courses" search={{view:"catalog"}}>Course catalog / registration</Link></Button>
+       {requests.length>0&&<WorkspacePanel title="Pending class changes" className="mt-4">
+         {requests.map(request=><p key={request.id} className="mt-2 text-sm"><Link to="/student/courses" search={{view:"catalog",section:request.sectionId}} className="underline">{request.title}</Link> · {request.status}</p>)}
+       </WorkspacePanel>}
+     </>}/>;
+   }
+   if(!search.section && outcome.data.native && !outcome.data.native.ok)
+     return <LoaderFailure eyebrow="Academics" title="Your classes" outcome={outcome.data.native}/>;
    return <StudentClasses data={outcome.data}/>;
  }
  return <CourseRegistrationView data={outcome.data}/>;

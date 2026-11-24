@@ -56,8 +56,8 @@ export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selecte
     {selected.videoResources.length>0&&<section className="space-y-2 border-t border-border pt-4">
       <h3 className="font-semibold">Supplemental videos</h3>
       <p className="text-xs text-muted-foreground">
-        Supplemental video resources come from this Course's saved lesson content.
-        Their presence does not constitute publication, accessibility, or shared-screen playback approval.
+        These original lesson references are supplemental, not a reviewed recorded-instructor presentation.
+        Their availability and accessibility must be confirmed by the school.
       </p>
       <div className="space-y-4">
         {selected.videoResources.map(video=>

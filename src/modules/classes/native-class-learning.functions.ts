@@ -90,7 +90,7 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         const content=lesson.content&&typeof lesson.content==="object" &&
           !Array.isArray(lesson.content)
           ?lesson.content as Record<string,unknown>:{};
-        const videoResources=canonicalLessonVideoResources(content);
+        const videoResources=canonicalLessonVideoResources(content,{includeSupplementalCandidates:false});
         return {
           unitId:lesson.unitId,unitTitle:lesson.unitTitle,unitOrder:lesson.unitOrder,
           lessonId:lesson.lessonId,lessonTitle:lesson.lessonTitle,lessonOrder:lesson.lessonOrder,
