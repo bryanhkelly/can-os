@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNotice } from "@/components/workspace";
+import { DashboardProgress, EmptyState, QueryState, WorkspaceNotice } from "@/components/workspace";
 import { CourseAssessmentPanel } from "./CourseAssessmentPanel";
 import { NoncreditCourseSurveys } from "./NoncreditCourseSurveys";
 import { getLearnerCourseParticipationKind } from "@/modules/learning/noncredit-learning.functions";
@@ -68,19 +68,16 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
         Your progress remains your own if you switch recorded instructors.
       </p>
       <nav aria-label="Training steps" className="mt-4 flex flex-wrap gap-4 text-sm">
-        <a href="#course-recorded-lessons" className="font-semibold text-primary underline">1. Recorded lessons</a>
-        <a href="#course-knowledge-check" className="font-semibold text-primary underline">2. Knowledge check</a>
-        <a href="#course-feedback" className="font-semibold text-primary underline">3. Feedback survey</a>
-        <a href="#course-progress" className="font-semibold text-primary underline">4. Completion</a>
+        {hasBaseline&&<a href="#course-baseline-check" className="font-semibold text-primary underline">Before learning: knowledge check</a>}
+        <a href="#course-recorded-lessons" className="font-semibold text-primary underline">Recorded lessons</a>
+        {hasFinal&&<a href="#course-final-check" className="font-semibold text-primary underline">Final knowledge check</a>}
+        <a href="#course-feedback" className="font-semibold text-primary underline">Feedback</a>
+        <a href="#course-progress" className="font-semibold text-primary underline">Completion</a>
       </nav>
       {readiness&&<div className="mt-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-          <strong>Lesson progress</strong>
-          <span className="tabular-nums">{readiness.completedLessons} of {readiness.totalLessons} completed</span>
-        </div>
-        <progress className="mt-2 h-3 w-full accent-primary"
-          value={readiness.completedLessons} max={Math.max(1,readiness.totalLessons)}
-          aria-label="Completed course lessons"/>
+        {readiness.totalLessons>0?<DashboardProgress label="Lesson progress" value={readiness.completedLessons}
+          max={readiness.totalLessons} description={`${readiness.completedLessons} of ${readiness.totalLessons} lessons marked complete`}/>
+          :<p role="status" className="text-sm">No published lessons available.</p>}
         <p className="mt-2 text-xs text-muted-foreground">
           {readiness.recordedCompletion?"Training completion confirmed.":
             readiness.eligible?"Learning requirements met; final completion decision is separate.":
@@ -91,10 +88,11 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
     </section>
     <section id="course-knowledge-check" className="space-y-4" aria-label="Course knowledge checks">
       <h2 className="font-serif text-xl">Knowledge checks</h2>
-    {hasBaseline&&<CourseAssessmentPanel courseAttemptId={courseAttemptId}
-      phase="baseline" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>}
-    {hasFinal&&<CourseAssessmentPanel courseAttemptId={courseAttemptId}
-      phase="final" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>} 
+    {hasBaseline&&<div id="course-baseline-check"><WorkspaceNotice>For a meaningful comparison, submit your baseline knowledge check before beginning lessons.</WorkspaceNotice><CourseAssessmentPanel courseAttemptId={courseAttemptId}
+      phase="baseline" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/></div>}
+    {hasFinal&&<div id="course-final-check"><CourseAssessmentPanel courseAttemptId={courseAttemptId}
+      phase="final" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/></div>}
+    {!hasBaseline&&!hasFinal&&<EmptyState title="No knowledge checks available" description="Only assessments authorized for your course appear here."/>}
     </section>
     <section id="course-feedback" className="space-y-4" aria-label="Training feedback">
       <h2 className="font-serif text-xl">Feedback survey</h2>
@@ -128,9 +126,8 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
             Knowledge checks are separate from academic grades and credit.
           </p>
         </>:
-        <p className="text-sm" role="status">
-          {readinessError?"Completion information is temporarily unavailable.":"Loading completion requirements..."}
-        </p>}
+        <QueryState loading={!readinessError?"Loading completion requirements…":undefined}
+          error={readinessError?"Completion information is temporarily unavailable.":undefined}/>}
       {readinessError&&<Button type="button" size="sm" variant="outline"
         onClick={()=>setRetryRevision(revision=>revision+1)}>Retry completion status</Button>}
     </section>
