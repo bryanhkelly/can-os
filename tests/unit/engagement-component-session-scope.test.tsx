@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
+import { engagementChannels, engagementChannelSchema, engagementChannelLabels } from "@/domain/engagement-definition";
 import { GoLinkWorkspace } from "@/components/launch-studio/GoLinkWorkspace";
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
@@ -32,6 +34,15 @@ describe("Engagement component session isolation", () => {
     const keys=scopes.map(props=>UniversalEngagementPublisher(props).key);
     expect(new Set(keys).size).toBe(scopes.length);
     scopes.forEach((props,index)=>expect(SiteEngagementLibrary(props).key).toBe(keys[index]));
+  });
+  it("preserves explicit Site and Program owner identity", () => {
+    const key=(kind:"site"|"program",id:string)=>engagementOwnerScopeKey(undefined,undefined,kind==="site"?{kind,siteId:id}:{kind,programId:id});
+    expect(new Set([key("site","a"),key("site","b"),key("program","a"),key("program","b")]).size).toBe(4);
+  });
+  it("uses a single channel vocabulary for presentation and validation", () => {
+    expect(Object.keys(engagementChannelLabels)).toEqual([...engagementChannels]);
+    for(const channel of engagementChannels)expect(engagementChannelSchema.parse(channel)).toBe(channel);
+    expect(engagementChannelSchema.safeParse("unsupported").success).toBe(false);
   });
   it("isolates preview shares, pending requests and created URLs by Site", () => {
     expect(LaunchPreviewSharing({siteId:"site-a"}).key).toBe(LaunchPreviewSharing({siteId:"site-a"}).key);
