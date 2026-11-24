@@ -162,9 +162,15 @@ const [gateway] = await sql`
       AND has_column_privilege(r.oid,'public.site_go_links','code','SELECT')
       AND NOT has_column_privilege(r.oid,'public.site_go_links','created_by_person_id','SELECT')
       AND NOT has_table_privilege(r.oid,'public.site_go_link_daily_visits','DELETE,TRUNCATE')
-      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','INSERT,UPDATE,SELECT')
-      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','INSERT,UPDATE,SELECT')
-      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','INSERT,UPDATE,SELECT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','INSERT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','UPDATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','SELECT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','INSERT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','UPDATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','SELECT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','INSERT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','UPDATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','SELECT')
   ) AS restricted_gateway,
   (SELECT count(*)=4 FROM pg_policies WHERE schemaname='public'
     AND policyname IN ('go_gateway_exact_code','go_gateway_counter_read',
