@@ -15,7 +15,7 @@ import {
   canonicalEnrollmentSites,
   canonicalClassEnrollmentInvitations,canonicalClassEnrollmentApprovalRequests,
   canonicalClassEnrollmentRepeatAuthorizations,
-  learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
+  courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
   educationOperationOrganizationRoles,
@@ -30,6 +30,7 @@ import {
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
+import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -354,16 +355,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           kind:"provider_default",classId:instance.id,
           organizationId:current.operatingOrganizationId,siteId:current.siteId},
       });
-      const [attempt]=await tx.insert(learnerCourseAttempts).values({
-        classEnrollmentId:enrollment.id,enrollmentId:null,noncreditRegistrationId:null,
-        deploymentId:current.deploymentId,adoptionId:current.adoptionId,
-        offeringVersionId:current.offeringVersionId,
-        courseVersionId:current.courseVersionId,sectionId:null,
-        attemptNo:1,status:"active",
-      }).returning({id:learnerCourseAttempts.id});
-      if(!attempt)throw new Error("Course Attempt insert failed");
-      await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
-        .where(eq(canonicalClassEnrollments.id,enrollment.id));
+      const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
       if(repeatAuthorization){
         await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
           .set({consumedByEnrollmentId:enrollment.id})
