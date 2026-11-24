@@ -7,7 +7,9 @@ import ts from "typescript";
 // route names, JSX snippets, or expected component counts as migration gates.
 // Existing debt is reported; changed files may never add more debt.
 const nativeTags = new Set(["button", "input", "label", "select", "textarea", "dialog"]);
-const radiusPattern = /(?:^|\s)(?:[\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=\s|$)/g;
+// Covers directional/logical corners, arbitrary values and variants, including
+// Tailwind important modifiers. Brand shape data is handled separately below.
+const radiusPattern = /(?:^|\s)(?:(?:[\w-]+|\[[^\]\r\n]+\]):)*!?rounded(?:-(?:[trblse]|tl|tr|bl|br|ss|se|es|ee))?(?:-(?:none|xs|sm|md|lg|xl|[2-9]xl|full|\[[^\]\r\n]+\]|\([^\)\r\n]+\)))?!?(?=\s|$)/g;
 const ignoredFile = /\.(?:test|spec|stories)\.tsx$/;
 
 function location(file, node) {
