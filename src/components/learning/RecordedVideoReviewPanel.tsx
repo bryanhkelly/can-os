@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {useWorkspaceSession,workspaceSessionIdentity} from "@/components/shell/WorkspaceSession";
 import {useQuery,useQueryClient} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
 import {Field} from "@/components/ui/field";
@@ -12,30 +13,32 @@ import {listRecordedVideoReviews,previewRecordedVideoForReview,decideRecordedVid
 type Item=Awaited<ReturnType<typeof listRecordedVideoReviews>>["items"][number];
 export function RecordedVideoReviewPanel({versions}:{versions:readonly {id:string;label:string}[]}){
  const [course,setCourse]=useState("");
- const eligible=versions.some(v=>v.id===course);
+ const session=useWorkspaceSession();
+ const identity=workspaceSessionIdentity(session);
+ const eligible=!!identity&&!session.error&&session.session?.authenticated&&session.session.role==="academic_content_reviewer"&&versions.some(v=>v.id===course);
  return <WorkspacePanel title="Recording asset reviews" className="mt-6"
  description="Review the exact private recording before it can be associated with an instructional track. Publication does not authorize learner delivery.">
  <Field label="Published Course"><Select value={eligible?course:""} onChange={e=>setCourse(e.target.value)}>
  <option value="">Select an assigned Course</option>
  {versions.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}
  </Select></Field>
- {eligible&&<ReviewQueue key={course} courseVersionId={course}/>}
+ {eligible&&<ReviewQueue key={identity+":"+course} courseVersionId={course} identity={identity!}/>}
  </WorkspacePanel>;
 }
-function ReviewQueue({courseVersionId}:{courseVersionId:string}){
- const queue=useQuery({queryKey:["recorded-asset-review",courseVersionId],
+function ReviewQueue({courseVersionId,identity}:{courseVersionId:string;identity:string}){
+ const queue=useQuery({queryKey:["recorded-asset-review",identity,courseVersionId],
  queryFn:()=>listRecordedVideoReviews({data:{courseVersionId}}),retry:false});
  if(queue.isPending)return <p role="status">Checking submitted recordings…</p>;
  if(queue.isError||!queue.data)return <WorkspaceNotice tone="danger">Recording review inventory is unavailable.</WorkspaceNotice>;
  return <div className="mt-4 space-y-4">
  {queue.data.limited&&<WorkspaceNotice tone="attention">Showing up to 50 submitted recordings. Complete the current queue before relying on it as exhaustive.</WorkspaceNotice>}
  {!queue.data.items.length&&<EmptyState title="No submitted recordings" description="Creator submissions appear here after private upload and verification."/>}
- {queue.data.items.map(item=><AssetReview key={item.id+":"+item.sha256} item={item} courseVersionId={courseVersionId}/>)}
+ {queue.data.items.map(item=><AssetReview key={item.id+":"+item.sha256} item={item} courseVersionId={courseVersionId} identity={identity}/>)}
  </div>;
 }
-function AssetReview({item,courseVersionId}:{item:Item;courseVersionId:string}){
+function AssetReview({item,courseVersionId,identity}:{item:Item;courseVersionId:string;identity:string}){
  const client=useQueryClient();
- const feedback=useMutationFeedback(()=>client.invalidateQueries({queryKey:["recorded-asset-review",courseVersionId]}));
+ const feedback=useMutationFeedback(()=>client.invalidateQueries({queryKey:["recorded-asset-review",identity,courseVersionId]}));
  const [kind,setKind]=useState<"academic"|"rights"|"accessibility">("academic");
  const [decision,setDecision]=useState<"approved"|"rejected">("approved");
  const [evidence,setEvidence]=useState("");
