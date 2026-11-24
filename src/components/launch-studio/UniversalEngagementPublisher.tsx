@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { WorkspacePanel } from "@/components/workspace";
 import {
   engagementDomains, engagementAudienceKinds, engagementInteractions,
+  engagementChannels, engagementChannelLabels, type EngagementChannel,
   engagementSubjectKinds, engagementDefinitionSchema,
   type EngagementDefinition, type EngagementOwner,
 } from "@/domain/engagement-definition";
@@ -48,7 +49,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
   const [actionLabel,setActionLabel]=useState("Learn more");
   const [execution,setExecution]=useState<"page"|"redirect">("page");
   const [target,setTarget]=useState<GoDestination|null>(null);
-  const [channel,setChannel]=useState<"email"|"sms"|"qr"|"social"|"partner"|"web"|"other">("web");
+  const [channel,setChannel]=useState<EngagementChannel>("web");
   const [published,setPublished]=useState<Published|null>(null);
   const [links,setLinks]=useState<CreatedLink[]>([]);
   const [revoked,setRevoked]=useState<Set<string>>(()=>new Set());
@@ -188,8 +189,8 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <Field label="Distribution channel">
           <Select value={channel} onChange={event=>setChannel(event.target.value as typeof channel)}>
-            {(["web","email","sms","qr","social","partner","other"] as const).map(c=>
-              <option key={c} value={c}>{labels(c)}</option>)}
+            {engagementChannels.map(c=>
+              <option key={c} value={c}>{engagementChannelLabels[c]}</option>)}
           </Select>
         </Field>
         <Button disabled={busy} type="button" onClick={()=>void createLink()}>
