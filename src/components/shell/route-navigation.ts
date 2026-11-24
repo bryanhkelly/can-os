@@ -68,7 +68,7 @@ export const routeNavigation = {
   "/groups": page(learn, ["student", "teacher", "guardian"]),
   "/groups/$groupId": hidden("Study group detail", ["student", "teacher"]),
   "/groups/new": hidden("Dedicated study group creation", ["student", "teacher"]),
-  "/home": page("/home", all),
+  "/home": page("/home", [...all,"reporting_relationship_manager"]),
   "/interest-event": publicPage,
   "/launch": publicPage,
   "/launch/site": page("/launch/site", admins),
