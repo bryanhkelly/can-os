@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { nativeClassConsentDigest } from "./native-class-consent.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
@@ -321,9 +321,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       // Revocation between preflight and insertion must fail inside the same
       // transaction as the seat change, including cross-provider public Classes.
       await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
-      const consentSha256=createHash("sha256")
-        .update(version.consentVersion!).update("\u0000").update(version.consentText!)
-        .digest("hex");
+      const consentSha256=nativeClassConsentDigest(version.consentVersion!,version.consentText!);
       const [enrollment]=await tx.insert(canonicalClassEnrollments).values({
         classId:instance.id,classOfferingVersionId:version.id,
         learnerPersonId,enrolledByPersonId:learnerPersonId,
