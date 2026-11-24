@@ -22,8 +22,10 @@ try{
    distinct_learner_grants:true,no_premature_completion:true,
    learner_and_policy_pinned:true,assessment_alone_not_completion:true,
    seven_lessons_required:true,automatic_completion_once:true,completion_audit_and_domain_event:true,
+   baseline_no_feedback:true,final_feedback_exact_scope:true,feedback_invitation_idempotent:true,
+   five_feedback_answers:true,duplicate_feedback_denied:true,
  }]);
- console.log("PASS: 10 canonical assessment provisioning and automatic completion checks; synthetic fixture rolled back.");
+ console.log("PASS: 15 canonical assessment, completion and feedback checks; synthetic fixture rolled back.");
 }finally{
  if(client){try{await client.query("ROLLBACK");}finally{client.release();}}
  await pool.end();
