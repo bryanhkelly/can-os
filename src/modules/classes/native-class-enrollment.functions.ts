@@ -29,6 +29,7 @@ import {
   assertNativeClassSeatAvailable, nativeClassCapacity,
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
+import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
@@ -279,18 +280,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           consentVersion:version.consentVersion,consentText:version.consentText,
         },now);
       }
-      const previous=await tx.select({
-        id:canonicalClassEnrollments.id,status:canonicalClassEnrollments.status,
-        creditMode:canonicalClassEnrollments.creditMode,
-        courseAttemptId:canonicalClassEnrollments.courseAttemptId,
-      }).from(canonicalClassEnrollments).where(and(
-        eq(canonicalClassEnrollments.classId,instance.id),
-        eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
-        inArray(canonicalClassEnrollments.status,["pending","active"]),
-      )).limit(2);
-      if(previous.length>1)
-        throw new AuthorizationError("duplicate open Class enrollments require reconciliation");
-      const existing=previous[0];
+      const existing=await readOpenNativeClassEnrollment(tx,instance.id,learnerPersonId);
       if(existing){
         // Idempotent responses are still current privileged learner reads.
         // The native session may have been revoked while this transaction
@@ -303,12 +293,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       // A bounded recent-history query is not sufficient for completed
       // participants who later withdrew multiple times. Check the complete
       // completion history via its indexed status predicate.
-      const [completed]=await tx.select({id:canonicalClassEnrollments.id})
-        .from(canonicalClassEnrollments).where(and(
-          eq(canonicalClassEnrollments.classId,instance.id),
-          eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
-          eq(canonicalClassEnrollments.status,"completed"),
-        )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(1);
+      const completed=await readLatestCompletedNativeClassEnrollment(tx,instance.id,learnerPersonId);
       const repeatAuthorization=completed
         ?await requireNativeRepeatAuthorization(tx,instance.id,learnerPersonId,completed.id,now)
         :null;
