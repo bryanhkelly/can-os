@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceNotice, SelectionChip, SelectionChipGroup } from "@/components/workspace";
 import type { SiteExperienceDetail, SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import {
   siteExperienceGroups, siteExperienceCatalog, siteExperienceById,
@@ -194,7 +194,7 @@ export function EstablishExperiencesV61({
       </div>
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground" aria-label="Selection legend">
         <span className="flex items-center gap-2">
-          <span className="size-3 bg-primary" aria-hidden="true"/>Selected
+          <span className="size-3 border border-primary bg-accent" aria-hidden="true"/>Selected
         </span>
         <span className="flex items-center gap-2">
           <span className="size-3 border border-primary bg-accent/50" aria-hidden="true"/>
@@ -216,24 +216,17 @@ export function EstablishExperiencesV61({
                   <h4 id={"experience-group-"+group.id} className="text-sm font-semibold">{group.title}</h4>
                   <p className="text-xs leading-5 text-muted-foreground">{group.description}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <SelectionChipGroup density="standard">
                   {group.topics.map(topic=>{
                     const selected=selectedIds.includes(topic.id);
                     const recommended=recommendedIds.has(topic.id);
                     const blocked=disabled||(!selected&&count>=siteExperienceLimit);
-                    return <Button key={topic.id} type="button" size="sm"
-                      variant={selected?"default":"outline"} aria-pressed={selected}
-                      aria-label={topic.title+(recommended?". Recommended.":"")+
-                        (selected?" Selected.":" Not selected.")}
-                      disabled={blocked} onClick={()=>toggleTopic(topic.id)}
-                      className={"min-h-9 whitespace-normal text-left "+
-                        (!selected&&recommended?"border-primary/60 bg-accent/50 text-primary":"")}>
-                      {selected?<Check aria-hidden="true"/>:
-                        recommended?<Sparkles aria-hidden="true"/>:null}
+                    return <SelectionChip key={topic.id} density="standard" selected={selected}
+                      recommended={recommended} disabled={blocked} onChange={()=>toggleTopic(topic.id)}>
                       {topic.title}
-                    </Button>;
+                    </SelectionChip>;
                   })}
-                </div>
+                </SelectionChipGroup>
               </div>
             </div>
           </section>;
@@ -398,12 +391,11 @@ export function EstablishExperiencesV61({
             <div className="flex flex-wrap gap-2">
               {draft.audienceIds.map(id=>{
                 const active=detail?.audienceIds.includes(id)??false;
-                return <Button key={id} size="sm" variant={active?"default":"outline"}
-                  aria-pressed={active} disabled={disabled}
-                  onClick={()=>patchDetail(topic.id,{
+                return <SelectionChip key={id} selected={active} disabled={disabled}
+                  onChange={()=>patchDetail(topic.id,{
                     audienceIds:toggleChip<SiteExperienceAudienceId>(
-                      detail?.audienceIds??[],id,4)})}>
-                  {active&&<Check aria-hidden="true"/>}{siteExperienceAudienceNames[id]}</Button>;
+                      detail?.audienceIds??[],id,draft.audienceIds.length)})}>
+                  {siteExperienceAudienceNames[id]}</SelectionChip>;
               })}
             </div>
             {!draft.audienceIds.length&&<p className="text-xs text-muted-foreground">
