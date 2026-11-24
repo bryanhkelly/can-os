@@ -7,6 +7,7 @@ import { accessSessionCookie } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { AuthorizationError } from "@/domain/command-context";
 import { getIdentityContext } from "@/modules/identity/command-context.server";
+import { auditDelegation } from "@/domain/audit-identity";
 
 /**
  * Compatibility contract for native Class and noncredit callers.
@@ -35,13 +36,7 @@ async function impersonationAuditContext(actorPersonId:string|null|undefined) {
   if(!actor.impersonatedByAccountId)return {};
   if(!actorPersonId || actor.actorPersonId!==actorPersonId)
     throw new AuthorizationError("current effective audit Person");
-  return {
-    effectiveAccountId: actor.accountId,
-    sessionAccountId: actor.impersonatedByAccountId,
-    sessionId: actor.sessionId,
-    selectedGrantId: actor.grantId,
-    delegatedByDemoAdmin: true,
-  };
+  return auditDelegation(actor);
 }
 
 export async function writeCanonicalAudit(
