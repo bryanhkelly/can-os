@@ -59,7 +59,8 @@ export async function readCurriculumStudio(actor: Actor, programId: string) {
     .where(eq(courseTemplates.owningOrganizationId, program.organizationId)).orderBy(desc(courseTemplateVersions.version));
   return { programId, courses: courses.map(course => ({
     id: course.id, code: course.code, title: course.title, subject: course.subject,
-    releases: releases.filter(release => release.courseId === course.id).map(release => ({
+    releases: releases.filter(release => release.courseId === course.id &&
+      !release.curriculum.supersededByCourseVersionId).map(release => ({
       id: release.id, version: release.version, status: release.status, revision: revision(release.curriculum),
       content: readClassContent(release.curriculum), teacherGuides: readClassTeacherGuides(release.curriculum),
       publishedAt: release.publishedAt?.toISOString() ?? null,
@@ -101,6 +102,8 @@ export async function createCurriculumDraft(actor: Actor, input: {
     await ownedCourse(tx, input.courseId, program.organizationId);
     const versions = await tx.select().from(courseTemplateVersions)
       .where(eq(courseTemplateVersions.courseTemplateId, input.courseId)).orderBy(desc(courseTemplateVersions.version));
+    if (versions.some(version => version.curriculum.supersededByCourseVersionId))
+      throw new Error("This curriculum has moved to native Course authoring.");
     const retry = versions.find(version => version.curriculum.authoringRequestId === input.requestId);
     if (retry) {
       if ((retry.curriculum.sourceVersionId ?? null) !== (input.sourceVersionId ?? null))
