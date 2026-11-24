@@ -8,6 +8,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { getIdentityContext } from "@/modules/identity/command-context.server";
 import { currentClassAuthority } from "./native-class-authority.server";
+import { studentSiteScope } from "@/domain/student-site-scope";
 
 /** Student Class discovery is identical for real and synthetic Sites.
  * No special demo enrollment/consent pathway. New student enrollment uses
@@ -22,17 +23,13 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
     if(error instanceof AuthorizationError)return {kind:"other" as const,classes:[]};
     throw error;
   }
-  if(actor.role!=="student" || !actor.actorPersonId ||
-     !actor.grantSiteId || actor.scope.siteIds?.length!==1 ||
-     actor.scope.siteIds[0]!==actor.grantSiteId ||
-     actor.scope.organizationIds?.length!==1 ||
-     !actor.capabilities.has("student:read"))
-    return {kind:"other" as const,classes:[]};
+  const membership=studentSiteScope(actor);
+  if(!membership)return {kind:"other" as const,classes:[]};
 
   return db.transaction(async tx=>{
     const scope=and(
-      eq(canonicalClasses.siteId,actor.grantSiteId!),
-      eq(canonicalClasses.operatingOrganizationId,actor.scope.organizationIds![0]!),
+      eq(canonicalClasses.siteId,membership.siteId),
+      eq(canonicalClasses.operatingOrganizationId,membership.organizationId),
       eq(canonicalClasses.state,"active"),
     );
     const fields={
@@ -44,7 +41,7 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
     const assigned=await tx.select(fields).from(canonicalClasses)
       .innerJoin(canonicalClassEnrollments,and(
         eq(canonicalClassEnrollments.classId,canonicalClasses.id),
-        eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!),
+        eq(canonicalClassEnrollments.learnerPersonId,membership.personId),
         inArray(canonicalClassEnrollments.status,["active","pending"]),
       )).where(scope);
     const discovery=await tx.select(fields).from(canonicalClasses).where(scope)
@@ -64,7 +61,7 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
       courseAttemptId:canonicalClassEnrollments.courseAttemptId,
     }).from(canonicalClassEnrollments).where(and(
       inArray(canonicalClassEnrollments.classId,classIds),
-      eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!),
+      eq(canonicalClassEnrollments.learnerPersonId,membership.personId),
       inArray(canonicalClassEnrollments.status,["active","pending"]),
     ));
     const offeringRows=await tx.select({
