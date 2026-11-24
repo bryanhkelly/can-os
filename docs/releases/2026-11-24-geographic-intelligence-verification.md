@@ -16,3 +16,6 @@ Branch: release-11232026. Database target: can-os Neon main (sweet-hall-62441909
 
 ## Fixture execution
 Use a rollback-only transaction with the geography migrations and `tests/postgres/geographic-intelligence-acceptance.sql` in a production-shaped database. The fixture must never be committed. For production apply, resolve migration provenance and require exact expected ledger hashes and verified release gates first.
+
+## Superseding production update
+Neon main is now migrated through 0123, after exact-source recovery and reconciliation of its historical ledger. All seven pending migration hashes verified after commit, with no malformed records or pending journal entries as of source aaa9900800d27236922b58882a336ac6bf568540. The geographic acceptance fixture passed again on the installed schema with all test data rolled back. Nine existing Sites have unsupported enrichment jobs; none are eligible for real address enrichment. See [production migration governance](2026-11-24-production-migration-governance.md) for detailed evidence. Full application, Storybook, live Census and authenticated browser acceptance remain outstanding. No application deployment was performed.
