@@ -799,6 +799,13 @@
       "when": 1795462007000,
       "tag": "0113_go_gateway_scoped_access",
       "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1795462008000,
+      "tag": "0114_go_response_metrics",
+      "breakpoints": true
     }
   ]
 }
