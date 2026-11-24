@@ -16,7 +16,8 @@ const actionLabels={
   accept:"Accept relationship",decline:"Decline",withdraw:"Withdraw",revoke:"Revoke access",
 } satisfies Record<RelationshipAction,string>;
 export type RelationshipPanelEntry={
-  agreement:ReportingRelationship;
+  agreement:Omit<ReportingRelationship,"proposedByPersonId"|"acceptedByPersonId">;
+  scopeName?:string;
   organizationName:string;
   metricLabels:readonly string[];
   allowedActions:readonly RelationshipAction[];
@@ -50,18 +51,18 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
   return <section aria-label="Reporting relationships" className="space-y-4 border border-border bg-card p-5">
     <div className="space-y-1">
       <h3 className="text-base font-semibold">Organization relationships</h3>
-      <p className="text-sm text-muted-foreground">Tag organizations and choose which aggregate metrics to share. Sharing begins only after acceptance and does not grant access to learner records.</p>
+      <p className="text-sm text-muted-foreground">Tag organizations and agree on aggregate reporting metrics. Acceptance records consent; report release requires separate disclosure checks.</p>
     </div>
     {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
     {entries.length===0?<p className="text-sm text-muted-foreground">No relationships for this scope yet.</p>:
-      <ul className="space-y-3">{entries.map(({agreement,organizationName,metricLabels,allowedActions})=>
+      <ul className="space-y-3">{entries.map(({agreement,organizationName,scopeName,metricLabels,allowedActions})=>
         <li key={agreement.id} className="space-y-2 border border-border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-semibold">{organizationName}</span>
             <span className="text-sm capitalize text-muted-foreground">{agreement.status}</span>
           </div>
           <p className="text-sm">{relationshipLabels[agreement.relationshipKind]}</p>
-          <p className="text-sm text-muted-foreground">Authorized scope: {agreement.scopeKind}. Selected metrics: {metricLabels.join(", ")||"None"}.</p>
+          <p className="text-sm text-muted-foreground">Scope: {agreement.scopeKind}{scopeName?": "+scopeName:""}. Selected metrics: {metricLabels.join(", ")||"None"}.</p>
           {agreement.validThrough&&<p className="text-sm text-muted-foreground">Ends {agreement.validThrough.slice(0,10)} (UTC).</p>}
           <div className="flex flex-wrap gap-2">{allowedActions.map(action=><Button key={action} type="button"
             variant="outline" disabled={busy} onClick={()=>setConfirm({id:agreement.id,action})}>{actionLabels[action]}</Button>)}</div>
