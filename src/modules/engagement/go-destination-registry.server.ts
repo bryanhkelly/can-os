@@ -8,6 +8,7 @@ import { publicSiteHost } from "@/domain/public-site-address";
 import { engagementJourneys } from "@/domain/engagement-journeys";
 import { goDestinationHref, type GoDestination } from "@/domain/site-go-links";
 import { goLikeContainsLiteral } from "@/domain/go-link-search";
+import { engagementOwnerAllowsSite, type PublicEngagementOwnerScope } from "@/domain/engagement-target-scope";
 
 /** Shared canonical Destination Registry for Link Management, public resolution
  * and the operator picker. No duplicate publication rules or open redirects.
@@ -153,12 +154,7 @@ export async function listGoDestinationChoices(
  * checked when publishing, but public resolution must check the CURRENT
  * owner and public availability again. A typed link alone never grants access.
  */
-export type EngagementTargetOwner={
-  ownerKind:"platform"|"organization"|"site"|"program";
-  organizationId:string|null;
-  siteId:string|null;
-  programId:string|null;
-};
+export type EngagementTargetOwner=PublicEngagementOwnerScope;
 
 /** Resolve public destination under the published engagement's owning scope.
  * Reuse the original Go registry so new journeys cannot weaken publish gates.
@@ -198,10 +194,11 @@ export async function inspectEngagementDestination(
   const [site]=await reader.select({
     organizationId:sites.organizationId,status:sites.lifecycleStatus,
   }).from(sites).where(eq(sites.id,targetSiteId)).limit(1);
-  if(!site || site.status==="closed" ||
-      (owner.organizationId!==null && site.organizationId!==owner.organizationId))
-    return unavailable;
-  if(owner.siteId && targetSiteId!==owner.siteId)return unavailable;
+  if(!engagementOwnerAllowsSite(owner,{
+    id:targetSiteId,
+    organizationId:site?.organizationId??"",
+    status:site?.status??"closed",
+  }))return unavailable;
   // The original catalog enforces exact current Site, release publication,
   // seat windows, guardian registration policy and Class visibility.
   const inspected=await inspectGoDestination(targetSiteId,destination,code,reader);
