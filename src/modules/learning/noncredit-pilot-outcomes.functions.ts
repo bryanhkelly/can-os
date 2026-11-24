@@ -13,7 +13,7 @@ import {
 } from "@/db/canonical-v301";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
-  countDistinctNoncreditLearners,
+  countDistinctNoncreditLearners,buildPilotDisclosureEvidence,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
@@ -308,12 +308,13 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
       };
     });
+    const personByRegistration=new Map(registrations.map(r=>[r.id,r.participantPersonId]));
     const byTraining=trainings.map(t=>{
       const subset=facts.filter(f=>f.trainingVersionId===t.id);
       if(!subset.length)return null;
       const summary=summarizeNoncreditPilot(subset);
       return {trainingVersionId:t.id,title:t.title,summary,
-        publicationSafe:publicationSafePilotSummary(summary)};
+        publicationSafe:publicationSafePilotSummary(summary,10,buildPilotDisclosureEvidence(subset,personByRegistration))};
     }).filter((r):r is NonNullable<typeof r>=>r!==null);
     const totals=summarizeNoncreditPilot(facts);
     return {from:from.toISOString(),to:to.toISOString(),
@@ -321,5 +322,5 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       deliverySites:new Set(registrations.map(r=>r.siteId)).size,
       distinctLearners:countDistinctNoncreditLearners(registrations.map(r=>r.participantPersonId)),
       totals,byTraining,
-      publicationSafe:publicationSafePilotSummary(totals)};
+      publicationSafe:publicationSafePilotSummary(totals,10,buildPilotDisclosureEvidence(facts,personByRegistration))};
   });
