@@ -3,7 +3,8 @@ const digest=bytes=>createHash("sha256").update(bytes).digest("hex");
 /** Historical Windows checkout bytes are an explicitly bounded compatibility
  * rule, never a blanket exemption for mismatched SQL. */
 const historicalCrlfIndices=new Set([0,1,2,3,5]);
-export function assessProductionLedger(entries,rows,readSql){
+export const retainedHistoricalMigration={time:"1792513890490",hash:"f434947644ed1fc9c0ab14ccffb71d6835666d41da3194769977c7a45604ab73",path:"database/production/history/0026_charming_dark_beast.sql",sourceCommit:"a6c38ac54b80599beaa6c822ab8cf30c83672bfe"};
+export function assessProductionLedger(entries,rows,readSql,readHistoricalSql){
  const issues=[],pending=[],legacy=[],matched=[],byTime=new Map();
  if(!Array.isArray(entries)||entries.length===0)throw Error("Empty migration journal");
  for(const row of rows){
@@ -28,7 +29,12 @@ export function assessProductionLedger(entries,rows,readSql){
   if(historicalCrlfIndices.has(e.idx)&&row.hash===crlf){legacy.push({idx:e.idx,kind:"verified_crlf",time});continue;}
   issues.push({kind:"hash_mismatch",idx:e.idx,time,expected,actual:row.hash});
  }
- for(const [time,row] of byTime)if(!seen.has(time))issues.push({kind:"unmapped_history",time,hash:row.hash});
+ for(const [time,row] of byTime)if(!seen.has(time)){
+  const historical=retainedHistoricalMigration;
+  if(time===historical.time&&row.hash===historical.hash&&readHistoricalSql&&digest(readHistoricalSql(historical.path))===historical.hash){
+   legacy.push({kind:"verified_retained_source",time,sourceCommit:historical.sourceCommit});
+  }else issues.push({kind:"unmapped_history",time,hash:row.hash});
+ }
  return {issues,pending,legacy,matched,ready:issues.length===0};
 }
 export function assertProductionIdentity(identity){

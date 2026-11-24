@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {assessProductionLedger,assertProductionIdentity} from "./production-migration-governance.mjs";
+import {assessProductionLedger,assertProductionIdentity,retainedHistoricalMigration} from "./production-migration-governance.mjs";
 const h=s=>createHash("sha256").update(s).digest("hex");
 const entries=[{idx:0,tag:"0000_base",when:1},{idx:1,tag:"0001_next",when:2},{idx:2,tag:"0002_new",when:3}];
 const source=()=>Buffer.from("SELECT 1;\n");
@@ -23,4 +23,13 @@ test("production identity is exact",()=>{
  const identity={project_id:"sweet-hall-62441909",branch_id:"br-restless-sea-ar9ooo55",database_name:"neondb",role:"neondb_owner"};
  assert.doesNotThrow(()=>assertProductionIdentity(identity));
  assert.throws(()=>assertProductionIdentity({...identity,branch_id:"br-other"}));
+});
+
+test("retained historical row needs exact original bytes, not a hash exemption",()=>{
+ const bytes=Buffer.from("ALTER TABLE \"account_person_grants\" DROP COLUMN \"is_synthetic\";");
+ const history={created_at:retainedHistoricalMigration.time,hash:retainedHistoricalMigration.hash};
+ const rows=[row(1),row(2),row(3),history];
+ assert.equal(assessProductionLedger(entries,rows,source).ready,false);
+ assert.equal(assessProductionLedger(entries,rows,source,()=>Buffer.from("changed")).ready,false);
+ assert.equal(assessProductionLedger(entries,rows,source,()=>bytes).ready,true);
 });

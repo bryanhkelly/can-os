@@ -20,6 +20,6 @@ const sql=neon(process.env.DATABASE_URL);
 const [identity]=await sql`SELECT current_setting('neon.project_id',true) project_id,current_setting('neon.branch_id',true) branch_id,current_database() database_name,current_user AS role`;
 assertProductionIdentity(identity);
 const rows=await sql`SELECT created_at::text,hash FROM drizzle.__drizzle_migrations ORDER BY created_at`;
-const result=assessProductionLedger(journal.entries,rows,source);
+const result=assessProductionLedger(journal.entries,rows,source,path=>readFileSync(path));
 console.log(JSON.stringify({sha,identity,appliedRows:rows.length,...result},null,2));
 if(!result.ready)process.exitCode=1;
