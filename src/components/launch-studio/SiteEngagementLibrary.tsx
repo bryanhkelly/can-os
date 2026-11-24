@@ -25,12 +25,17 @@ const problem=(error:unknown)=>error instanceof Error?error.message:"Action unav
  * Recover published experiences and their actual persisted Go Links. In-memory
  * authoring state must never be the only way to manage a distributed link.
  */
-export function SiteEngagementLibrary({
-  siteId,packageId,ownerSurface,
-}:{siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface}){
+type LibraryProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface};
+export function SiteEngagementLibrary(props:LibraryProps){
+  const owner=props.ownerSurface?.owner;
+  const scope=JSON.stringify([props.siteId,props.packageId,owner?.kind,owner?.kind==="organization"?owner.organizationId:null]);
+  return <SiteEngagementLibrarySession key={scope} {...props}/>;
+}
+function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryProps){
   const [records,setRecords]=useState<Entry[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [links,setLinks]=useState<Link[]>([]);
+  const [linksFor,setLinksFor]=useState<string|null>(null);
   const [distribution,setDistribution]=useState<string|null>(null);
   const [loading,setLoading]=useState(true);
   const [linksLoading,setLinksLoading]=useState(false);
@@ -52,18 +57,18 @@ export function SiteEngagementLibrary({
         setLoading(false);
       })
       .catch(()=>{
-        if(active){setError("Unable to load published engagements.");setLoading(false);}
+        if(active){setRecords([]);setSelected(null);setError("Unable to load published engagements.");setLoading(false);}
       });
     return ()=>{active=false;};
   },[siteId,packageId,ownerSurface?.owner.kind,ownerSurface?.owner.kind==="organization"?ownerSurface.owner.organizationId:null,refresh]);
 
   useEffect(()=>{
     let active=true;
-    setDistribution(null);
-    if(!selected){setLinks([]);return;}
+    setDistribution(null);setLinks([]);setLinksFor(null);
+    if(!selected){setLinksLoading(false);return;}
     setLinksLoading(true);
     listEngagementGoLinks({data:{engagementId:selected}})
-      .then(rows=>{if(active){setLinks(rows);setLinksLoading(false);}})
+      .then(rows=>{if(active){setLinks(rows);setLinksFor(selected);setLinksLoading(false);}})
       .catch(()=>{if(active){setLinks([]);setError("Unable to load saved Go Links.");setLinksLoading(false);}});
     return ()=>{active=false;};
   },[selected,refresh]);
@@ -83,7 +88,7 @@ export function SiteEngagementLibrary({
     finally{setBusy(false);}
   }
   async function revoke(link:Link){
-    if(!record||busy||link.status==="revoked")return;
+    if(!record||busy||linksFor!==record.engagementId||link.status==="revoked")return;
     if(!window.confirm("Revoke this Go Link? Existing distributed copies will stop working."))return;
     setBusy(true);setError("");setMessage("");
     try{
@@ -121,8 +126,8 @@ export function SiteEngagementLibrary({
     {!loading&&records.length>0&&<>
       <div className="mt-4 grid gap-1">
         <label className="text-sm font-medium" htmlFor="saved-go-engagement">Published experience</label>
-        <Select id="saved-go-engagement" value={selected??""} onChange={event=>{
-          setSelected(event.target.value);setError("");setMessage("");
+        <Select id="saved-go-engagement" disabled={busy} value={selected??""} onChange={event=>{
+          setSelected(event.target.value);setLinks([]);setLinksFor(null);setLinksLoading(true);setDistribution(null);setError("");setMessage("");
         }}>
           {records.map(row=><option key={row.engagementId} value={row.engagementId}>
             {row.headline} (v{row.version}, {row.status})
@@ -147,7 +152,7 @@ export function SiteEngagementLibrary({
         </div>
       </>}
       {linksLoading&&<p className="mt-4 text-sm" role="status">Loading saved links…</p>}
-      {!linksLoading&&<div className="mt-4 grid gap-2">
+      {!linksLoading&&selected!==null&&linksFor===selected&&<div className="mt-4 grid gap-2">
         {!links.length&&<p className="text-sm text-muted-foreground">No Go Links issued for this engagement.</p>}
         {links.map(link=><div key={link.id} className="flex flex-wrap justify-between gap-2 border p-3">
           <div className="min-w-0">
@@ -166,7 +171,7 @@ export function SiteEngagementLibrary({
           </div>
         </div>)}
       </div>}
-      {distribution&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
+      {distribution&&!linksLoading&&linksFor===selected&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
     </>}
     {siteId&&!ownerSurface&&<SiteCampaignEvidencePanel key={siteId} siteId={siteId}/>}
     {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
