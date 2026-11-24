@@ -1,8 +1,8 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { siteGoLinks, siteGoLinkDailyVisits, siteMarketingPackages, sites, organizations } from "@/db/schema";
+import { siteMarketingPackages, sites, organizations } from "@/db/schema";
 import { requireCurrentNetworkAgreement } from "@/modules/networks/network-agreement.server";
-import { goCodeSchema } from "@/domain/site-go-links";
+import { readPublicGoLink, observePublicGoEntry, type PublicGoLink } from "./go-public-gateway.server";
 import { goLinkAvailability } from "@/domain/go-link-policy";
 import { executeSiteGoDestination, type SiteGoExecution } from "./go-destination-registry.server";
 
@@ -11,13 +11,10 @@ import { executeSiteGoDestination, type SiteGoExecution } from "./go-destination
  * A successful redirect is observed only as an aggregated daily count.
  */
 export async function resolveSiteGoExperience(code: string, observe=true, page="/"): Promise<SiteGoExecution | null> {
-  if (!goCodeSchema.safeParse(code).success) return null;
-  const [link] = await db.select({
-    id:siteGoLinks.id,destination:siteGoLinks.destination,status:siteGoLinks.status,
-    startsAt:siteGoLinks.startsAt,expiresAt:siteGoLinks.expiresAt,
-    siteId:siteGoLinks.siteId,organizationId:siteGoLinks.organizationId,
-    packageId:siteGoLinks.packageId,engagementVersionId:siteGoLinks.engagementVersionId,
-  }).from(siteGoLinks).where(eq(siteGoLinks.code,code)).limit(1);
+  const link=await readPublicGoLink(code);
+  return resolveLoadedSiteGoExperience(code,link,observe,page);
+}
+export async function resolveLoadedSiteGoExperience(code:string,link:PublicGoLink|null,observe=true,page="/"):Promise<SiteGoExecution|null>{
   if(!link || goLinkAvailability(link)!=="available" ||
       link.engagementVersionId || !link.siteId || !link.organizationId || !link.destination)return null;
 
@@ -50,17 +47,7 @@ export async function resolveSiteGoExperience(code: string, observe=true, page="
 
   // Best-effort observational counter. No IP, cookie, headers, Person, unique
   // visitor claim, or fabricated enrollment. Metrics never block navigation.
-  if(observe&&(outcome.mode==="redirect"||page==="/"))try {
-    const day=new Date().toISOString().slice(0,10);
-    await db.insert(siteGoLinkDailyVisits).values({
-      linkId:link.id,day,redirects:1,
-    }).onConflictDoUpdate({
-      target:[siteGoLinkDailyVisits.linkId,siteGoLinkDailyVisits.day],
-      set:{redirects:sql`${siteGoLinkDailyVisits.redirects} + 1`},
-    });
-  }catch{
-    console.error("Go Link aggregate observation unavailable",{kind:"daily_counter"});
-  }
+  if(observe&&(outcome.mode==="redirect"||page==="/"))await observePublicGoEntry(code,link.id);
   return outcome;
 }
 
