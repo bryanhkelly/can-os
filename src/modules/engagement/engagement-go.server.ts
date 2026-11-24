@@ -2,13 +2,13 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   engagementDefinitions, engagementDefinitionVersions, organizations,
-  programs, siteGoLinks, siteGoLinkDailyVisits, sitePublications, siteBrandVersions, sites,
+  programs, siteGoLinks, siteGoLinkDailyVisits, siteBrandVersions, sites,
 } from "@/db/schema";
 import {
   engagementDefinitionSchema, type EngagementDefinition,
 } from "@/domain/engagement-definition";
-import { goCodeSchema, goDestinationHref, type GoDestination } from "@/domain/site-go-links";
-import { publicSiteHost } from "@/domain/public-site-address";
+import { goCodeSchema } from "@/domain/site-go-links";
+import { inspectEngagementDestination } from "./go-destination-registry.server";
 import { siteBrandConfigurationSchema } from "@/domain/site-brand";
 import { resolveSiteTheme, type SiteTheme } from "@/domain/site-theme";
 import { goLinkAvailability } from "@/domain/go-link-policy";
@@ -39,15 +39,6 @@ async function publishedExperienceBrand(
       brand.headingFontId??undefined,brand.bodyFontId??undefined,
     ),
   };
-}
-async function publishedSiteHost(siteId:string|null):Promise<string|null>{
-  if(!siteId)return null;
-  const [publication]=await db.select({
-    slug:sitePublications.slug,status:sitePublications.status,
-    publishedAt:sitePublications.publishedAt,
-  }).from(sitePublications).where(eq(sitePublications.siteId,siteId)).limit(1);
-  if(!publication || publication.status!=="published" || !publication.publishedAt)return null;
-  return publicSiteHost(publication.slug);
 }
 async function validOwner(
   owner:{ownerKind:string;organizationId:string|null;siteId:string|null;programId:string|null},
@@ -84,13 +75,6 @@ async function validOwner(
     return {name:program.name,siteId:program.siteId};
   }
   return null;
-}
-
-async function resolveDestination(
-  destination:GoDestination,code:string,siteId:string|null,
-):Promise<string|null>{
-  const host=destination.kind==="site-page"?await publishedSiteHost(siteId):null;
-  return goDestinationHref(destination,code,host);
 }
 
 /** One best-effort aggregate observation shared by direct and universal links.
@@ -145,8 +129,14 @@ export async function resolveGoExperience(code:string):Promise<GoExperience|null
   const definition=parsed.data;
   const destination=definition.execution.mode==="redirect"
     ? definition.execution.destination:definition.execution.action;
-  const href=await resolveDestination(destination,code,owner.siteId);
-  if(!href)return null;
+  const result=await inspectEngagementDestination({
+    ownerKind:record.ownerKind,
+    organizationId:record.organizationId,
+    siteId:record.siteId,
+    programId:record.programId,
+  },destination,code);
+  if(!result.available||!result.href)return null;
+  const href=result.href;
   await observeUniversalGoVisit(link.id);
   if(definition.execution.mode==="redirect")return {mode:"redirect",href};
   const identity=await publishedExperienceBrand(
