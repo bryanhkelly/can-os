@@ -29,6 +29,12 @@ const remediation: Record<string, {label:string; owner:string}> = {
   site_geography_reference_missing: {label:"Site geography reference absent",owner:"Geographic data steward"},
   site_organization_lifecycle_unclassified: {label:"Site owning Organization lifecycle not classified",owner:"Organization operations"},
   organization_lifecycle_unclassified: {label:"Organization lifecycle not classified",owner:"Organization operations"},
+  historical_evidence_checksum_mismatch: {label:"Historical evidence checksum mismatch",owner:"Data integrity engineering"},
+  historical_evidence_scope_mismatch: {label:"Historical evidence Class scope mismatch",owner:"Data integrity engineering"},
+  historical_mapped_snapshot_pending: {label:"Mapped historical evidence not yet preserved",owner:"Academic data migration"},
+  historical_assessment_unmapped: {label:"Historical assessment without verified Class mapping",owner:"Registrar / data migration"},
+  historical_submission_unmapped: {label:"Historical submission without verified enrollment mapping",owner:"Registrar / data migration"},
+  historical_grade_unmapped: {label:"Historical grade without verified enrollment mapping",owner:"Registrar / academic authority"},
   active_demo_noncredit_mode: {label:"Synthetic noncredit demonstration enrollment",owner:"Registrar / academic authority"},
 };
 export function PlatformAcademicIntegrity({integrity}:{integrity:Integrity}){
