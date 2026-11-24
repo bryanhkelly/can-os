@@ -32,7 +32,7 @@ function fromLocalTime(value:string){
   return date.toISOString();
 }
 function advancedDestination(kind:Kind,value:string):GoDestination|null {
-  if(kind==="site-page")return null;
+  if(kind==="site-page"||kind==="website-preview")return null;
   if(kind==="information")
     return /^[a-z][a-z0-9-]{1,60}$/.test(value)
       ?{kind:"information",journeyId:value}:null;
@@ -175,7 +175,7 @@ export function GoLinkWorkspace({siteId,packageId}:{siteId:string;packageId?:str
             setKind(event.target.value as Kind);setTarget("");setSelected("");
             setChoices([]);setDestinationTerm("");setAdvanced(false);
           }}>
-            {Object.entries(labels).map(([value,label])=>
+            {Object.entries(labels).filter(([value])=>value!=="website-preview").map(([value,label])=>
               <option key={value} value={value}>{label}</option>)}
           </Select>
         </label>
