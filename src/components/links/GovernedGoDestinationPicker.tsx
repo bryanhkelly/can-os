@@ -6,7 +6,7 @@ import type {GoDestination} from "@/domain/site-go-links";
 
 type GoChoice=Awaited<ReturnType<typeof listAvailableGoDestinations>>[number];
 type Kind=GoDestination["kind"];
-const kindLabels:Record<Kind,string>={
+const kindLabels:Record<Exclude<Kind,"website-preview">,string>={
   "site-page":"Published Site page",
   "information":"Information or inquiry",
   "adult-training":"Published adult training",
