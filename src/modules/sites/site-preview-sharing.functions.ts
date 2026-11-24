@@ -14,13 +14,8 @@ import { EventTypes } from "@/domain/event-types";
 import {
   classifySiteLocalContent, normalizeSiteLocalContent,
 } from "@/domain/site-local-content";
-import {
-  readSitePreviewShares, type SitePreviewShare,
-} from "@/domain/site-preview-sharing";
 import { findGoIssuance, goRequestFingerprint, issueAuthorizedGoLink, transitionAuthorizedGoLink } from "@/modules/engagement/go-link-lifecycle.server";
-import { goLinkAvailability } from "@/domain/go-link-policy";
 import { buildUrlDestination } from "@/domain/url-destinations";
-import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { getPartnerWebsitePreview } from "./site-website-preview.server";
 import { sitePreviewSnapshotKey, writeSitePreviewSnapshot, deleteUnreferencedSitePreviewSnapshot } from "@/platform/storage/site-preview-snapshots.server";
 
@@ -48,7 +43,7 @@ async function authorizedShareSite(siteId: string) {
   const actor = await getCommandContext(getRequest());
   const [site] = await db.select({
     id: sites.id, organizationId: sites.organizationId, name: sites.name,
-    lifecycleStatus: sites.lifecycleStatus, metadata: sites.metadata,
+    lifecycleStatus: sites.lifecycleStatus,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) throw new AuthorizationError("Site preview sharing scope");
   await assertPreviewSharingScope(actor, site);
@@ -60,26 +55,18 @@ async function authorizedShareSite(siteId: string) {
 async function previewLinks(siteId:string, reader:Pick<typeof db,"select">=db) {
   return reader.select().from(siteGoLinks).where(and(eq(siteGoLinks.siteId,siteId),sql`${siteGoLinks.destination}->>'kind'='website-preview'`)).orderBy(desc(siteGoLinks.createdAt));
 }
-function overview(shares: readonly SitePreviewShare[]) {
-  return shares.map(share => ({
-    id: share.id, createdAt: share.createdAt, expiresAt: share.expiresAt,
-    revokedAt: share.revokedAt, sourceRevision: share.sourceRevision,
-    brandVersionId:share.brandVersionId??null, code:null as string|null, paused:false,
-  }));
-}
-
-/** Authenticated operators see metadata only, never any previously-issued token. */
+/** Authorized operators can retrieve the canonical Go codes. */
 export const listSitePreviewShares = createServerFn({ method: "GET" })
   .validator((value: unknown) => previewParams.parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const { site } = await authorizedShareSite(data.siteId);
     const links=await previewLinks(site.id);
-    return [...links.flatMap(link=>link.destination?.kind==="website-preview"?[{
+    return links.flatMap(link=>link.destination?.kind==="website-preview"?[{
       id:link.id,code:link.code,createdAt:link.createdAt.toISOString(),expiresAt:link.expiresAt?.toISOString()??null,
       revokedAt:link.status==="revoked"?link.updatedAt.toISOString():null,paused:link.status==="paused",
       sourceRevision:link.destination.sourceRevision,brandVersionId:link.destination.brandVersionId,
-    }]:[]),...overview(readSitePreviewShares(site.metadata))];
+    }]:[]);
   });
 
 /** An immutable, sanitized website snapshot is captured when the URL is
@@ -116,12 +103,9 @@ export const createSitePreviewShare = createServerFn({ method: "POST" })
       const retry=await findGoIssuance(tx,actor,site,data.requestId,fingerprint);
       if(retry?.destination?.kind==="website-preview")return {shareId:retry.id,relativeUrl:buildUrlDestination({kind:"go",code:retry.code}).href,expiresAt:retry.expiresAt?.toISOString()??null,sourceRevision:retry.destination.sourceRevision};
       if (site.lifecycleStatus === "closed") throw new AuthorizationError("closed Site");
-      const existing = readSitePreviewShares(site.metadata);
       const now = new Date();
-      const active = existing.filter(share => !share.revokedAt
-        && (!share.expiresAt || Date.parse(share.expiresAt) > now.getTime()));
       const links=await previewLinks(site.id,tx);
-      if (active.length + links.filter(link=>goLinkAvailability(link)==="available" || goLinkAvailability(link)==="paused").length >= 5)
+      if (links.filter(link=>link.status!=="revoked" && (!link.expiresAt || link.expiresAt>now)).length >= 5)
         throw new DomainError("UNAVAILABLE", "Revoke an unused preview link before creating another.");
 
       const [latest] = await tx.select({
@@ -237,29 +221,6 @@ export const revokeSitePreviewShare = createServerFn({ method: "POST" })
         await emitEvent(tx,{eventType:EventTypes.SiteWebsitePreviewRevoked,aggregateType:"site",aggregateId:site.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,payload:{shareId:link.id,revokedAt:new Date().toISOString()}});
         return {changed:true};
       }
-      const shares = readSitePreviewShares(site.metadata);
-      const match = shares.find(entry => entry.id === data.shareId);
-      if (!match) throw new DomainError("UNAVAILABLE", "This preview link no longer exists.");
-      if (match.revokedAt) return { changed: false };
-      const now = new Date().toISOString();
-      await tx.update(sites).set({
-        metadata: { ...site.metadata, websitePreviewSharesV1: shares.map(entry =>
-          entry.id === data.shareId ? { ...entry, revokedAt: now } : entry) },
-        updatedAt: nextSiteConfigurationRevision(site.updatedAt),
-      }).where(eq(sites.id, site.id));
-      await writeAudit(tx, actor, {
-        action: "site.website.preview_share.revoked",
-        entityType: "site", entityId: site.id,
-        scope: { organizationId: site.organizationId, siteId: site.id },
-        after: { shareId: data.shareId, revokedAt: now },
-      });
-      await emitEvent(tx, {
-        eventType: EventTypes.SiteWebsitePreviewRevoked,
-        aggregateType: "site", aggregateId: site.id,
-        actorPersonId: actor.actorPersonId, siteId: site.id,
-        organizationId: site.organizationId,
-        payload: { shareId: data.shareId, revokedAt: now },
-      });
-      return { changed: true };
+      throw new DomainError("UNAVAILABLE", "This preview link no longer exists.");
     });
   });
