@@ -71,8 +71,10 @@ export function UniversalEngagementPublisher({
   const draft:EngagementDefinition={
     domain,subject:{kind:subjectKind,id:null,label:subjectLabel.trim()},
     audience:[audience],interaction,
-    expectedOutcome:interaction==="apply"?"application":interaction==="register"?"registration":
-      interaction==="schedule"?"appointment":interaction==="contribute"?"contribution":"inquiry",
+    expectedOutcome:interaction==="discover"?"viewed":interaction==="apply"?"application":
+      interaction==="register"?"registration":interaction==="schedule"?"appointment":
+      interaction==="contribute"?"contribution":interaction==="accept"?"agreement":
+      interaction==="continue"?"participation":"inquiry",
     presentation:{headline:headline.trim(),summary:summary.trim(),
       ...(detail.trim()?{detail:detail.trim()}:{})},
     execution:execution==="page"
