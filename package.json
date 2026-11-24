@@ -124,6 +124,7 @@
     "db:check:main:native-release": "node scripts/acceptance/check-main-native-course-release.mjs",
     "verify:governance:main-consolidation": "node scripts/acceptance/check-main-governance-leaf-consolidation.mjs",
     "check:component-boundaries": "node scripts/check-component-boundaries.mjs",
+    "verify:architecture": "npm run check:build-source-syntax && npm run check:test-source-syntax && npm run check:local-import-exports && npm run check:test-import-exports && npm run check:component-boundaries && npm run check:class-architecture && npm run check:route-identifiers && npm run test:design-audit && npm run test:migration-safety && npm run db:check:journal && npm run verify:reporting:sql && node scripts/check-design-system.mjs && npm run design:coverage",
     "architecture:inventory": "node scripts/report-component-architecture.mjs",
     "check:local-import-exports": "node scripts/acceptance/check-local-import-exports.mjs",
     "test:local-import-exports": "node --test scripts/acceptance/check-local-import-exports.test.mjs",
