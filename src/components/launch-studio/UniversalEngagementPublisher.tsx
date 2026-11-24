@@ -1,5 +1,6 @@
 import { Field } from "@/components/ui/field";
-import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import { GoLinkActions } from "@/components/links/GoLinkActions";
+import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
 import { OwnerEngagementDestinationPicker, type OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,9 +30,11 @@ const errorMessage=(error:unknown)=>error instanceof Error?error.message:"Unable
  * Site-specific consumer of the platform registry. It does not own registry
  * data and does not create a separate outreach/contact/admissions service.
  */
-export function UniversalEngagementPublisher({
-  siteId,packageId,ownerSurface,
-}:{siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface}){
+type PublisherProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface};
+export function UniversalEngagementPublisher(props:PublisherProps){
+  return <UniversalEngagementPublisherSession key={engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner)} {...props}/>;
+}
+function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:PublisherProps){
   const owner:EngagementOwner=ownerSurface?.owner??{kind:"site",siteId:siteId!};
   const [domain,setDomain]=useState<EngagementDefinition["domain"]>("outreach");
   const [subjectKind,setSubjectKind]=useState<EngagementDefinition["subject"]["kind"]>("initiative");
@@ -201,9 +204,8 @@ export function UniversalEngagementPublisher({
             {revoked.has(link.linkId)&&<p className="text-xs text-muted-foreground">Revoked</p>}
           </div>
           <div className="flex gap-2">
-            {!revoked.has(link.linkId)&&<CopyLinkButton destination={{kind:"go",code:link.code}}/>}
-            <Button size="sm" variant="outline" disabled={busy||revoked.has(link.linkId)}
-              onClick={()=>void revoke(link)}>Revoke</Button>
+            <GoLinkActions code={link.code} status={revoked.has(link.linkId)?"revoked":"active"}
+              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")void revoke(link);}}/>
           </div>
         </div>)}
       </div>
