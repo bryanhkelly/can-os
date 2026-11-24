@@ -19,7 +19,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      - id: install
+        run: npm ci
       - run: npm run test:design-audit
       - run: node --test scripts/lib/v61-visual-evidence.test.mjs
       - name: Verify V6.1 source against the full release range
@@ -29,7 +30,19 @@ jobs:
           node scripts/check-design-system.mjs
       - run: npm run check:component-boundaries
       - name: Require source coverage and reviewed independent render evidence
-        run: node scripts/check-v61-coverage.mjs --strict
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p acceptance-artifacts
+          node scripts/check-v61-coverage.mjs --strict | tee acceptance-artifacts/v61-coverage.json
+      - name: Preserve source coverage diagnostics even when acceptance fails
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: v61-source-coverage-${{ github.run_attempt }}
+          path: acceptance-artifacts/v61-coverage.json
+          if-no-files-found: error
   visual:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
