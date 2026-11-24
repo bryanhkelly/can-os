@@ -1,5 +1,5 @@
 import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
-import {getReportingGeographyOptions} from "@/modules/geography/reporting-geography.functions";
+import {useReportGeography} from "@/hooks/use-report-geography";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import {useMemo,useState} from "react";
@@ -31,7 +31,7 @@ export function NoncreditProviderEvidencePanel(){
   const scope=usePrivateReportScope();
   const [requestedSite,setRequestedSite]=useState("");
   const [geography,setGeography]=useState("");
-  const geographyOptions=usePrivateReportQuery({scope,key:["geography-options","current"],read:()=>getReportingGeographyOptions({data:{basis:"current"}})});
+  const geographyOptions=useReportGeography(scope,"current");
   const [showDefinitions,setShowDefinitions]=useState(false);
   const {query:response,data}=usePrivateReportQuery({scope,key:["provider-delivery",geography],read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;

@@ -21,7 +21,7 @@ export function ReportGeographyFilter({value,options,onChange,basis,disabled=fal
    })}
   </Select></Field>
   <p id={id} className="text-xs text-muted-foreground" role={loading||error||unavailable?"status":undefined}>
-   {error?"Geography options unavailable. Refresh the report to retry.":loading?"Loading authorized geography…":unavailable?"This selection is unavailable. Choose another geography.":basis==="historical"?"Site geography recorded at registration; not participant residence.":"Current Site geography; not a historical or participant location."}
+   {error?"Geography options unavailable. Refresh the report to retry.":loading?"Loading authorized geography…":unavailable?"This selection is unavailable. Choose another geography.":basis==="historical"?"Site geography recorded at registration; earlier unrecorded geography remains unknown. Not participant residence.":"Current Site geography; not a historical or participant location."}
   </p>
  </div>;
 }

@@ -1,3 +1,6 @@
+import {useState} from "react";
+import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
+import {useReportGeography} from "@/hooks/use-report-geography";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
@@ -8,7 +11,9 @@ import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit
  * report requires separate network membership authority and disclosure review. */
 export function NoncreditNetworkReportPanel(){
   const scope=usePrivateReportScope();
-  const {query:report,data}=usePrivateReportQuery({scope,key:["provider-delivery"],read:()=>getNoncreditOperatorNetworkSummary({data:{}})});
+  const [geography,setGeography]=useState("");
+  const options=useReportGeography(scope,"current");
+  const {query:report,data}=usePrivateReportQuery({scope,key:["provider-delivery",geography],read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const totals=data?.totals;
   if(scope===null)return null;
   return <section className="mt-7 border border-border bg-card p-5" aria-label="Noncredit program impact">
@@ -17,6 +22,7 @@ export function NoncreditNetworkReportPanel(){
       Across enrollment releases owned by the current authorized operating organization,
       including authorized Sites. This is not a national cross-organization report.
     </p>
+    <div className="mt-4"><ReportGeographyFilter value={geography} options={options.data??[]} onChange={setGeography} basis="current" loading={options.query.isFetching} error={options.query.isError}/></div>
     {(report.isPending||report.isFetching)&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
     {report.isError&&<p role="alert" className="mt-4 text-sm">
       Reporting is unavailable or its bounded dataset needs partitioning.

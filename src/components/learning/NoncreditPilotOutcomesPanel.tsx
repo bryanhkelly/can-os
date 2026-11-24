@@ -1,5 +1,5 @@
 import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
-import {getReportingGeographyOptions} from "@/modules/geography/reporting-geography.functions";
+import {useReportGeography} from "@/hooks/use-report-geography";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
 import {ReportDateFilter} from "@/components/workspace/report-date-filter";
@@ -20,7 +20,7 @@ export function NoncreditPilotOutcomesPanel(){
   const [showDefinitions,setShowDefinitions]=useState(false);
   const scope=usePrivateReportScope();
   const [geography,setGeography]=useState("");
-  const geographyOptions=usePrivateReportQuery({scope,key:["geography-options","historical"],read:()=>getReportingGeographyOptions({data:{basis:"historical"}})});
+  const geographyOptions=useReportGeography(scope,"historical");
   const [range,setRange]=useState(()=>previousCompleteUtcDays(90,new Date()));
   const [rolling,setRolling]=useState(true);
   const period=rolling?null:resolveReportDateRange(range,366,new Date());

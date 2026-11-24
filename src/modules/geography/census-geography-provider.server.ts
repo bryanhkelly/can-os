@@ -8,6 +8,7 @@ export interface GeographyProvider {
 type Row=Record<string,unknown>;
 const object=(value:unknown):Row=>value!==null&&typeof value==="object"&&!Array.isArray(value)?value as Row:{};
 const string=(value:unknown)=>typeof value==="string"?value:"";
+export const CENSUS_GEOGRAPHY_YEAR=2024;
 const layers:readonly [string,GeographyKind,string,RegExp][]=[
   ["Counties","county","COUNTY",/^\d{5}$/],
   ["Census Tracts","tract","TRACT",/^\d{11}$/],
@@ -63,7 +64,7 @@ export function parseCensusGeography(raw:unknown,address:PhysicalSiteAddress):Ge
   const markets=areas.filter(a=>a.kind==="metro"||a.kind==="micro");
   if(markets.length>1)throw new Error("geography_provider_ambiguous_market");
   // An omitted layer is not evidence that a point lies outside a market.
-  const complete=Array.isArray(geo["Metropolitan Statistical Areas"])&&Array.isArray(geo["Micropolitan Statistical Areas"]);
+  const complete=["Metropolitan Statistical Areas","Micropolitan Statistical Areas"].every(key=>Array.isArray(geo[key])&&(geo[key] as unknown[]).length===0);
   return {source:"us-census-geocoder",benchmark,vintage,latitude,longitude,areas,
     marketStatus:markets[0]?.kind==="metro"?"metro":markets[0]?.kind==="micro"?"micro":complete?"outside_market":"unknown"};
 }
@@ -78,6 +79,17 @@ export function parseCommunityProfile(raw:unknown,area:GeographicAreaFact,year:n
   }])) as CommunityProfile["indicators"];
   return {areaCode:area.code,source:"acs5",year,indicators};
 }
+/** Explicit successful empty TIGERweb responses establish absence; omitted geocoder layers do not. */
+export function parseTigerMarket(raw:unknown,kind:"metro"|"micro"):GeographicAreaFact[]{
+  const result=object(raw);
+  if(result.error||result.exceededTransferLimit||!Array.isArray(result.features)||result.features.length>1)
+    throw new Error("geography_market_boundary_invalid_response");
+  return result.features.map(feature=>{
+    const row=object(object(feature).attributes),id=string(row.GEOID),name=string(row.NAME).trim();
+    if(!/^\d{5}$/.test(id)||!name||name.length>200)throw new Error("geography_market_boundary_invalid_feature");
+    return {code:"US-CBSA-"+id,name,kind,sourceId:id};
+  });
+}
 export function createCensusGeographyProvider(options:{fetcher?:typeof fetch;apiKey?:string}={}):GeographyProvider {
   const fetcher=options.fetcher??fetch;
   async function json(url:URL){
@@ -85,13 +97,32 @@ export function createCensusGeographyProvider(options:{fetcher?:typeof fetch;api
     if(!response.ok)throw new Error("geography_provider_unavailable");
     return response.json() as Promise<unknown>;
   }
+  async function boundaryMarket(result:GeographicResolution,kind:"metro"|"micro"){
+    const layer=kind==="metro"?93:91;
+    const url=new URL("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS"+CENSUS_GEOGRAPHY_YEAR+"/MapServer/"+layer+"/query");
+    url.search=new URLSearchParams({where:"1=1",geometry:result.longitude+","+result.latitude,
+      geometryType:"esriGeometryPoint",inSR:"4326",spatialRel:"esriSpatialRelIntersects",
+      outFields:"GEOID,NAME",returnGeometry:"false",f:"json"}).toString();
+    return parseTigerMarket(await json(url),kind);
+  }
   return {
     async resolve(address){
       if(address.country!=="US"||/^\s*(?:p\.?\s*o\.?\s*box|post office box)\b/i.test(address.street1))return null;
       const url=new URL("https://geocoding.geo.census.gov/geocoder/geographies/address");
       url.search=new URLSearchParams({street:address.street1,city:address.city,state:address.state,zip:address.postalCode.slice(0,5),
-        benchmark:"Public_AR_Current",vintage:"ACS2024_Current",layers:"all",format:"json"}).toString();
-      return parseCensusGeography(await json(url),address);
+        benchmark:"Public_AR_Current",vintage:"ACS"+CENSUS_GEOGRAPHY_YEAR+"_Current",layers:"all",format:"json"}).toString();
+      const result=parseCensusGeography(await json(url),address);
+      if(!result)return null;
+      if(result.benchmark!=="4"||result.vintage!==String(400+CENSUS_GEOGRAPHY_YEAR-2000))
+        throw new Error("geography_provider_unexpected_vintage");
+      if(result.marketStatus!=="unknown")return result;
+      // Geocoder can omit empty layers. Resolve only against pinned boundary
+      // polygons, never the closest city, ZIP centroid or current live vintage.
+      const [metro,micro]=await Promise.all([boundaryMarket(result,"metro"),boundaryMarket(result,"micro")]);
+      const markets=[...metro,...micro];
+      if(markets.length>1)throw new Error("geography_provider_ambiguous_market");
+      return {...result,areas:[...result.areas,...markets],
+        marketStatus:markets[0]?.kind==="metro"?"metro":markets[0]?.kind==="micro"?"micro":"outside_market"};
     },
     async communityProfile(area,year){
       if(!options.apiKey)return null;

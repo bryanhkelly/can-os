@@ -1,8 +1,8 @@
 import {describe,expect,it,vi} from "vitest";
-import {parseCensusGeography,createCensusGeographyProvider,parseCommunityProfile} from "@/modules/geography/census-geography-provider.server";
+import {parseCensusGeography,createCensusGeographyProvider,parseCommunityProfile,parseTigerMarket} from "@/modules/geography/census-geography-provider.server";
 import {censusEstimate,marketArea,communityArea} from "@/domain/geographic-intelligence";
 const address={country:"US",state:"GA",postalCode:"30060",city:"Marietta",street1:"100 Example Street"};
-const payload=(geographies:Record<string,unknown>)=>({result:{input:{benchmark:{id:"4"},vintage:{id:"420"}},addressMatches:[{
+const payload=(geographies:Record<string,unknown>)=>({result:{input:{benchmark:{id:"4"},vintage:{id:"424"}},addressMatches:[{
   coordinates:{x:-84.5,y:33.9},addressComponents:{state:"GA",zip:"30060"},geographies:{States:[{GEOID:"13",NAME:"Georgia"}],Counties:[{GEOID:"13067",NAME:"Cobb County"}],...geographies}
 }]}});
 describe("Geographic intelligence",()=>{
@@ -25,6 +25,27 @@ describe("Geographic intelligence",()=>{
   const profile=parseCommunityProfile([["state","county","B01003_001E","B01003_001M"],["13","067","100","5"]],area,2024);
   expect(profile?.indicators.population).toEqual({variable:"B01003_001",estimate:100,marginOfError:5});
   expect(profile?.indicators.medianHouseholdIncome.estimate).toBeNull();expect(censusEstimate("-666666666")).toBeNull();
+ });
+ it("uses pinned market boundaries when empty layers are omitted",async()=>{
+  const fetcher=vi.fn<typeof fetch>()
+   .mockResolvedValueOnce(new Response(JSON.stringify(payload({}))))
+   .mockResolvedValueOnce(new Response(JSON.stringify({features:[{attributes:{GEOID:"12060",NAME:"Atlanta Metro"}}]})))
+   .mockResolvedValueOnce(new Response(JSON.stringify({features:[]})));
+  const result=await createCensusGeographyProvider({fetcher}).resolve(address);
+  expect(result?.marketStatus).toBe("metro");
+  expect(result?.areas.find(a=>a.kind==="metro")?.code).toBe("US-CBSA-12060");
+  expect(String(fetcher.mock.calls[1]?.[0])).toContain("tigerWMS_ACS2024/MapServer/93/query");
+  expect(String(fetcher.mock.calls[2]?.[0])).toContain("tigerWMS_ACS2024/MapServer/91/query");
+ });
+ it("requires two successful empty boundary responses for outside-market classification",async()=>{
+  const fetcher=vi.fn<typeof fetch>()
+   .mockResolvedValueOnce(new Response(JSON.stringify(payload({}))))
+   .mockResolvedValueOnce(new Response(JSON.stringify({features:[]})))
+   .mockResolvedValueOnce(new Response(JSON.stringify({features:[]})));
+  expect((await createCensusGeographyProvider({fetcher}).resolve(address))?.marketStatus).toBe("outside_market");
+  expect(()=>parseTigerMarket({error:{code:500}},"metro")).toThrow();
+  expect(()=>parseTigerMarket({features:[{attributes:{GEOID:"bad",NAME:"Unknown"}}]},"metro")).toThrow();
+  expect(parseCensusGeography(payload({"Metropolitan Statistical Areas":[{}],"Micropolitan Statistical Areas":[]}),address)?.marketStatus).toBe("unknown");
  });
  it("does not send PO boxes or call ACS without a configured key",async()=>{
   const fetcher=vi.fn<typeof fetch>();const provider=createCensusGeographyProvider({fetcher});
