@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNotice } from "@/components/workspace";
+import { DisclosureSection, WorkspaceNotice } from "@/components/workspace";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import {
   isChurchSiteIdentityV61, isFaithBasedSiteIdentityV61, siteIdentityEditorialContextV61,
@@ -195,28 +195,19 @@ export function WebsiteSiteContentStep({
     {canReuse&&data.editingContent?.contentReuseConsent!=="granted"&&onSavePrivateDraft&&<WorkspaceNotice tone="info"><p>Save your private website draft to record your content reuse choice before using Gloo. Nothing will be published.</p><Button type="button" variant="outline" size="sm" className="mt-2" disabled={busy||!data.canEdit||!data.draftStorageReady} onClick={onSavePrivateDraft}>Save private draft</Button></WorkspaceNotice>}
     {canReuse&&<SiteIntelligenceContentPanel key={data.siteId+":website:"+data.currentRevision} siteId={data.siteId} target="website" disabled={busy||!data.canEdit} onApply={draft=>{if(draft.website)setContent(old=>({...old,...draft.website,...(draft.websiteComposition&&!old.websiteComposition?{websiteComposition:draft.websiteComposition}:{})}));}}/>}
     {primaryFields.map(renderField)}
-    {canReuse&&churchSite&&<details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">
-        Suggested text (optional)
-      </summary>
-      <div className="mt-4">
-        <ChurchSourceSuggestionReview currentRevision={data.currentRevision}/>
-      </div>
-    </details>}
-    <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Leadership and local traditions (optional)</summary>
-      <div className="mt-4 space-y-5">{additionalFields.map(renderField)}</div>
-    </details>
-    {showFaithFields&&<details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">
-        {faithBased ? (churchSite ? "Your church and faith information" : "Faith and values (optional)") : "Previously saved faith information"}
-      </summary>
+    {canReuse&&churchSite&&<DisclosureSection title="Suggested text (optional)">
+      <ChurchSourceSuggestionReview currentRevision={data.currentRevision}/>
+    </DisclosureSection>}
+    <DisclosureSection title="Leadership and local traditions (optional)">
+      <div className="space-y-5">{additionalFields.map(renderField)}</div>
+    </DisclosureSection>
+    {showFaithFields&&<DisclosureSection title={faithBased ? (churchSite ? "Your church and faith information" : "Faith and values (optional)") : "Previously saved faith information"}>
       <p className="mt-2 text-xs text-muted-foreground">
         {faithBased ? "Use only descriptions that reflect your Site. Formal affiliations are reviewed separately."
           : "These earlier answers are preserved so you can review, edit or clear them after changing Site identity."}
       </p>
       <div className="mt-4 space-y-5">{faithFields.map(renderField)}</div>
-    </details>}
+    </DisclosureSection>}
     <WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>
     <p className="text-xs text-muted-foreground">Your website pages and sections are prepared from your Site information and evolve with your approved learning opportunities.</p>
   </div>;
