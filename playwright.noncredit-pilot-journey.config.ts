@@ -19,7 +19,7 @@ if(!env.CAN_PILOT_QA_FIXTURE_JSON||!env.CAN_PILOT_QA_LEARNER_SESSION||
 const git=(...args:string[])=>execFileSync("git",args,{encoding:"utf8"}).trim();
 if(git("status","--porcelain")||git("rev-parse","HEAD")!==env.CAN_RELEASE_SOURCE_SHA)
   throw new Error("Use a clean checkout pinned to CAN_RELEASE_SOURCE_SHA");
-execFileSync(process.execPath,["scripts/verify-admissions-neon-branch.mjs"],{
+execFileSync(process.execPath,["scripts/acceptance/check-noncredit-full-journey-fixture.mjs"],{
   stdio:"inherit",env:{...env,CAN_ADMISSIONS_TEST_BRANCH_ID:branch},
 });
 
