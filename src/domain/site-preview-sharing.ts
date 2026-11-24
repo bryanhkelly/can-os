@@ -79,6 +79,7 @@ export function renderSharedSitePreview(
   storedHtml: string, siteId: string, token: string,
   availablePages: readonly string[],
   _synthetic = false,
+  goCode?: string,
 ): string {
   const known = new Set(availablePages.filter(isPublicSitePagePath));
   const rewritten = storedHtml.replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, "")
@@ -86,6 +87,7 @@ export function renderSharedSitePreview(
       if (target.startsWith("#")) return `${prefix}href="${target}"`;
       if (!isPublicSitePagePath(target) || !known.has(target))
         return `${prefix}href="#" aria-disabled="true" tabindex="-1"`;
+      if(goCode) return `${prefix}href="/go/${goCode}?${new URLSearchParams({page:target}).toString()}"`;
       const params = new URLSearchParams({ siteId, token, page: target });
       return `${prefix}href="/site-preview-share?${params.toString().replaceAll("&", "&amp;")}"`;
     });
