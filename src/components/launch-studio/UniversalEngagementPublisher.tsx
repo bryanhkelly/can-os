@@ -1,3 +1,4 @@
+import { Field } from "@/components/ui/field";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
 import { OwnerEngagementDestinationPicker, type OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { useState } from "react";
@@ -112,64 +113,64 @@ export function UniversalEngagementPublisher({
     description="Publish a reusable invitation or opportunity experience, then generate channel-specific Go Links. No application, employment, partnership or enrollment is created here.">
     {!published ? <>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-1 text-sm font-semibold">Business domain
+        <Field label="Business domain">
           <Select value={domain} onChange={event=>setDomain(event.target.value as typeof domain)}>
             {engagementDomains.map(value=><option key={value} value={value}>{labels(value)}</option>)}
           </Select>
-        </label>
-        <label className="grid gap-1 text-sm font-semibold">Intended audience
+        </Field>
+        <Field label="Intended audience">
           <Select value={audience} onChange={event=>setAudience(event.target.value as typeof audience)}>
             {engagementAudienceKinds.map(value=><option key={value} value={value}>{labels(value)}</option>)}
           </Select>
-        </label>
-        <label className="grid gap-1 text-sm font-semibold">Subject type
+        </Field>
+        <Field label="Subject type">
           <Select value={subjectKind} onChange={event=>setSubjectKind(event.target.value as typeof subjectKind)}>
             {engagementSubjectKinds.map(value=><option key={value} value={value}>{labels(value)}</option>)}
           </Select>
-        </label>
-        <label className="grid gap-1 text-sm font-semibold">Requested interaction
+        </Field>
+        <Field label="Requested interaction">
           <Select value={interaction} onChange={event=>setInteraction(event.target.value as typeof interaction)}>
             {engagementInteractions.map(value=><option key={value} value={value}>{labels(value)}</option>)}
           </Select>
-        </label>
+        </Field>
       </div>
       <div className="mt-4 grid gap-3">
-        <label className="grid gap-1 text-sm font-semibold">Subject name
+        <Field label="Subject name">
           <Input value={subjectLabel} maxLength={160} placeholder="Digital Skills Community Program"
             onChange={event=>setSubjectLabel(event.target.value)}/>
-        </label>
-        <label className="grid gap-1 text-sm font-semibold">Headline
+        </Field>
+        <Field label="Headline">
           <Input value={headline} maxLength={160} placeholder="You're invited to explore digital learning"
             onChange={event=>setHeadline(event.target.value)}/>
-        </label>
-        <label className="grid gap-1 text-sm font-semibold">Short introduction
+        </Field>
+        <Field label="Short introduction">
           <Textarea rows={3} value={summary} maxLength={1200} onChange={event=>setSummary(event.target.value)}/>
-        </label>
-        <label className="grid gap-1 text-sm font-semibold">Optional detail
+        </Field>
+        <Field label="Optional detail">
           <Textarea rows={3} value={detail} maxLength={3000} onChange={event=>setDetail(event.target.value)}/>
-        </label>
+        </Field>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1 text-sm font-semibold">Visitor experience
+        <Field label="Visitor experience">
           <Select value={execution} onChange={event=>setExecution(event.target.value as typeof execution)}>
             <option value="page">Render a branded invitation page</option>
             <option value="redirect">Go directly to an existing destination</option>
           </Select>
-        </label>
-        {execution==="page"&&<label className="grid gap-1 text-sm font-semibold">Page template
+        </Field>
+        {execution==="page"&&<Field label="Page template">
           <Select value={template} onChange={event=>setTemplate(event.target.value as typeof template)}>
             <option value="information">Information</option>
             <option value="invitation">Invitation</option>
             <option value="opportunity">Opportunity</option>
           </Select>
-        </label>}
+        </Field>}
         <div className="sm:col-span-2">
           {ownerSurface?<OwnerEngagementDestinationPicker surface={ownerSurface} value={target} onChange={setTarget} disabled={busy}/>:siteId?<GovernedGoDestinationPicker siteId={siteId} packageId={packageId}
             value={target} onChange={setTarget} disabled={busy}/>:null}
         </div>
-        {execution==="page"&&<label className="grid gap-1 text-sm font-semibold">Button label
+        {execution==="page"&&<Field label="Button label">
           <Input maxLength={80} value={actionLabel} onChange={event=>setActionLabel(event.target.value)}/>
-        </label>}
+        </Field>}
       </div>
       {!actionSupported&&<p role="status" className="mt-3 text-sm text-muted-foreground">
         This destination cannot complete the selected interaction. Use Discover or Respond for informational journeys; Register requires an eligible training release or enrichment Season. Application, payment, agreement and verified resume integrations are not yet available.
@@ -182,12 +183,12 @@ export function UniversalEngagementPublisher({
       <p className="mt-4 text-sm font-medium">Published engagement version {published.version}</p>
       <p className="mt-1 text-xs text-muted-foreground">The public experience content cannot be changed in this version. New Go Links can be issued or revoked.</p>
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="grid gap-1 text-sm font-semibold">Distribution channel
+        <Field label="Distribution channel">
           <Select value={channel} onChange={event=>setChannel(event.target.value as typeof channel)}>
             {(["web","email","sms","qr","social","partner","other"] as const).map(c=>
               <option key={c} value={c}>{labels(c)}</option>)}
           </Select>
-        </label>
+        </Field>
         <Button disabled={busy} type="button" onClick={()=>void createLink()}>
           {busy?"Working…":"Create Go Link"}
         </Button>
