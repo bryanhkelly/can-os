@@ -1,3 +1,4 @@
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -115,7 +116,7 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
     if(!existing?.active)throw new Error("CAN account Person is not active");
   }else{
     const [created] = await tx.insert(people).values({
-      legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
+      legalFirstName: signup.firstName, legalLastName: signup.lastName, email, domain: identityEmailDomain(email),
       metadata: {
         origin: approval==="demo_code"?"demo_personal_signup":"verified_email_personal_signup",
         nameEvidence: "self_declared",
