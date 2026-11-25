@@ -11,7 +11,7 @@ import {
 import { cancelChurchOnboardingRequest, requestChurchOnboardingEvidence, resendChurchEvidenceNotice } from "@/modules/networks/church-applications.functions";
 
 type Applications = Awaited<ReturnType<typeof listChurchOnboardingRequests>>;
-const field = "mt-1 w-full  border bg-background p-2 text-sm";
+const field = "mt-1";
 
 export function ChurchApplicationsDesk() {
   const [applications, setApplications] = useState<Applications>([]);
@@ -131,9 +131,8 @@ export function ChurchApplicationsDesk() {
                 {label}
               </Label>)}
             </fieldset>
-            <Button variant="ghost" type="button" disabled={!!working||!request.authorityEvidence?.usable||!checklistComplete(request.id)}
-              onClick={()=>void act(request.id,"approve")}
-              className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+            <Button type="button" disabled={!!working||!request.authorityEvidence?.usable||!checklistComplete(request.id)}
+              onClick={()=>void act(request.id,"approve")}>
               Approve and invite church leader
             </Button>
           </div>}
