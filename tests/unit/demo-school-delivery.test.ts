@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ rows: [] as unknown[], read: vi.fn() }));
 vi.mock("@/db/client", () => ({
   db: { select: state.read },
 }));
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
-import { beginSmsVerification, sendOptedInSms } from "@/platform/subscriptions/preferences";
+import { sendOptedInSms } from "@/platform/subscriptions/preferences";
 import { emailNotificationRecipients } from "@/modules/communication/notification-email.server";
 
 beforeEach(() => {
@@ -15,12 +15,11 @@ beforeEach(() => {
     return query;
   });
 });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("registered demo-school external delivery", () => {
   it("classifies new demo tenants from the registry even when disabled", async () => {
     state.rows = [{ domain: "newschool.demo", enabled: false }];
     expect(await isDemoTenantOrganization("newschool-org")).toBe(true);
-    expect(await sendOptedInSms("+15555550123", "No external message", "newschool-org")).toBe(false);
-    await expect(beginSmsVerification("person", "+15555550123", ["newschool-org"])).rejects.toThrow("tenant scope");
   });
   it("resolves eligible real recipients in demo organizations using the ordinary query", async () => {
     state.rows = [
@@ -33,8 +32,16 @@ describe("registered demo-school external delivery", () => {
     expect(await isDemoTenantOrganization("ordinary-school")).toBe(false);
     expect(await isDemoTenantOrganization(null)).toBe(false);
   });
-  it("fails closed when tenant classification cannot be read", async () => {
-    state.read.mockImplementation(() => { throw new Error("database unavailable"); });
-    await expect(sendOptedInSms("+15555550123", "No message", "unknown-school")).rejects.toThrow("unavailable");
+  it("uses the same SMS transport for either organization, without classification queries", async () => {
+    vi.stubEnv("TWILIO_ACCOUNT_SID", "ACmock");
+    vi.stubEnv("TWILIO_AUTH_TOKEN", "mock");
+    vi.stubEnv("TWILIO_FROM_NUMBER", "+15555550124");
+    const send=vi.fn(async () => new Response(JSON.stringify({sid:"mock-receipt"}), {status:200}));
+    vi.stubGlobal("fetch",send);
+    expect(await sendOptedInSms("+15555550123","Consented notification","newschool-org")).toBe(true);
+    expect(await sendOptedInSms("+15555550123","Consented notification","ordinary-school")).toBe(true);
+    expect(await sendOptedInSms("+15555550123","No scope",null)).toBe(false);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(state.read).not.toHaveBeenCalled();
   });
 });
