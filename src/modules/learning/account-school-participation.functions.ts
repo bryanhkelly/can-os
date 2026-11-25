@@ -148,6 +148,18 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         .leftJoin(s.sites,eq(s.sites.id,s.sections.siteId))
         .where(and(
           eq(s.enrollments.kind,"section"),
+          // A verified cutover link replaces the legacy display record only for
+          // a direct Student whose matching native enrollment is in this same
+          // authorized scope. Guardian and legacy-only history stays visible.
+          directStudent?sql`NOT EXISTS (
+            SELECT 1 FROM public.academic_enrollment_cutover_links link
+            JOIN public.class_enrollments ce ON ce.id=link.class_enrollment_id
+            JOIN public.classes c ON c.id=ce.class_id
+            WHERE link.legacy_enrollment_id=${s.enrollments.id}
+              AND ce.learner_person_id=${directStudent.personId}::uuid
+              AND c.site_id=${directStudent.siteId}::uuid
+              AND c.operating_organization_id=${directStudent.organizationId}::uuid
+          )`:undefined,
           // The Section owns the Program linkage. Historical Enrollment rows
           // may predate the redundant enrollment.program_id backfill.
           inArray(s.enrollments.studentProfileId,[...profiles.keys()]),
