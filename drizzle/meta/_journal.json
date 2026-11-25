@@ -932,6 +932,13 @@
       "when": 1795462026000,
       "tag": "0132_session_authentication_provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1795462027000,
+      "tag": "0133_restricted_staff_credential_parity",
+      "breakpoints": true
     }
   ]
 }
