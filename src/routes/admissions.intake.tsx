@@ -70,7 +70,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const [interactive,setInteractive]=useState(false);
  useEffect(()=>setInteractive(true),[]);
  const busy=mutation.pending||mutation.refreshFailed||!interactive;
- async function perform(fn:()=>Promise<unknown>,message:string,refresh?:()=>Promise<unknown>){
+ async function perform<T>(fn:()=>Promise<T>,message:string|((value:T)=>string),refresh?:()=>Promise<unknown>){
   await mutation.run(fn,{successMessage:message,commandErrorMessage:"Unable to save",refresh});
  }
  const onVerify=(applicationId:string,verification:GuardianVerification)=>{
