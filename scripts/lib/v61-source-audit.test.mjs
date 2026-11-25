@@ -223,3 +223,32 @@ test("the build and release share the same theme contract", () => {
   assert.equal(inspectV61ThemeTokens(css.replace('"DM Sans"', '"Arial"')).fontSans, false);
   assert.equal(inspectV61ThemeTokens(css.replace("--color-danger: var(--danger);", "")).semanticDanger, false);
 });
+
+
+test("canonical appearance ownership follows imported aliases and conditional classes", () => {
+  const source = [
+    'import { Button as Action } from "@/components/ui/button";',
+    'import { Input } from "@/components/ui/input";',
+    'const field = "mt-1 border bg-background p-2";',
+    'export const Page = () => <div><Action className={cn("w-full", active && "hover:bg-primary", active ? "px-4" : "mt-2")}/><Input className={field}/></div>;',
+  ].join("\n");
+  const audit = analyzeSource(source, "/demo/src/routes/example.tsx");
+  assert.deepEqual(audit.appearance.map(issue => issue.utility).sort(),
+    ["bg-background", "border", "hover:bg-primary", "p-2", "px-4"]);
+});
+test("layout composition and feature-local names are not appearance violations", () => {
+  const source = [
+    'import { Button } from "@/components/ui/button";',
+    'import { Input } from "./custom-input";',
+    'export const Page = () => <div><Button className="mt-2 w-full min-w-0 flex-1 whitespace-normal text-left"/><Input className="bg-background"/></div>;',
+  ].join("\n");
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/example.tsx").appearance, []);
+});
+test("appearance violations block the absolute source gate", () => temp(({root, write}) => {
+  write("src/routes/page.tsx", 'import { Button } from "@/components/ui/button"; export const Page = () => <Button className="bg-red-500"/>;');
+  write("src/components/ui/button.tsx", 'export const Button = () => <button className="bg-primary"/>;');
+  const violations = collectV61SourceViolations(createInventory(root));
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0].kind, "control-appearance");
+  assert.equal(violations[0].detail, "Button: bg-red-500");
+}));
