@@ -127,9 +127,11 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
         },
       });
       setNotice(!result.pending
-        ? `${values.email} already has an active grant; no new invitation was sent.`
+        ? "demoAccess" in result && result.demoAccess
+          ? `Access is approved for ${values.email}. No email is sent. Use the account’s current credential or contact the Platform Owner for secure enrollment.`
+          : `${values.email} already has an active grant; no new invitation was sent.`
         : "demoAccess" in result && result.demoAccess
-          ? `Demo invitation recorded for ${values.email}. Sign in with code 000000 to accept the exact-school role; no email is sent.`
+          ? `Invitation recorded for ${values.email}. No email is sent to this address. Use the current account credential or contact the Platform Owner.`
         : result.emailSent
           ? `Invitation submitted to the email provider for ${values.email}. Their exact-site role stays inactive until they accept the secure link.`
           : `Invitation recorded for ${values.email}, but email delivery was not confirmed. Retry the same invitation; no duplicate grant will be created.`);
@@ -171,7 +173,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
         {notice && <WorkspaceNotice className="mt-8">{notice}</WorkspaceNotice>}
 
         {mode==="invite"&&<WorkspacePanel id="invite-staff" title="Invitation details" className="mt-8">
-          <p className="mt-1 text-sm text-muted-foreground">Create the person and an inactive exact-Site grant, then email the canonical secure access link. Accepting it establishes the intended local identity and role.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Create or reuse a Person and issue an exact-Site invitation. Email recipients accept through a secure access link; approved non-deliverable addresses use their current account credential.</p>
            <p className="mt-1 text-xs text-muted-foreground">Onsite safeguarding roles are site-bound. Restricted intake is implemented but has not completed legal review or operational acceptance; continue to use approved external reporting and emergency procedures.</p>
           <Form {...form}>
             <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit(submitInvite)}>
@@ -193,7 +195,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                     </Select>
                   </FormControl>
                   {field.value === "site_website_editor" && <p className="mt-2 text-xs text-muted-foreground">
-                    After secure email acceptance, this publisher can edit only church-owned website copy,
+                    After account approval, this publisher can edit only church-owned website copy,
                     branding and approved artwork at the selected Site. It grants no registrar, student-record,
                     academic approval, institutional publication or administrator access.
                   </p>}
@@ -258,7 +260,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 needs_action:"Accepted · needs qualifications",inactive:"Inactive",
               }[grant.onboarding.status])},
               {id:"next",title:"Still needs action",render:({grant})=>({
-                accept_invitation:"Recipient accepts email link",
+                accept_invitation:"Recipient completes account approval",
                 submit_qualifications:"Staff submit screening and training",
                 await_qualification_review:"Independent qualification review or current evidence",
                 restore_access:"Access is disabled",
