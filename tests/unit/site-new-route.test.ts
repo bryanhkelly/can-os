@@ -11,7 +11,7 @@ vi.mock("@tanstack/react-router", () => ({
     return {};
   },
 }));
-vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestSchoolSetupAccess: state.signup }));
+vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestSiteSignup: state.signup }));
 vi.mock("@/modules/identity/anonymous-auth-admission.server", () => ({
   admitAnonymousAuthRequest: state.admission,
   anonymousAuthAdmissionResponse: (value: { allowed: boolean }) => value.allowed ? null :
@@ -20,7 +20,7 @@ vi.mock("@/modules/identity/anonymous-auth-admission.server", () => ({
 import "@/routes/site.new";
 
 const input = { name: "Valor Learning Center", organizationName: "Grace Community Church",
-  organizationType: "other_partner",
+  organizationType: "other_partner", organizationDomain: "gracechurch.org",
   firstName: "Alex", lastName: "Leader", email: "admin@example.org" };
 function request(body: unknown, origin = "https://example.org") {
   return new Request("https://example.org/site/new", { method: "POST",
@@ -45,6 +45,16 @@ describe("/site/new signup boundary", () => {
     expect((await state.post!({ request: request(data) })).status).toBe(202);
     expect(state.signup).toHaveBeenCalledWith(data);
   });
+  it("rejects malformed domains and shared-code bootstrap of a real organization", async () => {
+    expect((await state.post!({ request: request({ ...input, organizationDomain: "https://gracechurch.org" }) })).status).toBe(400);
+    expect((await state.post!({ request: request({ ...input, email: "admin@grace.demo" }) })).status).toBe(400);
+    expect(state.signup).not.toHaveBeenCalled();
+  });
+  it("accepts a verified-email administrator for a demo organization", async () => {
+    const data = { ...input, organizationDomain: "grace.demo" };
+    expect((await state.post!({ request: request(data) })).status).toBe(202);
+    expect(state.signup).toHaveBeenCalledWith(data);
+  });
   it("rejects CAN-owned network classification from public signup", async () => {
     expect((await state.post!({ request: request({ ...input, organizationType: "can_network" }) })).status).toBe(400);
     expect(state.signup).not.toHaveBeenCalled();
@@ -61,10 +71,10 @@ describe("/site/new signup boundary", () => {
     expect((await state.post!({ request: request(input) })).status).toBe(429);
     expect(state.signup).not.toHaveBeenCalled();
   });
-  it("does not disclose delivery or account eligibility on sender failures", async () => {
+  it("returns a generic setup error if the provisioning service throws", async () => {
     state.signup.mockRejectedValue(new Error("sender unavailable"));
     const response = await state.post!({ request: request(input) });
-    expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ accepted: true });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: expect.any(String) });
   });
 });
