@@ -1,4 +1,5 @@
 import { AuthorizationError, type CommandContext } from "./command-context";
+import { hasValidAccessGrantScope } from "./access-grant-scope";
 
 /** Claims are resolved from verified DB rows, never from caller-provided roles. */
 export type VerifiedAccessGrant = {
@@ -99,11 +100,9 @@ export function assertSingleAccountPerson(
 export function resolveAccessContext(principal: SessionPrincipal, grants: readonly VerifiedAccessGrant[]): AccessContext {
  const grant = grants.find(g => g.id === principal.activeGrantId && g.accountId === principal.accountId && g.active);
  if (!grant || !Object.hasOwn(roleCapabilities,grant.role)) throw new AuthorizationError("active membership");
- // A personal login must never be reinterpreted as site-wide access even if
- // a malformed database row is later introduced.
- if ((grant.role === "account_holder" || grant.role === "app_admin" || grant.role === "platform_owner") &&
-     (grant.organizationId !== null || grant.siteId !== null))
-  throw new AuthorizationError("account-only scope");
+ // Never project capabilities for malformed membership scope.
+ if (!grant.personId?.trim() || !hasValidAccessGrantScope(grant))
+  throw new AuthorizationError("valid active membership scope");
  return {
   accountId: principal.accountId,
   sessionId: principal.sessionId,
@@ -119,7 +118,8 @@ export function resolveAccessContext(principal: SessionPrincipal, grants: readon
  };
 }
 export function assertGrantSelection(accountId: string, proposedGrantId: string, grants: readonly VerifiedAccessGrant[]): void {
- if (!grants.some(g => g.accountId === accountId && g.id === proposedGrantId && g.active && Object.hasOwn(roleCapabilities,g.role))) {
+ if (!grants.some(g => g.accountId === accountId && g.id === proposedGrantId && g.active && Object.hasOwn(roleCapabilities,g.role) &&
+    !!g.personId?.trim() && hasValidAccessGrantScope(g))) {
   throw new AuthorizationError("active membership");
  }
 }

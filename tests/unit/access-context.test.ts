@@ -116,6 +116,27 @@ describe("provider-independent authorization context",()=>{
   expect(()=>assertGrantSelection("account-1","grant-1",[{...grant,role:"toString"}])).toThrow();
   expect(()=>resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},[{...grant,role:"toString"}])).toThrow();
  });
+ it("rejects malformed membership scope during both selection and resolution",()=>{
+  const principal={accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"};
+  for(const invalid of [
+   {...grant,organizationId:null,siteId:null},
+   {...grant,organizationId:null},
+   {...grant,organizationId:" "},
+   {...grant,siteId:" "},
+   {...grant,personId:" "},
+   ...["account_holder","app_admin","platform_owner"].map(role=>({...grant,role})),
+  ]){
+   expect(()=>resolveAccessContext(principal,[invalid])).toThrow();
+   expect(()=>assertGrantSelection(principal.accountId,invalid.id,[invalid])).toThrow();
+  }
+  for(const role of ["account_holder","app_admin","platform_owner"]){
+   const valid={...grant,role,organizationId:null,siteId:null};
+   expect(()=>assertGrantSelection(principal.accountId,valid.id,[valid])).not.toThrow();
+   expect(resolveAccessContext(principal,[valid]).scope.organizationIds).toEqual([]);
+  }
+  const institutional={...grant,siteId:null};
+  expect(resolveAccessContext(principal,[institutional]).scope.organizationIds).toEqual(["org-1"]);
+ });
  it("rejects inactive or arbitrary role grants",()=>{
   expect(()=>assertGrantSelection("account-1","grant-1",[{...grant,active:false}])).toThrow();
   expect(()=>resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},[{...grant,role:"superadmin"}])).toThrow();

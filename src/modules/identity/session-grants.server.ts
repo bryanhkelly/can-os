@@ -5,6 +5,7 @@ import {
   people, programs, publicFamilyStartRequests,
 } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
+import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { EventTypes } from "@/domain/event-types";
 import { matchesVerifiedExternalSandboxInvitation } from "@/domain/sandbox-external-invitation";
 import { matchesDemoSchoolAdministrator } from "@/domain/school-setup";
@@ -119,7 +120,8 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
     ));
   return rows.filter(row =>
     row.accountId !== LOCAL_DEMO_ADMIN.accountId &&
-    row.personId !== LOCAL_DEMO_ADMIN.personId);
+    row.personId !== LOCAL_DEMO_ADMIN.personId &&
+    hasValidAccessGrantScope(row));
 }
 
 /** Resolve only current account grants or the separately provisioned demo-admin switch list. */
@@ -130,9 +132,7 @@ export async function readSessionGrants(accountId: string, email: string, reader
   const adminAccount =
     accountId === LOCAL_DEMO_ADMIN.accountId || normalizedEmail === LOCAL_DEMO_ADMIN.email;
   const ownGrants = (await listActiveAccountGrants(accountId, reader))
-    .filter(grant => grant.accountId === accountId &&
-      (grant.role !== "account_holder" ||
-        (grant.organizationId === null && grant.siteId === null)));
+    .filter(grant => grant.accountId === accountId && hasValidAccessGrantScope(grant));
 
   const valorAccount = LOCAL_DEMO_ACCOUNTS.some(account => account.accountId === accountId) ||
     normalizedEmail.endsWith("@valorschool.demo");
