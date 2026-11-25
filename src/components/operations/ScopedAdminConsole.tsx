@@ -2,7 +2,7 @@
  * V6.1 Launch Studio Prepare. All writes go through the original staff service. */
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { personDisplayName } from "@/domain/person-name";
 import { useEffect, useState } from "react";
@@ -11,7 +11,7 @@ import { z } from "zod";
 import {
   inviteStaffMember, listAccessAccounts, listPeople, listScopedSites, setGrantActive,
 } from "@/modules/identity/admin.functions";
-import { CreateAction, DirectoryTable, WorkspaceShell, QueryState, secondaryActionClassName } from "@/components/workspace";
+import { CreateAction, DirectoryTable, WorkspaceShell, QueryState, WorkspacePanel, WorkspaceNotice, EmptyState, ActionFooter } from "@/components/workspace";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
 import { launchStaffInvitationDefaults } from "@/domain/launch-staff-invitation";
 import { Input } from "@/components/ui/input";
@@ -107,6 +107,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
   }
 
   async function submitInvite(values: z.output<typeof inviteSchema>) {
+    if (busy) return;
     if (lockedSiteId && (values.siteId !== lockedSiteId ||
         !sites.some(site => site.id === lockedSiteId))) {
       setError("This invitation must remain within your current Site.");
@@ -154,7 +155,6 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
     }
   }
 
-  const fieldClass = "mt-2 w-full  border bg-background p-3";
 
   return (
     <WorkspaceShell embedded={hubMode}
@@ -163,14 +163,14 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
       breadcrumbs={!hubMode && mode!=="access"?<Link to="/admin" search={{siteId:selection.siteId}} className="underline">Administration</Link>:undefined}
       actions={!hubMode && <div className="flex flex-wrap gap-2">
         {mode!=="invite"&&<CreateAction><Link to="/admin/invite" search={{siteId:selection.siteId, inviteRole:selection.inviteRole==="registrar" || selection.inviteRole==="site_website_editor" ? selection.inviteRole : undefined}}>Invite staff</Link></CreateAction>}
-        {mode!=="people"&&<Link to="/admin/people" search={{siteId:selection.siteId}} className={secondaryActionClassName}>People directory</Link>}
+        {mode!=="people"&&<Button asChild variant="outline"><Link to="/admin/people" search={{siteId:selection.siteId}}>People directory</Link></Button>}
       </div>}
     >
       <QueryState loading={loading ? "Loading admin console…" : ""} error={authError}>
-        {error && <p className="mt-8  border p-4 text-sm" role="alert">{error}</p>}
-        {notice && <p className="mt-8  border bg-muted p-4 text-sm" role="status">{notice}</p>}
+        {error && <WorkspaceNotice tone="danger" className="mt-8">{error}</WorkspaceNotice>}
+        {notice && <WorkspaceNotice className="mt-8">{notice}</WorkspaceNotice>}
 
-        {mode==="invite"&&<section id="invite-staff" className="mt-8"><h2 className="font-serif text-2xl font-semibold">Invitation details</h2>
+        {mode==="invite"&&<WorkspacePanel id="invite-staff" title="Invitation details" className="mt-8">
           <p className="mt-1 text-sm text-muted-foreground">Create the person and an inactive exact-Site grant, then email the canonical secure access link. Accepting it establishes the intended local identity and role.</p>
            <p className="mt-1 text-xs text-muted-foreground">Onsite safeguarding roles are site-bound. Restricted intake is implemented but has not completed legal review or operational acceptance; continue to use approved external reporting and emergency procedures.</p>
           <Form {...form}>
@@ -179,7 +179,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">Email</FormLabel>
                   <FormControl>
-                    <Input className={fieldClass} type="email" {...field} />
+                    <Input type="email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -188,7 +188,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">Role</FormLabel>
                   <FormControl>
-                    <Select className={`${fieldClass} capitalize`} {...field}>
+                    <Select className="capitalize" {...field}>
                       {roles.map(option => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
                     </Select>
                   </FormControl>
@@ -204,7 +204,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">First name</FormLabel>
                   <FormControl>
-                    <Input className={fieldClass} maxLength={80} {...field} />
+                    <Input maxLength={80} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -213,7 +213,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">Last name</FormLabel>
                   <FormControl>
-                    <Input className={fieldClass} maxLength={80} {...field} />
+                    <Input maxLength={80} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -222,7 +222,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem className="sm:col-span-2">
                   <FormLabel className="text-sm font-semibold">Exact Site (required)</FormLabel>
                   <FormControl>
-                    <Select className={fieldClass} required {...field} disabled={busy || Boolean(lockedSiteId)}>
+                    <Select required {...field} disabled={busy || Boolean(lockedSiteId)}>
                       <option value="">Select a permitted school</option>
                       {sites.filter(site => !lockedSiteId || site.id === lockedSiteId)
                         .map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
@@ -231,24 +231,24 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                   <FormMessage />
                 </FormItem>
               )} />
-              <div className="sm:col-span-2">
-                <Button variant="default" size="lg" type="submit"
+              <ActionFooter layout="form" className="sm:col-span-2">
+                <Button variant="default" size="lg" type="submit" loading={busy} loadingLabel="Inviting…"
                   disabled={busy || Boolean(lockedSiteId && !sites.some(site => site.id === lockedSiteId))}>
-                  {busy ? "Inviting…" : "Invite staff member"}
+                  Invite staff member
                 </Button>
-              </div>
+              </ActionFooter>
             </form>
           </Form>
-        </section>}
+        </WorkspacePanel>}
 
-        {mode==="access"&&<section id="access-accounts" className="mt-8"><h2 className="font-serif text-2xl font-semibold">Staff access and readiness</h2>
+        {mode==="access"&&<WorkspacePanel id="access-accounts" title="Staff access and readiness" className="mt-8">
           <p className="mt-1 text-sm text-muted-foreground">Acceptance and qualification are separate facts. Onsite directors, facilitators and staff submit screening and safeguarding-training evidence through their Profile; an independent reviewer must approve both.</p>
           <DirectoryTable label="Staff access" caption="Account grants in your authorized organizational scope."
             rows={accounts.flatMap(account=>account.grants
               .filter(grant=>!lockedSiteId || grant.siteId===lockedSiteId)
               .map(grant=>({account,grant})))}
             rowKey={row=>row.grant.grantId}
-            empty={<p className="p-4 text-sm text-muted-foreground">No access accounts found in your organization scope.</p>}
+            empty={<EmptyState title="No access accounts found in your organization scope."/>}
             columns={[
               {id:"email",title:"Email",render:({account})=><>{account.email}{account.disabled?" (disabled)":""}</>},
               {id:"person",title:"Person",render:({grant})=>grant.personName},
@@ -268,18 +268,16 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
             rowActions={[{id:"toggle-access",label:({grant})=>grant.active?"Deactivate":"Activate",
               allowed:({grant})=>grant.onboarding.status!=="invited",
               onClick:({grant})=>void toggleGrant(grant.grantId,grant.active)}]}/>
-        </section>}
+        </WorkspacePanel>}
 
         {mode==="access"&&includeRoomCoverage&&form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
-        {mode==="people"&&<section className="mt-8">
-          <h2 className="text-lg font-semibold">People directory</h2>
-          <Label className="mt-4 block max-w-sm text-sm font-semibold">
-            Search
-            <Input className="mt-2 w-full  border bg-background p-3" type="search" placeholder="Search by name" value={query} onChange={event => setQuery(event.target.value)} />
-          </Label>
+        {mode==="people"&&<WorkspacePanel title="People directory" className="mt-8">
+          <Field label="Search" className="mt-4 max-w-sm">
+            <Input type="search" placeholder="Search by name" value={query} onChange={event => setQuery(event.target.value)} />
+          </Field>
           <DirectoryTable label="People directory" caption="People in the authorized organizational scope."
             rows={people} rowKey={person=>person.personId}
-            empty={<p className="p-4 text-sm text-muted-foreground">No people found.</p>}
+            empty={<EmptyState title="No people found."/>}
             columns={[
               {id:"person",title:"Person",render:person=>personDisplayName({
                 preferredName:person.preferredName,legalFirstName:person.firstName,legalLastName:person.lastName})},
@@ -288,7 +286,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 {person.grants.map(grant=><li key={grant.grantId}>{grant.role} · {grant.accountEmail} · {grant.active?"active":"inactive"}</li>)}
               </ul>},
             ]}/>
-        </section>}
+        </WorkspacePanel>}
       </QueryState>
     </WorkspaceShell>
   );
