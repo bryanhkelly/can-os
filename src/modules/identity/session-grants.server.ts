@@ -139,19 +139,17 @@ export async function readSessionGrants(accountId: string, email: string, reader
     // All non-switching credentials use the same current Person and active
     // grants. Credential approval limits the reachable institution, not
     // the permitted business capabilities of a valid role.
-    const school = await readDemoSchoolForAccount(accountId, reader);
-    const bindings = await readDemoStaffBindings(accountId, reader);
     const fixedIdentity = LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===accountId ||
       candidate.email===normalizedEmail);
     if (fixedIdentity && (fixedIdentity.accountId!==accountId || fixedIdentity.email!==normalizedEmail))
       return {grants:[],demoAccountSwitching:false};
+    if (fixedIdentity) return {grants:ownGrants.filter(grant=>grant.email===normalizedEmail &&
+      grant.accountPersonId===grant.personId && isApprovedDemoGrant(grant,normalizedEmail)),demoAccountSwitching:false};
+    const school = await readDemoSchoolForAccount(accountId, reader);
+    const bindings = await readDemoStaffBindings(accountId, reader);
     const grants:typeof ownGrants=[];
     for (const grant of ownGrants) {
       if (grant.email!==normalizedEmail || grant.accountPersonId!==grant.personId) continue;
-      if (fixedIdentity) {
-        if (isApprovedDemoGrant(grant,normalizedEmail)) grants.push(grant);
-        continue;
-      }
       if (grant.role==="account_holder" && !grant.organizationId && !grant.siteId) {
         if (await hasApprovedDemoPersonalCredential(accountId,normalizedEmail,reader)) grants.push(grant);
         continue;
@@ -168,6 +166,10 @@ export async function readSessionGrants(accountId: string, email: string, reader
   }
 
   if (!adminAccount && !demoAccount) {
+    // An explicitly registered founder cannot bypass its credential boundary
+    // by changing the account email to a deliverable address.
+    const founder=await readDemoSchoolForAccount(accountId,reader);
+    if(founder)return {grants:[],demoAccountSwitching:false};
     // Real testers use normal verified-email sign-in. A synthetic grant
     // additionally needs an issued-and-accepted original Site invitation.
     const organizationIds = [...new Set(ownGrants.map(grant => grant.organizationId)
