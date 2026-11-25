@@ -58,9 +58,10 @@ export async function setupSchool(
     }).returning();
     const [person] = await tx.insert(people).values({
       legalFirstName: "Demo", legalLastName: "Administrator",
-      metadata: { synthetic: true },
+      email: adminEmail, metadata: { synthetic: true },
     }).returning();
-    const [account] = await tx.insert(accessAccounts).values({ emailNormalized: adminEmail }).returning();
+    if (!person) throw new Error("Demo administrator Person was not created");
+    const [account] = await tx.insert(accessAccounts).values({ emailNormalized: adminEmail, personId: person.id }).returning();
     if (!site || !person || !account) throw new Error("School bootstrap identity was not created");
     const [grant] = await tx.insert(accountPersonGrants).values({
       accountId: account.id, personId: person.id, role: "site_admin",
