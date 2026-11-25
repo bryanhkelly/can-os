@@ -85,7 +85,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
     <WorkspacePanel id="network-affiliations" title="School affiliation requests">
       <p className="mt-2 text-sm text-muted-foreground">Schools retain their own organizations and academic permissions. Approving a link does not give HQ access to students, families, courses or admissions.</p>
       <div className="mt-4 space-y-3">
-        {data.affiliations.map(entry => <WorkspacePanel key={entry.id} title={entry.siteName} description={entry.siteOrganizationName} actions={<StatusBadge tone={entry.status==="approved"?"success":entry.status==="pending"?"attention":"neutral"}>{entry.status}</StatusBadge>}>
+        {data.affiliations.map(entry => <WorkspacePanel key={entry.id} headingLevel="h3" title={entry.siteName} description={entry.siteOrganizationName} actions={<StatusBadge tone={entry.status==="approved"?"success":entry.status==="pending"?"attention":"neutral"}>{entry.status}</StatusBadge>}>
           <p className="mt-2 text-sm">{entry.requestNote}</p>
           {entry.decisionReason && <p className="mt-2 text-sm text-muted-foreground">Last decision: {entry.decisionReason}</p>}
           {(entry.status === "pending" || entry.status === "approved") && <>
@@ -122,7 +122,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
     <WorkspacePanel id="network-create" title="Add a headquarters-operated location" className="mt-8">
       <p className="mt-2 text-sm text-muted-foreground">Use this only for a location owned or operated by the denomination. Independently owned churches and schools require a reviewed affiliation link, not a transfer of site ownership.</p>
       <form noValidate className="mt-5 space-y-4" onSubmit={create} aria-busy={busy}>
-        <FormSection title="Location details">
+        <FormSection headingLevel="h3" title="Location details">
         <Field label="Location name" className="text-sm" required error={createAttempted&&name.trim().length<2?"Enter a location name with at least 2 characters.":undefined}>
           <Input minLength={2} maxLength={160} value={name} onChange={event => setName(event.target.value)} placeholder="Central Community Campus"/>
         </Field>
