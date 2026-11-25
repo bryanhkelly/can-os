@@ -11,7 +11,7 @@ const work={id:"11111111-1111-4111-8111-111111111111",lease_id:"22222222-2222-42
  unsubscribe_token:"33333333-3333-4333-8333-333333333333",attempts:1,outcome_unconfirmed:false,first_attempt_at:new Date().toISOString(),
  subject:"QA invitation",body:"Synthetic fixture",public_url:"https://qa.example.org/go/abcdefghijkl",
  sender_from:"qa@real.org",sender_address:"QA mailing address",sender_scope:"organization:qa",organization_id:"qa",code:"abcdefghijkl",cancelled_at:null};
-function claim(){mocked.txExecute.mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[work]});}
+function claim(recipient=work.email){mocked.txExecute.mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[{...work,email:recipient}]});}
 beforeEach(()=>{
  vi.resetAllMocks();
  mocked.transaction.mockImplementation(async (run:(tx:{execute:typeof mocked.txExecute})=>unknown)=>run({execute:mocked.txExecute}));
@@ -28,6 +28,13 @@ describe("campaign worker fenced delivery",()=>{
   const send=vi.fn(async()=>new Response(JSON.stringify({id:"receipt"}),{status:200}));vi.stubGlobal("fetch",send);
   expect(await processEngagementCampaignDeliveries(1)).toEqual({accepted:1,failed:0,suppressed:0,retry:0,unconfirmed:0});
   expect(send).toHaveBeenCalledWith("https://api.resend.com/emails",expect.objectContaining({redirect:"error",headers:expect.objectContaining({"Idempotency-Key":"engagement-campaign/"+work.id})}));
+ });
+ it("suppresses demo destinations without provider calls",async()=>{
+  claim("participant@nested.school.demo");
+  mocked.execute.mockResolvedValueOnce({rows:[{id:work.id,status:"suppressed",outcome_unconfirmed:false}]});
+  const send=vi.fn();vi.stubGlobal("fetch",send);
+  expect((await processEngagementCampaignDeliveries(1)).suppressed).toBe(1);
+  expect(send).not.toHaveBeenCalled();
  });
  it("does not count acceptance after a webhook or another worker has settled the lease",async()=>{
   claim();mocked.execute.mockResolvedValueOnce({rows:[{eligible:true}]}).mockResolvedValueOnce({rows:[]});
