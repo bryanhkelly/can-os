@@ -1,7 +1,7 @@
 import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
 import {resolveGoExperience} from "@/modules/engagement/engagement-go.server";
-import {isDemoAccountEmail} from "@/domain/local-demo-access";
+import {suppressDemoEmailDelivery} from "@/domain/email-delivery-policy";
 import {OUTBOUND_LEASE_MS,outboundRetryDelayMs} from "@/domain/outbound-retry-policy";
 import {campaignRetryable,parseCampaignRecipients,campaignRetryAfterMs} from "@/domain/campaign-policy";
 import type {ResendReceiptEvent} from "@/domain/resend-webhook";
@@ -90,7 +90,7 @@ export async function processEngagementCampaignDeliveries(limit=10){
    const url=new URL(work.public_url);
    if(parsed.invalid.length||parsed.recipients.length!==1||work.sender_from!==sender.from||work.sender_address!==sender.address||
      url.origin!==new URL(sender.origin).origin||url.pathname!=="/go/"+work.code||url.search||url.hash||
-     isDemoAccountEmail(work.email)){
+     suppressDemoEmailDelivery(work.email)){
     countSettled(await settle(work,"suppressed"));continue;
    }
    const experience=await resolveGoExperience(work.code,"/",false);
