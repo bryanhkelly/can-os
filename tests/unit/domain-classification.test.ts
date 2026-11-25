@@ -37,6 +37,8 @@ describe("canonical identity domains", () => {
     expect(identityEmailDomain(" PERSON@TRAINING.SCHOOL.DEMO ")).toBe("training.school.demo");
     expect(identityEmailDomain(null)).toBeNull();
     expect(identityEmailDomain("person@@school.demo")).toBeNull();
+    expect(identityEmailDomain("person@ school.demo")).toBeNull();
+    expect(identityEmailDomain("person @school.demo")).toBeNull();
     expect(identityEmailDomain("person.demo@school.org")).toBe("school.org");
     expect(isDemoDomain("school.demo")).toBe(true);
     expect(isDemoDomain(identityEmailDomain("person@school.org"))).toBe(false);
