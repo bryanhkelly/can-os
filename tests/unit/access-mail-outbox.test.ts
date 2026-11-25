@@ -23,6 +23,17 @@ afterEach(async () => {
 });
 
 describe("isolated access-mail delivery", () => {
+  it.each(["learner@school.demo", " LEARNER@TRAINING.SCHOOL.DEMO "])("never submits demo destination %s to any mail transport", async (to) => {
+    const directory = await outbox();
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("APP_ENV", "test");
+    vi.stubEnv("CAN_ACCESS_MAIL_OUTBOX_DIR", directory);
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    await expect(sendAccessLinkViaResend({to, accessUrl:"https://app.can-os.test/access/verify#token=example"})).rejects.toThrow("Demo email destination suppressed");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await readdir(directory)).toEqual([]);
+  });
   it("delivers secure access mail with CAN branding when school branding fails", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN", "https://app.can-os.test");
