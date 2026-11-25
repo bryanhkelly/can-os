@@ -47,6 +47,26 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(registry).toContain("assertWholeSiteProgramsInScope");
     expect(read("src/modules/communication/engagement-campaigns.server.ts")).toContain("@/modules/engagement/engagement-registry.server");
   });
+  it("serializes engagement lifecycle mutations after exact ownership authorization",()=>{
+    const registry=read("src/modules/engagement/engagement-registry.server.ts");
+    expect(registry.match(/authorizedDefinition\(data.engagementId,actor,true,tx,true\)/g)).toHaveLength(3);
+    expect(registry).toContain('await lookup().for("update").limit(1)');
+    expect(registry.indexOf("await authorizeEngagementOwner(ownerFromRow")).toBeLessThan(registry.indexOf('await lookup().for("update")'));
+    expect(registry).toContain("locked.ownerKind!==record.ownerKind");
+    expect(registry).toContain("locked.organizationId!==record.organizationId");
+    expect(registry).toContain("locked.siteId!==record.siteId");
+    expect(registry).toContain("locked.programId!==record.programId");
+  });
+  it("serializes campaign idempotency across different recipient lists",()=>{
+    const campaign=read("src/modules/communication/engagement-campaigns.server.ts");
+    const queue=campaign.slice(campaign.indexOf("export const queueEngagementCampaign"),campaign.indexOf("export const cancelEngagementCampaign"));
+    expect(queue).toContain('JSON.stringify(["engagement-campaign",s.ownerScope,data.requestId])');
+    expect(queue.indexOf("pg_advisory_xact_lock")).toBeGreaterThan(-1);
+    expect(queue.indexOf("pg_advisory_xact_lock")).toBeLessThan(queue.indexOf("FOR UPDATE"));
+    expect(queue.indexOf("FOR UPDATE")).toBeLessThan(queue.indexOf("AND request_id="));
+    expect(queue.indexOf("AND request_id=")).toBeLessThan(queue.indexOf("INSERT INTO public.engagement_campaigns"));
+    expect(queue).toContain("existing.list_id!==data.listId");
+  });
   it("keeps public redirect observation anonymous and non-blocking",()=>{
     const schema=read("src/db/schema/site-go-links.ts");
     const resolver=read("src/modules/engagement/site-go-links.server.ts");

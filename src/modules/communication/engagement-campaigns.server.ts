@@ -68,6 +68,10 @@ export const queueEngagementCampaign = async (data: z.output<typeof queueEngagem
  const draft=await readAuthorizedEngagementInvitation(data.engagementId,data.linkId,s.actor);
  const scheduledAt=new Date(data.scheduledAt);if(scheduledAt.getTime()>Date.now()+90*86400000)throw new Error("Schedule within 90 days.");
  return db.transaction(async tx=>{
+ // Serialize on the same identity as the unique constraint, even when two
+ // requests reuse an idempotency key with different recipient lists.
+ const requestLock=JSON.stringify(["engagement-campaign",s.ownerScope,data.requestId]);
+ await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${requestLock},0))`);
  const [list]=await campaignRows<{id:string}>(tx,sql`SELECT id FROM public.campaign_recipient_lists WHERE id=${data.listId} AND owner_scope=${s.ownerScope} FOR UPDATE`);
  if(!list)throw new Error("Recipient list unavailable.");
  const [existing]=await campaignRows<{id:string;list_id:string;link_id:string;engagement_id:string;scheduled_at:string|Date}>(tx,sql`SELECT id,list_id,link_id,engagement_id,scheduled_at FROM public.engagement_campaigns WHERE owner_scope=${s.ownerScope} AND request_id=${data.requestId}`);

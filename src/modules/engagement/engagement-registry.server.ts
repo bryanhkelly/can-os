@@ -110,9 +110,11 @@ function ownerFromRow(row:OwnerRecord):EngagementOwner{
 }
 async function authorizedDefinition(
   engagementId:string,actor:AccessContext,write:boolean,reader:Reader,
+  lockForMutation=false,
 ){
-  const [record]=await reader.select().from(engagementDefinitions)
-    .where(eq(engagementDefinitions.id,engagementId)).limit(1);
+  const lookup=()=>reader.select().from(engagementDefinitions)
+    .where(eq(engagementDefinitions.id,engagementId));
+  const [record]=await lookup().limit(1);
   if(!record)throw new DomainError("UNAVAILABLE","Engagement unavailable.");
   const current=await authorizeEngagementOwner(ownerFromRow({
     ownerKind:record.ownerKind,organizationId:record.organizationId,
@@ -120,6 +122,16 @@ async function authorizedDefinition(
   }),actor,write,reader);
   if(current.organizationId!==record.organizationId||current.siteId!==record.siteId||current.programId!==record.programId)
     throw new AuthorizationError("unchanged exact engagement ownership");
+  // Lock only after authorizing the resource; a waiting mutation must see
+  // the committed lifecycle state, not the earlier unlocked read.
+  if(lockForMutation){
+    const [locked]=await lookup().for("update").limit(1);
+    if(!locked||locked.ownerKind!==record.ownerKind||
+       locked.organizationId!==record.organizationId||locked.siteId!==record.siteId||
+       locked.programId!==record.programId)
+      throw new AuthorizationError("unchanged exact engagement ownership");
+    return locked;
+  }
   return record;
 }
 async function assertDestinationReady(
@@ -205,7 +217,7 @@ export const createEngagementDefinition = async (data: z.output<typeof createEng
 export const createEngagementGoLink = async (data: z.output<typeof createEngagementGoLinkInput>) =>db.transaction(async tx=>{
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
-    const record=await authorizedDefinition(data.engagementId,actor,true,tx);
+    const record=await authorizedDefinition(data.engagementId,actor,true,tx,true);
     if(record.status!=="active")throw new DomainError("CONFLICT","This engagement is retired.");
     const [version]=await tx.select({
       id:engagementDefinitionVersions.id,content:engagementDefinitionVersions.content,
@@ -250,7 +262,7 @@ export const listEngagementGoLinks = async (data: z.output<typeof listEngagement
 export const retireEngagementDefinition = async (data: z.output<typeof retireEngagementDefinitionInput>) =>db.transaction(async tx=>{
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
-    const record=await authorizedDefinition(data.engagementId,actor,true,tx);
+    const record=await authorizedDefinition(data.engagementId,actor,true,tx,true);
     if(record.status==="retired")return {retired:true};
     await tx.update(engagementDefinitions).set({status:"retired",updatedAt:new Date()})
       .where(eq(engagementDefinitions.id,record.id));
@@ -265,7 +277,7 @@ export const retireEngagementDefinition = async (data: z.output<typeof retireEng
 export const revokeEngagementGoLink = async (data: z.output<typeof revokeEngagementGoLinkInput>) =>db.transaction(async tx=>{
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
-    const record=await authorizedDefinition(data.engagementId,actor,true,tx);
+    const record=await authorizedDefinition(data.engagementId,actor,true,tx,true);
     const [link]=await tx.select().from(siteGoLinks).where(
       eq(siteGoLinks.id,data.linkId)).for("update").limit(1);
     if(!link?.engagementVersionId)throw new DomainError("UNAVAILABLE","Link unavailable.");
