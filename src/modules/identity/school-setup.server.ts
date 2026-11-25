@@ -6,19 +6,17 @@ import {
 } from "@/db/schema";
 import { DomainError } from "@/domain/errors";
 import { EventTypes } from "@/domain/event-types";
-import { matchesDemoSchoolAdministrator, schoolSetupSchema, type SchoolSetupInput, type SchoolSetupResult, type PublicSignupOrganizationType, initialVerifiedSignupOrganizationType } from "@/domain/school-setup";
+import { matchesDemoSchoolAdministrator, schoolSetupSchema, type SchoolSetupInput, type SchoolSetupResult } from "@/domain/school-setup";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
-/** Public bootstrap creates only a new synthetic institution; never adopts existing records. */
+/** Legacy disposable test fixture only. Public signup uses school-setup-signup.server. */
 export async function setupSchool(
   input: SchoolSetupInput,
   database: Pick<Database, "transaction"> = db,
-  founder?: { email: string; firstName: string; lastName: string; organizationName?: string; organizationType: PublicSignupOrganizationType },
 ): Promise<SchoolSetupResult> {
   const data = schoolSetupSchema.parse(input);
   const slug = `demo-${data.domain.slice(0, -5)}`;
-  const adminEmail = founder?.email ?? `admin.demo@${data.domain}`;
-  if (adminEmail.split("@")[1] !== data.domain) throw new DomainError("FORBIDDEN");
+  const adminEmail = `admin.demo@${data.domain}`;
   return database.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"school-setup:" + data.domain}))`);
     const [existing] = await tx.select().from(demoSchoolTenants)
@@ -33,7 +31,7 @@ export async function setupSchool(
         .where(eq(people.id, existing.adminPersonId)).limit(1);
       const [grant] = await tx.select().from(accountPersonGrants)
         .where(eq(accountPersonGrants.id, existing.adminGrantId)).limit(1);
-      if (!organization || organization.name !== (founder?.organizationName || data.name) || !site ||
+      if (!organization || organization.name !== data.name || !site ||
         site.organizationId !== organization.id || site.timezone !== data.timezone ||
         !account || account.emailNormalized !== adminEmail || account.disabled || !person?.active || !grant?.active ||
         !matchesDemoSchoolAdministrator(existing, grant, account.emailNormalized)) {
@@ -50,7 +48,7 @@ export async function setupSchool(
     if (occupied || occupiedEmail) throw new DomainError("CONFLICT", "School identity already exists");
 
     const [organization] = await tx.insert(organizations).values({
-      name: founder?.organizationName || data.name, slug, type: founder ? initialVerifiedSignupOrganizationType(founder.organizationType) : "christian_school",
+      name: data.name, slug, type: "christian_school",
       metadata: { synthetic: true, demoDomain: data.domain },
     }).returning();
     if (!organization) throw new Error("School organization was not created");
@@ -59,7 +57,7 @@ export async function setupSchool(
       timezone: data.timezone, metadata: { synthetic: true },
     }).returning();
     const [person] = await tx.insert(people).values({
-      legalFirstName: founder?.firstName ?? "Demo", legalLastName: founder?.lastName ?? "Administrator",
+      legalFirstName: "Demo", legalLastName: "Administrator",
       email: adminEmail, metadata: { synthetic: true },
     }).returning();
     if (!person) throw new Error("Demo administrator Person was not created");
