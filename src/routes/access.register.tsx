@@ -33,9 +33,9 @@ export const Route = createFileRoute("/access/register")({
     try { data = await request.json(); }
     catch { return Response.json({ error: "Invalid request" }, { status: 400 }); }
     try {
-      await (await import("@/modules/identity/personal-account-signup.server"))
+      const result = await (await import("@/modules/identity/personal-account-signup.server"))
         .requestPersonalCanAccount(data);
-      return Response.json({ accepted: true }, { headers: { "Cache-Control": "no-store" } });
+      return Response.json(result, { headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
     } catch (error) {
       if (error && typeof error === "object" && "issues" in error)
         return Response.json({ error: "Check your registration details" }, { status: 400 });
@@ -53,12 +53,13 @@ function RegisterPersonalAccount() {
   const [email, setEmail] = useState("");
   const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [privateAccessCode, setPrivateAccessCode] = useState<string|null>(null);
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"info" | "attention" | "danger">("info");
   const hydrated = useHydrated();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || privateAccessCode) return;
     setBusy(true); setMessage(""); setMessageTone("info");
     try {
       const response = await fetch("/access/register", {
@@ -70,14 +71,18 @@ function RegisterPersonalAccount() {
       if (response.status === 429) { setMessageTone("attention"); setMessage("Too many requests. Please try again later."); }
       else if (response.status === 503) { setMessageTone("danger"); setMessage("Account creation is temporarily unavailable."); }
       else if (!response.ok) { setMessageTone("attention"); setMessage("Please check your name and email address."); }
-      else setMessage(isDemoAccountEmail(email) ? "If this demo address is eligible, your account is ready. Sign in using your demo access code. No email is sent." : "If this address is eligible, we have requested a secure email link. Open it to complete account creation or sign in.");
+      else {
+        const result=await response.json() as {privateAccessCode?:string};
+        setPrivateAccessCode(result.privateAccessCode??null);
+        setMessage(result.privateAccessCode ? "Your account is ready. Save your private access code." : isDemoAccountEmail(email) ? "If you already have an eligible account, use your existing access credential to sign in." : "If this address is eligible, we have requested a secure email link. Open it to complete account creation or sign in.");
+      }
     } catch { setMessageTone("danger"); setMessage("Account creation is temporarily unavailable."); }
     finally { setBusy(false); }
   }
   return <WorkspaceShell width="reading" eyebrow="CAN account" title="Create your CAN account"
     subtitle="One account for learning, schools, organizations and programs. Joining a school or course is a separate step.">
     <WorkspacePanel title="Account details" className="mt-6 max-w-xl">
-      <form onSubmit={submit} aria-busy={busy} className="space-y-5">
+      {privateAccessCode ? <div className="space-y-4"><WorkspaceNotice>Save this private access code in your password manager. It is shown only once.</WorkspaceNotice><Field label="Private access code"><Input value={privateAccessCode} readOnly autoComplete="off" /></Field><Button asChild><Link to="/access" search={{email,returnTo}}>Sign in</Link></Button></div> : <form onSubmit={submit} aria-busy={busy} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="First name" required><Input name="given-name" autoComplete="given-name" required
             maxLength={80} value={firstName} onChange={event => setFirstName(event.target.value)} /></Field>
@@ -92,12 +97,12 @@ function RegisterPersonalAccount() {
             className="mt-1"/>
           I am at least 18 years old. Student accounts for minors are set up through an authorized school or guardian.
         </Label>
-        <p className="text-sm leading-6 text-muted-foreground">{isDemoAccountEmail(email) ? "Eligible demo addresses receive automatic account approval and use the demo access code. Joining a program is a separate step." : "We will email you a single-use link. Your details stay in CAN OS; joining a participating organization requires a separate registration or invitation."}</p>
+        <p className="text-sm leading-6 text-muted-foreground">{isDemoAccountEmail(email) ? "New demo addresses receive automatic account approval and a private access code. Joining a program is a separate step." : "We will email you a single-use link. Your details stay in CAN OS; joining a participating organization requires a separate registration or invitation."}</p>
         <Button type="submit" disabled={!hydrated} loading={busy} loadingLabel="Creating account…" className="w-full">
           Continue
         </Button>
         {message && <WorkspaceNotice tone={messageTone}>{message}</WorkspaceNotice>}
-      </form>
+      </form>}
       <div className="mt-6 border-t border-border pt-5 text-sm">
         Already have a CAN account? <Link to="/access" search={returnTo ? { returnTo } : {}}
           className="font-semibold text-primary underline underline-offset-4">Sign in</Link>
