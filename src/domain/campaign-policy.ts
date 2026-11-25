@@ -1,8 +1,7 @@
-import {isDemoAccountEmail} from "./local-demo-access";
 export const campaignRecipientLimit=1000;
 export function parseCampaignRecipients(raw:string){
  const values=[...new Set(raw.split(/[;,\s]+/).filter(Boolean).map(v=>v.toLowerCase()))];
- const invalid=values.filter(v=>v.length>254||! /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}$/i.test(v)||v.includes("..")||isDemoAccountEmail(v)||/\.(test|invalid|example|localhost)$/.test(v)||/@example\.(com|net|org)$/.test(v));
+ const invalid=values.filter(v=>v.length>254||! /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}$/i.test(v)||v.includes("..")||/\.(test|invalid|example|localhost)$/.test(v)||/@example\.(com|net|org)$/.test(v));
  return {recipients:values,invalid,tooMany:values.length>campaignRecipientLimit};
 }
 export function campaignOwnerScope(owner:{ownerKind:string;organizationId:string|null;siteId:string|null;programId:string|null}){
