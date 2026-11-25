@@ -135,6 +135,18 @@ describe("public demo session isolation", () => {
     state.rows = [[], [ownerTarget, studentGrant]];
     expect(await readOwnerDelegationGrants(ownerTarget.accountId, ownerTarget.personId, ownerTarget.email)).toEqual([ownerTarget]);
   });
+  it("uses private credential memberships across Organizations without registry lookup", async () => {
+    const first={...newGrant,privateCredential:true};
+    const second={...first,id:"second-grant",organizationId:"another-org",siteId:"another-site",role:"teacher"};
+    const protectedRole={...first,id:"protected-grant",role:"platform_owner",organizationId:null,siteId:null};
+    state.rows=[[first,second,protectedRole],[]];
+    expect((await readSessionGrants(first.accountId,first.email)).grants).toEqual([first,second]);
+    expect(state.select).toHaveBeenCalledTimes(2);
+  });
+  it("never offers a private credential Account to shared fixture switching",async()=>{
+    state.rows=[[adminGrant],[{...studentGrant,privateCredential:true}]];
+    expect((await readSessionGrants(adminGrant.accountId,adminGrant.email)).grants).toEqual([adminGrant]);
+  });
   it("allows an existing canonical demo membership for independent owner delegation without shared-code registration", async () => {
     const target = { ...newGrant, email:"admin@unregistered.demo", emailVerifiedAt:null };
     state.rows = [[], [target]];
