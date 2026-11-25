@@ -132,7 +132,7 @@ describe("canonical demo school provisioning", () => {
       role: "site_admin", organizationId: school.organizationId, siteId: school.siteId,
     });
     expect(state.writes.find(row => row.table === "access_accounts")?.value).toEqual({
-      emailNormalized: "admin.demo@example.demo",
+      emailNormalized: "admin.demo@example.demo", personId: "people-id",
     });
     expect(state.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       actorPersonId: null, action: "school.setup",
