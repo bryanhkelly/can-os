@@ -4,7 +4,6 @@ import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, outboundAttemptOutcome } from "@/domain/outbound-sms-safety";
 import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import {
   dispatchOutboundMessages, type OutboundAdapter, type OutboundClaim,
   type OutboundPreparation, type OutboundSendResult,
@@ -96,8 +95,6 @@ const schoolFamilyAdapter = {
         record.actionType !== "school_family_bulletin" ||
         !record.programId || !record.siteId || !record.organizationId)
       return { kind: "suppress", reason: "invalid_school_alert" };
-    if (record.outbound.channel === "sms" && await isDemoTenantOrganization(record.organizationId))
-      return { kind: "suppress", reason: "demo_tenant_external_delivery" };
 
     // Re-evaluate custody, school enrollment, active account and scoped
     // guardian grant on every attempt, not from publication-time recipients.
