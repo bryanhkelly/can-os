@@ -38,6 +38,11 @@ function adultSourceExcluded(session:Extract<Awaited<ReturnType<typeof readWorks
   const effective=session.grants.find(g=>g.id===session.activeGrantId);
   return session.demoTenant===true || (!!effective?.email&&isDemoAccountEmail(effective.email));
 }
+// Waitlist opportunities use ordinary account approval, not the native learner
+// bridge. The source service independently validates the exact Person and Site.
+function waitlistSourceExcluded(session:Extract<Awaited<ReturnType<typeof readWorkspaceSession>>,{authenticated:true}>):boolean{
+  return adultSourceExcluded(session) && (session.role!=="account_holder" || session.demoAccountSwitching===true);
+}
 const outputCursor=(value:object|null)=>value?JSON.stringify(value):null;
 function parseCursor(value:string|null):unknown{
   if(value===null)return null;
@@ -108,7 +113,7 @@ export const getMyActivityOpportunityPage=createServerFn({method:"GET"})
     privateRead();
     const session=await readWorkspaceSession(getRequest());
     if(!session.authenticated)throw new AuthorizationError("verified CAN account");
-    if(adultSourceExcluded(session))throw new AuthorizationError("verified independent adult account");
+    if(waitlistSourceExcluded(session))throw new AuthorizationError("approved participant account");
     const cursor=parseCursor(data.cursor) as {joinedAt:string;waitlistId:string};
     const page=await getMyNoncreditWaitlistPage({data:{cursor}});
     return {
@@ -155,7 +160,7 @@ export const getMyActivity=createServerFn({method:"GET"})
         }
       })());
     }
-    if(adultSourceExcluded(session)){
+    if(waitlistSourceExcluded(session)){
       sources.push({source:"noncredit_waitlist",state:"not_applicable",coverage:"not_applicable",message:null});
     }else tasks.push((async()=>{
       try{
