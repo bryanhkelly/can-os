@@ -1,3 +1,5 @@
+import { classifyOwnedData } from "./domain-classification";
+
 /**
  * WS6 reusable dimension projection from already-authorized source facts.
  * THIS IS NOT AN AUTHORIZATION SERVICE. The caller must verify every active
@@ -69,6 +71,7 @@ export function rollupAuthorizedParticipation(
   facts:readonly ParticipationReportingFact[],
   proof:ReportingScopeProof,
   period:{from:string;to:string;asOf:string},
+  population?:{ownerDomains:ReadonlyMap<string,string|null>;classification:"all"|"real"|"synthetic"|"unknown"},
 ){
   assertAuthorizedReportFacts(facts,proof);
   const from=Date.parse(period.from),to=Date.parse(period.to),asOf=Date.parse(period.asOf);
@@ -77,7 +80,8 @@ export function rollupAuthorizedParticipation(
   const inPeriod=facts.filter(f=>{
     const at=Date.parse(f.registeredAt);
     if(!Number.isFinite(at))throw new Error("Invalid canonical registration date");
-    return at>=from&&at<to&&at<=asOf;
+    return at>=from&&at<to&&at<=asOf && (!population || population.classification==="all" ||
+      classifyOwnedData(population.ownerDomains.get(f.operatingOrganizationId))===population.classification);
   });
   const totals=count(inPeriod);
   const sites=group(inPeriod,x=>x.deliverySiteId);
@@ -91,6 +95,7 @@ export function rollupAuthorizedParticipation(
   // unique-person subtotals as though these groups were mutually exclusive.
   return {asOf:period.asOf,period:{from:period.from,to:period.to},totals,
     sites,organizations,courses,programs,
+    ...(population?{population:population.classification,classificationBasis:"current_operating_organization_domain" as const}:{}),
     exclusions:"Standalone Courses do not create synthetic Program membership",
     networkReportAvailable:false as const};
 }
