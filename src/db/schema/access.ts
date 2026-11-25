@@ -11,10 +11,106 @@ export const accessAccounts = pgTable("access_accounts", {
  personId: uuid("person_id").references(() => people.id, {onDelete:"restrict"}),
  emailNormalized: text("email_normalized").notNull(),
  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+ // Optional account-held credential; never returned by an Account projection.
+ privateAccessCodeHash: text("private_access_code_hash"),
  disabled: boolean("disabled").notNull().default(false),
  createdAt: createdAt(),
  updatedAt: updatedAt(),
 }, t => [
+ check("access_accounts_private_access_code_hash_ck", sql`${t.privateAccessCodeHash} IS NULL OR ${t.privateAccessCodeHash} ~ '^[a-f0-9]{64}
+ uniqueIndex("access_accounts_person_id_uq").on(t.personId).where(sql`${t.personId} IS NOT NULL`),
+]);
+
+/** Verified account-to-person assignment; one login can represent multiple genuine memberships. */
+export const accountPersonGrants = pgTable("account_person_grants", {
+ id: id(),
+ accountId: uuid("account_id").notNull().references(() => accessAccounts.id, {onDelete:"cascade"}),
+ personId: uuid("person_id").notNull().references(() => people.id, {onDelete:"restrict"}),
+ role: text("role").notNull(),
+ organizationId: uuid("organization_id"),
+ siteId: uuid("site_id"),
+ active: boolean("active").notNull().default(true),
+ createdAt: createdAt(),
+ updatedAt: updatedAt(),
+}, t => [index("account_person_grants_account_idx").on(t.accountId),index("account_person_grants_person_idx").on(t.personId)]);
+
+/** Explicit operator-verified binding; canonical principal IDs are not inferred from legacy people or Sites. */
+export const accessAccountCanonicalPrincipals = pgTable("access_account_canonical_principals", {
+ id: id(),
+ accountId: uuid("account_id").notNull().references(() => accessAccounts.id, { onDelete: "restrict" }),
+ canonicalPrincipalId: uuid("canonical_principal_id").notNull(),
+ verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+ verifiedByAccountId: uuid("verified_by_account_id").notNull().references(() => accessAccounts.id, { onDelete: "restrict" }),
+ revokedAt: timestamp("revoked_at", { withTimezone: true }),
+ createdAt: createdAt(),
+}, t => [
+ uniqueIndex("access_account_canonical_principals_active_account_uq")
+  .on(t.accountId).where(sql`${t.revokedAt} IS NULL`),
+ uniqueIndex("access_account_canonical_principals_active_person_uq")
+  .on(t.canonicalPrincipalId).where(sql`${t.revokedAt} IS NULL`),
+ index("access_account_canonical_principals_principal_idx").on(t.canonicalPrincipalId),
+ check("access_account_canonical_principals_not_self_verified", sql`${t.accountId} <> ${t.verifiedByAccountId}`),
+ check("access_account_canonical_principals_revocation_after_verification", sql`${t.revokedAt} IS NULL OR ${t.revokedAt} >= ${t.verifiedAt}`),
+]);
+
+/** Hash at rest; one-time token redemption must be atomic and attempt limited. */
+export const accessChallenges = pgTable("access_challenges", {
+ id: id(),
+ accountId: uuid("account_id").notNull().references(() => accessAccounts.id,{onDelete:"cascade"}),
+ tokenHash: text("token_hash").notNull(),
+ expiresAt: timestamp("expires_at",{withTimezone:true}).notNull(),
+ consumedAt: timestamp("consumed_at",{withTimezone:true}),
+ attempts: integer("attempts").notNull().default(0),
+ createdAt: createdAt(),
+}, t => [uniqueIndex("access_challenges_hash_uq").on(t.tokenHash),index("access_challenges_account_idx").on(t.accountId)]);
+
+/**
+ * Shared global safety buckets (sign-in request, verification and church application), not per-user or per-IP.
+ * Postgres upserts the count atomically; no untrusted proxy headers are used.
+ * This is a coarse emergency admission limit until trusted-edge rate limiting
+ * can be configured. Fixed-size table: no unbounded attempt log.
+ */
+export const authRequestRateLimits = pgTable("auth_request_rate_limits", {
+ route: text("route").primaryKey(),
+ windowStartedAt: timestamp("window_started_at", {withTimezone:true}).notNull().defaultNow(),
+ requestCount: integer("request_count").notNull().default(0),
+});
+
+/** Independent of OTP provider; hash opaque session secret and revoke server-side. */
+export const accessSessions = pgTable("access_sessions", {
+ id: id(),
+ accountId: uuid("account_id").notNull().references(() => accessAccounts.id,{onDelete:"cascade"}),
+ secretHash: text("secret_hash").notNull(),
+ activeGrantId: uuid("active_grant_id").references(() => accountPersonGrants.id,{onDelete:"set null"}),
+ // Owner delegation never mutates activeGrantId: it remains the original owner grant.
+ delegatedGrantId: uuid("delegated_grant_id").references(() => accountPersonGrants.id,{onDelete:"restrict"}),
+ delegatedMode: text("delegated_mode").$type<"view"|"act">(),
+ delegatedUntil: timestamp("delegated_until",{withTimezone:true}),
+ delegatedReason: text("delegated_reason"),
+
+ expiresAt: timestamp("expires_at",{withTimezone:true}).notNull(),
+ revokedAt: timestamp("revoked_at",{withTimezone:true}),
+ createdAt: createdAt(),
+ updatedAt: updatedAt(),
+ lastActivityAt:timestamp("last_activity_at",{withTimezone:true}).notNull().defaultNow(),
+ clientInstanceId:uuid("client_instance_id"),deviceCategory:text("device_category"),
+ browserFamily:text("browser_family"),osFamily:text("os_family"),
+ ipAddress:text("ip_address"),networkObservedAt:timestamp("network_observed_at",{withTimezone:true}),
+ sharedDevice:boolean("shared_device").notNull().default(false),
+}, t => [uniqueIndex("access_sessions_secret_uq").on(t.secretHash),index("access_sessions_account_idx").on(t.accountId)]);
+
+/** Account-scoped, bounded security indicators, not independent authentication. */
+export const accessSessionSignals=pgTable("access_session_signals",{
+ id:id(),accountId:uuid("account_id").notNull().references(()=>accessAccounts.id,{onDelete:"cascade"}),
+ sessionId:uuid("session_id").notNull().references(()=>accessSessions.id,{onDelete:"cascade"}),
+ signal:text("signal").$type<"new_device_profile"|"concurrent_session"|"network_changed">().notNull(),
+ occurredAt:timestamp("occurred_at",{withTimezone:true}).notNull().defaultNow(),
+ details:jsonb("details").$type<Record<string,string>>().notNull().default({}),
+},t=>[
+ uniqueIndex("access_session_signals_session_kind_uq").on(t.sessionId,t.signal),
+ index("access_session_signals_account_time_idx").on(t.accountId,t.occurredAt),
+]);
+`),
  uniqueIndex("access_accounts_email_uq").on(t.emailNormalized),
  uniqueIndex("access_accounts_person_id_uq").on(t.personId).where(sql`${t.personId} IS NOT NULL`),
 ]);
