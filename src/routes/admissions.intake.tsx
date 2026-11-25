@@ -8,7 +8,7 @@ import {createFileRoute,Link,redirect,useRouter} from "@tanstack/react-router";
 import {getAdmissionsStageCounts,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspacePanel, WorkspaceShell} from "@/components/workspace";
+import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell} from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -67,6 +67,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
 
  const mutation=useMutationFeedback(()=>router.invalidate());
  const [interactive,setInteractive]=useState(false);
+ const [issuedCredential,setIssuedCredential]=useState<{applicationId:string;email:string;code:string}|null>(null);
  useEffect(()=>setInteractive(true),[]);
  const busy=mutation.pending||mutation.refreshFailed||!interactive;
  async function perform<T>(fn:()=>Promise<T>,message:string|((value:T)=>string),refresh?:()=>Promise<unknown>){
@@ -76,10 +77,16 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   void perform(()=>verifyAdmissionsGuardianRelationship({data:{applicationId,...verification}}),
    "Guardian relationship verified and family permissions enabled.");
  };
- const onProvision=(applicationId:string)=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),
-  "Verified guardian sign-in access provisioned.");
+ const onProvision=(applicationId:string)=>{
+  setIssuedCredential(null);
+  void perform(async()=>{
+   const result=await provisionInquiryGuardianAccount({data:{applicationId}});
+   if("privateAccessCode" in result && typeof result.privateAccessCode==="string")setIssuedCredential({applicationId,email:result.email,code:result.privateAccessCode});
+   return result;
+  },"Verified guardian sign-in access provisioned.");
+ };
  const onInvite=(applicationId:string)=>void perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId}}),
-  "A secure email sign-in invitation was requested for this guardian.");
+  result=>result.signInMethod==="email_link"?"A secure email sign-in invitation was requested for this guardian.":"Guardian access is provisioned. Use the existing authorized credential; no email is sent to this address.");
  const onDecision=(applicationId:string,decision:AdmissionsDecision,label:string)=>{
   void perform(()=>transitionAdmissionsStage({data:{applicationId,decision}}),label+" saved.");
  };
@@ -96,6 +103,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
    main={record ? (
     <div className="space-y-5">
      <MutationFeedback state={mutation} pendingMessage="Saving admissions records..."/>
+     {issuedCredential?.applicationId===record.id&&<WorkspacePanel title="Guardian private access code"><WorkspaceNotice>Transfer this one-time-displayed credential privately to the independently verified guardian at {issuedCredential.email}. Do not email or post it.</WorkspaceNotice><Field label="Private access code"><Input value={issuedCredential.code} readOnly autoComplete="off" /></Field><Button type="button" variant="outline" onClick={()=>setIssuedCredential(null)}>Dismiss code</Button></WorkspacePanel>}
     <AdmissionsApplicantCard r={record} busy={busy} showSummary={false} onVerify={onVerify}
       onProvision={onProvision} onInvite={onInvite} onDecision={onDecision}/>
     </div>
