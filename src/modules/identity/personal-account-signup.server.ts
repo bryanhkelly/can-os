@@ -5,6 +5,7 @@ import {
 } from "@/db/schema";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { personalCanSignupSchema } from "@/domain/personal-account-signup";
+import { readDemoCredentialDomain } from "./demo-school-tenants.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { requestOneTimeAccess } from "./passwordless-access.server";
@@ -23,9 +24,11 @@ export async function requestPersonalCanAccount(input: unknown,
   sender: AccessEmailSender = sendAccessLinkViaResend): Promise<typeof genericResult> {
   const data = personalCanSignupSchema.parse(input);
   const email = normalizeAccessEmail(data.email);
-  if (isDemoAccountEmail(email) || email.endsWith(".invalid")) return genericResult;
+  const demo = isDemoAccountEmail(email);
+  if (email.endsWith(".invalid") || (email.endsWith(".demo") && !demo)) return genericResult;
   await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"personal-signup:" + email}))`);
+    if (demo && !await readDemoCredentialDomain(email,tx)) return;
     let [account] = await tx.select({
       id: accessAccounts.id, disabled: accessAccounts.disabled,
     }).from(accessAccounts).where(eq(accessAccounts.emailNormalized, email)).limit(1);
@@ -47,6 +50,12 @@ export async function requestPersonalCanAccount(input: unknown,
     // Real existing school/staff/guardian identities are never overwritten by
     // an anonymous signup; the same email receives its ordinary sign-in link.
     if (grant || schoolSignup) return;
+    // Never resurrect a revoked synthetic membership from anonymous signup.
+    if (demo) {
+      const [prior]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants)
+        .where(eq(accountPersonGrants.accountId,account.id)).limit(1);
+      if (prior) return;
+    }
     const [existing] = await tx.select().from(accessAccountSignups)
       .where(eq(accessAccountSignups.accountId, account.id)).for("update").limit(1);
     const expiresAt = new Date(Date.now() + SIGNUP_LIFETIME_MS);
@@ -55,7 +64,10 @@ export async function requestPersonalCanAccount(input: unknown,
       // A consumed prior signup is historical evidence, not an eternal ban
       // on creating an account-only membership after roles were revoked.
       // Never replace a still-pending verified-email signup.
-      if (!existing.consumedAt && existing.expiresAt > new Date()) return;
+      if (!existing.consumedAt && existing.expiresAt > new Date()) {
+        if (demo) await provisionVerifiedPersonalCanAccount(tx,account.id,email,new Date(),"demo_code");
+        return;
+      }
       await tx.update(accessAccountSignups).set({
         firstName: data.firstName, lastName: data.lastName, expiresAt, consumedAt: null,
       }).where(eq(accessAccountSignups.accountId, account.id));
@@ -64,14 +76,17 @@ export async function requestPersonalCanAccount(input: unknown,
         accountId: account.id, firstName: data.firstName, lastName: data.lastName, expiresAt,
       });
     }
+    if (demo) await provisionVerifiedPersonalCanAccount(tx,account.id,email,new Date(),"demo_code");
   });
-  await requestOneTimeAccess(email, sender, safeAccessReturnTo(data.returnTo) ?? "/account/");
+  if (!demo) await requestOneTimeAccess(email, sender, safeAccessReturnTo(data.returnTo) ?? "/account/");
   return genericResult;
 }
 
 /** Called only inside atomic, single-use email-token redemption. */
 export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: string,
-  email: string, now: Date): Promise<string | null> {
+  email: string, now: Date, approval: "verified_email" | "demo_code" = "verified_email"): Promise<string | null> {
+  if ((approval==="demo_code")!==isDemoAccountEmail(email)) throw new Error("Invalid account approval method");
+  const source=approval==="demo_code"?"automatic_demo_approval":"single_use_email_verification";
   const [signup] = await tx.select().from(accessAccountSignups).where(and(
     eq(accessAccountSignups.accountId, accountId), isNull(accessAccountSignups.consumedAt),
     gt(accessAccountSignups.expiresAt, now),
@@ -102,13 +117,19 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
     const [created] = await tx.insert(people).values({
       legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
       metadata: {
-        origin: "verified_email_personal_signup",
+        origin: approval==="demo_code"?"demo_personal_signup":"verified_email_personal_signup",
         nameEvidence: "self_declared",
         legalNameVerified: false,
       },
     }).returning({id:people.id});
     if(!created)throw new Error("Personal profile could not be initialized");
     personId=created.id;
+  }
+  if (!account.personId) {
+    const [bound]=await tx.update(accessAccounts).set({personId,updatedAt:now})
+      .where(and(eq(accessAccounts.id,accountId),isNull(accessAccounts.personId)))
+      .returning({personId:accessAccounts.personId});
+    if(bound?.personId!==personId)throw new Error("Personal account identity binding failed");
   }
   const [grant] = await tx.insert(accountPersonGrants).values({
     accountId, personId, role: "account_holder",
@@ -123,11 +144,12 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
     scope: {},
     after: {
       personalGrantId: grant.id,
-      emailVerified: true,
+      emailVerified: approval==="verified_email",
+      approvalMethod:approval,
       nameEvidence: "self_declared",
       institutionGranted: false,
     },
-    context: { accountId, source: "single_use_email_verification" },
+    context: { accountId, source },
   });
   await tx.update(accessAccountSignups).set({ consumedAt: now })
     .where(eq(accessAccountSignups.accountId, accountId));
