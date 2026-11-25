@@ -8,7 +8,7 @@ import { readCookie } from "@/domain/session-cookies";
 import { roleCapabilities } from "@/domain/access-context";
 import { platformOwnerMayActAs, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
-import { readSessionGrants } from "./session-grants.server";
+import { readOwnerDelegationGrants } from "./session-grants.server";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { writeAudit } from "@/platform/mutation";
 
@@ -101,7 +101,7 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
       eq(accessAccounts.id, accountPersonGrants.accountId),
       eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
-      isNotNull(accessAccounts.emailVerifiedAt)))
+      or(isNotNull(accessAccounts.emailVerifiedAt), sql`${accessAccounts.emailNormalized} LIKE '%.demo'`)))
     .innerJoin(people, and(
       eq(people.id, accountPersonGrants.personId),
       eq(people.active, true)))
@@ -113,8 +113,12 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
         ilike(people.legalFirstName, term),
         ilike(people.legalLastName, term)),
     )).limit(26);
-  return { targets: rows.filter(row=>Object.hasOwn(roleCapabilities,row.role)&&!isDemoAccountEmail(row.email)).slice(0,25),
-    limited: rows.length > 25 };
+  const eligible = await Promise.all(rows.map(async row => {
+    if (!Object.hasOwn(roleCapabilities, row.role)) return null;
+    const grants = await readOwnerDelegationGrants(row.accountId, row.personId, row.email);
+    return grants.some(grant => grant.id === row.grantId) ? row : null;
+  }));
+  return { targets: eligible.filter(row => row !== null).slice(0,25), limited: rows.length > 25 };
 }
 
 /** Independent-account authorizations are rechecked again when the delegated
@@ -147,10 +151,10 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
       .where(eq(accountPersonGrants.id, data.grantId)).limit(1);
     if (!target || target.accountId === owner.ownerAccountId ||
         target.role === "platform_owner" || !Object.hasOwn(roleCapabilities, target.role) ||
-        !target.personActive || target.accountDisabled || !target.verifiedAt || isDemoAccountEmail(target.email) ||
+        !target.personActive || target.accountDisabled ||
         target.accountPersonId !== target.personId)
-      throw new AuthorizationError("existing verified delegate");
-    const { grants } = await readSessionGrants(target.accountId, target.email, tx);
+      throw new AuthorizationError("existing eligible delegate");
+    const grants = await readOwnerDelegationGrants(target.accountId, target.personId, target.email, tx);
     if (!grants.some(grant => grant.id === target.grantId && grant.active))
       throw new AuthorizationError("current delegated membership");
     await assertRawAccountPerson(target.accountId, target.personId);
