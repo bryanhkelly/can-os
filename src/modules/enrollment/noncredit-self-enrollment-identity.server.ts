@@ -90,15 +90,7 @@ export async function requireNoncreditParticipantAccount():Promise<NoncreditPart
   return readNoncreditParticipantAccount(actor.accountId,actor.actorPersonId);
 }
 
-/** Shared credentials may never consume a live program seat or be included
- * in another institution's participant ledger. */
-export function assertNoncreditParticipantRelease(owner:NoncreditParticipantAccount,
-  release:{registeringOrganizationId:string;siteId:string|null}) {
-  if(owner.demoScope&&(owner.demoScope.organizationId!==release.registeringOrganizationId||
-      owner.demoScope.siteId!==release.siteId))
-    throw new AuthorizationError("participant credential eligible for this release");
-}
-
+export { assertNoncreditParticipantRelease } from "@/domain/noncredit-participant-credential";
 
 const NATIVE_SESSION_SECONDS = 12 * 60 * 60;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
