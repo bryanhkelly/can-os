@@ -41,6 +41,7 @@ if (fixture.format !== "can-os-demo-teacher-marketplace-v1" ||
     fixture.provenance?.credentialsVerified !== false ||
     fixture.provenance?.assignmentsAuthorized !== false ||
     fixture.provider?.slug !== "can-demo-teaching-provider" ||
+    (fixture.provider.domain != null && fixture.provider.domain !== "teaching.can.demo") ||
     fixture.provider?.metadata?.isSynthetic !== true ||
     fixture.teachers?.length !== 30 || fixture.courseTeachers?.length !== 120 ||
     fixture.staffingExamples?.length !== 15)
@@ -53,6 +54,7 @@ const coverage = new Set();
 for (const teacher of fixture.teachers) {
   if (!/^CAN-DEMO-TEACHER-\d{2}$/.test(teacher.key) ||
       !/^can\.demo\.teacher\d{2}@example\.invalid$/.test(teacher.email) ||
+      (teacher.domain != null && teacher.domain !== "teaching.can.demo") ||
       !teacher.firstName || !teacher.lastName || teacher.verified !== false ||
       !Array.isArray(teacher.courseCodes) || !teacher.courseCodes.length ||
       new Set(teacher.courseCodes).size !== teacher.courseCodes.length)
@@ -111,7 +113,7 @@ try {
     if (!providerId) {
       providerId = randomUUID();
       await client.query(
-        "INSERT INTO organizations (id,type,name,slug,metadata) VALUES ($1,'other_partner',$2,$3,$4::jsonb)",
+        "INSERT INTO organizations (id,type,name,slug,metadata,domain) VALUES ($1,'other_partner',$2,$3,$4::jsonb,'teaching.can.demo')",
         [providerId, fixture.provider.name, fixture.provider.slug, JSON.stringify(fixture.provider.metadata)]);
       result.providerCreated = true;
     }
@@ -125,7 +127,7 @@ try {
       if (!personId) {
         personId = randomUUID();
         await client.query(
-          "INSERT INTO people (id,legal_first_name,legal_last_name,preferred_name,email,metadata) VALUES ($1,$2,$3,$4,$5,$6::jsonb)",
+          "INSERT INTO people (id,legal_first_name,legal_last_name,preferred_name,email,metadata,domain) VALUES ($1,$2,$3,$4,$5,$6::jsonb,'teaching.can.demo')",
           [personId,teacher.firstName,teacher.lastName,teacher.firstName,teacher.email,
             JSON.stringify({ sourceSystem:"can-demo-teacher-marketplace-factory",
               demoFixtureKey:teacher.key, synthetic:true, biography:teacher.biography,
