@@ -12,6 +12,7 @@ import { matchesDemoSchoolAdministrator } from "@/domain/school-setup";
 import { hasApprovedDemoPersonalCredential, matchesDemoCredentialScope, readDemoSchoolForAccount } from "./demo-school-tenants.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 import { AuthorizationError } from "@/domain/command-context";
+import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import {
   isDemoAccountEmail,
   isApprovedDemoGrant,
@@ -115,6 +116,7 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
   return rows.filter(row =>
     row.accountId !== LOCAL_DEMO_ADMIN.accountId &&
     row.personId !== LOCAL_DEMO_ADMIN.personId &&
+    row.accountPersonId === row.personId && row.active &&
     row.email.endsWith("@valorschool.demo") && isDemoAccountEmail(row.email) &&
     row.role !== "platform_owner" && row.role !== "app_admin" &&
     hasValidAccessGrantScope(row));
@@ -229,11 +231,15 @@ export async function readSessionGrants(accountId: string, email: string, reader
 }
 
 /** Independently authenticated Platform Owner may project an existing eligible
- * membership, never the target account's cross-account fixture switch list. */
+ * membership. This is not a target-account login: do not consult public fixture
+ * credential registration or a target account's cross-account switch list.
+ * Callers must independently authenticate the owner and apply view/act policy. */
 export async function readOwnerDelegationGrants(accountId: string, personId: string, email: string, reader: GrantReader = db) {
-  const { grants } = await readSessionGrants(accountId, email, reader);
+  try { await assertRawAccountPerson(accountId, personId, reader); }
+  catch (error) { if (error instanceof AuthorizationError) return []; throw error; }
+  const grants = await listActiveAccountGrants(accountId, reader);
   return grants.filter(grant => grant.accountId === accountId && grant.personId === personId &&
     grant.accountPersonId === personId && grant.email === email.trim().toLowerCase() &&
     (grant.emailVerifiedAt !== null && grant.emailVerifiedAt !== undefined || isDemoAccountEmail(grant.email)) &&
-    grant.active && grant.role !== "platform_owner");
+    grant.active && grant.role !== "platform_owner" && hasValidAccessGrantScope(grant));
 }
