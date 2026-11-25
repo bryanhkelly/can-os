@@ -5,7 +5,7 @@ import {isDemoAccountEmail} from "@/domain/local-demo-access";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { useHydrated } from "@/lib/use-hydrated";
 import {clearLearnerBrowserState} from "@/domain/session-client";
 import { BuildDiagnosticsFooter } from "@/components/shell/BuildDiagnosticsFooter";
@@ -33,6 +33,7 @@ function AccessPage(){
  const verifyAction=search.returnTo
  ?`/access/verify?returnTo=${encodeURIComponent(search.returnTo)}`:"/access/verify";
  async function submit(e:React.FormEvent<HTMLFormElement>){
+  if(busy||!hydrated){e.preventDefault();return;}
   if(isDemoEmail){clearLearnerBrowserState();setBusy(true);return;}
   e.preventDefault();setBusy(true);setStatus({text:"",isError:false});
   try{
@@ -51,10 +52,10 @@ function AccessPage(){
    <fieldset disabled={!hydrated||(!isDemoEmail&&busy)} className="space-y-4">
     <Field label="Email" required><Input name="email" type="email" autoComplete="email" value={email} onChange={e=>updateEmail(e.target.value)}/></Field>
     {isDemoEmail&&<Field label="Access code" required><Input name="code" type="password" autoComplete="one-time-code" value={code} onChange={e=>{setCode(e.target.value);setStatus({text:"",isError:false});}}/></Field>}
-    <Button disabled={!hydrated||busy} type="submit" className="w-full">{!hydrated?"Preparing sign-in…":busy?isDemoEmail?"Signing in…":"Sending access link…":isDemoEmail?"Sign in":"Email me an access link"}</Button>
+    <Button disabled={!hydrated} loading={busy} loadingLabel={isDemoEmail?"Signing in…":"Sending access link…"} type="submit" className="w-full">{!hydrated?"Preparing sign-in…":isDemoEmail?"Sign in":"Email me an access link"}</Button>
    </fieldset>
   </form>
-  <p role={feedback?.isError?"alert":"status"} className="mt-4 text-sm" aria-live="polite">{feedback?.text??""}</p>
+  {feedback?.text&&<WorkspaceNotice tone={feedback.isError?"danger":"info"} className="mt-4">{feedback.text}</WorkspaceNotice>}
   <div className="mt-6 space-y-4 border-t pt-4">
     <p className="text-sm"><Button asChild variant="outline" className="w-full"><Link to="/access/register" search={{returnTo:search.returnTo}}>Create a personal CAN account</Link></Button></p>
     <p className="text-sm"><Button asChild variant="outline" className="w-full"><Link to="/site/new">Create a Site</Link></Button></p>
