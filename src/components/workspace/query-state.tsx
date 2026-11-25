@@ -17,7 +17,7 @@ export interface QueryStateProps {
 function QueryState({ loading, error, isEmpty, empty, children, onRetry, retrying }: QueryStateProps) {
   if (loading) {
     return (
-      <div className="mt-8 text-sm" role="status">
+      <div className="mt-8 min-w-0 text-sm text-muted-foreground [overflow-wrap:anywhere]" role="status" aria-live="polite">
         {loading}
       </div>
     );
@@ -25,7 +25,7 @@ function QueryState({ loading, error, isEmpty, empty, children, onRetry, retryin
   if (error) {
     return <WorkspaceNotice tone="danger" className="mt-8">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
-      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{error}</span>
+      <span className="min-w-0 basis-full [overflow-wrap:anywhere] sm:flex-1 sm:basis-auto">{error}</span>
       {onRetry && <Button type="button" variant="ghost" size="sm" onClick={onRetry} loading={retrying} loadingLabel="Retrying…" disabled={retrying}>
         Retry
       </Button>}
