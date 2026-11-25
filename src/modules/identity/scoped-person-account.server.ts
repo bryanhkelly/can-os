@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db/client";
-import { accessAccounts, accountPersonGrants } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -51,6 +52,9 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
       .returning({id:accessAccounts.id,personId:accessAccounts.personId,disabled:accessAccounts.disabled});
   }
   if (!account) throw new Error("Account could not be provisioned");
+  const domain = identityEmailDomain(email);
+  if (domain) await tx.update(people).set({domain, updatedAt:new Date()})
+    .where(and(eq(people.id,input.personId),isNull(people.domain)));
   return {id:account.id,email};
 }
 
