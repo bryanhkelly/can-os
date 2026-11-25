@@ -2,12 +2,13 @@ import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { existingStudentChoices } from "./admissions-student-choices.server";
 import { db } from "@/db/client";
-import { accessAccounts,accountPersonGrants,admissionOffers,applications,actions,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,publicAdmissionsInterests,studentProfiles } from "@/db/schema";
+import { accessAccounts,accountPersonGrants,admissionOffers,applications,actions,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,organizations,people,programs,publicAdmissionsInterests,studentProfiles } from "@/db/schema";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { provisionScopedPersonAccount, assertScopedCredential } from "@/modules/identity/scoped-person-account.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { isDemoDomain } from "@/domain/domain-classification";
 import { assertPublicInterestConversion } from "@/domain/public-interest-conversion";
 import { applicationGuardianContact } from "@/domain/application-guardian-contact";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
@@ -270,7 +271,10 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
   return db.transaction(async tx=>{
    let existingStudent:typeof studentProfiles.$inferSelect|undefined;
    let existingChoice:Awaited<ReturnType<typeof existingStudentChoices>>[number]|undefined;
-   let synthetic=false;
+   const [owner]=await tx.select({domain:organizations.domain}).from(organizations)
+    .where(eq(organizations.id,program.organizationId)).limit(1);
+   if(!owner)throw new AuthorizationError("admissions organization");
+   const synthetic=isDemoDomain(owner.domain);
    if(data.existingStudent){
     const [choice]=await existingStudentChoices(tx,actor,data.programId,data.existingStudent);
     if(!choice)throw new AuthorizationError("existing student, guardian and household scope");
@@ -285,7 +289,6 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     const [person]=await tx.select({metadata:people.metadata}).from(people)
      .where(eq(people.id,existingStudent.personId)).limit(1);
     if(!person)throw new AuthorizationError("existing student identity");
-    synthetic=existingStudent.metadata.synthetic===true||person.metadata.synthetic===true;
    }
    const idempotencyKey="registrar-inquiry:"+data.requestId;
    const [repeat]=await tx.select({id:applications.id,programId:applications.programId,
