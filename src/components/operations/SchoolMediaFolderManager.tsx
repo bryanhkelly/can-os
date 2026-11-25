@@ -192,7 +192,7 @@ export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
       </Label>
       <Label className="block text-sm font-medium">Rights review note
         <Textarea rows={2} value={reason} onChange={event=>setReason(event.target.value)}
-          placeholder="Document the source and image-use permissions" className="mt-1 w-full  border bg-background p-2"/>
+          placeholder="Document the source and image-use permissions" className="mt-1"/>
       </Label>
       <Button variant="default" type="button" disabled={!rights||!release||!consents||reason.trim().length<10||working}
         onClick={()=>void approve()} className="min-h-11  bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">
