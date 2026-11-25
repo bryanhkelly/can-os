@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNotNull, like } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, like, sql } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents,
   people, programs, publicFamilyStartRequests,
 } from "@/db/schema";
+import { privateAccountGrantEligible } from "@/domain/private-account-authority";
 import { roleCapabilities } from "@/domain/access-context";
 import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { EventTypes } from "@/domain/event-types";
@@ -35,6 +36,7 @@ const grantSelection = {
   email: accessAccounts.emailNormalized,
   emailVerifiedAt: accessAccounts.emailVerifiedAt,
   accountPersonId: accessAccounts.personId,
+  privateCredential: sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
 };
 
 const supportedRoles = Object.keys(roleCapabilities);
@@ -102,6 +104,7 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
       eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
       like(accessAccounts.emailNormalized, "%@valorschool.demo"),
+      isNull(accessAccounts.privateAccessCodeHash),
     ))
     .innerJoin(people, and(
       eq(people.id, accountPersonGrants.personId),
@@ -116,7 +119,7 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
   return rows.filter(row =>
     row.accountId !== LOCAL_DEMO_ADMIN.accountId &&
     row.personId !== LOCAL_DEMO_ADMIN.personId &&
-    row.accountPersonId === row.personId && row.active &&
+    row.accountPersonId === row.personId && row.active && !row.privateCredential &&
     row.email.endsWith("@valorschool.demo") && isDemoAccountEmail(row.email) &&
     row.role !== "platform_owner" && row.role !== "app_admin" &&
     hasValidAccessGrantScope(row));
@@ -131,6 +134,17 @@ export async function readSessionGrants(accountId: string, email: string, reader
     accountId === LOCAL_DEMO_ADMIN.accountId || normalizedEmail === LOCAL_DEMO_ADMIN.email;
   const ownGrants = (await listActiveAccountGrants(accountId, reader))
     .filter(grant => grant.accountId === accountId && hasValidAccessGrantScope(grant));
+
+  // Private credentials replace the shared-code scope, not ordinary grants.
+  // Enrollment/rotation revokes earlier sessions; public fixture switching
+  // cannot target accounts with individual credentials.
+  if (ownGrants.some(grant => grant.privateCredential)) {
+    if (!isDemoAccountEmail(normalizedEmail)) return {grants:[],demoAccountSwitching:false};
+    const grants = ownGrants.filter(grant => grant.privateCredential && privateAccountGrantEligible(grant,accountId,normalizedEmail));
+    if (grants.length) await assertRawAccountPerson(accountId,grants[0]!.personId,reader);
+    const founder = grants.find(grant => grant.role==="site_admin" && grant.siteId);
+    return {grants,demoAccountSwitching:false,...(founder?.siteId?{launchSiteId:founder.siteId}:{})};
+  }
 
   if (demoAccount && !adminAccount) {
     // All non-switching credentials use the same current Person and active
