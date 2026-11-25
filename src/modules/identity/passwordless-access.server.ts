@@ -18,7 +18,7 @@ import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
-import { realSchoolSetupSignupSchema } from "@/domain/school-setup";
+import { realSchoolSetupSignupSchema, siteSignupSchema } from "@/domain/school-setup";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -146,6 +146,18 @@ export async function requestSchoolSetupAccess(input:unknown,sender:AccessEmailS
  });
  await issueOneTimeAccess(email,sender);
  return genericResult;
+}
+/** Public signup approval dispatch. The UI never selects an account type. */
+export async function requestSiteSignup(input:unknown) {
+ const data=siteSignupSchema.parse(input);
+ if(isDemoAccountEmail(data.email)) {
+  const {provisionDemoSiteSignup}=await import("./school-setup-signup.server");
+  await provisionDemoSiteSignup(data);
+  return {accepted:true as const,demo:true as const};
+ }
+ try {await requestSchoolSetupAccess(data);}
+ catch {console.error("[site-signup] verified email request unavailable");}
+ return {accepted:true as const,demo:false as const};
 }
 /** This privileged status is for already-authorized onboarding staff only.
  * Dispatched means the configured sender accepted the message, not inbox delivery. */
