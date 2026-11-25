@@ -62,6 +62,13 @@ describe("private account credential recovery",()=>{
    await expect(rotatePrivateAccountAccessCode(request(),input)).rejects.toThrow();
    expect(state.updates).toEqual([]);
  });
+ it("enrolls a legacy operational Account only with an explicit enrollment action",async()=>{
+   state.rows=[[grant],[{...account,privateAccessCodeHash:null}],[grant]];
+   const result=await rotatePrivateAccountAccessCode(request(),{...input,operation:"enroll"});
+   expect(state.updates[0]).toMatchObject({privateAccessCodeHash:hashPrivateAccessCode(result.privateAccessCode,pepper)});
+   expect(state.audit).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({action:"identity.private_access_code.enrolled"}));
+   expect(state.updates[1]).toMatchObject({revokedAt:expect.any(Date)});
+ });
  it("cannot recover an account carrying an independent protected role",async()=>{
    state.rows=[[grant],[account],[grant,{...grant,role:"academic_content_reviewer"}]];
    await expect(rotatePrivateAccountAccessCode(request(),input)).rejects.toThrow();
