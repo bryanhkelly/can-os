@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionDialog, EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, ActionFooter, EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   engagementDomains, engagementAudienceKinds, engagementInteractions,
   engagementChannels, engagementChannelLabels, type EngagementChannel,
@@ -188,13 +188,13 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
         </Field>}
       </div>
       {!ready&&actionSupported&&<WorkspaceNotice tone="attention">Enter a subject of at least 2 characters, headline of at least 3, introduction of at least 10 and button label of at least 2 characters.</WorkspaceNotice>}
-      {!actionSupported&&<p role="status" className="mt-3 text-sm text-muted-foreground">
+      {!actionSupported&&<WorkspaceNotice tone="attention" className="mt-3">
         {outreach?"Select an available destination for your email invitation.":"This destination cannot complete the selected interaction. Use Discover or Respond for informational journeys; Register requires an eligible training release or enrichment Season. Application, payment, agreement and verified resume integrations are not yet available."}
-      </p>}
+      </WorkspaceNotice>}
       <p className="mt-3 text-xs text-muted-foreground">Publishing creates an immutable, publicly accessible definition. Review content before continuing. This is not a formal program approval or registration.{outreach?" The invitation uses the current Site Brand, and its email wording may differ from a generated material file.":""}</p>
-      <Button type="button" className="mt-4" disabled={busy||!ready} onClick={()=>void publish()}>
-        {busy?"Preparing…":outreach?"Prepare invitation & add recipients":"Publish engagement"}
-      </Button>
+      <ActionFooter layout="inline"><Button type="button" disabled={busy||!ready} loading={busy} loadingLabel="Preparing…" onClick={()=>void publish()}>
+        {outreach?"Prepare invitation & add recipients":"Publish engagement"}
+      </Button></ActionFooter>
     </> : <>
       {outreach&&emailLink&& !revoked.has(emailLink)&&<EngagementEmailDistribution engagementId={published.engagementId} linkId={emailLink} onClose={()=>setEmailLink(null)}/>}
       {outreach&&!emailLink&&links.filter(link=>!revoked.has(link.linkId)).map(link=><Button key={link.linkId} type="button" variant="outline" onClick={()=>setEmailLink(link.linkId)}>Add recipients</Button>)}
@@ -213,16 +213,13 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
       </div>
       <div className="mt-4 space-y-3">
         {!links.length&&<EmptyState title="Create a link for distribution."/>}
-        {links.map(link=><div key={link.linkId} className="flex flex-wrap items-center justify-between gap-2 border p-3">
-          <div>
-            <p className="font-mono text-sm select-all">/go/{link.code}</p>
-            {revoked.has(link.linkId)&&<StatusBadge>Revoked</StatusBadge>}
-          </div>
-          <div className="flex gap-2">
+        {links.map(link=><WorkspacePanel key={link.linkId} headingLevel="h3" title={"/go/"+link.code}
+          actions={<StatusBadge tone={revoked.has(link.linkId)?"neutral":"success"}>{revoked.has(link.linkId)?"Revoked":"Active"}</StatusBadge>}>
+          <ActionFooter layout="inline" className="mt-0">
             <GoLinkActions code={link.code} status={revoked.has(link.linkId)?"revoked":"active"}
               busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")setRevokeTarget(link);}}/>
-          </div>
-        </div>)}
+          </ActionFooter>
+        </WorkspacePanel>)}
       </div>
     </>}
     {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
