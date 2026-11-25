@@ -82,11 +82,12 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
    personId:accessAccounts.personId,
    email:accessAccounts.emailNormalized,
    emailVerifiedAt:accessAccounts.emailVerifiedAt,
+   privateAccessCodeHash:accessAccounts.privateAccessCodeHash,
   }).from(accessAccounts).where(and(
    eq(accessAccounts.id,activeGrant.accountId),
    eq(accessAccounts.disabled,false),
   )).limit(1);
-  if(!target || target.personId!==activeGrant.personId ||
+  if(!target || target.privateAccessCodeHash || target.personId!==activeGrant.personId ||
      !isDemoAccountEmail(target.email) || !target.email.endsWith("@valorschool.demo"))
    return rejectSession(request,"membership_unavailable");
   try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
