@@ -96,7 +96,7 @@ function GuardianNativeClasses(){
     <Input id="guardian-native-class-search" type="search" maxLength={100}
      value={searchText} onChange={e=>setSearchText(e.target.value)}
      placeholder="Search available Classes"
-     className="min-h-11 flex-1 border border-border bg-background px-3 text-sm"/>
+     className="min-w-0 flex-1"/>
     <Button type="submit">Search</Button>
    </form>
    <div className="mt-4 grid gap-4 md:grid-cols-2">
