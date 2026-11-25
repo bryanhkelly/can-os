@@ -1,16 +1,17 @@
 import { rolesAllow, hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
- accessAccounts, accountPersonGrants, applications, enrollments,
+ accessAccounts, accessSessions, accountPersonGrants, applications, enrollments,
  guardianRelationships, people, programs, sections, studentAccessConsents,
  studentProfiles, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { familyApplicationSchoolYearId } from "@/domain/family-application-handoff";
+import { individualStaffIssuerEligible } from "@/domain/individual-staff-handoff";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { provisionScopedPersonAccount, assertFamilyCredentialPair } from "@/modules/identity/scoped-person-account.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -30,7 +31,7 @@ const studentAccessReviewInput=idInput.extend({
  confirmedIndependentIdentity:z.literal(true).optional(),
  reviewMethod:z.enum(["institutional_school_record","verified_in_person"]).optional(),
 }).strict();
-const statement="I am this student's independently verified parent or legal guardian. I authorize CAN OS to send this student a separate school learning sign-in link to the email I provided. This does not grant my account student access.";
+const statement="I am this student's independently verified parent or legal guardian. I authorize CAN OS to establish this student’s separate school learning sign-in using the address I provided. This does not grant my account student access.";
 
 type HandoffReader=typeof db|Parameters<Parameters<typeof db.transaction>[0]>[0];
 async function readHandoffApplication(tx:HandoffReader,applicationId:string){
@@ -114,7 +115,7 @@ export const consentToStudentLearningAccount=createServerFn({method:"POST"})
  .validator((v:unknown)=>consentInput.parse(v))
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
-  if(actor.role!=="guardian"||!actor.actorPersonId||actor.sessionAccountId)
+  if(actor.role!=="guardian"||!actor.actorPersonId||actor.sessionAccountId||actor.impersonatedByAccountId||actor.delegatedByPlatformOwner)
    throw new AuthorizationError("real verified guardian");
   assertCapability(actor,"enrollment.apply");
   const studentEmail=normalizeAccessEmail(data.studentEmail);
@@ -140,7 +141,7 @@ export const consentToStudentLearningAccount=createServerFn({method:"POST"})
      .from(guardianRelationships).where(eq(guardianRelationships.id,guardian.id)).limit(1);
    if(verified?.metadata.verification!=="verified")throw new AuthorizationError("independently verified guardian relationship");
    const [adultAccount]=await tx.select({email:accessAccounts.emailNormalized,
-     verified:accessAccounts.emailVerifiedAt}).from(accessAccounts)
+     verified:accessAccounts.emailVerifiedAt,privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`}).from(accessAccounts)
      .where(eq(accessAccounts.id,actor.accountId)).limit(1);
    await assertFamilyCredentialPair(tx,adultAccount,studentEmail,app.organizationId,app.siteId!);
    const [person]=await tx.select({email:people.email}).from(people)
@@ -235,10 +236,12 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
  .validator((v:unknown)=>studentAccessReviewInput.parse(v))
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
-  if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId)
+  if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId||actor.impersonatedByAccountId||actor.delegatedByPlatformOwner)
    throw new AuthorizationError("real school registrar");
   assertCapability(actor,"enrollment.activate");
-  const email=await db.transaction(async tx=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  setResponseHeader("Referrer-Policy","no-referrer");
+  const handoff=await db.transaction(async tx=>{
    const app=await eligibleStudent(tx,data.applicationId);
    if(!actor.scope.programIds?.includes(app.programId)||
       !actor.scope.siteIds?.includes(app.siteId!)||
@@ -265,9 +268,23 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      .from(people).where(eq(people.id,app.studentPersonId)).for("update").limit(1);
    if(!student?.active || (student.email && normalizeAccessEmail(student.email)!==normalized))
     throw new AuthorizationError("validated student identity and contact");
+   let allowIndividualCredential=false;
+   if(isDemoAccountEmail(normalized)){
+     const [issuer]=await tx.select({
+       personId:accessAccounts.personId,disabled:accessAccounts.disabled,
+       email:accessAccounts.emailNormalized,emailVerifiedAt:accessAccounts.emailVerifiedAt,
+       privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
+       authenticationMethod:accessSessions.authenticationMethod,
+     }).from(accessAccounts).innerJoin(accessSessions,eq(accessSessions.accountId,accessAccounts.id))
+       .where(and(eq(accessAccounts.id,actor.accountId),eq(accessSessions.id,actor.sessionId),
+         eq(accessSessions.activeGrantId,actor.grantId),isNull(accessSessions.revokedAt),
+         gt(accessSessions.expiresAt,new Date()),isNull(accessSessions.delegatedGrantId))).limit(1);
+     allowIndividualCredential=individualStaffIssuerEligible(issuer,actor.actorPersonId) &&
+       consent.status==="pending_review" && data.confirmedIndependentIdentity===true && !!data.reviewMethod;
+   }
    const account=await provisionScopedPersonAccount(tx,{
     email:normalized,personId:app.studentPersonId,organizationId:app.organizationId,
-    siteId:app.siteId!,onlyRole:"student",
+    siteId:app.siteId!,onlyRole:"student",allowIndividualCredential,
    });
    const [grant]=await tx.select({id:accountPersonGrants.id,active:accountPersonGrants.active})
      .from(accountPersonGrants).where(and(
@@ -311,16 +328,17 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      resourceType:"student_access_consent",
      resourceId:consent.id,
      scope:{organizationId:app.organizationId,programId:app.programId,siteId:app.siteId},
-     after:{studentProfileId:app.studentProfileId,status:"approved",
+     after:{studentProfileId:app.studentProfileId,status:"approved",credentialIssued:!!account.privateAccessCode,
        ...(consent.status==="pending_review"?{reviewMethod:data.reviewMethod}:{} )},
      context:{accountId:actor.accountId,sessionId:actor.sessionId}});
-   return normalized;
+   return {email:normalized,privateCredential:account.privateCredential,privateAccessCode:account.privateAccessCode};
   });
   // Email is never sent inside an open DB transaction. On delivery failure
   // the approved grant remains retryable through normal passwordless sign-in.
-  if(isDemoAccountEmail(email))return {status:"approved" as const,signInRequest:"demo_code" as const};
+  if(handoff.privateCredential)return {status:"approved" as const,signInRequest:"private_code" as const,...(handoff.privateAccessCode?{privateAccessCode:handoff.privateAccessCode}:{})};
+  if(isDemoAccountEmail(handoff.email))return {status:"approved" as const,signInRequest:"demo_code" as const};
   try {
-    await requestOneTimeAccess(email, undefined, "/profiles");
+    await requestOneTimeAccess(handoff.email, undefined, "/profiles");
     // The passwordless API intentionally returns a generic acceptance result;
     // it may enforce cooldowns. Never claim provider or inbox delivery here.
     return {status:"approved" as const,signInRequest:"requested" as const};
