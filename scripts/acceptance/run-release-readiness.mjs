@@ -67,7 +67,7 @@ if(profile==="pilot"){
     "tests/unit/noncredit-completion.test.ts","tests/unit/noncredit-pilot-outcomes.test.ts",
     "tests/unit/noncredit-self-enrollment.test.ts","tests/unit/noncredit-completion-automation.test.ts",
     "tests/unit/native-publisher-release-readiness.test.ts","tests/unit/engagement-distribution.test.ts",
-    "tests/unit/campaign-policy.test.ts","tests/unit/campaign-store.test.ts","tests/unit/resend-webhook.test.ts",
+    "tests/unit/campaign-policy.test.ts","tests/unit/outreach-distribution-v61.test.ts","tests/unit/campaign-store.test.ts","tests/unit/resend-webhook.test.ts",
     "tests/unit/platform-owner-delegation.test.ts","tests/unit/platform-owner-pilot-access.test.ts",
     "tests/unit/outbound-dispatcher.test.ts","tests/unit/gloo-content-provider.test.ts",
     "src/domain/site-content-generation.test.ts","src/domain/site-content-package.test.ts"]);

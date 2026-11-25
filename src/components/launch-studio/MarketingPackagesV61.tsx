@@ -1,6 +1,6 @@
 import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { siteAudienceNames } from "@/domain/site-audiences";
-import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
+import { MarketingPackageWizardV61, OutreachProgressV61 } from "./MarketingPackageWizardV61";
 import { marketingEditorReducer, type MarketingEditorView, type MarketingEditorState } from "./marketing-package-editor-state";
 import { SiteGuideV61 } from "./SiteGuideV61";
 import { MarketingPackageReleaseHistoryV61 } from "./MarketingPackageReleaseHistoryV61";
@@ -96,6 +96,8 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   const setPreviewFormat=(update:SetStateAction<MarketingFormat>)=>dispatchEditor({type:"previewFormat",update});
   const setEditingFormat=(update:SetStateAction<MarketingFormat|null>)=>dispatchEditor({type:"editingFormat",update});
   const [showArchived,setShowArchived]=useState(false);
+  const [advancedDistribution,setAdvancedDistribution]=useState(false);
+  const [emailPreparation,setEmailPreparation]=useState<{packageId:string;revision:number}|null>(null);
   const [busy,setBusy]=useState(false);
   const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
   const [discardDialogOpen,setDiscardDialogOpen]=useState(false);
@@ -115,6 +117,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     "Leave this outreach plan? Unsaved changes will be lost.");
 
   function open(recordToOpen:PackageRecord,editing=false) {
+    setEmailPreparation(null);setAdvancedDistribution(false);
     dispatchEditor({type:"open",record:recordToOpen,editing,content:{
       ...recordToOpen.content,plan:recordToOpen.content.plan??{
         ...newPlan(siteIntent?.audienceIds??[]),
@@ -127,6 +130,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     setReleaseRequestId(crypto.randomUUID());setCompare(null);
   }
   function start() {
+    setEmailPreparation(null);setAdvancedDistribution(false);
     dispatchEditor({type:"start",title:siteName+" outreach",content:{
       ...starter(context.defaultPurpose),
       plan:newPlan(siteIntent?.audienceIds??[]),
@@ -202,7 +206,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       const saved=await saveCurrent(nextContent);
       setContent(saved.content);
       if(step<5)setStep(value=>value+1);
-      else {setView("detail");setNotice("Outreach plan saved. Materials are not generated or sent.");}
+      else {setView("share");setNotice("Outreach plan saved. Choose how to distribute it. Nothing has been sent.");}
     });
   }
   async function saveMaterialOverride() {
@@ -343,7 +347,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       : hasDownloadableMaterials
         ? "Your reviewed materials can be downloaded. Nothing has been sent."
         : "Your plan is saved, but there are no complete materials to download yet. Review the previews and create materials first.";
-  const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Create Outreach":view==="share"?"Use & Share":view==="followup"?"Follow Up":record?.title??"Outreach Details";
+  const titleText=view==="library"?context.libraryTitle:view==="wizard"?"Create Outreach":view==="share"?"Distribute":view==="followup"?"Follow Up":record?.title??"Outreach Details";
   const guidePlan = view === "wizard" ? content.plan : record?.content.plan;
   const guideRecipients = (guidePlan?.recipients ?? []).slice(0, 2).map(id =>
     marketingAudienceOptions.find(option => option.id === id)?.label ?? id);
@@ -576,10 +580,19 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           <Button variant="outline" disabled={Boolean(editingFormat)} onClick={()=>{setView("library");setRecord(null);}}>My Outreach</Button>
           <Button variant="outline" disabled={busy} onClick={()=>void duplicate(record)}><Copy aria-hidden="true"/> Duplicate</Button>
           <Button variant="outline" disabled={busy||record.status==="archived"||Boolean(editingFormat)} onClick={()=>open(record,true)}>Edit plan</Button>
-          <Button disabled={busy||Boolean(editingFormat)} onClick={()=>setView("share")}>Use &amp; Share <ArrowRight aria-hidden="true"/></Button>
+          <Button disabled={busy||Boolean(editingFormat)} onClick={()=>setView("share")}>Distribute <ArrowRight aria-hidden="true"/></Button>
         </ActionFooter>
       </>}
       {view==="share"&&record&&<>
+        <OutreachProgressV61 step={6}/>
+        {record.status==="archived"?<WorkspaceNotice tone="attention">Restore this outreach before distributing it.</WorkspaceNotice>:<>
+        {record.content.formats.includes("email")&&<WorkspacePanel title="Email recipients" description="Resume a saved invitation or prepare a new one, then enter addresses or choose a saved recipient list. Nothing is sent until you confirm.">
+          {!(emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision)&&<SiteEngagementLibrary key={"saved-email:"+record.id} siteId={siteId} packageId={record.id} emailOnly/>}
+          <Button type="button" variant="outline" onClick={()=>setEmailPreparation(current=>current?.packageId===record.id&&current.revision===record.revision?null:{packageId:record.id,revision:record.revision})}>{emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision?"Return to saved invitations":"Prepare a new email invitation"}</Button>
+          {emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision&&<UniversalEngagementPublisher key={"email:"+record.id+":"+record.revision} siteId={siteId} packageId={record.id} outreach={{title:record.title,headline:record.content.materialOverrides?.email?.headline??record.content.headline,message:record.content.materialOverrides?.email?.message??record.content.message,callToAction:record.content.materialOverrides?.email?.callToAction??record.content.callToAction}} />}
+        </WorkspacePanel>}
+        </>}
+        <MarketingPackageReleaseControlsV61 record={record} versions={packageReleases} currentBrand={currentBrand} selectedBrandRevision={selectedBrandRevision} busy={busy} releasesLoading={releasesLoading} releasesUnavailable={releasesUnavailable} onSelectCurrentBrand={()=>{void selectCurrentBrand();}} onRetryHistory={()=>setReleaseRefreshKey(value=>value+1)} onPreview={()=>{setTitle(record.title);setContent(record.content);setStep(5);setView("wizard");}} onRelease={()=>{void releasePackage();}} />
         <WorkspacePanel title="Available materials" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
           <p className="text-sm text-muted-foreground">
             {materialAvailabilityMessage}
@@ -596,9 +609,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             These files are ready to download. Sharing or sending them requires a separate action.
           </WorkspaceNotice>}
         </WorkspacePanel>
-        <UniversalEngagementPublisher key={"engagement:"+record.id} siteId={siteId} packageId={record.id} />
-        <SiteEngagementLibrary key={"library:"+record.id} siteId={siteId} packageId={record.id} />
-        <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
+        {record.status!=="archived"&&<details className="border p-4" open={advancedDistribution} onToggle={event=>setAdvancedDistribution(event.currentTarget.open)}><summary className="cursor-pointer font-semibold">Manage invitations, digital links and existing campaigns</summary>
+          {advancedDistribution&&<>
+          <UniversalEngagementPublisher key={"engagement:"+record.id} siteId={siteId} packageId={record.id} />
+          <SiteEngagementLibrary key={"library:"+record.id} siteId={siteId} packageId={record.id} />
+        </>}</details>}
+        <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button><Button variant="outline" onClick={()=>{setEmailPreparation(null);setView("library");setRecord(null);}}>Finish / My Outreach</Button></ActionFooter>
       </>}
       {view==="followup"&&record&&<>
         <WorkspacePanel title="Responses & events" description="Review inquiries and interest events for your site. These may include activity unrelated to this outreach plan.">

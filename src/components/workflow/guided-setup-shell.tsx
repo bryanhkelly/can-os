@@ -22,7 +22,7 @@ export function GuidedSetupProgress({ steps, onStepChange, navigationDisabled = 
       steps.length === 2 ? "grid-cols-1 sm:grid-cols-2" :
       steps.length === 3 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" :
       steps.length === 4 ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" :
-      steps.length === 6 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" :
+      steps.length === 6 || steps.length === 7 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" :
       "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5")}>
       {steps.map((step, index) => {
         const item = <>

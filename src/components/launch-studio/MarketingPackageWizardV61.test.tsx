@@ -23,9 +23,11 @@ const props = {
 };
 
 describe("Share V6.1 guided outreach editor",()=>{
-  it("uses six shared progress steps and distinguishes recipients from beneficiaries",()=>{
+  it("uses seven shared progress steps and distinguishes recipients from beneficiaries",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props}/>);
     expect(html).toContain("Share outreach steps");
+    expect(html).toContain("Distribute");
+    expect(html.match(/<li\b/g)?.length).toBeGreaterThanOrEqual(7);
     expect(html).toContain("Who should hear about this?");
     expect(html).toContain("Who would you like to reach?");
     expect(html).toContain("Who are you hoping to help?");
@@ -49,12 +51,12 @@ describe("Share V6.1 guided outreach editor",()=>{
     expect(html).toContain("Which materials would you like to create?");
     expect(html).toContain("before sending or publishing anything");
   });
-  it("offers story angles and editable output on the final step",()=>{
+  it("offers story angles and editable output on the review step",()=>{
     const html=renderToStaticMarkup(<MarketingPackageWizardV61 {...props} step={5}/>);
     expect(html).toContain("Community Impact");
     expect(html).toContain("Partnership");
     expect(html).toContain("Outreach name");
-    expect(html).toContain("Use suggestion for this plan");
-    expect(html).toContain("Save Outreach Plan");
+    expect(html).toContain("Use basic plan suggestion");
+    expect(html).toContain("Save &amp; Continue to Distribute");
   });
 });

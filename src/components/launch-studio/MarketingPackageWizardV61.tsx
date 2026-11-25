@@ -20,6 +20,10 @@ import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 type Suggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
 type Suggestion = Suggestions[MarketingPackageContent["purpose"]];
 const stepTitles=["People","Message","Highlights","Action","Materials","Review"] as const;
+export const outreachProgressStepsV61=[...outreachStepIdsV61.map((id,index)=>({id,title:stepTitles[index]??id})),{id:"distribute",title:"Distribute"}];
+export function OutreachProgressV61({step}:{step:number}){
+  return <GuidedSetupProgress label="Share outreach steps" steps={outreachProgressStepsV61.map((item,index)=>({...item,status:index<step?"complete" as const:index===step?"current" as const:"upcoming" as const}))}/>;
+}
 const relationshipOptions=[
   {id:"known",label:"People I know"},{id:"new",label:"People I don't know"},{id:"both",label:"Both"},
 ] as const;
@@ -136,11 +140,7 @@ export function MarketingPackageWizardV61({
     ?activePreviewFormat:content.formats[0]??null;
 
   return <>
-    <GuidedSetupProgress label="Share outreach steps"
-      steps={outreachStepIdsV61.map((id,index)=>({
-        id,title:stepTitles[index]??id,
-        status:index<step?"complete" as const:index===step?"current" as const:"upcoming" as const,
-      }))}/>
+    <OutreachProgressV61 step={step}/>
     {step===0&&<WorkspacePanel title="Who should hear about this?"
       description="Choose who should receive your message, then identify who you hope will benefit.">
       <div className="mt-5 space-y-5">
@@ -309,7 +309,7 @@ export function MarketingPackageWizardV61({
         <Button type="button" variant="outline" disabled={busy||!hasSavedPackage}
           onClick={onSaveExit}>Save &amp; Exit</Button>
         <Button type="button" disabled={busy} onClick={onNext}>
-          {step===5?"Save Outreach Plan":"Save & Continue"}
+          {step===5?"Save & Continue to Distribute":"Save & Continue"}
           {step===5?<Check aria-hidden="true"/>:<ArrowRight aria-hidden="true"/>}
         </Button>
       </div>

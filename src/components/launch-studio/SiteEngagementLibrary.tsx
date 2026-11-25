@@ -23,12 +23,12 @@ const problem=(error:unknown)=>error instanceof Error?error.message:"Action unav
  * Recover published experiences and their actual persisted Go Links. In-memory
  * authoring state must never be the only way to manage a distributed link.
  */
-type LibraryProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface};
+type LibraryProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface;emailOnly?:boolean};
 export function SiteEngagementLibrary(props:LibraryProps){
   const scope=engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner);
-  return <SiteEngagementLibrarySession key={scope} {...props}/>;
+  return <SiteEngagementLibrarySession key={props.emailOnly?scope+":email":scope} {...props}/>;
 }
-function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryProps){
+function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=false}:LibraryProps){
   const [records,setRecords]=useState<Entry[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [links,setLinks]=useState<Link[]>([]);
@@ -37,7 +37,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
   const [loading,setLoading]=useState(true);
   const [linksLoading,setLinksLoading]=useState(false);
   const [refresh,setRefresh]=useState(0);
-  const [channel,setChannel]=useState<EngagementChannel>("web");
+  const [channel,setChannel]=useState<EngagementChannel>(emailOnly?"email":"web");
   const [busy,setBusy]=useState(false);
   const pending=useRef(false);
   const [error,setError]=useState("");
@@ -50,16 +50,17 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
     (ownerSurface?listOwnerEngagementDefinitions({data:{owner:ownerSurface.owner}}):listSiteEngagementDefinitions({data:{siteId:siteId!,packageId:packageId!}}))
       .then(rows=>{
         if(!active)return;
-        setRecords(rows);
-        setSelected(previous=>previous&&rows.some(row=>row.engagementId===previous)
-          ?previous:rows[0]?.engagementId??null);
+        const available=emailOnly?rows.filter(row=>row.status==="active"):rows;
+        setRecords(available);
+        setSelected(previous=>previous&&available.some(row=>row.engagementId===previous)
+          ?previous:available[0]?.engagementId??null);
         setLoading(false);
       })
       .catch(()=>{
         if(active){setRecords([]);setSelected(null);setError("Unable to load published engagements.");setLoading(false);}
       });
     return ()=>{active=false;};
-  },[siteId,packageId,ownerSurface?.owner.kind,ownerSurface?.owner.kind==="organization"?ownerSurface.owner.organizationId:null,refresh]);
+  },[siteId,packageId,ownerSurface?.owner.kind,ownerSurface?.owner.kind==="organization"?ownerSurface.owner.organizationId:null,refresh,emailOnly]);
 
   useEffect(()=>{
     let active=true;
@@ -67,10 +68,10 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
     if(!selected){setLinksLoading(false);return;}
     setLinksLoading(true);
     listEngagementGoLinks({data:{engagementId:selected}})
-      .then(rows=>{if(active){setLinks(rows);setLinksFor(selected);setLinksLoading(false);}})
+      .then(rows=>{if(active){const available=emailOnly?rows.filter(row=>row.channel==="email"&&row.status==="active"):rows;setLinks(available);setLinksFor(selected);setLinksLoading(false);if(emailOnly&&available.length===1&&available[0])setDistribution(available[0].id);}})
       .catch(()=>{if(active){setLinks([]);setError("Unable to load saved Go Links.");setLinksLoading(false);}});
     return ()=>{active=false;};
-  },[selected,refresh]);
+  },[selected,refresh,emailOnly]);
 
   const record=records.find(row=>row.engagementId===selected);
   // State alone cannot fence two actions before React commits a busy render.
@@ -120,18 +121,18 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
     finally{endMutation();}
   }
   return <WorkspacePanel
-    title="Published engagement library"
-    description="Saved invitations and links remain manageable after you leave this page. Each published engagement is an immutable version.">
+    title={emailOnly?"Saved email invitations":"Published engagement library"}
+    description={emailOnly?"Select a previously prepared invitation to resume recipient management. Review its saved wording before sending.":"Saved invitations and links remain manageable after you leave this page. Each published engagement is an immutable version."}>
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <Button type="button" variant="outline" size="sm" disabled={busy}
         onClick={refreshLibrary}>Refresh</Button>
     </div>
     {loading&&<QueryState loading="Loading published engagements…"/>}
     {!loading&&!records.length&&!error&&
-      <EmptyState className="mt-4" title="No published experiences in this workspace yet."/>}
+      <EmptyState className="mt-4" title={emailOnly?"No saved invitations yet. Prepare a new email invitation below.":"No published experiences in this workspace yet."}/>}
     {!loading&&records.length>0&&<>
       <Field className="mt-4" label="Published experience">
-        <Select id="saved-go-engagement" disabled={busy} value={selected??""} onChange={event=>{
+        <Select disabled={busy} value={selected??""} onChange={event=>{
           if(pending.current)return;
           setSelected(event.target.value);setLinks([]);setLinksFor(null);setLinksLoading(true);setDistribution(null);setConfirmation(null);setError("");setMessage("");
         }}>
@@ -145,16 +146,16 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
           <span className="font-medium">{record.domain}</span> · {record.mode==="page"?"Rendered experience":"Direct destination"} · {record.status}
         </div>
         <div className="mt-4 flex flex-wrap items-end gap-3">
-          <Field label="Channel">
+          {!emailOnly&&<Field label="Channel">
           <Select value={channel} disabled={busy} onChange={event=>{if(!pending.current)setChannel(event.target.value as EngagementChannel);}}>
               {engagementChannels.map(id=><option value={id} key={id}>{engagementChannelLabels[id]}</option>)}
             </Select>
-        </Field>
-          <Button type="button" disabled={busy||linksLoading||record.status!=="active"} onClick={()=>void createLink()}>
-            {busy?"Working…":"Create another Go Link"}
+        </Field>}
+          <Button type="button" disabled={busy||linksLoading||linksFor!==selected||record.status!=="active"||(emailOnly&&links.length>0)} onClick={()=>void createLink()}>
+            {busy?"Working…":emailOnly?"Prepare email link":"Create another Go Link"}
           </Button>
-          <Button type="button" variant="outline" disabled={busy||linksLoading||record.status==="retired"}
-            onClick={()=>setConfirmation({engagementId:record.engagementId})}>Retire engagement</Button>
+          {!emailOnly&&<Button type="button" variant="outline" disabled={busy||linksLoading||record.status==="retired"}
+            onClick={()=>setConfirmation({engagementId:record.engagementId})}>Retire engagement</Button>}
         </div>
       </>}
       {linksLoading&&<QueryState loading="Loading saved links…"/>}
@@ -169,15 +170,15 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
             {link.evidence?<p className="mt-1 text-xs text-muted-foreground">{link.evidence.redirects30d} observed requests · {link.evidence.registrationEvidence==="referenced_noncredit_claim"?`${link.evidence.referralRegistrations30d??0} matching registration claims`:"Outcome not connected"} (30 days; not unique people or causal conversions)</p>:<p className="mt-1 text-xs text-muted-foreground">Outcome evidence unavailable.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
-            {link.status==="active"&&record?.status==="active"&&<GoLinkActions code={link.code} status="active"
+            {!emailOnly&&link.status==="active"&&record?.status==="active"&&<GoLinkActions code={link.code} status="active"
               busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")setConfirmation({engagementId:record.engagementId,link});}}/>}
-            {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>Prepare email</Button>}
+            {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>{emailOnly?"Add recipients / manage campaign":"Prepare email"}</Button>}
           </div>
         </div>)}
       </div>}
       {distribution&&!linksLoading&&linksFor===selected&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
     </>}
-    {siteId&&!ownerSurface&&<SiteCampaignEvidencePanel key={siteId} siteId={siteId}/>}
+    {!emailOnly&&siteId&&!ownerSurface&&<SiteCampaignEvidencePanel key={siteId} siteId={siteId}/>}
     {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
     {message&&<WorkspaceNotice tone="success" className="mt-4">{message}</WorkspaceNotice>}
     <ActionDialog open={!!confirmation&&confirmation.engagementId===selected}
