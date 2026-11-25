@@ -25,12 +25,13 @@ const unresolvedSource = inventory.inspected.flatMap(file => {
   // The AST already exempts accessible checkbox/radio card labels. Any
   // remaining native label is actionable design-system debt.
   const rawControls = file.native;
-  if (!rawControls.length && !file.corners.length && !file.syntaxErrors.length) return [];
+  if (!rawControls.length && !file.corners.length && !file.appearance.length && !file.syntaxErrors.length) return [];
   return [{
     path: file.path,
     rawControlCount: rawControls.length,
     nativeLabelCount: file.native.filter(item => item.tag === "label").length,
     roundedUtilityCount: file.corners.length,
+    appearanceViolationCount: file.appearance.length,
     syntaxErrorCount: file.syntaxErrors.length,
   }];
 });
@@ -94,7 +95,7 @@ if (missing.length) {
 }
 if (unresolvedSource.length) {
   console.error("V6.1 SOURCE NOT ALIGNED: " + unresolvedSource.length +
-    " files retain legacy controls, geometry or syntax. See sourceDebt.");
+    " files retain legacy controls, geometry, appearance overrides or syntax. See sourceDebt.");
   process.exitCode = 1;
 }
 const independent = [...new Set([
