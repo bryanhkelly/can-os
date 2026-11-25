@@ -23,11 +23,12 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 ## Demo identity, synthetic data and test infrastructure
 
 - A demo Organization or Person is classified by its normalized .demo domain. Synthetic operational data is classified by its owning Organization, not the participant's email or fixture provenance.
+- Canonical Organization and Person domains are nullable; collect or reconcile them from reliable identity evidence when available. Do not enforce mandatory domain association in the database, infer affiliation from a domain, or assign an unknown Person a demo domain based on membership. Publisher and teaching provider domains come from their Organization; Teacher domains come from their Person.
 - Production application functionality, authorization, workflow, rendering, persistence and performance must be independent of demo classification. Use the same services, canonical identities, grants and components.
 - The only intended functional exceptions are automatic email verification for demo identities and suppression of outbound email to .demo destinations. Record verification provenance accurately. Never equate automatic email verification with authentication or grant authority.
 - Preserve account ownership, current session checks, role/capability/resource/scope/relationship authorization and separation of duties for all identities. Existing public shared-code fixtures must not gain access to authentic records or privileged operations; migrate to equivalent secure credentials and canonical grants before removing legacy guards.
 - Synthetic classification is a reporting dimension; fixture provenance is test infrastructure, not business authorization. Use isolated deterministic fixtures and never place authentic student/family records in test fixtures.
-- During the convergence release, legacy demo registry, fixture and SMS restrictions remain until their consumers, data and security invariants are reconciled. Their existence is not a precedent for new demo-specific business logic. Do not introduce new demo-only handlers or deployment flags.
+- During the convergence release, legacy shared-credential registry and fixture restrictions remain until their consumers, data and security invariants are reconciled. Their existence is not a precedent for new demo-specific business logic. Do not introduce new demo-only handlers or deployment flags.
 
 ## Permanent V6.1 architecture contract
 
