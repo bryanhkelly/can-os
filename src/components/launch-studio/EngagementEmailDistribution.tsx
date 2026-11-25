@@ -71,7 +71,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
       <ActionFooter layout="inline"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></ActionFooter>
     </>}
     {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
-    <NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady={!!draft}/>
+    {draft&&<NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady/>}
     {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
     {draft&&error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
   </section>;

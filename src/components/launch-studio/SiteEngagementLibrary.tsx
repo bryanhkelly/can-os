@@ -68,7 +68,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
     if(!selected){setLinksLoading(false);return;}
     setLinksLoading(true);
     listEngagementGoLinks({data:{engagementId:selected}})
-      .then(rows=>{if(active){const available=emailOnly?rows.filter(row=>row.channel==="email"&&row.status==="active"):rows;setLinks(available);setLinksFor(selected);setLinksLoading(false);}})
+      .then(rows=>{if(active){const available=emailOnly?rows.filter(row=>row.channel==="email"&&row.status==="active"):rows;setLinks(available);setLinksFor(selected);setLinksLoading(false);if(emailOnly&&available.length===1)setDistribution(available[0].id);}})
       .catch(()=>{if(active){setLinks([]);setError("Unable to load saved Go Links.");setLinksLoading(false);}});
     return ()=>{active=false;};
   },[selected,refresh,emailOnly]);
@@ -132,7 +132,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
       <EmptyState className="mt-4" title={emailOnly?"No saved invitations yet. Prepare a new email invitation below.":"No published experiences in this workspace yet."}/>}
     {!loading&&records.length>0&&<>
       <Field className="mt-4" label="Published experience">
-        <Select id="saved-go-engagement" disabled={busy} value={selected??""} onChange={event=>{
+        <Select disabled={busy} value={selected??""} onChange={event=>{
           if(pending.current)return;
           setSelected(event.target.value);setLinks([]);setLinksFor(null);setLinksLoading(true);setDistribution(null);setConfirmation(null);setError("");setMessage("");
         }}>
@@ -151,7 +151,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
               {engagementChannels.map(id=><option value={id} key={id}>{engagementChannelLabels[id]}</option>)}
             </Select>
         </Field>}
-          <Button type="button" disabled={busy||linksLoading||record.status!=="active"} onClick={()=>void createLink()}>
+          <Button type="button" disabled={busy||linksLoading||linksFor!==selected||record.status!=="active"||(emailOnly&&links.length>0)} onClick={()=>void createLink()}>
             {busy?"Working…":emailOnly?"Prepare email link":"Create another Go Link"}
           </Button>
           {!emailOnly&&<Button type="button" variant="outline" disabled={busy||linksLoading||record.status==="retired"}

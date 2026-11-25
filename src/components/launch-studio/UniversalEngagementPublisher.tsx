@@ -93,12 +93,12 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
         const link=await createEngagementGoLink({data:{engagementId:saved.engagementId,versionId:saved.versionId,channel:"email"}});
         setLinks([link]);setEmailLink(link.linkId);
       }
-      setNotice("Published immutable engagement v1. You can create independent links for each channel.");
+      setNotice(outreach?"Email invitation prepared. Add recipients below. Nothing has been sent.":"Published immutable engagement v1. You can create independent links for each channel.");
     }catch(error){setError(errorMessage(error));}
     finally{pending.current=false;setBusy(false);}
   }
   async function createLink(){
-    if(!published||busy||pending.current)return;
+    if(!published||busy||pending.current||(outreach&&links.some(link=>!revoked.has(link.linkId))))return;
     pending.current=true;
     setBusy(true);setError("");setNotice("");
     try{
@@ -112,7 +112,8 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
     finally{pending.current=false;setBusy(false);}
   }
   async function revoke(link:CreatedLink){
-    if(!published||busy||revoked.has(link.linkId))return;
+    if(!published||busy||pending.current||revoked.has(link.linkId))return;
+    pending.current=true;
     setBusy(true);setError("");setNotice("");
     try{
       await revokeEngagementGoLink({
@@ -121,7 +122,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
       setRevoked(current=>new Set(current).add(link.linkId));
       setNotice("The link was revoked.");setRevokeTarget(null);
     }catch(error){setError(errorMessage(error));}
-    finally{setBusy(false);}
+    finally{pending.current=false;setBusy(false);}
   }
   return <WorkspacePanel title={outreach?"Prepare email invitation":"Context-aware engagement"}
     description={outreach?"Confirm where recipients should go when they click your invitation. Preparing it makes the invitation page public but sends no email.":"Publish a reusable invitation or opportunity experience, then generate channel-specific Go Links. No application, employment, partnership or enrollment is created here."}>
@@ -186,8 +187,9 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
           <Input maxLength={80} value={actionLabel} onChange={event=>setActionLabel(event.target.value)}/>
         </Field>}
       </div>
+      {!ready&&actionSupported&&<WorkspaceNotice tone="attention">Enter a subject of at least 2 characters, headline of at least 3, introduction of at least 10 and button label of at least 2 characters.</WorkspaceNotice>}
       {!actionSupported&&<p role="status" className="mt-3 text-sm text-muted-foreground">
-        This destination cannot complete the selected interaction. Use Discover or Respond for informational journeys; Register requires an eligible training release or enrichment Season. Application, payment, agreement and verified resume integrations are not yet available.
+        {outreach?"Select an available destination for your email invitation.":"This destination cannot complete the selected interaction. Use Discover or Respond for informational journeys; Register requires an eligible training release or enrichment Season. Application, payment, agreement and verified resume integrations are not yet available."}
       </p>}
       <p className="mt-3 text-xs text-muted-foreground">Publishing creates an immutable, publicly accessible definition. Review content before continuing. This is not a formal program approval or registration.{outreach?" The invitation uses the current Site Brand, and its email wording may differ from a generated material file.":""}</p>
       <Button type="button" className="mt-4" disabled={busy||!ready} onClick={()=>void publish()}>
@@ -195,7 +197,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
       </Button>
     </> : <>
       {outreach&&emailLink&& !revoked.has(emailLink)&&<EngagementEmailDistribution engagementId={published.engagementId} linkId={emailLink} onClose={()=>setEmailLink(null)}/>}
-      {outreach&&links.filter(link=>!revoked.has(link.linkId)).map(link=><Button key={link.linkId} type="button" variant="outline" onClick={()=>setEmailLink(link.linkId)}>Add recipients</Button>)}
+      {outreach&&!emailLink&&links.filter(link=>!revoked.has(link.linkId)).map(link=><Button key={link.linkId} type="button" variant="outline" onClick={()=>setEmailLink(link.linkId)}>Add recipients</Button>)}
       <p className="mt-4 text-sm font-medium">Published engagement version {published.version}</p>
       <p className="mt-1 text-xs text-muted-foreground">The public experience content cannot be changed in this version. New Go Links can be issued or revoked.</p>
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -205,7 +207,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
               <option key={c} value={c}>{engagementChannelLabels[c]}</option>)}
           </Select>
         </Field>}
-        <Button disabled={busy} type="button" onClick={()=>void createLink()}>
+        <Button disabled={busy||Boolean(outreach&&links.some(link=>!revoked.has(link.linkId)))} type="button" onClick={()=>void createLink()}>
           {busy?"Working…":outreach?"Create email link":"Create Go Link"}
         </Button>
       </div>
