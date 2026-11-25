@@ -89,7 +89,7 @@ function TransferRecordsWorkspace({items,action}:{items:Items;action?:string}){
         <Link to="/admissions/transcripts" search={{query:item.studentName,student:item.studentPersonId}}
          className="text-sm font-semibold underline">Open official transcript issuance for {item.studentName}</Link>
         <Label className="block text-sm font-medium">Previously issued official transcript
-          <Select className="mt-2 w-full  border bg-background p-3"
+          <Select className="mt-2"
             value={selected[item.id]??item.issuances[0]?.id??""}
             onChange={e=>setSelected(current=>({...current,[item.id]:e.target.value}))}>
             {!item.issuances.length&&<option value="">No authorized transcript issuances available</option>}
@@ -99,7 +99,7 @@ function TransferRecordsWorkspace({items,action}:{items:Items;action?:string}){
           </Select>
         </Label>
         <Label className="block text-sm font-medium">Actual records delivery method
-          <Select className="mt-2 w-full  border bg-background p-3"
+          <Select className="mt-2"
             value={methods[item.id]??"approved_secure_exchange"}
             onChange={e=>setMethods(current=>({...current,[item.id]:e.target.value as DeliveryMethod}))}>
             {item.destinationApplicationId&&<option value="can_internal_school_records">Release directly to verified CAN receiving school</option>}
@@ -112,7 +112,7 @@ function TransferRecordsWorkspace({items,action}:{items:Items;action?:string}){
           <Input required minLength={12} maxLength={400} value={receipts[item.id]??""}
             onChange={e=>setReceipts(current=>({...current,[item.id]:e.target.value}))}
             placeholder="Unique secure-exchange confirmation or mailing tracking reference"
-            className="mt-2 w-full  border bg-background p-3"/>
+            className="mt-2"/>
         </Label>}
         {methods[item.id]==="can_internal_school_records"&&<p className=" border p-3 text-sm">
           This is an immediate CAN-to-CAN release of the immutable, officially issued transcript.
