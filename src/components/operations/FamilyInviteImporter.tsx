@@ -186,7 +186,7 @@ export function FamilyInviteImporter({
             ? `${program.name} · school launch information`
             : `${program.name} is welcoming families`);
           changed();
-        }} className="mt-2 block w-full  border bg-background p-3 font-normal">
+        }} className="mt-2">
           <option value="">Choose your school outreach destination</option>
           {programs.map(program => <option key={program.id} value={program.id}>{program.name} · {program.purpose === "interest" ? "Pre-opening information" : "Application"}</option>)}
         </Select>
@@ -199,7 +199,7 @@ export function FamilyInviteImporter({
       <Label className="mt-5 block text-sm font-semibold">Paste families
         <Textarea disabled={awaitingVerification} value={raw} onChange={event => { setRaw(event.target.value); changed(); }}
           rows={7} placeholder={"john@example.com\nMary Jones <mary@example.com>\nJane Smith,jane@example.com"}
-          className="mt-2 w-full  border bg-background p-3 font-normal" />
+          className="mt-2" />
       </Label>
       <Label className="mt-4 block text-sm font-semibold">Or upload CSV / text (up to 1 MB)
         <Input type="file" disabled={awaitingVerification} accept=".csv,.txt,text/csv,text/plain" className="mt-2 block w-full text-sm font-normal"
@@ -226,10 +226,10 @@ export function FamilyInviteImporter({
       </details>}
       <div className="mt-6 grid gap-4">
         <Label className="text-sm font-semibold">Subject
-          <Input disabled={awaitingVerification} value={subject} maxLength={120} onChange={event => { setSubject(event.target.value); changed(); }} className="mt-2 w-full  border bg-background p-3 font-normal" />
+          <Input disabled={awaitingVerification} value={subject} maxLength={120} onChange={event => { setSubject(event.target.value); changed(); }} className="mt-2" />
         </Label>
         <Label className="text-sm font-semibold">Personal introduction
-          <Textarea disabled={awaitingVerification} rows={3} value={introduction} maxLength={2000} onChange={event => { setIntroduction(event.target.value); changed(); }} className="mt-2 w-full  border bg-background p-3 font-normal" />
+          <Textarea disabled={awaitingVerification} rows={3} value={introduction} maxLength={2000} onChange={event => { setIntroduction(event.target.value); changed(); }} className="mt-2" />
         </Label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Email uses the approved CAN sender. Application links use the CAN access-mail service; pre-opening notices use the notification delivery service. A typed sender address cannot override either.</p>
