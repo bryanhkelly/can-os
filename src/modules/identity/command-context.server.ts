@@ -87,7 +87,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
    eq(accessAccounts.disabled,false),
   )).limit(1);
   if(!target || target.personId!==activeGrant.personId ||
-     (!target.emailVerifiedAt && !isDemoAccountEmail(target.email)))
+     !isDemoAccountEmail(target.email) || !target.email.endsWith("@valorschool.demo"))
    return rejectSession(request,"membership_unavailable");
   try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
   catch { return rejectSession(request,"membership_unavailable"); }
