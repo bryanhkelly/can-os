@@ -13,6 +13,47 @@ import { duplicateImportBindings } from "../lib/import-binding-conflicts.mjs";
 import { sourceDependencySpecifiers } from "../lib/v61-component-dependencies.mjs";
 import { unresolvedLocalSourceModule } from "../lib/source-module-resolution.mjs";
 
+// Opted-in strict RPC shells use only shared validation and dynamic server
+// implementation imports inside createServerFn handlers. This catches a
+// narrow source contract; TanStack's real client bundle remains authoritative.
+const strictRpcShells=new Map([
+  ["src/modules/engagement/engagement-registry.functions.ts","engagement-registry"],
+  ["src/modules/communication/engagement-campaigns.functions.ts","engagement-campaigns"],
+]);
+function strictRpcShellViolations(parsed,stem){
+  const violations=[];
+  const allowed=new Set(["@tanstack/react-start","./"+stem+".inputs"]);
+  for(const statement of parsed.statements){
+    if(ts.isImportDeclaration(statement)){
+      if(!ts.isStringLiteral(statement.moduleSpecifier)||!allowed.has(statement.moduleSpecifier.text))
+        violations.push({node:statement,message:"RPC shell static import must be shared validation or createServerFn"});
+      continue;
+    }
+    if(!ts.isVariableStatement(statement)||!statement.modifiers?.some(m=>m.kind===ts.SyntaxKind.ExportKeyword)){
+      violations.push({node:statement,message:"RPC shell may only declare exported createServerFn operations"});
+      continue;
+    }
+    for(const declaration of statement.declarationList.declarations){
+      const handler=declaration.initializer;
+      const property=(node,name)=>ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&node.expression.name.text===name;
+      const validator=handler&&property(handler,"handler")?handler.expression.expression:undefined;
+      const factory=validator&&property(validator,"validator")?validator.expression.expression:undefined;
+      const callback=handler&&ts.isCallExpression(handler)?handler.arguments[0]:undefined;
+      if(!factory||!ts.isCallExpression(factory)||!ts.isIdentifier(factory.expression)||factory.expression.text!=="createServerFn"||
+         !callback||!ts.isArrowFunction(callback)||!ts.isBlock(callback.body)||!ts.isIdentifier(declaration.name)){
+        violations.push({node:declaration,message:"RPC export must use createServerFn().validator().handler()"});
+        continue;
+      }
+      const expected='const implementation = await import("./'+stem+'.server");';
+      const expectedReturn="return implementation."+declaration.name.text+"(data);";
+      const statements=callback.body.statements;
+      if(statements.length!==2||statements[0].getText(parsed)!==expected||statements[1].getText(parsed)!==expectedReturn)
+        violations.push({node:declaration,message:"RPC handler must delegate to its matching server implementation"});
+    }
+  }
+  return violations;
+}
+
 const root=resolve(process.cwd());
 // Only runtime and build-tool source blocks a production build. Test suites
 // are parsed by their own test/CI commands, not production asset generation.
@@ -60,6 +101,14 @@ for(const filename of files){
     console.error(relative(root,filename)+":"+(line+1)+":"+(character+1)+
       " TS"+diagnostic.code+" "+message);
     errors++;
+  }
+  const stem=strictRpcShells.get(relative(root,filename).split("\\").join("/"));
+  if(stem){
+    for(const violation of strictRpcShellViolations(parsed,stem)){
+      const {line,character}=parsed.getLineAndCharacterOfPosition(violation.node.getStart(parsed));
+      console.error(relative(root,filename)+":"+ (line+1)+":"+ (character+1)+" "+violation.message);
+      errors++;
+    }
   }
   // Check local module targets before bundling, including re-exports and
   // type-only/lazy imports. A syntax-valid missing dependency must not
