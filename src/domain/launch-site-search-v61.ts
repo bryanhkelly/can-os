@@ -1,6 +1,6 @@
 import { decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { z } from "zod";
-import { normalizeSiteLaunchModuleV61, siteLaunchModules } from "./launch-site-navigation-v61";
+import { normalizeSiteLaunchModuleV61, siteLaunchModules, type SiteLaunchModuleIdV61 } from "./launch-site-navigation-v61";
 
 const compactOrLegacyUuid = z.preprocess(value =>
   typeof value === "string" ? decodeUuidPathParam(value) ?? value : value,
@@ -16,5 +16,5 @@ export const siteLaunchSearchSchemaV61 = z.object({
   programId: compactOrLegacyUuid,
   solutionPlanId: compactOrLegacyUuid,
   module: z.preprocess(normalizeSiteLaunchModuleV61,
-    z.enum(siteLaunchModules.map(item => item.id) as [string, ...string[]]).optional()),
+    z.enum(siteLaunchModules.map(item => item.id) as [SiteLaunchModuleIdV61, ...SiteLaunchModuleIdV61[]]).optional()),
 });

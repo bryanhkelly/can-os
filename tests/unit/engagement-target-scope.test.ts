@@ -29,5 +29,8 @@ describe("public universal Go destination owner boundaries",()=>{
     const owner={ownerKind:"platform",organizationId:null,siteId:null,programId:null} as const;
     expect(engagementOwnerAllowsSite(owner,null)).toBe(false);
     expect(engagementOwnerAllowsSite(owner,{...site,status:"closed"})).toBe(false);
+    expect(engagementOwnerAllowsSite(owner,{...site,status:null})).toBe(false);
+    expect(engagementOwnerAllowsSite(owner,{...site,status:"unexpected"})).toBe(false);
+    expect(engagementOwnerAllowsSite(owner,{...site,status:"planning"})).toBe(true);
   });
 });

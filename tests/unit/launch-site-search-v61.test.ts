@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import type { SiteLaunchModuleIdV61 } from "@/domain/launch-site-navigation-v61";
 import { siteLaunchSearchSchemaV61 } from "@/domain/launch-site-search-v61";
 
 const siteId = "f1000000-0000-4000-8000-000000000038";
 
 describe("Launch Studio module URL compatibility", () => {
+  it("retains the canonical module union through Zod normalization", () => {
+    const parsed = siteLaunchSearchSchemaV61.parse({ module: "promote" });
+    expectTypeOf(parsed.module).toEqualTypeOf<SiteLaunchModuleIdV61 | undefined>();
+  });
   it("opens the existing Promote bookmark in Create Outreach", () => {
     const url = new URL("https://can-os.bryanhkelly.workers.dev/launch/site" +
       "?siteId=" + siteId + "&module=promote");

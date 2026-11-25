@@ -40,7 +40,7 @@ export const Compact: Story = {
   render: () => <Example />,
   play: async ({canvasElement}) => {
     const canvas=within(canvasElement);
-    const adults=canvas.getByRole("button",{name:"Adults",exact:true});
+    const adults=canvas.getByRole("button",{name:/^Adults$/});
     const learners=canvas.getByRole("button",{name:"English language learners"});
     await expect(adults).toHaveAttribute("aria-pressed","true");
     await expect(learners).toHaveAttribute("aria-pressed","false");

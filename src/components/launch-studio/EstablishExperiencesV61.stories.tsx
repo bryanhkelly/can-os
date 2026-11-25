@@ -36,7 +36,7 @@ export const Browse:Story={render:()=> <Review/>,
     await expect(topic).toHaveAttribute("aria-pressed","true");
     await userEvent.click(canvas.getByRole("button",{name:"Personalize selections"}));
     await expect(canvas.getByText("Who is this for?")).toBeInTheDocument();
-    const audience=canvas.getByRole("button",{name:"English language learners",exact:true});
+    const audience=canvas.getByRole("button",{name:/^English language learners$/});
     await userEvent.click(audience);
     await expect(audience).toHaveAttribute("aria-pressed","true");
   }

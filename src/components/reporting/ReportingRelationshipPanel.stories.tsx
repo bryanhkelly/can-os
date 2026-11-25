@@ -44,6 +44,6 @@ function AcceptancePreview(){
 export const Incoming:Story={args:common,render:()=> <AcceptancePreview/>,play:async({canvasElement})=>{
   const canvas=within(canvasElement);
   await userEvent.click(canvas.getByRole("button",{name:"Accept relationship"}));
-  await userEvent.click(canvas.getByRole("button",{name:"Confirm",exact:true}));
+  await userEvent.click(canvas.getByRole("button",{name:/^Confirm$/}));
   await expect(canvas.getByText("accepted",{exact:true})).toBeVisible();
 }};

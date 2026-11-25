@@ -51,6 +51,7 @@ export const saveCampaignRecipientList = async (data: z.output<typeof saveCampai
  return db.transaction(async tx=>{
  const [list]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_recipient_lists(owner_scope,sender_scope,name,created_by_person_id)
  VALUES(${s.ownerScope},${s.senderScope},${data.name},${s.actor.actorPersonId}) ON CONFLICT(owner_scope,name) DO UPDATE SET name=excluded.name RETURNING id`);
+ if(!list)throw new Error("Recipient list write returned no record.");
  const [count]=await campaignRows<{count:number}>(tx,sql`SELECT count(*)::int count FROM public.campaign_list_members WHERE list_id=${list.id} AND NOT(email=ANY(${sql`ARRAY[${sql.join(parsed.recipients.map(email=>sql`${email}`),sql`,`)}]::text[]`}))`);
  if((count?.count??0)+parsed.recipients.length>campaignRecipientLimit)throw new Error("List exceeds the current campaign limit.");
  const addresses=sql`ARRAY[${sql.join(parsed.recipients.map(email=>sql`${email}`),sql`,`)}]::text[]`;
@@ -78,6 +79,7 @@ export const queueEngagementCampaign = async (data: z.output<typeof queueEngagem
  if(existing){if(existing.list_id!==data.listId||existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId||new Date(existing.scheduled_at).getTime()!==scheduledAt.getTime())throw new Error("Request already used.");return {id:existing.id};}
  const [campaign]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.engagement_campaigns(owner_scope,sender_scope,engagement_id,link_id,list_id,request_id,subject,body,public_url,sender_from,sender_address,created_by_person_id,scheduled_at)
  VALUES(${s.ownerScope},${s.senderScope},${data.engagementId},${data.linkId},${data.listId},${data.requestId},${draft.subject},${draft.body+"\n\nInvited by "+s.senderLabel},${draft.url},${sender.from},${sender.address},${s.actor.actorPersonId},${data.scheduledAt}::timestamptz) RETURNING id`);
+ if(!campaign)throw new Error("Campaign write returned no record.");
  const inserted=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_deliveries(owner_scope,campaign_id,email,status,next_attempt_at)
  SELECT m.owner_scope,${campaign.id},m.email,CASE WHEN s.email IS NULL THEN 'pending' ELSE 'suppressed' END,${data.scheduledAt}::timestamptz
  FROM public.campaign_list_members m LEFT JOIN public.campaign_suppressions s ON s.sender_scope=${s.senderScope} AND s.email=m.email

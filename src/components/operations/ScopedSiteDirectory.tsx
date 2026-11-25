@@ -24,7 +24,7 @@ export function ScopedSiteDirectory({sites,emptyMessage,profileLinks=false}:{
         {profileLinks
           ?(site.organizationSlug && site.slug && validFriendlySlug(site.organizationSlug) && validFriendlySlug(site.slug)
             ? <Link className="text-primary underline underline-offset-4" to="/o/$organizationSlug/$siteSlug/profile"
-                params={{organizationSlug:site.organizationSlug, siteSlug:site.slug}}>{site.name}</Link>
+                params={{organizationSlug:site.organizationSlug, siteSlug:site.slug}} search={{tab:undefined}}>{site.name}</Link>
             : <Link className="text-primary underline underline-offset-4" to="/sites/$siteId/profile"
                 params={{siteId:site.id}}>{site.name}</Link>)
           :site.name}

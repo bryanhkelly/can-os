@@ -81,7 +81,7 @@ function SchoolDetails({ needsJurisdictionReview = false }: { needsJurisdictionR
   const [online,setOnline]=useState(false);
   const [selfPaced,setSelfPaced]=useState(false);
   const [days,setDays]=useState("5");
-  const organization={id:"org",name:"Example School Organization",type:"christian_school"} as const;
+  const organization={id:"org",name:"Example School Organization",slug:"example-school-organization",type:"christian_school"} as const;
   const options:ComponentProps<typeof LaunchConfigurationForm>["hostAndProvider"]["options"]={
     organizations:[organization],academicProviderOrganizations:[organization],creditIssuingOrganizations:[organization],
     canCreateSite: true, schoolSetupAdministrator:true,

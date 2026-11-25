@@ -132,7 +132,7 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     return {
     seasonId: row.seasonId, name: row.name, seasonName: row.seasonName,
     programId: row.programId, programName: row.programName, programType: row.programType,
-    siteName: row.siteName, startsOn: row.startsOn, endsOn: row.endsOn,
+    siteId: row.siteId, siteName: row.siteName, startsOn: row.startsOn, endsOn: row.endsOn,
     capacity: row.capacity, seatsRemaining,
     packages: packageAvailability,
     feeAmountCents: row.feeAmountCents ?? 0,

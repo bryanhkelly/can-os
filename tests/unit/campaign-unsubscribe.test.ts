@@ -14,6 +14,12 @@ describe("campaign unsubscribe protocol",()=>{
   expect(campaignUnsubscribeToken(new Request(url+"&token=other"))).toBeNull();
   expect(await validateCampaignUnsubscribe(new Request(url,{method:"POST",body:new URLSearchParams({"List-Unsubscribe":"x".repeat(5000)})}))).toBe(413);
  });
+ it("fails closed for absent tokens, malformed tokens and missing content type",async()=>{
+  expect(campaignUnsubscribeToken(new Request(url))).toBe("11111111-1111-4111-8111-111111111111");
+  expect(campaignUnsubscribeToken(new Request("https://example.org/api/campaigns/unsubscribe"))).toBeNull();
+  expect(campaignUnsubscribeToken(new Request(url.replace(/token=.*/,"token=invalid")))).toBeNull();
+  expect(await validateCampaignUnsubscribe(new Request(url,{method:"POST"}))).toBe(400);
+ });
  it("interprets bounded provider Retry-After",()=>{
   expect(campaignRetryAfterMs("30",0)).toBe(30000);
   expect(campaignRetryAfterMs("bad",0)).toBe(0);

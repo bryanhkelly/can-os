@@ -47,7 +47,7 @@ export const Typical: Story={
   render:()=> <Review initial={typical}/>,
   play:async({canvasElement})=>{
     const canvas=within(canvasElement);
-    const refugees=canvas.getByRole("button",{name:"Refugees",exact:true});
+    const refugees=canvas.getByRole("button",{name:/^Refugees$/});
     await expect(refugees).toHaveAttribute("aria-pressed","false");
     await userEvent.click(refugees);
     await expect(refugees).toHaveAttribute("aria-pressed","true");

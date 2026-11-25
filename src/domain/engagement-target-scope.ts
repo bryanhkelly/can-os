@@ -8,9 +8,9 @@ export type PublicEngagementOwnerScope={
 };
 export function engagementOwnerAllowsSite(
   owner:PublicEngagementOwnerScope,
-  site:{id:string;organizationId:string;status:string}|null,
+  site:{id:string;organizationId:string;status:string|null}|null,
 ):boolean{
-  if(!site || site.status==="closed")return false;
+  if(!site || (site.status!=="active" && site.status!=="planning"))return false;
   if(owner.ownerKind==="platform")
     return owner.organizationId===null && owner.siteId===null && owner.programId===null;
   if(!owner.organizationId || owner.organizationId!==site.organizationId)return false;
