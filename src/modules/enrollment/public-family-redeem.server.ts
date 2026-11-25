@@ -1,3 +1,4 @@
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -44,7 +45,7 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
       programId:publicFamilyStartRequests.programId,
       siteId:publicFamilyStartRequests.siteId,
     });
-  if(!intent)throw new AuthorizationError("valid unexpired single-use family link");
+  if(!intent || suppressDemoEmailDelivery(intent.email))throw new AuthorizationError("valid unexpired single-use family link");
   // Recheck the original server-recorded entry channel and current authority
   // before creating any account, Person, grant or session.
   const school=await resolveRedeemedFamilyStartDestination(tx,intent);
@@ -55,9 +56,9 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
   // over an existing Person. Lock the email's account before inspecting grants.
   const [createdAccount]=await tx.insert(accessAccounts).values({
     emailNormalized:intent.email,emailVerifiedAt:now,
-  }).onConflictDoNothing().returning({id:accessAccounts.id});
+  }).onConflictDoNothing().returning({id:accessAccounts.id,personId:accessAccounts.personId,disabled:accessAccounts.disabled});
   const [account]=createdAccount?[createdAccount]:await tx.select({
-    id:accessAccounts.id,disabled:accessAccounts.disabled,
+    id:accessAccounts.id,disabled:accessAccounts.disabled,personId:accessAccounts.personId,
   }).from(accessAccounts).where(eq(accessAccounts.emailNormalized,intent.email))
     .for("update").limit(1);
   if(!account || ("disabled" in account && account.disabled))
@@ -81,7 +82,14 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
   // A staff/teacher account with the same verified email can also be a
   // parent. Reuse the SAME known Person, but never infer one if this account
   // has grants for more than one existing Person.
-  let personId=uniqueAccountPersonId(grants);
+  const grantPersonId=uniqueAccountPersonId(grants);
+  if(account.personId && grantPersonId && account.personId!==grantPersonId)
+    throw new AuthorizationError("canonical family account Person");
+  let personId=account.personId??grantPersonId;
+  if(personId){
+    const [existingPerson]=await tx.select({active:people.active}).from(people).where(eq(people.id,personId)).limit(1);
+    if(!existingPerson?.active)throw new AuthorizationError("active family account Person");
+  }
   if(!personId){
     const [person]=await tx.insert(people).values({
       legalFirstName:intent.firstName,legalLastName:intent.lastName,email:intent.email,domain:identityEmailDomain(intent.email),
@@ -98,11 +106,11 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     siteId:school.siteId,active:true,
   }).returning({id:accountPersonGrants.id});
   if(!createdGrant)throw new Error("Unable to establish school-scoped family membership");
-  await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now})
+  await tx.update(accessAccounts).set({personId,emailVerifiedAt:now,updatedAt:now})
     .where(eq(accessAccounts.id,account.id));
   const sessionSecret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
-    accountId:account.id,secretHash:hashAccessSecret(sessionSecret,pepper()),
+    accountId:account.id,authenticationMethod:"email_link",secretHash:hashAccessSecret(sessionSecret,pepper()),
     activeGrantId:createdGrant.id,
     expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   }).returning({id:accessSessions.id});
