@@ -1,9 +1,5 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 
-/** Enrollment demo uploads require an explicit deployment opt-in. */
-export function assertR2DemoEnabled(value:string|undefined):void {
- if(value!=="true")throw new Error("R2 demo uploads are disabled");
-}
 /** All enrollment documents require the same verified storage evidence. */
 export function enrollmentDocumentStorageVerified(metadata:Record<string,unknown>,_organizationId:string):boolean {
  return metadata.storageVerified===true;
