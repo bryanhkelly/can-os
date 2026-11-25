@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { EmptyState, StatCard, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { projectPublisherReleaseNextStep, projectNoncreditPilotBlockers,
   type NativePublisherReleaseRecord,
@@ -60,29 +60,18 @@ export function PlatformReleaseCenter({records,limited}:{
       More than 25 versions exist. The inventory is incomplete. Narrower authorized queries
       are required before making a platform-wide release claim.
     </WorkspaceNotice>}
-    <div className="mt-5 max-w-lg">
-      <Label htmlFor="platform-release-filter" className="mb-2 block">Filter Offering versions</Label>
+    <Field label="Filter Offering versions" className="mt-5 max-w-lg">
       <Input id="platform-release-filter" type="search" value={query}
         onChange={event=>setQuery(event.target.value)}
         placeholder="Search by Course or Offering title"/>
-    </div>
+    </Field>
     <div className="mt-4 space-y-3">
       {shown.map(({record,next})=>{
         const route=nextWorkspace[next.key];
         const pilotBlockers=record.noncreditTrainingStatus?projectNoncreditPilotBlockers(record):[];
-        return <article key={record.offeringVersionId} className="border border-border p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="font-semibold">{record.offeringTitle}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Version {record.versionNo} · {record.lifecycle.replaceAll("_"," ")} ·
-                {" "}{record.publishedCourses}/{record.courseCount} Courses published
-              </p>
-            </div>
-            <StatusBadge tone={next.key==="class-verification"&&!pilotBlockers.length?"info":"attention"}>
-              {pilotBlockers.length&&next.key==="class-verification"?"Noncredit prerequisites outstanding":next.label}
-            </StatusBadge>
-          </div>
+        return <WorkspacePanel key={record.offeringVersionId} headingLevel="h3" title={record.offeringTitle}
+          description={`Version ${record.versionNo} · ${record.lifecycle.replaceAll("_"," ")} · ${record.publishedCourses}/${record.courseCount} Courses published`}
+          actions={<StatusBadge tone={next.key==="class-verification"&&!pilotBlockers.length?"info":"attention"}>{pilotBlockers.length&&next.key==="class-verification"?"Noncredit prerequisites outstanding":next.label}</StatusBadge>}>
           {record.noncreditTrainingStatus&&<p className="mt-3 text-sm">
             <strong>Noncredit training:</strong> {record.noncreditTrainingStatus}.
             {" "}<strong>Assessment:</strong> {record.noncreditAssessmentStatus??"unverified"}.
@@ -91,7 +80,7 @@ export function PlatformReleaseCenter({records,limited}:{
             {" "}{record.pilotContentReviewCount??0} content-review flags
             in {record.pilotLessonCount??0} lessons.
           </p>}
-          {pilotBlockers.length>0&&<div className="mt-3 border p-3"><p className="text-sm font-semibold">Noncredit readiness blockers</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{pilotBlockers.map(blocker=><li key={blocker}>{blocker}</li>)}</ul><a className="mt-2 inline-block text-sm underline" href={"/programs/noncredit/enrollment?offeringCode="+encodeURIComponent(record.offeringCode??"")}>Inspect registration operations (authorized provider)</a><p className="mt-2 text-xs text-muted-foreground">A recorded open window does not prove eligibility, capacity or permission.</p></div>}
+          {pilotBlockers.length>0&&<WorkspaceNotice tone="attention" className="mt-3"><p className="text-sm font-semibold">Noncredit readiness blockers</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{pilotBlockers.map(blocker=><li key={blocker}>{blocker}</li>)}</ul><a className="mt-2 inline-block text-sm underline" href={"/programs/noncredit/enrollment?offeringCode="+encodeURIComponent(record.offeringCode??"")}>Inspect registration operations (authorized provider)</a><p className="mt-2 text-xs text-muted-foreground">A recorded open window does not prove eligibility, capacity or permission.</p></WorkspaceNotice>}
           <p className="mt-3 text-sm">{next.detail}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Responsible: {route.owner}
@@ -106,7 +95,7 @@ export function PlatformReleaseCenter({records,limited}:{
             <a href={route.url} className="mt-3 inline-flex text-sm font-semibold text-primary underline">
               {route.label} (requires authorized role)
             </a>}
-        </article>;
+        </WorkspacePanel>;
       })}
       {!shown.length&&<EmptyState title={query?"No versions match":"No Offering versions found"}
         description="Only versions in the current verified platform inventory can appear here."/>}
