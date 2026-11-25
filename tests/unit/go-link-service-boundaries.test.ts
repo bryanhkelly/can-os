@@ -17,7 +17,7 @@ describe("Go Link service boundary and privacy contracts",()=>{
   it("uses one transactional Go allocator and status transition while preserving exact ownership",()=>{
     const lifecycle=read("src/modules/engagement/go-link-lifecycle.server.ts");
     const direct=read("src/modules/engagement/site-go-links.functions.ts");
-    const engagement=read("src/modules/engagement/engagement-registry.functions.ts");
+    const engagement=read("src/modules/engagement/engagement-registry.server.ts");
     expect(lifecycle.match(/randomBytes\(9\)/g)).toHaveLength(1);
     expect(lifecycle.match(/tx\.update\(siteGoLinks\)/g)).toHaveLength(1);
     expect(lifecycle).toContain('actor.delegationMode==="view"');
@@ -33,6 +33,19 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(direct.match(/directSiteLinkScope\(site,data.packageId\)/g)).toHaveLength(5);
     expect(direct).toContain("readAuthorizedGoLinkEvidence(items.map(");
     expect(direct).not.toContain("readSiteGoLinkEvidence(");
+  });
+  it("keeps engagement and campaign RPC shells free of server-only static dependencies",()=>{
+    for(const path of ["src/modules/engagement/engagement-registry","src/modules/communication/engagement-campaigns"]){
+      const rpc=read(path+".functions.ts");
+      expect(rpc).not.toContain("@/db/");
+      expect(rpc).not.toContain("export async function");
+      expect(rpc).not.toMatch(/from\s+["'][^"']*\.server["']/);
+      expect(rpc.match(/createServerFn\(/g)?.length).toBe(rpc.match(/await import\("\.\/[^"]+\.server"\)/g)?.length);
+    }
+    const registry=read("src/modules/engagement/engagement-registry.server.ts");
+    expect(registry).toContain("requireCurrentNetworkAgreement(reader,org.id)");
+    expect(registry).toContain("assertWholeSiteProgramsInScope");
+    expect(read("src/modules/communication/engagement-campaigns.server.ts")).toContain("@/modules/engagement/engagement-registry.server");
   });
   it("keeps public redirect observation anonymous and non-blocking",()=>{
     const schema=read("src/db/schema/site-go-links.ts");
