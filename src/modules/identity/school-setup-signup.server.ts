@@ -1,3 +1,4 @@
+import { hashPrivateAccessCode, issueOpaqueSecret } from "@/domain/access-tokens";
 import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -150,6 +151,8 @@ export async function provisionDemoSiteSignup(input: unknown) {
   const domain = data.email.split("@")[1]!;
   if (!isDemoAccountEmail(data.email) || !isDemoSchoolDomain(domain) || domain === DEMO_ACCOUNT_DOMAIN)
     throw new DomainError("FORBIDDEN");
+  const privateAccessCode = issueOpaqueSecret();
+  const privateAccessCodeHash = hashPrivateAccessCode(privateAccessCode, process.env.CAN_ACCESS_TOKEN_PEPPER ?? "");
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"demo-founder:" + domain}))`);
     const [registered] = await tx.select().from(demoSchoolTenants)
@@ -159,7 +162,7 @@ export async function provisionDemoSiteSignup(input: unknown) {
       .where(eq(accessAccounts.emailNormalized,data.email)).limit(1);
     if (occupied) throw new DomainError("CONFLICT");
     const now = new Date();
-    const [account] = await tx.insert(accessAccounts).values({emailNormalized:data.email})
+    const [account] = await tx.insert(accessAccounts).values({emailNormalized:data.email,privateAccessCodeHash})
       .returning({id:accessAccounts.id});
     if (!account) throw new Error("Account could not be created");
     const [signup] = await tx.insert(schoolSetupSignups).values({
@@ -168,6 +171,8 @@ export async function provisionDemoSiteSignup(input: unknown) {
       expiresAt:new Date(now.getTime()+600000),
     }).returning();
     if (!signup) throw new Error("Site signup could not be created");
-    return provisionVerifiedSchoolSignup(tx,signup,account.id,data.email,now,"demo_code");
+    const provisioned = await provisionVerifiedSchoolSignup(tx,signup,account.id,data.email,now,"demo_code");
+    // Only this successful first response carries the raw credential. Never log it.
+    return {...provisioned,privateAccessCode};
   });
 }
