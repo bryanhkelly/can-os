@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
+import { Button } from "@/components/ui/button";
+import { ActionFooter } from "./action-footer";
 import { EmptyState } from "./empty-state";
 import { WorkspaceNotice } from "./notice";
 import { QueryState } from "./query-state";
@@ -75,4 +77,35 @@ export const AuthorizedActionLink: Story = {
       actionLabel="Review requirements"
     />
   </div>,
+};
+
+/** A narrow container also exercises nested panels, not only viewport breakpoints. */
+export const NarrowWorkspace: Story = {
+  render: () => <div className="w-full max-w-[20rem] bg-background p-4">
+    <WorkspacePanel title="Independent account review">
+      <div className="space-y-4">
+        <StatusBadge tone="attention">Independent identity verification and organizational approval required</StatusBadge>
+        <StatCard label="Reference" value="REFERENCEWITHOUTBREAKPOINTS01234567890123456789" />
+        <WorkspaceNotice tone="attention">An independently authorized reviewer must confirm the next step.</WorkspaceNotice>
+        <ActionFooter layout="inline">
+          <Button>Review independently verified account and organizational eligibility</Button>
+          <Button variant="outline">Check again</Button>
+        </ActionFooter>
+      </div>
+    </WorkspacePanel>
+  </div>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const panel = canvas.getByRole("region", { name: "Independent account review" });
+    const button = canvas.getByRole("button", { name: "Review independently verified account and organizational eligibility" });
+    await expect(button).toBeVisible();
+    await expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth + 1);
+    await expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth + 1);
+    const bounds = panel.getBoundingClientRect();
+    for (const element of panel.querySelectorAll("button, [class*='tabular-nums']")) {
+      const rect = element.getBoundingClientRect();
+      await expect(rect.right).toBeLessThanOrEqual(bounds.right + 1);
+      await expect(rect.left).toBeGreaterThanOrEqual(bounds.left - 1);
+    }
+  },
 };
