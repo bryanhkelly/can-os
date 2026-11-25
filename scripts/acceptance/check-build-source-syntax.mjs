@@ -18,6 +18,7 @@ import { unresolvedLocalSourceModule } from "../lib/source-module-resolution.mjs
 // implementation imports inside createServerFn handlers. This catches a
 // narrow source contract; TanStack's real client bundle remains authoritative.
 const strictRpcShells=new Map([
+  ["src/modules/learning/graduation.functions.ts","graduation"],
   ["src/modules/classes/native-class-repeats.functions.ts","native-class-repeats"],
   ["src/modules/engagement/engagement-registry.functions.ts","engagement-registry"],
   ["src/modules/communication/engagement-campaigns.functions.ts","engagement-campaigns"],
@@ -73,7 +74,7 @@ for(const filename of files){
   }
   const stem=strictRpcShells.get(relative(root,filename).split("\\").join("/"));
   if(stem){
-    for(const violation of strictRpcShellViolations(parsed,stem)){
+    for(const violation of strictRpcShellViolations(parsed,stem,stem==="graduation"?["listGraduationIssuers"]:[])){
       const {line,character}=parsed.getLineAndCharacterOfPosition(violation.node.getStart(parsed));
       console.error(relative(root,filename)+":"+ (line+1)+":"+ (character+1)+" "+violation.message);
       errors++;

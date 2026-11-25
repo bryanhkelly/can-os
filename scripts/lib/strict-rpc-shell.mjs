@@ -6,7 +6,7 @@ const identifier = (node, name) => node && ts.isIdentifier(node) && node.text ==
 
 /** Structural contract for explicitly governed browser-facing RPC shells.
  * The actual TanStack production bundle remains the authority for transitive imports. */
-export function strictRpcShellViolations(parsed, stem) {
+export function strictRpcShellViolations(parsed, stem, noInputReads = []) {
   const violations = [];
   const fail = (node, message) => violations.push({ node, message });
   const allowed = new Set(["@tanstack/react-start", "./" + stem + ".inputs"]);
@@ -24,10 +24,19 @@ export function strictRpcShellViolations(parsed, stem) {
     for (const declaration of statement.declarationList.declarations) {
       const handler = declaration.initializer;
       const validator = callOf(handler, "handler") ? handler.expression.expression : undefined;
-      const factory = callOf(validator, "validator") ? validator.expression.expression : undefined;
+      const hasValidator = callOf(validator, "validator");
+      const factory = hasValidator ? validator.expression.expression : validator;
       const callback = callOf(handler, "handler") ? handler.arguments[0] : undefined;
+      const method = factory && ts.isCallExpression(factory) && factory.arguments[0] &&
+        ts.isObjectLiteralExpression(factory.arguments[0])
+        ? factory.arguments[0].properties.find(p => ts.isPropertyAssignment(p) &&
+          identifier(p.name, "method"))?.initializer : undefined;
+      // A deliberately registered no-input GET may omit validation, never a mutation.
+      const noInput = !hasValidator && ts.isIdentifier(declaration.name) &&
+        noInputReads.includes(declaration.name.text) && method &&
+        ts.isStringLiteral(method) && method.text === "GET";
       if (!factory || !ts.isCallExpression(factory) || !identifier(factory.expression, "createServerFn") ||
-          !callback || !ts.isArrowFunction(callback) || !callback.modifiers?.some(m => m.kind === ts.SyntaxKind.AsyncKeyword) ||
+          (!hasValidator && !noInput) || !callback || !ts.isArrowFunction(callback) || !callback.modifiers?.some(m => m.kind === ts.SyntaxKind.AsyncKeyword) ||
           !ts.isBlock(callback.body) || !ts.isIdentifier(declaration.name)) {
         fail(declaration, "RPC export must use createServerFn().validator().handler()");
         continue;
@@ -43,7 +52,8 @@ export function strictRpcShellViolations(parsed, stem) {
           imported.arguments.length !== 1 || !ts.isStringLiteral(imported.arguments[0]) ||
           imported.arguments[0].text !== "./" + stem + ".server" ||
           !callOf(returned, declaration.name.text) || !identifier(returned.expression.expression, binding.name.text) ||
-          returned.arguments.length !== 1 || !identifier(returned.arguments[0], "data")) {
+          (noInput ? callback.parameters.length !== 0 || returned.arguments.length !== 0 :
+            returned.arguments.length !== 1 || !identifier(returned.arguments[0], "data"))) {
         fail(declaration, "RPC handler must delegate to its matching server implementation");
       }
     }

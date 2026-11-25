@@ -32,3 +32,17 @@ test("reports malformed shell declarations without crashing", () => {
   assert.ok(inspect("export const publish: unknown;").length);
   assert.ok(inspect(valid.replace("async ({ data })", "({ data })")).length);
 });
+
+test("permits only explicitly registered no-input GET operations", () => {
+  const noInput = `import { createServerFn } from "@tanstack/react-start";
+export const list = createServerFn({ method: "GET" }).handler(async () => {
+  const service = await import("./sample.server");
+  return service.list();
+});`;
+  const check = source => strictRpcShellViolations(ts.createSourceFile("sample.functions.ts", source, ts.ScriptTarget.Latest, true), "sample", ["list"]);
+  assert.ok(inspect(noInput).length);
+  assert.equal(check(noInput).length, 0);
+  assert.ok(check(noInput.replace('"GET"', '"POST"')).length);
+  assert.ok(check(noInput.replace("service.list()", "service.list(data)")).length);
+  assert.ok(check(noInput.replace("async ()", "async ({ data })")).length);
+});
