@@ -52,9 +52,6 @@ export const siteSignupSchema = z.object({
   if (isDemoAccountEmail(data.email) && data.organizationDomain && data.organizationDomain !== identityEmailDomain(data.email)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["organizationDomain"], message: "Use the same demo domain as your administrator email." });
   }
-  if (!isDemoAccountEmail(data.email) && isDemoDomain(data.organizationDomain)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["organizationDomain"], message: "Demo organization setup requires a demo administrator email." });
-  }
 });
 
 export const realSchoolSetupSignupSchema = siteSignupSchema.refine(data => !data.email.endsWith(".demo"), { path: ["email"], message: "Use a real email address." });
