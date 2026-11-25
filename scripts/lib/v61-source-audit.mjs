@@ -68,18 +68,21 @@ function importNames(clause) {
 // Layout, width, wrapping and content-specific typography remain composable.
 const governedControls = new Set(["Button", "Input", "Select", "Textarea", "Checkbox", "Radio"]);
 const ownedUtility = /^(?:bg-|border(?:$|-)|rounded(?:$|-)|shadow(?:$|-)|ring(?:$|-)|outline(?:$|-)|p[xytrblse]?-|opacity-|font-(?:normal|medium|semibold|bold|thin|light|extralight|extrabold|black|sans|serif)|text-(?!(?:left|right|center|justify|start|end|wrap|nowrap|balance|pretty)(?:$|\/)))/;
-function controlAppearanceIssues(syntax) {
-  const bindings = new Map(), namespaces = new Set(), issues = [];
+function controlAppearanceIssues(syntax, resolveControl) {
+  const bindings = new Map(), namespaces = new Map(), issues = [];
   for (const statement of syntax.statements) {
     if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier) &&
-        /(?:^|\/)ui(?:\/|$)/.test(statement.moduleSpecifier.text)) {
+        (resolveControl || /(?:^|\/)ui(?:\/|$)/.test(statement.moduleSpecifier.text))) {
       const clause = statement.importClause;
       if (!clause || clause.isTypeOnly) continue;
       const named = clause.namedBindings;
-      if (named && ts.isNamespaceImport(named)) namespaces.add(named.name.text);
+      if (named && ts.isNamespaceImport(named)) namespaces.set(named.name.text, statement.moduleSpecifier.text);
       if (named && ts.isNamedImports(named)) for (const el of named.elements) {
         const original = el.propertyName?.text ?? el.name.text;
-        if (!el.isTypeOnly && governedControls.has(original)) bindings.set(el.name.text, original);
+        if (!el.isTypeOnly) {
+          const control = resolveControl ? resolveControl(statement.moduleSpecifier.text, original) : governedControls.has(original) ? original : null;
+          if (control) bindings.set(el.name.text, control);
+        }
       }
     }
 
@@ -119,7 +122,7 @@ function controlAppearanceIssues(syntax) {
   function walk(node) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = node.tagName;
-      const control = bindings.get(tag.getText(syntax)) ?? (ts.isPropertyAccessExpression(tag) && namespaces.has(tag.expression.getText(syntax)) && governedControls.has(tag.name.text) ? tag.name.text : undefined);
+      const control = bindings.get(tag.getText(syntax)) ?? (ts.isPropertyAccessExpression(tag) && namespaces.has(tag.expression.getText(syntax)) ? (resolveControl ? resolveControl(namespaces.get(tag.expression.getText(syntax)), tag.name.text) : governedControls.has(tag.name.text) ? tag.name.text : undefined) : undefined);
       if (control) {
         const classes = attribute(node, "className");
         const style = attribute(node, "style");
@@ -188,7 +191,7 @@ export function analyzeSource(source, path, options = {}) {
   walk(syntax);
   return {
     native, corners, imports,
-    appearance: isTsx && !primitive ? controlAppearanceIssues(syntax) : [],
+    appearance: isTsx && !primitive ? controlAppearanceIssues(syntax, options.resolveControl) : [],
     syntaxErrors: syntax.parseDiagnostics.map(d => ({
       message: ts.flattenDiagnosticMessageText(d.messageText, "\n"),
       ...location(syntax, { getStart: () => d.start ?? 0 }),
@@ -226,7 +229,7 @@ export function createInventory(projectRoot) {
   function inspect(file) {
     if (!cache.has(file)) {
       const text = readFileSync(file, "utf8");
-      cache.set(file, analyzeSource(text, file));
+      cache.set(file, analyzeSource(text, file, { resolveControl: (specifier, name) => resolveControlExport(resolveModule(file, specifier), name) }));
     }
     return cache.get(file);
   }
@@ -240,6 +243,46 @@ export function createInventory(projectRoot) {
           (file.endsWith(".ts") && within(file, componentsDir)))) return file;
     }
     return null;
+  }
+  const exportCache = new Map();
+  function resolveControlExport(file, name, seen = new Set()) {
+    if (!file) return null;
+    const key = file + ":" + name;
+    if (seen.has(key)) return null;
+    if (exportCache.has(key)) return exportCache.get(key);
+    const next = new Set(seen).add(key);
+    if (within(file, join(componentsDir, "ui")) && governedControls.has(name)) return name;
+    const syntax = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+    let result = null;
+    for (const statement of syntax.statements) {
+      if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
+      const clause = statement.exportClause;
+      const from = statement.moduleSpecifier;
+      if (from && ts.isStringLiteral(from)) {
+        const dep = resolveModule(file, from.text);
+        if (!clause) result = resolveControlExport(dep, name, next);
+        else if (ts.isNamedExports(clause)) {
+          const binding = clause.elements.find(el => !el.isTypeOnly && el.name.text === name);
+          if (binding) result = resolveControlExport(dep, binding.propertyName?.text ?? name, next);
+        }
+      } else if (clause && ts.isNamedExports(clause)) {
+        const binding = clause.elements.find(el => !el.isTypeOnly && el.name.text === name);
+        if (binding) {
+          const local = binding.propertyName?.text ?? name;
+          for (const imp of syntax.statements) {
+            if (!ts.isImportDeclaration(imp) || !ts.isStringLiteral(imp.moduleSpecifier)) continue;
+            const bindings = imp.importClause?.namedBindings;
+            if (!bindings || !ts.isNamedImports(bindings)) continue;
+            const match = bindings.elements.find(el => !el.isTypeOnly && el.name.text === local);
+            if (match) result = resolveControlExport(resolveModule(file, imp.moduleSpecifier.text), match.propertyName?.text ?? local, next);
+            if (result) break;
+          }
+        }
+      }
+      if (result) break;
+    }
+    if (result) exportCache.set(key, result);
+    return result;
   }
   function composed(entry) {
     const seen = new Map(), files = new Set(), stack = [{ file: entry, names: ["*"] }];
