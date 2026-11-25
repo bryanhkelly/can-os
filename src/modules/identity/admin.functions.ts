@@ -19,7 +19,7 @@ import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-
 import { demoSchoolTenants } from "@/db/schema";
 import { DomainError } from "@/domain/errors";
 import { isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
-import { readDemoStaffBindings } from "./demo-staff-access.server";
+import { matchesDemoCredentialScope } from "./demo-school-tenants.server";
 import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
 const assignableRoles = localStaffInviteRoles;
@@ -222,18 +222,12 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       const syntheticSchool = Boolean(demoSchool) || isValorOrganization(organizationId);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
       if ((demoSchool && !demoSchool.enabled) ||
-        (localDemoIdentity && (!demoSchool || emailNormalized.split("@")[1] !== demoSchool.domain))) {
+        (localDemoIdentity && !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx))) {
         throw new DomainError("FORBIDDEN", "Local demo identities require their original registered school domain");
       }
       let [account] = await tx.select({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled }).from(accessAccounts)
         .where(eq(accessAccounts.emailNormalized, emailNormalized)).for("update").limit(1);
       if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
-      if (account && demoSchool && localDemoIdentity) {
-        const bindings = await readDemoStaffBindings(account.id, tx);
-        if (!bindings.some(binding => binding.enabled && binding.domain === demoSchool.domain &&
-          binding.payload.accountId === account!.id && binding.payload.role === data.role))
-          throw new DomainError("FORBIDDEN", "Existing accounts require an exact demo staff invitation binding");
-      }
       if (!account) {
         [account] = await tx.insert(accessAccounts).values({ emailNormalized }).returning({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled });
         await recordAudit(tx, actor, {
@@ -241,7 +235,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           after: { emailNormalized },
         });
       }
-      if (demoSchool && localDemoIdentity) {
+      if (localDemoIdentity) {
         const foreign = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
           .where(and(eq(accountPersonGrants.accountId, account!.id),
             sql`(${accountPersonGrants.organizationId} IS DISTINCT FROM ${organizationId}::uuid
@@ -269,7 +263,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           after: { firstName: data.firstName, lastName: data.lastName, email: emailNormalized },
         });
       }
-      if (localDemoIdentity && !account!.personId) {
+      if (!account!.personId) {
         await tx.update(accessAccounts).set({ personId, updatedAt: new Date() })
           .where(eq(accessAccounts.id, account!.id));
       }
@@ -285,6 +279,12 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         if (existingGrant.active) return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false };
         const pending = (await listPendingStaffInvitations(tx, account!.id)).some(grant => grant.id === existingGrant.id);
         if (!pending) throw new Error("An inactive grant already exists; review it separately instead of creating a replacement invitation");
+        if (localDemoIdentity) {
+          const invitations = await listPendingStaffInvitations(tx, account!.id);
+          const accepted = await acceptStaffInvitations(tx, account!.id, invitations.filter(item => item.id === existingGrant.id));
+          if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
+          return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false };
+        }
         return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: true };
       }
       const [grant] = await tx.insert(accountPersonGrants).values({
@@ -319,7 +319,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     });
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
       return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized),
-        deliveryStatus: invitation.pending ? "demo_code" as const : "already_active" as const };
+        deliveryStatus: isDemoAccountEmail(emailNormalized) ? "demo_code" as const : "already_active" as const };
     try {
       const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(
         emailNormalized, data.role === "teacher" ? "/profiles" : undefined);
