@@ -67,7 +67,7 @@ function importNames(clause) {
 // Control appearance belongs to the canonical primitive, not its consumers.
 // Layout, width, wrapping and content-specific typography remain composable.
 const governedControls = new Set(["Button", "Input", "Select", "Textarea", "Checkbox", "Radio"]);
-const ownedUtility = /^(?:bg-|border(?:$|-)|rounded(?:$|-)|shadow(?:$|-)|ring(?:$|-)|outline(?:$|-)|p[xytrblse]?-(?!0$)|opacity-|font-(?:normal|medium|semibold|bold)|text-(?:xs|sm|base|lg|xl|foreground|background|muted-foreground|primary|secondary|destructive|white|black)(?:$|\/))/;
+const ownedUtility = /^(?:bg-|border(?:$|-)|rounded(?:$|-)|shadow(?:$|-)|ring(?:$|-)|outline(?:$|-)|p[xytrblse]?-|opacity-|font-(?:normal|medium|semibold|bold|thin|light|extralight|extrabold|black|sans|serif)|text-(?!(?:left|right|center|justify|start|end|wrap|nowrap|balance|pretty)(?:$|\/)))/;
 function controlAppearanceIssues(syntax) {
   const bindings = new Map(), namespaces = new Set(), issues = [];
   for (const statement of syntax.statements) {
@@ -104,8 +104,10 @@ function controlAppearanceIssues(syntax) {
       return [];
     }
     if (ts.isConditionalExpression(node)) return [...literals(node.whenTrue, seen), ...literals(node.whenFalse, seen)];
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
-      return literals(node.right, seen);
+    if (ts.isBinaryExpression(node)) {
+      if (node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) return literals(node.right, seen);
+      if ([ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(node.operatorToken.kind)) return [...literals(node.left, seen), ...literals(node.right, seen)];
+    }
     if (ts.isCallExpression(node) && /^(?:cn|clsx|twMerge)$/.test(node.expression.getText(syntax)))
       return node.arguments.flatMap(arg => literals(arg, seen));
     if (ts.isJsxExpression(node) || ts.isParenthesizedExpression(node)) return literals(node.expression, seen);
