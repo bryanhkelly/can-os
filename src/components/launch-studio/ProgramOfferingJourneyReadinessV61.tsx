@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { RecordFacts, StatusBadge, WorkspaceLinkNavigation, WorkspaceNotice } from "@/components/workspace";
+import { RecordFacts, WorkspacePanel, QueryState, StatusBadge, WorkspaceLinkNavigation, WorkspaceNotice } from "@/components/workspace";
 import type { ProgramOfferingJourney } from "@/domain/program-offering-journey-v61";
 import type { LaunchReadinessContext, ReadinessRecord, LaunchReadinessIntent, LaunchReadinessSolutions, LaunchReadinessNoncredit } from "./launch-readiness-types-v61";
 
@@ -11,14 +11,13 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
   noncredit: ReadinessRecord<LaunchReadinessNoncredit>;
   pilotJourneys: ProgramOfferingJourney[] | null;
 }) {
-  return <section className="border bg-background p-4" aria-label="Program to Offering delivery journey">
-        <h3 className="text-sm font-semibold">From ideas to available experiences</h3>
+  return <WorkspacePanel headingLevel="h3" title="From ideas to available experiences">
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
           Follow each program idea from choosing a solution to planning activities and
           preparing registration. Each step has its own requirements.
         </p>
         {(savedIntent.state==="loading" || solutions.state==="loading") &&
-          <p role="status" className="mt-3 text-sm">Checking your programs and solutions…</p>}
+          <QueryState loading="Checking your programs and solutions…"/>}
         {(savedIntent.state==="unavailable" || solutions.state==="unavailable") &&
           <WorkspaceNotice tone="attention" className="mt-3">
             We couldn't check the latest details for your programs. Try refreshing before deciding what's ready.
@@ -79,5 +78,5 @@ export function ProgramOfferingJourneyReadinessV61({ siteId,context,savedIntent,
             </WorkspaceLinkNavigation>
           </li>)}
         </ul>}
-      </section>;
+      </WorkspacePanel>;
 }
