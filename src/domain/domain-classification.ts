@@ -8,7 +8,7 @@ export function normalizeIdentityDomain(value: string | null | undefined): strin
 
 export function identityEmailDomain(email: string | null | undefined): string | null {
   const parts=email?.trim().split("@");
-  if (!parts || parts.length!==2 || !parts[0] || /\s/.test(parts[0])) return null;
+  if (!parts || parts.length!==2 || !parts[0] || parts.some(part=>/\s/.test(part))) return null;
   return normalizeIdentityDomain(parts[1]);
 }
 
