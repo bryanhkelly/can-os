@@ -59,7 +59,11 @@ export async function withRequestDatabase<T>(
   operation: () => Promise<T>,
   connectionString = process.env.DATABASE_URL,
 ): Promise<T> {
-  if (requestDatabase.getStore()) return operation();
+  const existing = requestDatabase.getStore();
+  if (existing) {
+    if (existing.closed) throw new Error("Database request scope has finished");
+    return operation();
+  }
   const scoped: RequestDatabase = {
     ...makePoolDatabase(connectionString ?? ""),
     connectionString: connectionString ?? "",
@@ -73,11 +77,22 @@ export async function withRequestDatabase<T>(
       return await measureServerStep("db.request", "operation", operation);
     } finally {
       scoped.closed = true;
+      // Cleanup must attempt every close, including resources that throw
+      // synchronously. A cleanup failure must not mask the original error
+      // or turn an already committed mutation into a retryable failure.
       try {
-        await measureServerStep("db.request", "restricted-cleanup", () =>
-          Promise.allSettled([...scoped.resources.values()].map(resource => resource.close())).then(() => undefined));
+        await measureServerStep("db.request", "restricted-cleanup", async () => {
+          const results = await Promise.allSettled([...scoped.resources.values()]
+            .map(resource => Promise.resolve().then(() => resource.close())));
+          if (results.some(result => result.status === "rejected"))
+            console.warn("Database request cleanup failed", { resource: "restricted" });
+        });
       } finally {
-        await measureServerStep("db.request", "pool-close", () => scoped.pool.end());
+        try {
+          await measureServerStep("db.request", "pool-close", () => scoped.pool.end());
+        } catch {
+          console.warn("Database request cleanup failed", { resource: "primary" });
+        }
       }
     }
   });
@@ -90,7 +105,12 @@ export function getRequestScopedResource<T extends RequestResource>(
   key: string, create: () => T,
 ): T | undefined {
   const scoped = requestDatabase.getStore();
-  if (!scoped) return undefined;
+  if (!scoped) {
+    // All restricted pool consumers must honor the same Worker ingress
+    // boundary as the primary database; only Node may reuse a global pool.
+    assertUnscopedDatabaseAllowed(isCloudflareWorkerRuntime());
+    return undefined;
+  }
   if (scoped.closed) throw new Error("Database request scope has finished");
   const existing = scoped.resources.get(key);
   if (existing) return existing as T;
@@ -116,6 +136,7 @@ export async function withCanonicalOperationsDatabase<T>(
   )) {
     throw new Error("Restricted canonical operations database is not configured");
   }
+  if (requestDatabase.getStore()?.closed) throw new Error("Database request scope has finished");
   if (restrictedOperationsDatabase.getStore()) return operation();
 
   const scoped = getRequestScopedResource("canonical-operations-database", () => {

@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({
   created: [] as number[],
   ended: [] as number[],
   connectionStrings: [] as string[],
+  failClose: new Set<number>(),
 }));
 
 vi.mock("@neondatabase/serverless", () => ({
@@ -15,7 +16,10 @@ vi.mock("@neondatabase/serverless", () => ({
       state.created.push(this.id);
       state.connectionStrings.push(connectionString);
     }
-    async end() { state.ended.push(this.id); }
+    async end() {
+      state.ended.push(this.id);
+      if (state.failClose.has(this.id)) throw new Error("synthetic pool close failure");
+    }
   },
 }));
 
@@ -30,7 +34,7 @@ vi.mock("drizzle-orm/neon-serverless", () => ({
   }),
 }));
 
-import { db, withRequestDatabase, withCanonicalOperationsDatabase } from "@/db/client";
+import { db, withRequestDatabase, withCanonicalOperationsDatabase, getRequestScopedResource } from "@/db/client";
 
 const identity = () => Reflect.get(db, "marker") as number;
 const boundSelect = () => (Reflect.get(db, "select") as () => number)();
@@ -80,6 +84,58 @@ describe("Cloudflare and Netlify Neon pooling", () => {
       throw new Error("simulated route failure");
     }, "postgresql://failure")).rejects.toThrow("simulated route failure");
     expect(state.ended).toContain(id);
+  });
+
+  it("attempts every restricted close and preserves a successful mutation result", async () => {
+    const closeLater = vi.fn(async () => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let id = 0;
+    try {
+      const result = await withRequestDatabase(async () => {
+        id = identity();
+        state.failClose.add(id);
+        getRequestScopedResource("broken", () => ({ close() { throw new Error("synthetic restricted close failure"); } }));
+        getRequestScopedResource("later", () => ({ close: closeLater }));
+        return "committed";
+      }, "postgresql://cleanup-test");
+      expect(result).toBe("committed");
+      expect(closeLater).toHaveBeenCalledOnce();
+      expect(state.ended).toContain(id);
+      expect(warn).toHaveBeenCalledWith("Database request cleanup failed", { resource: "restricted" });
+      expect(warn).toHaveBeenCalledWith("Database request cleanup failed", { resource: "primary" });
+    } finally {
+      state.failClose.delete(id);
+      warn.mockRestore();
+    }
+  });
+
+  it("preserves the original route error even if closing the pool fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let id = 0;
+    try {
+      const original = new Error("original failure");
+      await expect(withRequestDatabase(async () => {
+        id = identity();
+        state.failClose.add(id);
+        throw original;
+      }, "postgresql://failed-cleanup")).rejects.toBe(original);
+      expect(state.ended).toContain(id);
+    } finally {
+      state.failClose.delete(id);
+      warn.mockRestore();
+    }
+  });
+
+  it("rejects detached nested operations after the request closes", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let detached!: Promise<unknown>;
+    await withRequestDatabase(async () => {
+      detached = gate.then(() => withRequestDatabase(async () => "must not run"));
+    }, "postgresql://detached");
+    const rejection = expect(detached).rejects.toThrow("Database request scope has finished");
+    release();
+    await rejection;
   });
 
   it("isolates and closes a delegated Blueprint database pool without replacing the owner's request scope", async () => {
