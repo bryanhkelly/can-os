@@ -170,7 +170,8 @@ export async function emailNotificationRecipients(
       personActive: people.active,
     })
     .from(accountPersonGrants)
-    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
+    .innerJoin(accessAccounts, and(eq(accessAccounts.id, accountPersonGrants.accountId),
+      eq(accessAccounts.personId, accountPersonGrants.personId)))
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
     .where(
       and(
