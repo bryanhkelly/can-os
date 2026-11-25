@@ -1,6 +1,6 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db/client";
-import { accessAccounts, accessSessions, accountPersonGrants } from "@/db/schema";
+import { accessAccounts, accessSessions, accountPersonGrants, people } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { sessionIdleCutoff } from "@/domain/access-tokens";
 import { individualStaffIssuerEligible } from "@/domain/individual-staff-handoff";
@@ -24,11 +24,13 @@ export async function canIssueIndividualCredential(
     .innerJoin(accountPersonGrants,and(eq(accountPersonGrants.id,accessSessions.activeGrantId),
       eq(accountPersonGrants.accountId,accessAccounts.id),eq(accountPersonGrants.personId,actor.actorPersonId),
       eq(accountPersonGrants.role,actor.role),eq(accountPersonGrants.active,true)))
+    .innerJoin(people,and(eq(people.id,accessAccounts.personId),eq(people.active,true)))
     .where(and(eq(accessAccounts.id,actor.accountId),eq(accessSessions.id,actor.sessionId),
       eq(accessSessions.activeGrantId,actor.grantId),isNull(accessSessions.revokedAt),
+      sql`${accountPersonGrants.siteId} IS NOT DISTINCT FROM ${actor.grantSiteId}::uuid`,
       gt(accessSessions.expiresAt,now),gt(accessSessions.updatedAt,sessionIdleCutoff(now)),
       isNull(accessSessions.delegatedGrantId),
       sql`(NOT ${accessSessions.sharedDevice} OR ${accessSessions.lastActivityAt} > ${new Date(now.getTime()-300000)})`))
-    .limit(1);
+    .for("share").limit(1);
   return individualStaffIssuerEligible(issuer,actor.actorPersonId);
 }
