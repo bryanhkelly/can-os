@@ -4,7 +4,7 @@ import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/choice";
 import {Field} from "@/components/ui/field";
 import {Textarea} from "@/components/ui/textarea";
-import {ActionFooter, QueryState, WorkspaceNotice} from "@/components/workspace";
+import {ActionFooter, QueryState, WorkspaceNotice, WorkspacePanel} from "@/components/workspace";
 import {prepareEngagementEmailDraft} from "@/modules/engagement/engagement-registry.functions";
 import {buildInvitationMailto,parseInvitationRecipients,type EngagementInvitation} from "@/domain/engagement-distribution";
 
@@ -58,11 +58,10 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
     }catch{setError("Could not copy a currently eligible invitation.");}
     finally{pending.current=false;if(active.current)setCopying(false);}
   }
-  return <section className="mt-4 border p-4" aria-label="Email invitation distribution">
-    <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Prepare email invitation</h3><Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button></div>
+  return <WorkspacePanel headingLevel="h3" title="Prepare email invitation" className="mt-4" actions={<Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button>}>
     <WorkspaceNotice className="mt-3">For a small external email draft, recipients stay in your browser and are placed in BCC. Native campaign sending below uses saved consented lists and separate provider receipts.</WorkspaceNotice>
     {draft&&<>
-      <div className="mt-3 border p-3 text-sm"><p className="font-semibold">{draft.subject}</p><p className="mt-2 whitespace-pre-wrap break-words">{draft.body}</p></div>
+      <WorkspacePanel headingLevel="h4" title={draft.subject} className="mt-3"><p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm">{draft.body}</p></WorkspacePanel>
       <Field className="mt-3" label="Recipient email addresses (up to 20)" description={`${parsed.recipients.length} unique addresses.`}
         error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"Limit is 20 addresses.":undefined}>
         <Textarea value={recipients} maxLength={6000} rows={3} disabled={busy||copying} placeholder="Enter one address per line" onChange={e=>{setRecipients(e.target.value);setAuthorized(false);}}/>
@@ -74,5 +73,5 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
     {draft&&<NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady/>}
     {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
     {draft&&error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
-  </section>;
+  </WorkspacePanel>;
 }
