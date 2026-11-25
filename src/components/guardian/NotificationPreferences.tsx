@@ -56,15 +56,15 @@ export function NotificationPreferences() {
     <div className="mt-4 grid gap-3 sm:grid-cols-3">
       <Label className="text-sm">Timezone (IANA)
         <Input disabled={busy} value={timezone} onChange={e => setTimezone(e.target.value)}
-          className="mt-1 block w-full  border bg-background p-2" placeholder="America/Los_Angeles"/>
+          className="mt-1" placeholder="America/Los_Angeles"/>
       </Label>
       <Label className="text-sm">Quiet from
         <Input disabled={busy} type="time" value={quietStart} onChange={e => setQuietStart(e.target.value)}
-          className="mt-1 block w-full  border bg-background p-2"/>
+          className="mt-1"/>
       </Label>
       <Label className="text-sm">Quiet until
         <Input disabled={busy} type="time" value={quietEnd} onChange={e => setQuietEnd(e.target.value)}
-          className="mt-1 block w-full  border bg-background p-2"/>
+          className="mt-1"/>
       </Label>
     </div>
     <Button disabled={busy} type="button" variant="outline" className="mt-3"
@@ -83,7 +83,7 @@ export function NotificationPreferences() {
         <p className="mt-1 text-sm text-muted-foreground">SMS is optional. Verify your number and explicitly agree before CAN sends reminders.</p>
         <Label className="mt-3 block text-sm">Phone number (+country code)
           <Input disabled={busy} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+15551234567"
-            className="mt-1 block w-full  border bg-background p-2"/>
+            className="mt-1"/>
         </Label>
         <Button disabled={busy} type="button" variant="outline" className="mt-2"
           onClick={() => void perform(() => requestMySmsVerification({ data: { phone } }), "Verification code requested.")}>
@@ -91,7 +91,7 @@ export function NotificationPreferences() {
         </Button>
         <Label className="mt-3 block text-sm">Verification code
           <Input disabled={busy} value={code} onChange={e => setCode(e.target.value)}
-            className="mt-1 block w-full  border bg-background p-2"/>
+            className="mt-1"/>
         </Label>
         <Label className="mt-3 flex items-start gap-2 text-sm">
           <Checkbox disabled={busy} checked={consent} onChange={e => setConsent(e.target.checked)}/>
