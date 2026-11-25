@@ -187,6 +187,17 @@ describe("Cloudflare and Netlify Neon pooling", () => {
     }
   });
 
+  it("rejects an unscoped Worker restricted resource before creating it", () => {
+    vi.stubGlobal("WebSocketPair", class {});
+    const factory = vi.fn(() => ({close: async () => {}}));
+    try {
+      expect(() => getRequestScopedResource("restricted",factory)).toThrow("withRequestDatabase");
+      expect(factory).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("preserves the reusable Node/Netlify pool outside the Worker wrapper", () => {
     const before = state.created.length;
     const saved = process.env.DATABASE_URL;

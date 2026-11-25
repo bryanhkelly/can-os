@@ -5,6 +5,7 @@ import { clientErrorCodes, clientErrorMessages, DomainError } from "@/domain/err
 import { AuthorizationError } from "@/domain/command-context";
 import { normalizeClientError } from "@/lib/client-error";
 import { sanitizeServerError, withSafeServerErrors } from "@/lib/server-error-middleware";
+import { logServerFailure } from "@/lib/server-failure-log";
 import { RetryableLoaderError, safeLoader } from "@/lib/safe-loader";
 import { notFound, redirect } from "@tanstack/react-router";
 import { z } from "zod";
@@ -58,12 +59,18 @@ describe("client-safe error contract",()=>{
     expect(mutationErrorMessage(error, "Unable to save.")).toBe(clientErrorMessages[code]);
     expect(JSON.stringify(error)).not.toContain("private record");
   });
-  it("logs unknown diagnostics on the server and emits only safe information",()=>{
+  it("logs only allowlisted diagnostics and emits only safe information",()=>{
     const log=vi.spyOn(console,"error").mockImplementation(()=>{});
     try{
-      const error=new Error("secret connection string");
+      const error=Object.assign(new Error("secret connection string"),{
+        query:"private SQL",params:["student record"],cause:new Error("secret credentials"),
+      });
       const safe=sanitizeServerError(error);
-      expect(log).toHaveBeenCalledWith("Server function failed",error);
+      logServerFailure("Unable to load workspace session",error);
+      const expected={code:"UNEXPECTED",kind:"unexpected",retryable:false};
+      expect(log).toHaveBeenCalledWith("Server function failed",expected);
+      expect(log).toHaveBeenCalledWith("Unable to load workspace session",expected);
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/secret connection|private SQL|student record|secret credentials/);
       expect(JSON.stringify(toJSON(safe))).not.toContain("secret connection");
     }finally{log.mockRestore();}
   });

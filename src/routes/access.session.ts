@@ -4,6 +4,7 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {selectAccessGrant,recordMeaningfulSessionActivity} from "@/modules/identity/passwordless-access.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {registerSessionDevice} from "@/modules/identity/session-device.server";
+import {logServerFailure} from "@/lib/server-failure-log";
 
 /** The browser may ask to change memberships, but cannot declare a person or role. */
 export const Route=createFileRoute("/access/session")({
@@ -13,7 +14,7 @@ export const Route=createFileRoute("/access/session")({
     const session=await readWorkspaceSession(request);
     return Response.json(session,{status:session.authenticated?200:401,headers:{"Cache-Control":"no-store"}});
    }catch(error){
-    console.error("Unable to load workspace session",error);
+    logServerFailure("Unable to load workspace session",error);
     return Response.json({error:"Unable to load your workspace session."},{status:500,headers:{"Cache-Control":"no-store"}});
    }
   },
