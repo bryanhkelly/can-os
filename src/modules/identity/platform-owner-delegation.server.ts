@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts, accessSessions, accountPersonGrants, people } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { accessSessionCookie, hashAccessSecret, sessionIdleCutoff } from "@/domain/access-tokens";
+import { accessSessionCookie, hashAccessSecret, hashPrivateAccessCode, issueOpaqueSecret, sessionIdleCutoff } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { roleCapabilities } from "@/domain/access-context";
 import { platformOwnerMayActAs, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
@@ -94,6 +94,7 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
     firstName: people.legalFirstName,
     lastName: people.legalLastName,
     email: accessAccounts.emailNormalized,
+    privateAccessCodeEnabled: sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
     organizationId: accountPersonGrants.organizationId,
     siteId: accountPersonGrants.siteId,
   }).from(accountPersonGrants)
@@ -220,5 +221,49 @@ export async function stopPlatformOwnerDelegation(request: Request) {
         previousGrantId: owner.delegatedGrantId, previousMode: owner.delegatedMode },
     });
     return { stopped: true };
+  });
+}
+
+/** Recover an already-issued private credential without reverting to a public
+ * shared code. Only an independently authenticated, undelegated owner may
+ * perform this operation. Protected roles cannot be acquired by rotation. */
+export async function rotatePrivateAccountAccessCode(request: Request, raw: unknown) {
+  if(request.headers.get("origin")!==new URL(request.url).origin)
+    throw new AuthorizationError("same-origin credential recovery");
+  const data=z.object({grantId:uuid,reason:z.string().trim().min(12).max(500),confirm:z.literal(true)}).strict().parse(raw);
+  const owner=await getVerifiedPlatformOwnerSession(request);
+  assertPlatformOwnerUndelegated(owner);
+  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+  if(!pepper||pepper.length<32)throw new Error("Account access is temporarily unavailable");
+  return db.transaction(async tx=>{
+    const [target]=await tx.select({accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
+      role:accountPersonGrants.role}).from(accountPersonGrants)
+      .where(and(eq(accountPersonGrants.id,data.grantId),eq(accountPersonGrants.active,true))).limit(1);
+    if(!target||target.accountId===owner.ownerAccountId||!platformOwnerMayActAs(target.role))
+      throw new AuthorizationError("eligible existing private-code account");
+    const [account]=await tx.select({id:accessAccounts.id,personId:accessAccounts.personId,email:accessAccounts.emailNormalized,
+      privateAccessCodeHash:accessAccounts.privateAccessCodeHash,disabled:accessAccounts.disabled})
+      .from(accessAccounts).where(eq(accessAccounts.id,target.accountId)).for("update").limit(1);
+    if(!account||account.disabled||account.personId!==target.personId||!account.privateAccessCodeHash||!isDemoAccountEmail(account.email))
+      throw new AuthorizationError("existing private-code account");
+    const eligible=await readOwnerDelegationGrants(account.id,target.personId,account.email,tx);
+    const allGrants=await tx.select({role:accountPersonGrants.role,personId:accountPersonGrants.personId})
+      .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true))).limit(101);
+    if(!eligible.some(grant=>grant.id===data.grantId)||!allGrants.length||allGrants.length>100||
+      allGrants.some(grant=>grant.personId!==target.personId||!platformOwnerMayActAs(grant.role)))
+      throw new AuthorizationError("independently protected account");
+    const privateAccessCode=issueOpaqueSecret();
+    const now=new Date();
+    await tx.update(accessAccounts).set({privateAccessCodeHash:hashPrivateAccessCode(privateAccessCode,pepper),updatedAt:now})
+      .where(eq(accessAccounts.id,account.id));
+    const revoked=await tx.update(accessSessions).set({revokedAt:now,updatedAt:now})
+      .where(and(eq(accessSessions.accountId,account.id),isNull(accessSessions.revokedAt)))
+      .returning({id:accessSessions.id});
+    await writeAudit(tx,{actorPersonId:owner.ownerPersonId,action:"identity.private_access_code.rotated",
+      resourceType:"account",resourceId:account.id,scope:{},context:{
+        ownerAccountId:owner.ownerAccountId,targetPersonId:target.personId,grantId:data.grantId,
+        reason:data.reason,revokedCount:revoked.length,
+      }});
+    return {privateAccessCode,revokedCount:revoked.length};
   });
 }
