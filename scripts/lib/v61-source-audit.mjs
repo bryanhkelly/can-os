@@ -257,9 +257,9 @@ export function createInventory(projectRoot) {
         const dep = resolveModule(file, item.from);
         if (!dep) continue;
         if (item.kind === "import") {
-          // A TypeScript barrel is resolved through its named exports; a TSX
-          // implementation follows its real component dependencies.
-          if (file.endsWith(".tsx")) stack.push({ file: dep, names: item.names });
+          // Follow imports as well as re-exports: barrels may import a component
+          // before exporting it locally. Conservative reachability is intentional.
+          stack.push({ file: dep, names: item.names });
         } else {
           const matching = item.exported.filter(
             binding => prior.has("*") || binding.name === "*" || prior.has(binding.name)
@@ -274,14 +274,14 @@ export function createInventory(projectRoot) {
     }
     // Barrel exports are resolved by requested symbols. These totals remain
     // static dependencies, not proof that a component renders at runtime.
-    const feature = [...files].filter(file =>
-      file !== entry && file.endsWith(".tsx") && !within(file, join(componentsDir, "ui")));
+    const reachable = [...files].filter(file =>
+      file !== entry && file.endsWith(".tsx"));
     return {
-      files: feature.length,
-      native: feature.reduce((n, file) => n + inspect(file).native.length, 0),
-      corners: feature.reduce((n, file) => n + inspect(file).corners.length, 0),
-      appearance: feature.reduce((n, file) => n + inspect(file).appearance.length, 0),
-      syntaxErrors: feature.reduce((n, file) => n + inspect(file).syntaxErrors.length, 0),
+      files: reachable.length,
+      native: reachable.reduce((n, file) => n + inspect(file).native.length, 0),
+      corners: reachable.reduce((n, file) => n + inspect(file).corners.length, 0),
+      appearance: reachable.reduce((n, file) => n + inspect(file).appearance.length, 0),
+      syntaxErrors: reachable.reduce((n, file) => n + inspect(file).syntaxErrors.length, 0),
     };
   }
   const rows = routes.map(file => {
