@@ -21,6 +21,20 @@ describe("WS6 authorized multi-Site reporting",()=>{
   expect(r.sites.reduce((n,x)=>n+x.uniquePeople,0)).toBe(14);
   expect(r.organizations[0]?.uniquePeople).toBe(13);
  });
+ it("uses the same metric implementation for each authorized owner population",()=>{
+  const allFacts=[...facts,...facts.map(f=>({...f,sourceId:"real-"+f.sourceId,operatingOrganizationId:"orgB"})),
+    {...facts[0]!,sourceId:"unknown",operatingOrganizationId:"orgC"}];
+  const fullProof={...proof,verifiedOrganizationIds:new Set(["orgA","orgB","orgC"])};
+  const ownerDomains=new Map<string,string|null>([["orgA","training.church.demo"],["orgB","church.org"],["orgC",null]]);
+  const synthetic=rollupAuthorizedParticipation(allFacts,fullProof,period,{ownerDomains,classification:"synthetic"});
+  const real=rollupAuthorizedParticipation(allFacts,fullProof,period,{ownerDomains,classification:"real"});
+  expect(synthetic.totals).toEqual(real.totals);
+  expect(rollupAuthorizedParticipation(allFacts,fullProof,period,{ownerDomains,classification:"unknown"}).totals.registrations).toBe(1);
+  const combined=rollupAuthorizedParticipation(allFacts,fullProof,period,{ownerDomains,classification:"all"});
+  expect(combined.totals.registrations).toBe(29);
+  expect(combined.totals.uniquePeople).toBe(13);
+  expect(()=>rollupAuthorizedParticipation(allFacts,proof,period,{ownerDomains,classification:"synthetic"})).toThrow("Out-of-scope");
+ });
  it("never counts a credited affiliation as an extra registration",()=>{
   const r=rollupAuthorizedParticipation(facts,proof,period);
   expect(r.totals.registrations).toBe(14);
