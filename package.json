@@ -83,7 +83,7 @@
     "design:inventory": "node scripts/report-design-system-adoption.mjs",
     "design:routes": "node scripts/audit-v61-routes.mjs",
     "design:coverage": "node scripts/check-v61-coverage.mjs",
-    "test:design-audit": "node --test scripts/lib/v61-source-audit.test.mjs scripts/lib/v61-component-dependencies.test.mjs scripts/codemods/v61-canonical-control-transform.test.mjs scripts/lib/source-module-resolution.test.mjs",
+    "test:design-audit": "node --test scripts/lib/v61-source-audit.test.mjs scripts/lib/v61-component-dependencies.test.mjs scripts/codemods/v61-canonical-control-transform.test.mjs scripts/lib/source-module-resolution.test.mjs scripts/lib/strict-rpc-shell.test.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
     "deploy:cloudflare": "npm run db:check:friendly-urls:deploy && node scripts/acceptance/check-one-person-deploy-schema.mjs && npm run build:cloudflare && wrangler deploy",
