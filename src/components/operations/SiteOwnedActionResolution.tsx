@@ -77,7 +77,7 @@ export function SiteOwnedActionResolution({ actions, timezone }: { actions: Owne
           <Textarea value={notes[action.id] ?? ""} maxLength={2000} rows={2}
             onChange={event => setNotes(current => ({ ...current, [action.id]: event.target.value }))}
             placeholder="Factual record of the steps taken and any remaining handoff"
-            className="mt-1 w-full  border bg-background p-2 text-sm font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+            className="mt-1" />
         </Label>
         <Button className="mt-2" variant="outline"
           disabled={!!busy || (notes[action.id] ?? "").trim().length < 10}
