@@ -155,6 +155,11 @@ export async function provisionDemoSiteSignup(input: unknown) {
   const privateAccessCodeHash = hashPrivateAccessCode(privateAccessCode, process.env.CAN_ACCESS_TOKEN_PEPPER ?? "");
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"demo-founder:" + domain}))`);
+    // Canonical Organization identity may predate the credential registry.
+    // Do not let public shared-domain signup claim an existing fixture/provider.
+    const [canonicalOwner] = await tx.select({id:organizations.id}).from(organizations)
+      .where(eq(organizations.domain,domain)).limit(1);
+    if(canonicalOwner)throw new DomainError("CONFLICT");
     const [registered] = await tx.select().from(demoSchoolTenants)
       .where(eq(demoSchoolTenants.domain, domain)).limit(1);
     if (registered) throw new DomainError("CONFLICT");
