@@ -71,7 +71,7 @@ export const Route=createFileRoute("/access/verify")({
     // an arbitrary token or demo-code attempt. Record only a bounded anonymous
     // rejection, never email, token, IP or request data.
     const method=payload&&"email" in payload&&"code" in payload
-     ?"local_demo_code":"email_link";
+     ?(typeof payload.code==="string" && /^[A-Za-z0-9_-]{43}$/.test(payload.code) ? "private_access_code" : "local_demo_code"):"email_link";
     try {
      const {recordRejectedAuthentication}=await import("@/modules/identity/authentication-rejections.server");
      await recordRejectedAuthentication(method);
