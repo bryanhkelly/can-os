@@ -168,7 +168,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
   }
   return <WorkspacePanel title="Go Links"
     description="Create a shareable entry point. The platform verifies the destination, manages the link and reports observed activity without collecting visitor identities.">
-    <section aria-label="Create Go Link" className="mt-4 space-y-4 border p-4">
+    <WorkspacePanel headingLevel="h3" title="Create Go Link" className="mt-4"><div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="What should people do?">
           <Select value={kind} onChange={event=>{
@@ -187,10 +187,8 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
           onChange={event=>{setDestinationTerm(event.target.value);setSelected(null);}}
           placeholder="Search published titles" maxLength={80}/>
         </Field>
-      {choiceState==="loading"&&<p role="status" className="text-xs text-muted-foreground">
-        Checking available destinations…</p>}
-      {choiceState==="error"&&<p role="alert" className="text-xs text-destructive">
-        The destination catalog could not load. Try changing the category or refresh.</p>}
+      {choiceState==="loading"&&<QueryState loading="Checking available destinations…"/>}
+      {choiceState==="error"&&<WorkspaceNotice tone="danger">The destination catalog could not load. Try changing the category or refresh.</WorkspaceNotice>}
       {choiceState==="ready"&&choices.length===0&&!advanced&&
         <p className="text-xs text-muted-foreground">
           No currently published, eligible destinations are available in this category.</p>}
@@ -234,7 +232,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
         <Button type="button" variant="outline" disabled={busy}
           onClick={()=>{setRetry(n=>n+1);setSelected(null);catalog.retry();}}>Refresh</Button>
       </ActionFooter>
-    </section>
+    </div></WorkspacePanel>
 
     <Field label="Search saved links by name" className="mt-5">
           <Input value={linkTerm}
@@ -245,18 +243,12 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
       error={readState==="error"?"Saved links are currently unavailable.":undefined} onRetry={()=>setRetry(n=>n+1)}/>}
     {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
     {notice&&<WorkspaceNotice className="mt-4">{notice}</WorkspaceNotice>}
-    {readState==="ready"&&<section aria-label="Managed links" className="mt-5 space-y-3">
-      <h3 className="font-semibold">Your links</h3>
+    {readState==="ready"&&<WorkspacePanel headingLevel="h3" title="Your links" className="mt-5"><div className="space-y-3">
       {!links.length&&<EmptyState kind={linkTerm?"matches":"records"} title={linkTerm?"No links match this search.":"No Go Links yet. Select an eligible destination above to create one."}/>}
-      {links.map(link=><article key={link.id} className="space-y-2 border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h4 className="font-medium">{link.name}</h4>
-            <p className="mt-1 break-all font-mono text-xs select-all">
-              {buildUrlDestination({kind:"go",code:link.code}).href}</p>
-          </div>
-          <StatusBadge tone={link.availability==="available"?"success":link.availability==="scheduled"?"info":link.availability==="paused"?"attention":"neutral"}>{readableState[link.availability]}</StatusBadge>
-        </div>
+      {links.map(link=><WorkspacePanel key={link.id} headingLevel="h4" title={link.name}
+        actions={<StatusBadge tone={link.availability==="available"?"success":link.availability==="scheduled"?"info":link.availability==="paused"?"attention":"neutral"}>{readableState[link.availability]}</StatusBadge>}>
+        <div className="space-y-2">
+        <p className="break-all font-mono text-xs select-all">{buildUrlDestination({kind:"go",code:link.code}).href}</p>
         <p className="text-xs text-muted-foreground">
           {labels[link.destination.kind]}{link.channel?" · "+link.channel:""}
           {link.startsAt?" · Opens "+new Date(link.startsAt).toLocaleString():""}
@@ -277,7 +269,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
         <GoLinkActions code={link.code} status={link.status} busy={busy}
           onTest={()=>void inspect(link)} onChange={action=>{if(action==="revoke")setRevokeTarget(link);else void change(link,action);}}/>
 
-      </article>)}
+      </div></WorkspacePanel>)}
       {nextCursor&&<div className="space-y-2">
         <Button type="button" size="sm" variant="outline" loading={loadingMore} loadingLabel="Loading…" onClick={()=>void loadMore()}>Load more links</Button>
         {pageError&&<WorkspaceNotice tone="danger">{pageError}</WorkspaceNotice>}
@@ -289,7 +281,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
         not from clicks. Other destination outcome types are shown as not connected,
         never as zero conversions.
       </p>
-    </section>}
+    </div></WorkspacePanel>}
     <ActionDialog open={!!revokeTarget} title="Revoke Go Link permanently"
       description="Distributed copies of this Go Link will stop working."
       confirmLabel="Revoke link" pending={busy} destructive
