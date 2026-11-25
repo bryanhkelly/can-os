@@ -109,3 +109,21 @@ export const NarrowWorkspace: Story = {
     }
   },
 };
+
+export const NestedPanels: Story = {
+  render: () => <div className="bg-background p-4">
+    <WorkspacePanel title="Operational lifecycle">
+      <WorkspacePanel headingLevel="h3" title="Algebra II" actions={<StatusBadge tone="success">Active</StatusBadge>}>
+        <WorkspaceNotice>Schedule changes require an authorized review.</WorkspaceNotice>
+        <ActionFooter layout="inline"><Button variant="outline">Review schedule</Button></ActionFooter>
+      </WorkspacePanel>
+    </WorkspacePanel>
+  </div>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { level: 2, name: "Operational lifecycle" })).toBeVisible();
+    const panel = canvas.getByRole("region", { name: "Algebra II" });
+    await expect(within(panel).getByRole("heading", { level: 3, name: "Algebra II" })).toBeVisible();
+    await expect(within(panel).getByRole("button", { name: "Review schedule" })).toBeEnabled();
+  },
+};

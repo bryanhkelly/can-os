@@ -5,7 +5,7 @@ import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { QueryState, ActionFooter } from "@/components/workspace";
+import { QueryState, ActionFooter, DisclosureSection } from "@/components/workspace";
 import { useMutationFeedback, mutationErrorMessage } from "@/lib/mutation-feedback";
 import { getPrivateLessonNote, savePrivateLessonNote } from "@/modules/learning/classroom-notes.functions";
 
@@ -66,13 +66,12 @@ export function PrivateLessonNotes({ sectionId, versionId, lessonId }: {
     </form>}
     </QueryState>
     <MutationFeedback state={mutation} pendingMessage="Saving private notes..."/>
-    {mutation.error && !mutation.refreshFailed && saved && <details className="text-sm">
-      <summary className="cursor-pointer underline">Resolve a conflict or uncertain save</summary>
+    {mutation.error && !mutation.refreshFailed && saved && <DisclosureSection title="Resolve a conflict or uncertain save">
       <p className="my-2 text-muted-foreground">Reload the saved revision without discarding your writing, then compare it before saving again.</p>
       <Button variant="outline" size="sm" disabled={busy} onClick={() => void mutation.run(async () => {
         await refresh();
       }, { successMessage: "Saved revision reloaded. Your unsaved writing is still in the editor.", commandErrorMessage: "Unable to reload the saved note." })}>Reload saved revision</Button>
-      <pre className="mt-3 whitespace-pre-wrap border p-3">{saved.body || "No saved text."}</pre>
-    </details>}
+      <pre className="mt-3 min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere] border border-border p-3">{saved.body || "No saved text."}</pre>
+    </DisclosureSection>}
   </section>;
 }

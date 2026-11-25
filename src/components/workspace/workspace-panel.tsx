@@ -3,12 +3,13 @@ import { Link, type RegisteredRouter, type ValidateLinkOptions } from "@tanstack
 import { Circle, CircleAlert, CircleCheck, Info, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function WorkspacePanel({ title, description, actions, children, className, id }: {
+export function WorkspacePanel({ title, description, actions, children, className, id, headingLevel: Heading = "h2" }: {
   title: string; description?: string; actions?: ReactNode; children: ReactNode; className?: string; id?: string;
+  headingLevel?: "h2" | "h3" | "h4" | "h5" | "h6";
 }) {
   return <section id={id} aria-label={title} className={cn("min-w-0 overflow-hidden border border-border/70 bg-card shadow-sm", className)}>
     <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5 sm:py-5">
-      <div className="min-w-0 [overflow-wrap:anywhere]"><h2 className="text-base font-semibold">{title}</h2>
+      <div className="min-w-0 [overflow-wrap:anywhere]"><Heading className="text-base font-semibold">{title}</Heading>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>
       {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </header>

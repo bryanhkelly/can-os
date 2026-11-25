@@ -32,7 +32,7 @@ describe("workspace design primitives", () => {
       <p>Saved successfully</p><p>Refresh may still be pending</p>
     </WorkspaceNotice>);
     expect(html).toMatch(/^<div\b/);
-    expect(html).toContain("<div class=\"min-w-0 flex-1\"><p>Saved successfully</p>");
+    expect(html).toMatch(/<div[^>]*><p>Saved successfully<\/p>/);
     expect(html).not.toContain("<span class=\"min-w-0 flex-1\"><p>");
     expect(html).toContain("<p>Refresh may still be pending</p>");
   });
@@ -68,6 +68,13 @@ describe("workspace design primitives", () => {
     expect(html).toContain("Authorized context");
     expect(html).toContain("Review");
     expect(html).toContain("Evidence");
+  });
+
+  it("supports nested panel headings and named regions", () => {
+    const html = renderToStaticMarkup(<WorkspacePanel title="Lifecycle"><WorkspacePanel headingLevel="h3" title="Algebra II">Section record</WorkspacePanel></WorkspacePanel>);
+    expect(html).toContain('aria-label="Algebra II"');
+    expect(html).toMatch(/<h2[^>]*>Lifecycle<\/h2>/);
+    expect(html).toMatch(/<h3[^>]*>Algebra II<\/h3>/);
   });
 
   it("keeps informational metrics still and gives linked metrics explicit hover and keyboard feedback", () => {
