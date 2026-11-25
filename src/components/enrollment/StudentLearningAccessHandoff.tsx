@@ -35,6 +35,7 @@ function ApplicationLearningAccessHandoff({
  const [email,setEmail]=useState("");
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
+ const [issuedCredential,setIssuedCredential]=useState<string|null>(null);
  const [error,setError]=useState("");
  const [retry,setRetry]=useState(0);
  const [independentReviewConfirmed,setIndependentReviewConfirmed]=useState(false);
@@ -45,7 +46,7 @@ function ApplicationLearningAccessHandoff({
   let live=true;
   // Switching between children must not retain another child's email, review
   // confirmation or approval status while a new handoff request is in flight.
-  setStatus("loading");setEmail("");setError("");setNotice("");setBlocker(null);
+  setStatus("loading");setEmail("");setError("");setNotice("");setBlocker(null);setIssuedCredential(null);
   setIndependentReviewConfirmed(false);
   setReviewMethod("institutional_school_record");
   void getStudentLearningHandoff({data:{applicationId}})
@@ -61,7 +62,7 @@ function ApplicationLearningAccessHandoff({
   setAttempted(true);
   if(role==="guardian"&&status==="not_requested"&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())||!guardianConsentConfirmed))return;
   if(role!=="guardian"&&status==="pending_review"&&!independentReviewConfirmed)return;
-  setBusy(true);setError("");setNotice("");
+  setBusy(true);setError("");setNotice("");setIssuedCredential(null);
   try{
    if(role==="guardian"){
     await consentToStudentLearningAccount({data:{
@@ -81,8 +82,11 @@ function ApplicationLearningAccessHandoff({
     setNotice("Student access approval is saved.");
     if(result.signInRequest==="failed"){
       setError("The sign-in link could not be requested. Wait at least a minute, then request it again below. Approval does not need to be repeated.");
+    }else if(result.signInRequest==="private_code"){
+      setIssuedCredential(result.privateAccessCode??null);
+      setNotice("Student access approval is saved. The student uses their individual account credential. No email is sent to this address.");
     }else if(result.signInRequest==="demo_code"){
-      setNotice("Student access approval is saved. Sign in with the student’s demo email and shared access code. No email was sent.");
+      setNotice("Student access approval is saved. Use the student’s existing authorized account credential. No email was sent.");
     }else{
       setNotice("Student access approval is saved. A sign-in link was requested; email delivery is not verified.");
     }
@@ -168,6 +172,7 @@ function ApplicationLearningAccessHandoff({
       invitation can be sent.</p>}
    </form>
   </QueryState>
+  {issuedCredential&&role==="registrar"&&<div className="space-y-3 border-t border-border pt-4"><WorkspaceNotice>Transfer this one-time-displayed access code privately to the independently confirmed student or authorized guardian. Do not email or post it. The account uses its own credential.</WorkspaceNotice><Field label="Student private access code"><Input value={issuedCredential} readOnly autoComplete="off" /></Field><Button type="button" variant="outline" onClick={()=>setIssuedCredential(null)}>Dismiss code</Button></div>}
   {notice&&<WorkspaceNotice tone="success" className="mt-4">{notice}</WorkspaceNotice>}
   {error&&<WorkspaceNotice tone={notice?"attention":"danger"} className="mt-4">{error}</WorkspaceNotice>}
  </WorkspacePanel>;
