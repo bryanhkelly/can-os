@@ -1,3 +1,4 @@
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { inArray, and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -135,7 +136,7 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
     let personId = personIds[0];
     if (!personId) {
       const [person] = await tx.insert(people).values({
-        legalFirstName: data.firstName, legalLastName: data.lastName, email,
+        legalFirstName: data.firstName, legalLastName: data.lastName, email, domain: identityEmailDomain(email),
       }).returning({ id: people.id });
       if (!person) throw new Error("Unable to prepare administrator identity");
       personId = person.id;
