@@ -2,6 +2,7 @@ import { inArray, sql } from "drizzle-orm";
 import { accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents, sites } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
 import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { demoCredentialScopePredicate } from "./demo-school-tenants.server";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
 
 /** Shared demo acceptance is an identity binding, never proof of email ownership. */
@@ -24,7 +25,12 @@ export function verifiedStaffIdentityPredicate() {
     or (
       ${grant.organizationId} = ${LOCAL_DEMO_ADMIN.organizationId}::uuid
       and ${grant.siteId} = ${LOCAL_DEMO_ADMIN.siteId}::uuid
-      and (${valor})
+      and ((${valor}) or (
+        not ${inArray(account.id, LOCAL_DEMO_ACCOUNTS.map(identity => identity.accountId))}
+        and ${account.personId} = ${grant.personId}
+        and ${demoCredentialScopePredicate(account.emailNormalized,grant.organizationId,grant.siteId)}
+        and ${inArray(grant.role,[...localStaffInviteRoles])}
+      ))
     )
     or (
       ${account.emailVerifiedAt} is not null
