@@ -148,7 +148,7 @@ describe("public demo session isolation", () => {
     const target = {...newGrant,email:"admin@example.org",emailVerifiedAt:null};
     state.rows = [[], [target]];
     expect(await readOwnerDelegationGrants(target.accountId,target.personId,target.email)).toEqual([]);
-    state.rows = [[], [{...newGrant,siteId:null}]];
+    state.rows = [[], [{...newGrant,organizationId:null}]];
     expect(await readOwnerDelegationGrants(newGrant.accountId,newGrant.personId,newGrant.email)).toEqual([]);
   });
   it("does not expose a real verified account through public demo-admin switching", async () => {
