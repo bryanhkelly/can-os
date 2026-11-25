@@ -6,7 +6,7 @@ import {
   Globe2, Mail, ShieldCheck, Sun, UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { realSchoolSetupSignupSchema, publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
+import { siteSignupSchema, publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
 import { useHydrated } from "@/lib/use-hydrated";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -44,12 +44,19 @@ export const Route = createFileRoute("/site/new")({
       } catch {
         return Response.json({ error: "Invalid submission." }, { status: 400, headers: noStore });
       }
-      const parsed = realSchoolSetupSignupSchema.safeParse(submitted);
+      const parsed = siteSignupSchema.safeParse(submitted);
       if (!parsed.success) {
         return Response.json({ error: "Please check the Site and administrator details." },
           { status: 400, headers: noStore });
       }
       try {
+        const { isDemoAccountEmail } = await import("@/domain/local-demo-access");
+        if (isDemoAccountEmail(parsed.data.email)) {
+          const { setupSchool } = await import("@/modules/identity/school-setup.server");
+          const { DEFAULT_SITE_TIMEZONE } = await import("@/domain/site-timezone");
+          await setupSchool({ name: parsed.data.name, domain: parsed.data.email.split("@")[1]!, timezone: DEFAULT_SITE_TIMEZONE, syntheticOnly: true }, undefined, parsed.data);
+          return Response.json({ accepted: true, demo: true }, { status: 202, headers: noStore });
+        }
         const { requestSchoolSetupAccess } = await import("@/modules/identity/passwordless-access.server");
         await requestSchoolSetupAccess(parsed.data);
       } catch {
@@ -96,6 +103,7 @@ function SiteNewPage() {
   const hydrated = useHydrated();
   const [sending, setSending] = useState(false);
   const [requested, setRequested] = useState(false);
+  const [demoReady, setDemoReady] = useState(false);
   const [error, setError] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -121,6 +129,8 @@ function SiteNewPage() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Request not accepted");
+      const result = await response.json() as { demo?: boolean };
+      setDemoReady(result.demo === true);
       setRequested(true);
     } catch {
       setError("We couldn't start verification. Check your details and try again.");
@@ -163,10 +173,9 @@ function SiteNewPage() {
           <section className="border bg-card p-5 sm:p-7" aria-label="Create your Site">
             {requested ? <div role="status" className="space-y-4">
               <CheckCircle2 className="size-9 text-success" aria-hidden="true" />
-              <h2 className="font-serif text-3xl">Check your email.</h2>
+              <h2 className="font-serif text-3xl">{demoReady ? "Your demo Site is ready." : "Check your email."}</h2>
               <p className="leading-7 text-muted-foreground">
-                If the address is eligible, you'll receive a secure verification link.
-                Follow it to create your Site and continue into Launch Studio.
+                {demoReady ? "Sign in with your demo email and the shared demo access code. No email verification is required." : "If the address is eligible, you will receive a secure verification link. Follow it to create your Site and continue into Launch Studio."}
               </p>
               <Button asChild variant="outline"><Link to="/access">Go to sign in</Link></Button>
             </div> : <form onSubmit={submit} className="space-y-5">
@@ -211,7 +220,7 @@ function SiteNewPage() {
               </Button>
               <p className="flex items-start gap-2 bg-muted p-3 text-xs leading-5 text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                We send a secure verification link. Your Site is created only after you verify your email.
+                Real accounts require email verification. Demo addresses create an isolated synthetic Site.
                 Creating a Site does not authorize opening or enrollment.
               </p>
               <p className="text-center text-xs text-muted-foreground">Already have a CAN OS account?{" "}
