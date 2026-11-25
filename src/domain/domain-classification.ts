@@ -15,3 +15,11 @@ export function identityEmailDomain(email: string | null | undefined): string | 
 export function isDemoDomain(domain: string | null | undefined): boolean {
   return normalizeIdentityDomain(domain)?.endsWith(".demo") ?? false;
 }
+
+/** Unknown domains are not evidence that an Organization's data is real.
+ * Classify the owner, never the learner, author, credential or publisher
+ * of content consumed by that owner. This is not a permission check. */
+export function classifyOwnedData(ownerDomain: string | null | undefined): "synthetic" | "real" | "unknown" {
+  const domain = normalizeIdentityDomain(ownerDomain);
+  return domain === null ? "unknown" : isDemoDomain(domain) ? "synthetic" : "real";
+}
