@@ -57,6 +57,7 @@ for (const [subject, count] of subjects) {
     ][index % 4];
     const teacher = {
       key, firstName, lastName,
+      domain: "teaching.can.demo",
       email: "can.demo.teacher" + String(index + 1).padStart(2, "0") + "@example.invalid",
       biography: "Synthetic CAN Academy " + subject + " instructor profile for product demonstrations only. Background and experience are illustrative, not verified.",
       primarySubject: subject,
@@ -119,7 +120,7 @@ const payload = {
     offeringAvailabilityConfirmed: false,
   },
   provider: {
-    slug: "can-demo-teaching-provider", name: "CAN Demo Teaching Provider",
+    slug: "can-demo-teaching-provider", name: "CAN Demo Teaching Provider", domain: "teaching.can.demo",
     organizationType: "other_partner", metadata: { demoProvider: true, isSynthetic: true },
   },
   teachers,
