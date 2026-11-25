@@ -95,7 +95,7 @@ export async function readDemoCredentialDomain(email:string, reader:Reader=db) {
 
 export async function hasApprovedDemoPersonalCredential(accountId:string,email:string,reader:Reader=db) {
   if (!await readDemoCredentialDomain(email,reader)) return false;
-  const [signup]=await reader.select({id:accessAccountSignups.id}).from(accessAccountSignups)
+  const [signup]=await reader.select({accountId:accessAccountSignups.accountId}).from(accessAccountSignups)
     .where(and(eq(accessAccountSignups.accountId,accountId),isNotNull(accessAccountSignups.consumedAt))).limit(1);
   return Boolean(signup);
 }
