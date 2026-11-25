@@ -2,7 +2,7 @@ name: Full-schema graduation migration (ephemeral PostgreSQL)
 
 on:
   push:
-    branches: [FullFlow]
+    branches: [main, FullFlow]
     paths:
       - "drizzle/**"
       - "tests/postgres/**"
@@ -12,6 +12,7 @@ on:
   pull_request:
     paths:
       - "drizzle/**"
+      - "tests/postgres/academic-private-evidence-acceptance.sql"
       - "tests/postgres/graduation-full-schema-acceptance.sql"
       - "tests/postgres/go-link-release-acceptance.sql"
       - "tests/postgres/fullflow-post0056-acceptance.sql"
@@ -119,3 +120,9 @@ jobs:
         run: |
           docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
             < tests/postgres/fullflow-post0056-acceptance.sql
+      - name: Verify academic evidence private access and revision integrity
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
+            < tests/postgres/academic-private-evidence-acceptance.sql
