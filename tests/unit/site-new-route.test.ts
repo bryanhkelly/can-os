@@ -39,6 +39,14 @@ describe("/site/new signup boundary", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(state.signup).toHaveBeenCalledWith(input);
   });
+  it("returns the newly created private credential only in the noncacheable signup response", async () => {
+    const data={...input,email:"admin@grace.demo",organizationDomain:"grace.demo"};
+    state.signup.mockResolvedValue({accepted:true,demo:true,privateAccessCode:"a".repeat(43)});
+    const response=await state.post!({request:request(data)});
+    expect(response.status).toBe(202);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({accepted:true,demo:true,privateAccessCode:"a".repeat(43)});
+  });
   it("keeps a denomination request provisional rather than granting network authority", async () => {
     const data = { ...input, name: "National Learning Center",
       organizationName: "National Faith Network", organizationType: "denomination" };
