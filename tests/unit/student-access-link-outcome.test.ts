@@ -17,16 +17,16 @@ vi.mock("@/db/client",()=>{
  }}};
 });
 vi.mock("@/db/schema",()=>Object.fromEntries([
- "accessAccounts","accountPersonGrants","applications","enrollments","guardianRelationships","people",
+ "accessAccounts","accessSessions","accountPersonGrants","applications","enrollments","guardianRelationships","people",
  "programs","sections","studentAccessConsents","studentProfiles","terms",
 ].map(name=>[name,Object.fromEntries(["id","programId","studentProfileId","stage","metadata","status","personId",
  "siteId","organizationId","schoolYearId","sectionId","termId","kind","active","guardianPersonId",
- "studentPersonId","canManageEnrollment","studentEmail","emailNormalized","disabled","accountId","email","role"]
+ "studentPersonId","canManageEnrollment","studentEmail","emailNormalized","disabled","accountId","email","role","privateAccessCodeHash","emailVerifiedAt","authenticationMethod","activeGrantId","revokedAt","expiresAt","delegatedGrantId","domain"]
  .map(key=>[key,name+"."+key]))])));
 vi.mock("@tanstack/react-start",()=>({createServerFn:()=>({validator(){return this;},handler(callback:unknown){return callback;}})}));
 vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("https://school.example.test"),setResponseHeader:vi.fn()}));
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>state.actor}));
-vi.mock("@/domain/access-tokens",()=>({normalizeAccessEmail:(email:string)=>email.trim().toLowerCase()}));
+vi.mock("@/domain/access-tokens",()=>({normalizeAccessEmail:(email:string)=>email.trim().toLowerCase(),issueOpaqueSecret:()=>"a".repeat(43),hashPrivateAccessCode:()=>"b".repeat(64)}));
 vi.mock("@/modules/enrollment/instructional-section-readiness.server",()=>({staffedPublishedSectionIds:async(ids:string[])=>new Set(ids)}));
 vi.mock("@/modules/identity/passwordless-access.server",()=>({requestOneTimeAccess:state.sender}));
 vi.mock("@/modules/identity/demo-school-tenants.server",()=>({matchesDemoCredentialScope:state.scope}));
@@ -45,6 +45,7 @@ function rows(status="pending_review",grants=[{personId:"student",role:"student"
    guardianPersonId:"guardian",studentEmail:email}],
   [{permission:true,metadata:{verification:"verified"}}],
   [{active:true,email}],
+  ...(email.endsWith(".demo")?[[]]:[]),
   [{id:"account",personId:"student",disabled:false}],grants,[{id:"grant",active:true}],
  ];
 }
@@ -64,7 +65,7 @@ describe("student approval and sign-in request outcomes",()=>{
  it("reports the generic request result separately after approval commits",async()=>{
   expect(await provisionStudentLearningAccess({data:input})).toEqual({status:"approved",signInRequest:"requested"});
   expect(state.emit).toHaveBeenCalledTimes(1);
-  expect(state.update).toHaveBeenCalledTimes(1);
+  expect(state.update).toHaveBeenCalledTimes(2);
   expect(state.sender).toHaveBeenCalledWith("child@example.test",undefined,"/profiles");
  });
  it("keeps the saved approval when the link request throws",async()=>{
@@ -79,7 +80,7 @@ describe("student approval and sign-in request outcomes",()=>{
   expect(await provisionStudentLearningAccess({data:{applicationId:"application"}}))
    .toEqual({status:"approved",signInRequest:"requested"});
   expect(state.emit).not.toHaveBeenCalled();
-  expect(state.update).not.toHaveBeenCalled();
+  expect(state.update).toHaveBeenCalledTimes(1);
   expect(state.sender).toHaveBeenCalledWith("child@example.test",undefined,"/profiles");
  });
  it("does not convert an identity collision into a delivery warning",async()=>{
@@ -101,6 +102,13 @@ describe("student approval and sign-in request outcomes",()=>{
   rows("pending_review",undefined,"child@example.demo");
   await expect(provisionStudentLearningAccess({data:input})).rejects.toThrow("eligible credential");
   expect(state.committed).toBe(false);
+  expect(state.sender).not.toHaveBeenCalled();
+  expect(state.emit).not.toHaveBeenCalled();
+ });
+ it("reuses an existing private student credential without sending or revealing it",async()=>{
+  rows("approved",undefined,"child@example.demo");
+  state.rows[7]=[{id:"account",personId:"student",disabled:false,privateCredential:true}];
+  expect(await provisionStudentLearningAccess({data:{applicationId:"application"}})).toEqual({status:"approved",signInRequest:"private_code"});
   expect(state.sender).not.toHaveBeenCalled();
   expect(state.emit).not.toHaveBeenCalled();
  });
