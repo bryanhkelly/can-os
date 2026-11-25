@@ -51,7 +51,7 @@ function AccessPage(){
    <input type="hidden" name="returnTo" value={search.returnTo??""}/>
    <fieldset disabled={!hydrated||(!isDemoEmail&&busy)} className="space-y-4">
     <Field label="Email" required><Input name="email" type="email" autoComplete="email" value={email} onChange={e=>updateEmail(e.target.value)}/></Field>
-    {isDemoEmail&&<Field label="Access code" required><Input name="code" type="password" autoComplete="one-time-code" value={code} onChange={e=>{setCode(e.target.value);setStatus({text:"",isError:false});}}/></Field>}
+    {isDemoEmail&&<Field label="Access code" required><Input name="code" type="password" autoComplete="current-password" maxLength={43} value={code} onChange={e=>{setCode(e.target.value);setStatus({text:"",isError:false});}}/></Field>}
     <Button disabled={!hydrated} loading={busy} loadingLabel={isDemoEmail?"Signing in…":"Sending access link…"} type="submit" className="w-full">{!hydrated?"Preparing sign-in…":isDemoEmail?"Sign in":"Email me an access link"}</Button>
    </fieldset>
   </form>
