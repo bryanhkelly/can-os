@@ -74,10 +74,10 @@ export function PlatformOwnerDelegationPanel() {
         onClick={()=>void search()}>Find users</Button>
     </div>
     {searched&&<div className="mt-4 space-y-2" role="group" aria-label="Available verified user roles">
-      {targets.length===0&&<EmptyState kind="matches" title="No eligible verified accounts match this search."/>}
+      {targets.length===0&&<EmptyState kind="matches" title="No eligible accounts match this search."/>}
       {targets.map(item=><Label key={item.grantId}
         className="flex cursor-pointer items-start gap-3 border border-border p-3 text-sm">
-        <Radio checked={selected===item.grantId}
+        <Radio disabled={busy} checked={selected===item.grantId}
           onChange={()=>{setSelected(item.grantId);setReplacementCode(null);setRotationConfirm("");}} name="owner-target-grant"
           className="mt-1"/>
         <span>
