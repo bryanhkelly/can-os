@@ -1,5 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
+import { loadNativeStudentHomework } from "@/modules/classes/native-student-homework-index";
+import { NativeStudentHomeworkIndex } from "@/components/student/NativeStudentHomeworkIndex";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { EmptyState, StatCard, WorkspaceNotice, WorkspaceShell, StatusBadge, DetailNavigation, SectionTab } from "@/components/workspace";
@@ -9,7 +11,10 @@ import { useStudentDisplayPreferences } from "@/components/shell/WorkspaceSessio
 import { formatTimestamp } from "@/modules/calendar/timezone";
 import { assignmentSummaryForSection } from "@/domain/student-assignment-work";
 
-const loadAssignments = () => getAssignments();
+const loadAssignments = async () => {
+ const [legacy,native] = await Promise.all([safeLoader(getAssignments)(),safeLoader(loadNativeStudentHomework)()]);
+ return {legacy,native};
+};
 export const Route = createFileRoute("/student/assignments")({
  validateSearch: (search: Record<string, unknown>): { filter?: "all" | "todo" | "missing" | "submitted" | "feedback"; assessment?: string; section?: string } => ({
   filter: search.filter === "all" || search.filter === "todo" || search.filter === "missing" || search.filter === "submitted" || search.filter === "feedback" ? search.filter : undefined,
@@ -40,7 +45,8 @@ function StudentAssignments() {
  return <StudentAssignmentsView key={JSON.stringify([filter, section, preferences.showCompletedAssignments])} data={result.data} showCompleted={preferences.showCompletedAssignments} />;
 }
 function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData; showCompleted: boolean }) {
- const { connected, assignments } = data;
+ const connected = data.legacy.ok && data.legacy.data.connected;
+ const assignments = data.legacy.ok ? data.legacy.data.assignments : [];
  const { filter = "all", section } = Route.useSearch();
  const summary = assignmentSummaryForSection(assignments, section);
  const items = summary.assignments.filter(item =>
@@ -55,7 +61,11 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
   subtitle="Read instructions, open an assignment to work on it, and follow through on feedback."
   breadcrumbs={<><Link to="/home" className="underline">Student Today</Link><span>/</span><Link to="/class"  className="underline">{section ? "Class" : "My classes"}</Link><span>/</span><span>Assignments</span></>}
   actions={<Button asChild variant="outline" size="sm"><Link to="/calendar-export">Export deadlines (.ics)</Link></Button>}>
-  {!connected && <WorkspaceNotice tone="attention" className="mt-5">School records are currently unavailable.</WorkspaceNotice>}
+  {!section&&data.native.ok&&<NativeStudentHomeworkIndex data={data.native.data}/>}
+  {!section&&!data.native.ok&&<WorkspaceNotice tone="attention" className="mt-5">Native Class assignments could not be loaded. Open My Classes to retry.</WorkspaceNotice>}
+  {!section&&data.native.ok&&data.native.data.classes.length>0&&<h2 className="mt-8 font-serif text-xl">School Section assignments</h2>}
+  {!connected && <WorkspaceNotice tone="attention" className="mt-5">School Section assignment records are currently unavailable. This does not mean your assignments have been cleared.</WorkspaceNotice>}
+  {connected&&<>
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
    <StatCard label="Assignments" value={summary.total}/>
    <StatCard label="Awaiting feedback" value={summary.awaitingFeedback}/>
@@ -83,5 +93,6 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
     <p className="mt-3 text-sm font-semibold text-primary">Open assignment →</p>
    </StudentAssignmentLink>)}
   </section>
+  </>}
  </WorkspaceShell>;
 }

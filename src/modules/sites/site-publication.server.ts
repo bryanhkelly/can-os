@@ -1,3 +1,4 @@
+import {emitReportableChange} from "@/platform/reportable-event";
 import { readSavedBrandVersion } from "./site-brand.server";
 import { assertSiteBrandMediaRights } from "@/domain/site-brand";
 import { siteBrandPresentationIdentity } from "@/domain/site-brand";
@@ -243,7 +244,8 @@ export async function changeSitePublicIdentity(
     const [siteConflict] = await tx.select({ id: sites.id }).from(sites).where(and(
       eq(sites.organizationId, site.organizationId), eq(sites.slug, slug), ne(sites.id, site.id),
     )).limit(1);
-    if (publicConflict || siteConflict) throw new DomainError("CONFLICT", "The requested school address is already reserved.");
+    if (publicConflict || siteConflict)
+      throw new DomainError("CONFLICT", "The requested school address is already reserved.");
     const updatedAt = new Date(Math.max(Date.now(), address.updatedAt.getTime() + 1));
     await tx.update(sites).set({ name, slug, updatedAt }).where(eq(sites.id, site.id));
     await tx.update(sitePublications).set({ slug, updatedAt }).where(eq(sitePublications.siteId, site.id));
@@ -403,13 +405,10 @@ export async function changeSitePublicationWithinTransaction(
         brandVersionId:needsReadiness?currentBrand?.id??null:null,
         websiteContentRevision:needsReadiness?local?.revision??null:null },
     });
-    await emitEvent(tx, {
-      eventType: input.action === "publish" ? EventTypes.SitePublished : EventTypes.SiteUnpublished,
-      aggregateType: "site", aggregateId: site.id, actorPersonId: actor.actorPersonId,
-      ...scope,
-      payload: { slug: current.slug, status: decision.status,
-        publishedAt: decision.publishedAt?.toISOString() ?? null },
-    });
+    const evidence={sourceId:site.id,sourceVersion:decision.updatedAt.toISOString(),occurredAt:decision.updatedAt,actorPersonId:actor.actorPersonId,dimensions:scope};
+    const publication={slug:current.slug,publishedAt:decision.publishedAt?.toISOString()??null,publicationAction:input.action};
+    if(decision.status==="published")await emitReportableChange(tx,{...evidence,eventType:EventTypes.SitePublished,payload:{...publication,status:"published"}});
+    else await emitReportableChange(tx,{...evidence,eventType:EventTypes.SiteUnpublished,payload:{...publication,status:"draft"}});
     return { siteId: site.id, status: decision.status,
       publishedAt: decision.publishedAt?.toISOString() ?? null,
       updatedAt: decision.updatedAt.toISOString(), changed: true };

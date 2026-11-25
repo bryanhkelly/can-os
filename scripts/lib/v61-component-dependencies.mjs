@@ -72,3 +72,53 @@ export function sourceDependencySpecifiers(sourceFile, ts) {
   visit(sourceFile);
   return [...references];
 }
+
+/** Runtime imports are distinct from erased TypeScript-only references.
+ * Keep import { type X } conservative: verbatimModuleSyntax may emit an
+ * empty runtime import. Use import type for a server-owned type contract.
+ */
+export function runtimeDependencySpecifiers(sourceFile, ts) {
+  const references = new Set();
+  function add(node) {
+    if (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) references.add(node.text);
+  }
+  function visit(node) {
+    if (ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly) add(node.moduleSpecifier);
+    if (ts.isExportDeclaration(node) && !node.isTypeOnly) add(node.moduleSpecifier);
+    if (ts.isImportEqualsDeclaration(node) && !node.isTypeOnly && ts.isExternalModuleReference(node.moduleReference)) add(node.moduleReference.expression);
+    if (ts.isCallExpression(node) && node.arguments.length >= 1 &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === "require"))) add(node.arguments[0]);
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return [...references];
+}
+
+/** Feature presentation may use RPC facades, never direct server implementations.
+ * This complements (not replaces) the stricter shared V6.1 layer policy.
+ */
+export function featureRuntimeImportViolation(file, specifier) {
+  const normalized = file.replaceAll("\\", "/");
+  const target = resolveSourceDependency(normalized, specifier);
+  const chartViolation=reportVisualizationImportViolation(normalized,specifier);
+  if(chartViolation)return chartViolation;
+  if (!normalized.startsWith("src/components/")) return null;
+  if (target && /\.server(?:\.[cm]?[jt]sx?)?(?:\/|$)/.test(target))
+    return "feature presentation must use an authorized RPC facade, not a server implementation: " + specifier;
+  if (/^(?:@neondatabase\/serverless|pg|postgres|drizzle-orm)(?:\/|$)/.test(specifier))
+    return "feature presentation must not own database transport or queries: " + specifier;
+  return null;
+}
+
+/** Prevent routes and other source modules from bypassing the governed chart surface. */
+export function reportVisualizationImportViolation(file,specifier){
+  const normalized=file.replaceAll("\\","/");
+  if(!normalized.startsWith("src/"))return null;
+  if(/^recharts(?:\/|$)/.test(specifier)&&normalized!=="src/components/workspace/report-chart-plot.tsx")
+    return "import Recharts only through the shared reporting plot adapter: "+specifier;
+  const target=resolveSourceDependency(normalized,specifier);
+  if(target&&/^src\/components\/workspace\/report-chart-plot(?:\.[cm]?[jt]sx?)?$/.test(target)&&normalized!=="src/components/workspace/report-chart.tsx")
+    return "consume ReportChart rather than its private Recharts adapter: "+specifier;
+  return null;
+}

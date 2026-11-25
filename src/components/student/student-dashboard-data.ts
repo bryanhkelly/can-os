@@ -5,7 +5,8 @@ import type { getStudentReportCard } from "@/modules/learning/report-cards.funct
 
 export type DashboardAssignment = StudentSuccessAssignment & { hasDraft: boolean };
 export type LearningResume = {
-  sectionId: string;
+  sectionId?: string;
+  classId?: string;
   title: string;
   lesson: { id: string; title: string; estimatedMinutes?: number } | null;
   completed: number;

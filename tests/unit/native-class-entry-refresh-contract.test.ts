@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 
 const route = readFileSync(new URL("../../src/routes/class.tsx", import.meta.url), "utf8");
 
+function card(name:string) {
+  expect(route).toContain("<"+name);
+  return readFileSync(new URL("../../src/components/learning/native-class/"+name+".tsx",import.meta.url),"utf8");
+}
+
 function component(from: string, until: string) {
   const start = route.indexOf(from);
   const end = route.indexOf(until, start);
@@ -12,12 +17,12 @@ function component(from: string, until: string) {
 
 describe("native Class command reconciliation", () => {
   it.each([
-    ["OfferingCard", "function OfferingCard(", "type NativeApproval=", "onJoined"],
-    ["ApprovedClassCard", "function ApprovedClassCard(", "type NativeInvitation=", "onChanged"],
-    ["InvitationCard", "function InvitationCard(", "type EnrolledClass=", "onChanged"],
-    ["EnrolledClassCard", "function EnrolledClassCard(", "/** One canonical Class entry.", "onChanged"],
-  ])("%s separates persisted command success from refresh errors", (_, from, until, refresh) => {
-    const source = component(from, until);
+    ["OfferingCard", "onJoined"],
+    ["ApprovedClassCard", "onChanged"],
+    ["InvitationCard", "onChanged"],
+    ["EnrolledClassCard", "onChanged"],
+  ])("%s separates persisted command success from refresh errors", (name, refresh) => {
+    const source = card(name);
     expect(source).toContain(`useMutationFeedback(${refresh})`);
     expect(source).toContain("mutation.pending||mutation.refreshFailed");
     expect(source).toContain("mutation.run(");
@@ -30,14 +35,14 @@ describe("native Class command reconciliation", () => {
   });
 
   it("keeps the learner's different server commands independent", () => {
-    const offering = component("function OfferingCard(", "type NativeApproval=");
+    const offering = card("OfferingCard");
     expect(offering).toContain("requestNativeClassApproval({data:");
     expect(offering).toContain("enrollCurrentPersonInClass({data:");
     expect(offering).toContain("result.duplicate?");
     expect(offering).toContain("result.alreadyEnrolled?");
-    const approval = component("function ApprovedClassCard(", "type NativeInvitation=");
+    const approval = card("ApprovedClassCard");
     expect(approval).toContain("approvalRequestId:item.approvalRequestId");
-    const invitation = component("function InvitationCard(", "type EnrolledClass=");
+    const invitation = card("InvitationCard");
     expect(invitation).toContain("invitationId:item.invitationId");
     expect(invitation).toContain("declineNativeClassInvitation({data:");
     expect(invitation).toContain("!item.consentText||busy");

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const route = readFileSync(new URL("../../src/routes/class.tsx", import.meta.url), "utf8");
-const start = route.indexOf("function NativeLearnerClasses(");
+const start = route.indexOf("function NativeAdultLearnerClasses(");
 const end = route.indexOf("  return <WorkspaceShell", start);
 const controller = route.slice(start, end);
 const restored = route.slice(

@@ -69,8 +69,10 @@ describe("Site-owned content source and publication contract",()=>{
     const preview=read("src/modules/sites/site-website-preview.server.ts");
     const service=read("src/modules/sites/site-content-channels.server.ts");
     expect(launch).toContain("Your website, as it grows");
-    expect(website).toContain("<SiteContentChannelEditor");
-    expect(website).toContain("initialConfig={data.contentChannelConfig}");
+    const step=read("src/components/launch-studio/WebsiteSiteContentStep.tsx");
+    expect(website).not.toContain("<SiteContentChannelEditor");
+    expect(step).not.toContain("<SiteContentChannelEditor");
+    expect(step).toContain("evolve with your approved learning opportunities");
     expect(preview).toContain("contentChannelConfig: contentConfig");
     expect(service).toContain("authorizeContentChannelEditor(actor, site, tx, \"write\")");
     expect(service).toContain("requirePartnerWebsiteEditor(actor, executor,");

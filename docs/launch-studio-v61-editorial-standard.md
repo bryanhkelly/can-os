@@ -23,6 +23,8 @@ Use a consistent three-layer page hierarchy:
 2. **Action:** What should the person do right now? Use direct, contextual guidance, preferably in one sentence.
 3. **Context, when needed:** Explain approvals, consent, permissions, regulatory requirements, or dependencies at the point where they change the person's decision.
 
+**Heading ownership in Launch Studio:** The page frame owns exactly one visible H1 and one concise subtitle. Stage and module names belong in the breadcrumb and navigation, not in a second card header. A stepper identifies progress; content panels use a distinct, action-oriented question or specific subject instead of repeating the selected step label. Keep a label for screen readers even when a redundant guided-shell header is visually suppressed (use `GuidedSetupShell.showHeader={false}` only when another visible heading provides the purpose). Preserve heading order H1 → H2 → H3 and do not repeat identical introductory descriptions in adjacent containers. The Site Guide remains a separately labeled assistance panel.
+
 Do not start a screen with implementation notes. Keep technical lineage, revision numbers, and configuration metadata in expandable details when they are genuinely needed for troubleshooting or expert review.
 
 ## Vocabulary

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { EmptyState, WorkspaceNotice } from "@/components/workspace";
+import { EmptyState, QueryState } from "@/components/workspace";
 import { CourseSurveyPanel } from "./CourseSurveyPanel";
 import { listNoncreditCourseSurveys } from "@/modules/learning/course-surveys.functions";
 
@@ -31,12 +30,7 @@ function NoncreditSurveySession({courseAttemptId,knowledgeCheckRevision}:{
       .catch(()=>{if(current)setError(true);});
     return ()=>{current=false;};
   },[courseAttemptId,knowledgeCheckRevision,retryRevision]);
-  if(error)return <WorkspaceNotice tone="danger">
-    <p>Feedback is temporarily unavailable. No survey response was changed.</p>
-    <Button type="button" size="sm" variant="outline" className="mt-3"
-      onClick={()=>setRetryRevision(revision=>revision+1)}>Retry feedback</Button>
-  </WorkspaceNotice>;
-  if(surveys===null)return <p role="status" className="text-sm">Checking for invited feedback surveys…</p>;
+  if(surveys===null)return <QueryState loading={!error&&"Checking for invited feedback surveys…"} error={error&&"Feedback is temporarily unavailable. No survey response was changed."} onRetry={()=>setRetryRevision(revision=>revision+1)}/>;
   if(!surveys.length)return <EmptyState title="No feedback survey available"
     description="If your provider enabled feedback, an invitation may appear after your knowledge check is submitted. Contact the organizer if a survey was expected."/>;
   return <section aria-label="Course feedback" className="space-y-4">

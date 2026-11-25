@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { QueryState, WorkspaceNotice } from "@/components/workspace";
 import { LearningQuestionnaire } from "./LearningQuestionnaire";
 import { getCourseSurvey, submitCourseSurvey } from "@/modules/learning/course-surveys.functions";
 
@@ -16,6 +17,7 @@ function CourseSurveySession({courseAttemptId,campaignId}:{
 }) {
   const [survey,setSurvey]=useState<Survey|null>(null);
   const [error,setError]=useState("");
+  const [retry,setRetry]=useState(0);
   useEffect(()=>{
     let active=true;
     setError("");
@@ -24,12 +26,9 @@ function CourseSurveySession({courseAttemptId,campaignId}:{
       .then(result=>{if(active)setSurvey(result);})
       .catch(()=>{if(active)setError("This survey is not available for your registration.");});
     return ()=>{active=false;};
-  },[courseAttemptId,campaignId]);
-  if(error)return <p role="alert" className="text-sm">{error}</p>;
-  if(!survey)return <p role="status" className="text-sm">Loading feedback questions...</p>;
-  if(survey.submitted)return <p role="status" className="text-sm">
-    Your feedback has been submitted. Thank you.
-  </p>;
+  },[courseAttemptId,campaignId,retry]);
+  if(!survey)return <QueryState loading={!error&&"Loading feedback questions…"} error={error} onRetry={()=>setRetry(value=>value+1)}/>;
+  if(survey.submitted)return <WorkspaceNotice tone="success">Your feedback has been submitted. Thank you.</WorkspaceNotice>;
   return <LearningQuestionnaire title={survey.title} questions={survey.questions}
     submitLabel="Submit feedback" onSubmit={async answers=>{
       await submitCourseSurvey({data:{courseAttemptId,campaignId,answers}});

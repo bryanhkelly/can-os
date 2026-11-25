@@ -5,13 +5,12 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
    canonicalClasses, canonicalClassEnrollments,
-  canonicalPersons, learnerCourseAttempts,canonicalClassEnrollmentApprovalRequests,
+  canonicalPersons,canonicalClassEnrollmentApprovalRequests,
 } from "@/db/canonical-v301";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import {
   planNativeClassExit, assertNativeClassOperatorExitScope,
-  assertNativeClassAttemptForExit,
   assertVerifiedAdultNativeClassExit, assertNativeClassExitReason,
 } from "@/domain/native-class-lifecycle";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -20,6 +19,8 @@ import { assertCurrentNativeClassLearnerForMutation } from
   "./native-class-learner-session.server";
 import { assertCurrentCanonicalStaffForMutation } from
   "@/modules/identity/canonical-transaction-authorization.server";
+
+import { withdrawNativeClassAttempts } from "./native-class-attempt.server";
 
 const uuid = z.string().uuid();
 const withdrawInput = z.object({classEnrollmentId:uuid}).strict();
@@ -127,39 +128,7 @@ async function exitNativeClass(command:ExitRequest){
 
     let closedAttemptIds:string[]=[];
     if(enrollment.status==="active"){
-      if(!enrollment.courseAttemptId)
-        throw new AuthorizationError("active Course Attempt required");
-      // Retakes may share the native Class Enrollment source. Updating only
-      // its selected attempt could strand other ACTIVE retakes after exit.
-      // Lock and validate every linked active Course Attempt before changing
-      // any row; keep completed/withdrawn attempts as historical evidence.
-      const attempts=await tx.select().from(learnerCourseAttempts)
-        .where(eq(learnerCourseAttempts.classEnrollmentId,enrollment.id))
-        .for("update");
-      // A Class placement linked to a Course Registration must be withdrawn
-      // through the owning Course command so both participation records and
-      // the single Course Attempt change together.
-      if(attempts.some(attempt=>attempt.noncreditRegistrationId!==null))
-        throw new AuthorizationError("Withdraw the Course registration to leave this Class");
-      const selected=attempts.find(attempt=>attempt.id===enrollment.courseAttemptId);
-      if(!selected)throw new AuthorizationError("selected Class Course Attempt");
-      assertNativeClassAttemptForExit({
-        attempt:selected,enrollment,classInstance:cls,
-      });
-      const live=attempts.filter(attempt=>attempt.status==="active");
-      for(const attempt of live){
-        assertNativeClassAttemptForExit({
-          attempt,enrollment,classInstance:cls,requireSelectedPointer:false,
-        });
-      }
-      // The canonical Course Attempt source trigger requires its parent
-      // Class Enrollment to remain ACTIVE until every live attempt closes.
-      for(const attempt of live){
-        await tx.update(learnerCourseAttempts)
-          .set({status:"withdrawn"})
-          .where(eq(learnerCourseAttempts.id,attempt.id));
-      }
-      closedAttemptIds=live.map(attempt=>attempt.id);
+      closedAttemptIds=await withdrawNativeClassAttempts(tx,enrollment,cls);
     }else if(enrollment.courseAttemptId){
       throw new AuthorizationError("pending enrollment cannot own Course Attempt");
     }

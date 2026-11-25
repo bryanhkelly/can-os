@@ -63,6 +63,9 @@ describe("signed Resend source receipt callbacks", () => {
       })).toMatchObject({ type, receiptId, providerMessageId });
     }
   });
+  it("correlates native campaign delivery without trusting recipient identity", () => {
+    expect(parseResendReceiptEvent({type:"email.bounced",data:{email_id:providerMessageId,tags:{can_source:"engagement_campaign",can_receipt:receiptId},to:["secret@example.com"]}})).toEqual({type:"email.bounced",source:"engagement_campaign",receiptId,providerMessageId});
+  });
   it("accepts canonical noncredit receipts and rejects unrelated products", () => {
     expect(parseResendReceiptEvent({ type: "email.delivered", data: {
       email_id: providerMessageId, tags: { can_source: "noncredit_waitlist", can_receipt: receiptId },
@@ -76,5 +79,22 @@ describe("signed Resend source receipt callbacks", () => {
     expect(parseResendReceiptEvent({ type: "email.opened", data: {
       email_id: providerMessageId, tags: { can_source: "school_family", can_receipt: receiptId },
     } })).toBeNull();
+  });
+});
+
+describe("Strict webhook wire format",()=>{
+  it("rejects malformed UTF-8 and preserves a signed BOM",async()=>{
+    const request=(bytes:Uint8Array)=>new Request("https://example.test/webhook",{method:"POST",body:Uint8Array.from(bytes).buffer});
+    expect(await readBoundedResendWebhookBody(request(new Uint8Array([0xff])))).toBeNull();
+    const withBom="\uFEFF"+body;
+    const received=await readBoundedResendWebhookBody(request(new TextEncoder().encode(withBom)));
+    expect(received).toBe(withBom);
+    expect(verifyResendWebhookSignature(received!,headers(withBom),secret,Number(timestamp)*1000)).toBe(true);
+    expect(verifyResendWebhookSignature(received!,headers(body),secret,Number(timestamp)*1000)).toBe(false);
+  });
+  it("rejects arrays that coerce to recognized receipt discriminators",()=>{
+    const event=JSON.parse(body);
+    expect(parseResendReceiptEvent({...event,type:["email.delivered"]})).toBeNull();
+    expect(parseResendReceiptEvent({...event,data:{...event.data,tags:{...event.data.tags,can_source:["engagement_campaign"]}}})).toBeNull();
   });
 });

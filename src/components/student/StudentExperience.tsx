@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
-import { EmptyState, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { DisclosureSection, EmptyState, WorkspaceLinkNavigation, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
 import { StudentAssignmentLink } from "./StudentAssignmentLink";
@@ -21,7 +21,11 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
   dashboard?: StudentDashboardData;
 }) {
  const otherOpenActions=liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id));
- const firstWeek=liveData.firstWeek??[];
+ const nativeClasses=dashboard?.classes?.ok && dashboard.classes.data.kind==="student"
+  ?dashboard.classes.data.classes.filter(item=>item.status==="active" && item.courseAttemptId):[];
+ const nativeUnavailable=dashboard?.classes?.ok===false;
+ // Legacy first-week tasks do not supply native lesson identities.
+ const firstWeek=nativeClasses.length || nativeUnavailable ? [] : liveData.firstWeek??[];
  const format=(date:Date|string,timeZone?:string)=>new Intl.DateTimeFormat("en-US",{
   dateStyle:"medium",timeStyle:"short",...(timeZone?{timeZone}:{}),
  }).format(new Date(date));
@@ -41,15 +45,14 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
      <StatusBadge tone={classroom.ready?"success":"attention"}>{classroom.ready?"Ready to start":"Setup in progress"}</StatusBadge>
      <p className="mt-2 text-xs text-muted-foreground">{classroom.ready?"Lesson and submission work are available.":"Your school still needs to complete this class setup."}</p>
      {classroom.ready?<div className="mt-3 space-y-2 text-sm">
-      <p>1. <Link to="/class"  className="underline focus-visible:outline-2">Study “{classroom.firstWeek.lesson!.title}”</Link></p>
+      <p>1. <Link to="/student/courses" search={{section:classroom.sectionId}} className="underline focus-visible:outline-2">Review class for “{classroom.firstWeek.lesson!.title}”</Link></p>
       <p>2. <StudentAssignmentLink assessmentId={classroom.firstWeek.assessment!.id} sectionId={classroom.sectionId} className="underline focus-visible:outline-2">Complete “{classroom.firstWeek.assessment!.title}”</StudentAssignmentLink></p>
      </div>:<ul className="mt-3 list-inside list-disc space-y-1 text-xs">{classroom.blockers.map(item=><li key={item.key}>{item.message}</li>)}</ul>}
     </article>;
    })}</div>
   </WorkspacePanel>}
-  <details className="mt-6 border bg-card p-4">
-  <summary className="cursor-pointer text-sm font-semibold">More learning details and school links</summary>
-  <nav aria-label="Student workspace" className="mt-4 flex flex-wrap gap-2 text-sm">
+  <DisclosureSection title="More learning details and school links" headingLevel="h2" className="mt-6">
+  <WorkspaceLinkNavigation label="Student workspace" surface="plain" className="gap-2">
    <Button asChild variant="outline" size="sm"><Link to="/student/assignments">Assignments</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/student/courses">Courses</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/student/support">Support</Link></Button>
@@ -58,12 +61,17 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
    <Button asChild variant="outline" size="sm"><Link to="/profiles">My profile</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/student/report-card">Report card</Link></Button>
    <Button asChild variant="outline" size="sm"><Link to="/calendar">Calendar</Link></Button>
-  </nav>
-  {liveData.sections.length>0&&<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
-   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/class"  className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
-    <h3 className="font-semibold">{section.sectionTitle}</h3><span className="mt-3 inline-block text-sm underline">Open class</span>
-   </Link>)}</div>
-  </WorkspacePanel>}
+  </WorkspaceLinkNavigation>
+  {nativeUnavailable?<WorkspaceNotice tone="attention">Your native Classes could not be verified. Retry from My Classes.</WorkspaceNotice>:
+   nativeClasses.length>0?<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{nativeClasses.map(item=><Link key={item.classId} to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"lessons"}} className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
+     <h3 className="font-semibold">{item.title}</h3><span className="mt-3 inline-block text-sm underline">Open class</span>
+    </Link>)}</div>
+   </WorkspacePanel>:liveData.sections.length>0&&<WorkspacePanel title="School class records" description="Review your school classwork and feedback." className="mt-7">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/student/courses" search={{section:section.sectionId}} className=" border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
+     <h3 className="font-semibold">{section.sectionTitle}</h3><span className="mt-3 inline-block text-sm underline">Review class record</span>
+    </Link>)}</div>
+   </WorkspacePanel>}
   <div className="mt-10 grid gap-6 lg:grid-cols-2">
    <WorkspacePanel title="Coursework" description="Published assignments and the latest saved status." className="min-w-0">
     <div className="space-y-3">{liveData.coursework.map(item=>{
@@ -93,7 +101,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
    </WorkspacePanel>
     </div>
   </div>
-  </details>
+  </DisclosureSection>
     <WorkspacePanel title="Other open actions" description="Support or follow-ups outside your assignment list.">
     <div className="space-y-3">{otherOpenActions.map(action=><article key={action.id} className=" border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">

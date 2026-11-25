@@ -1,93 +1,23 @@
 import type { SiteContentBlockProjection } from "./site-content-channels";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { z } from "zod";
-import { escapePublicHtml, type PublicSitePage } from "./public-site-html";
+import { type PublicSitePage } from "./public-site-html";
 import { siteLocalImagePublicationGaps, type SiteLocalContent } from "./site-local-content";
-import { isPublicSitePagePath, publicSitePagePaths } from "./public-site-paths";
-
-const uuid = z.string().uuid();
-const digest = z.string().regex(/^[a-f0-9]{64}$/);
-const iso = z.string().datetime({ offset: true });
-const snapshotPages = z.record(z.string(), z.string().max(1_500_000))
-  .refine(pages => Object.keys(pages).length > 0
-    && Object.keys(pages).length <= publicSitePagePaths.length
-    && Object.keys(pages).every(isPublicSitePagePath)
-    && typeof pages["/"] === "string", "Valid website preview pages are required");
-
-export const sitePreviewShareSchema = z.object({
-  id: uuid,
-  tokenDigest: digest,
-  createdAt: iso,
-  expiresAt: iso.nullable(),
-  revokedAt: iso.nullable(),
-  sourceRevision: z.number().int().nonnegative(),
-  brandVersionId:z.string().uuid().optional(),
-  synthetic:z.boolean().optional(),
-  /** Legacy V1 frozen HTML, readable until its link is revoked or expires. */
-  pages: snapshotPages.optional(),
-  /** V2: immutable R2 snapshot descriptor, never a public object URL. */
-  snapshotKey:z.string().regex(/^site-website-preview-snapshots\/v2\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.json$/).optional(),
-  snapshotDigest:digest.optional(),
-  snapshotPaths:z.array(z.enum(publicSitePagePaths)).min(1).max(publicSitePagePaths.length).optional(),
-}).strict().superRefine((value,ctx)=>{
-  const legacy=!!value.pages;
-  const v2=!!value.snapshotKey&&!!value.snapshotDigest&&!!value.snapshotPaths;
-  if(legacy===Boolean(v2))
-    ctx.addIssue({code:"custom",message:"Exactly one immutable preview snapshot representation is required"});
-});
-export type SitePreviewShare = z.infer<typeof sitePreviewShareSchema>;
-
-export const sitePreviewShareListSchema = z.array(sitePreviewShareSchema).max(12);
-
-export function readSitePreviewShares(metadata: Record<string, unknown>): SitePreviewShare[] {
-  const value = metadata.websitePreviewSharesV1;
-  return value === undefined ? [] : sitePreviewShareListSchema.parse(value);
-}
-
-export function createPreviewShareToken() {
-  const token = randomBytes(32).toString("base64url");
-  return { token, tokenDigest: hashPreviewShareToken(token) };
-}
-
-export function hashPreviewShareToken(token: string) {
-  return createHash("sha256").update(token, "utf8").digest("hex");
-}
-
-/** Only 256-bit random bearer tokens are accepted. Never log the raw token. */
-export function validPreviewShareToken(token: string): boolean {
-  return /^[A-Za-z0-9_-]{43}$/.test(token);
-}
-
-export function activePreviewShare(
-  shares: readonly SitePreviewShare[], token: string, at: Date,
-): SitePreviewShare | null {
-  if (!validPreviewShareToken(token)) return null;
-  const requested = Buffer.from(hashPreviewShareToken(token), "hex");
-  for (const share of shares) {
-    const stored = Buffer.from(share.tokenDigest, "hex");
-    if (!timingSafeEqual(requested, stored)) continue;
-    if (share.revokedAt || (share.expiresAt && Date.parse(share.expiresAt) <= at.getTime())) return null;
-    return share;
-  }
-  return null;
-}
+import { isPublicSitePagePath } from "./public-site-paths";
 
 /** Unlisted, immutable snapshot navigation: never allow submissions or
  * navigations into operational/public enrollment workflows.
  */
 export function renderSharedSitePreview(
-  storedHtml: string, siteId: string, token: string,
+  storedHtml: string, goCode: string,
   availablePages: readonly string[],
-  _synthetic = false,
 ): string {
+  if (!/^[A-Za-z0-9_-]{12}$/.test(goCode)) throw new Error("Invalid Go code");
   const known = new Set(availablePages.filter(isPublicSitePagePath));
   const rewritten = storedHtml.replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, "")
     .replace(/(<a\b[^>]*?)href="([^"]*)"/g, (_full, prefix: string, target: string) => {
       if (target.startsWith("#")) return `${prefix}href="${target}"`;
       if (!isPublicSitePagePath(target) || !known.has(target))
         return `${prefix}href="#" aria-disabled="true" tabindex="-1"`;
-      const params = new URLSearchParams({ siteId, token, page: target });
-      return `${prefix}href="/site-preview-share?${params.toString().replaceAll("&", "&amp;")}"`;
+      return `${prefix}href="/go/${goCode}?${new URLSearchParams({page:target}).toString()}"`;
     });
   const banner = `<aside class="can-share-preview" role="status">
     <strong>Proposed learning community · Website preview</strong>
@@ -153,12 +83,3 @@ export const sitePreviewShareHeaders = {
   "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https://*.can-os.com; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'none'",
 } as const;
 
-export function previewShareUnavailable(): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Website preview unavailable</title></head>
-  <body style="font:16px/1.6 system-ui;padding:32px">
-  <h1>Website preview unavailable</h1>
-  <p>${escapePublicHtml("This link is invalid, expired, or has been revoked. Ask the Site organizer for a new preview.")}</p>
-  </body></html>`;
-}

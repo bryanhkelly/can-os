@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ActionDialog, EmptyState, FilterBar, SelectionCard, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, EmptyState, FilterBar, SelectionCard, WorkspacePanel, WorkspaceNotice } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { projectSiteSolutionPreparationV61 } from "@/domain/site-solution-preparation-v61";
 import { SolutionPreparationSummaryV61 } from "./SolutionPreparationSummaryV61";
@@ -208,9 +208,15 @@ export function SolutionCatalogV61({ siteId, intent, delivery, initialPlanId, sc
                   <p className="mt-2">Solution v{selected.versionNo} · {selected.components.length} listed parts</p>
                   {selected.offeringCode && <p className="mt-1">Offering code: {selected.offeringCode}</p>}
                 </details>
-                {selected.offeringCode && <p className="mt-2 text-xs text-muted-foreground">
-                  This solution is linked to an offering. You'll complete its requirements before registration can open.
-                </p>}
+                {selected.offeringCode && <WorkspaceNotice
+                  tone={selected.linkedPublishedOffering ? "info" : "attention"} className="mt-3">
+                  <p className="font-medium">{selected.linkedPublishedOffering
+                    ? "Learning content published by its provider"
+                    : "Learning content not yet published"}</p>
+                  <p className="mt-1">{selected.linkedPublishedOffering
+                    ? "The offering has a published version. Site adoption, delivery approval and a separate registration release are still required."
+                    : "The provider must finish content and media review, publish the Course and Offering, and confirm training and assessment approvals. You can save your Site plan in the meantime."}</p>
+                </WorkspaceNotice>}
               </div>
               <div className="space-y-5 p-5">
                 <div>

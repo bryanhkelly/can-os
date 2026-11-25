@@ -1,3 +1,4 @@
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 /**
  * V6.1 Prepare to Open is a Site-scoped orchestration surface, not an approval
  * engine. The actual Site, Blueprint, Class and admissions services own writes.
@@ -46,7 +47,7 @@ type ModulePlan = {
   handoffs: readonly Handoff[];
 };
 
-const scoped = (siteId: string) => encodeURIComponent(siteId);
+const scoped = (siteId: string) => compactUuidUrlValue(siteId);
 /** These destinations are existing authorized operations, not new task stores. */
 const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
   "program-catalog": {
@@ -105,7 +106,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
       { title: "Review school admissions", detail: "View applications when your program uses school admissions.", href: id => "/admissions?siteId=" + scoped(id) },
       { title: "Review admissions capacity", detail: "Check available places when using school admissions.", href: id => "/admissions/capacity?siteId=" + scoped(id) },
       { title: "Manage Class registration", detail: "Manage registration for eligible Classes.", href: id => "/class?view=manage&siteId=" + scoped(id) },
-      { title: "Manage noncredit registration", detail: "Set up registration for approved noncredit offerings.", href: () => "/programs/noncredit/enrollment" },
+      { title: "Manage noncredit registration", detail: "Continue with the selected Site. Only an independently authorized provider may publish a noncredit enrollment release.", href: id => "/programs/noncredit/enrollment?publicSiteId=" + scoped(id) },
     ],
   },
   "opening-compliance": {
@@ -294,7 +295,8 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, solutionPla
       {module === "facilities-resources" && <PrepareFacilitiesV61 key={siteId} siteId={siteId} />}
       {module === "invite-team" && <PrepareTeamV61 key={siteId} siteId={siteId} />}
       {module === "schedules-capacity" && <PrepareSchedulesV61 key={siteId} siteId={siteId} />}
-      {(module === "funding-enrollment" || module === "opening-compliance") && <WorkspacePanel title="What to prepare"
+      {(module === "funding-enrollment" || module === "opening-compliance") && <WorkspacePanel
+        title={module === "funding-enrollment" ? "Before people register" : "Opening decisions and requirements"}
         description="Requirements depend on the Solution and location.">
         <div className="flex gap-3">
           <ClipboardCheck aria-hidden="true" className="mt-1 size-5 shrink-0 text-primary" />

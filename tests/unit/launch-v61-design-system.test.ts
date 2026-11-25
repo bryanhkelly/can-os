@@ -104,6 +104,63 @@ describe("V6.1 current Launch Studio presentation contract", () => {
     expect(read("src/components/workspace/selection-card.tsx")).not.toContain('layout?: "horizontal" | "vertical"');
   });
 
+  it("does not repeat Launch Studio page headers inside guided workflow cards", () => {
+    const siteInfo = read("src/components/launch-studio/EstablishSiteInformationV61.tsx");
+    const launchRoute = read("src/routes/launch.site.tsx");
+    const website = read("src/routes/site-website.tsx");
+    expect(siteInfo).toContain('<GuidedSetupShell title="Site Information" showHeader={false}');
+    expect(launchRoute).toContain('WorkspaceShell title="Programs & Audiences"');
+    expect(website).toContain('title="Website & Brand" showHeader={false}');
+    expect(website.match(/title="Website & Brand" showHeader=\{false\}/g)).toHaveLength(2);
+  });
+
+  it("keeps outreach page and content-card titles distinct", () => {
+    const outreach = read("src/components/launch-studio/MarketingPackagesV61.tsx");
+    expect(outreach).toContain('<WorkspacePanel title="Audience & highlights">');
+    expect(outreach).toContain('<WorkspacePanel title="Message & materials">');
+    expect(outreach).toContain('<WorkspacePanel title="Available materials"');
+    expect(outreach).toContain('<WorkspacePanel title="Responses & events"');
+    expect(outreach).not.toContain('<WorkspacePanel title={record.title}>');
+    expect(outreach).not.toContain('<WorkspacePanel title="Use & Share"');
+    expect(outreach).not.toContain('<WorkspacePanel title="Follow Up"');
+  });
+
+  it("applies one-purpose headings across Shape, Prepare and the Launch frame", () => {
+    const siteProfile = read("src/components/launch-studio/EstablishSiteProfileUnified.tsx");
+    const siteInfo = read("src/components/launch-studio/EstablishSiteInformationV61.tsx");
+    const programs = read("src/components/launch-studio/EstablishProgramsAudiencesV61.tsx");
+    const experiences = read("src/components/launch-studio/EstablishExperiencesV61.tsx");
+    const prepare = read("src/components/launch-studio/LaunchPrepareV61.tsx");
+    const frame = read("src/components/launch-studio/LaunchSiteFrameV61.tsx");
+
+    expect(siteProfile).toContain('<WorkspacePanel title="Site essentials">');
+    expect(siteInfo).toContain('title="Describe your Site and its host"');
+    expect(siteInfo).toContain('title="Where and how will people take part?"');
+    expect(siteInfo).toContain('title="Would you like to connect with a network?"');
+    expect(siteInfo).toContain("Tell your Site's story");
+    expect(programs).toContain('showHeader={step !== 2}');
+    expect(programs).toContain('<legend className="sr-only">Programs you want to explore</legend>');
+    expect(programs).toContain('<legend className="sr-only">Audiences you hope to serve (optional)</legend>');
+    expect(experiences).toContain('<h2 className="font-serif text-2xl">');
+    expect(experiences).toContain('<h4 id={"experience-group-"+group.id}');
+    expect(experiences).not.toContain("<h5");
+    expect(prepare).toContain('title={module === "funding-enrollment" ? "Before people register" : "Opening decisions and requirements"}');
+    expect(frame).toContain("Shape · Share · Prepare · Launch");
+  });
+
+  it("keeps Publish Website and Opening Checklist card headings distinct from H1", () => {
+    const publication = read("src/components/launch-studio/LaunchSitePublicationPanel.tsx");
+    const readiness = read("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
+    const opening = read("src/components/launch-studio/LaunchModuleDestinationV61.tsx");
+
+    expect(publication).toContain('<WorkspacePanel title="Final website checks"');
+    expect(publication).not.toContain('<WorkspacePanel title="Publish your website"');
+    expect(readiness).toContain('context==="open" ? "Readiness status"');
+    expect(readiness).not.toContain('"Your opening checklist"');
+    expect(opening).toContain('"Next steps to open"');
+    expect(opening).not.toContain('"Welcome participants"');
+  });
+
   it("reuses internal-step visuals and exposes selectable preview states", () => {
     const wizard = read("src/components/launch-studio/MarketingPackageWizardV61.tsx");
     const gallery = read("src/components/launch-studio/WebsiteTemplateGallery.tsx");

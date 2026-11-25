@@ -1,15 +1,18 @@
-import { and, asc, count, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassEnrollments, canonicalClassSessions,
   canonicalDeliverySessions, facilitatedClassroomPlans, learnerCourseAttempts,
-  participationAttributions,canonicalPersons,
+  participationAttributions,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { selectCourseClass } from "@/domain/course-class-registration";
-import { assertNativeClassSeatAvailable } from "@/domain/native-class-lifecycle";
-import { verifiedAdultOn } from "@/domain/native-class-enrollment";
+import { assertNativeClassSeatAvailable, nativeClassCapacity } from "@/domain/native-class-lifecycle";
+import { accessAccountNoncreditPrincipals } from "@/db/schema";
+import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
+import {readOpenNativeClassEnrollment} from "@/modules/classes/native-class-enrollment-history.server";
+import { readNativeClassOccupancy } from "@/modules/classes/native-class-capacity.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { emitCanonicalDomainEvent, writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
@@ -58,11 +61,9 @@ export async function listEligibleCourseClasses(
       .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
     if(cls.deliveryMode!=="self_paced"&&!upcoming.length)continue;
     if(upcoming.length>100)throw new AuthorizationError("Class schedule exceeds supported Session limit");
-    const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-      .where(and(eq(canonicalClassEnrollments.classId,cls.id),
-        inArray(canonicalClassEnrollments.status,["active","pending"])));
+    const occupancy=await readNativeClassOccupancy(tx,cls.id);
     result.push({id:cls.id,title:cls.title,deliveryMode:cls.deliveryMode,
-      seatsRemaining:cls.capacity===null?null:Math.max(0,cls.capacity-(occupancy?.total??0)),
+      seatsRemaining:nativeClassCapacity({method:"self",activeOrPending:occupancy,classCapacity:cls.capacity}).remainingSeats,
       sessions:upcoming.map(item=>({
         startsAt:item.startsAt.toISOString(),endsAt:item.endsAt.toISOString(),
       })),
@@ -95,10 +96,11 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
   // Native Class self-enrollment requires independently verified adulthood.
   // A Course sign-up attestation, email verification, or non-student role alone
   // cannot bypass the existing native Class learner identity policy.
-  const [person]=await tx.select({birthDate:canonicalPersons.birthDate})
-    .from(canonicalPersons).where(eq(canonicalPersons.id,args.personId)).limit(1);
-  if(!verifiedAdultOn(person?.birthDate,new Date()))
-    throw new AuthorizationError("verified adult identity before Class registration");
+  const [link]=await tx.select().from(accessAccountNoncreditPrincipals)
+    .where(and(eq(accessAccountNoncreditPrincipals.accessPersonId,args.personId),
+      eq(accessAccountNoncreditPrincipals.canonicalPersonId,args.personId))).limit(1);
+  if(!link)throw new AuthorizationError("verified adult identity before Class registration");
+  await assertCurrentReviewedNativeLearner(link.canonicalAccountId,args.personId,new Date(),tx,true);
   if(cls.deliveryMode!=="self_paced"){
     const [scheduled]=await tx.select({id:canonicalClassSessions.id})
       .from(canonicalClassSessions)
@@ -131,18 +133,11 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
     if(!existing)throw new AuthorizationError("Class change needs an authorized transfer");
     return {classId,classEnrollmentId:existing.id,created:false};
   }
-  const [previous]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,classId),
-      eq(canonicalClassEnrollments.learnerPersonId,args.personId),
-      inArray(canonicalClassEnrollments.status,["active","pending"]),
-    )).limit(1);
+  const previous=await readOpenNativeClassEnrollment(tx,classId,args.personId);
   if(previous)throw new AuthorizationError("existing Class participation requires reconciliation");
-  const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-    .where(and(eq(canonicalClassEnrollments.classId,classId),
-      inArray(canonicalClassEnrollments.status,["active","pending"])));
+  const occupancy=await readNativeClassOccupancy(tx,classId);
   assertNativeClassSeatAvailable({
-    method:"self",activeOrPending:occupancy?.total??0,
+    method:"self",activeOrPending:occupancy,
     classCapacity:authority.classCapacity,offeringCapacity:null,
   });
   const [placed]=await tx.insert(canonicalClassEnrollments).values({
@@ -163,13 +158,14 @@ export async function placeCourseRegistrationInClass(tx:Tx,args:{
   if(origin.deliverySiteId!==cls.siteId||origin.reportingSiteId!==cls.siteId)
     throw new AuthorizationError("Course and Class delivery attribution mismatch");
   await tx.insert(participationAttributions).values({
-    classEnrollmentId:placed.id,releaseId:args.release.id,
+    classEnrollmentId:placed.id,releaseId:null,
     deliverySiteId:origin.deliverySiteId,reportingSiteId:origin.reportingSiteId,
     creditedOrganizationId:origin.creditedOrganizationId,
     networkMembershipId:origin.networkMembershipId,
     attributionBasis:origin.attributionBasis,
     relationshipSnapshot:{
       source:"course_registration_class_placement",
+      releaseId:args.release.id,
       registrationId:args.registrationId,
       originalAttributionId:origin.id,
     },

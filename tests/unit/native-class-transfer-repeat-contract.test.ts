@@ -15,19 +15,21 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(transfer).toContain("orderBy(asc(canonicalClasses.id)).for(\"update\")");
   expect(transfer).toContain('source.status!=="active"');
   expect(transfer).toContain("assertCurrentNativeClassLearnerForMutation");
-  expect(transfer).toContain("assertNativeClassAttemptForExit");
+  expect(transfer).toContain("withdrawNativeClassAttempts(tx,source,sourceClass)");
   expect(transfer).toContain("assertNativeSelfEnrollmentEligible");
   expect(transfer).toContain("assertNativeClassSeatAvailable");
  });
  it("preserves source history, creates one destination Attempt and attribution",()=>{
   expect(transfer).toContain('set({status:"withdrawn"})');
   expect(transfer).toContain("tx.insert(canonicalClassEnrollments)");
-  expect(transfer).toContain("tx.insert(learnerCourseAttempts)");
-  expect(transfer).toContain("tx.insert(participationAttributions)");
+  expect(transfer).toContain("createInitialNativeClassAttempt(tx,destination.id,destinationAuthority)");
+  expect(transfer).toContain("writeNativeClassAttribution(tx,");
   expect(transfer).toContain('eventType:"ClassEnrollmentTransferred"');
-  expect(transfer).toContain("sourceAttemptIdsClosed:live.map");
-  expect(learner).toContain("transferMyNativeClassEnrollment");
-  expect(learner).toContain("I accept the destination Class terms");
+  expect(transfer).toContain("sourceAttemptIdsClosed:closedAttemptIds");
+  expect(learner).toContain("<EnrolledClassCard");
+  const card=read("src/components/learning/native-class/EnrolledClassCard.tsx");
+  expect(card).toContain("transferMyNativeClassEnrollment");
+  expect(card).toContain("I accept the destination Class terms");
  });
  it("blocks completed destination repeats without an independent authorization",()=>{
   expect(transfer).toContain('assertNativeClassRepeatEligible(completed?["completed"]:[])');
@@ -37,10 +39,14 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(repeat).toContain("isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId)");
  });
  it("consumes authorized repeat only inside successful Class admission",()=>{
+  const consumption=read("src/modules/classes/native-class-repeat-consumption.server.ts");
+  expect(consumption).toContain("ClassRepeatAuthorizationConsumed");
+  expect(consumption).toContain("consumedByEnrollmentId:input.classEnrollmentId");
+  expect(consumption).toContain("if(!consumed)throw");
   for(const source of [enrollment,assignment,guardian]){
    expect(source).toContain("requireNativeRepeatAuthorization");
-   expect(source).toContain("ClassRepeatAuthorizationConsumed");
-   expect(source).toContain("consumedByEnrollmentId:enrollment.id");
+   expect(source).toContain("consumeNativeClassRepeatAuthorization(tx,");
+   expect(source.indexOf("consumeNativeClassRepeatAuthorization(tx,")).toBeGreaterThan(source.indexOf("await createInitialNativeClassAttempt("));
   }
  });
 });

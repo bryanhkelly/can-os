@@ -1,10 +1,11 @@
+import { siteAudienceGroups, siteAudienceNames } from "@/domain/site-audiences";
 import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { GuidedSetupProgress } from "@/components/workflow/guided-setup-shell";
-import { ActionFooter, SelectionCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionFooter, SelectionCard, SelectionChip, SelectionChipGroup, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   composeOutreachDraftV61, initialOutreachPlanV61, marketingAudienceOptions,
   outreachFormatsV61, outreachStepIdsV61,
@@ -13,6 +14,7 @@ import {
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { siteExperienceById } from "@/domain/site-experience-interests";
 import type { readSiteMarketingSuggestionsV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
+import { SiteIntelligenceContentPanel } from "./SiteIntelligenceContentPanel";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 
 type Suggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
@@ -21,10 +23,7 @@ const stepTitles=["People","Message","Highlights","Action","Materials","Review"]
 const relationshipOptions=[
   {id:"known",label:"People I know"},{id:"new",label:"People I don't know"},{id:"both",label:"Both"},
 ] as const;
-const beneficiaryOptions=[
-  {id:"children",label:"Children"},{id:"teens",label:"Teens"},
-  {id:"adults",label:"Adults"},{id:"older_adults",label:"Older adults"},
-] as const;
+const beneficiaryOptions=siteAudienceGroups.flatMap(group=>group.items.map(item=>({id:item.id,label:item.label})));
 const messageOptions=[
   {id:"coming-soon",label:"Coming soon",description:"Build anticipation for an idea or upcoming launch."},
   {id:"feedback",label:"What do you think?",description:"Invite people to help shape the possibilities."},
@@ -57,9 +56,7 @@ const programLabels:Record<string,string>={
   afterschool:"After-school",summer:"Summer & Breaks",
   adult:"Adult Learning",senior:"Older Adult Learning",
 };
-const beneficiaryLabels:Record<string,string>={
-  children:"Children",teens:"Teens",adults:"Adults",older_adults:"Older adults",
-};
+const beneficiaryLabels=siteAudienceNames;
 const formatNames:Record<MarketingFormat,string>={
   email:"Email",social:"Social",flyer:"Flyer",handout:"Printable Handout","qr-card":"QR Card",
 };
@@ -173,12 +170,14 @@ export function MarketingPackageWizardV61({
           <p className="text-xs text-muted-foreground">
             Beneficiaries help explain the intended impact, even when they aren't the recipients.
           </p>
-          <fieldset className="grid gap-2 sm:grid-cols-2">
+          <fieldset className="space-y-3">
             <legend className="sr-only">Beneficiary audiences</legend>
-            {beneficiaryOptions.map(item=><SelectionCard key={item.id}
-              kind="checkbox" compact title={item.label} value={item.id}
-              checked={plan.beneficiaries.includes(item.id)} disabled={busy}
-              onChange={()=>updatePlan({beneficiaries:toggle(plan.beneficiaries,item.id) as OutreachPlanV61["beneficiaries"]})}/>)}
+            {siteAudienceGroups.map(group=><fieldset key={group.id} className="space-y-2">
+              <legend className="text-xs font-semibold">{group.label}</legend>
+              <SelectionChipGroup>{group.items.map(item=><SelectionChip key={item.id}
+                selected={plan.beneficiaries.includes(item.id)} disabled={busy}
+                onChange={()=>updatePlan({beneficiaries:toggle(plan.beneficiaries,item.id) as OutreachPlanV61["beneficiaries"]})}>{item.label}</SelectionChip>)}</SelectionChipGroup>
+            </fieldset>)}
           </fieldset>
         </section>
       </div>
@@ -275,8 +274,9 @@ export function MarketingPackageWizardV61({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Suggested message</h3>
           <Button type="button" variant="outline" size="sm" disabled={busy}
-            onClick={()=>onPatch(suggested)}>Use suggestion for this plan</Button>
+            onClick={()=>onPatch(suggested)}>Use basic plan suggestion</Button>
         </div>
+        <SiteIntelligenceContentPanel key={siteId+":outreach"} siteId={siteId} target="outreach" purpose={content.purpose} disabled={busy} onApply={draft=>{if(draft.outreach)onPatch(draft.outreach);}}/>
         <Field label="Outreach name" required><Input value={title} maxLength={120}
           onChange={event=>onTitleChange(event.target.value)}/></Field>
         <Field label="Headline" required><Input value={content.headline} maxLength={160}

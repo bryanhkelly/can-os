@@ -14,8 +14,10 @@ describe("WS2 native Class transaction and integration invariants",()=>{
 
   it("checks all open enrollments instead of five recent history rows",()=>{
     for(const source of [self,assigned]){
-      expect(source).toContain('inArray(canonicalClassEnrollments.status,["pending","active"])');
-      expect(source).toContain("duplicate open Class enrollments require reconciliation");
+      expect(source).toContain("readOpenNativeClassEnrollment(tx,");
+      const history=read("src/modules/classes/native-class-enrollment-history.server.ts");
+      expect(history).toContain('inArray(canonicalClassEnrollments.status,["pending","active"])');
+      expect(history).toContain("duplicate open Class enrollments require reconciliation");
       expect(source).not.toContain(".limit(5)");
       expect(source).toContain("assertNativeClassSeatAvailable(");
     }
@@ -54,7 +56,8 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(verifier).toContain("v301_canonical_session_context");
     expect(verifier).toContain("canonicalSessionDigestFromRequest(request)");
     expect(verifier).toContain("assertNativeClassLearnerSessionForExit(");
-    expect(verifier).toContain("actor.scope.organizationIds[0]");
+    expect(verifier).toContain("actor.scope.organizationIds?.length!==1");
+    expect(verifier).toContain('actor.scope.organizationIds?.[0]??""');
     expect(verifier).not.toContain("operatingOrganizationId");
     expect(self).toContain("await assertCurrentNativeClassLearnerForMutation(tx,request,actor)");
     expect(exit).toContain("await assertCurrentNativeClassLearnerForMutation(tx,request,actor)");
@@ -62,9 +65,12 @@ describe("WS2 native Class transaction and integration invariants",()=>{
 
   it("keeps public seat estimates behind the same current authority",()=>{
     expect(self).toContain("await currentClassAuthority(tx,row.classId,now)");
-    expect(self).toContain("remainingSeats:");
-    expect(self).toContain("Math.max(0,capacity-");
-    const ui=read("src/routes/class.tsx");
+    expect(self.match(/nativeClassCapacity\(\{/g)).toHaveLength(2);
+    expect(self).toContain("offeringCapacity:row.capacity");
+    expect(read("src/domain/native-class-lifecycle.ts")).toContain("Math.max(0,capacity-input.activeOrPending)");
+    const route=read("src/routes/class.tsx");
+    expect(route).toContain("<OfferingCard");
+    const ui=read("src/components/learning/native-class/OfferingCard.tsx");
     expect(ui).toContain("item.remainingSeats===0");
     expect(ui).toContain("disabled={!adult||!consent||busy||full}");
   });
@@ -77,7 +83,7 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(self).toContain("HH24:MI:SS.US");
     expect(self).toContain("enrolledAt:last.enrolledAtCursor");
     expect(self).not.toContain("new Date(data.cursor.enrolledAt)");
-    expect(self).toContain("lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)");
+    expect(self).toContain("lt(canonicalClassEnrollments.id,cursor.classEnrollmentId)");
     expect(self).toContain("eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId)");
     expect(self).toContain("desc(canonicalClassEnrollments.id)).limit(51)");
     expect(self).toContain("const items=rows.slice(0,50)");
@@ -90,11 +96,13 @@ describe("WS2 native Class transaction and integration invariants",()=>{
   });
 
   it("preserves Course Attempt authority when a Class ends",()=>{
-    expect(exit).toContain("assertNativeClassAttemptForExit(");
+    const attempts=read("src/modules/classes/native-class-attempt.server.ts");
+    expect(attempts).toContain("assertNativeClassAttemptForExit(");
+    expect(attempts).toContain("await tx.update(learnerCourseAttempts)");
     expect(exit).toContain("assertNativeClassExitReason(");
     expect(exit).toContain("assertVerifiedAdultNativeClassExit(");
     expect(exit).toContain("assertCurrentCanonicalStaffForMutation(");
-    const attemptClose=exit.indexOf("await tx.update(learnerCourseAttempts)");
+    const attemptClose=exit.indexOf("await withdrawNativeClassAttempts(tx,enrollment,cls)");
     const enrollmentClose=exit.indexOf("await tx.update(canonicalClassEnrollments)");
     expect(attemptClose).toBeGreaterThan(0);
     expect(enrollmentClose).toBeGreaterThan(attemptClose);

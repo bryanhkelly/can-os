@@ -1,3 +1,4 @@
+import { sharedPhotoReferenceSchema, type SharedPhotoReference } from "./template-sample-images";
 import { approvedSiteMediaUsage } from "./site-media-rights";
 import { z } from "zod";
 import { siteBrandDirectionIds } from "./site-brand-direction";
@@ -17,6 +18,7 @@ export const siteBrandConfigurationSchema=z.object({
   displayName:z.string().trim().min(1).max(120),
   logoAssetId:z.string().uuid().nullable(),
   heroAssetId:z.string().uuid().nullable(),
+  sharedHeroPhoto:sharedPhotoReferenceSchema.nullable().optional(),
 }).strict();
 export type SiteBrandConfiguration=z.infer<typeof siteBrandConfigurationSchema>;
 export type SiteBrandAsset={
@@ -37,7 +39,7 @@ export type ResolvedSiteBrand={
   headingFontId:SiteBrandConfiguration["headingFontId"];
   bodyFontId:SiteBrandConfiguration["bodyFontId"];
   theme:ReturnType<typeof resolveSiteTheme>;
-  logo:SiteBrandAsset|null;hero:SiteBrandAsset|null;
+  logo:SiteBrandAsset|null;hero:SiteBrandAsset|null;sharedHeroPhoto?:SharedPhotoReference|null;
 };
 export function initialSiteBrandConfiguration(name:string):SiteBrandConfiguration{
   return {directionId:null,paletteId:"signature",typographyId:"editorial",
@@ -52,7 +54,7 @@ export function resolveSiteBrandVersion(version:SavedSiteBrandVersion,assets:Rea
     displayName:c.displayName,directionId:c.directionId,paletteId:c.paletteId,typographyId:c.typographyId,
     headingFontId:c.headingFontId,bodyFontId:c.bodyFontId,
     theme:resolveSiteTheme(c.paletteId,c.typographyId,c.headingFontId??undefined,c.bodyFontId??undefined),
-    logo,hero};
+    logo,hero,sharedHeroPhoto:hero?null:c.sharedHeroPhoto};
 }
 export function assertSiteBrandMediaRights(asset:SiteBrandAsset|null):boolean {
   return !asset || approvedSiteMediaUsage({
@@ -89,5 +91,6 @@ export function siteBrandPresentationIdentity(
     ...(config.bodyFontId?{bodyFontId:config.bodyFontId}:{}),
     ...(brand.directionId?{brandDirectionId:brand.directionId}:{}),
     heroImage:image(brand.hero),logoImage:image(brand.logo),
+    ...(brand.sharedHeroPhoto?{sharedHeroPhoto:brand.sharedHeroPhoto}:{}),
   };
 }

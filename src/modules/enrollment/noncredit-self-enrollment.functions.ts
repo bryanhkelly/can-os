@@ -5,10 +5,10 @@ import { db } from "@/db/client";
 import { z } from "zod";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
-  accessAdultLearningReviews,
+  accessAdultLearningReviews, people,
 } from "@/db/schema";
 import {
-  canonicalAccounts, canonicalAccountGrants, canonicalPersons,
+  canonicalAccounts, canonicalAccountGrants,
   canonicalClasses,canonicalClassEnrollments,canonicalClassSessions,
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
@@ -21,10 +21,12 @@ import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
+import { verifyNoncreditGoReferral } from "@/modules/engagement/engagement-go.server";
 import { placeCourseRegistrationInClass } from "./course-class-placement.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -35,9 +37,12 @@ type VerifiedSelfEnrollmentActor = {
 
 
 async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActor, now:Date) {
-  // An email from an authenticated legacy CAN session is NOT evidence that
-  // an existing, separately created canonical identity belongs to this person.
-  // Only new native Persons, or a previously explicit bridge, are eligible.
+  // The verified CAN account already owns the authoritative public Person.
+  // A transitional native learning account may be provisioned, but never a
+  // second Person or a Person inferred from a matching email.
+  const [currentPerson]=await tx.select({id:people.id,active:people.active})
+    .from(people).where(eq(people.id,owner.personId)).limit(1);
+  if(!currentPerson?.active)throw new AuthorizationError("active authoritative CAN Person");
   const [link]=await tx.select().from(accessAccountNoncreditPrincipals)
     .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId))
     .for("update").limit(1);
@@ -64,7 +69,7 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
   if(adultReview&&!link)
     throw new AuthorizationError("approved adult review requires canonical learner activation first");
   if(link){
-    if(link.accessPersonId!==owner.personId)
+    if(link.accessPersonId!==owner.personId||link.canonicalPersonId!==owner.personId)
       throw new AuthorizationError("CAN identity changed; manual reconciliation required");
     // A newly approved but unconsumed review must not interrupt an
     // existing noncredit learner. Class admission still requires activation
@@ -80,15 +85,12 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
       disabledAt:canonicalAccounts.disabledAt,verifiedAt:canonicalAccounts.emailVerifiedAt,
     }).from(canonicalAccounts)
       .where(eq(canonicalAccounts.id,link.canonicalAccountId)).limit(1);
-    const [person]=await tx.select({id:canonicalPersons.id,birthDate:canonicalPersons.birthDate})
-      .from(canonicalPersons).where(eq(canonicalPersons.id,link.canonicalPersonId)).limit(1);
-    if(adultReview&&((adultReview.consumedAt||person?.birthDate)&&
-       person?.birthDate!==adultReview.verifiedBirthDate))
-      throw new AuthorizationError("canonical adult date of birth differs from approved evidence");
-    if(!native || !person || native.disabledAt || !native.verifiedAt ||
+    if(adultReview?.consumedAt)
+      await assertCurrentReviewedNativeLearner(link.canonicalAccountId,owner.personId,now,tx,true);
+    if(!native || native.disabledAt || !native.verifiedAt ||
        native.email!==owner.email)
       throw new AuthorizationError("verified native identity unavailable");
-    return {accountId:native.id,personId:person.id};
+    return {accountId:native.id,personId:owner.personId};
   }
   const [operatorLinked]=await tx.select({id:accessAccountCanonicalPrincipals.id})
     .from(accessAccountCanonicalPrincipals).where(and(
@@ -104,24 +106,19 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
   const [nativeAccount]=await tx.insert(canonicalAccounts).values({
     emailNormalized:owner.email,emailVerifiedAt:now,
   }).returning({id:canonicalAccounts.id});
-  const [nativePerson]=await tx.insert(canonicalPersons).values({
-    // The name is a display preference. Do not pretend that a signup
-    // independently verified the person's legal name or birth date.
-    preferredName:owner.preferredName,
-  }).returning({id:canonicalPersons.id});
-  if(!nativeAccount||!nativePerson)throw new Error("Unable to create native learner identity");
+  if(!nativeAccount)throw new Error("Unable to create native learner account");
   await tx.insert(accessAccountNoncreditPrincipals).values({
     accessAccountId:owner.accountId,accessPersonId:owner.personId,
-    canonicalAccountId:nativeAccount.id,canonicalPersonId:nativePerson.id,
+    canonicalAccountId:nativeAccount.id,canonicalPersonId:owner.personId,
     linkageMethod:"verified_existing_can_session",
   });
   await writeCanonicalAudit(tx,{
-    actorPersonId:nativePerson.id,
+    actorPersonId:owner.personId,
     eventCode:"noncredit.self_enrollment.identity_linked",
     entityKind:"canonical_account",entityId:nativeAccount.id,
     payload:{source:"verified_can_session",legalNameVerified:false},
   });
-  return {accountId:nativeAccount.id,personId:nativePerson.id};
+  return {accountId:nativeAccount.id,personId:owner.personId};
 }
 
 async function requireLearnerGrant(tx:Tx, accountId:string, personId:string, organizationId:string) {
@@ -158,6 +155,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
     const owner=await requireVerifiedAdultAccount();
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure native learning access is temporarily unavailable");
+    const verifiedReferral=await verifyNoncreditGoReferral(data.referralCode,data.releaseId);
     const outcome=await db.transaction(async tx=>{
       // Serialize capacity and duplicate checks for one published release.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+data.releaseId}))`);
@@ -278,7 +276,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           canonicalAccountId:native.accountId,siteId:release.siteId,
           consentVersion:release.consentVersion,
           consentSha256:release.consentSha256,adultAttested:data.adultConfirmed,
-          referralCode:data.referralCode||null,
+          referralCode:verifiedReferral,
         });
         // Directory visibility validates the institution, not the learner's
         // personal affiliation. Self-selection is explicitly self-reported.

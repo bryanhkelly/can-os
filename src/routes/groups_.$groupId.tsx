@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
@@ -27,6 +28,7 @@ const loadGroupDetail = async () => {
 };
 
 export const Route = createFileRoute("/groups_/$groupId")({
+  params: opaqueUuidPathParam("groupId"),
   validateSearch: (search: Record<string, unknown>): { session?: string } => sessionSearchSchema.parse(search),
   loader: safeLoader(loadGroupDetail, {
     authMessage: "Sign in as a student or teacher to access your study groups.",

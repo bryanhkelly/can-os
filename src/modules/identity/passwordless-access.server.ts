@@ -128,18 +128,19 @@ export async function requestSchoolSetupAccess(input:unknown,sender:AccessEmailS
   if(prior?.consumedAt)return;
   if(prior&&prior.expiresAt>now){
    if(prior.schoolName!==data.name||prior.organizationName!== (data.organizationName ?? null)||
+     prior.organizationType!==data.organizationType||
      prior.firstName!==data.firstName||prior.lastName!==data.lastName)return;
    await tx.update(schoolSetupSignups).set({expiresAt,updatedAt:now})
     .where(eq(schoolSetupSignups.id,prior.id));
    return;
   }
   if(prior){
-   await tx.update(schoolSetupSignups).set({schoolName:data.name,organizationName:data.organizationName??null,firstName:data.firstName,
+   await tx.update(schoolSetupSignups).set({schoolName:data.name,organizationName:data.organizationName??null,organizationType:data.organizationType,firstName:data.firstName,
     lastName:data.lastName,expiresAt,consumedAt:null,organizationId:null,siteId:null,updatedAt:now})
     .where(eq(schoolSetupSignups.id,prior.id));
   }else{
    await tx.insert(schoolSetupSignups).values({accountId,schoolName:data.name,
-    organizationName:data.organizationName??null,
+    organizationName:data.organizationName??null,organizationType:data.organizationType,
     firstName:data.firstName,lastName:data.lastName,expiresAt});
   }
  });

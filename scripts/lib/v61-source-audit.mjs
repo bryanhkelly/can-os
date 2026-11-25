@@ -7,7 +7,9 @@ import ts from "typescript";
 // route names, JSX snippets, or expected component counts as migration gates.
 // Existing debt is reported; changed files may never add more debt.
 const nativeTags = new Set(["button", "input", "label", "select", "textarea", "dialog"]);
-const radiusPattern = /(?:^|\s)(?:[\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=\s|$)/g;
+// Covers directional/logical corners, arbitrary values and variants, including
+// Tailwind important modifiers. Brand shape data is handled separately below.
+const radiusPattern = /(?:^|\s)(?:(?:[\w-]+|\[[^\]\r\n]+\]):)*!?rounded(?:-(?:[trblse]|tl|tr|bl|br|ss|se|es|ee))?(?:-(?:none|xs|sm|md|lg|xl|[2-9]xl|full|\[[^\]\r\n]+\]|\([^\)\r\n]+\)))?!?(?=\s|$)/g;
 const ignoredFile = /\.(?:test|spec|stories)\.tsx$/;
 
 function location(file, node) {
@@ -258,11 +260,22 @@ function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
-export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD^") {
+export function checkChangedFiles(root, base = process.env.V61_BASE_REF) {
   const src = resolve(root);
-  const result = { base, checked: 0, errors: [], warning: null };
+  const result = { base: base || null, checked: 0, errors: [], warning: null };
   let paths;
   try {
+    // A release can contain hundreds of commits. Comparing only HEAD^
+    // silently omits earlier changes. Explicit CI/operator bases take priority.
+    if (!base) {
+      const branch = git(src, ["branch", "--show-current"]);
+      if (branch.startsWith("release-")) {
+        base = git(src, ["merge-base", "HEAD", "origin/main"]);
+      } else {
+        base = "HEAD^";
+      }
+    }
+    result.base = base;
     // Include committed changes and the developer's current working tree.
     // A pre-commit lint run must detect staged, unstaged and new files too.
     const names = [
@@ -273,7 +286,7 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD
     ];
     paths = [...new Set(names.join("\n").split("\n").filter(Boolean))];
   } catch {
-    result.warning = "Git base unavailable; incremental regression check not run. Use --base=<commit> to compare a known base.";
+    result.warning = "Git base unavailable; incremental regression check not run. Set V61_BASE_REF to a known commit to compare the intended release range.";
     return result;
   }
   for (const path of paths) {

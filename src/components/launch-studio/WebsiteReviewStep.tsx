@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, DisclosureSection, WorkspaceNotice } from "@/components/workspace";
 import { WebsiteInformationChecklist, WebsiteSourceMappingPanel, WebsiteDesignChecklist } from "@/components/sites/WebsiteReadinessPanels";
 import { WebsitePreviewPanel } from "@/components/sites/WebsitePreviewPanel";
 import { LaunchPreviewSharing } from "./LaunchPreviewSharing";
@@ -27,62 +27,48 @@ export function WebsiteReviewStep({
 }){
   return <div className="space-y-4">
     <h3 className="text-lg font-semibold">Review your website</h3>
-    <div className="flex flex-wrap items-center gap-3">
-      <Button type="button" disabled={previewPending} onClick={onPreview}
+    <ActionFooter layout="inline">
+      <Button type="button" loading={previewPending} loadingLabel="Preparing preview…" onClick={onPreview}
         size="lg">
-        {previewPending?"Preparing preview...":"Preview changes"}
+        Preview changes
       </Button>
-      <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer"
-        className="inline-flex min-h-11 items-center border border-primary px-4 py-2 text-sm font-semibold text-primary">
-        Open full-page preview
-      </a>
+      <Button asChild variant="outline" size="lg">
+        <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer">Open private preview</a>
+      </Button>
       {data.currentRevision>0&&<Button type="button" variant="outline" className="min-h-11 border"
         onClick={()=>void navigator.clipboard.writeText(
           new URL(privateWebsitePreviewUrl(data.siteId),window.location.origin).href,
         ).then(()=>onShareMessage("Preview link copied. Reviewers must sign in with their own authorized Site account."))
-          .catch(()=>onShareMessage("Copy the address from Open full-page preview; clipboard permission was unavailable."))}>
-        Copy preview link
+          .catch(()=>onShareMessage("Copy the address from Open private preview; clipboard permission was unavailable."))}>
+        Copy internal link
       </Button>}
-    </div>
-    <p className="text-xs text-muted-foreground">This preview requires sign-in. Use Share preview to send a link to others.</p>
-    {data.currentRevision===0&&<p className="border p-3 text-sm" role="status">
-      Save your website before sharing.
-    </p>}
-    {shareMessage&&<p role="status" className="border p-3 text-sm">{shareMessage}</p>}
+    </ActionFooter>
+    <p className="text-xs text-muted-foreground">Private preview requires sign-in. To send the website to external visitors, create a shareable preview below. No account is required.</p>
+    {data.currentRevision===0&&<WorkspaceNotice tone="attention">Save your website before sharing.</WorkspaceNotice>}
+    {shareMessage&&<WorkspaceNotice>{shareMessage}</WorkspaceNotice>}
     {previewError&&<WorkspaceNotice tone="danger">{previewError}</WorkspaceNotice>}
     <WebsitePreviewPanel data={data}
       draftPreview={draftPreview?.source===content?draftPreview.rendered:null}/>
     {!dirty&&editorRevision>0&&!revisionConflict
       ?<div className="flex flex-wrap items-center justify-between gap-3 border p-4">
-          <p className="text-sm font-semibold">Share your website</p>
+          <p className="text-sm font-semibold">Share your website externally</p>
           <LaunchPreviewSharing siteId={data.siteId}/>
         </div>
-      :<p role="status" className="border p-3 text-sm">
-          Save your changes before sharing.
-        </p>}
+      :<WorkspaceNotice tone="attention">Save your changes before sharing.</WorkspaceNotice>}
     <WebsiteSourceMappingPanel data={data}/>
-    <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Family information</summary>
-      <div className="mt-4"><WebsiteInformationChecklist data={data}/></div>
-    </details>
-    <details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Content checks</summary>
-      <div className="mt-4"><WebsiteDesignChecklist data={data}/></div>
-    </details>
-    {!data.canPublish&&<p role="status" className="border p-3 text-sm">
-      You do not have permission to publish this website.
-    </p>}
+    <DisclosureSection title="Family information"><WebsiteInformationChecklist data={data}/></DisclosureSection>
+    <DisclosureSection title="Content checks"><WebsiteDesignChecklist data={data}/></DisclosureSection>
+    {!data.canPublish&&<WorkspaceNotice tone="attention">You do not have permission to publish this website.</WorkspaceNotice>}
     {allowPublication&&<Button type="button" variant="outline"
-      disabled={busy||!data.canPublish||revisionConflict} onClick={onSubmit}>
-      {busy?"Publishing…":"Publish website"}
+      disabled={busy||!data.canPublish||revisionConflict} onClick={onSubmit} loading={busy} loadingLabel="Publishing…">
+      Publish website
     </Button>}
     {!allowPublication&&<p className="text-sm text-muted-foreground">
       Publish your Site in Prepare.
     </p>}
 
-    {data.localHistory.length>0&&<details className="border p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Version history</summary>
-      <ul className="mt-3 space-y-2">
+    {data.localHistory.length>0&&<DisclosureSection title="Version history">
+      <ul className="space-y-2">
         {data.localHistory.map(version=><li key={version.revision}
           className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
           <span>Revision {version.revision} · {version.status==="published"?"Published":
@@ -96,6 +82,6 @@ export function WebsiteReviewStep({
             </Button>}
         </li>)}
       </ul>
-    </details>}
+    </DisclosureSection>}
   </div>;
 }

@@ -1,3 +1,4 @@
+import { encodeUuidForPath, decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { z } from "zod";
 
 /** URL selections are hints; malformed types are ignored, never coerced. */
@@ -11,10 +12,17 @@ export const siteProgramSelectionSchema = z.object({
   programId: optionalSearchString,
 });
 
+/** Encode only real UUID selection identifiers. Non-UUID test and historical
+ * values retain their pre-existing URL encoding and validation behavior. */
+function encodeOptionalReference(value: string): string {
+  const canonical = decodeUuidPathParam(value);
+  return canonical ? encodeUuidForPath(canonical) : value;
+}
+
 export function siteProgramHref(path: string, selection: { siteId?: string; programId?: string }): string {
   const search = new URLSearchParams();
-  if (selection.siteId) search.set("siteId", selection.siteId);
-  if (selection.programId) search.set("programId", selection.programId);
+  if (selection.siteId) search.set("siteId", encodeOptionalReference(selection.siteId));
+  if (selection.programId) search.set("programId", encodeOptionalReference(selection.programId));
   return path + (search.size ? `?${search.toString()}` : "");
 }
 

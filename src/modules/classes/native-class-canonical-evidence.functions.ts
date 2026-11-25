@@ -4,14 +4,14 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalClassEnrollments, canonicalClasses, canonicalClassOutcomes,
+  canonicalClassOutcomes,
   learnerProfiles, learnerLessonProgress, courseLessons,
   assessmentAccess, assessmentFormAdministrations,
   assessmentExecutionAttempts, assessmentExecutionResults,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
-import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
+import { authorizeNativeLearnerClass } from "./native-learner-class-access.server";
 import { latestCanonicalAssessmentRevisions } from "@/domain/canonical-assessment-revisions";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
@@ -33,20 +33,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
     if(!actor.actorPersonId||actor.role!=="learner")
       throw new AuthorizationError("current Class learner");
     return db.transaction(async tx=>{
-      const [enrollment]=await tx.select().from(canonicalClassEnrollments)
-        .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
-          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!))).limit(1);
-      if(!enrollment?.courseAttemptId)
-        throw new AuthorizationError("own Class Course Attempt");
-      const access=await authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId,true);
-      if(access.source!=="class"||access.sectionId!==null)
-        throw new AuthorizationError("native Class participation provenance");
-      const [cls]=await tx.select({id:canonicalClasses.id,
-        courseVersionId:canonicalClasses.courseVersionId,
-      }).from(canonicalClasses)
-        .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
-      if(!cls||cls.courseVersionId!==access.courseVersionId)
-        throw new AuthorizationError("same Course version and Class");
+      const {enrollment,access}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"history_read");
       const lessons=await tx.select({id:courseLessons.id})
         .from(courseLessons).where(eq(courseLessons.courseVersionId,access.courseVersionId))
         .limit(501);

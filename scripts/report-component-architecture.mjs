@@ -2,27 +2,30 @@
 /**
  * Repository-wide component reuse inventory.
  *
- * Observational only. Identical function-body fingerprints are review
+ * Inventory by default; --check blocks increases in cross-file exact copies.
+ * Identical function-body fingerprints are review
  * candidates, not evidence that separate domain policies are interchangeable.
  * No DB connection, build output, generated routes, or network is required.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { sourceDependencySpecifiers, sharedUiImportViolation, resolveSourceDependency } from "./lib/v61-component-dependencies.mjs";
+import { sourceDependencySpecifiers, sharedUiImportViolation, resolveSourceDependency, runtimeDependencySpecifiers, featureRuntimeImportViolation } from "./lib/v61-component-dependencies.mjs";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
+import { collectFunctionBodies, crossFileDuplicates, newDuplicateGroups, isProductionSource } from "./lib/component-reuse-fingerprints.mjs";
+import { indexCommittedSources, resolveReuseBase } from "./lib/component-reuse-baseline.mjs";
 import ts from "typescript";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const sourceRoot = resolve(root, "src");
 const files = [];
+const args = process.argv.slice(2);
+if (args.some(arg => arg !== "--check")) throw new Error("Unknown component architecture option");
+const check = args.includes("--check");
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const file = join(dir, entry.name);
     if (entry.isDirectory()) walk(file);
-    else if (entry.isFile() && /\.(ts|tsx)$/.test(file) &&
-      !/\.(test|spec|stories)\.(ts|tsx)$/.test(file) &&
-      !file.endsWith("routeTree.gen.ts")) files.push(file);
+    else if (entry.isFile() && isProductionSource("src/" + file.slice(sourceRoot.length + 1).replaceAll("\\", "/"))) files.push(file);
   }
 }
 walk(sourceRoot);
@@ -69,24 +72,19 @@ for (const file of files) {
     const violation = sharedUiImportViolation(path, value);
     if (violation) sharedLayerCandidates.push({file: path, dependency: value, violation});
   }
-  function candidate(name, body) {
-    if (!body || body.getWidth(syntax) < 180) return;
-    const normalized = body.getText(syntax).replace(/\s+/g, " ").trim();
-    const hash = createHash("sha256").update(normalized).digest("hex");
-    const list = fingerprints.get(hash) ?? [];
-    list.push({ file: path, function: name, chars: normalized.length });
-    fingerprints.set(hash, list);
+  for (const specifier of runtimeDependencySpecifiers(syntax, ts)) {
+    const violation = featureRuntimeImportViolation(path, specifier);
+    if (violation) boundaryCandidates.push({file: path, dependency: specifier, violation});
   }
+  collectFunctionBodies(syntax, path, fingerprints);
   function visit(node) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) jsx++;
     if (ts.isFunctionDeclaration(node) && node.body) {
       methods++;
-      candidate(node.name?.text ?? "<anonymous>", node.body);
     }
     if (ts.isVariableDeclaration(node) &&
         node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
       methods++;
-      candidate(node.name.getText(syntax), node.initializer.body);
     }
     ts.forEachChild(node, visit);
   }
@@ -101,10 +99,10 @@ for (const item of records) {
   familyRow.bytes+=item.bytes;
   familyRow.jsx+=item.jsx;
 }
-const duplicateFunctions = [...fingerprints.values()]
-  .filter(group => new Set(group.map(item => item.file)).size > 1)
-  .sort((a,b) => b[0].chars - a[0].chars)
-  .slice(0,50);
+const duplicateGroups = crossFileDuplicates(fingerprints);
+const duplicateFunctions = duplicateGroups.slice(0,50).map(([,group])=>group);
+const baseline = check ? resolveReuseBase(root) : null;
+const regressions = check ? newDuplicateGroups(fingerprints,indexCommittedSources(root,baseline)) : [];
 const largeUiFiles = records.filter(item => item.family === "components" || item.family === "routes")
   .sort((a,b) => b.bytes-a.bytes)
   .slice(0,35);
@@ -113,11 +111,14 @@ console.log(JSON.stringify({
   inspected: files.length,
   familyTotals,
   largestUiModules: largeUiFiles,
+  exactFunctionBodyGroupCount: duplicateGroups.length,
   exactFunctionBodyCandidates: duplicateFunctions,
+  reuseGate: {enabled:check,base:baseline,status:check?(regressions.length?"failed":"passed"):"not_run",regressions},
   componentDependencyCandidates: boundaryCandidates,
   crossFeatureComponentCandidates: crossFeatureCandidates,
   sharedLayerViolations: sharedLayerCandidates,
   heavilyCoupledModules: records.filter(item => item.imports >= 25)
     .sort((a, b) => b.imports - a.imports).slice(0, 40),
-  note: "Repo-wide observational audit, not a release gate. Cross-feature imports and identical bodies are review candidates, not evidence of interchangeable domain or authorization rules.",
+  note: "Exact cross-file copy increases fail in --check mode. Existing debt and cross-feature dependencies remain review candidates; identical bodies do not establish interchangeable authorization rules.",
 }, null, 2));
+if (check && regressions.length) process.exitCode = 1;

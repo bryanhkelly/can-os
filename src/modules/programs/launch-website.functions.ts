@@ -1,3 +1,8 @@
+import {programWebsiteContribution,pendingExtendedProgramWebsiteBlocks} from "@/domain/program-website-contributions";
+import {readOptionalSiteNoncreditReleases} from "@/modules/sites/site-noncredit-releases.server";
+import {readSavedBrandVersion} from "@/modules/sites/site-brand.server";
+import {siteBrandPresentationIdentity} from "@/domain/site-brand";
+import {resolveSiteTemplateId} from "@/domain/site-theme";
 import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
 import {eq} from "drizzle-orm";
@@ -37,7 +42,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const [school]=await db.select({programId:programs.id,programName:programs.name,
    organizationId:programs.organizationId,siteId:sites.id,siteOrganizationId:sites.organizationId,
    siteName:sites.name,organizationName:organizations.name,type:programs.type,
-   gradeRange:programs.gradeRange,deliveryModel:programs.deliveryModel,metadata:programs.metadata,
+   gradeRange:programs.gradeRange,deliveryModel:programs.deliveryModel,metadata:programs.metadata,programStatus:programs.status,
   }).from(programs).innerJoin(sites,eq(sites.id,programs.siteId))
    .innerJoin(organizations,eq(organizations.id,sites.organizationId))
    .where(eq(programs.id,data.programId)).limit(1);
@@ -45,7 +50,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
    !actor.scope.organizationIds?.includes(school.organizationId)||
    !actor.scope.siteIds?.includes(school.siteId)||!actor.scope.programIds?.includes(school.programId))
    throw new AuthorizationError("school launch website scope");
-  const [address]=await db.select({slug:sitePublications.slug,status:sitePublications.status})
+  const [address]=await db.select({slug:sitePublications.slug,status:sitePublications.status,brandVersionId:sitePublications.brandVersionId,websiteTemplateId:sitePublications.websiteTemplateId})
    .from(sitePublications).where(eq(sitePublications.siteId,school.siteId)).limit(1);
   const host=address?publicSiteHost(address.slug):null;
   const hostingConfigured=process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED==="true";
@@ -54,13 +59,13 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   });
   const {status:publicAvailability,checkedAt,diagnostic:hostingDiagnostic}=availability;
   const base={siteId:school.siteId,programId:school.programId,programName:school.programName,
-   host,status:address?.status??null,hostingConfigured,publicAvailability,checkedAt,hostingDiagnostic};
+   host,status:address?.status??null,hostingConfigured,publicAvailability,checkedAt,hostingDiagnostic,websiteContribution:programWebsiteContribution(school.type)};
   if(!address)return {...base,previewHtml:null,previewPages:{} as Record<string,string>,includesSuggestions:false};
   const [approved,local,enrichment,photos]=await Promise.all([
    readAcademicProgramCatalog(school.siteId),readCurrentLocalContent(school.siteId),readEnrichmentCatalog(school.siteId),readApprovedSchoolSitePhotos(school.siteId),
   ]);
   const targetOpeningDate=launchOpeningDate(school.metadata);
-  const needsPlanningCard=isAcademicMarketingType(school.type)&&!approved.some(program=>program.programId===school.programId);
+  const needsPlanningCard=isAcademicMarketingType(school.type)&&["draft","launching","ready","active"].includes(school.programStatus)&&!approved.some(program=>program.programId===school.programId);
   const planning=needsPlanningCard?[publicAcademicProgram({
    programId:school.programId,title:school.programName,type:school.type,status:"launching",
    summary:`${school.programName} is preparing to welcome families.${targetOpeningDate?` Target opening: ${targetOpeningDate}.`:""} This is a planning preview. School opening and academic services require their own approvals.`,
@@ -78,8 +83,11 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const approvedPrograms=withVerifiedPublicApplications(approved,parentExtras.admissions);
   const offerings=enrichment.map(toPublicSiteEnrichment);
   // Only the explicit Website & Brand consent step may generate narrative copy.
-  const localContent=local?.content??emptySiteLocalContent;
-  const site={name:school.siteName,organizationName:school.organizationName};
+  const copy=local?.content??emptySiteLocalContent;
+  const brand=await readSavedBrandVersion(school.siteId,address.brandVersionId);
+  const template=resolveSiteTemplateId(address.websiteTemplateId??copy.branding.templateId);
+  const localContent=brand?{...copy,branding:siteBrandPresentationIdentity(brand.resolved,template,true)}:copy;
+  const site={name:brand?.resolved.displayName??school.siteName,organizationName:school.organizationName};
   const academicPrograms=[...approvedPrograms,...planning];
   const config=safeReadSiteContentChannelConfig(siteFlags?.metadata?.websiteContentChannels);
   const launchPrefs=siteLaunchPreferencesSchema.safeParse(siteFlags?.metadata?.launchPreferences);
@@ -96,6 +104,8 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
       row.status as "pending"|"approved"|"rejected"|"revoked")
       ? [{name:row.name,status:row.status as "pending"|"approved"|"rejected"|"revoked"}] : []) ?? null;
   const classes=await readOptionalSitePublishedClasses(school.siteId);
+  const noncredit=await readOptionalSiteNoncreditReleases(school.siteId);
+  const pendingExtended=pendingExtendedProgramWebsiteBlocks({programId:school.programId,name:school.programName,type:school.type,status:school.programStatus,hasPublishedOffering:enrichment.some(item=>item.programId===school.programId)});
   const contentBlocks=resolveSiteContentBlocks(
     config,{
       mode:"private",preferences:launchPrefs.success?launchPrefs.data:null,
@@ -104,10 +114,10 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
         state:plannedLocation.success?plannedLocation.data.state:null,
         timezone:siteFlags?.timezone??null},
       networkAffiliations,networkStatusKnown:networkRows!==null,
-      academicPrograms,enrichment:offerings,classes,classTimezone:siteFlags?.timezone??null,
+      academicPrograms,enrichment:offerings,classes,noncredit,classTimezone:siteFlags?.timezone??null,
     });
   const enrollmentOpportunities=projectSiteEnrollmentOpportunities({
-     academicPrograms,enrichment:offerings,classes,
+     academicPrograms,enrichment:offerings,classes,noncredit,
    });
    const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
     planningPreferences:launchPrefs.success?launchPrefs.data:null,
@@ -117,6 +127,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
       site,academicPrograms,offerings,localContent,...parentExtras,
     }),contentBlocks:[
       ...contentBlocks,
+      ...pendingExtended,
       ...projectMissingSiteExperienceSectionsForPreview(
         config,launchPrefs.success?launchPrefs.data:null),
     ],enrollmentOpportunities,
@@ -126,7 +137,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const previewPages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
     path, renderPublicSiteHtml(page,{path,localPreview:true}),
   ]));
-  return {...base,includesSuggestions:needsPlanningCard||!local,
+  return {...base,includesSuggestions:needsPlanningCard||pendingExtended.length>0||!local,
     previewHtml:previewPages["/"] ?? null, previewPages,
   };
  });

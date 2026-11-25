@@ -5,9 +5,10 @@ import {
   Search, Sparkles, Users, Wallet, X, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceNotice, SelectionChip, SelectionChipGroup } from "@/components/workspace";
 import type { SiteExperienceDetail, SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import {
   siteExperienceGroups, siteExperienceCatalog, siteExperienceById,
@@ -140,9 +141,9 @@ export function EstablishExperiencesV61({
   return <section aria-label="Experiences" className="min-w-0 space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
       <div className="space-y-1">
-        <h3 className="font-serif text-2xl">
+        <h2 className="font-serif text-2xl">
           {stage==="choose"?"What would you love to bring to your community?":"Make these Experiences yours"}
-        </h3>
+        </h2>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           {stage==="choose"
             ?"Explore the possibilities and choose up to five experiences that reflect your vision."
@@ -159,7 +160,7 @@ export function EstablishExperiencesV61({
     {stage==="choose"&&<div className="space-y-5">
       <section aria-label="Your selected Experiences" className="space-y-3 border border-primary/20 bg-accent/40 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-sm font-semibold">Your selected Experiences</h4>
+          <h3 className="text-sm font-semibold">Your selected Experiences</h3>
           <span className="text-xs text-muted-foreground">Remove one to make room for another.</span>
         </div>
         {count===0
@@ -179,22 +180,21 @@ export function EstablishExperiencesV61({
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h4 className="font-serif text-lg">Explore all {siteExperienceCatalog.length} topics</h4>
+          <h3 className="font-serif text-lg">Explore all {siteExperienceCatalog.length} topics</h3>
           <p className="text-xs leading-5 text-muted-foreground">
             Browse the ideas below. Stars highlight experiences that may be a good fit for your community.
           </p>
         </div>
-        <label className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <Search className="size-4 text-muted-foreground" aria-hidden="true"/>
-          <span className="sr-only">Search topics and activities</span>
           <Input type="search" value={query} disabled={disabled}
             placeholder="Search topics or activities" aria-label="Search topics and activities"
-            onChange={event=>setQuery(event.target.value)} className="w-56"/>
-        </label>
+            onChange={event=>setQuery(event.target.value)} className="w-56 max-w-full"/>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground" aria-label="Selection legend">
         <span className="flex items-center gap-2">
-          <span className="size-3 bg-primary" aria-hidden="true"/>Selected
+          <span className="size-3 border border-primary bg-accent" aria-hidden="true"/>Selected
         </span>
         <span className="flex items-center gap-2">
           <span className="size-3 border border-primary bg-accent/50" aria-hidden="true"/>
@@ -213,27 +213,20 @@ export function EstablishExperiencesV61({
               <Icon className="mt-0.5 size-6 shrink-0 text-primary" strokeWidth={1.5} aria-hidden="true"/>
               <div className="min-w-0 flex-1 space-y-2">
                 <div>
-                  <h5 id={"experience-group-"+group.id} className="text-sm font-semibold">{group.title}</h5>
+                  <h4 id={"experience-group-"+group.id} className="text-sm font-semibold">{group.title}</h4>
                   <p className="text-xs leading-5 text-muted-foreground">{group.description}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <SelectionChipGroup density="standard">
                   {group.topics.map(topic=>{
                     const selected=selectedIds.includes(topic.id);
                     const recommended=recommendedIds.has(topic.id);
                     const blocked=disabled||(!selected&&count>=siteExperienceLimit);
-                    return <Button key={topic.id} type="button" size="sm"
-                      variant={selected?"default":"outline"} aria-pressed={selected}
-                      aria-label={topic.title+(recommended?". Recommended.":"")+
-                        (selected?" Selected.":" Not selected.")}
-                      disabled={blocked} onClick={()=>toggleTopic(topic.id)}
-                      className={"min-h-9 whitespace-normal text-left "+
-                        (!selected&&recommended?"border-primary/60 bg-accent/50 text-primary":"")}>
-                      {selected?<Check aria-hidden="true"/>:
-                        recommended?<Sparkles aria-hidden="true"/>:null}
+                    return <SelectionChip key={topic.id} density="standard" selected={selected}
+                      recommended={recommended} disabled={blocked} onChange={()=>toggleTopic(topic.id)}>
                       {topic.title}
-                    </Button>;
+                    </SelectionChip>;
                   })}
-                </div>
+                </SelectionChipGroup>
               </div>
             </div>
           </section>;
@@ -248,17 +241,15 @@ export function EstablishExperiencesV61({
           Optional. A local idea counts toward your five, and needs no narrative description.
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-2">
-          <label className="min-w-48 flex-1 space-y-1 text-sm font-medium">
-            Local topic name
+          <Field label="Local topic name" error={customError || undefined} className="min-w-48 flex-1">
             <Input maxLength={100} value={customName} type="text"
               disabled={disabled||count>=siteExperienceLimit}
               placeholder="e.g. Neighborhood history"
               onChange={event=>{setCustomName(event.target.value);setCustomError("");}}/>
-          </label>
+          </Field>
           <Button variant="outline" disabled={disabled||count>=siteExperienceLimit||!customName.trim()}
             onClick={addCustomExperience}>Add my idea</Button>
         </div>
-        {customError&&<p role="alert" className="mt-2 text-xs text-destructive">{customError}</p>}
       </details>
       {count>siteExperienceLimit&&<WorkspaceNotice tone="attention">
         This older Site plan contains more than five Experiences.
@@ -319,8 +310,7 @@ export function EstablishExperiencesV61({
                   {index+1}
                 </span>
                 <span className="font-serif text-lg">{topic.title}</span>
-                <label className="flex items-center gap-1">
-                  <span className="sr-only">Priority for {topic.title}</span>
+                <div className="flex items-center gap-1">
                   <Select value={detail.priority} disabled={disabled}
                     aria-label={"Priority for "+topic.title}
                     onChange={event=>patchDetail(topic.id,{
@@ -333,7 +323,7 @@ export function EstablishExperiencesV61({
                       {priorityLabel(priority)}
                     </option>)}
                   </Select>
-                </label>
+                </div>
               </div>
               <Button type="button" variant="ghost" size="sm"
                 disabled={disabled} aria-expanded={expanded}
@@ -398,12 +388,11 @@ export function EstablishExperiencesV61({
             <div className="flex flex-wrap gap-2">
               {draft.audienceIds.map(id=>{
                 const active=detail?.audienceIds.includes(id)??false;
-                return <Button key={id} size="sm" variant={active?"default":"outline"}
-                  aria-pressed={active} disabled={disabled}
-                  onClick={()=>patchDetail(topic.id,{
+                return <SelectionChip key={id} selected={active} disabled={disabled}
+                  onChange={()=>patchDetail(topic.id,{
                     audienceIds:toggleChip<SiteExperienceAudienceId>(
-                      detail?.audienceIds??[],id,4)})}>
-                  {active&&<Check aria-hidden="true"/>}{siteExperienceAudienceNames[id]}</Button>;
+                      detail?.audienceIds??[],id,draft.audienceIds.length)})}>
+                  {siteExperienceAudienceNames[id]}</SelectionChip>;
               })}
             </div>
             {!draft.audienceIds.length&&<p className="text-xs text-muted-foreground">
@@ -462,7 +451,7 @@ export function EstablishExperiencesV61({
             {selectedTopics.length+index+1}
           </span>
           <div className="min-w-0 flex-1">
-            <h5 className="font-serif text-lg">{name}</h5>
+            <h3 className="font-serif text-lg">{name}</h3>
             <p className="text-xs text-muted-foreground">
               Local planning topic. Curated activity and outcome chips are not available for custom names.
             </p>

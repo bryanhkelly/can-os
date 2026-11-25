@@ -5,10 +5,12 @@ import { getQuickWinActions } from "@/modules/actions/student-actions.functions"
 import { getStudentReportCard } from "@/modules/learning/report-cards.functions";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getClassWorkspace } from "@/modules/learning/class-workspace.functions";
+import { getNativeClassLearningResume } from "@/modules/classes/native-class-learning.functions";
 import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { DataUnavailableError, safeLoader } from "@/lib/safe-loader";
-import type { StudentDashboardData } from "@/components/student/student-dashboard-data";
+import { orderedBatches } from "@/lib/ordered-batches";
+import type { LearningResume, StudentDashboardData } from "@/components/student/student-dashboard-data";
 import {
   deriveStudentSuccessSupportTasks,
   type StudentSuccessSupportSummary,
@@ -64,7 +66,27 @@ export async function loadStudentToday() {
   const preferredSectionId = success?.steps.find(step => step.canEdit && step.sectionId)?.sectionId;
   const candidates = [...today.sections].sort((a, b) =>
     Number(b.sectionId === preferredSectionId) - Number(a.sectionId === preferredSectionId));
-  const learning = await safeLoader(async () => {
+  const classes = await classesPromise;
+  const learning = await safeLoader(async (): Promise<LearningResume | null> => {
+    if (!classes.ok) throw new DataUnavailableError();
+    const native = classes.data.classes.filter(item => item.status === "active" && item.enrollmentId && item.courseAttemptId);
+    if (native.length) {
+      let fallback: LearningResume | null = null;
+      // Reuse the authorized native lesson service. Never infer a Class from a Section title.
+      for await (const results of orderedBatches(native,3,item =>
+        safeLoader(() => getNativeClassLearningResume({data:{classEnrollmentId:item.enrollmentId!}}))())) {
+        for (const result of results) {
+          if (!result.ok) continue;
+          const resume: LearningResume = result.data;
+          if (!result.data.total) continue;
+          if (resume.lesson) return resume;
+          fallback ??= resume;
+        }
+      }
+      if (!fallback) throw new DataUnavailableError();
+      return fallback;
+    }
+    // Section-only schools retain their existing read path until migrated.
     let completedFallback: {
       sectionId: string; title: string;
       lesson: { id: string; title: string; estimatedMinutes?: number } | null;
@@ -73,13 +95,11 @@ export async function loadStudentToday() {
     // Bound fan-out to three authorized reads at a time. Preserve ordered
     // selection: the preferred urgent-work Section still wins whenever it has
     // a next lesson, and completed fallbacks still use the earliest candidate.
-    for (let offset = 0; offset < candidates.length; offset += 3) {
-      const batch = candidates.slice(offset, offset + 3);
-      const results = await Promise.all(batch.map(section =>
-        safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))()));
-      for (let index = 0; index < batch.length; index++) {
-        const section = batch[index]!;
-        const result = results[index]!;
+    for await (const results of orderedBatches(candidates,3,async section => ({
+      section,
+      result:await safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))(),
+    }))) {
+      for (const {section,result} of results) {
         if (!result.ok || !result.data.curriculumAccess.available) continue;
         const workspace = result.data;
         const content = workspace.content;
@@ -106,7 +126,6 @@ export async function loadStudentToday() {
     if (!completedFallback && candidates.length) throw new DataUnavailableError();
     return completedFallback;
   })();
-  const classes = await classesPromise;
   const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community, classes };
   return { today, success, support, dashboard };
 }

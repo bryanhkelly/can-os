@@ -722,6 +722,153 @@
       "when": 1795305600000,
       "tag": "0102_reporting_source_service_access",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1795410000000,
+      "tag": "0103_site_signup_organization_classification",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1795450000000,
+      "tag": "0104_platform_owner_delegation",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1795460000000,
+      "tag": "0105_site_go_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1795462000000,
+      "tag": "0106_universal_engagement",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1795462001000,
+      "tag": "0107_site_go_links_private_role_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1795462002000,
+      "tag": "0108_site_go_link_capabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1795462003000,
+      "tag": "0109_site_go_link_reuse",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1795462004000,
+      "tag": "0110_universal_engagement_private_role_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1795462005000,
+      "tag": "0111_delegation_and_go_link_null_invariants",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1795462006000,
+      "tag": "0112_site_intelligence_packages",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1795462007000,
+      "tag": "0113_go_gateway_scoped_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1795462008000,
+      "tag": "0114_go_response_metrics",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1795462009000,
+      "tag": "0115_engagement_campaigns",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1795462010000,
+      "tag": "0116_campaign_delivery_management",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1795462011000,
+      "tag": "0117_noncredit_assessment_uuid_aggregate",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1795462012000,
+      "tag": "0118_noncredit_assessment_grant_variable",
+      "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1795462013000,
+      "tag": "0119_noncredit_feedback_invitation",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1795462014000,
+      "tag": "0120_noncredit_feedback_campaign_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1795462015000,
+      "tag": "0121_geographic_intelligence",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1795462016000,
+      "tag": "0122_geography_launch_eligibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1795462017000,
+      "tag": "0123_universal_entity_geography",
+      "breakpoints": true
     }
   ]
 }

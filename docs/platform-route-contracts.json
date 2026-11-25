@@ -994,6 +994,51 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/o.$organizationSlug.$siteSlug.tsx",
+      "route": "/o/$organizationSlug/$siteSlug",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/o.$organizationSlug.$siteSlug.index.tsx",
+      "route": "/o/$organizationSlug/$siteSlug/",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/o.$organizationSlug.$siteSlug.profile.tsx",
+      "route": "/o/$organizationSlug/$siteSlug/profile",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/o.$organizationSlug.$siteSlug.launch.tsx",
+      "route": "/o/$organizationSlug/$siteSlug/launch",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/o.$organizationSlug.$siteSlug.website.tsx",
+      "route": "/o/$organizationSlug/$siteSlug/website",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/operations.tsx",
       "route": "/operations",
       "owner": "operations",

@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { StudentContinueLearningPanel } from "./StudentContinueLearningPanel";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({to,children,search:_search}: {to:string;children:ReactNode;search?:unknown})=>
-    <a href={to}>{children}</a>,
+  Link: ({to,children,params,search}: {to:string;children:ReactNode;params?:{classId:string};search?:{lesson?:string}})=>
+    <a href={to.replace("$classId",params?.classId??"")+(search?.lesson?`?lesson=${search.lesson}`:"")}>{children}</a>,
 }));
 vi.mock("./StudentAssignmentLink", () => ({
   StudentAssignmentLink: ({children}: {children:ReactNode})=><div>{children}</div>,
@@ -16,6 +16,10 @@ vi.mock("@/components/workspace/dashboard-widgets", () => ({
 }));
 
 describe("student learning resumption panel", () => {
+  it("links the exact authorized native class and lesson",()=>{
+    const html=renderToStaticMarkup(<StudentContinueLearningPanel resume={{classId:"algebra",title:"Algebra",lesson:{id:"equations",title:"Equations"},completed:0,total:1}} unavailable={false} hasClasses={true} classes={[{classId:"algebra",title:"Algebra",status:"active",courseAttemptId:"attempt"}]}/>);
+    expect(html).toContain("/class/algebra?lesson=equations");
+  });
   it("does not treat an unavailable lesson read as no enrollment", () => {
     const html=renderToStaticMarkup(<StudentContinueLearningPanel
       resume={null} unavailable={true} hasClasses={true}/>);

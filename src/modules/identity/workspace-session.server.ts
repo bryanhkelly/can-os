@@ -15,13 +15,16 @@ export async function readWorkspaceSession(request: Request) {
     if (error instanceof AuthorizationError) return { authenticated: false as const };
     throw error;
   }
-  const sessionAccountId = context.impersonatedByAccountId ?? context.sessionAccountId ?? context.accountId;
+  const sessionAccountId = context.delegatedByPlatformOwner
+    ? context.accountId : context.impersonatedByAccountId ?? context.sessionAccountId ?? context.accountId;
   const [account] = await db.select({ email: accessAccounts.emailNormalized })
     .from(accessAccounts).where(eq(accessAccounts.id, sessionAccountId)).limit(1);
   if (!account) throw new AuthorizationError("authenticated account");
 
   const { grants, demoAccountSwitching } = await readSessionGrants(sessionAccountId, account.email);
-  if (!grants.some(grant => grant.id === context.grantId)) {
+  const visibleGrants = context.delegatedByPlatformOwner
+    ? grants.filter(grant => grant.id === context.grantId) : grants;
+  if (!visibleGrants.some(grant => grant.id === context.grantId)) {
     throw new AuthorizationError("active membership");
   }
 
@@ -40,9 +43,13 @@ export async function readWorkspaceSession(request: Request) {
   return {
     authenticated: true as const,
     ...(isDemoAccountEmail(account.email) ? { demoTenant: true as const } : {}),
-    ...(demoAccountSwitching ? { demoAccountSwitching: true as const } : {}),
+    ...(demoAccountSwitching && !context.delegatedByPlatformOwner ? { demoAccountSwitching: true as const } : {}),
+    ...(context.delegatedByPlatformOwner ? { ownerDelegation: {
+      mode: context.delegationMode!,
+      expiresAt: context.delegationExpiresAt!,
+    } } : {}),
     sites: siteChoices, programs: programChoices, activeGrantId: context.grantId,
-    role: context.role, grants: grants.map(grant => ({
+    role: context.role, grants: visibleGrants.map(grant => ({
       id: grant.id, personId: grant.personId, role: grant.role,
       firstName: grant.firstName, lastName: grant.lastName,
       organizationId: grant.organizationId, siteId: grant.siteId,

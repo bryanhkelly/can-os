@@ -31,6 +31,16 @@ describe("Canonical lesson video preservation",()=>{
       {url:"https://vimeo.com/1234",title:"Vimeo practice",reviewStatus:"unreviewed"},
     ]);
   });
+  it("excludes supplemental review candidates from learner playback without changing stored resources",()=>{
+    const content={
+      resources:[{url:"https://youtu.be/LDIiYKYvvdA",title:"Equation balance"}],
+      videoResources:[{url:"https://youtu.be/sg0kQYvTlnc",title:"Phishing",reviewStatus:"teacher_review_required"}],
+    };
+    expect(canonicalLessonVideoResources(content,{includeSupplementalCandidates:false})).toEqual([
+      {url:"https://youtu.be/LDIiYKYvvdA",title:"Equation balance",reviewStatus:"original_resource_review_unverified"},
+    ]);
+    expect(canonicalLessonVideoResources(content)).toHaveLength(2);
+  });
   it("handles missing or malformed resource arrays without errors",()=>{
     expect(canonicalLessonVideoResources({resources:null,videoResources:"invalid"})).toEqual([]);
   });

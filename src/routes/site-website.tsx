@@ -1,3 +1,4 @@
+import { decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
@@ -13,6 +14,7 @@ import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { SiteGuideV61, type SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
+import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
@@ -72,7 +74,7 @@ const websiteGuideSteps: readonly SiteGuideContentV61[] = [
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   // Preserve supplied selectors for explicit validation; never silently omit
   // an invalid Site and open the editor under a different active membership.
-  siteId:z.string().optional(),
+  siteId:z.preprocess(value => typeof value === "string" ? decodeUuidPathParam(value) ?? value : value, z.string().optional()),
   programId:z.string().optional(),
   returnGrantId:z.string().optional(),
   returnToHub:z.boolean().optional(),
@@ -113,10 +115,11 @@ function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare
   </section>;
 }
 
-export function WebsiteHome({ outcome, selection, studio = false, onStepChange }: {
+export function WebsiteHome({ outcome, selection, studio = false, friendlyIdentity, onStepChange }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
   selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] };
   studio?: boolean;
+  friendlyIdentity?: FriendlySiteIdentity;
   onStepChange?: (step:number)=>void;
 }) {
   const [localStep,setLocalStep]=useState(0);
@@ -125,6 +128,8 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   const changeStep=onStepChange??setLocalStep;
   const returnToLaunch=selection.returnToSettings && selection.siteId
     ? <Link to="/settings" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Settings</Link>
+    : selection.returnToHub && friendlyIdentity
+    ? <Link to="/o/$organizationSlug/$siteSlug/launch" params={friendlyIdentity} className="font-semibold text-primary">Back to Launch Studio</Link>
     : selection.returnToHub && selection.siteId
     ? <Link to="/launch/site" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Launch Studio</Link>
     : selection.siteId&&selection.programId&&selection.returnGrantId
@@ -139,7 +144,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     {id:"content",title:"Your Content"}, {id:"review",title:"Review & Finish"},
   ];
   if (studio) return <LaunchSiteFrame
-    site={{id:data.siteId,name:data.siteName}} active="website-brand"
+    site={{id:data.siteId,name:data.siteName}} identity={friendlyIdentity} active="website-brand"
     previewAvailable={Boolean(data.host)}
     previewHref={privateWebsitePreviewUrl(data.siteId)}>
     <PageFrame width="wide" className="launch-studio-page">
@@ -151,8 +156,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
             subtitle="Design your Site website." />
           <div className="mt-5">
             {data.host ? <GuidedSetupShell
-              title="Website & Brand"
-              description="Choose a layout, customize your style and edit your content."
+              title="Website & Brand" showHeader={false}
               progressLabel="Website & Brand steps"
               steps={steps.map((item,index)=>({
                 id:item.id,
@@ -197,8 +201,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     title={data.siteName + " · website & brand"}
     subtitle={data.organizationName} actions={returnToLaunch}>
     <GuidedSetupShell
-      title="Website & Brand"
-      description="Choose a layout, customize your style and edit your content."
+      title="Website & Brand" showHeader={false}
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Choose a style":index===1?"Choose a layout":
           index===2?"Colors, fonts and imagery":index===3?"Use saved information":
@@ -300,7 +303,6 @@ function LocalWebsiteCopyEditor({
   const revisionConflict = editor.siteId === data.siteId && editor.revision !== data.currentRevision;
   const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const [preparingArtwork, setPreparingArtwork] = useState(false);
-  const [contentBlocksDirty, setContentBlocksDirty] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
   const artworkGaps = [content.branding.heroImage, content.branding.logoImage ?? null]
@@ -369,6 +371,7 @@ function LocalWebsiteCopyEditor({
       displayName:brandDisplayName.trim(),
       logoAssetId:brandConfigRef.current?.logoAssetId??null,
       heroAssetId:brandConfigRef.current?.heroAssetId??null,
+      sharedHeroPhoto:branding.heroImage?null:branding.sharedHeroPhoto??null,
     };
   }
   function acceptSavedBrand(brand:{
@@ -381,10 +384,6 @@ function LocalWebsiteCopyEditor({
 
   async function saveDraft(mode: "stay" | "exit" = "stay") {
     if(busy||!data.canEdit||!data.draftStorageReady||revisionConflict)return;
-    if(contentBlocksDirty){
-      setError("Save your website section layout using 'Save private blocks' before saving or exiting.");
-      return;
-    }
     setError("");
     const submitted=content;
     const outcome=await mutation.run(()=>saveSiteWebsiteAndBrand({data:{
@@ -484,7 +483,7 @@ function LocalWebsiteCopyEditor({
     setPreparingArtwork(true); setError("");
     try {
       const dataUrl = await prepareWebsiteArtwork(file);
-      setContent(old => ({ ...old, branding: { ...old.branding, [field]: {
+      setContent(old => ({ ...old, branding: { ...old.branding, ...(field==="heroImage"?{sharedHeroPhoto:null}:{}), [field]: {
         dataUrl, altText: "", rightsConfirmed: false, childImageConsent: "unconfirmed",
       } } }));
     } catch (caught) {
@@ -578,9 +577,7 @@ function LocalWebsiteCopyEditor({
         disabled={busy||!data.canEdit}
         hasSavedContent={data.currentRevision>0}/>}
       {step===4&&<WebsiteSiteContentStep data={data} content={content}
-        setContent={setContent} busy={busy} allowPublication={allowPublication}
-        onContentBlocksSaved={()=>{void router.invalidate();}}
-        onContentBlocksDirty={setContentBlocksDirty}/>}
+        setContent={setContent} busy={busy} onSavePrivateDraft={()=>void saveDraft("stay")}/>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
         setContent={setContent} onSelectArtwork={selectArtwork}/>}

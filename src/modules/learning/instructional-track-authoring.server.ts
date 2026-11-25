@@ -492,7 +492,8 @@ export async function saveInstructionalTrackDraft(
         ...input.materials.flatMap((material) => material.assetVersionId ? [material.assetVersionId] : []),
         ...input.presentations.map((presentation) => presentation.assetVersionId),
       ];
-      await assertInstructionalTrackAssetsEligible(tx, assetIds);
+      // Empty private drafts may be saved; submission still requires eligible assets and coverage.
+      if (assetIds.length) await assertInstructionalTrackAssetsEligible(tx, assetIds);
       await tx.delete(instructionalTrackMaterials)
         .where(eq(instructionalTrackMaterials.trackVersionId, bundle.version.id));
       await tx.delete(trackLessonPresentations)
@@ -911,7 +912,14 @@ export async function readCreatorTrackDraft(context: AccessContext, trackVersion
           eq(contentAssetVersions.lifecycle, "published"),
         )).limit(250),
     ]);
+    const boundIds=[...new Set(presentations.map(item=>item.assetVersionId))];
+    const boundAssets=boundIds.length?await tx.select({
+      id:contentAssetVersions.id,title:contentAssets.title,lifecycle:contentAssetVersions.lifecycle,
+    }).from(contentAssetVersions).innerJoin(contentAssets,eq(contentAssets.id,contentAssetVersions.assetId))
+      .where(and(inArray(contentAssetVersions.id,boundIds),
+        eq(contentAssets.ownerOrganizationId,bundle.course.publisherOrganizationId))):[];
     return {
+      boundAssets,
       trackVersionId: id, trackTitle: bundle.track.title,
       courseTitle: bundle.course.title, courseVersionId: bundle.version.courseVersionId,
       trackKind: bundle.version.trackKind,

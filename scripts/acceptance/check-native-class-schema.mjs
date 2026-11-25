@@ -9,17 +9,23 @@ if(process.env.CAN_NATIVE_CLASS_SCHEMA_VALIDATION!=="1")
 if(!process.env.DATABASE_URL)throw new Error("Select an isolated QA DATABASE_URL");
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const tables=["classes","class_offerings","class_offering_versions","class_enrollments","class_outcomes","class_awards","class_staff_assignments","class_sessions","class_survey_campaigns"];
-const allTriggers=["learner_course_attempt_source_gate","class_enrollment_attempt_guard",
-  "canonical_class_offering_guard_trg","canonical_class_staff_guard_trg",
-  "canonical_class_enrollment_identity_guard_trg","canonical_class_session_guard_trg",
-  "canonical_class_plan_boundary_trg","canonical_class_survey_campaign_guard_trg",
-  "canonical_linked_survey_scope_guard_trg"];
+const expectedTriggers={
+  learner_course_attempt_source_gate:"learner_course_attempts",
+  class_enrollment_attempt_guard:"class_enrollments",
+  canonical_class_offering_guard_trg:"class_offering_versions",
+  canonical_class_staff_guard_trg:"class_staff_assignments",
+  canonical_class_enrollment_identity_guard_trg:"class_enrollments",
+  canonical_class_session_guard_trg:"class_sessions",
+  canonical_class_plan_boundary_trg:"facilitated_classroom_plans",
+  canonical_class_survey_campaign_guard_trg:"class_survey_campaigns",
+  canonical_linked_survey_scope_guard_trg:"survey_campaigns",
+};
 try{
   const [relations,cols,checks,triggers,functions]=await Promise.all([
     pool.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity, EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS grants_public FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])",[tables]),
     pool.query("SELECT table_name,column_name,is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name=ANY($1::text[])",[[...tables,"learner_course_attempts"]]),
-    pool.query("SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='public.learner_course_attempts'::regclass AND conname='native_course_attempt_one_source_ck'"),
-    pool.query("SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('education_v30','education_v30_secure') AND NOT t.tgisinternal AND tgname=ANY($1::text[])",[allTriggers]),
+    pool.query("SELECT conname,convalidated,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='public.learner_course_attempts'::regclass AND conname='course_attempt_one_registration_with_optional_class_ck'"),
+    pool.query("SELECT tgname,c.relname,t.tgenabled FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal AND tgname=ANY($1::text[])",[Object.keys(expectedTriggers)]),
     pool.query("SELECT pg_get_functiondef('education_v30.validate_course_attempt_source()'::regprocedure) AS body"),
 
   ]);
@@ -59,9 +65,17 @@ try{
   assert.equal(enrollmentOffering?.is_nullable,"YES",
     "Class assignment must work without a Class Offering");
   assert.equal(checks.rows.length,1,"Native Course Attempt single-source guard missing");
-  assert(checks.rows[0].definition.includes("class_enrollment_id"),
-    "Course Attempt must accept Class Enrollment identity");
-  for(const name of allTriggers)
-    assert(triggers.rows.some(x=>x.tgname===name),"Missing guard "+name);
+  const constraint=checks.rows[0];
+  assert(constraint.convalidated,"Course Attempt provenance constraint must be validated");
+  assert(constraint.definition.includes("num_nonnulls(enrollment_id, noncredit_registration_id, class_enrollment_id) = 1") &&
+    constraint.definition.includes("enrollment_id IS NULL") &&
+    constraint.definition.includes("noncredit_registration_id IS NOT NULL") &&
+    constraint.definition.includes("class_enrollment_id IS NOT NULL"),
+    "Course Attempt must preserve the governed noncredit-to-Class placement exception");
+  assert.equal(functions.rows.length,1,"Missing Course Attempt source validation function");
+  for(const [name,table] of Object.entries(expectedTriggers)){
+    const matches=triggers.rows.filter(x=>x.tgname===name && x.relname===table && ["O","A"].includes(x.tgenabled));
+    assert.equal(matches.length,1,"Missing or disabled public Class guard "+name+" on "+table);
+  }
   console.log("Native Class identity, direct Course Attempt source, RLS and triggers verified (read only); shared assessment/survey grants require separate acceptance.");
 }finally{await pool.end();}

@@ -1,23 +1,17 @@
+import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
+import {useProviderReportOptions} from "@/hooks/use-provider-report-options";
+import {providerDeliveryQueryKey,PROVIDER_REPORT_FILTER_CAPABILITIES} from "@/domain/report-filter-state";
+import {ProviderReportFilters} from "./ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import { Label } from "@/components/ui/label";
-import {useMemo,useState} from "react";
+import {useMemo} from "react";
+import { DisclosureSection, WorkspaceNotice } from "@/components/workspace";
 import {Button} from "@/components/ui/button";
-import {Select} from "@/components/ui/select";
-import {StatCard} from "@/components/workspace";
-import {useQuery} from "@tanstack/react-query";
+import {ReportMetricCard} from "@/components/workspace/report-metric-card";
+import {ReportRankedComparison} from "@/components/workspace/report-ranked-comparison";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import {ReportChart} from "@/components/workspace/report-chart";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
-import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
-import {reportingCsvRow} from "@/domain/reporting-csv";
-
-/** Private operator CSV shares the formula-safe serializer with Class reports. */
-function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filename:string){
-  const source=rows.map(reportingCsvRow).join("\r\n");
-  const blob=new Blob([source],{type:"text/csv;charset=utf-8"});
-  const url=URL.createObjectURL(blob);
-  const link=document.createElement("a");
-  link.href=url;link.download=filename;
-  document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
-}
+import {downloadReportingCsv} from "@/lib/reporting-download";
 
 /**
  * Existing one-operator noncredit evidence service remains the source of
@@ -26,20 +20,18 @@ function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filena
  * canonical principal, role and scoped permitted Sites on every request.
  */
 export function NoncreditProviderEvidencePanel(){
-  const grantKey=useActiveWorkspaceMember()?.id??"unbound-canonical-session";
-  const [requestedSite,setRequestedSite]=useState("");
-  const [showDefinitions,setShowDefinitions]=useState(false);
-  const response=useQuery({
-    queryKey:["ws6-private-noncredit-report",grantKey],
-    queryFn:()=>getNoncreditOperatorNetworkSummary(),retry:false,
-    staleTime:0,gcTime:0,refetchOnMount:"always",
-  });
-  const data=response.data;
+  const scope=usePrivateReportScope();
+  const controller=useProviderReportFilters(scope);
+  const {geography,siteId:requestedSite}=controller.filters;
+  const basis=PROVIDER_REPORT_FILTER_CAPABILITIES["provider-delivery"].geographyBasis;
+  const options=useProviderReportOptions(scope,basis,controller.filters);
+  const {query:response,data}=usePrivateReportQuery({scope,key:providerDeliveryQueryKey(geography),enabled:options.ready,read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
+  const selectionUnavailable=!!requestedSite&&!site;
   const siteId=site?.siteId??"";
-  const selectedCohorts=useMemo(()=>data?.cohorts.filter(c=>!siteId||c.siteId===siteId)??[],
-    [data,siteId]);
-  const totals=site??data?.totals;
+  const selectedCohorts=useMemo(()=>selectionUnavailable?[]:data?.cohorts.filter(c=>!siteId||c.siteId===siteId)??[],
+    [data,siteId,selectionUnavailable]);
+  const totals=selectionUnavailable?undefined:site??data?.totals;
   const definitions=[
     {label:"Registrations",source:"noncredit_self_enrollment_claims + noncredit_registrations",
       grain:"Unique canonical registration",meaning:"Counts registrations including later withdrawals; not distinct people"},
@@ -61,14 +53,14 @@ export function NoncreditProviderEvidencePanel(){
       ["Site","Training","Release ID","Delivery","Registrations","Active registrations",
         "Withdrawn registrations","Confirmed noncredit completions",
         "Registrations with host-attested attendance","Linked rooms","As of UTC",
-        "Data classification"],
+        "Delivery geography filter","Site filter","Geography basis","Data classification"],
       ...selectedCohorts.map(c=>[
         c.siteName,c.trainingTitle,c.releaseId,c.deliveryMode,c.registrations,c.active,
-        c.withdrawn,c.completed,c.verifiedAttendees,c.linkedRooms,data.asOf,
+        c.withdrawn,c.completed,c.verifiedAttendees,c.linkedRooms,data.asOf,geography||"all",requestedSite||"all","current",
         "PRIVATE OPERATOR EVIDENCE - NOT APPROVED FOR PUBLICATION",
       ]),
     ];
-    savePrivateCsv(rows,"can-os-private-noncredit-evidence-"+data.asOf.slice(0,10)+".csv");
+    downloadReportingCsv(rows,"can-os-private-noncredit-evidence-"+data.asOf.slice(0,10)+".csv");
   }
   return <section aria-label="Authorized Program and Site reporting" className="space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -85,29 +77,21 @@ export function NoncreditProviderEvidencePanel(){
         Export private evidence CSV
       </Button>
     </div>
-    {response.isPending&&<p role="status" className="border border-border p-4 text-sm">
-      Reconciling authorized releases and canonical outcomes…
-    </p>}
-    {response.isError&&<p role="alert" className="border border-border p-4 text-sm">
+    {scope!==null&&options.ready&&(response.isPending||response.isFetching)&&<WorkspaceNotice>Reconciling authorized releases and canonical outcomes…</WorkspaceNotice>}
+    {scope!==null&&options.ready&&response.isError&&<WorkspaceNotice tone="danger">
       The current account cannot access this provider report, or reporting exceeds
       the service's safe result bounds. No partial totals are displayed.
-    </p>}
+    </WorkspaceNotice>}
+    {scope===null&&<WorkspaceNotice tone="attention">A current verified workspace session is required.</WorkspaceNotice>}
+    {scope!==null&&<ProviderReportFilters controller={controller} options={options} basis={basis}/>}
     {data&&<>
-      <div className="grid gap-3 border border-border bg-card p-4 md:grid-cols-[minmax(0,18rem)_1fr]">
-        <Label className="block text-sm font-medium">
-          Delivery Site
-          <Select className="mt-2"
-            value={siteId} onChange={e=>setRequestedSite(e.target.value)}>
-            <option value="">All authorized Sites</option>
-            {data.sites.map(s=><option key={s.siteId} value={s.siteId}>{s.siteName}</option>)}
-          </Select>
-        </Label>
-        <div className="text-xs text-muted-foreground md:self-end md:pb-3">
-          <p>As of {new Date(data.asOf).toLocaleString()}</p>
-          <p>Lifetime registered releases in this authorized Organization. Historical
-            time-window selection requires a versioned source lifecycle projection.</p>
-        </div>
+      <div className="border border-border bg-card p-4 text-xs text-muted-foreground">
+        <p>As of {data.asOf}</p>
+        <p>Lifetime registered releases. Historical time-window selection requires a versioned source lifecycle projection.</p>
       </div>
+      {selectionUnavailable&&<p role="status" className="text-sm text-muted-foreground">No release evidence matches the selected Site and current geography. The selection remains applied.</p>}
+      {data.sites.length>0&&data.sites.length<=60&&<ReportRankedComparison title="Registrations by authorized Site" description="Comparison across Sites matching the current geography. Select a Site to narrow the metrics, release chart and evidence below; this comparison remains the navigation overview."
+        rows={data.sites.map(s=>({id:s.siteId,label:s.siteName,value:s.registrations}))} selectedId={requestedSite} onSelect={value=>controller.dispatch({type:"site",value})}/>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {([
           ["Registrations",totals?.registrations],
@@ -117,9 +101,14 @@ export function NoncreditProviderEvidencePanel(){
           ["Registrations with host-attested attendance",totals?.verifiedAttendees],
           ["Linked rooms (not delivery proof)",totals?.linkedRooms],
         ] as const).map(([label,value])=>
-          <StatCard key={label} label={label} value={value?.toLocaleString()??"Unavailable"}/>
+          <ReportMetricCard key={label} item={{id:label,label,value:value??null,asOf:data.asOf}}/>
         )}
       </div>
+      {selectedCohorts.length>0&&selectedCohorts.length<=20&&<ReportChart spec={{
+        title:"Registration counts by release",description:"The selected authorized Site filter applies to both this chart and the release detail table.",
+        kind:"comparison",format:"count",valueLabel:"Registrations",
+        points:selectedCohorts.map(c=>({id:c.releaseId,label:c.trainingTitle+" · "+c.siteName,value:c.registrations})),
+      }}/>}
       <div className="border border-border bg-card">
         <Table scrollLabel="Release-level evidence drill-down" aria-label="Release-level evidence drill-down" className="w-full min-w-[40rem] text-left text-sm">
           <TableCaption className="p-4 text-left font-semibold">Release-level evidence drill-down</TableCaption>
@@ -144,19 +133,12 @@ export function NoncreditProviderEvidencePanel(){
             <TableCell className="p-3 tabular-nums">{c.completed.toLocaleString()}</TableCell>
           </TableRow>)}
           {!selectedCohorts.length&&<TableRow><TableCell colSpan={5} className="p-4 text-muted-foreground">
-            No releases in this authorized Site scope.
+            No releases match the selected Site and geography.
           </TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
-      <section className="border border-border bg-card p-4">
-        <Button type="button" variant="ghost" aria-expanded={showDefinitions}
-          onClick={()=>setShowDefinitions(x=>!x)}
-          className="flex w-full justify-between gap-4 px-0 text-left">
-          Metric definitions and source interpretation
-          <span aria-hidden="true">{showDefinitions?"−":"+"}</span>
-        </Button>
-        {showDefinitions&&<div className="mt-3">
+      <DisclosureSection title="Metric definitions and source interpretation">
           <Table scrollLabel="Metric definitions and source interpretation" aria-label="Metric definitions and source interpretation" className="w-full min-w-[36rem] text-left text-sm"><TableCaption className="sr-only">Metric definitions and source interpretation</TableCaption>
             <TableHeader className="border-b border-border">
               <TableRow><TableHead className="p-3">Metric</TableHead><TableHead className="p-3">Source</TableHead><TableHead className="p-3">Counting rule</TableHead></TableRow>
@@ -167,8 +149,7 @@ export function NoncreditProviderEvidencePanel(){
               <TableCell className="p-3">{item.grain}. {item.meaning}.</TableCell>
             </TableRow>)}</TableBody>
           </Table>
-        </div>}
-      </section>
+      </DisclosureSection>
       <p className="border-t border-border pt-3 text-xs text-muted-foreground">
         Internal operator-only evidence, not approved for public release or use as verified
         funding impact. Cross-provider network access requires independently authorized host

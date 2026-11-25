@@ -40,8 +40,9 @@ describe("Class identity and optional enrollment publication",()=>{
       "assertNativeClassSeatAvailable({method:\"assignment\"","classOfferingVersionId:null",
     ])expect(src).toContain(rule);
     const policy=read("src/domain/native-class-lifecycle.ts");
-    expect(policy).toContain("args.method===\"self\"");
-    expect(policy).toContain("args.activeOrPending>=cap");
+    expect(policy).toContain('input.method!=="assignment"');
+    expect(policy).toContain("Math.max(0,capacity-input.activeOrPending)");
+    expect(policy).toContain("nativeClassCapacity(args).remainingSeats===0");
     expect(src).toContain("assertNativeClassOperatorExitScope(actor,cls)");
     expect(src).not.toContain("enrollmentMethod:\"self\"");
     expect(src).not.toContain("creditMode:z.enum([\"for_credit\"");

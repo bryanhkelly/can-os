@@ -1,6 +1,7 @@
 import { auditEvents, domainEvents, notifications } from "@/db/schema";
 import type { CommandContext } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
+import { auditDelegation, sanitizeAuditContextExtras } from "@/domain/audit-identity";
 
 /**
  * Minimal structural view of a Drizzle transaction's write surface. The db
@@ -101,7 +102,8 @@ export async function writeAudit(
   // A generic CommandContext (e.g., system mutations) has no account/session
   // and must not fabricate an identity or let contextExtras override one.
   const session = context as CommandContext & Partial<Pick<AccessContext,
-    "accountId" | "sessionAccountId" | "impersonatedByAccountId" | "sessionId" | "grantId" | "role">>;
+    "accountId" | "sessionAccountId" | "impersonatedByAccountId" | "sessionId" | "grantId" | "role" |
+    "delegatedByPlatformOwner" | "delegationMode" | "delegationExpiresAt">>;
   const authenticatedAttribution = {
     ...(session.accountId ? { accountId: session.accountId } : {}),
     ...((session.impersonatedByAccountId ?? session.sessionAccountId)
@@ -110,8 +112,7 @@ export async function writeAudit(
     ...(session.grantId ? { grantId: session.grantId } : {}),
     ...(session.role ? { role: session.role } : {}),
   };
-  const contextExtras=Object.fromEntries(Object.entries(entry.contextExtras??{})
-    .filter(([key])=>!["accountId","sessionAccountId","sessionId","grantId","role"].includes(key)));
+  const contextExtras=sanitizeAuditContextExtras(entry.contextExtras);
   await tx.insert(auditEvents).values({
     actorPersonId: context.actorPersonId,
     action: entry.action,
@@ -124,6 +125,7 @@ export async function writeAudit(
       ...contextExtras,
       requestId: context.requestId ?? null,
       ...authenticatedAttribution,
+      ...auditDelegation(session),
     },
   });
 }

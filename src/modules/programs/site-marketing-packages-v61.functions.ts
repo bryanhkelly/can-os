@@ -6,6 +6,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { sites, siteMarketingPackages } from "@/db/schema";
+import { readStoredSitePackage } from "@/modules/sites/site-content-package.server";
 import { projectSiteContentBriefV61 } from "@/domain/site-content-brief-v61";
 import { readPublishedBlueprintReferences } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import { normalizeSiteLocalContent } from "@/domain/site-local-content";
@@ -106,14 +107,18 @@ export const readSiteMarketingSuggestionsV61=createServerFn({method:"GET"})
   .validator((input:unknown)=>siteInput.parse(input))
   .handler(async ({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const {site,source}=await db.transaction(async tx=>{
-      const {site}=await authorizedSite(data.siteId,"program.read",tx);
-      return {site,source:await marketingSource(site,tx)};
+    const {site,source,stored}=await db.transaction(async tx=>{
+      const {actor,site}=await authorizedSite(data.siteId,"program.read",tx);
+      const source=await marketingSource(site,tx);
+      const stored=source.reuseAllowed?await readStoredSitePackage(actor,site.id,"outreach",tx):null;
+      return {site,source,stored};
     });
-    return Object.fromEntries(marketingPurposeIds.map(purpose=>
-      [purpose,suggestMarketingStarterV61(site.name,purpose,source)])) as
-      Record<(typeof marketingPurposeIds)[number],
-        ReturnType<typeof suggestMarketingStarterV61>>;
+    return Object.fromEntries(marketingPurposeIds.map(purpose=>{
+      const base=suggestMarketingStarterV61(site.name,purpose,source);
+      const generated=stored?.package;
+      const copy=generated&&!generated.stale?generated.marketing?.[purpose]:null;
+      return [purpose,copy?{...base,content:{...base.content,...copy},sources:[...base.sources,"Stored Site Intelligence v"+generated!.revision],generatedVersion:generated!.revision}:base];
+    })) as Record<(typeof marketingPurposeIds)[number],ReturnType<typeof suggestMarketingStarterV61>&{generatedVersion?:number}>;
   });
 
 const scopedPackage = (siteId:string,packageId:string) => and(
@@ -139,17 +144,21 @@ export const createSiteMarketingPackageV61 = createServerFn({method:"POST"})
       .where(eq(sites.id,site.id)).limit(1);
     if(!currentBrand?.id)
       throw new DomainError("UNAVAILABLE","Save your Site Brand in Shape → Website & Brand before creating outreach materials.");
+    const source=await marketingSource(site,tx);
+    const starter=suggestMarketingStarterV61(site.name,data.purpose,source).content;
+    const generated=source.reuseAllowed?(await readStoredSitePackage(actor,site.id,"outreach",tx)).package:null;
+    const generatedCopy=generated&&!generated.stale?generated.marketing?.[data.purpose]:null;
     const [created]=await tx.insert(siteMarketingPackages).values({
       siteId:site.id,organizationId:site.organizationId,
       createdByPersonId:actor.actorPersonId!,title:data.title,
       brandVersionId:currentBrand.id,
-      content:suggestMarketingStarterV61(site.name,data.purpose,await marketingSource(site,tx)).content,
+      content:generatedCopy?{...starter,...generatedCopy}:starter,
     }).returning();
     if(!created)throw new DomainError("UNAVAILABLE","Unable to create package");
     await writeAudit(tx,actor,{
       action:"site.marketing_package.create",entityType:"site_marketing_package",
       entityId:created.id,scope:{siteId:site.id,organizationId:site.organizationId},
-      after:{purpose:data.purpose,revision:created.revision},
+      after:{purpose:data.purpose,revision:created.revision,...(generatedCopy&&generated?{sourceGeneratedContentId:generated.id,sourceGeneratedRevision:generated.revision}:{})},
     });
     await emitReportableChange(tx,{
       eventType:EventTypes.SiteMarketingPackageCreated,

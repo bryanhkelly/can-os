@@ -1,36 +1,47 @@
-import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Share2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ExternalLink, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CopyLinkButton } from "@/components/links/CopyLinkButton";
+import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
+import { GoLinkActions, type GoLinkAction } from "@/components/links/GoLinkActions";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { WorkspaceNotice } from "@/components/workspace";
+import { ActionDialog, EmptyState, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  createSitePreviewShare, listSitePreviewShares, revokeSitePreviewShare,
+  createSitePreviewShare, listSitePreviewShares, revokeSitePreviewShare, setSitePreviewSharePaused,
 } from "@/modules/sites/site-preview-sharing.functions";
 
 type Share = Awaited<ReturnType<typeof listSitePreviewShares>>[number];
 
 /** Website design can be shared in Establish without a Site publication or
- * enrollment claim. One-time bearer URL is never rehydrated from storage.
+ * enrollment claim. Authorized operators may retrieve saved Go codes.
  */
 export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
+  return <LaunchPreviewSharingSession key={siteId} siteId={siteId}/>;
+}
+function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
   const [open, setOpen] = useState(false);
   const [shares, setShares] = useState<Share[]>([]);
   const [expiresAfterDays, setExpiresAfterDays] = useState<7 | 30 | null>(7);
   const [createdUrl, setCreatedUrl] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [createdCode,setCreatedCode]=useState<string|null>(null);
+  const pending=useRef<{siteId:string;expires:7|30|null;id:string}|null>(null);
+  const [operation, setOperation] = useState<"create"|"change"|null>(null);
+  const busy = operation !== null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
   function close() {
     setOpen(false);
-    // The raw bearer URL is intentionally shown only in this creation session.
+    setRevokeTarget(null);
+    // Clear transient selection; saved Go codes remain in the authorized inventory.
     setCreatedUrl("");
-    setCopied(false);
+    setCreatedCode(null);
   }
 
   useEffect(() => {
@@ -50,43 +61,53 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
 
   async function create() {
     if (busy) return;
-    setBusy(true);
+    setOperation("create");
     setError(null);
     setCreatedUrl("");
-    setCopied(false);
+    setCreatedCode(null);
     try {
-      const result = await createSitePreviewShare({ data: { siteId, expiresAfterDays } });
-      const url = new URL(result.relativeUrl, window.location.origin);
+      const origin=await getCanonicalGoLinkShareOrigin();
+      const request=pending.current?.siteId===siteId&&pending.current.expires===expiresAfterDays?pending.current:{siteId,expires:expiresAfterDays,id:crypto.randomUUID()};
+      pending.current=request;
+      const result = await createSitePreviewShare({ data: { siteId, expiresAfterDays,requestId:request.id } });
+      pending.current=null;
+      setCreatedCode(result.relativeUrl.split("/").at(-1)??null);
+      const url = new URL(result.relativeUrl, origin);
       setCreatedUrl(url.toString());
-      setShares(await listSitePreviewShares({ data: { siteId } }));
+      // The share has already been committed. A failed list refresh must not
+      // masquerade as a failed creation or cause the operator to issue duplicates.
+      try {
+        setShares(await listSitePreviewShares({ data: { siteId } }));
+      } catch {
+        setError("Your link was created. The active links list could not be refreshed. Copy your link before closing.");
+      }
     } catch (cause) {
       setError(normalizeClientError(cause,
-        "Could not create a public-safe website preview. Check the saved content and try again.").message);
-    } finally { setBusy(false); }
+        "Could not create the website preview. Your saved website has not been changed. Try again or contact platform support.").message);
+    } finally { setOperation(null); }
   }
 
-  async function revoke(shareId: string) {
+  async function change(shareId: string, action:GoLinkAction) {
     if (busy) return;
-    setBusy(true);
+    setOperation("change");
     setError(null);
     try {
-      await revokeSitePreviewShare({ data: { siteId, shareId } });
-      setShares(await listSitePreviewShares({ data: { siteId } }));
+      if(action==="revoke")await revokeSitePreviewShare({ data: { siteId, shareId } });
+      else await setSitePreviewSharePaused({data:{siteId,shareId,action}});
+      setRevokeTarget(null);
       setCreatedUrl("");
-      setCopied(false);
+      setCreatedCode(null);
+      // Reflect the confirmed write even if the authoritative refresh fails.
+      setShares(current=>action==="revoke"?current.filter(share=>share.id!==shareId):
+        current.map(share=>share.id===shareId?{...share,paused:action==="pause"}:share));
+      try {
+        setShares(await listSitePreviewShares({ data: { siteId } }));
+      } catch {
+        setError("The preview link was updated, but the list could not be refreshed. Close and reopen sharing to refresh.");
+      }
     } catch (cause) {
-      setError(normalizeClientError(cause, "Could not revoke this preview link.").message);
-    } finally { setBusy(false); }
-  }
-
-  async function copy() {
-    if (!createdUrl) return;
-    try {
-      await navigator.clipboard.writeText(createdUrl);
-      setCopied(true);
-    } catch {
-      setError("Clipboard access is unavailable. Select the link below to copy it manually.");
-    }
+      setError(normalizeClientError(cause, "Could not change this preview link.").message);
+    } finally { setOperation(null); }
   }
 
   const activeShares = shares.filter(share => !share.revokedAt &&
@@ -118,8 +139,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
           Sharing does not publish the Site.
         </WorkspaceNotice>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-44 flex-1 space-y-2">
-            <Label htmlFor="website-preview-expiration">Link expiration</Label>
+          <Field label="Link expiration" className="min-w-44 flex-1">
             <Select id="website-preview-expiration"
               value={expiresAfterDays === null ? "never" : String(expiresAfterDays)}
               disabled={busy} onChange={event => {
@@ -130,10 +150,10 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
               <option value="30">30 days</option>
               <option value="never">No automatic expiration</option>
             </Select>
-          </div>
+          </Field>
           <Button type="button" disabled={busy || loading || activeShares.length >= 5}
-            onClick={() => void create()}>
-            {busy ? "Saving preview…" : "Create shareable preview"}
+            loading={operation==="create"} loadingLabel="Saving preview…" onClick={() => void create()}>
+            Create shareable preview
           </Button>
         </div>
         {createdUrl && <div className="border p-4">
@@ -141,15 +161,13 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
             <Check className="size-4 text-success" aria-hidden="true" /> View-only link created
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Copy this link now. The token cannot be retrieved again after you close this window.
+            Copy this Go Link now or retrieve it later from your active preview links.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Input readOnly aria-label="Created shareable website preview URL" value={createdUrl}
               onFocus={event => event.currentTarget.select()} className="min-w-0 flex-1" />
-            <Button type="button" variant="outline" onClick={() => void copy()}>
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              {copied ? "Copied" : "Copy link"}
-            </Button>
+            {createdCode && <CopyLinkButton destination={{kind:"go",code:createdCode}}/>}
+            {createdCode && <GoLinkQrButton key={createdCode} code={createdCode}/>}
             <Button asChild variant="outline">
               <a href={createdUrl} target="_blank" rel="noopener noreferrer">Open <ExternalLink className="size-4" /></a>
             </Button>
@@ -160,7 +178,7 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
           <p className="mt-1 text-xs text-muted-foreground">
             Up to five active links. Revoke any link to stop access to its frozen website snapshot.
           </p>
-          {loading ? <p role="status" className="mt-3 text-sm">Loading preview links…</p>
+          {loading ? <QueryState loading="Loading preview links…"/>
             : activeShares.length ? <div className="mt-3 space-y-2">
               {activeShares.map(share => <div key={share.id}
                 className="flex flex-wrap items-center justify-between gap-3 border p-3">
@@ -171,13 +189,27 @@ export function LaunchPreviewSharing({ siteId }: { siteId: string }) {
                     {share.expiresAt ? " Expires " + new Date(share.expiresAt).toLocaleDateString() : " No expiration"}
                   </p>
                 </div>
-                <Button size="sm" variant="outline" disabled={busy}
-                  onClick={() => void revoke(share.id)}>Revoke</Button>
+                <div className="space-y-2">
+                  {share.paused && <StatusBadge tone="attention">Paused</StatusBadge>}
+                  <GoLinkActions code={share.code} status={share.paused?"paused":"active"} busy={busy}
+                    onShow={()=>void (async()=>{
+                      try{const origin=await getCanonicalGoLinkShareOrigin();setCreatedUrl(new URL("/go/"+share.code,origin).href);setCreatedCode(share.code);}
+                      catch{setError("Could not load the approved sharing origin.");}
+                    })()}
+                    onChange={action=>{if(action==="revoke"){setError(null);setRevokeTarget(share.id);}else void change(share.id,action);}}/>
+                </div>
               </div>)}
-            </div> : <p className="mt-3 text-sm text-muted-foreground">No active preview links.</p>}
+            </div> : !error ? <EmptyState className="mt-3" title="No active preview links."/> : null}
         </div>
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
       </div>
     </Modal>
+    <ActionDialog open={open&&!!revokeTarget} title="Revoke website preview permanently"
+      description="Distributed copies will stop working. The saved website itself will not be changed."
+      confirmLabel="Revoke preview" pending={busy} destructive
+      confirmDisabled={!revokeTarget||!activeShares.some(share=>share.id===revokeTarget)}
+      onClose={()=>setRevokeTarget(null)} onConfirm={()=>{if(revokeTarget)void change(revokeTarget,"revoke");}}>
+      {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+    </ActionDialog>
   </>;
 }

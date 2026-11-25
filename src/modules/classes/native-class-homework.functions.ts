@@ -1,12 +1,13 @@
+import {readHistoricalClassWork} from "./historical-class-work.server";
+import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { canonicalClassEnrollments, canonicalClasses } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
-import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
+import { authorizeNativeLearnerClass } from "./native-learner-class-access.server";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
 const uuid = z.string().uuid();
@@ -16,38 +17,10 @@ const submit = target.extend({
   responseText: z.string().trim().min(5).max(20000),
 }).strict();
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type Actor = Awaited<ReturnType<typeof getInstructionalLearnerContext>>;
 
 function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
   setResponseHeader("Referrer-Policy", "no-referrer");
-}
-
-/** Homework belongs to an exact active Class Enrollment and one Course Attempt.
- * No legacy Section lookup, surrogate student identity or extra submission table. */
-async function authorized(tx: Tx, actor: Actor, classEnrollmentId: string) {
-  if (!actor.actorPersonId ||
-      !(actor.role === "student" && actor.capabilities.has("student:read") ||
-        actor.role === "learner" && actor.capabilities.has("learning.participate"))) {
-    throw new AuthorizationError("own authenticated Course learner");
-  }
-  const [enrollment] = await tx.select().from(canonicalClassEnrollments)
-    .where(and(eq(canonicalClassEnrollments.id, classEnrollmentId),
-      eq(canonicalClassEnrollments.learnerPersonId, actor.actorPersonId),
-      eq(canonicalClassEnrollments.status, "active")))
-    .for("update").limit(1);
-  if (!enrollment?.courseAttemptId) throw new AuthorizationError("active Class Enrollment and Course Attempt");
-  const [cls] = await tx.select().from(canonicalClasses)
-    .where(eq(canonicalClasses.id, enrollment.classId)).limit(1);
-  if (!cls || cls.state !== "active") throw new AuthorizationError("current Class");
-  if (actor.role === "student" && (actor.scope.siteIds?.[0] !== cls.siteId ||
-      !actor.scope.organizationIds?.includes(cls.operatingOrganizationId))) {
-    throw new AuthorizationError("own CAN student Site");
-  }
-  const access = await authorizeCanonicalCourseAttempt(tx, actor, enrollment.courseAttemptId);
-  if (access.source !== "class" || access.courseVersionId !== cls.courseVersionId)
-    throw new AuthorizationError("own canonical Class Course Attempt");
-  return { enrollment, cls, courseAttemptId: access.courseAttemptId };
 }
 
 type HomeworkRow = {
@@ -65,38 +38,83 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown> : {};
 
-export const getNativeClassHomework = createServerFn({method:"GET"})
-  .validator((raw: unknown) => target.parse(raw))
-  .handler(async ({data}) => {
-    noStore();
-    const actor = await getInstructionalLearnerContext(getRequest());
-    return db.transaction(async tx => {
-      const {cls,courseAttemptId} = await authorized(tx,actor,data.classEnrollmentId);
-      const result = await tx.execute(sql`
-        SELECT a.id, a.assignment_key, a.assignment_spec, a.due_at,
-          o.official_spec, s.id AS submission_id, s.status, s.response, s.submitted_at
+/** One authorized assignment query; the index never reads submission text or feedback. */
+async function readHomeworkRows(tx:Tx,courseVersionId:string,courseAttemptId:string,detail:boolean):Promise<HomeworkRow[]>{
+  const result = await tx.execute(sql`
+        SELECT a.id, a.assignment_key, ${detail ? sql`a.assignment_spec` : sql`jsonb_build_object('title',a.assignment_spec->'title')`} AS assignment_spec, a.due_at,
+          ${detail ? sql`o.official_spec` : sql`jsonb_build_object('title',o.official_spec->'title')`} AS official_spec,
+          s.id AS submission_id, s.status, ${detail ? sql`s.response` : sql`NULL::jsonb`} AS response, s.submitted_at
         FROM public.graded_assignments a
         JOIN public.official_course_assignment_versions o
           ON o.id=a.official_assignment_version_id
          AND o.course_version_id=a.course_version_id
         LEFT JOIN public.graded_submissions s
           ON s.assignment_id=a.id AND s.course_attempt_id=${courseAttemptId}::uuid
-        WHERE a.course_version_id=${cls.courseVersionId}::uuid
+        WHERE a.course_version_id=${courseVersionId}::uuid
           AND a.section_id IS NULL
         ORDER BY a.due_at NULLS LAST, a.assignment_key
         LIMIT 100
       `);
-      return {courseAttemptId, assignments:(result.rows as HomeworkRow[]).map(item => {
+  return result.rows as HomeworkRow[];
+}
+
+function homeworkSummary(item:HomeworkRow){
+  const spec=asRecord(item.assignment_spec);
+  const official=asRecord(item.official_spec);
+  return {
+    id:String(item.id),
+    title:String(spec.title??official.title??item.assignment_key),
+    dueAt:item.due_at ? new Date(item.due_at).toISOString() : null,
+    status:item.status??"not_started",
+    submittedAt:item.submitted_at ? new Date(item.submitted_at).toISOString() : null,
+  };
+}
+
+/** Minimal DTO for the authenticated student assignment index. */
+export const getNativeClassHomeworkSummary=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>target.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getInstructionalLearnerContext(getRequest());
+    return db.transaction(async tx=>{
+      const {cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+      const rows=await readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,false);
+      return {assignments:rows.map(homeworkSummary)};
+    });
+  });
+
+export const getNativeClassHomework = createServerFn({method:"GET"})
+  .validator((raw: unknown) => target.parse(raw))
+  .handler(async ({data}) => {
+    noStore();
+    const actor = await getInstructionalLearnerContext(getRequest());
+    return db.transaction(async tx => {
+      const {cls,enrollment,courseAttemptId} = await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+      const rows = await readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,true);
+      // Preserve access to original academic evidence during the cutover.
+      // Exact recovery provenance only; no title inference or new enrollment.
+      const legacy = actor.role==="student" ? await tx.execute(sql`
+        SELECT DISTINCT sec.id AS section_id
+        FROM public.academic_enrollment_cutover_links link
+        JOIN public.enrollments e ON e.id=link.legacy_enrollment_id
+        JOIN public.student_profiles sp ON sp.id=e.student_profile_id
+        JOIN public.sections sec ON sec.id=e.section_id
+        WHERE sp.person_id=${enrollment.learnerPersonId}::uuid
+          AND e.kind='section' AND e.status='active'
+          AND sec.site_id=${cls.siteId}::uuid
+          AND e.organization_id=${cls.operatingOrganizationId}::uuid
+          AND link.class_enrollment_id=${enrollment.id}::uuid
+          AND md5('valor-v61:class:'||sec.code)::uuid=${cls.id}::uuid
+        LIMIT 2
+      `) : null;
+      const legacySectionId=legacy?.rows.length===1?String(legacy.rows[0]?.section_id):null;
+      return {courseAttemptId, legacySectionId, assignments:rows.map(item => {
         const spec=asRecord(item.assignment_spec);
         const official=asRecord(item.official_spec);
         const response=asRecord(item.response);
         return {
-          id:String(item.id),
-          title:String(spec.title??official.title??item.assignment_key),
+          ...homeworkSummary(item),
           instructions:String(spec.instructions??official.instructions??"Submit your written response."),
-          dueAt:item.due_at ? new Date(item.due_at).toISOString() : null,
-          status:item.status??"not_started",
-          submittedAt:item.submitted_at?.toISOString()??null,
           responseText:typeof response.text==="string"?response.text:"",
           practiceFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"
             ?response.teacherFeedback:null,
@@ -112,6 +130,32 @@ export const getNativeClassHomework = createServerFn({method:"GET"})
     });
   });
 
+/** Read a bounded page of the learner's own preserved submission states.
+ * The parent homework service owns authorization; no separate identity path. */
+export const getNativeClassHomeworkHistory=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>target.extend({
+    assignmentId:uuid,beforeRevision:z.number().int().positive().optional(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getInstructionalLearnerContext(getRequest());
+    return db.transaction(async tx=>{
+      const {cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+      const result=await tx.execute(sql`
+        SELECT r.revision_no,r.status,r.response,r.submitted_at,r.recorded_at,r.source
+        FROM public.graded_submission_revisions r
+        JOIN public.graded_submissions gs ON gs.id=r.submission_id AND gs.course_version_id=r.course_version_id
+        JOIN public.graded_assignments ga ON ga.id=gs.assignment_id AND ga.course_version_id=gs.course_version_id
+        WHERE gs.course_attempt_id=${courseAttemptId}::uuid
+          AND gs.course_version_id=${cls.courseVersionId}::uuid
+          AND ga.id=${data.assignmentId}::uuid AND ga.section_id IS NULL
+          AND (${data.beforeRevision??null}::int IS NULL OR r.revision_no<${data.beforeRevision??null}::int)
+        ORDER BY r.revision_no DESC LIMIT 21
+      `);
+      return projectSubmissionRevisionPage(result.rows);
+    });
+  });
+
 /** Persist text homework in the EXISTING graded_submissions table. A submitted
  * or graded response is never silently overwritten. Repeated identical
  * submissions return an idempotent acknowledgement. */
@@ -124,7 +168,7 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
          actor.role==="learner"&&actor.capabilities.has("learning.participate")))
       throw new AuthorizationError("own homework submission capability");
     return db.transaction(async tx=>{
-      const {enrollment,cls,courseAttemptId}=await authorized(tx,actor,data.classEnrollmentId);
+      const {enrollment,cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_write");
       // Ordinary non-credit Class assignments may receive private, unscored
       // teacher feedback. This is determined by the current Enrollment's
       // credit mode, never by a synthetic Site/Person marker or demo email.
@@ -193,3 +237,16 @@ export const submitNativeClassHomework = createServerFn({method:"POST"})
       return {submissionId:created.id,alreadySubmitted:false};
     });
   });
+
+/** Historical school work is not available through adult learner placement grants. */
+export const getNativeClassHistoricalWork=createServerFn({method:"GET"})
+ .validator((raw:unknown)=>target.extend({beforeId:uuid.optional()}).strict().parse(raw))
+ .handler(async({data})=>{
+  noStore();
+  const actor=await getInstructionalLearnerContext(getRequest());
+  if(actor.role!=="student")throw new AuthorizationError("own school records");
+  return db.transaction(async tx=>{
+   const {cls,enrollment}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+   return readHistoricalClassWork(tx,{classId:cls.id,classEnrollmentId:enrollment.id,beforeId:data.beforeId});
+  });
+ });

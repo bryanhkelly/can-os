@@ -1,3 +1,4 @@
+import { compactUuidUrlValue, shortUuidHref } from "@/domain/opaque-url-id";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 
 const INTERNAL_ORIGIN = "https://can-os.invalid";
@@ -38,11 +39,11 @@ export function accessLandingPath(role: string, launchSiteId?: string, returnTo?
  // A new school's first sign-in lands in its guided launcher, not a dashboard;
  // the launcher itself offers a skip to the dashboard.
  if(hasRegistrarAuthority(role)&&launchSiteId&&(!safeReturnTo||genericReturnPaths.has(safeReturnTo)))
-  return "/launch/site?siteId="+encodeURIComponent(launchSiteId);
+  return "/launch/site?siteId="+compactUuidUrlValue(launchSiteId);
  if(safeReturnTo&&!genericReturnPaths.has(safeReturnTo))return safeReturnTo;
  // An operating school is a workspace, not a school-creation journey.
  if(hasRegistrarAuthority(role)&&homeSiteId)
-  return "/sites/"+encodeURIComponent(homeSiteId);
+  return shortUuidHref("/sites/", homeSiteId);
  if(safeReturnTo)return safeReturnTo;
  const home:Record<string,string>={account_holder:"/account/",student:"/",teacher:"/teacher/missing-work",guardian:"/guardian/students",registrar:"/admissions",specialist:"/home",counselor:"/home"};
  return Object.hasOwn(home,role)?home[role]! : "/access";

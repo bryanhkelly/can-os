@@ -15,6 +15,7 @@ const OperationsHome = lazy(() => import("@/components/home/OperationsHome").the
 const SiteDayHome = lazy(() => import("@/components/operations/SiteDayPage").then(module => ({ default: module.SiteDayPage })));
 const CoachHome = lazy(() => import("@/components/home/CoachHome").then(module => ({ default: module.CoachPage })));
 const WebsiteHome = lazy(() => import("./site-website").then(module => ({ default: module.WebsiteHome })));
+const ReportingRelationshipsHome = lazy(() => import("@/components/home/ReportingRelationshipsHome").then(module => ({ default: module.ReportingRelationshipsHome })));
 const NetworkHome = lazy(() => import("@/components/home/NetworkHome").then(module => ({ default: module.NetworkHome })));
 const StewardHome = lazy(() => import("@/components/home/StewardHome").then(module => ({ default: module.CANPartnerDesk })));
 const JurisdictionReviewerDesk = lazy(() => import("@/components/operations/CANSchoolJurisdictionReviewDesk")
@@ -57,6 +58,8 @@ export async function loadHomeDashboard(role: string, search: HomeSearch) {
       return { kind: "safeguarding", outcome: await loadSafeguardingHome() } as const;
     case "site_website_editor":
       return { kind: "website", outcome: await (await import("./site-website")).loadWebsiteHome(search.siteId) } as const;
+    case "reporting_relationship_manager":
+      return { kind: "reporting-relationships" } as const;
     case "network_admin":
       return { kind: "network", outcome: await (await import("@/components/home/NetworkHome")).loadNetworkHome() } as const;
     case "can_network_steward":
@@ -120,6 +123,7 @@ function HomePage() {
         case "profile": return <ProfileHome outcome={dashboard.outcome} />;
         case "safeguarding": return <SafeguardingHome outcome={dashboard.outcome} search={search} />;
         case "website": return <WebsiteHome outcome={dashboard.outcome} selection={search} />;
+        case "reporting-relationships": return <ReportingRelationshipsHome />;
         case "network": return <NetworkHome result={dashboard.outcome} />;
         case "steward": return <StewardHome outcome={dashboard.outcome} />;
         case "jurisdiction-review": return <WorkspaceShell width="wide" eyebrow="CAN Jurisdiction"

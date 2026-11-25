@@ -8,7 +8,7 @@ import { safeAccessReturnTo } from "@/domain/access-navigation";
 const publicRoots = new Set([
   "/access", "/landing", "/site/new", "/explore",
   "/interest-event", "/family/interest", "/family/join",
-  "/church/apply", "/learn/enroll", "/site-preview-share",
+  "/church/apply", "/learn/enroll",
   "/published-site", "/enrichment",
 ]);
 
@@ -19,7 +19,7 @@ export function isPublicCanPath(pathname: string): boolean {
   return path.startsWith("/access/") ||
     path.startsWith("/landing/") || path.startsWith("/next/") ||
     path.startsWith("/explore/") || path.startsWith("/enrichment/") ||
-    path.startsWith("/published-site/");
+    path.startsWith("/published-site/") || path.startsWith("/go/");
 }
 
 export function signInReturnUrl(value: unknown): string {

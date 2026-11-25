@@ -1,6 +1,7 @@
 import {useQuery} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
-import {QueryState} from "@/components/workspace";
+import {QueryState, StatusBadge} from "@/components/workspace";
+import {useWorkspaceSession} from "@/components/shell/WorkspaceSession";
 import {getNoncreditTrainingReadiness} from "@/modules/enrollment/noncredit-enrollment-publication.functions";
 
 /** Shared 6.1 pre-publication inventory for any authorized noncredit Course.
@@ -15,14 +16,16 @@ export type NoncreditTrainingSelection={
 export function NoncreditTrainingReadiness({selection}:{
   selection:NoncreditTrainingSelection;
 }){
+  const {session,error}=useWorkspaceSession();
+  const scope=session?.authenticated&&!error?JSON.stringify([session.activeGrantId,session.activeContext,session.ownerDelegation??null]):null;
   const query=useQuery({
-    queryKey:["noncredit-training-readiness",
+    queryKey:["noncredit-training-readiness",scope,
       selection.deploymentId,selection.adoptionId,
       selection.trainingVersionId,selection.courseVersionId],
     queryFn:()=>getNoncreditTrainingReadiness({data:selection}),
-    retry:false,staleTime:15_000,
+    enabled:scope!==null,retry:false,staleTime:15_000,
   });
-  const data=query.data;
+  const data=scope!==null&&!query.isError?query.data:undefined;
   const checks=data?[
     {
       label:"Published Course lessons",
@@ -70,7 +73,7 @@ export function NoncreditTrainingReadiness({selection}:{
         <dt className="text-xs text-muted-foreground">{check.label}</dt>
         <dd className="mt-1 text-sm font-semibold">{check.detail}</dd>
         <p className="mt-1 text-xs text-muted-foreground">
-          {check.ready?"Configuration found":"Requires review before pilot activation"}
+          <StatusBadge tone={check.ready?"success":"attention"}>{check.ready?"Configuration found":"Requires review before pilot activation"}</StatusBadge>
         </p>
       </div>)}
     </dl>}

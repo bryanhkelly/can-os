@@ -145,3 +145,16 @@ test("student help request draft is guarded before submission", async ({ page, c
   await page.getByRole("link", { name: "Student Today" }).click();
   await expect(editor).toHaveValue("Unsent synthetic QA help request");
 });
+
+
+test("synthetic student opens a specific native classroom from My Classes", async ({page,context})=>{
+  test.skip(!cookie,"Requires a provisioned synthetic student session");
+  await studentSession(context);
+  await open(page,"/class");
+  const card=page.getByRole("article").filter({has:page.getByRole("heading",{name:"Algebra I",exact:true})});
+  const link=card.getByRole("link",{name:"Open Class"});
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(page).toHaveURL(/\/class\/[^/?]+/);
+  await expect(page.getByRole("heading",{name:"Algebra I",exact:true})).toBeVisible();
+});

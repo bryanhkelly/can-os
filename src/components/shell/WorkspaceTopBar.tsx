@@ -2,14 +2,17 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Bell, ChevronDown, Menu, MessageCircle, Search } from "lucide-react";
 import { WorkspaceAccountTrigger } from "./WorkspaceAccountMenu";
+import { PlatformOwnerDelegationBanner } from "./PlatformOwnerDelegationBanner";
 import { Button } from "@/components/ui/button";
+import { focusRingClasses } from "@/components/ui/control-styles";
+import { cn } from "@/lib/utils";
 import { WorkspaceNotice } from "@/components/workspace";
 import { formatWorkspaceRole, getWorkspaceScopeLabel } from "./workspace-scope";
 import { accessReturnToFromLocation, safeAccessReturnTo } from "@/domain/access-navigation";
 import { useHydrated } from "@/lib/use-hydrated";
 
 export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable, sessionError,
-  error, demoAccountSwitching, demoTenant, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
+  error, demoAccountSwitching, demoTenant, ownerDelegation, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
   onOpenSwitcher, onOpenSearch, onOpenAsk, onOpenNotifications, onOpenAccount, focused = false, notificationsOpen = false }: {
   member?: { role: string; firstName: string; lastName: string; siteId: string | null };
   sites: readonly { id: string; name: string }[];
@@ -19,6 +22,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   error: string;
   demoAccountSwitching: boolean;
   demoTenant?: boolean;
+  ownerDelegation?: {mode:"view"|"act";expiresAt:string};
   changing: boolean;
   menuOpen: boolean;
   switcherOpen: boolean;
@@ -58,14 +62,14 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
           className="mr-auto flex h-auto min-w-0 max-w-[22rem] shrink items-center justify-start gap-2  border-border/70 bg-background px-3 py-1.5 text-left">
           <span className="sr-only">Switch workspace:</span>{" "}
           <span className="min-w-0">
-            <span className="block text-xs font-semibold">{formatWorkspaceRole(member.role)}</span>{" "}
+            <span className="block truncate text-xs font-semibold">{formatWorkspaceRole(member.role)}</span>{" "}
             <span className="block truncate text-xs text-muted-foreground">
               {getWorkspaceScopeLabel(member, sites)}
             </span>
           </span>
           <ChevronDown className="size-4 shrink-0" aria-hidden="true" />
         </Button>
-        : <Link to="/" className="mr-auto  font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>}
+        : <Link to="/" className={cn("mr-auto font-serif text-xl font-semibold",focusRingClasses)}>CAN OS</Link>}
       {member && <>
         <Button variant="outline" size="sm" aria-label="Search workspace" aria-haspopup="dialog"
           title="Find pages and authorized records (Ctrl+K / Cmd+K)" onClick={onOpenSearch}>
@@ -88,6 +92,9 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   </header>
   <div className="space-y-2 px-[var(--page-gutter)] empty:hidden [&:not(:empty)]:pt-3">
       {(error || sessionError) && <WorkspaceNotice tone="danger" className="w-full">{error || sessionError}</WorkspaceNotice>}
+      {ownerDelegation && <PlatformOwnerDelegationBanner mode={ownerDelegation.mode}
+        expiresAt={ownerDelegation.expiresAt}
+        targetLabel={member ? member.firstName+" "+member.lastName+" ("+formatWorkspaceRole(member.role)+")" : "Selected user"}/>}
       {demoAccountSwitching && dismissedDemoContext !== demoContext && <WorkspaceNotice className="w-full"
         onDismiss={dismissDemoNotice} dismissLabel="Dismiss demo information">
         <span className="sm:hidden">Demo session as {member?.firstName} ({member && formatWorkspaceRole(member.role)}). Shared data; switches audited.</span>

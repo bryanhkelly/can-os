@@ -6,6 +6,7 @@ import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPan
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { getSiteToday } from "@/modules/operations/site-today.functions";
+import { AuthorizationError } from "@/domain/command-context";
 import { StatCard, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -15,13 +16,21 @@ import { SiteTodayPriorities } from "@/components/operations/SiteTodayPriorities
 import type { DailyAttentionItem } from "@/domain/daily-operations";
 import { SiteOwnedActionResolution } from "@/components/operations/SiteOwnedActionResolution";
 import { plural } from "@/lib/format";
+import { friendlySiteBase, type FriendlySiteIdentity } from "@/domain/friendly-site-urls";
+
+/** Reuse the exact authorized Site Today read for either URL identity. */
+export function readSiteToday(siteId: string | null) {
+  return safeLoader(
+    () => {
+      if (!siteId) throw new AuthorizationError("site.today.read");
+      return getSiteToday({ data: { siteId } });
+    },
+    { authMessage: "You do not have access to this school site." },
+  )();
+}
 
 export const Route = createFileRoute("/sites/$siteId/")({
-  loader: ({ params }) =>
-    safeLoader(
-      () => getSiteToday({ data: { siteId: params.siteId } }),
-      { authMessage: "You do not have access to this school site." },
-    )(),
+  loader: ({ params }) => readSiteToday(params.siteId),
   component: SiteTodayPage,
 });
 
@@ -38,10 +47,17 @@ const ownerResolvableTypes = new Set([
 ]);
 
 function SiteTodayPage() {
-  const outcome = Route.useLoaderData();
+  return <SiteTodayView outcome={Route.useLoaderData()} />;
+}
+
+export function SiteTodayView({ outcome, identity }: {
+  outcome: Awaited<ReturnType<typeof readSiteToday>>;
+  identity?: FriendlySiteIdentity;
+}) {
   if (!outcome.ok) return <LoaderFailure eyebrow="Today"
     title="Site Today" outcome={outcome} />;
   const data: Awaited<ReturnType<typeof getSiteToday>> = outcome.data;
+  const friendlyBase = identity ? friendlySiteBase(identity) : null;
   const localTime = (date: string) => new Intl.DateTimeFormat("en-US", {
     timeZone: data.site.timezone, hour: "numeric", minute: "2-digit",
   }).format(new Date(date));
@@ -70,11 +86,11 @@ function SiteTodayPage() {
     shortcuts={<>
       <DashboardShortcut title="School operations" description="Authorized actions and readiness" icon={<ClipboardList className="size-5" />}><Link to="/home" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
       <DashboardShortcut title="Admissions" description="Applications and enrollment" icon={<Users className="size-5" />}><Link to="/admissions" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
-      <DashboardShortcut title="Website & domain" description="Default address, custom domain and publication" icon={<Globe className="size-5" />}><Link to="/sites/$siteId/profile" params={{siteId:data.site.id}} /></DashboardShortcut>
+      <DashboardShortcut title="Website & domain" description="Default address, custom domain and publication" icon={<Globe className="size-5" />}><a href={friendlyBase ? friendlyBase + "/profile" : "/sites/" + encodeURIComponent(data.site.id) + "/profile"} /></DashboardShortcut>
       <DashboardShortcut title="Calendar" description={`Dates in ${data.site.timezone}`} icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:data.localDate}} /></DashboardShortcut>
     </>}
     rail={<DashboardCalendar date={data.localDate} timezone={data.site.timezone} />}
-    actions={<div className="flex flex-wrap items-center gap-2"><Link className={secondaryActionClassName} to="/sites/$siteId/profile" params={{siteId:data.site.id}}>School profile</Link><Link className={secondaryActionClassName} to="/sites/$siteId/publish" params={{siteId:data.site.id}}>Website & domain</Link></div>}
+    actions={<div className="flex flex-wrap items-center gap-2"><a className={secondaryActionClassName} href={friendlyBase ? friendlyBase + "/profile" : "/sites/" + encodeURIComponent(data.site.id) + "/profile"}>School profile</a><Link className={secondaryActionClassName} to="/sites/$siteId/publish" params={{siteId:data.site.id}}>Website & domain</Link></div>}
     priority={<>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([

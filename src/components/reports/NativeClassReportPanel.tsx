@@ -1,20 +1,16 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/choice";
+import { DisclosureSection, WorkspaceNotice } from "@/components/workspace";
 import {useState} from "react";
-import {useQuery} from "@tanstack/react-query";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import {ReportDateFilter} from "@/components/workspace/report-date-filter";
+import {utcDaysThroughToday,priorReportDateRange,resolveReportDateRange,type ReportDateRange} from "@/components/workspace/report-date-range";
+import {ReportMetricComparison} from "@/components/workspace/report-period-comparison";
 import {getNativeClassReport} from "@/modules/reporting/native-class-report.functions";
-import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
-import {reportingCsvRow} from "@/domain/reporting-csv";
+import {downloadReportingCsv} from "@/lib/reporting-download";
 
-function datePlus(value:string,days:number){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return "";
-  const d=new Date(value+"T00:00:00.000Z");
-  d.setUTCDate(d.getUTCDate()+days);
-  return d.toISOString().slice(0,10);
-}
 function exportReport(report:NonNullable<ReturnType<typeof useClassReport>["data"]>){
   // Stable metric keys, availability and source lineage for future Insights reuse.
   // Aggregates only; never export individual learners from this route.
@@ -30,38 +26,26 @@ function exportReport(report:NonNullable<ReturnType<typeof useClassReport>["data
       "PRIVATE OPERATOR EVIDENCE - NOT APPROVED FOR PUBLICATION",
     ]),
   ];
-  const file=new Blob([rows.map(reportingCsvRow).join("\r\n")],{type:"text/csv;charset=utf-8"});
-  const url=URL.createObjectURL(file);
-  const link=document.createElement("a");
-  link.href=url;link.download="can-os-class-evidence-"+report.classId+"-"+report.period.from.slice(0,10)+".csv";
-  document.body.appendChild(link);link.click();link.remove();
-  URL.revokeObjectURL(url);
+  downloadReportingCsv(rows,"can-os-class-evidence-"+report.classId+"-"+report.period.from.slice(0,10)+".csv");
 }
-function useClassReport(classId:string,from:string,to:string,grantKey:string,enabled=true){
-  return useQuery({
-    queryKey:["ws6-class-report",grantKey,classId,from,to],
-    queryFn:()=>getNativeClassReport({data:{classId,from,to}}),
-    enabled:enabled&&from<to,retry:false,staleTime:0,gcTime:0,refetchOnMount:"always",
+function useClassReport(classId:string,range:ReportDateRange|null,scope:string|null,enabled=true){
+  return usePrivateReportQuery({
+    scope,key:["native-class-evidence",classId,range?.fromDay??null,range?.untilDay??null],
+    enabled:enabled&&range!==null,read:()=>getNativeClassReport({data:{classId,from:range!.fromDay,to:range!.untilDay}}),
   });
 }
 
 /** WS6 provider-private reporting component; 6.1 semantic tokens and
  * rectangular panels. No cross-provider publish button is exposed. */
 export function NativeClassReportPanel({classId}:{classId:string}){
-  const today=new Date().toISOString().slice(0,10);
-  const grantKey=useActiveWorkspaceMember()?.id??"unbound-canonical-session";
-  const [from,setFrom]=useState(()=>datePlus(today,-30));
-  const [toInclusive,setToInclusive]=useState(today);
+  const scope=usePrivateReportScope();
+  const [range,setRange]=useState(()=>utcDaysThroughToday(30,new Date()));
   const [compare,setCompare]=useState(false);
-  const [expanded,setExpanded]=useState(false);
-  const to=datePlus(toInclusive,1);
-  const report=useClassReport(classId,from,to,grantKey);
-  const length=Math.round((Date.parse(to+"T00:00:00Z")-
-    Date.parse(from+"T00:00:00Z"))/86400000);
-  const previousFrom=datePlus(from,-length);
-  const previous=useClassReport(classId,previousFrom,from,grantKey,compare&&length>0&&length<=366);
-  const valid=!!from&&!!toInclusive&&from<=toInclusive&&length>0&&length<=366;
-  const data=valid?report.data:null;
+  const valid=resolveReportDateRange(range,366,new Date(),true)!==null;
+  const {query:report,data}=useClassReport(classId,valid?range:null,scope);
+  const priorRange=priorReportDateRange(range,366,new Date());
+  const {query:previous,data:previousData}=useClassReport(classId,priorRange,scope,compare);
+  const comparable=compare&&data&&previousData&&data.contractVersion===previousData.contractVersion?previousData:null;
   return <section aria-label="Class participation reports" className="space-y-5">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
@@ -76,65 +60,35 @@ export function NativeClassReportPanel({classId}:{classId:string}){
         Export evidence CSV
       </Button>
     </div>
-    <div className="grid gap-3 border border-border bg-card p-4 md:grid-cols-[1fr_1fr_auto]">
-      <Label className="block text-sm font-medium">From (UTC, inclusive)
-        <Input type="date" value={from} max={today} onChange={e=>setFrom(e.target.value)}
-          className="mt-2 block min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+    <div className="space-y-3 border border-border bg-card p-4">
+      <ReportDateFilter initial={range} maxDays={366} allowPartialToday onApply={setRange}/>
+      <Label className="flex items-center gap-2 text-sm">
+        <Checkbox checked={compare} onChange={e=>setCompare(e.target.checked)}/> Compare equal-length prior period
       </Label>
-      <Label className="block text-sm font-medium">Through (UTC, inclusive)
-        <Input type="date" value={toInclusive} max={today} onChange={e=>setToInclusive(e.target.value)}
-          className="mt-2 block min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-      </Label>
-      <Label className="flex items-center gap-2 self-end pb-3 text-sm">
-        <Checkbox checked={compare} onChange={e=>setCompare(e.target.checked)}
-          className="h-4 w-4"/>Compare prior period
-      </Label>
+      {compare&&!priorRange&&<p role="status" className="text-xs text-muted-foreground">Choose a completed UTC window for an equal-period comparison. Today is partial.</p>}
+      {compare&&priorRange&&<p className="text-xs text-muted-foreground">Prior window: {priorRange.fromDay} to {priorRange.untilDay} exclusive (UTC). Both cohorts reflect their source state at query time, not historical snapshots.</p>}
     </div>
-    {!valid&&<p role="alert" className="border border-border p-3 text-sm">
-      Choose ascending dates covering no more than 366 days.
-    </p>}
-    {valid&&report.isPending&&<p role="status" className="border border-border p-4 text-sm">
-      Reconciling verified Class records…
-    </p>}
-    {valid&&report.isError&&<p role="alert" className="border border-border p-4 text-sm">
-      Reporting is unavailable with your current Class permissions or this reporting interval exceeds safety limits.
-    </p>}
+    {scope===null&&<WorkspaceNotice tone="attention">A current verified workspace session is required.</WorkspaceNotice>}
+    {!valid&&<WorkspaceNotice tone="attention">Choose ascending dates covering no more than 366 days.</WorkspaceNotice>}
+    {scope!==null&&valid&&(report.isPending||report.isFetching)&&<WorkspaceNotice>Reconciling verified Class records…</WorkspaceNotice>}
+    {scope!==null&&valid&&report.isError&&<WorkspaceNotice tone="danger">Reporting is unavailable with your current Class permissions or this reporting interval exceeds safety limits.</WorkspaceNotice>}
     {data&&<>
       <p className="text-xs text-muted-foreground">
         As of {new Date(data.asOf).toLocaleString()} · Contract {data.contractVersion}
         {" · "}Exact authorized delivery Site only. Not approved for external publication.
       </p>
       {data.definitions.some(def=>data.metrics[def.key]===null)&&
-        <p role="status" className="border border-border bg-card p-3 text-sm text-muted-foreground">
+        <WorkspaceNotice>
           Unavailable metrics are not zero. Their underlying authoritative evidence or
           governed decision source is not yet reportable.
-        </p>}
-      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {data.definitions.map(def=>{
-          const value=data.metrics[def.key];
-          const old=previous.data?.metrics[def.key];
-          return <div key={def.key} className="border border-border bg-card p-4">
-            <dt className="text-xs font-medium text-muted-foreground">{def.label}</dt>
-            <dd className="mt-2 font-serif text-3xl font-semibold tabular-nums">
-              {value===null?"Not available":value.toLocaleString()}
-            </dd>
-            {compare&&old!==undefined&&old!==null&&value!==null&&
-              <p className="mt-2 text-xs text-muted-foreground">
-                Prior {old.toLocaleString()} · Change {value-old>0?"+":""}{(value-old).toLocaleString()}
-              </p>}
-            <p className="mt-2 text-xs text-muted-foreground">{def.denominator}</p>
-          </div>;
-        })}
-      </dl>
+        </WorkspaceNotice>}
+      <ReportMetricComparison compare={compare&&priorRange!==null} items={data.definitions.map(def=>({
+        id:def.key,label:def.label,value:data.metrics[def.key],prior:comparable?.metrics[def.key],hint:def.denominator,asOf:data.asOf,
+      }))}/>
       {compare&&previous.isError&&<p role="status" className="text-sm">
         Prior-period comparison is unavailable. Current period remains independently sourced.
       </p>}
-      <section className="border border-border bg-card p-4">
-        <Button variant="ghost" type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}
-          className="flex min-h-11 w-full items-center justify-between gap-3 text-left font-semibold">
-          <span>Metric definitions and audit trail</span><span aria-hidden="true">{expanded?"−":"+"}</span>
-        </Button>
-        {expanded&&<div className="mt-3">
+      <DisclosureSection title="Metric definitions and audit trail">
           <Table scrollLabel="Class metric definitions and audit trail" aria-label="Class metric definitions and audit trail" className="w-full min-w-[42rem] text-left text-sm"><TableCaption className="sr-only">Class metric definitions and audit trail</TableCaption>
             <TableHeader className="border-b border-border bg-muted/40"><TableRow>
               <TableHead scope="col" className="p-3">Metric</TableHead>
@@ -149,8 +103,7 @@ export function NativeClassReportPanel({classId}:{classId:string}){
               <TableCell className="p-3">{def.timeBasis}</TableCell>
             </TableRow>)}</TableBody>
           </Table>
-        </div>}
-      </section>
+      </DisclosureSection>
       <div className="border-t border-border pt-3 text-xs text-muted-foreground">
         {data.limitations.map(item=><p key={item} className="mt-2">{item}</p>)}
       </div>

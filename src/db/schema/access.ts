@@ -80,6 +80,12 @@ export const accessSessions = pgTable("access_sessions", {
  accountId: uuid("account_id").notNull().references(() => accessAccounts.id,{onDelete:"cascade"}),
  secretHash: text("secret_hash").notNull(),
  activeGrantId: uuid("active_grant_id").references(() => accountPersonGrants.id,{onDelete:"set null"}),
+ // Owner delegation never mutates activeGrantId: it remains the original owner grant.
+ delegatedGrantId: uuid("delegated_grant_id").references(() => accountPersonGrants.id,{onDelete:"restrict"}),
+ delegatedMode: text("delegated_mode").$type<"view"|"act">(),
+ delegatedUntil: timestamp("delegated_until",{withTimezone:true}),
+ delegatedReason: text("delegated_reason"),
+
  expiresAt: timestamp("expires_at",{withTimezone:true}).notNull(),
  revokedAt: timestamp("revoked_at",{withTimezone:true}),
  createdAt: createdAt(),

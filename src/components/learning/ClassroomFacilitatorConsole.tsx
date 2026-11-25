@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MutationFeedback } from "@/components/workspace";
+import { EmptyState, MutationFeedback, QueryState, StatCard, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
 import { getClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
@@ -73,19 +73,10 @@ export function ClassroomFacilitatorConsole({
         </Link>
       </Button>
     </div>
-    {room.isPending && <p role="status">Checking Site and classroom authority…</p>}
-    {room.isError && <p role="alert" className="text-sm text-destructive">
-      Classroom controls are unavailable. Refresh after verifying the facilitator role.
-    </p>}
+    <QueryState loading={room.isPending&&"Checking Site and classroom authority…"} error={room.isError&&"Classroom controls are unavailable. Refresh after verifying the facilitator role."} onRetry={()=>void room.refetch()} retrying={room.isFetching}/>
     {room.isSuccess && room.data && <div className="grid gap-3 sm:grid-cols-2">
-      <div className="border border-border bg-card p-3">
-        <p className="text-xs text-muted-foreground">Registered learners with paired devices</p>
-        <p className="mt-2 font-serif text-2xl font-semibold tabular-nums">{room.data.pairedCount}</p>
-      </div>
-      <div className="border border-border bg-card p-3">
-        <p className="text-xs text-muted-foreground">Recently active learner devices (estimate)</p>
-        <p className="mt-2 font-serif text-2xl font-semibold tabular-nums">{room.data.activeDevicesEstimate}</p>
-      </div>
+      <StatCard label="Registered learners with paired devices" value={room.data.pairedCount}/>
+      <StatCard label="Recently active learner devices (estimate)" value={room.data.activeDevicesEstimate}/>
     </div>}
     <section className="border border-border bg-card p-4" aria-label="Classroom connection health">
       <h5 className="text-sm font-semibold">Classroom health</h5>
@@ -105,18 +96,10 @@ export function ClassroomFacilitatorConsole({
           room.data.releases.reduce((count,release)=>count+release.responseEvents,0)+" response events":
           "Unavailable"}</p>
       </div>
-      {projector.isError&&<p role="alert" className="mt-2 text-sm text-destructive">
-        The latest projector command could not be verified. This is not a playback confirmation.
-      </p>}
-      {projector.isSuccess&&projector.data.roomState==="blocked"&&<p role="alert" className="mt-2 text-sm text-destructive">
-        Projector authorization is blocked. Recheck audience enrollment and recording rights.
-      </p>}
-      {room.isError&&<p role="alert" className="mt-2 text-sm text-destructive">
-        Current facilitator or room access cannot be verified. Do not rely on previous counts or command states.
-      </p>}
-      {room.isSuccess&&room.data.partial&&<p role="status" className="mt-2 text-xs">
-        Counts are partial because this room exceeds the bounded summary.
-      </p>}
+      {projector.isError&&<WorkspaceNotice tone="danger" className="mt-2">The latest projector command could not be verified. This is not a playback confirmation.</WorkspaceNotice>}
+      {projector.isSuccess&&projector.data.roomState==="blocked"&&<WorkspaceNotice tone="danger" className="mt-2">Projector authorization is blocked. Recheck audience enrollment and recording rights.</WorkspaceNotice>}
+      {room.isError&&<WorkspaceNotice tone="attention" className="mt-2">Current facilitator or room access cannot be verified. Do not rely on previous counts or command states.</WorkspaceNotice>}
+      {room.isSuccess&&room.data.partial&&<WorkspaceNotice tone="attention" className="mt-2">Counts are partial because this room exceeds the bounded summary.</WorkspaceNotice>}
       <p className="mt-2 text-xs text-muted-foreground">
         Device activity is an estimate, not attendance, proof of watching, or delivery confirmation.
         Projector command acknowledgements are separate from confirmed playback observations.
@@ -125,9 +108,6 @@ export function ClassroomFacilitatorConsole({
         disabled={room.isFetching}
         onClick={()=>{void room.refetch();void projector.refetch();}}>Recheck classroom health</Button>
     </section>
-    {room.isSuccess && room.data?.partial && <p role="status" className="text-xs text-muted-foreground">
-      This room exceeded the bounded live summary. The counts shown are partial.
-    </p>}
     <p className="text-xs text-muted-foreground">
       Paired devices and activity heartbeats are observational, never verified
       physical attendance, video consumption, academic grades or completion.
@@ -138,9 +118,7 @@ export function ClassroomFacilitatorConsole({
         setLastLocalCommand(kind+" "+(status==="accepted"?"accepted":"refused"));
         if(status==="failed")setFailedCommands(count=>count+1);
       }}/>}
-    {room.isSuccess && room.data && !isLive && <p role="status" className="border border-border p-4 text-sm">
-      This classroom is {currentState}. New prompts and playback controls are closed.
-    </p>}
+    {room.isSuccess && room.data && !isLive && <WorkspaceNotice>This classroom is {currentState}. New prompts and playback controls are closed.</WorkspaceNotice>}
     {isLive && <section className="border border-border bg-card p-4" aria-label="Release an activity">
       <h5 className="font-semibold">Ask the room a question</h5>
       <p className="mt-1 text-xs text-muted-foreground">
@@ -182,9 +160,7 @@ export function ClassroomFacilitatorConsole({
     </section>}
     {room.isSuccess && room.data && <section className="border border-border bg-card p-4" aria-label="Classroom activity results">
       <h5 className="font-semibold">Released activities</h5>
-      {!room.data.releases.length && <p className="mt-2 text-sm text-muted-foreground">
-        No classroom activities have been released.
-      </p>}
+      {!room.data.releases.length && <EmptyState className="mt-2" title="No classroom activities have been released."/>}
       {room.data.releases.map(activity => <article key={activity.id}
         className="mt-3 border-t border-border pt-3">
         <p className="font-medium">{activity.prompt}</p>

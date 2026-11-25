@@ -48,7 +48,9 @@ check("WS2 Class lifecycle retains transactional terminal and source validation"
   const s=read("src/modules/classes/native-class-lifecycle.functions.ts");
   required(s.includes('canonicalClasses')&&s.includes('for("update")'),
     "Missing parent Class row lock for seat mutation");
-  required(s.includes("assertNativeClassAttemptForExit") &&
+  const attempts=read("src/modules/classes/native-class-attempt.server.ts");
+  required(s.includes("withdrawNativeClassAttempts") &&
+           attempts.includes("assertNativeClassAttemptForExit") &&
            s.includes("assertCurrentNativeClassLearnerForMutation"),
     "Missing exact linked attempt/current learner verification");
 });
@@ -158,11 +160,13 @@ check("WS3 governed completion and WS6 reporting routes are indexed, no duplicat
   for(const url of [
     "/canonical/completion-evidence-reviews",
     "/canonical/noncredit/completion",
-    "/reports/class/$classId",
+    "/class_/$classId",
     "/reports/",
   ])required(urls.has(url),"Missing governed completion/reporting route "+url);
+  required(entries.some(x=>x.route==="/class_/$classId" && x.file==="src/routes/class_.$classId.tsx"),
+    "Class evidence drilldown must be indexed at its canonical workspace route");
   const detail=read("src/routes/class_.$classId.tsx");
-  required(detail.includes('NativeClassReportPanel') &&
+  required(detail.includes('workspace.tab==="reports"') && detail.includes('NativeClassReportPanel') &&
     detail.includes('<NativeClassReportPanel classId={workspace.classId}/>'),
     "Class Reports tab must reuse the WS6 verified evidence panel inside /class");
   required(read("src/components/shell/workspace-navigation.registry.ts")

@@ -16,10 +16,10 @@ export function FormSection({ title, description, children, className, columns =
   const id = useId();
   const descriptionId = useId();
   return <section aria-labelledby={id} aria-describedby={description ? descriptionId : undefined}
-    data-form-section="" className={cn("border-t border-border/60 pt-6 first:border-t-0 first:pt-0", className)}>
-    <h2 id={id} className="text-lg font-semibold">{title}</h2>
-    {description && <div id={descriptionId} className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</div>}
-    <div className={cn("mt-4 grid gap-5", columns === 1 ? "grid-cols-1" : "sm:grid-cols-2")}>{children}</div>
+    data-form-section="" className={cn("min-w-0 border-t border-border/60 pt-6 first:border-t-0 first:pt-0", className)}>
+    <h2 id={id} className="text-lg font-semibold leading-6 [overflow-wrap:anywhere]">{title}</h2>
+    {description && <div id={descriptionId} className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">{description}</div>}
+    <div className={cn("mt-4 grid min-w-0 grid-cols-1 gap-5 [&>*]:min-w-0", columns === 2 && "sm:grid-cols-2")}>{children}</div>
   </section>;
 }
 

@@ -1,26 +1,35 @@
+import {useStandaloneProviderReportFilters} from "@/hooks/use-provider-report-filters";
+import {providerDeliveryQueryKey} from "@/domain/report-filter-state";
+import {hasGeographyFilterOption} from "@/domain/geographic-reporting";
+import {ReportGeographyFilter} from "@/components/workspace/report-geography-filter";
+import {useReportGeography} from "@/hooks/use-report-geography";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import {useQuery} from "@tanstack/react-query";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import { ReportChart } from "@/components/workspace/report-chart";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
 
 /** Exact authorized operating-organization aggregation. Publishing a national
  * report requires separate network membership authority and disclosure review. */
 export function NoncreditNetworkReportPanel(){
-  const report=useQuery({
-    queryKey:["noncredit-operator-network-report"],
-    queryFn:()=>getNoncreditOperatorNetworkSummary(),
-    retry:false,staleTime:30_000,
-  });
-  const data=report.data;
+  const scope=usePrivateReportScope();
+  const controller=useStandaloneProviderReportFilters(scope);
+  const geography=controller.filters.geography;
+  const options=useReportGeography(scope,"current");
+  const ready=!geography||!!options.data&&hasGeographyFilterOption(geography,options.data);
+  const {query:report,data}=usePrivateReportQuery({scope,key:providerDeliveryQueryKey(geography),enabled:ready,read:()=>getNoncreditOperatorNetworkSummary({data:{geography}})});
   const totals=data?.totals;
+  if(scope===null)return null;
   return <section className="mt-7 border border-border bg-card p-5" aria-label="Noncredit program impact">
     <h2 className="font-serif text-2xl">Program participation & outcomes</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Across enrollment releases owned by the current authorized operating organization,
       including authorized Sites. This is not a national cross-organization report.
     </p>
-    {report.isPending&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
-    {report.isError&&<p role="alert" className="mt-4 text-sm">
+    <div className="mt-4"><ReportGeographyFilter value={geography} options={options.data??[]} onChange={value=>controller.dispatch({type:"geography",value})} basis="current" loading={options.query.isFetching} error={options.query.isError}/></div>
+    {!ready&&<p role="status" className="mt-4 text-sm text-muted-foreground">Selected geography must be verified before displaying report results. <Button type="button" size="sm" variant="outline" onClick={()=>controller.dispatch({type:"geography",value:""})}>Clear geography</Button> <Button type="button" size="sm" variant="outline" onClick={()=>void options.query.refetch()}>Retry geography options</Button></p>}
+    {ready&&(report.isPending||report.isFetching)&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
+    {ready&&report.isError&&<p role="alert" className="mt-4 text-sm">
       Reporting is unavailable or its bounded dataset needs partitioning.
       <Button variant="ghost" type="button" className="ml-2 text-primary underline" onClick={()=>void report.refetch()}>Retry</Button>
     </p>}
@@ -39,6 +48,11 @@ export function NoncreditNetworkReportPanel(){
             <dd className="mt-2 font-serif text-3xl tabular-nums">{value.toLocaleString()}</dd>
           </div>)}
       </dl>
+      {data!.sites.length>0&&data!.sites.length<=20&&<div className="mt-5">
+        <ReportChart spec={{title:"Registrations by delivery Site",description:"Authorized Site totals, not a national cross-organization report.",
+          valueLabel:"Registrations",kind:"comparison",format:"count",
+          points:data!.sites.map(site=>({id:site.siteId,label:site.siteName,value:site.registrations}))}}/>
+      </div>}
       <div className="mt-5 border border-border">
         <Table scrollLabel="Site participation totals" aria-label="Site participation totals" className="text-left"><TableCaption className="sr-only">Site participation totals</TableCaption>
           <TableHeader><TableRow className="border-b border-border bg-muted/30">
@@ -95,8 +109,8 @@ export function NoncreditNetworkReportPanel(){
           </Table>
         </div>
       </section>}
-      <p className="mt-3 text-xs leading-6 text-muted-foreground">{report.data?.notice}</p>
-      <p className="mt-2 text-xs text-muted-foreground">Public-safe site totals suppress counts below {report.data?.publicationSafe.minimumCell}. The exact figures above are private to the authorized operator.</p>
+      <p className="mt-3 text-xs leading-6 text-muted-foreground">{data?.notice}</p>
+      <p className="mt-2 text-xs text-muted-foreground">Public-safe site totals suppress counts below {data?.publicationSafe.minimumCell}. The exact figures above are private to the authorized operator.</p>
     </>}
   </section>;
 }

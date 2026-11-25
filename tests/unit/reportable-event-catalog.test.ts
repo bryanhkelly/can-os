@@ -58,6 +58,16 @@ describe("governed event catalog", () => {
     expect(() => validateReportableEvent({...input, payload:{...payload, email:"private@example.org"}}))
       .toThrow();
   });
+  it("rejects raw generated content and campaign recipient identities",()=>{
+    const base={...input,aggregateType:"site_intelligence_version",source:{...input.source,kind:"site_intelligence_version"},eventType:EventTypes.SiteIntelligenceProcessingCompleted};
+    const valid={attempt:1,outputId:room};
+    expect(validateReportableEvent({...base,payload:valid})).toEqual(valid);
+    expect(()=>validateReportableEvent({...base,payload:{...valid,output:"Private text"}})).toThrow();
+    const campaign={...input,aggregateType:"site_campaign",source:{...input.source,kind:"site_campaign"},eventType:EventTypes.SiteCampaignQueued};
+    const queue={engagementId:site,linkId:room,recipientCount:10,scheduledAt:input.occurredAt.toISOString()};
+    expect(validateReportableEvent({...campaign,payload:queue})).toEqual(queue);
+    expect(()=>validateReportableEvent({...campaign,payload:{...queue,email:"private@example.org"}})).toThrow();
+  });
   it("does not write when validation fails", async () => {
     const insert = vi.fn();
     await expect(emitReportableEvent({insert} as never,

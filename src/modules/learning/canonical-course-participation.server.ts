@@ -1,15 +1,15 @@
-import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   learnerCourseAttempts, enrollments, learnerProfiles, noncreditRegistrations,
   noncreditTrainingVersions, programDeployments, deploymentOfferingAdoptions,
   courseVersions, offeringVersions, canonicalClassEnrollments, canonicalClasses,
-  catalogSites, educationOperationSites, siteOrganizationRoles, classroomDeploymentSites,
-  educationOperations, educationOperationOrganizationRoles, offerings, canonicalOfferingCourses,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { resolveCanonicalCourseParticipation, type CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
 import { authorizeNativeClassAttempt } from "@/domain/native-class-enrollment";
+import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
+import { studentSiteScope } from "@/domain/student-site-scope";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -20,6 +20,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  */
 export async function authorizeCanonicalCourseAttempt(
   tx: Tx, context: CommandContext, courseAttemptId: string, allowCompletedHistory = false,
+  expectedClassEnrollmentId?: string,
 ): Promise<CanonicalParticipationAccess> {
   if (!context.actorPersonId ||
       !["learner", "student"].includes(context.role ?? "")) {
@@ -29,16 +30,8 @@ export async function authorizeCanonicalCourseAttempt(
   const [attempt] = await tx.select().from(learnerCourseAttempts)
     .where(eq(learnerCourseAttempts.id,courseAttemptId)).limit(1);
   if (!attempt) throw new AuthorizationError("course participation");
-  const [deployment] = await tx.select().from(programDeployments)
-    .where(eq(programDeployments.id,attempt.deploymentId)).limit(1);
-  const [adoption] = await tx.select().from(deploymentOfferingAdoptions)
-    .where(and(eq(deploymentOfferingAdoptions.id,attempt.adoptionId),
-      eq(deploymentOfferingAdoptions.deploymentId,attempt.deploymentId),
-      eq(deploymentOfferingAdoptions.offeringVersionId,attempt.offeringVersionId))).limit(1);
-  const [course] = await tx.select().from(courseVersions)
-    .where(eq(courseVersions.id,attempt.courseVersionId)).limit(1);
-  const [offering] = await tx.select().from(offeringVersions)
-    .where(eq(offeringVersions.id,attempt.offeringVersionId)).limit(1);
+  if(expectedClassEnrollmentId!==undefined && attempt.classEnrollmentId!==expectedClassEnrollmentId)
+    throw new AuthorizationError("exact requested Class Enrollment");
   // Native Class enrollments are the authoritative learner source, never
   // inferred from an academic Section, noncredit registration or marketing Site.
   if (attempt.classEnrollmentId) {
@@ -51,77 +44,31 @@ export async function authorizeCanonicalCourseAttempt(
     if (!classInstance || !classEnrollment) {
       throw new AuthorizationError("current native Class Enrollment");
     }
-    if(!deployment || !adoption || !course || !offering){
-      throw new AuthorizationError("current native Course publication and Deployment");
+    if(context.role==="student"){
+      const membership=studentSiteScope(context);
+      if(!membership || membership.siteId!==classInstance.siteId ||
+         membership.organizationId!==classInstance.operatingOrganizationId)
+        throw new AuthorizationError("own current student Class Site");
     }
+    // One server-owned publication/operation/Site authority for discovery,
+    // enrollment and instruction. History relaxes only the Class state.
     const now=new Date();
-    const [operator] = await tx.select({id:educationOperationOrganizationRoles.id})
-      .from(educationOperationOrganizationRoles)
-      .innerJoin(educationOperations,eq(educationOperations.id,educationOperationOrganizationRoles.operationId))
-      .where(and(
-        eq(educationOperationOrganizationRoles.operationId,deployment.operationId),
-        eq(educationOperationOrganizationRoles.organizationId,classInstance.operatingOrganizationId),
-        eq(educationOperationOrganizationRoles.roleCode,"operator"),
-        eq(educationOperationOrganizationRoles.status,"approved"),
-        lte(educationOperationOrganizationRoles.validFrom,now),
-        or(isNull(educationOperationOrganizationRoles.validThrough),
-          gt(educationOperationOrganizationRoles.validThrough,now)),
-        eq(educationOperations.status,"active"),
-      )).limit(1);
-    if(!operator)throw new AuthorizationError("current operating Organization authority");
-    const [publishedProduct]=await tx.select({courseVersionId:canonicalOfferingCourses.courseVersionId})
-      .from(canonicalOfferingCourses)
-      .innerJoin(offerings,eq(offerings.id,offering.offeringId))
-      .where(and(
-        eq(canonicalOfferingCourses.offeringVersionId,offering.id),
-        eq(canonicalOfferingCourses.courseVersionId,course.id),
-        eq(offerings.id,deployment.offeringId),
-        eq(offerings.status,"active"),
-      )).limit(1);
-    if(!publishedProduct)throw new AuthorizationError("currently authorized publisher Course contents");
-    // Revoked Site authority must close native instructional access, even
-    // when the learner has a previously issued Course Attempt.
-    if (classInstance.siteId) {
-      const [site] = await tx.select({id:catalogSites.id}).from(catalogSites)
-        .innerJoin(educationOperationSites,and(
-          eq(educationOperationSites.siteId,catalogSites.id),
-          eq(educationOperationSites.operationId,deployment.operationId),
-          lte(educationOperationSites.validFrom,now),
-          or(isNull(educationOperationSites.validThrough),
-            gt(educationOperationSites.validThrough,now)),
-        ))
-        .innerJoin(siteOrganizationRoles,and(
-          eq(siteOrganizationRoles.siteId,catalogSites.id),
-          eq(siteOrganizationRoles.organizationId,classInstance.operatingOrganizationId),
-          inArray(siteOrganizationRoles.roleCode,["operator","host"]),
-          lte(siteOrganizationRoles.validFrom,now),
-          or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
-        ))
-        .where(and(eq(catalogSites.id,classInstance.siteId),eq(catalogSites.status,"active")))
-        .limit(1);
-      if(!site)throw new AuthorizationError("currently authorized Class Site");
-      if(classInstance.deliveryMode!=="self_paced"){
-        const [placement]=await tx.select({id:classroomDeploymentSites.id})
-          .from(classroomDeploymentSites)
-          .where(and(
-            eq(classroomDeploymentSites.deploymentId,classInstance.deploymentId),
-            eq(classroomDeploymentSites.siteId,classInstance.siteId),
-          )).limit(1);
-        if(!placement)throw new AuthorizationError("current Class Site placement");
-      }
-    }
+    const current=await currentClassAuthority(tx,classInstance.id,now,{allowCompletedHistory});
+    if(current.deploymentId!==classInstance.deploymentId || current.adoptionId!==classInstance.adoptionId ||
+       current.offeringVersionId!==classInstance.offeringVersionId || current.courseVersionId!==classInstance.courseVersionId ||
+       current.operatingOrganizationId!==classInstance.operatingOrganizationId || current.siteId!==classInstance.siteId ||
+       current.classState!==classInstance.state || current.deliveryMode!==classInstance.deliveryMode)
+      throw new AuthorizationError("unchanged native Class authority");
     const accepted=authorizeNativeClassAttempt({
       actorPersonId:context.actorPersonId,attempt,classInstance,
       enrollment:classEnrollment,
-      authority:deployment&&adoption&&course&&offering?{
-        deploymentState:deployment.status,
-        adoptionState:adoption.approvalStatus,
-        adoptionValidFrom:adoption.validFrom,
-        adoptionValidThrough:adoption.validThrough,
-        coursePublished:course.lifecycle==="published"&&course.publishedAt!==null,
-        offeringPublished:offering.lifecycle==="published"&&offering.publishedAt!==null,
-      }:null,
-      now:new Date(),historicalRead:allowCompletedHistory,
+      authority:{
+        deploymentState:"active",adoptionState:"approved",
+        adoptionValidFrom:current.adoptionValidFrom,
+        adoptionValidThrough:current.adoptionValidThrough,
+        coursePublished:true,offeringPublished:true,
+      },
+      now,historicalRead:allowCompletedHistory,
     });
     return {
       courseAttemptId:accepted.courseAttemptId,
@@ -131,6 +78,16 @@ export async function authorizeCanonicalCourseAttempt(
       noncreditRegistrationId:null,
     };
   }
+  const [deployment] = await tx.select().from(programDeployments)
+    .where(eq(programDeployments.id,attempt.deploymentId)).limit(1);
+  const [adoption] = await tx.select().from(deploymentOfferingAdoptions)
+    .where(and(eq(deploymentOfferingAdoptions.id,attempt.adoptionId),
+      eq(deploymentOfferingAdoptions.deploymentId,attempt.deploymentId),
+      eq(deploymentOfferingAdoptions.offeringVersionId,attempt.offeringVersionId))).limit(1);
+  const [course] = await tx.select().from(courseVersions)
+    .where(eq(courseVersions.id,attempt.courseVersionId)).limit(1);
+  const [offering] = await tx.select().from(offeringVersions)
+    .where(eq(offeringVersions.id,attempt.offeringVersionId)).limit(1);
   let enrollment: {id:string;deploymentId:string;learnerPersonId:string;status:"pending"|"active"|"completed"|"withdrawn"|"cancelled"} | null=null;
   let registration: typeof noncreditRegistrations.$inferSelect | null=null;
   let training: typeof noncreditTrainingVersions.$inferSelect | null=null;

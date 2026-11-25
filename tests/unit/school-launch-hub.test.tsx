@@ -1,3 +1,4 @@
+import { encodeUuidForPath } from "@/domain/opaque-url-id";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
@@ -14,7 +15,7 @@ describe("single V6.1 Site Launch Studio", () => {
     expect(html).toContain("Introduce");
     expect(html).toContain("Prepare");
     expect(html).toContain("Open");
-    expect(html).toContain("/launch/site-preview?siteId="+site.id);
+    expect(html).toContain("/launch/site-preview?siteId="+encodeUuidForPath(site.id));
     expect(html).toContain("Overview content");
     expect(html).not.toContain("Launch Hub");
   });

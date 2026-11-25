@@ -3,6 +3,8 @@ import {useInfiniteQuery,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import {WorkspaceShell} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
+import {HistoricalClassWork} from "@/components/learning/HistoricalClassWork";
+import {getGuardianNativeHistoricalWork} from "@/modules/classes/guardian-historical-class-work.functions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -221,6 +223,8 @@ function GuardianClassHistoryCard({item,onChanged}:{
   <h3 className="font-serif text-lg">{item.title}</h3>
   <p className="mt-2 text-sm">Status: {item.status}</p>
   {item.status==="active"&&<>
+   <HistoricalClassWork key={item.classEnrollmentId} queryScope={["guardian-historical-class-work",item.classEnrollmentId]}
+    loadPage={beforeId=>getGuardianNativeHistoricalWork({data:{classEnrollmentId:item.classEnrollmentId,beforeId}})}/>
    {!confirm?<Button variant="outline" className="mt-3"
     onClick={()=>setConfirm(true)}>Withdraw learner</Button>:
    <div className="mt-3 border border-border p-3">

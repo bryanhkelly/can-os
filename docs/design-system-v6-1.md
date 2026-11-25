@@ -730,3 +730,49 @@ Verification requires **all** of source/lint, TypeScript, focused
 unit/Storybook interaction tests, and visual inspection on desktop/mobile
 (including active, disabled, checked, keyboard focus and overflow states).
 A green source/lint result alone is not a completed visual audit.
+
+## Governed selection patterns and Storybook review
+
+Use `SelectionCard` for choices requiring explanatory context (its compact variant for secondary choices), `SelectionChip` standard for curated topics, and compact for dense taxonomies. Chips are controlled toggles with native Button focus and aria-pressed; the feature owns limits, validation and persistence. Use Checkbox/Radio for conventional form choices and StatusBadge for noninteractive status. Do not recreate chip styling in feature pages.
+
+Compact chips use square corners, 28px minimum height, 12px text, 8px horizontal padding and 6px group gaps. Standard chips use 36px minimum height and 14px text. Both use semantic tokens and reserve selection-icon space to avoid layout shifts. Storybook: Workspace / Selection Chip and Workspace / Selection Patterns. Launch Studio / Shape / Audiences uses the production AudienceIntentFieldsV61 component with offline fixtures, not a replica of its field markup. Navigation and writes are disabled in that review harness.
+
+Review light, dark and validated Site brand themes at 390, 768, 1024 and 1440px. Capture empty, typical, dense, disabled and error states where relevant. Run npm run build-storybook, npm run test:storybook and npm run design:inventory; use the existing npm run test:visual when Chromatic is configured. A committed story is not proof of a passing test or accepted visual baseline. New page stories must compose production presentation components with deterministic fixtures and must not call live Site services.
+
+## Governed data visualization foundation (V6.1)
+
+Data visualization is a shared application-pattern capability under `src/components/workspace/`, not a parallel theme or a feature-specific chart library. `ReportChart`, `ReportDocumentView`, `ReportMetricComparison` and `ReportDateFilter` are the public presentation contracts; Recharts is private to `report-chart-plot.tsx`. No direct library or adapter imports in feature code.
+
+- Neutral analytical marks use `--report-series-1..4` in the canonical light/dark theme. All four marks contrast at least 3:1 against both canvas and card, and categorical charts distinguish solid, diagonal, dot and crosshatch textures plus textual legends and full tables. Site branding never changes analytical series identity or assigns operational status. Series positions are stable for the supplied ordered categories; use the same ordered metric IDs for repeated comparisons.
+- The single neutral series is for bars, trends and nested stage comparisons. Stacks and donuts require reconciled disjoint categories. Funnel stage bars require source-proven nesting. No gradient, decorative status color, animation, inferred conversion or missing-value imputation. Percent plots use a fixed 0–100 scale; compact axis labels never replace exact formatted values.
+- Reuse DashboardPanel editorial headings (Instrument Serif), DM Sans axes and values, square marks/panels, shared EmptyState/WorkspaceNotice/QueryState, Table, and a single read-only tooltip surface. The plot adapts to measured container width; duplicate display names retain distinct IDs. Tooltip/plot are supplementary pointer visuals. Legends, source explanations and exact tables remain available without pointer or chart JavaScript. Missing values and measured zeros stay distinct.
+- Interactive views retain the accessible table if plot loading/rendering fails. Print presentation and browser print use tables rather than relying on a color/SVG rendering or lazy module. Print review does not issue a PDF, snapshot or publication approval. No client-side learner detail or authorization change.
+- Storybook: **V6.1 foundations / Data Visualization / Charts**, **Period comparison**, and **V6.1 templates / Reporting / Impact review**. Review at 390, 768, 1024, 1440px in light, dark and validated Site themes, including four-series texture, dense, missing, zero, empty, invalid, long-label, large-number and print cases. Actual browser/visual acceptance is required; the existence of a story is not acceptance. Sequential color scales are deferred until an actual governed heatmap or choropleth contract exists; do not repurpose category colors as magnitude gradients.
+
+Nested dark theme scopes explicitly resolve analytical axis, grid, separator and hover aliases against their active semantic tokens. Print scopes use the canonical light reading palette and allow long tables to paginate with repeated headers. Explicit print review includes metric definitions expanded. Browser print of an interactive view is not a substitute for the explicit print review or a disclosure-approved report artifact.
+
+### Analytical contracts and reusable presentation
+
+- Use `report-value-format.ts` for report numbers. Counts require nonnegative safe integers; percentages are 0–100; USD values are dollars (not cents); hours, minutes and ratio values retain source units. Compact notation is plot-only. Invalid/unavailable values are not zero. Percentage-point changes and relative changes are different; a zero prior denominator has no relative change.
+- Categorical charts can declare a complete, stable `seriesOrder` family (up to four IDs), retaining reserved slots across filtering/reordering. Unknown or duplicate family identities fail validation. Unconfigured legacy charts retain positional styling; do not claim cross-chart stability without an explicit family. Numeric comparison charts may declare a common `axisMax` only when it cannot clip any authorized mark; percentage axes always use 0–100.
+- `ReportMetricCard` composes StatCard and accepts source-provided freshness and exact metric definition metadata. `ReportTargetAttainment` composes DashboardProgress with neutral analytical ink; actual attainment can exceed 100%, but the visual bar is capped and labeled. `ReportRankedComparison` composes DashboardPanel, Table and Button, preserves unavailable values, uses one shared scale and emits only IDs from its supplied bounded authorized rows.
+- Provider Site comparison filters the same already-authorized cohort rows, cards and chart. It does not navigate or acquire additional permission. An unavailable prior selection no longer silently broadens the report. Cross-organization drilldown still requires an independently authorized reader and source-defined dimensions. Never compute distinct-person totals by adding Site aggregates.
+- Storybook: V6.1 foundations / Data Visualization / Analytical components, Reserved series slots and Fixed shared axis. Browser and screenshot acceptance remain mandatory.
+
+### Independent rendered-output evidence (release gate)
+
+The strict coverage command `node scripts/check-v61-coverage.mjs --strict`
+requires one reviewed record per independently rendered source in
+`docs/verification/v61-visual-evidence.json`. Bind each record to the source
+SHA-256 and to three distinct screenshot files under
+`docs/verification/screenshots/`. Each screenshot record contains
+`viewport`, `path`, and `sha256`. Capture mobile at 390 px, tablet at 768 px,
+and desktop at 1440 px, with device scale factor 1. Keep screenshots and source
+hashes current; a change to reviewed source or a screenshot invalidates the
+record. Record the actual reviewer and review timestamp only after inspection.
+
+The validator checks PNG headers, exact byte hashes, unique viewport entries
+and path containment. It does not decode all image content, authenticate the
+reviewer, prove correct rendering, or replace accessibility and authenticated
+journey acceptance. Use actual browser evidence; never populate the manifest
+with synthetic fixtures or placeholder screenshots.

@@ -18,9 +18,27 @@ export const REPORTING_DOMAIN_COVERAGE: readonly ReportingDomainCoverage[] = [
   {
     domain:"launch_studio",owner:"Site setup and Launch Studio",
     state:"instrumented_subset",
-    instrumentedEvents:[EventTypes.SiteInformationUpdated],
-    missingLifecycleExamples:["Program/Solution activation", "readiness approval",
+    instrumentedEvents:[EventTypes.SiteInformationUpdated,EventTypes.SiteProgramLaunchRecorded],
+    missingLifecycleExamples:["Native deployment/Solution activation", "readiness approval",
       "Site opening and compliance decisions"],
+  },
+  {
+    domain:"site_intelligence",owner:"Site Intelligence processing",
+    state:"instrumented_subset",
+    instrumentedEvents:[EventTypes.SiteIntelligenceProcessingRequested,EventTypes.SiteIntelligenceProcessingCompleted,EventTypes.SiteIntelligenceProcessingFailed,EventTypes.SiteIntelligencePackageReused],
+    missingLifecycleExamples:["Expired processing lease reconciliation","Provider usage and cost reconciliation","Exact generated version adoption by consumers"],
+  },
+  {
+    domain:"website_brand",owner:"Website, Brand and Program marketing publication",
+    state:"instrumented_subset",
+    instrumentedEvents:[EventTypes.SiteBrandVersionSaved,EventTypes.SiteLocalWebsiteDraftSaved,EventTypes.SiteLocalWebsiteContentPublished,EventTypes.SiteLocalWebsiteContentReviewRequested,EventTypes.SitePublished,EventTypes.SiteUnpublished,EventTypes.AcademicProgramMarketingPublished,EventTypes.AcademicProgramMarketingUnpublished],
+    missingLifecycleExamples:["Website release manifest provenance","Public page observation and referrer coverage","Preview link lifecycle"],
+  },
+  {
+    domain:"campaign_delivery",owner:"Native engagement campaigns",
+    state:"instrumented_subset",
+    instrumentedEvents:[EventTypes.SiteCampaignQueued,EventTypes.SiteCampaignCancelled],
+    missingLifecycleExamples:["Delivery settlement and receipt events","Organization, Program and platform-owned campaigns","Consent and suppression history"],
   },
   {
     domain:"introduce",owner:"Marketing Packages and Interest Events",
@@ -42,6 +60,15 @@ export const REPORTING_DOMAIN_COVERAGE: readonly ReportingDomainCoverage[] = [
       "verified conversion attribution"],
   },
   {
+    domain:"go_link_engagement",owner:"Go Links and canonical enrollment attribution",
+    state:"domain_metrics_only",instrumentedEvents:[],
+    missingLifecycleExamples:[
+      "verified source-specific outcomes for Class, enrichment and public interest",
+      "consented person-level touchpoint reconciliation",
+      "cross-channel deduplicated reach",
+    ],
+  },
+  {
     domain:"facilities",owner:"Site room operations",
     state:"instrumented_subset",
     instrumentedEvents:[EventTypes.SiteRoomCreated,EventTypes.SiteRoomUpdated,
@@ -51,15 +78,15 @@ export const REPORTING_DOMAIN_COVERAGE: readonly ReportingDomainCoverage[] = [
   },
   {
     domain:"noncredit_learning",owner:"Existing noncredit participation and completion authority",
-    state:"domain_metrics_only",instrumentedEvents:[],
+    state:"instrumented_subset",instrumentedEvents:[EventTypes.NoncreditRegistrationLifecycleRecorded],
     missingLifecycleExamples:["participant identity reconciliation",
       "verified attendance decision", "completion correction and unique participant reporting"],
   },
   {
     domain:"native_classes",owner:"Existing Class and Classroom Connect authority",
-    state:"domain_metrics_only",instrumentedEvents:[],
+    state:"instrumented_subset",instrumentedEvents:[EventTypes.NativeClassEnrollmentLifecycleRecorded,EventTypes.NativeClassSessionLifecycleRecorded],
     missingLifecycleExamples:["Class/session attendance decisions",
-      "learning assessments", "transfers and withdrawals"],
+      "learning assessments", "completion and award decisions", "legacy placement and session closure coverage"],
   },
   {
     domain:"experiences",owner:"Experience offerings and enrollments",

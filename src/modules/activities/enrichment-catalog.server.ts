@@ -1,5 +1,6 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
+import { goLikeContainsLiteral } from "@/domain/go-link-search";
 import * as s from "@/db/schema";
 import { readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { canSubmitEnrichmentRegistration, readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
@@ -17,7 +18,7 @@ const extended = ["summer_enrichment", "summer_program", "after_school_enrichmen
  * Public-safe program catalog: published/open noncredit offerings only.
  * No identity, private staffing details, student data, or draft schedules.
  */
-export async function readEnrichmentCatalog(siteId?: string, executor: Pick<typeof db, "select"> = db) {
+export async function readEnrichmentCatalog(siteId?: string, executor: Pick<typeof db, "select"> = db, seasonId?:string, term?:string) {
   const rows = await executor.select({
     seasonId: s.activitySeasons.id, name: s.activities.name,
     seasonName: s.activitySeasons.name,
@@ -45,12 +46,14 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
       // Site filtering occurs before the 200-result limit; never filter a
       // global page in memory and silently omit a smaller site's offerings.
       siteId ? eq(s.activities.siteId, siteId) : undefined,
+      seasonId ? eq(s.activitySeasons.id,seasonId) : undefined,
+      term ? ilike(s.activities.name,goLikeContainsLiteral(term)) : undefined,
       eq(s.programs.organizationId, s.sites.organizationId),
       inArray(s.programs.type, extended),
       eq(s.programs.status, "active"),
       eq(s.activities.status, "active"),
       eq(s.activitySeasons.status, "registration"),
-    )).orderBy(asc(s.activitySeasons.startsOn)).limit(200);
+    )).orderBy(asc(s.activitySeasons.startsOn)).limit(seasonId?1:200);
 
   const now = new Date();
   const approvals = await readExtendedSeasonApprovals(rows.map(row => ({
@@ -128,7 +131,7 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
       (!row.registrationClosesAt || now <= row.registrationClosesAt);
     return {
     seasonId: row.seasonId, name: row.name, seasonName: row.seasonName,
-    programName: row.programName, programType: row.programType,
+    programId: row.programId, programName: row.programName, programType: row.programType,
     siteName: row.siteName, startsOn: row.startsOn, endsOn: row.endsOn,
     capacity: row.capacity, seatsRemaining,
     packages: packageAvailability,

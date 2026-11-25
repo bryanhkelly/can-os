@@ -62,3 +62,28 @@ describe("native /class recorded-video upload contract",()=>{
     expect(storage).toContain('signPrivateObjectUrl({');
   });
 });
+
+describe("canonical recording asset publication handoff",()=>{
+  it("uses existing asset review records, exact receipt and current rights evidence",()=>{
+    const service=read("src/modules/learning/recorded-video-review.functions.ts");
+    expect(service).toContain("assertTrackProvider(tx,actor");
+    expect(service).toContain("author===actor.actorPersonId");
+    expect(service).toContain("reviewRequestedAt");
+    expect(service).toContain("tx.insert(publishedAssetReviews)");
+    expect(service).toContain("hasExactReviewReceipt");
+    expect(service).toContain("hashPrivateObjectSha256");
+    expect(service).toContain('eq(evidenceDocuments.owningOrganizationId,organizationId)');
+    expect(service).toContain('review.reviewerPersonId===asset.author');
+    expect(service).toContain('review.decision!=="approved"');
+    expect(service).toContain('lifecycle:"published",publishedAt:new Date()');
+    expect(service).not.toContain("tx.insert(contentAssets)");
+  });
+  it("connects existing creator upload to independent reviewer workspace and player",()=>{
+    expect(read("src/components/learning/ProviderVideoUploadForm.tsx")).toContain("submitRecordedVideoForReview");
+    expect(read("src/components/learning/ProviderInstructionReviews.tsx")).toContain("<RecordedVideoReviewPanel");
+    const panel=read("src/components/learning/RecordedVideoReviewPanel.tsx");
+    expect(panel).toContain("<ClassVideoPlayer");
+    expect(panel).toContain("workspaceSessionIdentity");
+    expect(panel).toContain("publishReviewedRecordedVideo");
+  });
+});

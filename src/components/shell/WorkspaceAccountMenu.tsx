@@ -3,7 +3,7 @@ import { UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ContextTray, WorkspaceNotice } from "@/components/workspace";
 
-const focusRingClass = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+import { focusRingClasses } from "@/components/ui/control-styles";
 
 /** Shared account trigger for the ordinary workspace and every Launch Studio shell. */
 export function WorkspaceAccountTrigger({ member, accountOpen, onOpenAccount }: {
@@ -36,13 +36,13 @@ export function WorkspaceAccountMenu({ member, accountOpen, onCloseAccount,
     <div className="space-y-2 text-sm">
       {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
       <Link to="/account" onClick={onCloseAccount}
-        className={`block p-3 font-semibold hover:bg-muted ${focusRingClass}`}>My CAN account</Link>
+        className={`block p-3 font-semibold hover:bg-muted ${focusRingClasses}`}>My CAN account</Link>
       <Link to="/profiles" onClick={onCloseAccount}
-        className={`block p-3 hover:bg-muted ${focusRingClass}`}>My profile</Link>
+        className={`block p-3 hover:bg-muted ${focusRingClasses}`}>My profile</Link>
       <Link to="/account/sessions" onClick={onCloseAccount}
-        className={`block p-3 hover:bg-muted ${focusRingClass}`}>Account sessions</Link>
+        className={`block p-3 hover:bg-muted ${focusRingClasses}`}>Account sessions</Link>
       {member?.role === "student" && <Link to="/student/settings" onClick={onCloseAccount}
-        className={`block p-3 hover:bg-muted ${focusRingClass}`}>Account settings</Link>}
+        className={`block p-3 hover:bg-muted ${focusRingClasses}`}>Account settings</Link>}
       <Button variant="ghost" size="sm" disabled={changing} onClick={onSignOut}
         className="w-full justify-start">Sign out</Button>
     </div>

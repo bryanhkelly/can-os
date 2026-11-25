@@ -10,7 +10,8 @@ type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Canonical Class active publication, operation, Site and placement authority.
  * Kept server-only so imported RPC entrypoints cannot expose the query. */
-export async function currentClassAuthority(tx:Tx,classId:string,now:Date){
+export async function currentClassAuthority(tx:Tx,classId:string,now:Date,options:{allowCompletedHistory?:boolean}={}){
+  if(!Number.isFinite(now.getTime()))throw new AuthorizationError("valid Class authority time");
   const [r]=await tx.select({
     classId:canonicalClasses.id,classTitle:canonicalClasses.title,
     classCapacity:canonicalClasses.capacity,
@@ -20,6 +21,8 @@ export async function currentClassAuthority(tx:Tx,classId:string,now:Date){
     courseVersionId:canonicalClasses.courseVersionId,
     siteId:canonicalClasses.siteId,deliveryMode:canonicalClasses.deliveryMode,
     operatingOrganizationId:canonicalClasses.operatingOrganizationId,
+    adoptionValidFrom:deploymentOfferingAdoptions.validFrom,
+    adoptionValidThrough:deploymentOfferingAdoptions.validThrough,
   }).from(canonicalClasses)
     .innerJoin(programDeployments,eq(programDeployments.id,canonicalClasses.deploymentId))
     .innerJoin(educationOperations,eq(educationOperations.id,programDeployments.operationId))
@@ -48,8 +51,9 @@ export async function currentClassAuthority(tx:Tx,classId:string,now:Date){
       lte(deploymentOfferingAdoptions.validFrom,now),
       or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
     )).limit(1);
-  if(!r || r.classState!=="active")throw new AuthorizationError("currently authorized Class");
-  if(!r.siteId)throw new AuthorizationError("active Class must have an authorized Site");
+  if(!r || (r.classState!=="active" && !(options.allowCompletedHistory===true && r.classState==="completed")))
+    throw new AuthorizationError("currently authorized Class");
+  if(!r.siteId)throw new AuthorizationError("Class must have an authorized Site");
   const [operator]=await tx.select({id:educationOperationOrganizationRoles.id})
     .from(educationOperationOrganizationRoles)
     .innerJoin(programDeployments,eq(programDeployments.operationId,educationOperationOrganizationRoles.operationId))

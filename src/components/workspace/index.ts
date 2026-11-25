@@ -32,3 +32,21 @@ export { MasterDetailWorkspace, MasterDetailListItem } from "./master-detail-wor
 export { DashboardProgress, DashboardTimeline, DashboardPreviewList, DashboardMediaTile } from "./dashboard-widgets";
 export type { TimelineEntry, DashboardPreviewItem } from "./dashboard-widgets";
 export { SelectionCard, type SelectionCardProps } from "./selection-card";
+
+export { SelectionChip, SelectionChipGroup, type SelectionChipProps } from "./selection-chip";
+
+export {ReportChart,type ReportPresentation} from "./report-chart";
+export type {ReportChartSpec} from "./report-chart-data";
+export {ReportDocumentView,type ReportDocument,type ReportBlock} from "./report-document";
+export {ReportDateFilter} from "./report-date-filter";
+
+export {ReportMetricComparison,type ReportComparisonItem} from "./report-period-comparison";
+
+export {ReportGeographyFilter} from "./report-geography-filter";
+
+export {ReportMetricCard,type ReportMetricItem} from "./report-metric-card";
+export {ReportTargetAttainment} from "./report-target-attainment";
+export {ReportRankedComparison,type ReportRankedRow} from "./report-ranked-comparison";
+
+export {ReportSiteFilter} from "./report-site-filter";
+export {ProviderReportFilterBar} from "./provider-report-filter-bar";

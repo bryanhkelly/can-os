@@ -1,6 +1,6 @@
-import {and,eq,gt,isNull,inArray} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray,isNotNull} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,programs,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
@@ -9,6 +9,8 @@ import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { authorizedProgramWhere } from "./authorized-program-query.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
+import { platformOwnerMayActAs } from "@/domain/platform-owner-delegation";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -36,6 +38,9 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   email:accessAccounts.emailNormalized,emailVerifiedAt:accessAccounts.emailVerifiedAt,
   accountPersonId:accessAccounts.personId,
   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
+  delegatedGrantId:accessSessions.delegatedGrantId,
+  delegatedMode:accessSessions.delegatedMode,
+  delegatedUntil:accessSessions.delegatedUntil,
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
@@ -87,17 +92,91 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
   catch { return rejectSession(request,"membership_unavailable"); }
  }
+ // A Platform Owner's actual grant remains active on the original session.
+ // The impersonated Person is an independently verified, expiring projection,
+ // never a browser-provided role or permanent membership transfer.
+ let effectiveGrant=activeGrant;
+ let effectiveGrants=grants;
+ let ownerDelegation: { mode:"view"|"act"; expiresAt:Date }|null=null;
+ // Expired delegation must not silently elevate a stale browser mutation.
+ // Show the owner in read-only mode until the explicit Return action clears it.
+ if(session.delegatedGrantId&&session.delegatedUntil&&session.delegatedUntil<=now){
+  const owner=await getVerifiedPlatformOwnerSession(request);
+  if(activeGrant.role!=="platform_owner"||activeGrant.id!==owner.grantId||
+     owner.delegatedGrantId!==session.delegatedGrantId || owner.delegatedUntil?.getTime()!==session.delegatedUntil.getTime())
+   return rejectSession(request,"membership_unavailable");
+  if(request.method!=="GET")throw new AuthorizationError("expired owner delegation: return to Platform Owner");
+  ownerDelegation={mode:"view",expiresAt:session.delegatedUntil};
+ }else if(session.delegatedGrantId){
+  const owner=await getVerifiedPlatformOwnerSession(request);
+  if(activeGrant.role!=="platform_owner"||activeGrant.id!==owner.grantId||
+     owner.delegatedGrantId!==session.delegatedGrantId || owner.delegatedMode!==session.delegatedMode ||
+     owner.delegatedUntil?.getTime()!==session.delegatedUntil?.getTime() ||
+     session.delegatedMode!=="view"&&session.delegatedMode!=="act"||
+     !session.delegatedUntil||session.delegatedUntil<=now)
+   return rejectSession(request,"membership_unavailable");
+  // View As never runs mutations, including privileged server functions.
+  if(session.delegatedMode==="view"&&request.method!=="GET")
+   throw new AuthorizationError("read-only owner delegation");
+  const [target]=await db.select({
+   accountId:accountPersonGrants.accountId,
+   personId:accountPersonGrants.personId,
+   role:accountPersonGrants.role,
+   email:accessAccounts.emailNormalized,
+   accountPersonId:accessAccounts.personId,
+  }).from(accountPersonGrants)
+   .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+   .where(and(eq(accountPersonGrants.id,session.delegatedGrantId),
+      eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false),
+      isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
+  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||isDemoAccountEmail(target.email)||
+     !target.accountPersonId||target.accountPersonId!==target.personId)
+   return rejectSession(request,"membership_unavailable");
+  try{await assertRawAccountPerson(target.accountId,target.personId);}
+  catch{return rejectSession(request,"membership_unavailable");}
+  const eligible=await readSessionGrants(target.accountId,target.email);
+  const exact=eligible.grants.find(grant=>grant.id===session.delegatedGrantId&&grant.active);
+  if(!exact)return rejectSession(request,"membership_unavailable");
+  if(session.delegatedMode==="act" && !platformOwnerMayActAs(exact.role))
+   throw new AuthorizationError("independent protected reviewer role");
+  effectiveGrant=exact;
+  effectiveGrants=eligible.grants;
+  ownerDelegation={mode:session.delegatedMode,expiresAt:session.delegatedUntil};
+ }
+ // A malformed Site membership must never expand into a different tenant.
+ if(effectiveGrant.siteId){
+  const [site]=await db.select({organizationId:schoolSites.organizationId}).from(schoolSites)
+   .where(eq(schoolSites.id,effectiveGrant.siteId)).limit(1);
+  if(!site||!effectiveGrant.organizationId||site.organizationId!==effectiveGrant.organizationId)
+   return rejectSession(request,"membership_unavailable");
+ }
  const context=resolveAccessContext({
-  accountId:activeGrant.accountId,
-  sessionId:session.id,activeGrantId:session.activeGrantId,
- },grants);
+  accountId:effectiveGrant.accountId,
+  sessionId:session.id,activeGrantId:effectiveGrant.id,
+ },effectiveGrants);
+ if(ownerDelegation){
+  context.impersonatedByAccountId=session.accountId;
+  context.delegatedByPlatformOwner=true;
+  context.delegationMode=ownerDelegation.mode;
+  context.delegationExpiresAt=ownerDelegation.expiresAt.toISOString();
+ }
  // Delegation is established ONLY by the server-verified Demo Admin login
  // and selected active target grant. Downstream services receive the ordinary
  // effective actor and use identical role, Site, Class and enrollment checks.
  // Keep the session owner separately for audit, not as a domain authorization
  // exclusion that turns demo data into a different application.
- if(demoAccountSwitching && activeGrant.accountId!==session.accountId)
+ if(!ownerDelegation && demoAccountSwitching && activeGrant.accountId!==session.accountId)
   context.impersonatedByAccountId=session.accountId;
+ // A relationship manager has consent-workflow authority only, not implicit
+ // Site, Program or learner-record access. Resource choices are resolved by
+ // the dedicated relationship service; ordinary academic scopes stay empty.
+ if(context.role==="reporting_relationship_manager"){
+  if(context.grantSiteId!==null||context.scope.organizationIds?.length!==1)
+   throw new AuthorizationError("organization-wide reporting relationship appointment");
+  context.scope.siteIds=[];
+  context.scope.programIds=[];
+  return context;
+ }
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
  const grantSites=context.scope.siteIds??[];

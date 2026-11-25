@@ -35,7 +35,7 @@ async function currentPlatformActor(capability: "catalog.platform.manage" | "blu
   const actor = await getIdentityContext(getRequest());
   assertCapability(actor, "platform.admin");
   assertCapability(actor, capability);
-  if (actor.role !== "app_admin" || actor.sessionAccountId ||
+  if (!["app_admin","platform_owner"].includes(actor.role) || actor.sessionAccountId ||
       !actor.accountId || !actor.actorPersonId || actor.grantSiteId ||
       (actor.scope.organizationIds?.length ?? 0) !== 0 ||
       (actor.scope.siteIds?.length ?? 0) !== 0) {

@@ -1,7 +1,7 @@
 /** Existing Course lesson media is authored in two shapes:
  * `resources` for subject-specific lesson materials and `videoResources`
- * for supplemental demonstration candidates. Keep both visible in the
- * learner's own canonical Class player, without creating new media records. */
+ * for supplemental demonstration candidates. Retain both for review and diagnostics;
+ * learner playback must exclude unapproved supplemental candidates. */
 export type CanonicalLessonVideo = {
   url:string;
   title:string;
@@ -10,10 +10,12 @@ export type CanonicalLessonVideo = {
 
 const allowedVideoUrl=/^https:\/\/(?:www\.)?(?:youtube\.com\/watch\?|youtube\.com\/shorts\/|youtu\.be\/|vimeo\.com\/)/i;
 
-export function canonicalLessonVideoResources(content:Record<string,unknown>):CanonicalLessonVideo[]{
+export function canonicalLessonVideoResources(content:Record<string,unknown>,
+  {includeSupplementalCandidates=true}:{includeSupplementalCandidates?:boolean}={}):CanonicalLessonVideo[]{
   const videos:CanonicalLessonVideo[]=[];
   const seen=new Set<string>();
   for(const source of ["resources","videoResources"] as const){
+    if(source==="videoResources"&&!includeSupplementalCandidates)continue;
     const entries=content[source];
     if(!Array.isArray(entries))continue;
     for(const entry of entries){

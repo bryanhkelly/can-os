@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ActionFooter, EmptyState, WorkspaceNotice } from "@/components/workspace";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { markNativeClassLessonComplete } from "@/modules/classes/native-class-learning.functions";
 import { normalizeClientError } from "@/lib/client-error";
@@ -25,7 +26,7 @@ export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selecte
   const selected=lessons.find(lesson=>lesson.lessonId===selectedLessonId)??lessons[0];
   if(!selected)return <section className="border border-border bg-card p-5">
     <h2 className="font-serif text-xl">Course lessons</h2>
-    <p className="mt-3 text-sm">No published lesson content is available yet.</p>
+    <EmptyState className="mt-3" title="No published lesson content is available yet."/>
   </section>;
   async function complete(){
     if(working||!selected)return;
@@ -56,8 +57,8 @@ export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selecte
     {selected.videoResources.length>0&&<section className="space-y-2 border-t border-border pt-4">
       <h3 className="font-semibold">Supplemental videos</h3>
       <p className="text-xs text-muted-foreground">
-        Supplemental video resources come from this Course's saved lesson content.
-        Their presence does not constitute publication, accessibility, or shared-screen playback approval.
+        These original lesson references are supplemental, not a reviewed recorded-instructor presentation.
+        Their availability and accessibility must be confirmed by the school.
       </p>
       <div className="space-y-4">
         {selected.videoResources.map(video=>
@@ -67,15 +68,15 @@ export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selecte
       </div>
     </section>}
     <div className="border-t border-border pt-4">
-      <Button type="button" variant={done?"outline":"default"}
-        disabled={working||done} onClick={()=>void complete()}>
-        {done?"Lesson completed":working?"Saving…":"Mark lesson complete"}
-      </Button>
+      <ActionFooter layout="inline" className="mt-0"><Button type="button" variant={done?"outline":"default"}
+        disabled={working||done} loading={working} loadingLabel="Saving…" onClick={()=>void complete()}>
+        {done?"Lesson completed":"Mark lesson complete"}
+      </Button></ActionFooter>
       <p className="mt-2 text-xs text-muted-foreground">
         This records an individual learning milestone, not a grade, attendance or academic credit.
       </p>
     </div>
-    {notice&&<p role="status" className="text-sm">{notice}</p>}
-    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+    {notice&&<WorkspaceNotice tone="success">{notice}</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
   </section>;
 }

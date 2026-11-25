@@ -1,4 +1,6 @@
 vi.mock("@/modules/sites/site-media-folder.server",()=>({readApprovedSchoolSitePhotos:async()=>[]}));
+vi.mock("@/modules/sites/site-brand.server",()=>({readSavedBrandVersion:async()=>null}));
+vi.mock("@/modules/sites/site-noncredit-releases.server",()=>({readOptionalSiteNoncreditReleases:async()=>[]}));
 import {beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({rows:[] as any[],actor:{} as any,catalog:vi.fn(),local:vi.fn(),requireActor:vi.fn()}));
 vi.mock("@/db/client",()=>({db:{select:()=>{const query:any={from:()=>query,innerJoin:()=>query,where:()=>query,for:()=>query,limit:async()=>state.rows.shift()??[]};return query;}}}));
@@ -10,7 +12,7 @@ vi.mock("@/modules/sites/academic-program-catalog.server",()=>({readAcademicProg
 vi.mock("@/modules/sites/site-local-content.server",()=>({readCurrentLocalContent:state.local}));
 vi.mock("@/modules/activities/enrichment-catalog.server",()=>({readEnrichmentCatalog:async()=>[]}));
 import {getLaunchWebsitePreparation} from "../../src/modules/programs/launch-website.functions";
-const school={programId:"program",programName:"Hope School",organizationId:"org",siteId:"site",siteOrganizationId:"org",siteName:"Hope Church",organizationName:"Church",type:"church_hosted_academy",gradeRange:{min:"K",max:"8"},deliveryModel:{onsite:true,onsiteDaysPerWeek:5},metadata:{targetOpeningDate:"2027-08-23"}};
+const school={programId:"program",programName:"Hope School",organizationId:"org",siteId:"site",siteOrganizationId:"org",siteName:"Hope Church",organizationName:"Church",type:"church_hosted_academy",programStatus:"launching",gradeRange:{min:"K",max:"8"},deliveryModel:{onsite:true,onsiteDaysPerWeek:5},metadata:{targetOpeningDate:"2027-08-23"}};
 beforeEach(()=>{vi.clearAllMocks();state.actor={scope:{programIds:["program"],siteIds:["site"],organizationIds:["org"]}};state.requireActor.mockImplementation(async()=>state.actor);state.rows=[[school],[{slug:"hope-school",status:"draft"}]];state.catalog.mockResolvedValue([]);state.local.mockResolvedValue(null);});
 describe("launch website preparation",()=>{
  it("builds a useful private school draft from saved identity and offered grades",async()=>{
@@ -22,6 +24,14 @@ describe("launch website preparation",()=>{
   expect(view.previewPages["/school-day"]).toContain("5 onsite days per week");
   expect(view.previewPages["/admissions"]).not.toContain("<form");
   expect(view.previewHtml).not.toContain('<form action="/apply"');expect(view.previewHtml).not.toContain('<form action="/inquiry"');
+ });
+ it("previews the exact noncredit Program in its own launch without opening enrollment",async()=>{
+  state.rows=[[{...school,programName:"Summer Discovery",type:"summer_enrichment"}],[{slug:"hope-school",status:"draft"}]];
+  const view=await getLaunchWebsitePreparation({data:{programId:"program"}});
+  expect(view.websiteContribution.pages).toContain("/programs");
+  expect(view.previewPages["/programs"]).toContain("Summer Discovery");
+  expect(view.previewPages["/programs"]).toContain("Private launch preview");
+  expect(view.previewPages["/programs"]).not.toContain("<form");
  });
  it("does not create a second planning card for an approved listing",async()=>{
   state.catalog.mockResolvedValue([{programId:"program",title:"Approved School",summary:"Approved school summary",typeLabel:"School",grades:{min:"K",max:"8"},delivery:{onsite:true,asynchronous:false,liveOnline:false,onsiteDaysPerWeek:5},availability:"operating"}]);

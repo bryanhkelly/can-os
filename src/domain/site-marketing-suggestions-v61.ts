@@ -96,7 +96,7 @@ export function suggestMarketingStarterV61(
     older_adults:"older-adults",
   } as const;
   if(intent?.audienceIds.length){
-    content.audiences=[...new Set(intent.audienceIds.map(id=>audienceFromPlan[id]))];
+    content.audiences=[...new Set(intent.audienceIds.flatMap(id=>id in audienceFromPlan ? [audienceFromPlan[id as keyof typeof audienceFromPlan]] : []))];
   }
   const selectedPrograms=(intent?.programCodes??[])
     .map(code=>source.publishedPrograms?.find(program=>program.code===code))

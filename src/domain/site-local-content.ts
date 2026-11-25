@@ -1,3 +1,6 @@
+import {websiteCompositionSchema,type WebsiteComposition} from "./website-composition";
+import { containsProtectedInstitutionalClaim } from "./public-claims-policy";
+import { sharedPhotoReferenceSchema, type SharedPhotoReference } from "./template-sample-images";
 import { siteBrandDirectionIds, type SiteBrandDirectionId } from "./site-brand-direction";
 import type { SiteExperienceProfile } from "./site-website-experience";
 import { isSiteFontId, type SiteFontId, sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
@@ -67,6 +70,7 @@ export type SiteLocalBranding = {
   /** Structural template is versioned with local branding, not Program facts. */
   templateId?: SiteTemplateId;
   heroImage: SiteLocalImage | null;
+  sharedHeroPhoto?: SharedPhotoReference | null;
   logoImage?: SiteLocalImage | null;
   /** Curated, accessible local identity. Optional for historical revisions. */
   paletteId?: SitePaletteId;
@@ -85,6 +89,8 @@ export type WebsiteContentReuseConsent = "unselected" | "granted" | "denied";
 export type SiteLocalContent = SiteLocalTextContent & {
   /** Site-scoped authorization to derive website and marketing copy from Shape data. */
   contentReuseConsent?: WebsiteContentReuseConsent;
+  /** Reviewed composition pinned to this immutable website content revision. */
+  websiteComposition?: WebsiteComposition;
   branding: SiteLocalBranding;
   /** Site-owned, optional Leadership page content; never auto-scraped. */
   leadershipMembers?:SiteLeader[];
@@ -303,22 +309,7 @@ export type SiteLocalContentDecision =
   | { status: "published"; flaggedFields: [] }
   | { status: "review_required"; flaggedFields: SiteLocalTextField[] };
 
-const protectedClaims = [
-  /\bacc?redit(?:ed|ation|ing)?\b/i,
-  /\b(?:school of record|credit issu(?:er|ing)|official transcript|diploma|graduation requirements)\b/i,
-  /\b(?:tuition|school fees?|financial aid|scholarship guarantee|payment plan)\b/i,
-  /\b(?:admissions? (?:are |is )?open|enrollment (?:is |now )?open|guaranteed (?:admission|enrollment|seat))\b/i,
-  /\b(?:state[- ]licensed school|certified high school|official CAN curriculum|CAN[- ]approved)\b/i,
-  /\b(?:official(?:ly)? (?:endorsed|recognized|affiliated) by (?:a |the )?denomination)\b/i,
-  /\b(?:only (?:accept|admit|enroll) (?:children|students|families) who)\b/i,
-  /\b(?:only|never|do not|won't)\s+(?:admit|accept|enroll)\b/i,
-  /\b(?:school admissions policy|academic admission requirement|CAN(?: Academy| OS)?(?:'s)? official (?:faith|theology|doctrine))\b/i,
-];
-/** Institutional and admissions claims must use authoritative approved facts. */
-export function containsProtectedInstitutionalClaim(text: string): boolean {
-  return protectedClaims.some(rule => rule.test(text));
-}
-
+export { containsProtectedInstitutionalClaim };
 const unsafeText = [
   /<\s*\/?\s*(?:script|iframe|style|img|a|svg|object|embed|form)\b/i,
   /\b(?:javascript|data):\s*[^\s]+/i,
@@ -390,6 +381,7 @@ export function validateInlinePng(dataUrl: string): void {
 
 export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   contentReuseConsent?: WebsiteContentReuseConsent;
+  websiteComposition?: WebsiteComposition;
   leadershipMembers?: SiteLeader[];
   branding?: SiteLocalBranding | null;
   editorialBaseline?: SiteEditorialBaseline;
@@ -398,6 +390,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   if(input.contentReuseConsent !== undefined && !["unselected", "granted", "denied"].includes(input.contentReuseConsent))
     throw new Error("Choose a valid website content reuse decision");
   result.contentReuseConsent = input.contentReuseConsent ?? "unselected";
+  if(input.websiteComposition!==undefined&&result.contentReuseConsent==="granted")
+    result.websiteComposition=websiteCompositionSchema.parse(input.websiteComposition);
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
     result[field] = normalizeText(input[field] ?? "", field);
   }
@@ -432,6 +426,7 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   result.branding = { theme: branding.theme, paletteId, typographyId, templateId,
     ...(branding.brandDirectionId ? {brandDirectionId:branding.brandDirectionId} : {}), ...fontOverrides,
     heroImage: normalizeArtwork(branding.heroImage),
+    ...(branding.sharedHeroPhoto && !branding.heroImage ? {sharedHeroPhoto:sharedPhotoReferenceSchema.parse(branding.sharedHeroPhoto)} : {}),
     ...(branding.logoImage !== undefined ? { logoImage: normalizeArtwork(branding.logoImage) } : {}),
   };
   if (input.leadershipMembers !== undefined) {

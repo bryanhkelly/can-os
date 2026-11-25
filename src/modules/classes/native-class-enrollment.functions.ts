@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
+import { nativeClassConsentDigest } from "./native-class-consent.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts,accessAccountNoncreditPrincipals,
@@ -14,22 +14,25 @@ import {
   canonicalAccounts, canonicalAccountGrants,
   canonicalEnrollmentSites,
   canonicalClassEnrollmentInvitations,canonicalClassEnrollmentApprovalRequests,
-  canonicalClassEnrollmentRepeatAuthorizations,
-  learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
+  courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
   educationOperationOrganizationRoles,
-  canonicalOfferingCourses, participationAttributions, networkMemberships,
-} from "@/db/canonical-v301";
+  canonicalOfferingCourses, } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
   assertOperationalClassOfferingTerms,
-  assertNativeClassSeatAvailable,
+  assertNativeClassSeatAvailable, nativeClassCapacity,
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
+import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
+import { readNativeClassOccupancy } from "./native-class-capacity.server";
+import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
+import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
+import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { resolveAuthorizedLearningPerson } from "@/modules/identity/authorized-learning-person.server";
@@ -94,20 +97,13 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
         assertOperationalClassOfferingTerms(row);
         const {authority,openSeats}=await db.transaction(async tx=>{
           const authority=await currentClassAuthority(tx,row.classId,now);
-          const [occupancy]=await tx.select({total:count()})
-            .from(canonicalClassEnrollments).where(and(
-              eq(canonicalClassEnrollments.classId,row.classId),
-              inArray(canonicalClassEnrollments.status,["pending","active"]),
-            ));
-          return {authority,openSeats:occupancy?.total??0};
+          const occupancy=await readNativeClassOccupancy(tx,row.classId);
+          return {authority,openSeats:occupancy};
         });
         // All enrollment methods share one occupied-seat count. The optional
         // publication limit narrows only self-registration, not assignment.
-        const limits=[row.capacity,authority.classCapacity]
-          .filter((n):n is number=>n!==null);
-        const capacity=limits.length?Math.min(...limits):null;
-        allowed.push({...row,capacity,
-          remainingSeats:capacity===null?null:Math.max(0,capacity-openSeats)});
+        allowed.push({...row,...nativeClassCapacity({method:"self",activeOrPending:openSeats,
+          classCapacity:authority.classCapacity,offeringCapacity:row.capacity})});
       }catch(e){if(!(e instanceof AuthorizationError))throw e;}
     }
     return allowed;
@@ -168,17 +164,9 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
         try{
           assertOperationalClassOfferingTerms(row);
           const authority=await currentClassAuthority(tx,row.classId,now);
-          const [occupancy]=await tx.select({total:count()})
-            .from(canonicalClassEnrollments).where(and(
-              eq(canonicalClassEnrollments.classId,row.classId),
-              inArray(canonicalClassEnrollments.status,["pending","active"]),
-            ));
-          const limits=[row.capacity,authority.classCapacity]
-            .filter((n):n is number=>n!==null);
-          const capacity=limits.length?Math.min(...limits):null;
-          items.push({...row,capacity,
-            remainingSeats:capacity===null?null:
-              Math.max(0,capacity-(occupancy?.total??0))});
+          const occupancy=await readNativeClassOccupancy(tx,row.classId);
+          items.push({...row,...nativeClassCapacity({method:"self",activeOrPending:occupancy,
+            classCapacity:authority.classCapacity,offeringCapacity:row.capacity})});
         }catch(error){
           if(!(error instanceof AuthorizationError))throw error;
         }
@@ -292,18 +280,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           consentVersion:version.consentVersion,consentText:version.consentText,
         },now);
       }
-      const previous=await tx.select({
-        id:canonicalClassEnrollments.id,status:canonicalClassEnrollments.status,
-        creditMode:canonicalClassEnrollments.creditMode,
-        courseAttemptId:canonicalClassEnrollments.courseAttemptId,
-      }).from(canonicalClassEnrollments).where(and(
-        eq(canonicalClassEnrollments.classId,instance.id),
-        eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
-        inArray(canonicalClassEnrollments.status,["pending","active"]),
-      )).limit(2);
-      if(previous.length>1)
-        throw new AuthorizationError("duplicate open Class enrollments require reconciliation");
-      const existing=previous[0];
+      const existing=await readOpenNativeClassEnrollment(tx,instance.id,learnerPersonId);
       if(existing){
         // Idempotent responses are still current privileged learner reads.
         // The native session may have been revoked while this transaction
@@ -316,30 +293,21 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       // A bounded recent-history query is not sufficient for completed
       // participants who later withdrew multiple times. Check the complete
       // completion history via its indexed status predicate.
-      const [completed]=await tx.select({id:canonicalClassEnrollments.id})
-        .from(canonicalClassEnrollments).where(and(
-          eq(canonicalClassEnrollments.classId,instance.id),
-          eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
-          eq(canonicalClassEnrollments.status,"completed"),
-        )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(1);
+      const completed=await readLatestCompletedNativeClassEnrollment(tx,instance.id,learnerPersonId);
       const repeatAuthorization=completed
         ?await requireNativeRepeatAuthorization(tx,instance.id,learnerPersonId,completed.id,now)
         :null;
-      const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-        .where(and(eq(canonicalClassEnrollments.classId,instance.id),
-          inArray(canonicalClassEnrollments.status,["pending","active"])));
+      const occupancy=await readNativeClassOccupancy(tx,instance.id);
       assertOperationalClassOfferingTerms(version);
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
       assertNativeClassSeatAvailable({method:invitation?"invitation":approval?"approval":"self",
-        activeOrPending:occupancy?.total??0,
+        activeOrPending:occupancy,
         classCapacity:current.classCapacity,offeringCapacity:version.capacity});
       // Revocation between preflight and insertion must fail inside the same
       // transaction as the seat change, including cross-provider public Classes.
       await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
-      const consentSha256=createHash("sha256")
-        .update(version.consentVersion!).update("\u0000").update(version.consentText!)
-        .digest("hex");
+      const consentSha256=nativeClassConsentDigest(version.consentVersion!,version.consentText!);
       const [enrollment]=await tx.insert(canonicalClassEnrollments).values({
         classId:instance.id,classOfferingVersionId:version.id,
         learnerPersonId,enrolledByPersonId:learnerPersonId,
@@ -347,54 +315,13 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
         consentVersion:version.consentVersion,consentSha256,consentedAt:now,
       }).returning({id:canonicalClassEnrollments.id});
       if(!enrollment)throw new Error("Class Enrollment insert failed");
-      const [selectedMembership]=data.networkMembershipId
-        ?await tx.select({
-          id:networkMemberships.id,
-          memberOrganizationId:networkMemberships.memberOrganizationId,
-        }).from(networkMemberships).where(and(
-          eq(networkMemberships.id,data.networkMembershipId),
-          eq(networkMemberships.status,"approved"),
-          eq(networkMemberships.directoryVisible,true),
-          eq(networkMemberships.networkOrganizationId,current.operatingOrganizationId),
-          lte(networkMemberships.validFrom,now),
-          or(isNull(networkMemberships.validThrough),gt(networkMemberships.validThrough,now)),
-        )).limit(1):[];
-      if(data.networkMembershipId&&!selectedMembership)
-        throw new AuthorizationError("approved directory-visible network affiliate");
-      await tx.insert(participationAttributions).values({
-        classEnrollmentId:enrollment.id,
-        deliverySiteId:current.siteId,reportingSiteId:current.siteId,
-        creditedOrganizationId:selectedMembership?.memberOrganizationId??
-          current.operatingOrganizationId,
-        networkMembershipId:selectedMembership?.id??null,
-        attributionBasis:selectedMembership?"self_reported":"provider_default",
-        relationshipSnapshot:selectedMembership?{}:{
-          kind:"provider_default",classId:instance.id,
-          organizationId:current.operatingOrganizationId,siteId:current.siteId},
-      });
-      const [attempt]=await tx.insert(learnerCourseAttempts).values({
-        classEnrollmentId:enrollment.id,enrollmentId:null,noncreditRegistrationId:null,
-        deploymentId:current.deploymentId,adoptionId:current.adoptionId,
-        offeringVersionId:current.offeringVersionId,
-        courseVersionId:current.courseVersionId,sectionId:null,
-        attemptNo:1,status:"active",
-      }).returning({id:learnerCourseAttempts.id});
-      if(!attempt)throw new Error("Course Attempt insert failed");
-      await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
-        .where(eq(canonicalClassEnrollments.id,enrollment.id));
+      await writeNativeClassAttribution(tx,{enrollmentId:enrollment.id,source:current,now:now,networkMembershipId:data.networkMembershipId});
+      const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
       if(repeatAuthorization){
-        await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
-          .set({consumedByEnrollmentId:enrollment.id})
-          .where(and(
-            eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
-            isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
-          ));
-        await emitCanonicalDomainEvent(tx,{
-          eventType:"ClassRepeatAuthorizationConsumed",
-          aggregateType:"class_repeat_authorization",
-          aggregateId:repeatAuthorization.id,actorPersonId:learnerPersonId,
-          payload:{classId:instance.id,priorEnrollmentId:completed!.id,
-            classEnrollmentId:enrollment.id,courseAttemptId:attempt.id},
+        await consumeNativeClassRepeatAuthorization(tx,{
+          authorizationId:repeatAuthorization.id,classId:instance.id,learnerPersonId:learnerPersonId,
+          priorEnrollmentId:completed!.id,classEnrollmentId:enrollment.id,
+          courseAttemptId:attempt.id,actorPersonId:learnerPersonId,
         });
       }
       if(approval){

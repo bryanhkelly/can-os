@@ -74,6 +74,9 @@ export async function handleResendDeliveryWebhook(request: Request): Promise<Res
   const event = parseResendReceiptEvent(parsed);
   if (!event) return new Response(null, { status: 200 });
 
-  await attachResendReceiptEvent(event);
+  if(event.source==="engagement_campaign"){
+    const {attachCampaignProviderReceipt}=await import("./campaign-store.server");
+    await attachCampaignProviderReceipt(event);
+  }else await attachResendReceiptEvent(event);
   return new Response(null, { status: 200 });
 }

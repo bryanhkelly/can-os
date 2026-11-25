@@ -51,7 +51,7 @@ export function authorizeNetworkMetricScope(
   // since expired or been revoked. Authorization is checked at request time
   // as well as against the requested evidence period.
   const current=now.getTime();
-  if(!Number.isFinite(current))throw new Error("Valid current reporting time required");
+  if(!Number.isFinite(current)||at>current)throw new Error("Valid current reporting time required");
   const granted:string[]=[];
   for(const host of request.hostOrganizationIds){
     if(!host)throw new Error("Verified host Organization required");
@@ -105,4 +105,36 @@ export function assertPublishedReportDisclosure(
     !approval.reviewedOverlappingCuts||
     !approval.reviewedHistoricalDifferencing)
     throw new Error("Approved scoped disclosure review required before publication");
+}
+
+/** Future report readers must authorize the entire requested window, not
+ * merely its end. Unit/metric allowlists and evidence verification are
+ * supplied only by trusted server policy. No endpoint accepts them from clients.
+ * This is deliberately not an execution grant.
+ */
+export function authorizeNetworkReportPeriod(
+  reader:VerifiedNetworkReader,
+  verifiedGrants:readonly NetworkReportGrant[],
+  request:{hostOrganizationIds:readonly string[];metricKeys:readonly string[];from:string;to:string;unitId:string|null},
+  policy:{networkOrganizationId:string;actorPersonId:string;allowedMetricKeys:readonly string[];
+    scopes:readonly {unitId:string|null;hostOrganizationIds:readonly string[]}[]},
+  now=new Date(),
+){
+  const from=validDate(request.from),to=validDate(request.to),current=now.getTime();
+  if(!Number.isFinite(current)||from>=to||to>current||to-from>366*86400000)
+    throw new Error("Closed network report window of up to 366 days required");
+  if(request.hostOrganizationIds.length>1000||request.metricKeys.length>50)
+    throw new Error("Network report exceeds bounded host or metric scope");
+  if(request.metricKeys.some(key=>!policy.allowedMetricKeys.includes(key)))
+    throw new Error("Metric is not approved for network reporting");
+  if(policy.networkOrganizationId!==reader.networkOrganizationId||policy.actorPersonId!==reader.actorPersonId)
+    throw new Error("Trusted network reporting scope does not match reader");
+  const scopes=policy.scopes.filter(scope=>scope.unitId===request.unitId);
+  if(scopes.length!==1||request.hostOrganizationIds.some(host=>!scopes[0]!.hostOrganizationIds.includes(host)))
+    throw new Error("Explicit authorized network reporting unit and host scope required");
+  const covering=verifiedGrants.filter(grant=>validDate(grant.validFrom)<=from&&
+    (grant.validThrough===null||validDate(grant.validThrough)>=to));
+  return {...authorizeNetworkMetricScope(reader,covering,{
+    hostOrganizationIds:request.hostOrganizationIds,metricKeys:request.metricKeys,asOf:request.from,
+  },now),from:request.from,to:request.to,unitId:request.unitId};
 }

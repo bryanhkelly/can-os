@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge, MutationFeedback } from "@/components/workspace";
+import { ActionFooter, EmptyState, QueryState, StatusBadge, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
 import {
@@ -26,7 +26,7 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
   });
   const [method,setMethod]=useState<Method>("in_person_roll_call");
   const [notes,setNotes]=useState<Record<string,string>>({});
-  const [busy,setBusy]=useState("");
+  const [busy,setBusy]=useState<{courseAttemptId:string;status:Status}|null>(null);
   const feedback=useMutationFeedback(()=>roster.refetch({throwOnError:true}));
   const blocked=Boolean(busy)||feedback.refreshFailed;
   const [error,setError]=useState("");
@@ -56,7 +56,7 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
     const key=[facilitatedSessionId,courseAttemptId,status,method,note||""].join(":");
     const requestId=retries.current[key]??crypto.randomUUID();
     retries.current[key]=requestId;
-    setBusy(courseAttemptId);setError("");setMessage("");
+    setBusy({courseAttemptId,status});setError("");setMessage("");
     try {
       const outcome=await feedback.run(()=>attestClassroomParticipation({data:{
         facilitatedSessionId,courseAttemptId,requestId,
@@ -72,7 +72,7 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
         delete retries.current[key];
         setNotes(current=>({...current,[courseAttemptId]:""}));
       }
-    }finally{setBusy("");}
+    }finally{setBusy(null);}
   }
   return <section className="mt-4 border border-border bg-card p-4"
     aria-label="Verified room participation">
@@ -89,16 +89,9 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
         <option value="remote_live_check">Direct remote-live check</option>
       </Select>
     </Field>
-    {roster.isPending&&<p role="status" className="mt-3 text-sm">Checking current Site roster…</p>}
-    {roster.isError&&<p role="alert" className="mt-3 text-sm text-destructive">
-      Registered learners could not be verified. No attendance data is available.
-    </p>}
-    {roster.isSuccess&&roster.data.partial&&<p role="status" className="mt-3 text-sm">
-      Roster or historical attendance exceeds the display limit; verify this with an administrator before using the totals.
-    </p>}
-    {roster.isSuccess&&roster.data.members.length===0&&<p className="mt-3 text-sm">
-      There are no currently eligible registered Course attempts at this Site.
-    </p>}
+    <QueryState loading={roster.isPending&&"Checking current Site roster…"} error={roster.isError&&"Registered learners could not be verified. No attendance data is available."} onRetry={()=>void roster.refetch()} retrying={roster.isFetching}/>
+    {roster.isSuccess&&roster.data.partial&&<WorkspaceNotice tone="attention" className="mt-3">Roster or historical attendance exceeds the display limit; verify this with an administrator before using the totals.</WorkspaceNotice>}
+    {roster.isSuccess&&roster.data.members.length===0&&<EmptyState className="mt-3" title="There are no currently eligible registered Course attempts at this Site."/>}
     {roster.isSuccess&&roster.data.members.map(person=><article
       key={person.courseAttemptId} className="mt-3 border-t border-border pt-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -124,22 +117,21 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
       {(!person.pairedDevice || person.lastAssertedAt) && <p className="mt-1 text-xs text-muted-foreground">
         An explanation of at least 15 characters is required for unpaired learners or changes to a previous verification.
       </p>}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <ActionFooter layout="inline">
         {(["present","absent","unknown"] as const).map(status=>
           <Button type="button" size="sm" key={status}
             variant={person.latestStatus===status?"default":"outline"}
             disabled={blocked||!roster.data.attestationsOpen||
               Boolean(person.lastAssertedAt && person.latestStatus===status && person.latestMethod===method)}
+            loading={busy?.courseAttemptId===person.courseAttemptId&&busy?.status===status} loadingLabel="Saving…"
             onClick={()=>void attest(person.courseAttemptId,status)}>
-            {busy===person.courseAttemptId?"Saving…":
-              status==="present"?"Verified present":status==="absent"?"Verified absent":"Not verified"}
+            {status==="present"?"Verified present":status==="absent"?"Verified absent":"Not verified"}
           </Button>)}
-      </div>
+      </ActionFooter>
     </article>)}
-    {roster.isSuccess&&!roster.data.attestationsOpen&&<p role="status"
-      className="mt-4 text-sm">The 48-hour correction window has closed.</p>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-    {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
+    {roster.isSuccess&&!roster.data.attestationsOpen&&<WorkspaceNotice className="mt-4">The 48-hour correction window has closed.</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {message&&<WorkspaceNotice className="mt-3">{message}</WorkspaceNotice>}
     <MutationFeedback state={feedback} pendingMessage="Saving verified room participation…" className="mt-3"/>
   </section>;
 }

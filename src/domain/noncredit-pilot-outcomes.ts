@@ -50,12 +50,15 @@ export type PilotParticipantFact = {
   knowledgeResult:"pass"|"fail"|"inconclusive"|null;
   surveySubmitted:boolean;
   completionRecorded:boolean;
+  /** Source-verified, current non-superseded participation minutes only. */
+  verifiedParticipationMinutes?:number;
   baselineFraction:number|null;
   finalFraction:number|null;
 };
 
 export type PilotOutcomeSummary = {
   registrations:number;
+  verifiedParticipationMinutes:number;
   engagedParticipants:number;
   participantsWithCompletedLessons:number;
   lessonsMarkedComplete:number;
@@ -80,6 +83,10 @@ export const NONCREDIT_PILOT_COUNT_DEFINITIONS = [
     source:"noncredit_registrations + approved Site release claims",
     denominator:"Distinct canonical Person IDs",timeBasis:"registered_at",
     rule:"Deduplicated across the provider's authorized Site releases and training versions."},
+  {key:"verifiedParticipationMinutes",label:"Verified participation minutes",
+    source:"noncredit_participation_events + verified evidence_document_versions",
+    denominator:"Registration-linked, unsuperseded evidence events",timeBasis:"Registration cohort, evidence current at report generation",
+    rule:"Sum source-verified minutes; not elapsed browser time, watch time or deduplicated person time."},
   {key:"registrations",label:"Training registrations",
     source:"noncredit_registrations + noncredit_self_enrollment_claims",
     denominator:"Registration IDs",timeBasis:"registered_at",
@@ -119,7 +126,7 @@ export const NONCREDIT_PILOT_COUNT_DEFINITIONS = [
 export function summarizeNoncreditPilot(facts:readonly PilotParticipantFact[]):PilotOutcomeSummary {
   const seen=new Set<string>();
   const totals:PilotOutcomeSummary={
-    registrations:0,engagedParticipants:0,participantsWithCompletedLessons:0,
+    registrations:0,verifiedParticipationMinutes:0,engagedParticipants:0,participantsWithCompletedLessons:0,
     lessonsMarkedComplete:0,knowledgeCheckSubmissions:0,
     knowledgeCheckPasses:0,knowledgeCheckFailures:0,surveyRespondents:0,
     confirmedNoncreditCompletions:0,pairedKnowledgeChecks:0,
@@ -134,6 +141,10 @@ export function summarizeNoncreditPilot(facts:readonly PilotParticipantFact[]):P
        !Number.isSafeInteger(fact.totalLessonCount)||fact.totalLessonCount<0||
        fact.completedLessonCount>fact.totalLessonCount)
       throw new Error("Invalid noncredit lesson progress");
+    const minutes=fact.verifiedParticipationMinutes??0;
+    if(!Number.isSafeInteger(minutes)||minutes<0)throw new Error("Invalid verified participation minutes");
+    totals.verifiedParticipationMinutes+=minutes;
+    if(!Number.isSafeInteger(totals.verifiedParticipationMinutes))throw new Error("Participation minute total exceeds safe integer range");
     totals.registrations+=fact.registered?1:0;
     totals.engagedParticipants+=fact.engaged?1:0;
     totals.participantsWithCompletedLessons+=fact.completedLessonCount>0?1:0;
@@ -159,24 +170,61 @@ export function summarizeNoncreditPilot(facts:readonly PilotParticipantFact[]):P
   return totals;
 }
 
-/**
- * Public-facing/partner summaries should not expose small cohorts or
- * potentially identifying per-learner detail.
+/** Disclosure evidence is computed only from canonical Person IDs on the server.
+ * A registration count is not an anonymity threshold: one person can retake training.
+ * Both sides of a binary outcome must have enough distinct contributors.
+ * This is defense in depth for a private report, not permission to publish externally.
  */
-export function publicationSafePilotSummary(summary:PilotOutcomeSummary,minimumCell=10){
+const disclosureMetrics = {
+  engagedParticipants:(f:PilotParticipantFact)=>f.engaged,
+  knowledgeCheckSubmissions:(f:PilotParticipantFact)=>f.knowledgeSubmitted,
+  knowledgeCheckPasses:(f:PilotParticipantFact)=>f.knowledgeResult==="pass",
+  surveyRespondents:(f:PilotParticipantFact)=>f.surveySubmitted,
+  confirmedNoncreditCompletions:(f:PilotParticipantFact)=>f.completionRecorded,
+  pairedKnowledgeChecks:(f:PilotParticipantFact)=>f.baselineFraction!==null&&f.finalFraction!==null&&
+    Number.isFinite(f.baselineFraction)&&Number.isFinite(f.finalFraction)&&
+    f.baselineFraction>=0&&f.baselineFraction<=1&&f.finalFraction>=0&&f.finalFraction<=1,
+} as const;
+type DisclosureMetric=keyof typeof disclosureMetrics;
+export function buildPilotDisclosureEvidence(facts:readonly PilotParticipantFact[],personByRegistration:ReadonlyMap<string,string>){
+  const people=new Set<string>();
+  const contributors:Record<DisclosureMetric,Set<string>>={
+    engagedParticipants:new Set(),knowledgeCheckSubmissions:new Set(),knowledgeCheckPasses:new Set(),
+    surveyRespondents:new Set(),confirmedNoncreditCompletions:new Set(),pairedKnowledgeChecks:new Set(),
+  };
+  for(const fact of facts){
+    const person=personByRegistration.get(fact.registrationId);
+    if(!person)throw new Error("Disclosure requires canonical Person identity");
+    people.add(person);
+    for(const key of Object.keys(disclosureMetrics) as DisclosureMetric[]){
+      if(disclosureMetrics[key](fact))contributors[key].add(person);
+    }
+  }
+  return {distinctPeople:people.size,contributors:Object.fromEntries(
+    (Object.keys(contributors) as DisclosureMetric[]).map(key=>[key,contributors[key].size])
+  ) as Record<DisclosureMetric,number>};
+}
+type DisclosureEvidence=ReturnType<typeof buildPilotDisclosureEvidence>;
+
+export function publicationSafePilotSummary(summary:PilotOutcomeSummary,minimumCell=10,evidence?:DisclosureEvidence){
   if(!Number.isSafeInteger(minimumCell)||minimumCell<5)
     throw new Error("Invalid confidentiality cell threshold");
-  if(summary.registrations<minimumCell)
+  if(!evidence||!Number.isSafeInteger(evidence.distinctPeople)||evidence.distinctPeople<minimumCell||evidence.distinctPeople>summary.registrations)
     return {publishable:false,minimumCell,summary:null};
+  const safe=(key:DisclosureMetric):number|null=>{
+    const n=evidence.contributors[key];
+    if(!Number.isSafeInteger(n)||n<minimumCell||evidence.distinctPeople-n<minimumCell||n>summary[key])return null;
+    return summary[key];
+  };
+  const paired=safe("pairedKnowledgeChecks");
   return {publishable:true,minimumCell,summary:{
     registrations:summary.registrations,
-    engagedParticipants:summary.engagedParticipants<minimumCell?null:summary.engagedParticipants,
-    knowledgeCheckSubmissions:summary.knowledgeCheckSubmissions<minimumCell?null:summary.knowledgeCheckSubmissions,
-    knowledgeCheckPasses:summary.knowledgeCheckPasses<minimumCell?null:summary.knowledgeCheckPasses,
-    surveyRespondents:summary.surveyRespondents<minimumCell?null:summary.surveyRespondents,
-    confirmedNoncreditCompletions:summary.confirmedNoncreditCompletions<minimumCell?null:summary.confirmedNoncreditCompletions,
-    pairedKnowledgeChecks:summary.pairedKnowledgeChecks<minimumCell?null:summary.pairedKnowledgeChecks,
-    averageImprovementPercentagePoints:summary.pairedKnowledgeChecks>=minimumCell
-      ?summary.averageImprovementPercentagePoints:null,
+    engagedParticipants:safe("engagedParticipants"),
+    knowledgeCheckSubmissions:safe("knowledgeCheckSubmissions"),
+    knowledgeCheckPasses:safe("knowledgeCheckPasses"),
+    surveyRespondents:safe("surveyRespondents"),
+    confirmedNoncreditCompletions:safe("confirmedNoncreditCompletions"),
+    pairedKnowledgeChecks:paired,
+    averageImprovementPercentagePoints:paired!==null?summary.averageImprovementPercentagePoints:null,
   }};
 }

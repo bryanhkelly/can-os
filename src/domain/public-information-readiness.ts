@@ -1,3 +1,4 @@
+import { shortUuidHref } from "@/domain/opaque-url-id";
 import type { PublicParentSchoolProfile, PublicClaim } from "./parent-information";
 
 /** Diagnostic only: this projection cannot grant marketing, legal or
@@ -44,9 +45,9 @@ export function projectPublicInformationReadiness(input: {
   openingConfirmed: boolean;
 }): PublicInformationReadiness {
   const p = input.profile;
-  const siteEditor = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}/parent-information` : "/sites";
-  const institutionalPublisher = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}/publish` : "/sites";
-  const siteSetup = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}` : "/sites";
+  const siteEditor = input.siteId ? shortUuidHref("/sites/", input.siteId) + "/parent-information" : "/sites";
+  const institutionalPublisher = input.siteId ? shortUuidHref("/sites/", input.siteId) + "/publish" : "/sites";
+  const siteSetup = input.siteId ? shortUuidHref("/sites/", input.siteId) : "/sites";
   const scheduleReview = "/operations/school-years";
   const gaps: PublicInformationGap[] = [];
   const missing = (category:PublicInformationCategory, owner:PublicInformationGap["owner"],

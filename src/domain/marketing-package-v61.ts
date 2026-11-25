@@ -1,3 +1,4 @@
+import { sitePlanningAudienceIds, siteAudienceNames } from "./site-audiences";
 import { z } from "zod";
 import { siteIdentityEditorialContextV61, type SiteIdentityV61 } from "./site-identity-v61";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
@@ -20,7 +21,7 @@ export const outreachStepIdsV61 = ["who","message","highlight","action","channel
 export const outreachPlanSchemaV61 = z.object({
   relationship: z.enum(["known","new","both"]),
   recipients: z.array(z.enum(marketingAudienceIds)).max(8),
-  beneficiaries: z.array(z.enum(["children","teens","adults","older_adults"])).max(4),
+  beneficiaries: z.array(z.enum(sitePlanningAudienceIds)).max(sitePlanningAudienceIds.length),
   messageFocus: z.enum(["coming-soon","feedback","invitation","recruiting","update"]),
   highlights: z.array(z.object({
     source: z.enum(["program","audience","experience","vision"]),
@@ -87,9 +88,7 @@ export function composeOutreachDraftV61(
     ? projectSiteExperienceBriefV61(intent??null).find(item=>item.id===featuredExperience.id)
     : null;
   const activities=experience?.activities.slice(0,2)??[];
-  const beneficiaries=plan.beneficiaries.map(id=>({
-    children:"children",teens:"teens",adults:"adults",older_adults:"older adults",
-  }[id])).join(" and ");
+  const beneficiaries=plan.beneficiaries.map(id=>siteAudienceNames[id].toLowerCase()).join(" and ");
   const recipientText=plan.recipients.includes("partners")?"community partners":
     plan.recipients.includes("prospective-leaders")?"prospective leaders":
     plan.recipients.includes("employees")?"prospective team members":

@@ -1,3 +1,4 @@
+import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
 import { safeLoader } from "@/lib/safe-loader";
@@ -6,6 +7,7 @@ import { SchoolYearRecord, schoolYearTabs, type SchoolYearTab } from "@/componen
 import { EmptyState, WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/operations/school-years_/$yearId")({
+  params: opaqueUuidPathParam("yearId"),
   validateSearch: (search: Record<string, unknown>): { tab?: SchoolYearTab } => ({
     tab: schoolYearTabs.find(tab => tab.value === search.tab && tab.value !== "overview")?.value,
   }),

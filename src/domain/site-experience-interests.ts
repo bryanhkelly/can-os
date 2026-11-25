@@ -1,3 +1,4 @@
+import { siteAudienceNames } from "./site-audiences";
 import type { SiteProgramsAudiencesV61 } from "./site-launch-preferences";
 
 /** Guided Site vision, never an approved Solution, Course, Class or Offering. */
@@ -192,9 +193,7 @@ export const siteExperienceCatalog:readonly SiteExperienceCategory[] = rows.map(
 }));
 export const siteExperienceById = new Map(siteExperienceCatalog.map(item=>[item.id,item] as const));
 
-export const siteExperienceAudienceNames:Record<SiteExperienceAudienceId,string> = {
-  children:"Children",teens:"Teens",adults:"Adults",older_adults:"Older adults",
-};
+export const siteExperienceAudienceNames = siteAudienceNames;
 export const siteExperienceProgramNames:Record<SiteExperienceProgramId,string> = {
   "grades-6-8":"Grades 6–8","grades-9-12":"Grades 9–12",
   afterschool:"After-school",summer:"Summer & Breaks",
@@ -240,6 +239,10 @@ export function recommendedSiteExperiences(
      intent.audienceIds.includes("children"))
     add("arts-creativity","science-makers","sports-recreation","outdoor-discovery",
       "study-support","family-learning");
+  if (intent.audienceIds.some(id => ["immigrants","refugees","newcomers","english_language_learners"].includes(id)))
+    add("languages-cultures","reading-literacy","digital-confidence","career-skills");
+  if (intent.audienceIds.some(id => ["homelessness","housing_insecure","unemployed","justice_impacted","veterans"].includes(id)))
+    add("career-skills","financial-literacy","digital-confidence");
   add("digital-confidence","financial-literacy","science-makers","arts-creativity",
     "wellness-movement","community-service","voting-elections","career-skills");
   const eligible=new Set(suggestedSiteExperiences(intent).map(item=>item.id));

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export const FieldError = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
   ({ id, className, children, ...props }, ref) => {
     if (!children) return null;
-    return <p ref={ref} id={id} role="alert" className={cn("text-sm text-destructive", className)} {...props}>{children}</p>;
+    return <p ref={ref} id={id} role="alert" className={cn("text-sm leading-5 text-destructive [overflow-wrap:anywhere]", className)} {...props}>{children}</p>;
   },
 );
 FieldError.displayName = "FieldError";
@@ -27,7 +27,7 @@ export function Field({ label, description, error, required, children, className
     ...(description ? [descriptionId] : []),
     ...(error ? [errorId] : []),
   ])].join(" ") || undefined;
-  return <div className={cn("space-y-2", className)}>
+  return <div className={cn("min-w-0 space-y-2", className)}>
     <Label htmlFor={id} className={error ? "text-destructive" : undefined}>
       {label}{required && <span className="ml-1 text-xs text-muted-foreground">(required)</span>}
     </Label>
@@ -37,7 +37,7 @@ export function Field({ label, description, error, required, children, className
       "aria-invalid": error ? true : children.props["aria-invalid"],
       "aria-describedby": describedBy,
     })}
-    {description && <p id={descriptionId} className="text-sm text-muted-foreground">{description}</p>}
+    {description && <p id={descriptionId} className="text-sm leading-5 text-muted-foreground [overflow-wrap:anywhere]">{description}</p>}
     <FieldError id={errorId}>{error}</FieldError>
   </div>;
 }

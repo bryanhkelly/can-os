@@ -5,10 +5,13 @@ const read=(path:string)=>readFileSync(path,"utf8");
 describe("native Class evidence consolidates on existing canonical engines",()=>{
   it("ties the read model to the authenticated Person and actual Class Course Attempt",()=>{
     const source=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
-    expect(source).toContain('eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId)');
-    expect(source).toContain("authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId,true)");
-    expect(source).toContain('access.source!=="class"');
-    expect(source).toContain("cls.courseVersionId!==access.courseVersionId");
+    const access=read("src/modules/classes/native-learner-class-access.server.ts");
+    expect(source).toContain('if(!actor.actorPersonId||actor.role!=="learner")');
+    expect(source).toContain('authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"history_read")');
+    expect(access).toContain("eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId)");
+    expect(access).toContain('authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId,mode==="history_read",enrollment.id)');
+    expect(access).toContain('access.source!=="class"');
+    expect(access).toContain("access.courseVersionId!==cls.courseVersionId");
     expect(source).toContain('setResponseHeader("Cache-Control","private, no-store")');
     expect(source).not.toContain('process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED');
   });

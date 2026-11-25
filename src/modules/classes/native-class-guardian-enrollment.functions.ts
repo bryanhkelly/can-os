@@ -1,24 +1,26 @@
-import {createHash} from "node:crypto";
+import { nativeClassConsentDigest } from "./native-class-consent.server";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,asc,count,desc,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
+import {and,asc,desc,eq,gt,isNull,lte,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
  canonicalClasses,canonicalClassOfferings,
- canonicalClassEnrollmentRepeatAuthorizations,
  canonicalClassOfferingVersions,canonicalClassEnrollments,
  canonicalClassEnrollmentApprovalRequests,canonicalPersons,
- guardianAuthorities,learnerProfiles,learnerCourseAttempts,participationAttributions,
-} from "@/db/canonical-v301";
+ guardianAuthorities,learnerProfiles,} from "@/db/canonical-v301";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {currentClassAuthority} from "./native-class-authority.server";
+import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} from "./native-class-enrollment-history.server";
+import { readNativeClassOccupancy } from "./native-class-capacity.server";
+import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./native-class-attempt.server";
+import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
+import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import {requireNativeGuardian,requireNativeGuardianChild} from
  "./native-class-guardian-authority.server";
-import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable,
- assertNativeClassAttemptForExit} from "@/domain/native-class-lifecycle";
+import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable} from "@/domain/native-class-lifecycle";
 
 const uuid=z.string().uuid();
 const requestSchema=z.object({
@@ -95,12 +97,7 @@ export const requestNativeGuardianClassApproval=createServerFn({method:"POST"})
       (terms.opensAt&&terms.opensAt>now)||(terms.closesAt&&terms.closesAt<=now))
     throw new AuthorizationError("current Class guardian approval application");
    await requireNativeGuardianChild(tx,guardian.personId,data.learnerPersonId,new Date());
-   const [open]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,cls.id),
-      eq(canonicalClassEnrollments.learnerPersonId,data.learnerPersonId),
-      inArray(canonicalClassEnrollments.status,["pending","active"]),
-    )).limit(1);
+   const open=await readOpenNativeClassEnrollment(tx,cls.id,data.learnerPersonId);
    if(open)throw new AuthorizationError("learner already participates");
    const [replay]=await tx.select().from(canonicalClassEnrollmentApprovalRequests)
     .where(and(
@@ -247,31 +244,18 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
       eq(canonicalClassOfferings.classId,cls.id),
     )).limit(1);
    if(!offering)throw new AuthorizationError("Class Offering identity");
-   const [already]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,cls.id),
-      eq(canonicalClassEnrollments.learnerPersonId,approval.learnerPersonId),
-      inArray(canonicalClassEnrollments.status,["pending","active"]),
-    )).limit(1);
+   const already=await readOpenNativeClassEnrollment(tx,cls.id,approval.learnerPersonId);
    if(already)throw new AuthorizationError("minor already enrolled");
-   const [completed]=await tx.select({id:canonicalClassEnrollments.id})
-    .from(canonicalClassEnrollments).where(and(
-      eq(canonicalClassEnrollments.classId,cls.id),
-      eq(canonicalClassEnrollments.learnerPersonId,approval.learnerPersonId),
-      eq(canonicalClassEnrollments.status,"completed"),
-    )).limit(1);
+   const completed=await readLatestCompletedNativeClassEnrollment(tx,cls.id,approval.learnerPersonId);
    const repeatAuthorization=completed
      ?await requireNativeRepeatAuthorization(tx,cls.id,approval.learnerPersonId,
        completed.id,new Date())
      :null;
-   const [seats]=await tx.select({total:count()}).from(canonicalClassEnrollments)
-    .where(and(eq(canonicalClassEnrollments.classId,cls.id),
-      inArray(canonicalClassEnrollments.status,["pending","active"])));
-   assertNativeClassSeatAvailable({method:"approval",activeOrPending:seats?.total??0,
+   const seats=await readNativeClassOccupancy(tx,cls.id);
+   assertNativeClassSeatAvailable({method:"approval",activeOrPending:seats,
     classCapacity:current.classCapacity,offeringCapacity:terms.capacity});
    const admissionAt=new Date();
-   const consentSha256=createHash("sha256")
-    .update(terms.consentVersion).update("\u0000").update(terms.consentText).digest("hex");
+   const consentSha256=nativeClassConsentDigest(terms.consentVersion,terms.consentText);
    const [enrollment]=await tx.insert(canonicalClassEnrollments).values({
     classId:cls.id,classOfferingVersionId:terms.id,
     learnerPersonId:approval.learnerPersonId,enrolledByPersonId:guardian.personId,
@@ -279,38 +263,15 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
     consentVersion:terms.consentVersion,consentSha256,consentedAt:admissionAt,
    }).returning({id:canonicalClassEnrollments.id});
    if(!enrollment)throw new Error("guardian Class Enrollment not saved");
-   await tx.insert(participationAttributions).values({
-    classEnrollmentId:enrollment.id,
-    deliverySiteId:current.siteId,reportingSiteId:current.siteId,
-    creditedOrganizationId:current.operatingOrganizationId,
-    attributionBasis:"provider_default",
-    relationshipSnapshot:{kind:"provider_default",classId:cls.id,
-      siteId:current.siteId,organizationId:current.operatingOrganizationId},
-   });
-   const [attempt]=await tx.insert(learnerCourseAttempts).values({
-    classEnrollmentId:enrollment.id,enrollmentId:null,noncreditRegistrationId:null,
-    sectionId:null,deploymentId:current.deploymentId,adoptionId:current.adoptionId,
-    offeringVersionId:current.offeringVersionId,courseVersionId:current.courseVersionId,
-    attemptNo:1,status:"active",
-   }).returning({id:learnerCourseAttempts.id});
-   if(!attempt)throw new Error("guardian Course Attempt not saved");
-   await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
-    .where(eq(canonicalClassEnrollments.id,enrollment.id));
+   await writeNativeClassAttribution(tx,{enrollmentId:enrollment.id,source:current,now:admissionAt});
+   const attempt=await createInitialNativeClassAttempt(tx,enrollment.id,current);
    if(repeatAuthorization){
-    await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
-     .set({consumedByEnrollmentId:enrollment.id})
-     .where(and(
-       eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
-       isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
-     ));
-    await emitCanonicalDomainEvent(tx,{
-     eventType:"ClassRepeatAuthorizationConsumed",
-     aggregateType:"class_repeat_authorization",aggregateId:repeatAuthorization.id,
-     actorPersonId:guardian.personId,
-     payload:{classId:cls.id,priorEnrollmentId:completed!.id,
-       classEnrollmentId:enrollment.id,courseAttemptId:attempt.id},
-    });
-   }
+        await consumeNativeClassRepeatAuthorization(tx,{
+          authorizationId:repeatAuthorization.id,classId:cls.id,learnerPersonId:approval.learnerPersonId,
+          priorEnrollmentId:completed!.id,classEnrollmentId:enrollment.id,
+          courseAttemptId:attempt.id,actorPersonId:guardian.personId,
+        });
+      }
    await tx.update(canonicalClassEnrollmentApprovalRequests)
     .set({acceptedEnrollmentId:enrollment.id})
     .where(and(eq(canonicalClassEnrollmentApprovalRequests.id,approval.id),
@@ -357,16 +318,7 @@ export const withdrawMyGuardianNativeClassEnrollment=createServerFn({method:"POS
    if(enrollment.status!=="active"||!enrollment.courseAttemptId||
       cls.state!=="active")
     throw new AuthorizationError("currently active Class participation");
-   const attempts=await tx.select().from(learnerCourseAttempts)
-    .where(eq(learnerCourseAttempts.classEnrollmentId,enrollment.id)).for("update");
-   const selected=attempts.find(a=>a.id===enrollment.courseAttemptId);
-   if(!selected)throw new AuthorizationError("selected canonical Course Attempt");
-   assertNativeClassAttemptForExit({attempt:selected,enrollment,classInstance:cls});
-   for(const attempt of attempts.filter(a=>a.status==="active")){
-    assertNativeClassAttemptForExit({attempt,enrollment,classInstance:cls,requireSelectedPointer:false});
-    await tx.update(learnerCourseAttempts).set({status:"withdrawn"})
-     .where(eq(learnerCourseAttempts.id,attempt.id));
-   }
+   await withdrawNativeClassAttempts(tx,enrollment,cls);
    await tx.update(canonicalClassEnrollments).set({status:"withdrawn"})
     .where(eq(canonicalClassEnrollments.id,enrollment.id));
    const payload={classId:cls.id,classEnrollmentId:enrollment.id,

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Field } from "@/components/ui/field";
+import { ActionFooter, EmptyState, QueryState, WorkspaceNotice } from "@/components/workspace";
 import {
   attachClassroomSurvey,getClassroomSurveyOptions,
 } from "@/modules/learning/classroom-surveys.functions";
@@ -43,12 +44,7 @@ export function ClassroomSurveyManager({facilitatedSessionId}:{
       consent and confidentiality rules remain authoritative. Answers are never
       copied into classroom activity or shown on the projector.
     </p>
-    {campaigns.isPending&&<p role="status" className="mt-3 text-sm">
-      Checking approved surveys…
-    </p>}
-    {campaigns.isError&&<p role="alert" className="mt-3 text-sm text-destructive">
-      Approved survey campaigns could not be verified.
-    </p>}
+    <QueryState loading={campaigns.isPending&&"Checking approved surveys…"} error={campaigns.isError&&"Approved survey campaigns could not be verified."} onRetry={()=>void campaigns.refetch()} retrying={campaigns.isFetching}/>
     {campaigns.isSuccess&&<div className="mt-4 grid gap-3 sm:grid-cols-2">
       <Field label="Approved campaign">
         <Select className="mt-2"
@@ -67,17 +63,13 @@ export function ClassroomSurveyManager({facilitatedSessionId}:{
           <option value="exit">After instruction (exit)</option>
         </Select>
       </Field>
-      <div className="sm:col-span-2">
+      <ActionFooter layout="inline" className="sm:col-span-2 mt-0">
         <Button type="button" size="sm" disabled={!selected||busy}
-          onClick={()=>void attach()}>{busy?"Linking…":"Link approved survey"}</Button>
-      </div>
+          loading={busy} loadingLabel="Linking…" onClick={()=>void attach()}>Link approved survey</Button>
+      </ActionFooter>
     </div>}
     {campaigns.isSuccess&&!campaigns.data.campaigns.length&&
-      <p role="status" className="mt-3 text-sm text-muted-foreground">
-        No active, identified, permission-verified campaign is ready for
-        this Deployment. Prepare and invite participants through the existing
-        CAN survey workflow first.
-      </p>}
+      <EmptyState className="mt-3" title="No approved survey campaigns are ready for this Deployment." description="Prepare and invite participants through the existing survey workflow first."/>}
     {campaigns.isSuccess&&!!campaigns.data.links.length&&
       <div className="mt-4 border-t border-border pt-3">
         <p className="text-sm font-medium">Linked to this room</p>
@@ -88,8 +80,8 @@ export function ClassroomSurveyManager({facilitatedSessionId}:{
         </p>)}
       </div>}
     {campaigns.isSuccess&&campaigns.data.partial&&
-      <p role="status" className="mt-3 text-xs">Survey list limited to 100 entries.</p>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-    {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
+      <WorkspaceNotice tone="attention" className="mt-3">Survey list limited to 100 entries.</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {message&&<WorkspaceNotice tone="success" className="mt-3">{message}</WorkspaceNotice>}
   </section>;
 }

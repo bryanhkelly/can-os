@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { signPrivateObjectUrl } from "./r2";
 import { liveCloudflarePhotoEnv } from "@/platform/photography/cloudflare-runtime.server";
 import { isPublicSitePagePath, publicSitePagePaths, type PublicSitePath } from "@/domain/public-site-paths";
 
@@ -29,26 +30,61 @@ export function encodeSitePreviewSnapshot(pages:Partial<Record<PublicSitePath,st
 export async function writeSitePreviewSnapshot(key:string,pages:Partial<Record<PublicSitePath,string>>){
   if(!keyPattern.test(key))throw new Error("Invalid preview object key");
   const bucket=(await liveCloudflarePhotoEnv())?.TEMPLATE_PHOTO_BUCKET;
-  if(!bucket)throw new Error("Private Cloudflare R2 snapshot storage is not available");
   const snapshot=encodeSitePreviewSnapshot(pages);
-  const created=await bucket.put(key,snapshot.text,{
-    onlyIf:{etagDoesNotMatch:"*"},
-    httpMetadata:{contentType:"application/json"},
-  });
-  if(!created)throw new Error("An immutable website snapshot already exists");
+  if(bucket){
+    const created=await bucket.put(key,snapshot.text,{
+      onlyIf:{etagDoesNotMatch:"*"},
+      httpMetadata:{contentType:"application/json"},
+    });
+    if(!created)throw new Error("An immutable website snapshot already exists");
+  }else{
+    // Netlify and other Node deployments use the existing private R2 signer.
+    // No public URL, inline HTML in Site metadata, or overwrite fallback.
+    const result=await fetch(signPrivateObjectUrl({method:"PUT",key,keyPattern,
+      contentType:"application/json",preventOverwrite:true}),{
+      method:"PUT",headers:{"Content-Type":"application/json","If-None-Match":"*"},
+      body:snapshot.text,redirect:"error",
+    });
+    if(!result.ok)throw new Error("Private website snapshot upload failed");
+  }
   return {key,digest:snapshot.digest,paths:snapshot.paths};
 }
 export async function readSitePreviewSnapshot(key:string,digest:string):
   Promise<Partial<Record<PublicSitePath,string>>|null>{
   if(!keyPattern.test(key)||!/^[0-9a-f]{64}$/.test(digest))return null;
   const bucket=(await liveCloudflarePhotoEnv())?.TEMPLATE_PHOTO_BUCKET;
-  if(!bucket)return null;
-  const head=await bucket.head(key);
-  if(!head||head.size>maxBytes)return null;
-  const object=await bucket.get(key);
-  if(!object)return null;
-  const text=await object.text();
-  if(new TextEncoder().encode(text).byteLength!==head.size||
+  let text:string;
+  let size:number;
+  if(bucket){
+    const head=await bucket.head(key);
+    if(!head||head.size>maxBytes)return null;
+    const object=await bucket.get(key);
+    if(!object)return null;
+    size=head.size;
+    text=await object.text();
+  }else{
+    const response=await fetch(signPrivateObjectUrl({method:"GET",key,keyPattern}),{redirect:"error"});
+    if(!response.ok||!response.body)return null;
+    size=Number(response.headers.get("content-length"));
+    if(!Number.isSafeInteger(size)||size<1||size>maxBytes){await response.body.cancel();return null;}
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder("utf-8",{fatal:true});
+    let total=0;
+    const parts:string[]=[];
+    try{
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        total+=value.byteLength;
+        if(total>size)return null;
+        parts.push(decoder.decode(value,{stream:true}));
+      }
+      if(total!==size)return null;
+      parts.push(decoder.decode());
+      text=parts.join("");
+    }finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+  }
+  if(new TextEncoder().encode(text).byteLength!==size||
      sitePreviewSnapshotDigest(text)!==digest)return null;
   try {
     const document=JSON.parse(text) as {version?:number;pages?:Record<string,unknown>};
@@ -58,4 +94,15 @@ export async function readSitePreviewSnapshot(key:string,digest:string):
       !isPublicSitePagePath(path)||typeof html!=="string"))return null;
     return document.pages as Partial<Record<PublicSitePath,string>>;
   }catch{return null;}
+}
+
+/** Only call after a transaction has failed and the canonical link registry
+ * has confirmed this newly generated snapshot is not referenced. */
+export async function deleteUnreferencedSitePreviewSnapshot(siteId:string,snapshotId:string):Promise<void>{
+  const key=sitePreviewSnapshotKey(siteId,snapshotId);
+  if(!keyPattern.test(key))throw new Error("Invalid preview object key");
+  const bucket=(await liveCloudflarePhotoEnv())?.TEMPLATE_PHOTO_BUCKET;
+  if(bucket?.delete){await bucket.delete(key);return;}
+  const response=await fetch(signPrivateObjectUrl({method:"DELETE",key,keyPattern}),{method:"DELETE",redirect:"error"});
+  if(!response.ok&&response.status!==404)throw new Error("Private preview artifact cleanup failed");
 }

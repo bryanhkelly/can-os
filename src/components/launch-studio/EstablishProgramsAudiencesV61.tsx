@@ -1,3 +1,4 @@
+import { AudienceIntentFieldsV61 } from "./AudienceIntentFieldsV61";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -49,12 +50,7 @@ const times = [
   { id: "daytime", label: "Daytime", detail: "Morning, afternoon, or full day" },
   { id: "evenings", label: "Evenings", detail: "After-work or evening learning" },
 ] as const;
-const audienceChoices = [
-  { id: "children", label: "Children", detail: "Elementary-age learners" },
-  { id: "teens", label: "Teens", detail: "Middle and high school ages" },
-  { id: "adults", label: "Adults", detail: "Career skills and enrichment" },
-  { id: "older_adults", label: "Older adults", detail: "Lifelong learning and community" },
-] as const;
+
 
 const guidance = [
   {
@@ -235,28 +231,26 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
   const sections = [
     { id: "interests", title: "Programs", description: "What you want to offer",
       status: step === 0 ? "current" as const : "upcoming" as const },
-    { id: "audiences", title: "Audiences", description: "Who you hope to serve",
+    { id: "audiences", title: "Audiences", description: "Who you desire to serve",
       status: step === 1 ? "current" as const : "upcoming" as const },
     { id: "experiences", title: "Experiences", description: "What people could learn, do or enjoy",
       status: step === 2 ? "current" as const : "upcoming" as const },
   ];
   return <section aria-label="Programs & Audiences" className="min-w-0 space-y-5">
     <GuidedSetupShell title={step === 0 ? "What would you like to bring to your community?" :
-      step === 1 ? "Who do you hope to serve?" : "What experiences interest you?"}
+      step === 1 ? "Who do you desire to serve?" : "Experiences"}
       description={step === 0
         ? "Choose the program ideas you want to explore. You will select how to deliver them in Prepare."
-        : step === 1 ? "Choose the people you hope to serve."
+        : step === 1 ? "Identify the people and communities you have a heart to serve, even if you do not currently have the programs or resources to reach them."
         : "Imagine what people could learn, do or enjoy. Details and approvals come later in Prepare."}
+      showHeader={step !== 2}
       steps={sections} onStepChange={id => selectStep(id === "interests" ? 0 : id === "audiences" ? 1 : 2)} navigationDisabled={disabled}>
       <div ref={panel} tabIndex={-1} role="region" aria-label={step === 0 ? "Program Interests" : step === 1 ? "Your Audiences" : "Experiences"}
         className="min-w-0 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {step === 0 ? <>
         {existingPrograms && <ExistingSiteProgramsV61 siteId={siteId} result={existingPrograms} />}
         <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold">What kinds of programs are you thinking about offering?</legend>
-          <p className="text-xs leading-5 text-muted-foreground">
-            Select what interests you. You'll choose the details in Prepare.
-          </p>
+          <legend className="sr-only">Programs you want to explore</legend>
           <h3 className="text-sm font-semibold">Programs to explore</h3>
           {!programCatalog && !catalogError && <p role="status" className="text-sm text-muted-foreground">Loading available Programs…</p>}
           {catalogError && <div role="alert" className="space-y-2 border p-3 text-sm">
@@ -337,15 +331,7 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
           </div>
         </section>
       </> : step === 1 ? <>
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold">Who do you hope to serve? <span className="font-normal text-muted-foreground">(optional)</span></legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {audienceChoices.map(choice => <SelectionCard key={choice.id} kind="checkbox"
-              value={choice.id} title={choice.label} detail={choice.detail} className="min-h-24"
-              checked={draft.audienceIds.includes(choice.id)} disabled={disabled}
-              onChange={checked => toggleAudience(choice.id, checked)} />)}
-          </div>
-        </fieldset>
+        <AudienceIntentFieldsV61 selected={draft.audienceIds} disabled={disabled} onChange={toggleAudience}/>
       </> : <>
         <EstablishExperiencesV61 draft={draft} setDraft={setDraft} disabled={disabled}
           programCatalog={programs} stage={experienceStage} onStageChange={setExperienceStage}/>

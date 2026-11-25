@@ -1,6 +1,6 @@
-import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
-import { useCallback, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { ActionFooter, DisclosureSection, EmptyState, WorkspaceNotice, WorkspaceLinkNavigation } from "@/components/workspace";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -36,8 +36,8 @@ type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHi
  * enrollment, official assignments, or grades. Lesson completion updates only
  * the canonical Course-attempt progress shared across recorded presenters.
  */
-export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", initialLessonId }: {
-  courseAttemptId: string; mode?: "training" | "native";initialLessonId?:string|null;
+export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", initialLessonId, classEnrollmentId }: {
+  courseAttemptId: string; mode?: "training" | "native";initialLessonId?:string|null;classEnrollmentId?:string;
 }) {
   const release = useQuery({
     queryKey: ["canonical-learning-release"],
@@ -54,18 +54,20 @@ export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", 
   // A missing release-status response fails closed for optional telemetry.
   if (enabled) return <CanonicalLearningActivityProvider key={courseAttemptId} courseAttemptId={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
+      activityEnabled facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId} classEnrollmentId={classEnrollmentId}/>
   </CanonicalLearningActivityProvider>;
   return <DisabledCanonicalLearningActivityProvider key={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled={false} facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
+      activityEnabled={false} facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId} classEnrollmentId={classEnrollmentId}/>
   </DisabledCanonicalLearningActivityProvider>;
 }
 
-function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled, mode, initialLessonId }: {
+function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled, mode, initialLessonId, classEnrollmentId }: {
   courseAttemptId: string; activityEnabled: boolean; facilitatedEnabled: boolean;
-  mode: "training" | "native";initialLessonId?:string|null;
+  mode: "training" | "native";initialLessonId?:string|null;classEnrollmentId?:string;
 }) {
+  const client=useQueryClient();
+  const appliedDeepLink=useRef<string|null>(null);
   const { selectLesson, observe, observeNativeVideo } = useCanonicalLearningActivity();
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
   const [instruction, setInstruction] = useState<SelectedInstruction | null>(null);
@@ -107,7 +109,9 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
   // A deep link may select a published lesson, but it never changes
   // the learner's saved instructor, evidence or completion state.
   useEffect(()=>{
-    if(initialLessonId && instruction?.lessons.some(lesson=>lesson.id===initialLessonId)){
+    if(!initialLessonId){appliedDeepLink.current=null;return;}
+    if(appliedDeepLink.current!==initialLessonId && instruction?.lessons.some(lesson=>lesson.id===initialLessonId)){
+      appliedDeepLink.current=initialLessonId;
       setLessonId(initialLessonId);
     }
   },[initialLessonId,instruction]);
@@ -149,6 +153,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
       const nextLessonId = nextRecordedLessonId(instruction.lessons, lessonId);
       if (nextLessonId) setLessonId(nextLessonId);
       await reload();
+      if(mode==="native"&&classEnrollmentId)await client.invalidateQueries({queryKey:["native-unified-class-progress",classEnrollmentId]});
       setLessonProgressRevision(revision=>revision+1);
       setNotice(nextLessonId
         ? "Lesson completed. Continue with your next unfinished lesson."
@@ -233,21 +238,19 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
         Your learning progress stays with this course when you switch recorded
         instructors. Official grades and assignments, when applicable, remain unchanged.
       </p>
-      {loading ? <p role="status" className="mt-3 text-sm">Loading recorded instruction...</p> :
+      {loading ? <WorkspaceNotice className="mt-3">Loading recorded instruction…</WorkspaceNotice> :
         catalog && catalog.choices.length > 0
           ? <RecordedInstructorChoices catalog={catalog} pending={pending}
-            onSelect={trackVersionId => void selectTeacher(trackVersionId)}/> : <p className="mt-3 text-sm text-muted-foreground">
-          No recorded instructors are available for this course yet.
-        </p>}
+            onSelect={trackVersionId => void selectTeacher(trackVersionId)}/> : <EmptyState className="mt-3" title="No recorded instructors are available for this course yet."/>}
     </div>
 
     {catalog?.selection && !recordedInstructorSelectionIsCurrent(catalog) &&
-      <p role="status" className="border p-3 text-sm">
+      <WorkspaceNotice tone="attention">
         Your recorded-teacher selection needs to be renewed under the current course policy.
         Choose an approved instructor above to continue your lessons.
-      </p>}
-    {error && <p role="alert" className="border p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="border p-3 text-sm">{notice}</p>}
+      </WorkspaceNotice>}
+    {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+    {notice && <WorkspaceNotice>{notice}</WorkspaceNotice>}
 
     {instruction && <>
       {mode==="training" && instruction.sectionId && <RecordedOfficialCourseLinks sectionId={instruction.sectionId}/>}
@@ -337,9 +340,9 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
                 [`${material.id}:${prompt.key}`]: event.target.value,
               }))}/>
           </Field>)}
-          <Button type="submit" size="sm" disabled={pending}>
+          <ActionFooter layout="inline"><Button type="submit" size="sm" disabled={pending}>
             {pending ? "Saving..." : "Save practice"}
-          </Button>
+          </Button></ActionFooter>
           <p className="text-xs text-muted-foreground">
             Optional teacher practice. Official course assignments and grades are unchanged.
           </p>
@@ -408,14 +411,8 @@ export function RecordedPracticeHistory({ history }: { history: PracticeHistory 
     </p>
     <ol className="mt-3 divide-y">
       {history.map(attempt => <li key={attempt.id} className="py-3 text-sm">
-        <details>
-          <summary className="cursor-pointer">
-            <strong>{attempt.courseUnitTitle ?? "Course unit"}</strong>
-            <span className="ml-2 text-muted-foreground">· {attempt.trackTitle ?? "Recorded teacher"}</span>
-            <span className="ml-2 text-xs text-muted-foreground">
-              {new Date(attempt.recordedAt).toISOString().slice(0, 10)}
-            </span>
-          </summary>
+        <DisclosureSection headingLevel="h4" title={attempt.courseUnitTitle ?? "Course unit"}
+          description={`${attempt.trackTitle ?? "Recorded teacher"} · ${new Date(attempt.recordedAt).toISOString().slice(0, 10)}`}>
           {attempt.answers.length ? <ol className="mt-3 space-y-3 border-l pl-4">
             {attempt.answers.map((answer, index) => <li key={`${answer.promptKey}:${index}`}>
               <p className="font-medium">{answer.promptText}</p>
@@ -424,7 +421,7 @@ export function RecordedPracticeHistory({ history }: { history: PracticeHistory 
           </ol> : <p className="mt-2 text-xs text-muted-foreground">
             Saved responses are not available for this attempt.
           </p>}
-        </details>
+        </DisclosureSection>
       </li>)}
     </ol>
   </section>;

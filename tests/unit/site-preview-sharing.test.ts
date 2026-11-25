@@ -4,62 +4,17 @@ import type { SiteLaunchPreferences } from "@/domain/site-launch-preferences";
 import { describe, expect, it } from "vitest";
 import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
 import {
-  activePreviewShare, createPreviewShareToken, hashPreviewShareToken,
-  projectShareableSitePreview, readSitePreviewShares, renderSharedSitePreview, sitePreviewShareHeaders,
-  validPreviewShareToken,
+  projectShareableSitePreview, renderSharedSitePreview, sitePreviewShareHeaders,
 } from "@/domain/site-preview-sharing";
 
-const siteId = "00000000-0000-4000-8000-000000000001";
-const today = new Date("2026-11-19T12:00:00.000Z");
-
-function sampleShare(overrides: Record<string, unknown> = {}) {
-  const { token, tokenDigest } = createPreviewShareToken();
-  const share = {
-    id: "00000000-0000-4000-8000-000000000002",
-    tokenDigest,
-    createdAt: "2026-11-18T12:00:00.000Z",
-    expiresAt: "2026-11-26T12:00:00.000Z",
-    revokedAt: null,
-    sourceRevision: 12,
-    pages: {
-      "/": `<!doctype html><html><head><title>School</title></head><body>
-        <a href="/">Home</a><a href="/about">About</a><a href="/apply">Apply</a>
-        <form action="/apply" method="post"><input name="child"></form>
-        </body></html>`,
-      "/about": "<!doctype html><html><head><title>About</title></head><body>About</body></html>",
-    },
-    ...overrides,
-  };
-  return { token, share };
-}
-
+const code="K7x2p9AaB3cD";
+const pages={"/":'<html><head><title>School</title></head><body><a href="/">Home</a><a href="/about">About</a><a href="/apply">Apply</a><form action="/apply"><input name="child"></form></body></html>',"/about":"<html>About</html>"};
 describe("Site website share preview safety", () => {
-  it("uses high-entropy, nonrecoverable bearer digests", () => {
-    const one = createPreviewShareToken();
-    const two = createPreviewShareToken();
-    expect(validPreviewShareToken(one.token)).toBe(true);
-    expect(one.token).not.toBe(two.token);
-    expect(one.tokenDigest).toBe(hashPreviewShareToken(one.token));
-    expect(one.tokenDigest).toMatch(/^[a-f0-9]{64}$/);
-    expect(one.tokenDigest).not.toContain(one.token);
-    expect(validPreviewShareToken("guess")).toBe(false);
-  });
-
-  it("enforces expiry and immediate revocation for every subsequent GET", () => {
-    const { token, share } = sampleShare();
-    expect(activePreviewShare([share], token, today)?.sourceRevision).toBe(12);
-    expect(activePreviewShare([share], token + "A", today)).toBeNull();
-    expect(activePreviewShare([share], token, new Date("2026-11-26T12:00:00.000Z"))).toBeNull();
-    expect(activePreviewShare([{ ...share, revokedAt: "2026-11-19T12:00:00.000Z" }],
-      token, today)).toBeNull();
-  });
-
   it("freezes a sanitized snapshot and disables enrollment and external links", () => {
-    const { token, share } = sampleShare();
-    const html = renderSharedSitePreview(share.pages["/"], siteId, token, Object.keys(share.pages));
+    const html = renderSharedSitePreview(pages["/"], code, Object.keys(pages));
     expect(html).toContain("Proposed learning community");
     expect(html).toContain("Not published or independently approved");
-    expect(html).toContain("/site-preview-share?");
+    expect(html).toContain("/go/"+code+"?");
     expect(html).toContain("page=%2Fabout");
     expect(html).not.toContain("<form");
     expect(html).not.toContain('href="/apply"');
@@ -138,12 +93,7 @@ describe("Site website share preview safety", () => {
     })).toEqual([]);
   });
 
-  it("rejects invalid persisted share metadata rather than displaying private content", () => {
-    const { share } = sampleShare();
-    expect(readSitePreviewShares({})).toEqual([]);
-    expect(readSitePreviewShares({ websitePreviewSharesV1: [share] })).toHaveLength(1);
-    expect(() => readSitePreviewShares({ websitePreviewSharesV1: [{ ...share,
-      pages: { "/admin": "private", "/": "home" },
-    }] })).toThrow();
+  it("rejects invalid Go codes",()=>{
+    expect(()=>renderSharedSitePreview(pages["/"],"../admin",Object.keys(pages))).toThrow();
   });
 });

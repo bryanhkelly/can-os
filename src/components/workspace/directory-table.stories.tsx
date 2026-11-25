@@ -49,8 +49,12 @@ export const SortingAndPaging: Story = {
   render: () => <Example/>,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByRole("columnheader", { name: "Teacher" })).toHaveAttribute("aria-sort", "ascending");
+    await expect(canvas.getByRole("columnheader", { name: "Students" })).not.toHaveAttribute("aria-sort");
     await userEvent.click(canvas.getByRole("button", { name: "Students" }));
     await expect(canvas.getByRole("columnheader", { name: "Students" })).toHaveAttribute("aria-sort", "ascending");
+    await expect(canvas.getByRole("columnheader", { name: "Teacher" })).not.toHaveAttribute("aria-sort");
+    await expect(canvasElement.querySelectorAll("[aria-sort]")).toHaveLength(1);
     await userEvent.click(canvas.getByRole("button", { name: "Students" }));
     await expect(canvas.getByRole("columnheader", { name: "Students" })).toHaveAttribute("aria-sort", "descending");
     await userEvent.click(canvas.getByRole("button", { name: "Next page" }));

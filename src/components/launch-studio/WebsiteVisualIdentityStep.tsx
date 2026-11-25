@@ -1,3 +1,4 @@
+import { SharedPhotoPicker } from "./SharedPhotoPicker";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,8 +10,8 @@ import { SchoolBrandPreview } from "./SchoolBrandPreview";
 import { SchoolMediaFolderManager } from "@/components/operations/SchoolMediaFolderManager";
 import { brandRecommendedPalette, type SiteBrandDirectionId } from "@/domain/site-brand-direction";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
-import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, siteFontCatalog,
-  type SiteTemplateId, type SiteTypographyId, type SiteFontId } from "@/domain/site-theme";
+import { resolveSiteTheme, curatedSitePaletteIds, curatedSitePalettes, siteTypographyIds, siteFontCatalog,
+  type SiteTypographyId, type SiteFontId } from "@/domain/site-theme";
 import type { SiteLocalContent } from "@/domain/site-local-content";
 
 /** Feature presentation only. The route owns revision, draft persistence and authorization. */
@@ -43,19 +44,20 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
         <DisclosureSection title="Colors" defaultOpen>
           <fieldset disabled={busy || !data.canEdit}>
             <legend className="sr-only">Choose a color palette</legend>
+            {!curatedSitePaletteIds.some(id=>id===content.branding.paletteId) && content.branding.paletteId && <p className="mb-3 text-sm text-muted-foreground">Your existing palette is retained until you choose a new one.</p>}
             <div role="group" aria-label="Site color palettes" className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              {sitePaletteIds.map(id=>{
+              {curatedSitePaletteIds.map(id=>{
                 const palette=resolveSiteTheme(id,content.branding.typographyId);
                 const current=(content.branding.paletteId ?? "signature")===id;
                 return <SelectionCard key={id} kind="radio" name="site-color-palette"
                   value={id} checked={current}
                   onChange={checked=>{if(checked)setContent(old=>({...old,branding:{...old.branding,paletteId:id}}));}}
-                  title={id==="signature"?"CAN Signature":id.startsWith("brand-")
-                    ?(schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name??"Site")+" palette":id}
-                  icon={<span className="flex h-5 w-20 shrink-0 overflow-hidden" aria-hidden="true">
+                  title={curatedSitePalettes[id].label}
+                  icon={<span className="flex h-6 w-24 shrink-0 overflow-hidden" aria-hidden="true">
                     <span className="flex-1" style={{backgroundColor:palette.ink}}/>
                     <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
                     <span className="flex-1" style={{backgroundColor:palette.accent}}/>
+                    <span className="flex-1" style={{backgroundColor:palette.surface}}/>
                     <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
                   </span>}
                   className="h-full min-h-16 capitalize" />;
@@ -126,6 +128,8 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
         <DisclosureSection title="Imagery">
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Only use images you have permission to share.</p>
+            <SharedPhotoPicker value={content.branding.sharedHeroPhoto} recommendedTemplate={content.branding.templateId}
+              disabled={busy||!data.canEdit} onChange={photo=>setContent(old=>({...old,branding:{...old.branding,sharedHeroPhoto:photo,heroImage:null}}))}/>
             <WebsiteArtworkField field="heroImage" value={content.branding.heroImage}
               disabled={busy || !data.canPublish} onSelect={selectArtwork}
               onChange={next=>setContent(old=>({...old,branding:{...old.branding,heroImage:next}}))}/>

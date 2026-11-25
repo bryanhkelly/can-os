@@ -1,3 +1,4 @@
+import {emitReportableChange} from "@/platform/reportable-event";
 import { matchesProgramLaunchReplay } from "@/domain/program-launch-replay";
 import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
 import { db } from "@/db/client";
@@ -240,6 +241,8 @@ export async function startProgramLaunch(
         creditIssuingOrganizationId: creditMode === "credit_bearing" ? input.creditIssuingOrganizationId : null,
       },
     });
+
+    if(launchSite)await emitReportableChange(tx,{eventType:EventTypes.SiteProgramLaunchRecorded,sourceId:program.id,sourceVersion:"started:"+journeyId,occurredAt:new Date(),actorPersonId:context.actorPersonId,dimensions:{organizationId:launchSite.organizationId,siteId:launchSite.id,programId:program.id},payload:{stage:"started",journeyId}});
 
     // Close the pre-existing-Site gap: a real Program launch creates (or
     // reuses) its Site's PRIVATE website address in this same transaction.
@@ -543,6 +546,7 @@ export async function activateProgram(
       },
     });
 
+    if(program.siteId)await emitReportableChange(tx,{eventType:EventTypes.SiteProgramLaunchRecorded,sourceId:programId,sourceVersion:"activated:"+activatedAt.toISOString(),occurredAt:activatedAt,actorPersonId:context.actorPersonId,dimensions:{organizationId:program.organizationId,siteId:program.siteId,programId},payload:{stage:"activated",journeyId:journey.id}});
     await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "program.activate",

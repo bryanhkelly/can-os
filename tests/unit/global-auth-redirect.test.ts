@@ -15,7 +15,7 @@ describe("global protected-route authentication",()=>{
     for(const path of ["/access","/access/verify","/access/register","/landing",
       "/landing/cogic","/next/cogic","/site/new","/explore","/interest-event","/family/interest",
       "/family/join","/church/apply","/learn/enroll","/enrichment","/enrichment/season-1",
-      "/site-preview-share","/published-site"])
+      "/go/K7x2p9AaB3cD","/published-site"])
       expect(isPublicCanPath(path)).toBe(true);
     expect(isPublicCanPath("/access-private")).toBe(false);
     expect(isPublicCanPath("/landing-admin")).toBe(false);

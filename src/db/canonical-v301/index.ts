@@ -44,3 +44,7 @@ export * from "./ws3-class-completion";
 
 // WS3 staged independent evidence approval workflow (migration gated).
 export * from "./ws3-evidence-review";
+
+export * from "./submission-revisions";
+
+export * from "./academic-cutover";

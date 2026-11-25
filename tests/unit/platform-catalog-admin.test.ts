@@ -54,7 +54,7 @@ describe("platform-owned Program Catalog and Solution Blueprint authority", () =
 
   it("keeps platform management server-only and planning-only", () => {
     const source = readFileSync("src/modules/blueprints/platform-catalog.functions.ts", "utf8");
-    expect(source).toContain('actor.role !== "app_admin"');
+    expect(source).toContain('!["app_admin","platform_owner"].includes(actor.role)');
     expect(source).toContain("isDemoAccountEmail(account.email)");
     expect(source).toContain('assertCapability(actor, "platform.admin")');
     expect(source).toContain('mayApprovePlatformVersion(authorId, actor.actorPersonId)');

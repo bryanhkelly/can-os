@@ -1,6 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {
-  projectPublisherReleaseNextStep,
+  projectPublisherReleaseNextStep, projectNoncreditPilotBlockers,
   type NativePublisherReleaseRecord,
 } from "@/domain/native-publisher-release-readiness";
 
@@ -47,5 +47,20 @@ describe("publisher Course release inventory is evidence-only",()=>{
       manifestStatus:"approved",lifecycle:"published",approvedAdoptions:1});
     expect(state.key).toBe("class-verification");
     expect(state.detail).toContain("separate live checks");
+  });
+});
+
+describe("noncredit pilot readiness",()=>{
+  it("shows simultaneous content, assessment, policy and release blockers",()=>{
+    const blockers=projectNoncreditPilotBlockers({...baseline,pilotLessonCount:7,pilotPlaceholderCount:7,pilotContentReviewCount:7,pilotAssessmentPendingCount:7,noncreditTrainingStatus:"draft",noncreditAssessmentStatus:"draft",noncreditTrainingApproved:false});
+    expect(blockers).toContain("Replace placeholder instructional media");
+    expect(blockers).toContain("Publish effective completion policy");
+    expect(blockers).toContain("Authorize and publish registration listing");
+    expect(blockers).toContain("Publish independently approved training version");
+  });
+  it("distinguishes a recorded listing from an open window",()=>{
+    const ready={...baseline,pilotLessonCount:4,noncreditTrainingStatus:"published",noncreditTrainingApproved:true,noncreditAssessmentStatus:"published",completionPolicies:1,approvedAdoptions:1,registrationListings:1,openRegistrationListings:0};
+    expect(projectNoncreditPilotBlockers(ready)).toEqual(["Verify currently open registration window"]);
+    expect(projectNoncreditPilotBlockers({...ready,openRegistrationListings:1})).toEqual([]);
   });
 });

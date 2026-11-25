@@ -163,6 +163,8 @@ export const getMyRecordedVideoDrafts = createServerFn({method:"GET"})
       const rows=await tx.select({
         assetId:contentAssets.id,assetVersionId:contentAssetVersions.id,
         title:contentAssets.title,createdAt:contentAssets.createdAt,
+        sha256:contentAssetVersions.sha256,
+        reviewRequestedAt:sql<string|null>`${contentAssetVersions.licenseTerms}->>'reviewRequestedAt'`,
       }).from(contentAssetVersions)
         .innerJoin(contentAssets,eq(contentAssets.id,contentAssetVersions.assetId))
         .where(and(eq(contentAssets.ownerOrganizationId,publisher.organizationId),

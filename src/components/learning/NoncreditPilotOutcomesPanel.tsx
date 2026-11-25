@@ -1,61 +1,91 @@
+import {useProviderReportFilters} from "@/hooks/use-provider-report-filters";
+import {useProviderReportOptions} from "@/hooks/use-provider-report-options";
+import {resolveProviderOutcomeSelection,PROVIDER_REPORT_FILTER_CAPABILITIES} from "@/domain/report-filter-state";
+import {ProviderReportFilters} from "@/components/reports/ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
+import {ReportDateFilter} from "@/components/workspace/report-date-filter";
+import {reportDefinitionId} from "@/domain/report-catalog";
+import { ReportDocumentView } from "@/components/workspace/report-document";
+import { bindRegisteredCounts,pilotOutcomeDefinitions } from "@/domain/reporting-view-definitions";
 import { Button } from "@/components/ui/button";
-import { EmptyState, QueryState } from "@/components/workspace";
+import { DisclosureSection, EmptyState, QueryState, WorkspaceNotice } from "@/components/workspace";
 import { getNoncreditPilotOutcomes } from "@/modules/learning/noncredit-pilot-outcomes.functions";
+import {ReportMetricCard} from "@/components/workspace/report-metric-card";
+import {formatReportValue} from "@/domain/report-value-format";
 import { NONCREDIT_PILOT_COUNT_DEFINITIONS } from "@/domain/noncredit-pilot-outcomes";
-type Report=Awaited<ReturnType<typeof getNoncreditPilotOutcomes>>;
 
-const count=(n:number)=>n.toLocaleString("en-US");
+const count=(n:number)=>formatReportValue(n);
 
 /** Reusable, provider-only learning-outcomes panel, using Design System 6.1. */
 export function NoncreditPilotOutcomesPanel(){
-  const [showDefinitions,setShowDefinitions]=useState(false);
-  const query=useQuery<Report>({
-    queryKey:["noncredit-pilot-outcomes"],
-    queryFn:()=>getNoncreditPilotOutcomes({data:{}}),
-    retry:false,
-    staleTime:30_000,
+  const scope=usePrivateReportScope();
+  const controller=useProviderReportFilters(scope);
+  const {geography,siteId,outcomePeriod:{range}}=controller.filters;
+  const basis=PROVIDER_REPORT_FILTER_CAPABILITIES["noncredit-registration-outcomes"].geographyBasis;
+  const options=useProviderReportOptions(scope,basis,controller.filters);
+  const selection=resolveProviderOutcomeSelection(controller.filters,new Date());
+  const {rolling}=selection;
+  const {query,data:report}=usePrivateReportQuery({
+    scope,key:selection.key,
+    enabled:options.ready&&selection.valid,read:()=>getNoncreditPilotOutcomes({data:selection.input}),
   });
-  const report=query.data;
   const summary=report?.totals;
+  if(scope===null)return <WorkspaceNotice tone="attention">A current verified provider session is required to view program evidence.</WorkspaceNotice>;
   return <section aria-label="Noncredit program evidence" className="space-y-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="space-y-1">
         <h2 className="font-serif text-2xl font-semibold">Program evidence</h2>
         <p className="text-sm text-muted-foreground">
-          Private provider-scoped outcomes for the previous 90 days.
+          Private provider-scoped outcomes for the selected registration cohort.
           Unique learner reach is deduplicated across authorized Sites and training
           registrations. Learning, feedback and completion are tracked per registration.
         </p>
         {report&&<p className="text-xs text-muted-foreground">
-          Reporting window (UTC): {report.from.slice(0,10)} inclusive to {report.to.slice(0,10)} exclusive.
+          Reporting window (UTC): {report.from} inclusive to {report.to} exclusive.
         </p>}
       </div>
-      <Button type="button" size="sm" variant="outline" disabled={query.isFetching}
+      <Button type="button" size="sm" variant="outline" disabled={!options.ready||!selection.valid||query.isFetching}
         loading={query.isFetching} onClick={()=>void query.refetch()}>
         Refresh evidence
       </Button>
     </div>
-    <QueryState loading={query.isPending?"Loading verified program evidence…":undefined}
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">{rolling?"Showing the last 90 days through the current time (including today).":"Showing a selected closed UTC cohort."}</p>
+      {!rolling&&<Button type="button" variant="outline" size="sm" disabled={query.isFetching} onClick={()=>controller.dispatch({type:"rolling"})}>Use rolling 90 days</Button>}
+      <ProviderReportFilters controller={controller} options={options} basis={basis}/>
+      <ReportDateFilter key={range.fromDay+":"+range.untilDay} initial={range} maxDays={366} onApply={next=>{
+        if(!rolling&&next.fromDay===range.fromDay&&next.untilDay===range.untilDay){if(options.ready)void query.refetch();}else controller.dispatch({type:"closed",range:next});
+      }} disabled={query.isFetching}/>
+    </div>
+    {options.ready&&selection.valid&&<QueryState loading={query.isPending||query.isFetching?"Loading verified program evidence…":undefined}
       error={query.isError?"Program evidence is unavailable or exceeds the bounded report size.":undefined}
-      retrying={query.isFetching} onRetry={()=>void query.refetch()}/>
+      retrying={query.isFetching} onRetry={()=>void query.refetch()}/>}
+    {options.ready&&!selection.valid&&<WorkspaceNotice tone="attention">Choose a valid completed UTC reporting period.</WorkspaceNotice>}
     {summary?.registrations===0&&<EmptyState
       title="No registrations in this reporting window"
-      description="Publish approved training and an enrollment release. Results appear here after learners register and participate."/>}
+      description="No registrations match the selected Site, historical geography and reporting period."/>}
     {summary&&summary.registrations>0&&<>
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {NONCREDIT_PILOT_COUNT_DEFINITIONS.map(def=>{
           const value=def.key==="distinctLearners"
             ?report!.distinctLearners
             :summary[def.key];
-          return <div key={def.key} className="border border-border bg-card p-4">
-            <dt className="text-xs text-muted-foreground">{def.label}</dt>
-            <dd className="mt-2 text-2xl font-semibold tabular-nums">{count(value)}</dd>
-          </div>;
+          return <ReportMetricCard key={def.key} item={{id:def.key,label:def.label,value,asOf:report!.asOf}}/>;
         })}
-      </dl>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <ReportMetricCard item={{id:"participant-hours",label:"Recorded participant hours",value:summary.verifiedParticipationMinutes/60,format:"hours",hint:"Verified minutes divided by 60; not unique person time"}}/>
+        <ReportMetricCard item={{id:"delivery-sites",label:"Delivery Sites with registrations",value:report!.deliverySites,hint:"Authorized Sites, not a count of congregations"}}/>
+      </div>
+      <ReportDocumentView report={{version:1,definitionId:reportDefinitionId("noncredit-registration-outcomes"),title:"Registration outcomes",
+        scopeLabel:(options.sites.data?.find(option=>option.id===siteId)?.label??(siteId||"All authorized Sites"))+" · "+(options.geography.data?.find(option=>option.code===geography)?.name??(geography||"All delivery geographies")),asOf:report!.asOf,basis:"Registration cohort; evidence current at report generation",
+        definitions:pilotOutcomeDefinitions(),blocks:[{id:"outcomes",kind:"chart",spec:{
+          title:"Registration outcome counts",description:"Measures overlap; do not add them or treat them as a sequential funnel.",
+          valueLabel:"Registrations",kind:"comparison",format:"count",
+          points:bindRegisteredCounts(pilotOutcomeDefinitions(),summary),
+        }}]}}/>
+      <WorkspaceNotice>Only source-verified participation minutes are counted. Lesson ticks, playback and registrations are not evidence of attendance. National congregation reach requires independently authorized network attribution.</WorkspaceNotice>
       <div className="border border-border bg-card p-4">
         <h3 className="font-semibold">Demonstrated learning improvement</h3>
         <p className="mt-1 text-sm">
@@ -68,14 +98,8 @@ export function NoncreditPilotOutcomesPanel(){
           proof of verified participation minutes.
         </p>
       </div>
-      <section className="border border-border bg-card p-4">
-        <Button type="button" variant="ghost" aria-expanded={showDefinitions}
-          onClick={()=>setShowDefinitions(v=>!v)}
-          className="flex w-full justify-between gap-4 px-0 text-left">
-          Metric definitions and evidence sources
-          <span aria-hidden="true">{showDefinitions?"−":"+"}</span>
-        </Button>
-        {showDefinitions&&<Table scrollLabel="Pilot metric definitions" aria-label="Pilot metric definitions"
+      <DisclosureSection title="Metric definitions and evidence sources">
+        <Table scrollLabel="Pilot metric definitions" aria-label="Pilot metric definitions"
           className="mt-3 w-full min-w-[36rem] text-left text-sm">
           <TableCaption className="sr-only">Pilot metric definitions and authoritative sources</TableCaption>
           <TableHeader className="border-b border-border">
@@ -91,8 +115,8 @@ export function NoncreditPilotOutcomesPanel(){
               <TableCell className="p-3 font-mono text-xs">{def.source}</TableCell>
               <TableCell className="p-3">{def.denominator}. {def.rule} {def.timeBasis}.</TableCell>
             </TableRow>)}</TableBody>
-        </Table>}
-      </section>
+        </Table>
+      </DisclosureSection>
       {!!report?.byTraining.length&&<div className="border border-border bg-card">
         <Table scrollLabel="Training participation and outcome counts" aria-label="Training participation and outcome counts" className="w-full text-left text-sm"><TableCaption className="sr-only">Training participation and outcome counts</TableCaption>
           <TableHeader className="border-b bg-muted/40 text-xs text-muted-foreground">

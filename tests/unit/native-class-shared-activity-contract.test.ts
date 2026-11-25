@@ -3,6 +3,22 @@ import { describe,expect,it } from "vitest";
 
 const read=(path:string)=>readFileSync(path,"utf8");
 describe("native Class reuses canonical assessment and survey engines",()=>{
+  it("shares the same Class publication and Site authority across discovery and instruction",()=>{
+    const authority=read("src/modules/classes/native-class-authority.server.ts");
+    const participation=read("src/modules/learning/canonical-course-participation.server.ts");
+    const directory=read("src/modules/classes/native-class-student-home.functions.ts");
+    expect(directory).toContain("currentClassAuthority(tx,item.classId,now)");
+    expect(participation).toContain("currentClassAuthority(tx,classInstance.id,now,{allowCompletedHistory})");
+    expect(participation).toContain("authorizeNativeClassAttempt({");
+    expect(participation).not.toContain("siteOrganizationRoles");
+    expect(participation).not.toContain("educationOperationOrganizationRoles");
+    expect(participation).not.toContain("classroomDeploymentSites");
+    expect(authority).toContain('options.allowCompletedHistory===true && r.classState==="completed"');
+    expect(authority).toContain("if(!r.siteId)throw new AuthorizationError");
+    expect(authority).toContain("eq(catalogSites.status,\"active\")");
+    expect(authority).toContain("eq(educationOperationOrganizationRoles.status,\"approved\")");
+    expect(authority).toContain("gt(deploymentOfferingAdoptions.validThrough,now)");
+  });
   it("requires a real Class Course Attempt and independent provider-issued learner grant",()=>{
     const scope=read("src/modules/learning/native-class-assessment-scope.server.ts");
     const authorizer=read("src/modules/learning/canonical-course-participation.server.ts");

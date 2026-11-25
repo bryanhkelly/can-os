@@ -1,3 +1,7 @@
+import {NetworkReportingReadinessPanel} from "@/components/reports/NetworkReportingReadinessPanel";
+import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
+import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
+import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -39,6 +43,7 @@ function isValidTimezone(value: string) {
 
 function NetworkSites({ data }: { data: NetworkData }) {
   const router = useRouter();
+  const engagementSurface:OwnerEngagementSurface={owner:{kind:"organization",organizationId:data.organization.id},sites:data.sites};
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [timezone, setTimezone] = useState("America/Los_Angeles");
@@ -110,6 +115,13 @@ function NetworkSites({ data }: { data: NetworkData }) {
         </article>)}
         {data.affiliations.length === 0 && <p className="text-sm text-muted-foreground">No school affiliation requests yet.</p>}
       </div>
+    </section>
+    <NetworkReportingReadinessPanel/>
+    <section id="network-engagement" className="mt-8 space-y-4">
+      <h2 className="font-serif text-2xl">Network invitations and distribution</h2>
+      <p className="text-sm text-muted-foreground">Publish an HQ invitation and distribute a Go Link without transferring ownership of independent affiliates. Training registration requires a currently authorized HQ-operated delivery Site.</p>
+      <UniversalEngagementPublisher key={"publish:"+data.organization.id} ownerSurface={engagementSurface}/>
+      <SiteEngagementLibrary key={"library:"+data.organization.id} ownerSurface={engagementSurface}/>
     </section>
     <section id="network-create" className="mt-8  border bg-card p-5">
       <h2 className="font-serif text-2xl">Add a headquarters-operated location</h2>

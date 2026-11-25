@@ -1,3 +1,4 @@
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 /**
  * V6.1 Launch Studio module destinations. Show real owned capabilities and
  * honest planned states instead of a shared "not connected" placeholder.
@@ -23,7 +24,7 @@ type Destination = {
   note: string;
   links: readonly ModuleLink[];
 };
-const scope = (siteId: string) => encodeURIComponent(siteId);
+const scope = (siteId: string) => compactUuidUrlValue(siteId);
 export const launchModuleDestinationsV61: Record<DestinationModuleId, Destination> = {
   open: {
     subtitle: "Ready to welcome participants?",
@@ -55,7 +56,7 @@ export function LaunchModuleDestinationV61({ module, title, stage, siteId }: {
       next: destination.note }} />}>
     <div className="mt-5 space-y-5">
       {module === "open" && <LaunchReadinessPanelV61 siteId={siteId} context="open" />}
-      <WorkspacePanel title={module === "open" ? "Welcome participants" : "Your next steps"}
+      <WorkspacePanel title={module === "open" ? "Next steps to open" : "Your next steps"}
         description={module === "open"
           ? "Check readiness, then open registration for each eligible offering."
           : "Open the existing authorized workspace, retaining the selected Site where that destination supports it."}>

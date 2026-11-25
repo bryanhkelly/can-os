@@ -6,6 +6,8 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, EmptyState, StatCard, WorkspaceNotice } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
+import { NativeStudentClassHome } from "@/components/learning/NativeStudentClassHome";
 import { ClassroomWorkspace } from "@/components/learning/ClassroomWorkspace";
 import { StudentAssignmentLink } from "@/components/student/StudentAssignmentLink";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
@@ -18,7 +20,8 @@ const loadCourseRegistration=async(section?:string)=>{
  const registration=await getCourseRegistration();
  const enrolled=registration.viewerRole==="student"&&registration.sections.some(item=>item.id===section&&item.enrollmentStatus==="active");
  const classwork=enrolled?(await getAssignments()).assignments.filter(item=>item.sectionId===section):[];
- return {...registration,classwork};
+ const native = registration.viewerRole==="student" ? await safeLoader(() => getMyStudentClasses())() : null;
+ return {...registration,classwork,native};
 };
 export const Route=createFileRoute("/student/courses")({
  validateSearch:(search:Record<string,unknown>):{section?:string;view?:"catalog";tab?:"overview"|"classwork"|"grades"}=>({
@@ -34,7 +37,21 @@ function CourseRegistrationPage(){
  const outcome=Route.useLoaderData();
  const search=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="Academics" title="Choose your classes." outcome={outcome}/>;
- if(outcome.data.viewerRole==="student"&&search.view!=="catalog")return <StudentClasses data={outcome.data}/>;
+ if(outcome.data.viewerRole==="student"&&search.view!=="catalog") {
+   if(!search.section && outcome.data.native?.ok && outcome.data.native.data.kind==="student" &&
+     outcome.data.native.data.classes.some(item=>item.status==="active" || item.status==="pending")) {
+     const requests=outcome.data.requests.filter(item=>["open","in_progress","waiting"].includes(item.status));
+     return <NativeStudentClassHome classes={outcome.data.native.data.classes} navigation={<>
+       <Button asChild variant="outline"><Link to="/student/courses" search={{view:"catalog"}}>Course catalog / registration</Link></Button>
+       {requests.length>0&&<WorkspacePanel title="Pending class changes" className="mt-4">
+         {requests.map(request=><p key={request.id} className="mt-2 text-sm"><Link to="/student/courses" search={{view:"catalog",section:request.sectionId}} className="underline">{request.title}</Link> · {request.status}</p>)}
+       </WorkspacePanel>}
+     </>}/>;
+   }
+   if(!search.section && outcome.data.native && !outcome.data.native.ok)
+     return <LoaderFailure eyebrow="Academics" title="Your classes" outcome={outcome.data.native}/>;
+   return <StudentClasses data={outcome.data}/>;
+ }
  return <CourseRegistrationView data={outcome.data}/>;
 }
 function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCourseRegistration>>}){
@@ -117,7 +134,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
 /** Same V6.1 class actions in every student context; no parallel navigation path. */
 function StudentClassActions({sectionId}:{sectionId:string}) {
  return <nav aria-label="Class learning actions" className="mt-5 flex flex-wrap gap-3">
-  <Button asChild><Link to="/class" >Open classroom</Link></Button>
+  <Button asChild><Link to="/class" >Choose native classroom</Link></Button>
   <Button asChild variant="outline"><Link to="/student/assignments" search={{section:sectionId}}>Classwork</Link></Button>
  </nav>;
 }
@@ -131,7 +148,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
  
  const connections=course?<WorkspacePanel title="Class connections">
    <nav aria-label="Class connections" className="grid gap-4 text-sm">
-    <Link to="/class"  className="underline">Class lessons, files and announcements</Link>
+    <Link to="/class"  className="underline">Choose native classroom</Link>
     <Link to="/student/assignments" search={{section:course.id}} className="underline">View class assignments</Link>
     <Link to="/student/discussions" search={{section:course.id}} className="underline">Class discussion</Link>
     <Link to="/calendar" search={{section:course.id}} className="underline">Class schedule</Link>
@@ -168,7 +185,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
    </div>:<>
     <DetailNavigation label="Class detail">
      <SectionTab current={tab==="overview"} link={{to:"/student/courses",search:{section:course.id,tab:"overview"}}}>Overview</SectionTab>
-     <SectionTab current={false} link={{to:"/class"}}>Classroom</SectionTab>
+     <SectionTab current={false} link={{to:"/class"}}>Native classes</SectionTab>
      {(["classwork","grades"] as const).map(value=><SectionTab key={value} current={tab===value} link={{to:"/student/courses",search:{section:course.id,tab:value}}}>{value==="classwork"?"Classwork":"Grades & feedback"}</SectionTab>)}
     </DetailNavigation>
     {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>

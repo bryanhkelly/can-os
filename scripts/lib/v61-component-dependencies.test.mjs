@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import ts from "typescript";
-import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency } from "./v61-component-dependencies.mjs";
+import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency, runtimeDependencySpecifiers, featureRuntimeImportViolation } from "./v61-component-dependencies.mjs";
 
 test("V6.1 primitives can only depend on other primitives and utilities", () => {
   const file = "src/components/ui/field.tsx";
@@ -62,4 +62,38 @@ test("source resolver treats relative paths and aliases as the same dependency",
   assert.equal(resolveSourceDependency(file, "@/db/canonical-v301"), "src/db/canonical-v301");
   assert.equal(resolveSourceDependency(file, "../../db/canonical-v301"), "src/db/canonical-v301");
   assert.equal(resolveSourceDependency(file, "react"), null);
+});
+
+test("runtime feature boundaries distinguish erased types from server execution", () => {
+  const file = "src/components/launch-studio/Editor.tsx";
+  const parsed = ts.createSourceFile(file, `
+    import type { Row } from "@/modules/example/store.server";
+    export type { Model } from "@/modules/example/model.server";
+    type T = import("@/modules/example/types.server").T;
+    import { type Other } from "@/modules/example/unsafe.server";
+    import { load } from "@/modules/example/read.functions";
+    export { write } from "../../modules/example/write.server.ts";
+    const lazy = import("@/modules/example/lazy.server");
+    const db = require("drizzle-orm");
+    const chart = import("recharts/lib/chart/BarChart");
+  `, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const references = runtimeDependencySpecifiers(parsed, ts);
+  assert.deepEqual(references, [
+    "@/modules/example/unsafe.server", "@/modules/example/read.functions",
+    "../../modules/example/write.server.ts", "@/modules/example/lazy.server",
+    "drizzle-orm", "recharts/lib/chart/BarChart",
+  ]);
+  const violations = references.filter(specifier => featureRuntimeImportViolation(file, specifier));
+  assert.equal(violations.length, 5);
+  assert.equal(featureRuntimeImportViolation(file, "@/modules/example/read.functions"), null);
+  assert.equal(featureRuntimeImportViolation("src/components/workspace/report-chart-plot.tsx", "recharts"), null);
+  assert.equal(featureRuntimeImportViolation("src/modules/example/read.functions.ts", "drizzle-orm"), null);
+});
+
+test("all source layers must use the governed chart surface",()=>{
+  assert.match(featureRuntimeImportViolation("src/routes/reports.tsx","recharts"),/shared reporting plot adapter/);
+  assert.match(featureRuntimeImportViolation("src/components/reports/Feature.tsx","../workspace/report-chart-plot"),/consume ReportChart/);
+  assert.match(featureRuntimeImportViolation("src/routes/reports.tsx","@/components/workspace/report-chart-plot.tsx"),/consume ReportChart/);
+  assert.equal(featureRuntimeImportViolation("src/components/workspace/report-chart.tsx","./report-chart-plot"),null);
+  assert.equal(featureRuntimeImportViolation("src/routes/reports.tsx","@/components/workspace/report-chart"),null);
 });

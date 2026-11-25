@@ -1,0 +1,204 @@
+#!/usr/bin/env node
+/**
+ * Fail-closed, READ-ONLY release gate against the exact deployment DATABASE_URL.
+ * Does not apply SQL or migrate production and never logs credentials, IDs or
+ * application records. Run BEFORE deploying Cloudflare.
+ */
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { neon } from "@neondatabase/serverless";
+import { assertFriendlyUrlDeployment } from "../lib/friendly-url-deploy-guards.mjs";
+
+if (!process.env.DATABASE_URL)
+  throw new Error("BLOCKED: deployment DATABASE_URL is required");
+const sql = neon(process.env.DATABASE_URL);
+const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
+// Production currently ends at 0099. Do not allow the 0105 Go Link schema
+// alone to mask missing Reporting/Identity migrations from 0100 onward.
+// Every new migration added to the release journal is included automatically.
+const migrationEntries = journal.entries.filter(entry => entry.idx >= 100);
+if (migrationEntries.length < 12 ||
+    migrationEntries[0]?.idx !== 100 ||
+    !migrationEntries.some(entry => entry.tag === "0105_site_go_links") ||
+    !migrationEntries.some(entry => entry.tag === "0106_universal_engagement") ||
+    !migrationEntries.some(entry => entry.tag === "0107_site_go_links_private_role_access") ||
+    !migrationEntries.some(entry => entry.tag === "0108_site_go_link_capabilities") ||
+    !migrationEntries.some(entry => entry.tag === "0109_site_go_link_reuse") ||
+    !migrationEntries.some(entry => entry.tag === "0110_universal_engagement_private_role_access") ||
+    !migrationEntries.some(entry => entry.tag === "0111_delegation_and_go_link_null_invariants") ||
+    migrationEntries.some((entry, i) => entry.idx !== i + 100))
+  throw new Error("BLOCKED: incomplete or out-of-order deployment migration journal");
+const migrations = migrationEntries.map(entry => ({
+  tag: entry.tag, when: entry.when,
+  hash: createHash("sha256").update(
+    readFileSync("drizzle/" + entry.tag + ".sql"),
+  ).digest("hex"),
+}));
+
+const [identity] = await sql`
+  SELECT current_setting('neon.project_id',true) AS project_id,
+    current_setting('neon.branch_id',true) AS branch_id,
+    current_database() AS database_name
+`;
+const [schema] = await sql`
+  SELECT
+    to_regclass('public.organizations') IS NOT NULL AS organizations,
+    to_regclass('public.sites') IS NOT NULL AS sites,
+    to_regclass('public.site_marketing_packages') IS NOT NULL AS marketing_packages,
+    to_regclass('public.site_go_links') IS NOT NULL AS go_links,
+    to_regclass('public.site_go_link_daily_visits') IS NOT NULL AS go_link_daily_visits,
+    to_regclass('public.engagement_definitions') IS NOT NULL AS engagement_definitions,
+    to_regclass('public.engagement_definition_versions') IS NOT NULL AS engagement_versions
+`;
+const names = Object.keys(schema);
+if (names.some(name => schema[name] !== true))
+  throw new Error("BLOCKED: required migration tables missing: " + names.filter(name => !schema[name]).join(", "));
+
+// Refer only to the new table after confirming it exists, to distinguish
+// unapplied migrations from privilege errors or a missing database.
+const [schemaChecks] = await sql`
+  SELECT
+    (SELECT relrowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.site_go_links')) AS go_link_rls,
+    (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.site_go_links')) AS go_link_private,
+    (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.engagement_definitions')) AS engagement_definitions_private,
+    (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.engagement_definition_versions')) AS engagement_versions_private,
+    (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.site_go_link_daily_visits')) AS go_link_daily_visits_private,
+    (SELECT relrowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.sites')) AS site_rls,
+    (SELECT relrowsecurity FROM pg_class
+      WHERE oid=to_regclass('public.organizations')) AS organization_rls,
+    EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+      AND indexname='site_go_links_code_uq' AND indexdef ILIKE '%UNIQUE INDEX%')
+      AS unique_go_code,
+    EXISTS(SELECT 1 FROM pg_constraint
+      WHERE conname='site_go_links_code_ck' AND conrelid=to_regclass('public.site_go_links'))
+      AS valid_go_code_constraint,
+    EXISTS(SELECT 1 FROM pg_constraint
+      WHERE conname='site_go_links_status_ck'
+        AND conrelid=to_regclass('public.site_go_links')
+        AND pg_get_constraintdef(oid) ILIKE '%paused%')
+      AS valid_go_lifecycle_constraint,
+    EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+      AND indexname='site_go_link_daily_visits_day_uq' AND indexdef ILIKE '%UNIQUE INDEX%')
+      AS unique_go_daily_counter,
+    EXISTS(SELECT 1 FROM pg_attribute
+      WHERE attrelid=to_regclass('public.site_go_links')
+        AND attname='package_id' AND attnotnull=false AND NOT attisdropped)
+      AS optional_go_outreach_package,
+    EXISTS(SELECT 1 FROM pg_attribute
+      WHERE attrelid=to_regclass('public.site_go_links')
+        AND attname='request_id' AND atttypid='uuid'::regtype AND NOT attisdropped)
+      AS go_idempotency_key,
+    EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+      AND indexname='site_go_links_request_uq' AND indexdef ILIKE '%UNIQUE INDEX%')
+      AS unique_go_idempotent_request,
+    EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+      AND indexname='site_go_links_site_page_idx')
+      AS go_site_page_index,
+    EXISTS(SELECT 1 FROM pg_constraint WHERE
+      conrelid=to_regclass('public.site_go_links') AND
+      conname='site_go_links_request_fingerprint_ck' AND
+      pg_get_constraintdef(oid) ILIKE '%request_fingerprint IS NOT NULL%')
+      AS valid_go_idempotency_constraint,
+    (SELECT count(*)=3 FROM pg_attribute
+      WHERE attrelid=to_regclass('public.site_go_link_daily_visits')
+        AND attname IN ('link_opens','page_views','redirect_responses')
+        AND atttypid='integer'::regtype AND attnotnull AND NOT attisdropped) AS typed_go_observations,
+    EXISTS(SELECT 1 FROM pg_constraint
+      WHERE conrelid=to_regclass('public.site_go_link_daily_visits')
+        AND conname='site_go_link_daily_visits_response_counts_ck' AND convalidated) AS valid_go_observation_counts,
+    EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.access_sessions'::regclass
+      AND conname='access_sessions_owner_delegation_ck' AND convalidated
+      AND pg_get_constraintdef(oid) ILIKE '%delegated_mode IS NOT NULL%'
+      AND pg_get_constraintdef(oid) ILIKE '%delegated_reason IS NOT NULL%') AS strict_owner_delegation_shape,
+    EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.access_sessions'::regclass
+      AND conname='access_sessions_delegated_grant_id_fkey' AND confdeltype='r' AND convalidated) AS owner_delegation_restrict_delete
+`;
+const [roleChecks] = await sql`
+  SELECT
+    (SELECT count(*)::int FROM pg_roles r
+      WHERE r.rolname IN ('anonymous','authenticated')) AS count,
+    (SELECT count(*)::int FROM pg_roles r
+      WHERE r.rolname IN ('anonymous','authenticated')
+      AND (has_table_privilege(r.oid,'public.sites','SELECT')
+        OR has_table_privilege(r.oid,'public.organizations','SELECT')
+        OR has_table_privilege(r.oid,'public.site_go_links','SELECT')
+        OR has_table_privilege(r.oid,'public.engagement_definitions','SELECT,INSERT,UPDATE,DELETE')
+        OR has_table_privilege(r.oid,'public.engagement_definition_versions','SELECT,INSERT,UPDATE,DELETE')
+        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','SELECT')
+        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','INSERT')
+        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','UPDATE')
+        OR has_table_privilege(r.oid,'public.site_go_link_daily_visits','DELETE')
+        OR has_table_privilege(r.oid,'public.site_go_links','INSERT')
+        OR has_table_privilege(r.oid,'public.site_go_links','UPDATE')
+        OR has_table_privilege(r.oid,'public.site_go_links','DELETE')))
+      AS unauthorized_selects,
+    (has_table_privilege(current_user,'public.sites','SELECT')
+      AND has_table_privilege(current_user,'public.organizations','SELECT')
+      AND has_table_privilege(current_user,'public.site_go_links','SELECT')
+      AND has_table_privilege(current_user,'public.engagement_definitions','SELECT')
+      AND has_table_privilege(current_user,'public.engagement_definition_versions','SELECT')
+      AND has_table_privilege(current_user,'public.site_go_link_daily_visits','SELECT'))
+      AS application_can_read,
+    (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user)
+      AS application_can_bypass_go_rls,
+    (has_table_privilege(current_user,'public.site_go_link_daily_visits','INSERT')
+      AND has_table_privilege(current_user,'public.site_go_link_daily_visits','UPDATE'))
+      AS application_can_count_redirects
+`;
+// A scoped gateway is mandatory for public registry access. The broader
+// catalog and authenticated management services retain their existing role.
+const [gateway] = await sql`
+  SELECT EXISTS (
+    SELECT 1 FROM pg_roles r WHERE r.rolname='can_go_gateway'
+      AND NOT (r.rolcanlogin OR r.rolbypassrls OR r.rolsuper OR r.rolcreaterole OR r.rolcreatedb)
+      AND pg_has_role(current_user,r.oid,'MEMBER')
+      AND NOT has_table_privilege(r.oid,'public.site_go_links','SELECT,INSERT,UPDATE,DELETE')
+      AND has_column_privilege(r.oid,'public.site_go_links','code','SELECT')
+      AND NOT has_column_privilege(r.oid,'public.site_go_links','created_by_person_id','SELECT')
+      AND NOT has_table_privilege(r.oid,'public.site_go_link_daily_visits','DELETE,TRUNCATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','INSERT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','UPDATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','link_opens','SELECT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','INSERT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','UPDATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','page_views','SELECT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','INSERT')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','UPDATE')
+      AND has_column_privilege(r.oid,'public.site_go_link_daily_visits','redirect_responses','SELECT')
+  ) AS restricted_gateway,
+  (SELECT count(*)=4 FROM pg_policies WHERE schemaname='public'
+    AND policyname IN ('go_gateway_exact_code','go_gateway_counter_read',
+      'go_gateway_counter_insert','go_gateway_counter_update')
+    AND 'can_go_gateway'=ANY(roles)) AS gateway_policies
+`;
+if(!gateway.restricted_gateway || !gateway.gateway_policies)
+  throw new Error("BLOCKED: scoped Go gateway role/policies or runtime membership missing");
+const [,roleAttestation] = await sql.transaction([
+  sql`SET LOCAL ROLE can_go_gateway`,
+  sql`SELECT current_user='can_go_gateway' AS assumed,
+    count(*)=0 AS unscoped_denied FROM public.site_go_links`,
+]);
+if(!roleAttestation[0]?.assumed||!roleAttestation[0]?.unscoped_denied)
+  throw new Error("BLOCKED: runtime could not assume an isolated Go gateway role");
+const recorded = await sql`
+  SELECT hash, created_at FROM drizzle.__drizzle_migrations
+  WHERE created_at >= ${migrations[0].when}
+
+`;
+assertFriendlyUrlDeployment(
+  {projectId:identity.project_id,branchId:identity.branch_id,databaseName:identity.database_name},
+  {...schema,...schemaChecks},
+  {count:roleChecks.count,unauthorizedSelects:roleChecks.unauthorized_selects,
+    applicationCanRead:roleChecks.application_can_read,
+    applicationCanBypassGoRls:roleChecks.application_can_bypass_go_rls,
+    applicationCanCountRedirects:roleChecks.application_can_count_redirects},
+  recorded.map(item => ({createdAt:item.created_at,hash:item.hash})),
+  migrations,
+);
+console.log("PASS: friendly URLs and Go Links deployment schema/roles match reviewed release. No data changed.");

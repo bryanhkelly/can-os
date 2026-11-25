@@ -84,6 +84,7 @@ export interface WorkspaceNavigationItem {
 export const workspaceHome = {
   account_holder: "/account/",
   app_admin: "/platform",
+  platform_owner: "/platform",
   academic_content_creator: "/class?view=content",
   academic_content_reviewer: "/class?view=reviews",
   site_website_editor: "/home",
@@ -101,6 +102,7 @@ export const workspaceHome = {
   specialist: "/home",
   counselor: "/home",
   network_admin: "/home",
+  reporting_relationship_manager: "/home",
   can_network_steward: "/home",
   can_credential_reviewer: "/canonical/issuer-access",
   can_jurisdiction_reviewer: "/home",
@@ -136,6 +138,7 @@ const siteAdminProfileLink = {
 const roleLinks = {
   account_holder: [{ title: "Classes", path: "/class", icon: "book" }, { title: "My Activity", path: "/learn/my-activity", icon: "book" }],
   app_admin: [],
+  platform_owner: [],
   academic_content_creator: [],
   academic_content_reviewer: [],
   site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
@@ -167,6 +170,7 @@ const roleLinks = {
   safeguarding_responder: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
   safeguarding_lead: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
   network_admin: [],
+  reporting_relationship_manager: [],
   can_network_steward: [
     { title: "Jurisdiction profiles", path: "/operations/jurisdiction-profiles", icon: "clipboard" },
   ],

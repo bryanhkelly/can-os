@@ -220,7 +220,7 @@ integration("public demo school canonical setup", () => {
         const suffix = crypto.randomUUID().slice(0, 8);
         const email = `admin-${suffix}@example.test`;
         let accessUrl = "";
-        await requestSchoolSetupAccess({ name: `Real School ${suffix}`, email,
+        await requestSchoolSetupAccess({ name: `Real School ${suffix}`, email, organizationType: "christian_school",
           firstName: "Real", lastName: "Administrator" }, async message => { accessUrl = message.accessUrl; });
         expect(accessUrl).toContain("https://app.example.test/access/verify#token=");
         const token = new URL(accessUrl).hash.slice("#token=".length);

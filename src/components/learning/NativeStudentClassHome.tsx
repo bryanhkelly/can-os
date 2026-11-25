@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, StatusBadge, WorkspaceLinkNavigation, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 
 export type StudentClass={
@@ -11,6 +11,7 @@ export type StudentClass={
   status:string;
   courseAttemptId:string|null;
   canJoin:boolean;
+  creditMode?:string|null;
 };
 
 /** Ordinary student Class list and navigation. The standard Class enrollment
@@ -19,30 +20,31 @@ export type StudentClass={
 export function NativeStudentClassHome({classes,navigation}:{
   classes:StudentClass[];navigation:ReactNode;
 }){
+  const enrolled=classes.filter(item=>item.status==="active"&&!!item.courseAttemptId);
+  const enrolledIds=new Set(enrolled.map(item=>item.classId));
+  const groups=[{title:"Enrolled Classes",items:enrolled},{title:"Other available Classes",items:classes.filter(item=>!enrolledIds.has(item.classId))}];
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Learning"
     title="My Classes"
     subtitle="Your current Classes and published offerings, based on your verified CAN Site membership.">
     {navigation}
-    <section className="mt-6 space-y-3" aria-label="Student Classes">
-      <h2 className="font-serif text-2xl">Available Classes</h2>
-      {classes.length===0&&<p className="text-sm text-muted-foreground">
-        There are no active Classes available for your Site.
-      </p>}
+    {groups.map(group=><section key={group.title} className="mt-6 space-y-3" aria-label={group.title}>
+      <h2 className="font-serif text-2xl">{group.title}</h2>
+      {group.items.length===0&&<EmptyState title={group.title==="Enrolled Classes"?"No active Class enrollments are available.":"No other Classes are available for your Site."}/>}
       <div className="grid gap-4 md:grid-cols-2">
-        {classes.map(item=>{
+        {group.items.map(item=>{
           const enrolled=item.status==="active"&&!!item.courseAttemptId;
           return <article key={item.classId} className="space-y-3 border border-border bg-card p-5">
             <h3 className="font-serif text-xl">{item.title}</h3>
-            <p className="text-xs text-muted-foreground">
-              {item.deliveryMode.replaceAll("_"," ")} · {enrolled?"Enrolled":
-                item.status==="pending"?"Enrollment pending":"Not enrolled"}
-            </p>
-            {enrolled?<Button asChild>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{item.deliveryMode.replaceAll("_"," ")}</span>
+              <StatusBadge tone={enrolled?"success":item.status==="pending"?"attention":"neutral"}>{enrolled?"Enrolled":item.status==="pending"?"Enrollment pending":"Not enrolled"}</StatusBadge>
+            </div>
+            {enrolled&&item.creditMode==="not_applicable"&&<p className="text-xs text-muted-foreground">Noncredit participation. No academic credit is awarded.</p>}
+            {enrolled?<WorkspaceLinkNavigation label={item.title+" actions"} surface="plain" className="gap-2"><Button asChild>
               <Link to="/class/$classId" params={{classId:item.classId}}
                 search={{view:"learn",tab:"lessons"}}>
                 Open Class
               </Link>
-            </Button>:<div className="space-y-2">
+            </Button><Button asChild variant="outline"><Link to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"assignments"}}>Assignments</Link></Button><Button asChild variant="outline"><Link to="/class/$classId" params={{classId:item.classId}} search={{view:"learn",tab:"progress"}}>Progress</Link></Button></WorkspaceLinkNavigation>:<div className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 {item.status==="pending"
                   ?"Your Class enrollment is awaiting authorization."
@@ -61,6 +63,6 @@ export function NativeStudentClassHome({classes,navigation}:{
           </article>;
         })}
       </div>
-    </section>
+    </section>)}
   </WorkspaceShell>;
 }

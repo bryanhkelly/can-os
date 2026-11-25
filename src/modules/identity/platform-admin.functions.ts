@@ -6,6 +6,7 @@ import { accessAccounts, accessAdultLearningReviews } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import academicIntegritySql from "../../../scripts/acceptance/academic-integrity-inventory.sql?raw";
 
 /**
  * Platform administration is an independently provisioned, account-wide
@@ -17,7 +18,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getCommandContext(getRequest());
     assertCapability(actor, "platform.admin");
-    if (actor.role !== "app_admin" || actor.sessionAccountId ||
+    if (!["app_admin","platform_owner"].includes(actor.role) || actor.sessionAccountId ||
         !actor.accountId || actor.grantSiteId ||
         (actor.scope.organizationIds?.length ?? 0) > 0 ||
         (actor.scope.siteIds?.length ?? 0) > 0) {
@@ -59,7 +60,28 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     // A record's presence is not a current authorization decision.
     const publisherReleaseRows=await db.execute(sql`
       SELECT ov.id AS "offeringVersionId",o.title AS "offeringTitle",
-        ov.version_no AS "versionNo",ov.lifecycle,
+        o.code AS "offeringCode",ov.version_no AS "versionNo",ov.lifecycle,
+        training.state AS "noncreditTrainingStatus",
+        assessment.lifecycle AS "noncreditAssessmentStatus",
+        (training.approved_by_person_id IS NOT NULL) AS "noncreditTrainingApproved",
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id) AS "pilotLessonCount",
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id AND cl.content->>'placeholder'='true')
+          AS "pilotPlaceholderCount",
+        (SELECT count(*)::int FROM public.offering_courses oc
+          JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id AND
+            (cl.content->>'requiresPartnerContentApproval'='true' OR
+             cl.content->>'requiresIndependentReview'='true'))
+          AS "pilotContentReviewCount",
+        (SELECT count(*)::int FROM public.offering_courses oc JOIN public.course_lessons cl ON cl.course_version_id=oc.course_version_id
+          WHERE oc.offering_version_id=ov.id AND cl.content->>'assessmentStatus'='not_published') AS "pilotAssessmentPendingCount",
+        (SELECT count(*)::int FROM public.noncredit_completion_policies p WHERE p.training_version_id=training.id AND p.published_at IS NOT NULL AND p.approved_by_person_id IS NOT NULL AND p.effective_at<=now()) AS "completionPolicies",
+        (SELECT count(*)::int FROM public.noncredit_self_enrollment_releases r WHERE r.training_version_id=training.id AND r.offering_version_id=ov.id AND r.status='published') AS "registrationListings",
+        (SELECT count(*)::int FROM public.noncredit_self_enrollment_releases r WHERE r.training_version_id=training.id AND r.offering_version_id=ov.id AND r.status='published' AND r.opens_at<=now() AND r.closes_at>now()) AS "openRegistrationListings",
         (SELECT count(*)::int FROM public.offering_courses oc
           WHERE oc.offering_version_id=ov.id) AS "courseCount",
         (SELECT count(*)::int FROM public.offering_courses oc
@@ -129,7 +151,10 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
           AS "approvedAdoptions"
       FROM public.offering_versions ov
       JOIN public.offerings o ON o.id=ov.offering_id
-      ORDER BY o.title,ov.version_no DESC,ov.id
+      LEFT JOIN public.noncredit_training_versions training ON training.offering_version_id=ov.id
+      LEFT JOIN public.assessment_versions assessment ON assessment.id=training.assessment_version_id
+      ORDER BY CASE WHEN o.code IN ('CLC-CUSTOM-TRAINING-01','CLC-DIGITAL-01') THEN 0 ELSE 1 END,
+        o.title,ov.version_no DESC,ov.id
       LIMIT 26
     `);
     // Keep the sensitive review UI unavailable until the approved QA/prod
@@ -154,11 +179,33 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
       }).from(accessAdultLearningReviews)
         .orderBy(desc(accessAdultLearningReviews.reviewedAt)).limit(50)
       :[];
+    // Aggregate inventory only, behind the independently verified platform grant.
+    // A failed diagnostic must not prevent the remaining admin workflows.
+    const academicIntegrity = await db.execute(sql.raw(academicIntegritySql)).then(result => ({
+      status: "available" as const,
+      checkedAt: new Date().toISOString(),
+      findings: result.rows.map(item => ({code:String(item.code),priority:String(item.priority),
+        siteId:item.site_id == null ? null : String(item.site_id),
+        siteName:item.site_name == null ? "Unassigned Site" : String(item.site_name), affected:Number(item.affected)})),
+    })).catch(() => ({status:"unavailable" as const,checkedAt:new Date().toISOString(),findings:[]}));
     return {
+      academicIntegrity,
+      platformOwner: actor.role === "platform_owner",
       reviewedAdultIdentityReady,
       publisherReleasesLimited:publisherReleaseRows.rows.length>25,
       publisherReleaseReadiness:publisherReleaseRows.rows.slice(0,25).map(row=>({
         offeringVersionId:String(row.offeringVersionId),
+        offeringCode: String(row.offeringCode??""),
+        noncreditTrainingStatus: row.noncreditTrainingStatus===null?null:String(row.noncreditTrainingStatus),
+        noncreditAssessmentStatus: row.noncreditAssessmentStatus===null?null:String(row.noncreditAssessmentStatus),
+        noncreditTrainingApproved: row.noncreditTrainingApproved===true,
+        pilotLessonCount: Number(row.pilotLessonCount??0),
+        pilotPlaceholderCount: Number(row.pilotPlaceholderCount??0),
+        pilotContentReviewCount: Number(row.pilotContentReviewCount??0),
+        pilotAssessmentPendingCount: Number(row.pilotAssessmentPendingCount??0),
+        completionPolicies: Number(row.completionPolicies??0),
+        registrationListings: Number(row.registrationListings??0),
+        openRegistrationListings: Number(row.openRegistrationListings??0),
         offeringTitle:String(row.offeringTitle),
         versionNo:Number(row.versionNo),
         lifecycle:String(row.lifecycle),

@@ -9,6 +9,7 @@ export const schoolSetupSignups = pgTable("school_setup_signups", {
   accountId: uuid("account_id").notNull().references(() => accessAccounts.id, { onDelete: "cascade" }),
   schoolName: text("school_name").notNull(),
   organizationName: text("organization_name"),
+  organizationType: text("organization_type").$type<"denomination" | "church" | "christian_school" | "microschool_operator" | "consortium" | "other_partner">().notNull().default("other_partner"),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),

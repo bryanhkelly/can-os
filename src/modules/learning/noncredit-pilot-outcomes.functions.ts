@@ -1,4 +1,8 @@
-import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import {selectProviderOutcomeCohort} from "@/domain/report-filter-state";
+import {requireSelectedProviderReportSite} from "@/modules/reporting/provider-report-sites.server";
+import {geographyFilterSchema} from "@/domain/geographic-reporting";
+import {geographyFactPredicate} from "@/modules/geography/reporting-geography.server";
+import { and, asc, desc, eq, gte, inArray, lt, sql, count, notExists } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -8,15 +12,16 @@ import {
   learnerLessonProgress,courseLessons,assessmentAccess,
   assessmentExecutionAttempts,assessmentExecutionResults,
   assessmentFormAdministrations,noncreditCompletionDecisions,
-  surveyInvitations,surveyCampaigns,surveyResponses,noncreditParticipationEvents,
-  noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
+  surveyInvitations,surveyCampaigns,surveyResponses,noncreditParticipationEvents,canonicalClassSurveyCampaigns,
+  noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,evidenceDocumentVersions,
 } from "@/db/canonical-v301";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
-  countDistinctNoncreditLearners,
+  countDistinctNoncreditLearners,buildPilotDisclosureEvidence,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
+import { countVerifiedNoncreditMinutes } from "@/domain/noncredit-completion";
 import { currentNoncreditCompletionStates } from "@/domain/verified-completion-projection";
 
 /**
@@ -27,11 +32,17 @@ import { currentNoncreditCompletionStates } from "@/domain/verified-completion-p
  * and raw questionnaire answers are never returned.
  */
 const params=z.object({
+  geography:geographyFilterSchema,
+  siteId:z.string().uuid().optional(),
   from:z.string().datetime({offset:true}).optional(),
   to:z.string().datetime({offset:true}).optional(),
 }).strict();
 const uuidSet=(values:(string|null)[])=>[...new Set(values.filter((x):x is string=>!!x))];
 const take=5001;
+const evidenceTake=20001;
+function checkEvidenceBound(n:number,name:string){
+  if(n>=evidenceTake)throw new Error(name+" exceeds interactive evidence limit; use partitioned reporting");
+}
 function checkBound(n:number,name:string){
   if(n>=take)throw new Error(name+" exceeds interactive report limit; use partitioned reporting");
 }
@@ -40,9 +51,11 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const {organizationId,siteIds}=await requireCanonicalLabProvider("noncredit.enrollment.read");
-    const to=data.to?new Date(data.to):new Date();
+    const selectedSite=await requireSelectedProviderReportSite(db,{organizationId,siteIds},data.siteId);
+    const generatedAt=new Date();
+    const to=data.to?new Date(data.to):generatedAt;
     const from=data.from?new Date(data.from):new Date(to.getTime()-90*86400000);
-    if(!(to>from)||to.getTime()-from.getTime()>366*86400000)
+    if(!(to>from)||to>generatedAt||to.getTime()-from.getTime()>366*86400000)
       throw new Error("Pilot reporting must use a positive range of no more than 366 days");
     // The operator may deliver a Course published by a different authorized
     // provider. Scope through the operator's approved Site releases, never
@@ -61,7 +74,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       .orderBy(asc(noncreditTrainingVersions.title)).limit(take);
     checkBound(trainings.length,"Published pilot training versions");
     if(!trainings.length)return {
-      from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,
+      from:from.toISOString(),to:to.toISOString(),asOf:generatedAt.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
       totals:summarizeNoncreditPilot([]),byTraining:[],
       publicationSafe:publicationSafePilotSummary(summarizeNoncreditPilot([])),
     };
@@ -74,6 +87,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       offeringVersionId:noncreditRegistrations.offeringVersionId,
       registeringOrganizationId:noncreditRegistrations.registeringOrganizationId,
       registeredAt:noncreditRegistrations.registeredAt,
+      siteId:noncreditSelfEnrollmentClaims.siteId,
+      geographyMatches:sql<boolean>`${geographyFactPredicate(data.geography,sql`${noncreditSelfEnrollmentClaims.siteId}`,sql`${noncreditSelfEnrollmentReleases.registeringOrganizationId}`,sql`${noncreditRegistrations.registeredAt}`)}`,
     }).from(noncreditRegistrations)
       // A local Site operator cannot see registrations from unrelated Sites.
       // Claim + release establish the exact authorized Site for this pilot.
@@ -98,7 +113,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const registrationIds=registrations.map(r=>r.id);
     if(!registrationIds.length){
       const empty=summarizeNoncreditPilot([]);
-      return {from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,
+      return {from:from.toISOString(),to:to.toISOString(),asOf:generatedAt.toISOString(),participantCount:0,distinctLearners:0,deliverySites:0,
         totals:empty,byTraining:[],publicationSafe:publicationSafePilotSummary(empty)};
     }
     const attempts=await db.select({
@@ -114,17 +129,17 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const versions=uuidSet(attempts.map(row=>row.courseVersionId));
     const [lessons,progress,grants,decisions,participationEvents]=await Promise.all([
       versions.length?db.select({id:courseLessons.id,courseVersionId:courseLessons.courseVersionId})
-        .from(courseLessons).where(inArray(courseLessons.courseVersionId,versions)):[],
+        .from(courseLessons).where(inArray(courseLessons.courseVersionId,versions)).limit(evidenceTake):[],
       courseIds.length?db.select({
         courseAttemptId:learnerLessonProgress.courseAttemptId,
         lessonId:learnerLessonProgress.lessonId,status:learnerLessonProgress.status,
         observedAt:learnerLessonProgress.observedAt,
       }).from(learnerLessonProgress)
-        .where(inArray(learnerLessonProgress.courseAttemptId,courseIds)):[],
+        .where(inArray(learnerLessonProgress.courseAttemptId,courseIds)).limit(evidenceTake):[],
       courseIds.length?db.select({
         id:assessmentAccess.id,courseAttemptId:assessmentAccess.courseAttemptId,
       }).from(assessmentAccess)
-        .where(inArray(assessmentAccess.courseAttemptId,courseIds)):[],
+        .where(inArray(assessmentAccess.courseAttemptId,courseIds)).limit(evidenceTake):[],
       db.select({
         id:noncreditCompletionDecisions.id,
         registrationId:noncreditCompletionDecisions.registrationId,
@@ -135,12 +150,26 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         .where(inArray(noncreditCompletionDecisions.registrationId,registrationIds))
         .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(20001),
       db.select({
+        id:noncreditParticipationEvents.id,
         registrationId:noncreditParticipationEvents.registrationId,
+        supersedesId:noncreditParticipationEvents.supersedesId,
+        eventKind:noncreditParticipationEvents.eventKind,
+        evidenceVersionId:noncreditParticipationEvents.evidenceVersionId,
         occurredAt:noncreditParticipationEvents.occurredAt,
         countedMinutes:noncreditParticipationEvents.countedMinutes,
       }).from(noncreditParticipationEvents)
-        .where(inArray(noncreditParticipationEvents.registrationId,registrationIds)),
+        .where(inArray(noncreditParticipationEvents.registrationId,registrationIds)).limit(20001),
     ]);
+    checkEvidenceBound(lessons.length,"Course lessons");
+    checkEvidenceBound(progress.length,"Lesson progress");
+    checkEvidenceBound(grants.length,"Assessment access grants");
+    if(participationEvents.length>20000)throw new Error("Participation evidence exceeds the safe report limit");
+    const evidenceIds=uuidSet(participationEvents.map(e=>e.evidenceVersionId));
+    const evidence=evidenceIds.length?await db.select({id:evidenceDocumentVersions.id,verifiedAt:evidenceDocumentVersions.verifiedAt,verifiedByPersonId:evidenceDocumentVersions.verifiedByPersonId,validFrom:evidenceDocumentVersions.validFrom,validThrough:evidenceDocumentVersions.validThrough}).from(evidenceDocumentVersions).where(inArray(evidenceDocumentVersions.id,evidenceIds)):[];
+    const today=generatedAt.toISOString().slice(0,10);
+    const verifiedEvidence=new Set(evidence.filter(e=>e.verifiedAt!==null&&e.verifiedAt<=generatedAt&&e.verifiedByPersonId!==null&&(e.validFrom===null||e.validFrom<=today)&&(e.validThrough===null||e.validThrough>=today)).map(e=>e.id));
+    const eventsByRegistration=new Map<string,typeof participationEvents>();
+    for(const event of participationEvents){const rows=eventsByRegistration.get(event.registrationId);if(rows)rows.push(event);else eventsByRegistration.set(event.registrationId,[event]);}
     if(decisions.length>20000)
       throw new Error("Completion decision history exceeds the safe report limit");
     const completion=currentNoncreditCompletionStates(registrationIds,decisions);
@@ -153,7 +182,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       state:assessmentExecutionAttempts.state,
       submittedAt:assessmentExecutionAttempts.submittedAt,
     }).from(assessmentExecutionAttempts)
-      .where(inArray(assessmentExecutionAttempts.accessGrantId,grantIds)):[];
+      .where(inArray(assessmentExecutionAttempts.accessGrantId,grantIds)).limit(evidenceTake):[];
+    checkEvidenceBound(checkAttempts.length,"Assessment attempts");
     const checkIds=checkAttempts.map(a=>a.id);
     const adminIds=uuidSet(checkAttempts.map(a=>a.administrationId));
     const [results,administrations]=await Promise.all([
@@ -167,13 +197,14 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         revision:assessmentExecutionResults.resultRevision,
         supersedesId:assessmentExecutionResults.supersedesId,
       }).from(assessmentExecutionResults)
-        .where(inArray(assessmentExecutionResults.attemptId,checkIds)):[],
+        .where(inArray(assessmentExecutionResults.attemptId,checkIds)).limit(evidenceTake):[],
       adminIds.length?db.select({
         id:assessmentFormAdministrations.id,
         assessmentVersionId:assessmentFormAdministrations.assessmentVersionId,
       }).from(assessmentFormAdministrations)
         .where(inArray(assessmentFormAdministrations.id,adminIds)):[],
     ]);
+    checkEvidenceBound(results.length,"Assessment results");
     // A deployment may contain multiple independent training Offerings.
     // An identified response is attributable only when its approved campaign
     // explicitly names the same Offering as the participant's registration.
@@ -203,19 +234,38 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         inArray(surveyCampaigns.deploymentId,deployments),
         inArray(surveyCampaigns.offeringId,offeringIds),
         eq(surveyResponses.respondentMode,"identified"),
+        eq(surveyCampaigns.operatingOrganizationId,organizationId),
+        notExists(db.select({id:canonicalClassSurveyCampaigns.campaignId}).from(canonicalClassSurveyCampaigns)
+          .where(eq(canonicalClassSurveyCampaigns.campaignId,surveyCampaigns.id))),
       )).limit(take):[];
     checkBound(surveys.length,"Survey responses");
-    // Only one in-window registration for a Person, Deployment and Offering
-    // may claim an invited response. A retake or duplicate registration needs
-    // explicit registration-to-invitation provenance rather than guesswork.
+    // Ambiguity is evaluated over every registration in the authorized operator,
+    // including other Sites, training versions and dates. Filtering a report
+    // must never turn a shared Person/Offering invitation into unique evidence.
+    // Only aggregate cardinalities are used; no out-of-scope participant
+    // records or Site identities are returned to the report consumer.
     const registrationCounts=new Map<string,number>();
     const feedbackKey=(personId:string,deploymentId:string,offeringId:string,organizationId:string)=>
       [personId,deploymentId,offeringId,organizationId].join(":");
-    for(const r of registrations){
-      const offeringId=offeringByVersion.get(r.offeringVersionId);
-      if(!offeringId)continue;
-      const key=feedbackKey(r.participantPersonId,r.deploymentId,offeringId,r.registeringOrganizationId);
-      registrationCounts.set(key,(registrationCounts.get(key)??0)+1);
+    if(surveys.length){
+      const cardinalities=await db.select({
+        personId:noncreditRegistrations.participantPersonId,
+        deploymentId:noncreditRegistrations.deploymentId,
+        offeringId:offeringVersions.offeringId,
+        organizationId:noncreditRegistrations.registeringOrganizationId,
+        registrations:count(),
+      }).from(noncreditRegistrations)
+        .innerJoin(offeringVersions,eq(offeringVersions.id,noncreditRegistrations.offeringVersionId))
+        .where(and(
+          eq(noncreditRegistrations.registeringOrganizationId,organizationId),
+          inArray(noncreditRegistrations.participantPersonId,people),
+          inArray(noncreditRegistrations.deploymentId,deployments),
+          inArray(offeringVersions.offeringId,offeringIds),
+        )).groupBy(noncreditRegistrations.participantPersonId,noncreditRegistrations.deploymentId,
+          offeringVersions.offeringId,noncreditRegistrations.registeringOrganizationId).limit(evidenceTake);
+      checkEvidenceBound(cardinalities.length,"Feedback attribution scope");
+      for(const row of cardinalities)registrationCounts.set(
+        feedbackKey(row.personId,row.deploymentId,row.offeringId,row.organizationId),Number(row.registrations));
     }
     const surveyTimestamps=new Map<string,Date>();
     for(const s of surveys){
@@ -224,11 +274,11 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       const previous=surveyTimestamps.get(key);
       if(!previous||previous<s.submittedAt)surveyTimestamps.set(key,s.submittedAt);
     }
-    const attemptById=new Map(attempts.map(a=>[a.id,a]));
     const grantsById=new Map(grants.map(g=>[g.id,g]));
     const adminById=new Map(administrations.map(a=>[a.id,a]));
     const supersededResults=new Set(results.flatMap(r=>r.supersedesId?[r.supersedesId]:[]));
-    const latestResults=results.filter(r=>!supersededResults.has(r.id)&&r.status==="finalized");
+    const finalizedAttemptIds=new Set(checkAttempts.filter(a=>a.state==="finalized").map(a=>a.id));
+    const latestResults=results.filter(r=>!supersededResults.has(r.id)&&r.status==="finalized"&&finalizedAttemptIds.has(r.attemptId));
     const trainingById=new Map(trainings.map(t=>[t.id,t]));
     const facts:PilotParticipantFact[]=registrations.map(reg=>{
       const ownAttempts=attempts.filter(a=>a.registrationId===reg.id);
@@ -274,7 +324,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       const offeringId=offeringByVersion.get(reg.offeringVersionId);
       const surveyKey=offeringId?feedbackKey(reg.participantPersonId,reg.deploymentId,offeringId,reg.registeringOrganizationId):null;
       const feedbackSubmittedAt=surveyKey?surveyTimestamps.get(surveyKey):undefined;
-      const hasSubmitted=finalCheck.some(c=>c.submittedAt!==null);
+      const hasSubmitted=finalCheck.some(c=>c.submittedAt!==null&&["submitted","scored","finalized"].includes(c.state));
       return {
         registrationId:reg.id,trainingVersionId:reg.trainingVersionId,registered:true,
         engaged:doneLessons.size>0||hasSubmitted||
@@ -289,21 +339,28 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
           latestSubmittedAt:feedbackSubmittedAt??null,
         }),
         completionRecorded:completion.states.get(reg.id)==="completed",
+        verifiedParticipationMinutes:countVerifiedNoncreditMinutes((eventsByRegistration.get(reg.id)??[]).map(e=>({...e,evidenceVersionId:e.evidenceVersionId&&verifiedEvidence.has(e.evidenceVersionId)?e.evidenceVersionId:null})),generatedAt),
         baselineFraction:paired?Number(firstBaseline.earned)/Number(firstBaseline.possible):null,
         finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
       };
     });
+    // Resolve evidence and feedback ambiguity across the full authorized cohort first.
+    const selectedRegistrations=selectProviderOutcomeCohort(registrations,selectedSite);
+    const selectedIds=new Set(selectedRegistrations.map(r=>r.id));
+    const selectedFacts=facts.filter(f=>selectedIds.has(f.registrationId));
+    const personByRegistration=new Map(selectedRegistrations.map(r=>[r.id,r.participantPersonId]));
     const byTraining=trainings.map(t=>{
-      const subset=facts.filter(f=>f.trainingVersionId===t.id);
+      const subset=selectedFacts.filter(f=>f.trainingVersionId===t.id);
       if(!subset.length)return null;
       const summary=summarizeNoncreditPilot(subset);
       return {trainingVersionId:t.id,title:t.title,summary,
-        publicationSafe:publicationSafePilotSummary(summary)};
+        publicationSafe:publicationSafePilotSummary(summary,10,buildPilotDisclosureEvidence(subset,personByRegistration))};
     }).filter((r):r is NonNullable<typeof r>=>r!==null);
-    const totals=summarizeNoncreditPilot(facts);
-    return {from:from.toISOString(),to:to.toISOString(),
-      participantCount:registrations.length,
-      distinctLearners:countDistinctNoncreditLearners(registrations.map(r=>r.participantPersonId)),
+    const totals=summarizeNoncreditPilot(selectedFacts);
+    return {from:from.toISOString(),to:to.toISOString(),asOf:generatedAt.toISOString(),
+      participantCount:selectedRegistrations.length,
+      deliverySites:new Set(selectedRegistrations.map(r=>r.siteId)).size,
+      distinctLearners:countDistinctNoncreditLearners(selectedRegistrations.map(r=>r.participantPersonId)),
       totals,byTraining,
-      publicationSafe:publicationSafePilotSummary(totals)};
+      publicationSafe:publicationSafePilotSummary(totals,10,buildPilotDisclosureEvidence(selectedFacts,personByRegistration))};
   });

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lastGeneratedSnapshotIndex": 86,
-  "currentSqlTipIndex": 102,
+  "currentSqlTipIndex": 123,
   "modelParityVerified": false,
   "note": "Reviewed immutable SQL-only migration suffix. Generated Drizzle model parity is NOT claimed. Generate and push remain prohibited until a verified new modeled baseline exists.",
   "sqlOnlyMigrations": [
@@ -84,6 +84,111 @@
       "idx": 102,
       "tag": "0102_reporting_source_service_access",
       "gitBlobSha": "2477b3a1d93161342c5b5d9385261fc17269dea2"
+    },
+    {
+      "idx": 103,
+      "tag": "0103_site_signup_organization_classification",
+      "gitBlobSha": "6415f375aa8afb7f460c46ca3cfbedb25eedc2d6"
+    },
+    {
+      "idx": 104,
+      "tag": "0104_platform_owner_delegation",
+      "gitBlobSha": "58b88485fbbb5d17937d5b55ea1fb053c4b51bf1"
+    },
+    {
+      "idx": 105,
+      "tag": "0105_site_go_links",
+      "gitBlobSha": "a9e54a1165128a78727caecfcb756c7e06e5719e"
+    },
+    {
+      "idx": 106,
+      "tag": "0106_universal_engagement",
+      "gitBlobSha": "c05e942cb0fad4fbbcbc8a8d37f4affc63e7bf00"
+    },
+    {
+      "idx": 107,
+      "tag": "0107_site_go_links_private_role_access",
+      "gitBlobSha": "18186768b27aa0176c5c592ccd751b6a3c2bfc89"
+    },
+    {
+      "idx": 108,
+      "tag": "0108_site_go_link_capabilities",
+      "gitBlobSha": "f32243ed1d5295de3b4e193d573235bb9810a567"
+    },
+    {
+      "idx": 109,
+      "tag": "0109_site_go_link_reuse",
+      "gitBlobSha": "911ad6cba58f87c3521ef535cc9637f95e29db53"
+    },
+    {
+      "idx": 110,
+      "tag": "0110_universal_engagement_private_role_access",
+      "gitBlobSha": "5fe63926cf867428d88b130988d261a6dfca0807"
+    },
+    {
+      "idx": 111,
+      "tag": "0111_delegation_and_go_link_null_invariants",
+      "gitBlobSha": "83a9bb9ea22a54f211a371a1fbaa2c306c76c00b"
+    },
+    {
+      "idx": 112,
+      "tag": "0112_site_intelligence_packages",
+      "gitBlobSha": "910ac649fadad7427967bc8f665c25b80ae1b984"
+    },
+    {
+      "idx": 113,
+      "tag": "0113_go_gateway_scoped_access",
+      "gitBlobSha": "7fc8903316b69a13b4f9ffa8d4145b1aef1aa16e"
+    },
+    {
+      "idx": 114,
+      "tag": "0114_go_response_metrics",
+      "gitBlobSha": "8e435939abd9bf9b50699235bfac77255952d664"
+    },
+    {
+      "idx": 115,
+      "tag": "0115_engagement_campaigns",
+      "gitBlobSha": "5c7bec4a09363e41ed7b050ed40c22c2baf35a88"
+    },
+    {
+      "idx": 116,
+      "tag": "0116_campaign_delivery_management",
+      "gitBlobSha": "6effd70ecd30e7640cea69b5bd0fb96528dfe527"
+    },
+    {
+      "idx": 117,
+      "tag": "0117_noncredit_assessment_uuid_aggregate",
+      "gitBlobSha": "f725af273bc76b1d1db7a77c81be4d57f2a18a35"
+    },
+    {
+      "idx": 118,
+      "tag": "0118_noncredit_assessment_grant_variable",
+      "gitBlobSha": "1adba2eea8ca6b1bbfd8a546259a4018933497bf"
+    },
+    {
+      "idx": 119,
+      "tag": "0119_noncredit_feedback_invitation",
+      "gitBlobSha": "3fa8c2db538edf218d2ed781d13b04297d99ec5c"
+    },
+    {
+      "idx": 120,
+      "tag": "0120_noncredit_feedback_campaign_scope",
+      "gitBlobSha": "6c4a7d46885c960a3aed4015891b91d0314c5c7c"
+    },
+    {
+      "idx": 121,
+      "tag": "0121_geographic_intelligence",
+      "gitBlobSha": "507e94e693e68a3a9cafc937af8d777190b64ea1"
+    },
+    {
+      "idx": 122,
+      "tag": "0122_geography_launch_eligibility",
+      "gitBlobSha": "ee29875233607fd038cdd87c29b623cbe00a4d15"
+    },
+    {
+      "idx": 123,
+      "tag": "0123_universal_entity_geography",
+      "gitBlobSha": "e04a05a510ffea46fba8ba3a2098d0af9c79fc77"
     }
   ]
 }

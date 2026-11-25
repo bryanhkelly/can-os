@@ -29,7 +29,7 @@ for (const issue of findSharedLayerGeometryViolations(inventory)) {
 const regression = checkChangedFiles(projectRoot);
 if (regression.warning) {
   console.warn("V6.1 incremental comparison: " + regression.warning);
-  if (process.env.CI || process.env.V61_BASE_REF) {
+  if (process.env.CI || process.env.V61_BASE_REF || !regression.base) {
     // Never claim an executed CI check when the requested Git base is missing.
     process.exitCode = 1;
   }

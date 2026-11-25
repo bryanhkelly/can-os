@@ -7,7 +7,7 @@
  * CAN_CLASS_CUTOVER_CANDIDATES=1 CAN_CLASS_CUTOVER_QA_DATABASE_URL=... \
  *   node scripts/acceptance/report-class-cutover-candidates.mjs
  *
- * Connects only to the pinned CAN OS test01 branch. Exports no learner names,
+ * Connects only to the pinned CAN OS main branch in a read-only transaction. Exports no learner names,
  * email addresses, or row-level attendance/submission evidence.
  * This report does not create Class records, mappings, or dual writes.
  */
@@ -17,7 +17,7 @@ import { Pool } from "@neondatabase/serverless";
 assert.equal(process.env.CAN_CLASS_CUTOVER_CANDIDATES,"1",
   "Explicit CAN_CLASS_CUTOVER_CANDIDATES=1 required");
 assert(process.env.CAN_CLASS_CUTOVER_QA_DATABASE_URL,
-  "Isolated test01 CAN_CLASS_CUTOVER_QA_DATABASE_URL required");
+  "Explicit main CAN_CLASS_CUTOVER_QA_DATABASE_URL required");
 
 const pool=new Pool({
   connectionString:process.env.CAN_CLASS_CUTOVER_QA_DATABASE_URL,
@@ -30,8 +30,8 @@ try{
     "SELECT current_setting('neon.project_id',true) AS project_id, " +
     "current_setting('neon.branch_id',true) AS branch_id");
   assert.equal(branch?.project_id,"sweet-hall-62441909","Unexpected Neon project");
-  assert.equal(branch?.branch_id,"br-bitter-feather-ar0u63x7",
-    "Only isolated test01 may be inspected");
+  assert.equal(branch?.branch_id,"br-restless-sea-ar9ooo55",
+    "Only CAN OS main may be inspected");
 
   const {rows}=await client.query(`
     SELECT s.id::text AS legacy_section_id,
@@ -54,12 +54,21 @@ try{
       (SELECT count(*)::int FROM public.lesson_progress lp
         WHERE lp.section_id=s.id) AS lesson_progress_count,
       (SELECT count(DISTINCT cv.id)::int
-        FROM education_v30.courses nc
+        FROM public.courses nc
         JOIN public.course_versions cv ON cv.course_id=nc.id
         WHERE nc.course_code=ct.code
           AND nc.publisher_organization_id=ct.owning_organization_id
           AND cv.lifecycle='published'
           AND cv.version_no=ctv.version) AS exact_candidate_version_count
+      ,(SELECT count(*)::int FROM public.enrollments e
+        JOIN public.student_profiles sp ON sp.id=e.student_profile_id
+        JOIN public.class_enrollments ce ON ce.id=md5('valor-v61:classenrollment:'||e.id)::uuid
+          AND ce.learner_person_id=sp.person_id
+        JOIN public.classes c ON c.id=ce.class_id AND c.site_id=s.site_id
+          AND c.id=md5('valor-v61:class:'||s.code)::uuid
+        WHERE e.section_id=s.id AND e.status='active' AND ce.status='active') AS active_recovered_enrollments
+      ,(SELECT count(*)::int FROM public.enrollments e
+        WHERE e.section_id=s.id AND e.status='active') AS active_legacy_enrollments
     FROM public.sections s
     JOIN public.course_template_versions ctv
       ON ctv.id=s.course_template_version_id
@@ -80,15 +89,17 @@ try{
   const totals=Object.fromEntries([
     "enrollment_count","assessment_count","submission_count",
     "scheduled_occurrence_count","grade_count","lesson_progress_count",
+    "active_recovered_enrollments","active_legacy_enrollments",
   ].map(key=>[key,entries.reduce((n,row)=>n+Number(row[key]),0)]));
   const result={
-    target:"test01",
+    target:"main",
     purpose:"candidate inventory, not a migration authorization",
     source_classes:entries.length,totals,
     missing_candidates:entries.filter(e=>e.state==="missing_candidate").length,
     ambiguous_candidates:entries.filter(e=>e.state==="ambiguous_candidate").length,
     content_review_required:entries.filter(e=>e.state==="content_equivalence_review_required").length,
     entries,
+    active_legacy_without_verified_recovery:totals.active_legacy_enrollments-totals.active_recovered_enrollments,
     can_auto_migrate:false,
     note:"No guessing Person IDs, Class IDs, Course versions, credit or grades. Human-reviewed source-to-native evidence and transactions remain mandatory.",
   };

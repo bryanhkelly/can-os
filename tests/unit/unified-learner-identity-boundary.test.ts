@@ -31,11 +31,12 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    const review=read("src/modules/classes/native-class-adult-review.functions.ts");
    const activation=read("src/modules/classes/native-class-reviewed-onboarding.functions.ts");
    expect(review).toContain("link.accessPersonId!==account.personId");
-   expect(review).toContain("existingPerson.birthDate!==data.verifiedBirthDate");
-   expect(activation).toContain("eq(canonicalPersons.id,linked.personId)");
+   expect(review).toContain("link.personId!==account.personId");
+   expect(activation).toContain("assertCurrentAdultReviewEvidence(tx,review,now)");
+   expect(activation).toContain("nativePersonId=owner.personId");
+   expect(activation).not.toContain("tx.insert(canonicalPersons)");
    expect(activation).toContain("existingPersonReused:Boolean(linked)");
    expect(activation).toContain("if(linked){");
-   expect(activation).toContain("isNull(canonicalPersons.birthDate)");
    expect(activation).toContain('if(Boolean(sameEmail)!==Boolean(linked)');
  });
  it("requires real independently reviewed private evidence before granting adulthood",()=>{
@@ -50,6 +51,13 @@ describe("one canonical learning Person across Courses and Classes",()=>{
      'evidence.subjectId!==account.personId',
    ])expect(review).toContain(required);
    expect(review).not.toContain('data.evidenceReference.startsWith("https:")');
+ });
+ it("reuses the verified public Person for ordinary noncredit enrollment",()=>{
+   const source=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
+   expect(source).toContain("canonicalPersonId:owner.personId");
+   expect(source).toContain("link.canonicalPersonId!==owner.personId");
+   expect(source).toContain("currentPerson?.active");
+   expect(source).not.toContain("tx.insert(canonicalPersons)");
  });
  it("does not interrupt Course enrollment while an existing Person awaits Class age activation",()=>{
    const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
@@ -68,7 +76,8 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    expect(flow).toContain("await resumeLinkedNativeClassLearner()");
    expect(flow).toContain("await activateReviewedNativeClassLearner()");
    expect(flow).toContain("return enrollInNativeClass(input)");
-   expect(read("src/routes/class.tsx")).toContain("enrollCurrentPersonInClass");
+   expect(read("src/routes/class.tsx")).toContain("<OfferingCard");
+   expect(read("src/components/learning/native-class/OfferingCard.tsx")).toContain("enrollCurrentPersonInClass");
    const missing=normalizeClientError(new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED"));
    expect(missing.kind).toBe("authentication");
    expect(missing.retryable).toBe(false);
@@ -91,7 +100,11 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    expect(evidence).toContain("source.metadata.revokedAt!=null");
    expect(evidence).toContain("source.metadata.privateObjectVerified!==true");
    expect(evidence).toContain("source.expiresAt!==null&&source.expiresAt<=now");
-   expect(evidence).toContain("person?.birthDate!==review.verifiedBirthDate");
+   expect(evidence).toContain("review.accessPersonId!==canonicalPersonId");
+   expect(evidence).toContain("source.metadata.verifiedBirthDate!==review.verifiedBirthDate");
+   expect(evidence).toContain("current independently authorized adult reviewer");
+   expect(evidence).toContain("current independent identity evidence verifier");
+   expect(evidence).not.toContain("canonicalPersons");
    expect(reader).toContain("await assertCurrentReviewedNativeLearner(native.account_id,native.person_id)");
  });
  it("keeps review statuses redacted in platform operational reconciliation",()=>{

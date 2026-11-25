@@ -1,3 +1,5 @@
+import {projectProgramLaunchWebsiteBlocks} from "./program-website-contributions";
+import {orderEligibleWebsitePages} from "./website-composition";
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import type { SiteContentBlockProjection } from "./site-content-channels";
 import type { SiteEnrollmentOpportunity } from "./site-enrollment-opportunities";
@@ -8,7 +10,7 @@ import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome } from "./public-site-templates";
 import { publicSiteStyles } from "./public-site-styles";
 import { schoolBrandMonogram } from "./school-brand-identity";
-import { templateSampleImage } from "./template-sample-images";
+import { templateSampleImage, sharedPhotoUrl, sharedPhotoDisclosure } from "./template-sample-images";
 import { templateResponsiveAttributes,templateHeroPictureSources } from "./template-photo-responsive";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -176,9 +178,10 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     ...(hasLeadership?["/leadership"] as const:[]),
   ];
   const profile=resolveSiteExperienceProfile(opportunities,page.planningPreferences??null);
-  return profile==="school" || profile==="mixed"
+  const eligible:PublicSitePath[]=profile==="school" || profile==="mixed"
     ? ["/",...(hasStory||hasReviewedPeople?["/about"] as const:[]),...educational,...extra]
     : ["/",...educational,...(hasStory||hasReviewedPeople?["/about"] as const:[]),...extra];
+  return orderEligibleWebsitePages(eligible,local?.websiteComposition);
 }
 
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
@@ -288,8 +291,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   };
   const heroMedia=ownedMedia("hero");
   const approvedHero=heroMedia?.assetId==="template-sample"?null:heroMedia;
-  const heroPhotoSrc=image?.dataUrl ?? heroMedia?.src;
-  const heroPhotoAlt=image?.altText ?? heroMedia?.altText ?? "";
+  const sharedHero=local?.branding.sharedHeroPhoto;
+  const heroPhotoSrc=image?.dataUrl ?? (sharedHero?sharedPhotoUrl(sharedHero):heroMedia?.src);
+  const heroPhotoAlt=image?.altText ?? (sharedHero?sharedPhotoDisclosure:heroMedia?.altText) ?? "";
   const mediaImageAttributes = (media: PublicSchoolSiteMedia[keyof PublicSchoolSiteMedia] | null) => {
     if (!media) return "";
     const dimensions = media.width && media.height ? ` width="${media.width}" height="${media.height}"` : "";
@@ -511,7 +515,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
       (!availablePaths.includes("/academics") && availablePaths.includes("/contact")
         ? '<a class="hero-text-link" href="/contact">Contact information →</a>' : ""),
-    image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt,image?undefined:heroMedia??undefined):"",
+    image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt,image||sharedHero?undefined:heroMedia??undefined)+(sharedHero&&!image?'<span style="position:absolute;bottom:0;right:0;z-index:2;background:#fff;color:#222;padding:4px 8px;font-size:12px">Illustrative image</span>':""):"",
     mosaicImages: campusMosaicImages,
   });
   // The homepage introduces the Site; detailed local content belongs on
@@ -851,7 +855,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     : "";
   // Site channels are composed as native template sections. Preview routes
   // supply data; they do not splice a second page into the rendered HTML.
-  const contentBlocks = page.contentBlocks ?? [];
+  const contentBlocks = projectProgramLaunchWebsiteBlocks(page.contentBlocks??[],opportunities,Boolean(options?.localPreview||options?.templateGallery));
   const homeBlocks=contentBlocks.filter(block=>(block.page??"/")==="/");
   const hasContentChannel = (channel: SiteContentBlockProjection["channel"]) =>
     homeBlocks.some(block => block.channel === channel && block.items.length > 0);
@@ -934,7 +938,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <a href="/academics" class="hero-button">Explore available programs</a></section>` : "",
     contact: siteInterestForm || reviewedContact || reviewedAddress ? contactSection : "",
     channelsClosing: contentChannelAt("closing"),
-  });
+  },local?.websiteComposition);
   const leadershipProfiles=(local?.leadershipMembers??[])
     .filter(person=>person.consentConfirmed)
     .map(person=>{

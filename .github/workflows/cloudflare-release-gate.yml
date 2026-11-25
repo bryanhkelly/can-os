@@ -2,9 +2,9 @@ name: Cloudflare production build and regression gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "release-*"]
   push:
-    branches: [main]
+    branches: [main, "release-*"]
   workflow_dispatch:
 
 permissions:
@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24.22.1'
@@ -32,10 +34,26 @@ jobs:
           npm --version
       - name: Reproducible clean dependency install
         run: npm ci
-      - name: Drizzle migration journal, snapshots and identity-release source gates
+      - name: Engineering architecture and V6.1 source governance
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
-          npm run verify:reporting:sql
-          npm run db:check:journal
+          set -o pipefail
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            export V61_BASE_REF="$PR_BASE_SHA"
+          elif [[ "$GITHUB_REF" == refs/heads/release-* ]]; then
+            export V61_BASE_REF="$(git merge-base HEAD origin/main)"
+          elif [[ -n "$PUSH_BEFORE_SHA" && ! "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+            export V61_BASE_REF="$PUSH_BEFORE_SHA"
+          else
+            export V61_BASE_REF="$(git rev-parse HEAD^)"
+          fi
+          git cat-file -e "$V61_BASE_REF^{commit}"
+          npm run verify:architecture 2>&1 | tee architecture-governance.log
+      - name: Identity-release regression gates
+        run: |
           npx vitest run tests/unit/one-person-release-gate.test.ts tests/unit/access-context.test.ts tests/unit/personal-can-identity.test.ts tests/unit/canonical-can-sso.test.ts
       - name: Cloudflare production bundle (client AND server)
         shell: bash
@@ -46,26 +64,70 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm run typecheck 2>&1 | tee typecheck.log
+          npm run typecheck:full 2>&1 | tee typecheck.log
       - name: Site enrollment and website regression suite
         shell: bash
         run: |
           set -o pipefail
           npm run test:site:channels 2>&1 | tee site-regressions.log
+      - name: Go Links and friendly URLs regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:urls:unit 2>&1 | tee go-links-regressions.log
       - name: Native Class regression suite
         shell: bash
         run: |
           set -o pipefail
           npm run test:classes:unit 2>&1 | tee class-regressions.log
+      - name: Full ESLint and V6.1 coverage
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint.log
+      - name: Prevent new lint warnings on changed source
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -o pipefail
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            export CAN_LINT_BASE="$PR_BASE_SHA"
+          elif [[ "$GITHUB_REF" == refs/heads/release-* ]]; then
+            export CAN_LINT_BASE="origin/main"
+          elif [[ -n "$PUSH_BEFORE_SHA" && ! "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+            export CAN_LINT_BASE="$PUSH_BEFORE_SHA"
+          else
+            export CAN_LINT_BASE="$(git rev-parse HEAD^)"
+          fi
+          npm run test:lint-regressions
+          npm run check:lint-regressions 2>&1 | tee lint-regressions.log
+      - name: Full unit regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee unit-regressions.log
+      - name: Production dependency security audit
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run audit:production 2>&1 | tee dependency-audit.log
       - name: Retain diagnostics for first failure at this exact SHA
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cloudflare-release-gate-${{ github.sha }}
           path: |
+            architecture-governance.log
             cloudflare-build.log
             typecheck.log
             site-regressions.log
             class-regressions.log
+            go-links-regressions.log
+            lint.log
+            lint-regressions.log
+            unit-regressions.log
+            dependency-audit.log
           if-no-files-found: warn
           retention-days: 14

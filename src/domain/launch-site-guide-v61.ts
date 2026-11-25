@@ -1,3 +1,4 @@
+import { siteAudienceNames } from "./site-audiences";
 import type { SiteIdentityV61Draft } from "./site-identity-v61";
 import { siteIdentityTypeOptionsV61 } from "./site-identity-v61";
 import type { SiteHostingV61, SiteStoryV61 } from "./site-information-v61";
@@ -14,9 +15,7 @@ type SiteInformationInputs = {
   planning?: SiteProgramsAudiencesV61 | null;
 };
 
-const audienceNames: Record<SiteProgramsAudiencesV61["audienceIds"][number], string> = {
-  children: "Children", teens: "Teens", adults: "Adults", older_adults: "Older adults",
-};
+const audienceNames = siteAudienceNames;
 const interestNames: Record<SiteProgramsAudiencesV61["interestIds"][number], string> = {
   "grades-6-8": "Middle school", "grades-9-12": "High school",
   afterschool: "After-school", summer: "Summer", adult: "Adult learning", senior: "Older adults",
@@ -113,8 +112,8 @@ export function programsAudiencesGuideV61(
     connection: "Your selections help you discover suitable Solutions in Prepare and shape what you share with your community.",
   };
   if (step === 1) return {
-    summary: audiences.length ? "The people you hope to serve can guide what you offer and how you communicate it."
-      : "Choose who you hope to serve. You can reach different people with different messages later.",
+    summary: audiences.length ? "Your declared desire to serve can guide future programs and partnerships, even before delivery capacity exists."
+      : "Choose whom you desire to serve, even if you lack resources today.",
     highlights: audiences.slice(0, 3),
     insight: intent.audienceIds.includes("older_adults")
       ? "For older adults, also consider family caregivers, trusted local organizations and accessible ways to learn about an opportunity."

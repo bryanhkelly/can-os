@@ -1,3 +1,5 @@
+import { compactUuidUrlValue } from "@/domain/opaque-url-id";
+import { siteAudienceNames } from "@/domain/site-audiences";
 import { MarketingPackageWizardV61 } from "./MarketingPackageWizardV61";
 import { marketingEditorReducer, type MarketingEditorView, type MarketingEditorState } from "./marketing-package-editor-state";
 import { SiteGuideV61 } from "./SiteGuideV61";
@@ -33,6 +35,8 @@ import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketingPackageZip } from "./marketing-output-download";
 import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
 import { MarketingPackageReleaseControlsV61 } from "./MarketingPackageReleaseControlsV61";
+import { UniversalEngagementPublisher } from "./UniversalEngagementPublisher";
+import { SiteEngagementLibrary } from "./SiteEngagementLibrary";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
@@ -189,9 +193,11 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       }
       // The first draft is automatic; subsequent navigation must never
       // silently replace a message the operator has written or approved.
+      const storedSuggestion=suggestions?.[content.purpose];
       const nextContent=step===4&&content.plan&&!hasAuthoredCopy
-        ? {...content,...composeOutreachDraftV61(
-            siteName,content.plan,siteIntent,suggestions?.[content.purpose]?.siteIdentity)}
+        ? storedSuggestion?.generatedVersion
+          ? {...content,headline:storedSuggestion.content.headline,message:storedSuggestion.content.message,callToAction:storedSuggestion.content.callToAction}
+          : {...content,...composeOutreachDraftV61(siteName,content.plan,siteIntent,storedSuggestion?.siteIdentity)}
         : content;
       const saved=await saveCurrent(nextContent);
       setContent(saved.content);
@@ -376,8 +382,8 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     subtitle={context.subtitle}
     width="wide" rail={rail}>
     <div className="mt-6 space-y-5">
-      {error&&<p role="alert" className="border border-destructive bg-card p-4 text-sm text-destructive">{error}</p>}
-      {notice&&<p role="status" className="border bg-card p-4 text-sm">{notice}</p>}
+      {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+      {notice&&<WorkspaceNotice>{notice}</WorkspaceNotice>}
       {intentUnavailable&&<WorkspaceNotice tone="attention">
         We couldn't load your saved programs, audiences, or experiences. Refresh before choosing what to highlight.
       </WorkspaceNotice>}
@@ -386,7 +392,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
       </WorkspaceNotice>}
       {brandReadiness==="missing"&&<WorkspaceNotice tone="attention">
         Save your Site Brand in Shape → Website & Brand before creating materials.
-        {" "}<a href={`/launch/site?siteId=${encodeURIComponent(siteId)}&module=website-brand`}
+        {" "}<a href={`/launch/site?siteId=${compactUuidUrlValue(siteId)}&module=website-brand`}
           className="font-semibold underline">Open Website &amp; Brand</a>
       </WorkspaceNotice>}
       {brandReadiness==="loading"&&<WorkspaceNotice tone="info">
@@ -453,10 +459,10 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             Review its highlights and message before creating another release.
             Earlier materials are unchanged.
           </WorkspaceNotice>}
-        {record.content.plan&&<WorkspacePanel title="Your outreach plan">
+        {record.content.plan&&<WorkspacePanel title="Audience & highlights">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <p><strong>Who you want to reach:</strong> {record.content.plan.recipients.map(id=>marketingAudienceOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</p>
-            <p><strong>Who will benefit:</strong> {record.content.plan.beneficiaries.map(id=>id.replaceAll("_"," ").replace(/^./,c=>c.toUpperCase())).join(", ")||"Not selected"}</p>
+            <p><strong>Who will benefit:</strong> {record.content.plan.beneficiaries.map(id=>siteAudienceNames[id]).join(", ")||"Not selected"}</p>
             <p><strong>Highlights:</strong> {record.content.plan.highlights.map(x=>x.label).join(", ")||"Not selected"}</p>
             <p><strong>Requested action:</strong> {record.content.plan.action.replaceAll("-"," ").replace(/^./,c=>c.toUpperCase())}</p>
           </div>
@@ -518,7 +524,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             <p className="mt-2 text-muted-foreground">This kit is for talking points, not verified operational claims.</p>
           </div>}
         </WorkspacePanel>
-        <WorkspacePanel title={record.title}>
+        <WorkspacePanel title="Message & materials">
           <dl className="mt-3 space-y-4 text-sm">
             <div><dt className="font-semibold">Purpose</dt><dd className="text-muted-foreground">
               {marketingPurposeOptions.find(option=>option.id===record.content.purpose)?.label}</dd></div>
@@ -574,7 +580,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </ActionFooter>
       </>}
       {view==="share"&&record&&<>
-        <WorkspacePanel title="Use & Share" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
+        <WorkspacePanel title="Available materials" description="Download reviewed materials, or continue to a separately authorized sending or event workflow.">
           <p className="text-sm text-muted-foreground">
             {materialAvailabilityMessage}
           </p>
@@ -590,10 +596,12 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
             These files are ready to download. Sharing or sending them requires a separate action.
           </WorkspaceNotice>}
         </WorkspacePanel>
+        <UniversalEngagementPublisher key={"engagement:"+record.id} siteId={siteId} packageId={record.id} />
+        <SiteEngagementLibrary key={"library:"+record.id} siteId={siteId} packageId={record.id} />
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button></ActionFooter>
       </>}
       {view==="followup"&&record&&<>
-        <WorkspacePanel title="Follow Up" description="Review inquiries and interest events for your site. These may include activity unrelated to this outreach plan.">
+        <WorkspacePanel title="Responses & events" description="Review inquiries and interest events for your site. These may include activity unrelated to this outreach plan.">
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <WorkspaceActionLink title="Inquiries & responses" description="See inquiries and recorded interest for this site."
               href={"/admissions/intake?siteId="+encodeURIComponent(siteId)} actionLabel="Review inquiries"/>

@@ -44,6 +44,7 @@ export const Route=createFileRoute("/access/session")({
       });
       return Response.json(result,{headers:{"Cache-Control":"no-store"}});
     }
+    if(context.delegatedByPlatformOwner) return Response.json({error:"Return to Platform Owner before changing memberships."},{status:403});
     const grantId=body&&typeof body==="object"&&"grantId" in body?(body as {grantId:unknown}).grantId:null;
     if(typeof grantId!=="string")return Response.json({error:"Invalid membership"},{status:400});
     await selectAccessGrant(context.sessionId,context.impersonatedByAccountId??context.sessionAccountId??context.accountId,grantId);

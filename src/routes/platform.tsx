@@ -10,8 +10,16 @@ import { approveAdultClassLearnerReview, revokeAdultClassLearnerReview } from "@
 import { ActionFooter, DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
-import { NativePublisherReleaseReadinessPanel } from "@/components/learning/NativePublisherReleaseReadinessPanel";
+
 import { PlatformCatalogManager } from "@/components/platform/PlatformCatalogManager";
+import { PlatformOwnerDelegationPanel } from "@/components/platform/PlatformOwnerDelegationPanel";
+import { PlatformOwnerPilotAccessPanel } from "@/components/platform/PlatformOwnerPilotAccessPanel";
+import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
+import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
+import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
+import { PlatformReportingHealth } from "@/components/platform/PlatformReportingHealth";
+import { PlatformAcademicIntegrity } from "@/components/platform/PlatformAcademicIntegrity";
+import { PlatformReleaseCenter } from "@/components/platform/PlatformReleaseCenter";
 
 export const Route = createFileRoute("/platform")({
   loader: () => safeLoader(() => readPlatformAdminOverview())(),
@@ -23,17 +31,18 @@ function PlatformAdministration() {
   if (!result.ok) {
     return <WorkspaceShell width="wide" eyebrow="CAN OS · Platform"
       title="Platform administration"
-      subtitle="This area requires an independently provisioned, verified App Admin account.">
+      subtitle="This area requires a verified App Admin or Platform Owner account.">
       <p role="alert" className="mt-6 border border-destructive p-4 text-sm text-destructive">
         {result.message}
       </p>
       <p className="mt-4 text-sm text-muted-foreground">
         Site Admin and Registrar grants do not authorize platform administration.
-        An authorized operator must provision the account-wide App Admin membership.
+        An authorized operator must provision the account-wide App Admin or Platform Owner membership.
       </p>
     </WorkspaceShell>;
   }
   const summary = result.data;
+  const engagementSurface:OwnerEngagementSurface={owner:{kind:"platform"},sites:summary.siteReadiness.map(site=>({id:site.siteId,name:site.siteName}))};
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Platform"
     title="Platform administration"
     subtitle="Aggregate platform inventory. School operations and independent approvals retain their own permissions.">
@@ -63,9 +72,15 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
+    {summary.platformOwner && <PlatformOwnerPilotAccessPanel/>}
+    {summary.platformOwner && <PlatformOwnerDelegationPanel/>}
+    <PlatformReportingHealth/>
+    <PlatformAcademicIntegrity integrity={summary.academicIntegrity}/>
     <PlatformCatalogManager/>
-    <NativePublisherReleaseReadinessPanel records={summary.publisherReleaseReadiness}
+    <PlatformReleaseCenter records={summary.publisherReleaseReadiness}
       limited={summary.publisherReleasesLimited}/>
+
+    {summary.platformOwner&&<section className="mt-6 space-y-4"><h2 className="font-serif text-xl">Platform invitations and distribution</h2><p className="text-sm text-muted-foreground">Platform-owned invitations do not establish an institutional partnership or approve training. Only already eligible registration destinations appear.</p><UniversalEngagementPublisher ownerSurface={engagementSurface}/><SiteEngagementLibrary ownerSurface={engagementSurface}/></section>}
     <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady} cases={summary.reviewCases}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>

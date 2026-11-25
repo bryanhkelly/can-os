@@ -3,6 +3,8 @@ import { loadStudentToday } from "@/components/home/StudentHome";
 import { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
 import { getQuickWinActions } from "@/modules/actions/student-actions.functions";
+import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
+import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { getClassWorkspace } from "@/modules/learning/class-workspace.functions";
 import { getStudentReportCard } from "@/modules/learning/report-cards.functions";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
@@ -11,6 +13,8 @@ import { AuthorizationError } from "@/domain/command-context";
 vi.mock("@/modules/student-experience/student-today.functions",()=>({getMyStudentToday:vi.fn()}));
 vi.mock("@/modules/student-experience/assignments.functions",()=>({getAssignments:vi.fn()}));
 vi.mock("@/modules/actions/student-actions.functions",()=>({getQuickWinActions:vi.fn()}));
+vi.mock("@/modules/classes/native-class-student-home.functions",()=>({getMyStudentClasses:vi.fn()}));
+vi.mock("@/modules/classes/native-class-learning.functions",()=>({getNativeClassLearning:vi.fn()}));
 vi.mock("@/modules/learning/class-workspace.functions",()=>({getClassWorkspace:vi.fn()}));
 vi.mock("@/modules/learning/report-cards.functions",()=>({getStudentReportCard:vi.fn()}));
 vi.mock("@/modules/student-experience/school-experiences.functions",()=>({getSchoolExperiences:vi.fn()}));
@@ -18,6 +22,7 @@ vi.mock("@tanstack/react-router",()=>({createFileRoute:()=> (options:object)=>({
 
 beforeEach(()=>{
   vi.resetAllMocks();
+  vi.mocked(getMyStudentClasses).mockResolvedValue({kind:"student",classes:[]});
   vi.mocked(getMyStudentToday).mockResolvedValue({
     student:{studentProfileId:"student",personId:"person",firstName:"Jordan",preferredName:null,gradeLevel:"9"},
     generatedAt:new Date("2030-11-05T15:00:00Z"),sections:[{sectionId:"enrolled",sectionTitle:"English",timezone:"America/New_York"}],
@@ -44,6 +49,13 @@ beforeEach(()=>{
 });
 
 describe("refined student dashboard composition",()=>{
+  it("resumes the exact native Class and lesson without probing legacy Sections",async()=>{
+    vi.mocked(getMyStudentClasses).mockResolvedValue({kind:"student",classes:[{classId:"class",title:"Algebra",deliveryMode:"self_paced",enrollmentId:"enrollment",status:"active",courseAttemptId:"attempt",canJoin:false}]});
+    vi.mocked(getNativeClassLearning).mockResolvedValue({classId:"class",classTitle:"Algebra",classEnrollmentId:"enrollment",courseAttemptId:"attempt",courseVersionId:"version",enrollmentStatus:"active",creditMode:"not_applicable",outcomes:[],awards:[],lessons:[{unitId:"unit",unitTitle:"Unit",unitOrder:1,lessonOrder:1,lessonId:"lesson",lessonTitle:"Equations",lessonBody:"Solve an equation",progressStatus:null,observedAt:null,videoResources:[]}]});
+    const result=await loadStudentToday();
+    expect(getClassWorkspace).not.toHaveBeenCalled();
+    expect(result.dashboard.learning).toEqual({ok:true,data:{classId:"class",title:"Algebra",lesson:{id:"lesson",title:"Equations"},completed:0,total:1}});
+  });
   it("uses current identity APIs and projects only real instructional progress and released grade fields",async()=>{
     const result=await loadStudentToday();
     expect(getMyStudentToday).toHaveBeenCalledWith();

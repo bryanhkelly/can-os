@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { readRestrictedCanonicalSession } from "./restricted-canonical-session-reader.server";
+import { assertUnambiguousAdultAccount } from "./unambiguous-adult-account.server";
 import { assertCurrentReviewedNativeLearner } from "./reviewed-learning-evidence.server";
 import { accessAccounts, accessAccountNoncreditPrincipals, accessAdultLearningReviews } from "@/db/schema";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -9,6 +10,7 @@ import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connect
 import { accessSessionCookie } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { getIdentityContext } from "./command-context.server";
+import { studentSiteScope } from "@/domain/student-site-scope";
 import { resolveCanonicalSiteStaffFromCan } from "./can-site-staff-authority.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -136,10 +138,7 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
     // Course Attempt and Class Enrollment authorizers independently verify
     // Person, Site, Course and active participation on every request.
     if (actor.role === "student") {
-      if (!actor.actorPersonId ||
-          !actor.grantSiteId || actor.scope.siteIds?.length !== 1 ||
-          actor.scope.organizationIds?.length !== 1 ||
-          !actor.capabilities.has("student:read")) {
+      if (!studentSiteScope(actor)) {
         throw new AuthorizationError("current direct CAN student Site membership");
       }
       return actor;
@@ -189,6 +188,9 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
     if (!source?.verified || source.disabled || isDemoAccountEmail(source.email)) {
       throw new AuthorizationError("current verified CAN learner account");
     }
+    await assertUnambiguousAdultAccount(actor.accountId,actor.actorPersonId);
+    if(native.person_id!==actor.actorPersonId)
+      throw new AuthorizationError("one authoritative CAN learner Person");
     const links = await db.select({
       personId: accessAccountNoncreditPrincipals.accessPersonId,
       nativeAccountId: accessAccountNoncreditPrincipals.canonicalAccountId,

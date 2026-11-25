@@ -87,7 +87,7 @@ function RootComponent() {
   const pathname = useLocation({ select: location => location.pathname });
   const standalone = isLaunchStudioPath(pathname);
   const publicSiteSignup = pathname === "/site/new";
-  const siteLaunch = pathname === "/launch/site";
+  const siteLaunch = pathname === "/launch/site" || /^\/o\/[^/]+\/[^/]+\/(?:launch|website)\/?$/.test(pathname);
   const engagement = isEngagementPath(pathname);
 
   return (

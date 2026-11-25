@@ -97,7 +97,7 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
           ? {candidates:noncredit.value.candidates,releases:noncredit.value.published}:{}),
       })
     : null;
-  return <WorkspacePanel title={context==="open" ? "Your opening checklist" : "Your preparation checklist"}
+  return <WorkspacePanel title={context==="open" ? "Readiness status" : "Your preparation checklist"}
     description="See what's ready and what still needs attention. Registration opens separately for each approved offering.">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-xs text-muted-foreground">

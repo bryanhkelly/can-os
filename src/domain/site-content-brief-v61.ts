@@ -1,4 +1,6 @@
+import { projectSiteAudienceIntent, sitePlanningAudienceIds } from "./site-audiences";
 import { z } from "zod";
+import {editorialCommunityProfileSchema} from "./editorial-community-profile";
 import { siteIdentityV61Schema } from "./site-identity-v61";
 import { siteHostingV61Schema, siteEnvironmentV61Schema, siteStorySourceV61Schema, siteStoryV61Schema } from "./site-information-v61";
 import { readSiteProgramsAudiencesV61, siteProgramsAudiencesV61Schema, type SiteProgramsAudiencesV61 } from "./site-launch-preferences";
@@ -26,6 +28,9 @@ export const siteContentBriefV61Schema=z.object({
   hosting:siteHostingV61Schema.nullable(),
   environment:siteEnvironmentV61Schema.nullable(),
   planning:siteProgramsAudiencesV61Schema.nullable(),
+  audienceIntent:z.object({classification:z.literal("declared_desire"),
+    audiences:z.array(z.object({id:z.enum(sitePlanningAudienceIds),label:z.string(),category:z.string()}).strict()),
+    deliveryCapacityVerified:z.literal(false)}).strict().optional(),
   experiences:z.array(experienceSchema),
   story:siteStoryV61Schema.nullable(),
   leadership:z.array(z.object({
@@ -35,6 +40,7 @@ export const siteContentBriefV61Schema=z.object({
     heroHeadline:z.string(),welcomeMessage:z.string(),
     schoolVision:z.string(),communityOutreach:z.string(),
   }).strict().nullable(),
+  communityProfiles:z.array(editorialCommunityProfileSchema).max(2).optional(),
   consent:z.object({contentReuseAllowed:z.boolean()}).strict(),
 }).strict();
 export type SiteContentBriefV61=z.infer<typeof siteContentBriefV61Schema>;
@@ -110,7 +116,7 @@ export function projectSiteContentBriefV61(input:{
       brandVersionId:input.brandVersionId??null,brandRevision:input.brandRevision??null,
       websiteContentRevision:input.websiteContentRevision??null,
     },
-    identity,hosting,environment,planning,experiences:projectSiteExperienceBriefV61(planning),
+    identity,hosting,environment,planning,audienceIntent:projectSiteAudienceIntent(planning?.audienceIds??[]),experiences:projectSiteExperienceBriefV61(planning),
     story:consent?story?.answers??null:null,leadership,websiteCopy,
     consent:{contentReuseAllowed:consent},
   });

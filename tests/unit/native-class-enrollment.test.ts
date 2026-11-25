@@ -109,5 +109,11 @@ describe("native Class learner policy",()=>{
       enrollment:{...enrollment,status:"completed" as const}};
     expect(()=>authorizeNativeClassAttempt(completed)).toThrow();
     expect(authorizeNativeClassAttempt({...completed,historicalRead:true}).courseAttemptId).toBe("attempt");
+    expect(authorizeNativeClassAttempt({...completed,historicalRead:true,classInstance:{...cls,state:"completed"}}).courseAttemptId).toBe("attempt");
+    expect(()=>authorizeNativeClassAttempt({...completed,classInstance:{...cls,state:"completed"}})).toThrow();
+    expect(()=>authorizeNativeClassAttempt({...completed,historicalRead:true,classInstance:{...cls,state:"cancelled"}})).toThrow();
+    expect(()=>authorizeNativeClassAttempt({...completed,historicalRead:true,authority:{...authority,adoptionState:"suspended"}})).toThrow();
+    expect(()=>authorizeNativeClassAttempt({...completed,historicalRead:true,authority:{...authority,coursePublished:false}})).toThrow();
+    expect(()=>authorizeNativeClassAttempt({...completed,historicalRead:true,actorPersonId:"another-person"})).toThrow();
   });
 });

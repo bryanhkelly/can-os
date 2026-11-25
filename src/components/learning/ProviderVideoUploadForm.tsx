@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
-import { ActionFooter, MutationFeedback } from "@/components/workspace";
+import { ActionFooter, EmptyState, QueryState, StatusBadge, MutationFeedback } from "@/components/workspace";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { submitRecordedVideoForReview } from "@/modules/learning/recorded-video-review.functions";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { classVideoFileSchema, videoUploadPolicy } from "@/domain/class-video";
 import { createPrivateUploadTask } from "@/platform/storage/private-upload";
@@ -126,21 +127,20 @@ export function ProviderVideoUploadForm({
     <MutationFeedback state={feedback} pendingMessage="Uploading and verifying private media. Keep this page open."/>
     {courseVersionId&&<div className="mt-6 border-t border-border pt-5">
       <h3 className="text-sm font-semibold">Saved recording drafts</h3>
-      {drafts.isPending&&<p role="status" className="mt-2 text-sm">Loading private recordings…</p>}
-      {drafts.isError&&<p role="alert" className="mt-2 text-sm">
-        Saved recordings are not available for this Course appointment.
-      </p>}
-      {drafts.isSuccess&&!drafts.data.length&&<p className="mt-2 text-sm text-muted-foreground">
-        No private recordings uploaded for this Course.
-      </p>}
+      <QueryState loading={drafts.isPending&&"Loading private recordings…"}
+        error={drafts.isError&&"Saved recordings are not available for this Course appointment."}
+        onRetry={()=>void drafts.refetch()} retrying={drafts.isFetching}
+        isEmpty={drafts.isSuccess&&!drafts.data.length}
+        empty={<EmptyState title="No private recordings uploaded for this Course."/>}/>
       {drafts.isSuccess&&!!drafts.data.length&&
         <ul className="mt-3 divide-y border border-border">
           {drafts.data.map(draft=><li key={draft.assetVersionId}
             className="space-y-3 p-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{draft.title}</span>
-              <span className="text-muted-foreground">Private draft · Review required</span>
+              <StatusBadge tone={draft.reviewRequestedAt?"info":"neutral"}>{draft.reviewRequestedAt?"Submitted for independent review":"Private draft · Review required"}</StatusBadge>
             </div>
+            {!draft.reviewRequestedAt&&<Button type="button" variant="outline" disabled={busy||!draft.sha256} onClick={()=>void feedback.run(()=>submitRecordedVideoForReview({data:{courseVersionId,assetVersionId:draft.assetVersionId,expectedHash:draft.sha256!}}),{successMessage:"Recording submitted for independent review.",commandErrorMessage:"Submission blocked. Verify the recording and your Course appointment."})}>Submit for review</Button>}
             <ClassVideoPlayer title={draft.title+" · private creator preview"}
               resourceId={draft.assetVersionId}
               loadUrl={async()=>(await getOwnRecordedVideoPreview({data:{

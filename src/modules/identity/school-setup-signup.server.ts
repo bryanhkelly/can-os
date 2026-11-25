@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, memberships, organizations, people, roleAssignments, schoolSetupSignups, sites } from "@/db/schema";
 import { DEFAULT_SITE_TIMEZONE } from "@/domain/site-timezone";
+import { initialVerifiedSignupOrganizationType, publicSignupOrganizationTypeSchema } from "@/domain/school-setup";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -10,7 +11,7 @@ type Signup = typeof schoolSetupSignups.$inferSelect;
 
 function uniqueSlug(name: string, signupId: string): string {
   const stem = name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 38).replace(/-+$/g, "") || "school";
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 38).replace(/-+$/g, "") || "site";
   return `${stem}-${signupId.replace(/-/g, "").slice(0, 8)}`;
 }
 
@@ -20,9 +21,14 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
     throw new Error("School setup signup is no longer available");
 
   const slug = uniqueSlug(signup.schoolName, signup.id);
+  // Old pending signups predate classification. Do not assume they are schools.
+  const requestedType = publicSignupOrganizationTypeSchema.catch("other_partner").parse(signup.organizationType);
+  const initialType = initialVerifiedSignupOrganizationType(requestedType);
   const [organization] = await tx.insert(organizations).values({
-    type: "christian_school", name: signup.organizationName?.trim() || signup.schoolName,
+    type: initialType, name: signup.organizationName?.trim() || signup.schoolName,
     slug, lifecycleStatus: "active",
+    metadata: { signup: { requestedOrganizationType: requestedType,
+      classification: initialType === requestedType ? "self_reported" : "pending_verification" } },
   }).returning({ id: organizations.id });
   if (!organization) throw new Error("School organization could not be created");
 
@@ -97,7 +103,8 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
   await writeAudit(tx, {
     actorPersonId: personId, action: "school.setup", resourceType: "organization",
     resourceId: organization.id, scope: { organizationId: organization.id, siteId: site.id },
-    after: { schoolName: signup.schoolName, initialGrantId: grant.id,
+    after: { schoolName: signup.schoolName, requestedOrganizationType: requestedType,
+      initialOrganizationType: initialType, initialGrantId: grant.id,
       source: "verified_email_school_setup" },
     context: { accountId, grantId: grant.id, role: "site_admin", authenticated: true,
       source: "verified_email_school_setup" },

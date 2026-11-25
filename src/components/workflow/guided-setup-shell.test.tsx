@@ -30,6 +30,18 @@ describe("V6.1 internal setup navigation", () => {
     expect(html).toContain("Saved Site information is retained.");
   });
 
+  it("keeps a screen-reader label while suppressing a repeated page header", () => {
+    const html = renderToStaticMarkup(<GuidedSetupShell title="Site Information"
+      showHeader={false} description="Already in the page header." steps={steps}>
+      <p>Workflow content</p>
+    </GuidedSetupShell>);
+    expect(html).toContain('aria-label="Site Information"');
+    expect(html).not.toContain("<h2");
+    expect(html).not.toContain("Already in the page header.");
+    expect(html).toContain("Workflow content");
+    expect(html).toContain("Setup progress");
+  });
+
   it("does not interpret a visited step as complete", () => {
     const html = renderToStaticMarkup(<GuidedSetupProgress steps={[
       { id: "one", title: "First", status: "current" },

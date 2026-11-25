@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { sitePlanningAudienceIds } from "./site-audiences";
+export { sitePlanningAudienceIds } from "./site-audiences";
 import { siteExperienceIds, siteExperienceById, siteExperienceOutcomeIds,
   siteExperienceLimit, siteExperienceActivityLimit, siteExperienceOutcomeLimit,
   validCustomExperienceName } from "./site-experience-interests";
@@ -14,7 +16,7 @@ export const sitePlanningInterestIds = [
   "grades-6-8", "grades-9-12", "afterschool", "summer", "adult", "senior",
 ] as const;
 export const sitePlanningTimingIds = ["weekdays", "weekends", "daytime", "evenings"] as const;
-export const sitePlanningAudienceIds = ["children", "teens", "adults", "older_adults"] as const;
+
 
 const distinct = <T extends string>(values: T[]) => new Set(values).size === values.length;
 const customExperiences = z.array(z.string().trim().refine(
@@ -36,7 +38,7 @@ export const siteExperienceDetailSchema=z.object({
     .max(siteExperienceActivityLimit).refine(distinct,"Choose each activity once"),
   outcomeIds:z.array(z.enum(siteExperienceOutcomeIds))
     .max(siteExperienceOutcomeLimit).refine(distinct,"Choose each outcome once"),
-  audienceIds:z.array(z.enum(sitePlanningAudienceIds)).max(4)
+  audienceIds:z.array(z.enum(sitePlanningAudienceIds)).max(sitePlanningAudienceIds.length)
     .refine(distinct,"Choose each audience once"),
   programIds:z.array(z.enum(sitePlanningInterestIds)).max(6)
     .refine(distinct,"Choose each Program once"),
@@ -68,7 +70,7 @@ export const siteLaunchPreferencesSchema = z.object({
   planningVersion: z.literal(2).optional(),
   timingIds: z.array(z.enum(sitePlanningTimingIds)).max(4)
     .refine(distinct, "Duplicate timing preferences are not allowed").optional(),
-  audienceIds: z.array(z.enum(sitePlanningAudienceIds)).max(4)
+  audienceIds: z.array(z.enum(sitePlanningAudienceIds)).max(sitePlanningAudienceIds.length)
     .refine(distinct, "Duplicate audiences are not allowed").optional(),
   startingFocus: z.enum(sitePlanningInterestIds).nullable().optional(),
   // Canonical published Program reference codes (not adopted Solutions).
@@ -96,7 +98,7 @@ export type SiteLaunchPreferences = z.infer<typeof siteLaunchPreferencesSchema>;
 export const sitePublishedExperienceSnapshotSchema=z.object({
   version:z.literal(2),
   interestIds:z.array(z.enum(siteLaunchInterestIds)).max(8),
-  audienceIds:z.array(z.enum(sitePlanningAudienceIds)).max(4),
+  audienceIds:z.array(z.enum(sitePlanningAudienceIds)).max(sitePlanningAudienceIds.length),
   experienceIds:z.array(z.enum(siteExperienceIds)).max(siteExperienceIds.length),
   customExperiences:customExperiences,
   experienceDetails:experienceDetailsSchema,
@@ -117,7 +119,7 @@ export const siteProgramsAudiencesV61Schema = z.object({
     .refine(distinct, "Choose each learning interest once"),
   timingIds: z.array(z.enum(sitePlanningTimingIds)).max(4)
     .refine(distinct, "Choose each day or time once"),
-  audienceIds: z.array(z.enum(sitePlanningAudienceIds)).max(4)
+  audienceIds: z.array(z.enum(sitePlanningAudienceIds)).max(sitePlanningAudienceIds.length)
     .refine(distinct, "Choose each audience once"),
   startingFocus: z.enum(sitePlanningInterestIds).nullable(),
   programCodes: z.array(z.string().trim().min(3).max(128)).max(30)

@@ -19,6 +19,10 @@ export type AccessContext = CommandContext & {
  accountId: string;
  sessionId: string;
  grantId: string;
+ /** Server-only delegation metadata set by the signed Platform Owner session. */
+ delegatedByPlatformOwner?: true;
+ delegationMode?: "view" | "act";
+ delegationExpiresAt?: string;
  /** Original verified membership site (null means organization-wide), before effective site expansion. */
  grantSiteId: string | null;
  role: string;
@@ -31,6 +35,8 @@ const baseRoleCapabilities = {
  // Explicit platform-only membership: no implicit Site/organization access.
  // Platform operations must independently enforce platform.admin and audit changes.
  app_admin: ["platform.admin", "catalog.platform.manage", "blueprint.template.manage"],
+ // Owner can manage platform access and delegate an existing verified grant; no forged independent evidence.
+ platform_owner: ["platform.admin", "catalog.platform.manage", "blueprint.template.manage", "platform.owner", "platform.delegation.manage"],
  // Course-content roles are provider scoped and receive no learner-record powers.
  academic_content_creator: ["instructional_track.author"],
  academic_content_reviewer: ["instructional_track.review", "instructional_track.publish", "instructional_track.withdraw"],
@@ -40,6 +46,8 @@ const baseRoleCapabilities = {
  // It must be explicitly assigned to a real CAN Person through an organization-wide grant.
  can_credential_reviewer: ["credential.issuer.review"],
  can_jurisdiction_reviewer: ["jurisdiction.profile.verify"],
+ // Explicit independent relationship appointment, not inherited from school or platform administration.
+ reporting_relationship_manager: ["relationships.propose","relationships.decide","relationships.revoke","relationships.report"],
  network_admin: ["network.sites.read", "network.sites.manage", "network.affiliations.read", "network.affiliations.review"],
  // Partner website review is deliberately NOT registration, academic approval,
  // institutional publication, Site operations or access to family records.
@@ -93,7 +101,7 @@ export function resolveAccessContext(principal: SessionPrincipal, grants: readon
  if (!grant || !Object.hasOwn(roleCapabilities,grant.role)) throw new AuthorizationError("active membership");
  // A personal login must never be reinterpreted as site-wide access even if
  // a malformed database row is later introduced.
- if ((grant.role === "account_holder" || grant.role === "app_admin") &&
+ if ((grant.role === "account_holder" || grant.role === "app_admin" || grant.role === "platform_owner") &&
      (grant.organizationId !== null || grant.siteId !== null))
   throw new AuthorizationError("account-only scope");
  return {

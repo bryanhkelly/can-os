@@ -14,6 +14,7 @@ describe("WS2 native Class invitation authority",()=>{
   expect(command).toContain("seatReserved:false");
   expect(command).not.toContain("tx.insert(canonicalClassEnrollments)");
   expect(command).not.toContain("tx.insert(learnerCourseAttempts)");
+  expect(command).not.toContain("createInitialNativeClassAttempt(");
  });
  it("requires the real verified recipient and current exact Site staff grant",()=>{
   for(const rule of [
@@ -38,19 +39,22 @@ describe("WS2 native Class invitation authority",()=>{
     "invitation.creditMode!==data.creditMode",
     "assertCurrentNativeClassLearnerForMutation(tx,request,actor)",
     "assertNativeClassSeatAvailable",
-    "consentSha256=createHash",
-    'enrollmentMethod:invitation?"invitation":"self"',
+    "consentSha256=nativeClassConsentDigest",
+    'enrollmentMethod:invitation?"invitation":approval?"approval":"self"',
     'state:"accepted",respondedAt:now,acceptedEnrollmentId:enrollment.id',
     'eventType:"ClassInvitationAccepted"',
   ])expect(enroll).toContain(rule);
  });
  it("makes learner acceptance and decline accessible without bypassing consent",()=>{
+  expect(ui).toContain("getMyNativeClassInvitations()");
+  expect(ui).toContain("<InvitationCard");
+  const card=read("src/components/learning/native-class/InvitationCard.tsx");
   for(const rule of [
-    "getMyNativeClassInvitations()","declineNativeClassInvitation",
+    "declineNativeClassInvitation",
     "invitationId:item.invitationId","consentAccepted:true",
     "item.consentText","I accept the current participation",
-  ])expect(ui).toContain(rule);
-  expect(ui).toContain("An invitation does not reserve a seat");
+  ])expect(card).toContain(rule);
+  expect(card).toContain("An invitation does not reserve a seat");
  });
  it("permits only implemented operational Class enrollment modes",()=>{
   expect(policy).toContain('method !== "invitation"');

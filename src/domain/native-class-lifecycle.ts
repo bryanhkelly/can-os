@@ -172,24 +172,36 @@ export function assertVerifiedAdultNativeClassExit(
  * Offering's self-enrollment, never additional seats for assignments.
  * Call under the Class's FOR UPDATE lock after the open-enrollment lookup.
  */
-export function assertNativeClassSeatAvailable(args:{
+export type NativeClassCapacityInput = {
   method:"self"|"invitation"|"approval"|"assignment";
   activeOrPending:number;
   classCapacity:number|null;
   offeringCapacity?:number|null;
-}):void{
-  if(!Number.isSafeInteger(args.activeOrPending)||args.activeOrPending<0){
+};
+
+/** One capacity calculation for discovery and admission. A publication cap
+ * can narrow admission; it never increases the Class's physical seat pool. */
+export function nativeClassCapacity(input:NativeClassCapacityInput):{
+  capacity:number|null;remainingSeats:number|null;
+}{
+  if(!Number.isSafeInteger(input.activeOrPending)||input.activeOrPending<0){
     throw new AuthorizationError("valid Class occupancy count");
   }
-  const capacities=[args.classCapacity,
-    ...(args.method!=="assignment"?[args.offeringCapacity??null]:[])];
+  const capacities=[input.classCapacity,
+    ...(input.method!=="assignment"?[input.offeringCapacity??null]:[])];
   for(const cap of capacities){
     if(cap!==null && (!Number.isSafeInteger(cap)||cap<=0)){
       throw new AuthorizationError("valid positive Class capacity");
     }
-    if(cap!==null && args.activeOrPending>=cap){
-      throw new AuthorizationError("Class is at capacity");
-    }
+  }
+  const bounded=capacities.filter((cap):cap is number=>cap!==null);
+  const capacity=bounded.length?Math.min(...bounded):null;
+  return {capacity,remainingSeats:capacity===null?null:Math.max(0,capacity-input.activeOrPending)};
+}
+
+export function assertNativeClassSeatAvailable(args:NativeClassCapacityInput):void{
+  if(nativeClassCapacity(args).remainingSeats===0){
+    throw new AuthorizationError("Class is at capacity");
   }
 }
 
