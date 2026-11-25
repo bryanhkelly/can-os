@@ -140,7 +140,7 @@ export async function requestSchoolSetupAccess(input:unknown,sender:AccessEmailS
     .where(eq(schoolSetupSignups.id,prior.id));
   }else{
    await tx.insert(schoolSetupSignups).values({accountId,schoolName:data.name,
-    organizationName:data.organizationName??null,organizationType:data.organizationType,
+    organizationName:data.organizationName??null,organizationDomain:data.organizationDomain??null,organizationType:data.organizationType,
     firstName:data.firstName,lastName:data.lastName,expiresAt});
   }
  });
