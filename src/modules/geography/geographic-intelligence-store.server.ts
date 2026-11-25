@@ -1,7 +1,6 @@
 import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
 import {physicalSiteAddressSchema,siteAddressEditorDraft} from "@/domain/site-setup-configuration";
-import {isDemoTenantOrganization} from "@/modules/identity/demo-school-tenants.server";
 import {type GeographicResolution,type GeographicAreaFact,type CommunityProfile} from "@/domain/geographic-intelligence";
 import {createCensusGeographyProvider,type GeographyProvider} from "./census-geography-provider.server";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -120,7 +119,7 @@ export async function processGeographicIntelligence(options:{provider?:Geography
  if(work){
   try{
    const address=physicalSiteAddressSchema.safeParse(siteAddressEditorDraft(work.address));
-   if(!work.eligible||!address.success||address.data.country!=="US"||await isDemoTenantOrganization(work.organization_id)){
+   if(!work.eligible||!address.success||address.data.country!=="US"){
     await finishSite(work,"unsupported");
    }else{
     const result=await provider.resolve(address.data);
