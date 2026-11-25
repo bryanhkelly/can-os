@@ -1,7 +1,9 @@
 import { and, eq, isNotNull, sql, type SQLWrapper } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
-import { accessAccountSignups, demoSchoolTenants, sites } from "@/db/schema";
-import { DEMO_ACCOUNT_DOMAIN, LOCAL_DEMO_ADMIN, isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
+import { accessAccountSignups, demoSchoolTenants, organizations, sites } from "@/db/schema";
+import { DEMO_ACCOUNT_DOMAIN, LOCAL_DEMO_ADMIN, isDemoAccountEmail } from "@/domain/local-demo-access";
+
+import { isDemoDomain } from "@/domain/domain-classification";
 
 type Reader = Pick<Database, "select">;
 
@@ -23,13 +25,12 @@ export async function readDemoSchoolForAccount(accountId: string, reader: Reader
     school.siteOrganizationId === school.organizationId };
 }
 
-/** Classification survives tenant disablement so external delivery stays blocked. */
+/** Classification follows the owning Organization domain, not credential registration. */
 export async function isDemoTenantOrganization(organizationId: string | null, reader: Reader = db): Promise<boolean> {
   if (!organizationId) return false;
-  if (isValorOrganization(organizationId)) return true;
-  const [school] = await reader.select({ domain: demoSchoolTenants.domain })
-    .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId, organizationId)).limit(1);
-  return Boolean(school);
+  const [organization] = await reader.select({ domain: organizations.domain })
+    .from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  return isDemoDomain(organization?.domain);
 }
 
 /** Identity-layer boundary for shared-code credentials. Does not grant a role or
