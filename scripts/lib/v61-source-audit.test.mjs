@@ -252,3 +252,12 @@ test("appearance violations block the absolute source gate", () => temp(({root, 
   assert.equal(violations[0].kind, "control-appearance");
   assert.equal(violations[0].detail, "Button: bg-red-500");
 }));
+
+test("appearance ownership covers local constants, namespace imports and class maps", () => {
+  const source = [
+    'import * as UI from "@/components/ui";',
+    'const field = "mt-1";',
+    'export function Page() { const field = "border p-2"; return <UI.Input className={cn(field, {"focus:ring-2": true, "w-full": true})}/>; }',
+  ].join("\n");
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["border", "focus:ring-2", "p-2"]);
+});
