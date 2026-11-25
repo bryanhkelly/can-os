@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { WorkspacePanel, WorkspaceNotice, FormSection } from "@/components/workspace";
 
-const noStore = { "Cache-Control": "no-store" };
+const noStore = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
 
 /**
  * One public Site entry; identity approval determines when common provisioning runs.
@@ -127,6 +127,7 @@ function SiteNewPage() {
       });
       if (!response.ok) throw new Error("Request not accepted");
       const result = await response.json() as { demo?: boolean; privateAccessCode?: string };
+      if (result.demo === true && !result.privateAccessCode) throw new Error("Private access credential unavailable");
       setSignupEmail(payload.email);
       setPrivateAccessCode(result.privateAccessCode ?? null);
       setDemoReady(result.demo === true);
