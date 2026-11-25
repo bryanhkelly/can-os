@@ -33,7 +33,7 @@ describe("Release 3 canonical scheduled classroom windows",()=>{
     const model=read("src/db/canonical-v301/classroom-planning.ts");
     const server=read("src/modules/learning/classroom-scheduling.functions.ts");
     const sql=read("database/canonical/v3.0.1/patch-facilitated-classroom-plans.sql");
-    expect(model).toContain('educationV30.table("delivery_sessions"');
+    expect(model).toContain('pgTable("delivery_sessions"');
     expect(sql).toContain("facilitated_plans_delivery_session_uq");
     expect(sql).toContain("FORCE ROW LEVEL SECURITY");
     expect(server).toContain("createFacilitatedRoomForHost(tx,host");

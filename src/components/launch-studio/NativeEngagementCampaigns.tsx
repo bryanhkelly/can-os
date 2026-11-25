@@ -8,7 +8,7 @@ import {Textarea} from "@/components/ui/textarea";
 import {EmptyState,QueryState,WorkspaceNotice} from "@/components/workspace";
 import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagementCampaign,cancelEngagementCampaign} from "@/modules/communication/engagement-campaigns.functions";
 import {CampaignListMembers} from "./CampaignListMembers";
-import {parseCampaignRecipients} from "@/domain/campaign-policy";
+import {parseCampaignRecipients,parseCampaignRecipientCsv} from "@/domain/campaign-policy";
 type Workspace=Awaited<ReturnType<typeof readEngagementCampaignWorkspace>>;
 type CampaignProps={engagementId:string;linkId:string;invitationReady:boolean};
 export function NativeEngagementCampaigns(props:CampaignProps){
@@ -19,6 +19,18 @@ function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignPro
  const [name,setName]=useState(""),[raw,setRaw]=useState(""),[source,setSource]=useState(""),[attested,setAttested]=useState(false);
  const [list,setList]=useState(""),[when,setWhen]=useState(""),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
  const [manageList,setManageList]=useState(false);
+ const [importing,setImporting]=useState(false),[importError,setImportError]=useState("");
+ async function importCsv(file:File){
+   setImportError("");setImporting(true);setAttested(false);
+   try{
+     if(file.size>256000)throw new Error("CSV exceeds 256 KB.");
+     const imported=parseCampaignRecipientCsv(await file.text());
+     const merged=parseCampaignRecipients([raw,imported].filter(Boolean).join("\n"));
+     if(merged.invalid.length||merged.tooMany)throw new Error("Combined list must contain at most 1,000 valid addresses.");
+     setRaw(merged.recipients.join("\n"));
+   }catch(e){setImportError(e instanceof Error?e.message:"Unable to import CSV.");}
+   finally{setImporting(false);}
+ }
  const requestId=useRef<{id:string;scheduledAt:string}|null>(null),pending=useRef(false);
  const scope={engagementId,linkId};
  useEffect(()=>{let active=true;setData(null);setError("");readEngagementCampaignWorkspace({data:{engagementId,linkId}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active){setData(null);setError("Native campaign workspace unavailable.");}});return()=>{active=false;};},[engagementId,linkId,refresh]);
@@ -33,10 +45,12 @@ function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignPro
  <p className="text-sm">Campaign sender: {data.senderLabel}</p>
  <Field label="Recipient list name"><Input value={name} maxLength={120} disabled={busy} onChange={e=>setName(e.target.value)}/></Field>
  <Field label="Consented email addresses" description={parsed.recipients.length+" unique addresses; up to 1,000 per list"} error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"List exceeds the current limit.":undefined}>
- <Textarea value={raw} rows={4} maxLength={256000} disabled={busy} onChange={e=>{setRaw(e.target.value);setAttested(false);}}/></Field>
+ <Textarea value={raw} rows={4} maxLength={256000} disabled={busy||importing} onChange={e=>{setRaw(e.target.value);setAttested(false);}}/></Field>
+ <Field label="Import email CSV" description="Optional single email column, with or without an email header. Review addresses and confirm consent before saving."><Input type="file" accept=".csv,text/csv" disabled={busy||importing} onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value="";if(file)void importCsv(file);}}/></Field>
+ {importError&&<WorkspaceNotice tone="danger">{importError}</WorkspaceNotice>}
  <Field label="Consent evidence" description="Describe where and how these recipients agreed to campaign emails."><Input value={source} maxLength={500} disabled={busy} onChange={e=>{setSource(e.target.value);setAttested(false);}}/></Field>
- <label className="flex items-start gap-2 text-sm"><Checkbox checked={attested} disabled={busy} onChange={e=>setAttested(e.target.checked)}/>I have documented permission from every listed recipient for these campaign emails. Existing opt-outs will not be overridden.</label>
- <Button type="button" disabled={!valid||busy} onClick={()=>void run(async()=>{const saved=await saveCampaignRecipientList({data:{...scope,name,raw,consentSource:source,attested:true}});setList(saved.id);setRaw("");setAttested(false);setConfirmed(false);requestId.current=null;setNotice("Recipient list saved. No messages sent.");})}>Save or add to list</Button>
+ <label className="flex items-start gap-2 text-sm"><Checkbox checked={attested} disabled={busy||importing} onChange={e=>setAttested(e.target.checked)}/>I have documented permission from every listed recipient for these campaign emails. Existing opt-outs will not be overridden.</label>
+ <Button type="button" disabled={!valid||busy||importing} onClick={()=>void run(async()=>{const saved=await saveCampaignRecipientList({data:{...scope,name,raw,consentSource:source,attested:true}});setList(saved.id);setRaw("");setAttested(false);setConfirmed(false);requestId.current=null;setNotice("Recipient list saved. No messages sent.");})}>Save or add to list</Button>
  <Field label="Saved recipient list"><Select value={list} disabled={busy} onChange={e=>{setList(e.target.value);setConfirmed(false);requestId.current=null;}}><option value="">Select a list</option>{data.lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.recipients})</option>)}</Select></Field>
  {list&&<><Button type="button" variant="outline" disabled={busy} onClick={()=>setManageList(v=>!v)}>{manageList?"Close recipient management":"Manage saved recipients"}</Button>{manageList&&<CampaignListMembers key={list} engagementId={engagementId} linkId={linkId} listId={list} onChange={()=>{setConfirmed(false);setRefresh(v=>v+1);}}/>}</>}
  <Field label="Schedule (local time)" description="Leave empty to queue now. Scheduled processing is periodic, not an exact minute guarantee."><Input type="datetime-local" value={when} disabled={busy} onChange={e=>{setWhen(e.target.value);setConfirmed(false);requestId.current=null;}}/></Field>

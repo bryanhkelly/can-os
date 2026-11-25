@@ -1,7 +1,8 @@
+import { pgTable } from "drizzle-orm/pg-core";
 import { index, integer, jsonb, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { educationV30, type JsonObject } from "./core";
+import { type JsonObject } from "./core";
 
-export const auditEvents = educationV30.table(
+export const auditEvents = pgTable(
   "audit_events",
   {
     id: uuid("id").defaultRandom().primaryKey(),
@@ -18,7 +19,7 @@ export const auditEvents = educationV30.table(
   ],
 );
 
-export const domainEvents = educationV30.table(
+export const domainEvents = pgTable(
   "domain_events",
   {
     id: uuid("id").defaultRandom().primaryKey(),

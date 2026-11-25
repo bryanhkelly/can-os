@@ -19,7 +19,8 @@ import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
 
 type Suggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
 type Suggestion = Suggestions[MarketingPackageContent["purpose"]];
-export const outreachProgressStepsV61=[...outreachStepIdsV61.map((id,index)=>({id,title:["People","Message","Highlights","Action","Materials","Review"][index]})),{id:"distribute",title:"Distribute"}];
+const stepTitles=["People","Message","Highlights","Action","Materials","Review"] as const;
+export const outreachProgressStepsV61=[...outreachStepIdsV61.map((id,index)=>({id,title:stepTitles[index]??id})),{id:"distribute",title:"Distribute"}];
 export function OutreachProgressV61({step}:{step:number}){
   return <GuidedSetupProgress label="Share outreach steps" steps={outreachProgressStepsV61.map((item,index)=>({...item,status:index<step?"complete" as const:index===step?"current" as const:"upcoming" as const}))}/>;
 }

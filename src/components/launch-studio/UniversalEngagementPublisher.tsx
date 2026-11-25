@@ -165,13 +165,13 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
         </Field>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label="Visitor experience">
+        {!outreach&&<Field label="Visitor experience">
           <Select value={execution} onChange={event=>setExecution(event.target.value as typeof execution)}>
             <option value="page">Render a branded invitation page</option>
             <option value="redirect">Go directly to an existing destination</option>
           </Select>
-        </Field>
-        {execution==="page"&&<Field label="Page template">
+        </Field>}
+        {!outreach&&execution==="page"&&<Field label="Page template">
           <Select value={template} onChange={event=>setTemplate(event.target.value as typeof template)}>
             <option value="information">Information</option>
             <option value="invitation">Invitation</option>
@@ -189,7 +189,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
       {!actionSupported&&<p role="status" className="mt-3 text-sm text-muted-foreground">
         This destination cannot complete the selected interaction. Use Discover or Respond for informational journeys; Register requires an eligible training release or enrichment Season. Application, payment, agreement and verified resume integrations are not yet available.
       </p>}
-      <p className="mt-3 text-xs text-muted-foreground">Publishing creates an immutable, publicly accessible definition. Review content before continuing. This is not a formal program approval or registration.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Publishing creates an immutable, publicly accessible definition. Review content before continuing. This is not a formal program approval or registration.{outreach?" The invitation uses the current Site Brand, and its email wording may differ from a generated material file.":""}</p>
       <Button type="button" className="mt-4" disabled={busy||!ready} onClick={()=>void publish()}>
         {busy?"Preparing…":outreach?"Prepare invitation & add recipients":"Publish engagement"}
       </Button>

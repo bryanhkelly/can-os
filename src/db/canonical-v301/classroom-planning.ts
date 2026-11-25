@@ -1,5 +1,5 @@
+import { pgTable } from "drizzle-orm/pg-core";
 import { index, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
 import { facilitatedLearningSessions } from "./facilitated-learning";
 
 /**
@@ -8,7 +8,7 @@ import { facilitatedLearningSessions } from "./facilitated-learning";
  * This table contributes Course, facilitator and live-room linkage only; it
  * does not create an independent scheduling or learner enrollment system.
  */
-export const canonicalDeliverySessions = educationV30.table("delivery_sessions", {
+export const canonicalDeliverySessions = pgTable("delivery_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
   deploymentId: uuid("deployment_id").notNull(),
   deploymentSiteId: uuid("deployment_site_id"),
@@ -19,7 +19,7 @@ export const canonicalDeliverySessions = educationV30.table("delivery_sessions",
   modalityVocabularyCode: text("modality_vocabulary_code").notNull().default("delivery_modality"),
 });
 
-export const facilitatedClassroomPlans = educationV30.table("facilitated_classroom_plans", {
+export const facilitatedClassroomPlans = pgTable("facilitated_classroom_plans", {
   id: uuid("id").defaultRandom().primaryKey(),
   deliverySessionId: uuid("delivery_session_id").notNull()
     .references(()=>canonicalDeliverySessions.id),
