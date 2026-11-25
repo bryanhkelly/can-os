@@ -14,7 +14,7 @@ import {
 } from "@/domain/staff-onboarding-policy";
 import {
   listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE,
-} from "@/modules/identity/staff-invitations.server";
+, acceptStaffInvitations } from "@/modules/identity/staff-invitations.server";
 import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
 import { demoSchoolTenants } from "@/db/schema";
 import { DomainError } from "@/domain/errors";
@@ -225,8 +225,9 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         (localDemoIdentity && (!demoSchool || emailNormalized.split("@")[1] !== demoSchool.domain))) {
         throw new DomainError("FORBIDDEN", "Local demo identities require their original registered school domain");
       }
-      let [account] = await tx.select({ id: accessAccounts.id }).from(accessAccounts)
-        .where(eq(accessAccounts.emailNormalized, emailNormalized)).limit(1);
+      let [account] = await tx.select({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled }).from(accessAccounts)
+        .where(eq(accessAccounts.emailNormalized, emailNormalized)).for("update").limit(1);
+      if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
       if (account && demoSchool && localDemoIdentity) {
         const bindings = await readDemoStaffBindings(account.id, tx);
         if (!bindings.some(binding => binding.enabled && binding.domain === demoSchool.domain &&
@@ -234,7 +235,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           throw new DomainError("FORBIDDEN", "Existing accounts require an exact demo staff invitation binding");
       }
       if (!account) {
-        [account] = await tx.insert(accessAccounts).values({ emailNormalized }).returning({ id: accessAccounts.id });
+        [account] = await tx.insert(accessAccounts).values({ emailNormalized }).returning({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled });
         await recordAudit(tx, actor, {
           action: "admin.access_account.create", resourceType: "access_account", resourceId: account!.id,
           after: { emailNormalized },
@@ -255,9 +256,9 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       const distinctPeople = [...new Set(linkedPeople.map(grant => grant.personId))];
       // A verified mailbox alone cannot resolve multiple different real Person
       // records. Require operator review instead of choosing an arbitrary one.
-      if (!syntheticSchool && distinctPeople.length > 1)
+      if (distinctPeople.length > 1 || (account!.personId && distinctPeople.some(id => id !== account!.personId)))
         throw new DomainError("CONFLICT", "This account has multiple Person records. Reconcile identity before inviting staff.");
-      let personId = distinctPeople[0];
+      let personId = account!.personId ?? distinctPeople[0];
       if (!personId) {
         const [person] = await tx.insert(people).values({
           legalFirstName: data.firstName, legalLastName: data.lastName, email: emailNormalized,
@@ -267,6 +268,10 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           action: "admin.person.create", resourceType: "person", resourceId: personId,
           after: { firstName: data.firstName, lastName: data.lastName, email: emailNormalized },
         });
+      }
+      if (localDemoIdentity && !account!.personId) {
+        await tx.update(accessAccounts).set({ personId, updatedAt: new Date() })
+          .where(eq(accessAccounts.id, account!.id));
       }
       const [existingGrant] = await tx.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
         .from(accountPersonGrants).where(and(
@@ -304,6 +309,12 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         after: { accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false, publisherRelationship },
         scope: { organizationId, siteId },
       });
+      if (localDemoIdentity) {
+        const pending = await listPendingStaffInvitations(tx, account!.id);
+        const accepted = await acceptStaffInvitations(tx, account!.id, pending.filter(item => item.id === grant.id));
+        if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
+        return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false };
+      }
       return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };
     });
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
