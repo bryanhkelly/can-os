@@ -80,6 +80,7 @@ export const authRequestRateLimits = pgTable("auth_request_rate_limits", {
 /** Independent of OTP provider; hash opaque session secret and revoke server-side. */
 export const accessSessions = pgTable("access_sessions", {
  id: id(),
+ authenticationMethod: text("authentication_method").$type<"email_link"|"local_demo_code"|"private_access_code">(),
  accountId: uuid("account_id").notNull().references(() => accessAccounts.id,{onDelete:"cascade"}),
  secretHash: text("secret_hash").notNull(),
  activeGrantId: uuid("active_grant_id").references(() => accountPersonGrants.id,{onDelete:"set null"}),
