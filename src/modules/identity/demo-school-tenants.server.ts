@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql, type SQLWrapper } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import { demoSchoolTenants, sites } from "@/db/schema";
 import { DEMO_ACCOUNT_DOMAIN, LOCAL_DEMO_ADMIN, isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
@@ -50,4 +50,27 @@ export async function matchesDemoCredentialScope(
       eq(demoSchoolTenants.organizationId,organizationId),
       eq(demoSchoolTenants.siteId,siteId),eq(demoSchoolTenants.enabled,true))).limit(1);
   return Boolean(binding);
+}
+
+/** Transaction-side equivalent of credential scope. Inputs are trusted
+ * column expressions; never interpolate user-supplied SQL identifiers. */
+export function demoCredentialScopePredicate(
+  email: SQLWrapper, organizationId: SQLWrapper, siteId: SQLWrapper,
+) {
+  return sql<boolean>`(
+    ${email} ~ '^[^@[:space:]]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?\\.demo$'
+    AND ${organizationId} IS NOT NULL AND ${siteId} IS NOT NULL
+    AND EXISTS (SELECT 1 FROM public.sites credential_site
+      WHERE credential_site.id=${siteId} AND credential_site.organization_id=${organizationId})
+    AND (
+      (split_part(${email},'@',2)=${DEMO_ACCOUNT_DOMAIN}
+        AND ${organizationId}=${LOCAL_DEMO_ADMIN.organizationId}::uuid
+        AND ${siteId}=${LOCAL_DEMO_ADMIN.siteId}::uuid)
+      OR EXISTS (SELECT 1 FROM public.demo_school_tenants credential_tenant
+        WHERE credential_tenant.enabled
+          AND credential_tenant.domain=split_part(${email},'@',2)
+          AND credential_tenant.organization_id=${organizationId}
+          AND credential_tenant.site_id=${siteId})
+    )
+  )`;
 }
