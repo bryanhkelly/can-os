@@ -8,7 +8,7 @@ import { writeAudit } from "@/platform/mutation";
  * Never link an unverified token/email to a person, and never store credential
  * material, submitted email, IP, headers, or request body in audit_events.
  */
-export type AnonymousAuthMethod = "email_link" | "local_demo_code";
+export type AnonymousAuthMethod = "email_link" | "local_demo_code" | "private_access_code";
 export const ANONYMOUS_AUTH_RESOURCE_ID = "00000000-0000-0000-0000-000000000000";
 export const MAX_RECORDED_AUTH_REJECTIONS_PER_MINUTE = 30;
 
