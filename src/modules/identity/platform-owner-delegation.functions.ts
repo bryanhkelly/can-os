@@ -34,5 +34,5 @@ export const endPlatformOwnerDelegation=createServerFn({method:"POST"})
 
 /** Never cache the one-time raw replacement credential. */
 export const recoverPrivateAccountAccessCode=createServerFn({method:"POST"})
-  .validator((raw:unknown)=>z.object({grantId:z.string().uuid(),reason:z.string().trim().min(12).max(500),confirm:z.literal(true)}).strict().parse(raw))
+  .validator((raw:unknown)=>z.object({grantId:z.string().uuid(),reason:z.string().trim().min(12).max(500),confirm:z.literal(true),operation:z.enum(["enroll","rotate"]).default("rotate")}).strict().parse(raw))
   .handler(async({data})=>{noStore();setResponseHeader("Referrer-Policy","no-referrer");return rotatePrivateAccountAccessCode(getRequest(),data);});
