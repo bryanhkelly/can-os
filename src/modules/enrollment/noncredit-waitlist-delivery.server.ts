@@ -14,7 +14,7 @@ import {
 } from "@/modules/communication/notification-email.server";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { AuthorizationError } from "@/domain/command-context";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { currentWaitlistEmailOpportunity } from "@/domain/noncredit-waitlist-email-policy";
 
@@ -98,8 +98,6 @@ const waitlistAdapter = {
     const [eligibleRelease] = await readEligibleSelfEnrollmentReleases(db, record.releaseId);
     if (!eligibleRelease)
       return { kind: "suppress", reason: "release_eligibility_revoked" };
-    if (await isDemoTenantOrganization(record.organizationId))
-      return { kind: "suppress", reason: "demo_tenant_external_delivery" };
 
     const [recipient] = await db.select({ email: accessAccounts.emailNormalized })
       .from(accessAccounts)
@@ -119,6 +117,7 @@ const waitlistAdapter = {
       )).limit(1);
     if (!recipient?.email)
       return { kind: "suppress", reason: "verified_account_person_unavailable" };
+    if (suppressDemoEmailDelivery(recipient.email)) return { kind: "suppress", reason: "demo_email_destination" };
     try {
       await assertUnambiguousAdultAccount(record.accountId, record.personId);
     } catch (error) {
