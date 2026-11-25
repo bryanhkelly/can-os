@@ -1,6 +1,7 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {z} from "zod";
+import {isDemoAccountEmail} from "@/domain/local-demo-access";
 import {AuthorizationError} from "@/domain/command-context";
 import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {
@@ -33,6 +34,10 @@ const pagedInput=z.object({
   cursor:z.string().min(2).max(500).nullable().default(null),
 }).strict();
 const firstPageSources=participationSource.options;
+function adultSourceExcluded(session:Extract<Awaited<ReturnType<typeof readWorkspaceSession>>,{authenticated:true}>):boolean{
+  const effective=session.grants.find(g=>g.id===session.activeGrantId);
+  return session.demoTenant===true || (!!effective?.email&&isDemoAccountEmail(effective.email));
+}
 const outputCursor=(value:object|null)=>value?JSON.stringify(value):null;
 function parseCursor(value:string|null):unknown{
   if(value===null)return null;
@@ -85,6 +90,8 @@ export const getMyActivitySourcePage=createServerFn({method:"GET"})
     privateRead();
     const session=await readWorkspaceSession(getRequest());
     if(!session.authenticated)throw new AuthorizationError("verified CAN account");
+    if(data.source==="noncredit_course"&&adultSourceExcluded(session))
+      throw new AuthorizationError("verified independent adult account");
     const result=await readSourcePage(
       data.source,data.cursor,new Date(),session.sites,
     );
@@ -101,6 +108,7 @@ export const getMyActivityOpportunityPage=createServerFn({method:"GET"})
     privateRead();
     const session=await readWorkspaceSession(getRequest());
     if(!session.authenticated)throw new AuthorizationError("verified CAN account");
+    if(adultSourceExcluded(session))throw new AuthorizationError("verified independent adult account");
     const cursor=parseCursor(data.cursor) as {joinedAt:string;waitlistId:string};
     const page=await getMyNoncreditWaitlistPage({data:{cursor}});
     return {
@@ -125,6 +133,10 @@ export const getMyActivity=createServerFn({method:"GET"})
     const sources:ParticipationReadModel["sources"]=[];
     const tasks:Array<Promise<void>>=[];
     for(const source of firstPageSources){
+      if(source==="noncredit_course"&&adultSourceExcluded(session)){
+        sources.push({source,state:"not_applicable",coverage:"not_applicable",message:null});
+        continue;
+      }
       tasks.push((async()=>{
         try{
           const page=await readSourcePage(source,null,now,session.sites);
@@ -135,14 +147,17 @@ export const getMyActivity=createServerFn({method:"GET"})
             coverage:page.nextCursor?"partial":"complete",
             message:page.nextCursor?"Older records available. Load more Activity pages.":null,
           });
-        }catch{
+        }catch(error){
+          console.warn("My Activity source unavailable",{source,category:error instanceof AuthorizationError?"authorization":"unexpected"});
           // Never report unauthorized/unavailable sources as an empty history.
           sources.push({source,state:"unavailable",coverage:"unknown",
             message:"This source could not be verified with the current access."});
         }
       })());
     }
-    tasks.push((async()=>{
+    if(adultSourceExcluded(session)){
+      sources.push({source:"noncredit_waitlist",state:"not_applicable",coverage:"not_applicable",message:null});
+    }else tasks.push((async()=>{
       try{
         const page=await getMyNoncreditWaitlistPage({data:{cursor:null}});
         opportunities.push(...projectNoncreditOpportunities(page.items));
@@ -150,7 +165,8 @@ export const getMyActivity=createServerFn({method:"GET"})
         sources.push({source:"noncredit_waitlist",state:"ready",
           coverage:page.nextCursor?"partial":"complete",
           message:page.nextCursor?"Older invitation records are available.":null});
-      }catch{
+      }catch(error){
+        console.warn("My Activity source unavailable",{source:"noncredit_waitlist",category:error instanceof AuthorizationError?"authorization":"unexpected"});
         sources.push({source:"noncredit_waitlist",state:"unavailable",
           coverage:"unknown",message:"Waiting-list source could not be verified."});
       }

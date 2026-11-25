@@ -1,3 +1,4 @@
+import {shortUuidHref} from "@/domain/opaque-url-id";
 import {describe, expect, it} from "vitest";
 import {
   PARTICIPATION_READ_MODEL_VERSION, activityBucket, activityStatus, activityStatusLabel,
@@ -69,7 +70,7 @@ describe("Participation Read Model v1", () => {
     expect(records[0]?.siteName).toBe("Center A");
     expect(records[1]?.siteName).toBeNull();
     expect(records[0]?.key).not.toBe(records[1]?.key);
-    expect(records[0]?.action?.href).toContain(uuid(5));
+    expect(records[0]?.action?.href).toBe(shortUuidHref("/class/",uuid(5))+"?view=learn&tab=lessons");
   });
   it("hides current-class actions after withdrawal", () => {
     const records = projectNativeClasses([{
@@ -268,4 +269,12 @@ describe("Participation Read Model v1", () => {
     });
   });
 
+});
+
+it("projects nine current native Classes and one withdrawn record without granting history playback",()=>{
+ const records=projectNativeClasses(Array.from({length:10},(_,i)=>({classEnrollmentId:uuid(100+i),classId:uuid(200+i),title:"Class "+i,status:i===9?"withdrawn":"active",deliveryMode:"self_paced",courseAttemptId:i===9?null:uuid(300+i),enrolledAt:now,siteId:uuid(400)})),now);
+ expect(resolveActivityFilters(records,"current","learning")).toHaveLength(9);
+ expect(resolveActivityFilters(records,"history","all")).toHaveLength(1);
+ expect(records[9]?.action).toBeNull();
+ expect(records.slice(0,9).every(r=>r.action?.href.startsWith("/class/"))).toBe(true);
 });

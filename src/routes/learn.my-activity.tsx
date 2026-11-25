@@ -138,6 +138,7 @@ function MyActivityPage() {
   const [showAllTraining,setShowAllTraining]=useState(false);
   useEffect(()=>{if(window.location.hash==="#noncredit-management")setShowAllTraining(true);},[]);
   const activity = useQuery({
+    enabled: session?.authenticated===true,
     queryKey: ["my-activity", session?.authenticated ? session.activeGrantId : null,
       session?.authenticated ? session.role : null],
     queryFn: () => getMyActivity(),
@@ -252,12 +253,13 @@ function MyActivityPage() {
   ];
   const opportunities=bucket==="upcoming"&&kind==="all"?allOpportunities:[];
   const unavailable = activity.data?.sources.filter(item => item.state === "unavailable") ?? [];
+  const trainingApplicable=activity.data?.sources.find(item=>item.source==="noncredit_course")?.state!=="not_applicable";
   const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial" && (item.source==="noncredit_waitlist"?Boolean(nextOpportunityCursor):Boolean(nextCursors[item.source as ParticipationSource]))) ?? [];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Activity"
     subtitle="Your learning, programs, and participation in one place. Each provider keeps authority over its own records."
     actions={<div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
-      <a href="#noncredit-management" className="text-primary underline underline-offset-4"
-        onClick={()=>{setManagingKey(null);setShowAllTraining(true);}}>Manage training</a>
+      {trainingApplicable&&<a href="#noncredit-management" className="text-primary underline underline-offset-4"
+        onClick={()=>{setManagingKey(null);setShowAllTraining(true);}}>Manage training</a>}
       <Link to="/explore" className="text-primary underline underline-offset-4">Explore opportunities</Link>
     </div>}>
     <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Participation summary">
@@ -374,13 +376,13 @@ function MyActivityPage() {
     </>}
     {/* Training controls use separate source-authorized readers and remain
         available even when the assembled participation read model fails. */}
-      <section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
+      {trainingApplicable&&<section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
          <Button type="button" variant="outline" aria-expanded={showAllTraining}
            className="min-h-11 text-sm font-semibold text-primary underline underline-offset-4"
            onClick={()=>{setManagingKey(null);setShowAllTraining(value=>!value);}}>
            {showAllTraining?"Hide all training controls":"Manage all training registrations and waiting lists"}
          </Button>
          {showAllTraining&&<NoncreditEnrollmentManagement/>}
-       </section>
+       </section>}
   </WorkspaceShell>;
 }

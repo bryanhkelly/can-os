@@ -6,13 +6,14 @@ import {db} from "@/db/client";
 import * as s from "@/db/schema";
 import {AuthorizationError} from "@/domain/command-context";
 import {guardianRelationshipPredicate} from "@/domain/guardian-relationship";
-import {selectActivityMemberships} from "@/domain/account-activity-grants";
+import {selectActivityMemberships,selectEffectiveStudentActivityMembership} from "@/domain/account-activity-grants";
 import {
   projectSchoolSections,projectSchoolPrograms,projectFamilyEnrichment,
   projectAcceptedCalendarEvents,
 } from "@/domain/participation-projections";
 import type {ParticipationRecord} from "@/domain/participation-read-model";
 import {getCommandContext} from "@/modules/identity/command-context.server";
+import {studentSiteScope} from "@/domain/student-site-scope";
 import {readSessionGrants} from "@/modules/identity/session-grants.server";
 
 const id=z.string().uuid();
@@ -49,21 +50,23 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
     const actor=await getCommandContext(getRequest());
-    if(!actor.actorPersonId||!actor.accountId||actor.sessionAccountId)
+    const directStudent=studentSiteScope(actor);
+    if(!actor.actorPersonId||!actor.accountId||(actor.sessionAccountId&&!directStudent))
       throw new AuthorizationError("real verified account Person");
     const [account]=await db.select({
       email:s.accessAccounts.emailNormalized,personId:s.accessAccounts.personId,
       disabled:s.accessAccounts.disabled,verifiedAt:s.accessAccounts.emailVerifiedAt,
     }).from(s.accessAccounts).where(eq(s.accessAccounts.id,actor.accountId)).limit(1);
-    if(!account||account.disabled||!account.verifiedAt||
+    if(!account||account.disabled||(!account.verifiedAt&&!directStudent)||
        account.personId!==actor.actorPersonId)
       throw new AuthorizationError("single CAN account Person");
-    const {grants}=await readSessionGrants(actor.accountId,account.email);
+    const {grants}=directStudent?{grants:[]} : await readSessionGrants(actor.accountId,account.email);
     // Explicitly match original live grants to this single authenticated
     // Person. Demo delegation cannot ever merge a second Person's history.
-    const {student,guardian:guardians}=selectActivityMemberships(
-      grants,actor.accountId,actor.actorPersonId,
-    );
+    const memberships=selectActivityMemberships(grants,actor.accountId,actor.actorPersonId);
+    // A switched Student sees only the effective verified Site grant, never the operator’s memberships.
+    const student=directStudent?selectEffectiveStudentActivityMembership(actor):memberships.student;
+    const guardians=directStudent?[]:memberships.guardian;
     // Match each original organization/Site grant separately. A Site-only
     // grant never broadens to sibling sites just because the org matches.
     // Each source Person profile must be matched to the role that actually
@@ -145,6 +148,18 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         .leftJoin(s.sites,eq(s.sites.id,s.sections.siteId))
         .where(and(
           eq(s.enrollments.kind,"section"),
+          // A verified cutover link replaces the legacy display record only for
+          // a direct Student whose matching native enrollment is in this same
+          // authorized scope. Guardian and legacy-only history stays visible.
+          directStudent?sql`NOT EXISTS (
+            SELECT 1 FROM public.academic_enrollment_cutover_links link
+            JOIN public.class_enrollments ce ON ce.id=link.class_enrollment_id
+            JOIN public.classes c ON c.id=ce.class_id
+            WHERE link.legacy_enrollment_id=${s.enrollments.id}
+              AND ce.learner_person_id=${directStudent.personId}::uuid
+              AND c.site_id=${directStudent.siteId}::uuid
+              AND c.operating_organization_id=${directStudent.organizationId}::uuid
+          )`:undefined,
           // The Section owns the Program linkage. Historical Enrollment rows
           // may predate the redundant enrollment.program_id backfill.
           inArray(s.enrollments.studentProfileId,[...profiles.keys()]),

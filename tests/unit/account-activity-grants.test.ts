@@ -1,6 +1,7 @@
+import {resolveAccessContext} from "@/domain/access-context";
 import {describe,expect,it} from "vitest";
 import {
-  selectActivityMemberships,activityMembershipCovers,
+  selectActivityMemberships,activityMembershipCovers,selectEffectiveStudentActivityMembership,
   type AccountActivityGrant,
 } from "@/domain/account-activity-grants";
 const account="00000000-0000-4000-8000-000000000001";
@@ -49,4 +50,13 @@ describe("account-wide personal participation authority",()=>{
     ],account,person);
     expect(result).toEqual({student:[],guardian:[]});
   });
+});
+
+it("uses only the verified effective Student grant for switched history",()=>{
+ const active=grant(1,"student",orgA,siteA);
+ const actor=resolveAccessContext({accountId:account,sessionId:"session",activeGrantId:active.id},[active]);
+ actor.impersonatedByAccountId="operator";
+ expect(selectEffectiveStudentActivityMembership(actor)).toEqual([{id:active.id,role:"student",organizationId:orgA,siteId:siteA}]);
+ expect(selectEffectiveStudentActivityMembership({...actor,scope:{organizationIds:[orgA],siteIds:[siteA,siteB]}})).toEqual([]);
+ expect(selectEffectiveStudentActivityMembership({...actor,role:"guardian"})).toEqual([]);
 });
