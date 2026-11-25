@@ -7,8 +7,7 @@
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 
 export type NotificationEmailMessage = {
   to: string;
@@ -68,7 +67,7 @@ async function sendNotificationEmailCore(
   message: NotificationEmailMessage,
   idempotencyKey?: string,
 ): Promise<NotificationEmailSendReceipt> {
-  if(isDemoAccountEmail(message.to)){
+  if(suppressDemoEmailDelivery(message.to)){
     console.log("[notification-email] Demo account delivery suppressed");
     return { accepted: false };
   }
@@ -157,7 +156,7 @@ export async function emailNotificationRecipients(
   organizationId: string | null,
 ): Promise<Map<string, string>> {
   const recipients = new Map<string, string>();
-  if(!organizationId || await isDemoTenantOrganization(organizationId))return recipients;
+  if(!organizationId)return recipients;
   const uniqueIds = [...new Set(personIds)];
   if (uniqueIds.length === 0) return recipients;
 
@@ -184,7 +183,7 @@ export async function emailNotificationRecipients(
     );
 
   for (const row of rows) {
-    if (!eligibleNotificationEmailAccount(row) || isDemoAccountEmail(row.email)) continue;
+    if (!eligibleNotificationEmailAccount(row) || suppressDemoEmailDelivery(row.email)) continue;
     if (!recipients.has(row.personId)) {
       recipients.set(row.personId, row.email);
     }
