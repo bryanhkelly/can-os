@@ -1,4 +1,4 @@
--- Rollback-only PostgreSQL fixture. Run after 0121 through 0123 inside
+-- Rollback-only PostgreSQL fixture. Run after 0130 inside
 -- an isolated transaction that is ALWAYS rolled back. No provider calls.
 DO $geography_fixture$
 DECLARE
@@ -7,6 +7,8 @@ DECLARE
  t0 timestamptz:=clock_timestamp()-interval '2 days'; t1 timestamptz:=clock_timestamp()-interval '1 day';
  marker text:=replace(gen_random_uuid()::text,'-','');
 BEGIN
+ IF NOT public.site_geography_eligible('physical','{"synthetic":true}'::jsonb,'{"street1":"1 Fixture Way"}'::jsonb) OR NOT public.site_geography_eligible('physical','{}'::jsonb,'{"street1":"1 Fixture Way"}'::jsonb) THEN RAISE EXCEPTION 'Physical geography must not depend on synthetic metadata'; END IF;
+ IF public.site_geography_eligible('virtual','{"synthetic":true}'::jsonb,'{"street1":"1 Fixture Way"}'::jsonb) OR public.site_geography_eligible('physical','{"siteEnvironmentV61":{"delivery":"digital"}}'::jsonb,'{"street1":"1 Fixture Way"}'::jsonb) THEN RAISE EXCEPTION 'Nonphysical Sites must remain excluded'; END IF;
  SELECT id INTO org_a FROM public.organizations ORDER BY id LIMIT 1;
  SELECT id INTO org_b FROM public.organizations WHERE id<>org_a ORDER BY id LIMIT 1;
  SELECT id INTO actor_id FROM public.people ORDER BY id LIMIT 1;
