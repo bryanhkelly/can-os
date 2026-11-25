@@ -31,6 +31,8 @@ SELECT
     WHERE table_schema='public' AND table_name='access_accounts'
       AND column_name='person_id'
   ) AS has_person_anchor,
+  (SELECT count(*)::int FROM information_schema.columns WHERE table_schema='public' AND ((table_name IN ('organizations','people') AND column_name='domain') OR (table_name='school_setup_signups' AND column_name='organization_domain') OR (table_name='access_accounts' AND column_name='private_access_code_hash') OR (table_name='access_sessions' AND column_name='authentication_method'))) AS release_identity_columns,
+  (SELECT count(*)::int FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('organizations','people') AND column_name='domain' AND is_nullable='YES') AS nullable_domains,
   EXISTS(
     SELECT 1 FROM pg_indexes
     WHERE schemaname='public' AND indexname='access_accounts_person_id_uq'
@@ -60,10 +62,23 @@ assert.equal(row?.database_name,"neondb",
   "BLOCKED: unexpected database name");
 for(const [key,want] of [
   ["has_person_anchor",true],
+  ["release_identity_columns",5],
+  ["nullable_domains",2],
   ["has_unique_person_index",true],
   ["immutable_account_triggers",1],
   ["single_person_grant_triggers",1],
 ]) assert.equal(row?.[key],want,"BLOCKED: required CAN Person schema object missing: "+key);
+
+// Check the restricted database reader, not merely the public column names.
+const [reader] = await sql`
+SELECT
+  coalesce(pg_get_functiondef(to_regprocedure('education_v30.v301_can_staff_session_context(text)')) LIKE '%private_access_code_hash%',false) AS private_credential_reader,
+  coalesce(pg_get_functiondef(to_regprocedure('education_v30.v301_can_staff_session_context(text)')) LIKE '%authentication_method%',false) AS provenance_reader,
+  (SELECT max(created_at) FROM drizzle.__drizzle_migrations) AS migration_tip
+`;
+assert.equal(reader?.private_credential_reader,true,"BLOCKED: restricted staff credential migration 0133 missing");
+assert.equal(reader?.provenance_reader,true,"BLOCKED: restricted staff session provenance missing");
+assert.ok(Number(reader?.migration_tip)>=1795462027000,"BLOCKED: release migration ledger incomplete");
 
 // Do not even reference the new column until its existence is confirmed;
 // on an unmigrated deployment, the preceding checks fail with a clear reason.
