@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { QueryState, WorkspaceNotice, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { QueryState, WorkspaceNotice, WorkspacePanel, StatusBadge, ActionFooter, RecordFacts } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { readLaunchSitePublication, reviewLaunchSiteWebsiteCopy } from "@/modules/sites/launch-site-publication.functions";
 import { setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
@@ -186,30 +186,13 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
             {state.address?.status === "published" ? "Published" : "Not published"}
           </StatusBadge>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="border p-3">
-            <p className="text-xs font-semibold">Website content</p>
-            <p className="mt-2 text-sm">{state.reviewedLocalContentAvailable ? "Reviewed content ready" : "Website content needs review"}</p>
-          </div>
-          <div className="border p-3">
-            <p className="text-xs font-semibold">Approved program listings</p>
-            <p className="mt-2 text-sm">{state.approvedAcademicCount} academic · {state.approvedEnrichmentCount} enrichment</p>
-          </div>
-          <div className="border p-3">
-            <p className="text-xs font-semibold">Public hosting</p>
-            <p className="mt-2 text-sm">{state.hostingConfigured ? "Set up · check whether it's live" : "Not available yet"}</p>
-          </div>
-        </div>
-        {state.latestWebsiteStatus === "draft" && <section className="space-y-3 border p-4"
-          aria-label="Approve saved website copy">
-          <div>
-            <h3 className="text-sm font-semibold">Review your website content</h3>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Your latest website draft is still private. Check the wording, photos,
-              permissions, and any claims that need independent review before approving it.
-              This step reviews the content; it doesn't publish your website.
-            </p>
-          </div>
+        <RecordFacts columns={3} variant="tiles" label="Website publication requirements" items={[
+          {label:"Website content",value:state.reviewedLocalContentAvailable?"Reviewed content ready":"Website content needs review"},
+          {label:"Approved program listings",value:`${state.approvedAcademicCount} academic · ${state.approvedEnrichmentCount} enrichment`},
+          {label:"Public hosting",value:state.hostingConfigured?"Set up · check whether it's live":"Not available yet"},
+        ]}/>
+        {state.latestWebsiteStatus === "draft" && <WorkspacePanel headingLevel="h3" title="Review your website content"
+          description="Your latest website draft is still private. Check the wording, photos, permissions, and any claims that need independent review before approving it. This step reviews the content; it doesn't publish your website.">
           {state.canReviewWebsiteCopy ? <>
             <div className="flex items-start gap-3">
               <Checkbox id="site-copy-reviewed" checked={copyReviewed}
@@ -226,12 +209,12 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
           </> : <WorkspaceNotice tone="attention">
             An authorized Site website editor must approve the local website copy.
           </WorkspaceNotice>}
-        </section>}
+        </WorkspacePanel>}
         {state.latestWebsiteStatus === "review_required" && <WorkspaceNotice tone="attention">
           Some statements in your latest website draft need independent review.
           Update them in Website & Brand or complete that review before publishing.
         </WorkspaceNotice>}
-        <div className="flex flex-wrap gap-3">
+        <ActionFooter layout="inline">
           <Button asChild variant="outline">
             <Link to="/launch/website" search={{ siteId, returnToHub: true }}>Review website design</Link>
           </Button>
@@ -239,7 +222,7 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
             <a href={`/launch/site-preview?siteId=${encodeURIComponent(siteId)}`}
               target="_blank" rel="noopener noreferrer">Preview privately <ArrowUpRight className="size-4" /></a>
           </Button>
-        </div>
+        </ActionFooter>
         {!state.address ? <WorkspaceNotice tone="attention">
           Choose your website address in Website & Brand before publishing.
         </WorkspaceNotice> : <>
@@ -255,12 +238,12 @@ export function LaunchSitePublicationPanel({ siteId }: { siteId: string }) {
               {reachability === "live" && <a className="text-sm font-semibold text-primary underline"
                 href={`https://${state.address.host}/`} target="_blank" rel="noopener noreferrer">
                 Open verified website <ArrowUpRight className="inline size-4" /></a>}
-              {reachability && <p role="status" className="text-sm text-muted-foreground">
+              {reachability && <WorkspaceNotice tone={reachability==="live"?"success":"attention"} className="w-full">
                 {reachability === "live" ? "Public HTTPS website is reachable."
                   : reachability === "hosting_disabled" ? "Website hosting is disabled."
                   : reachability === "not_published" ? "Website publication is not active."
                   : "Public HTTPS reachability could not be verified."}
-              </p>}
+              </WorkspaceNotice>}
             </div>
           </> : (state.latestWebsiteStatus === "draft" || state.latestWebsiteStatus === "review_required")
           ? <WorkspaceNotice tone="attention">
