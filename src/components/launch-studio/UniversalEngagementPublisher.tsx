@@ -1,8 +1,9 @@
+import { EngagementEmailDistribution } from "./EngagementEmailDistribution";
 import { Field } from "@/components/ui/field";
 import { GoLinkActions } from "@/components/links/GoLinkActions";
 import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
 import { OwnerEngagementDestinationPicker, type OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -31,29 +32,31 @@ const errorMessage=(error:unknown)=>error instanceof Error?error.message:"Unable
  * Site-specific consumer of the platform registry. It does not own registry
  * data and does not create a separate outreach/contact/admissions service.
  */
-type PublisherProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface};
+type PublisherProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface;outreach?:{title:string;headline:string;message:string;callToAction:string}};
 export function UniversalEngagementPublisher(props:PublisherProps){
   return <UniversalEngagementPublisherSession key={engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner)} {...props}/>;
 }
-function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:PublisherProps){
+function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outreach}:PublisherProps){
   const owner:EngagementOwner=ownerSurface?.owner??{kind:"site",siteId:siteId!};
   const [domain,setDomain]=useState<EngagementDefinition["domain"]>("outreach");
   const [subjectKind,setSubjectKind]=useState<EngagementDefinition["subject"]["kind"]>("initiative");
-  const [subjectLabel,setSubjectLabel]=useState("");
+  const [subjectLabel,setSubjectLabel]=useState(outreach?.title??"");
   const [audience,setAudience]=useState<EngagementDefinition["audience"][number]>("public");
   const [interaction,setInteraction]=useState<EngagementDefinition["interaction"]>("discover");
-  const [headline,setHeadline]=useState("");
-  const [summary,setSummary]=useState("");
-  const [detail,setDetail]=useState("");
+  const [headline,setHeadline]=useState(outreach?.headline??"");
+  const [summary,setSummary]=useState(outreach?.message.slice(0,1200)??"");
+  const [detail,setDetail]=useState(outreach?.message.slice(1200)??"");
   const [template,setTemplate]=useState<"information"|"invitation"|"opportunity">("invitation");
-  const [actionLabel,setActionLabel]=useState("Learn more");
+  const [actionLabel,setActionLabel]=useState(outreach?.callToAction.slice(0,80)||"Learn more");
   const [execution,setExecution]=useState<"page"|"redirect">("page");
   const [target,setTarget]=useState<GoDestination|null>(null);
-  const [channel,setChannel]=useState<EngagementChannel>("web");
+  const [channel,setChannel]=useState<EngagementChannel>(outreach?"email":"web");
   const [published,setPublished]=useState<Published|null>(null);
   const [links,setLinks]=useState<CreatedLink[]>([]);
   const [revoked,setRevoked]=useState<Set<string>>(()=>new Set());
   const [busy,setBusy]=useState(false);
+  const pending=useRef(false);
+  const [emailLink,setEmailLink]=useState<string|null>(null);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [revokeTarget,setRevokeTarget]=useState<CreatedLink|null>(null);
@@ -78,28 +81,35 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
   const actionSupported=target!==null && engagementActionAvailable(interaction,target);
   const ready=actionSupported && engagementDefinitionSchema.safeParse(draft).success;
   async function publish(){
-    if(!ready || busy || published)return;
+    if(!ready || busy || published || pending.current)return;
+    pending.current=true;
     setError("");setNotice("");setBusy(true);
     try{
       const saved=await createEngagementDefinition({
         data:{owner,definition:draft},
       });
       setPublished(saved);
+      if(outreach){
+        const link=await createEngagementGoLink({data:{engagementId:saved.engagementId,versionId:saved.versionId,channel:"email"}});
+        setLinks([link]);setEmailLink(link.linkId);
+      }
       setNotice("Published immutable engagement v1. You can create independent links for each channel.");
     }catch(error){setError(errorMessage(error));}
-    finally{setBusy(false);}
+    finally{pending.current=false;setBusy(false);}
   }
   async function createLink(){
-    if(!published||busy)return;
+    if(!published||busy||pending.current)return;
+    pending.current=true;
     setBusy(true);setError("");setNotice("");
     try{
       const link=await createEngagementGoLink({
         data:{engagementId:published.engagementId,versionId:published.versionId,channel},
       });
       setLinks(current=>[link,...current]);
+      if(outreach)setEmailLink(link.linkId);
       setNotice("Go Link created. Copy its URL to distribute.");
     }catch(error){setError(errorMessage(error));}
-    finally{setBusy(false);}
+    finally{pending.current=false;setBusy(false);}
   }
   async function revoke(link:CreatedLink){
     if(!published||busy||revoked.has(link.linkId))return;
@@ -113,10 +123,10 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
     }catch(error){setError(errorMessage(error));}
     finally{setBusy(false);}
   }
-  return <WorkspacePanel title="Context-aware engagement"
-    description="Publish a reusable invitation or opportunity experience, then generate channel-specific Go Links. No application, employment, partnership or enrollment is created here.">
+  return <WorkspacePanel title={outreach?"Prepare email invitation":"Context-aware engagement"}
+    description={outreach?"Confirm where recipients should go when they click your invitation. Preparing it makes the invitation page public but sends no email.":"Publish a reusable invitation or opportunity experience, then generate channel-specific Go Links. No application, employment, partnership or enrollment is created here."}>
     {!published ? <>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      {!outreach&&<div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Field label="Business domain">
           <Select value={domain} onChange={event=>setDomain(event.target.value as typeof domain)}>
             {engagementDomains.map(value=><option key={value} value={value}>{labels(value)}</option>)}
@@ -137,7 +147,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
             {engagementInteractions.map(value=><option key={value} value={value}>{labels(value)}</option>)}
           </Select>
         </Field>
-      </div>
+      </div>}
       <div className="mt-4 grid gap-3">
         <Field label="Subject name">
           <Input value={subjectLabel} maxLength={160} placeholder="Digital Skills Community Program"
@@ -181,20 +191,22 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface}:Pub
       </p>}
       <p className="mt-3 text-xs text-muted-foreground">Publishing creates an immutable, publicly accessible definition. Review content before continuing. This is not a formal program approval or registration.</p>
       <Button type="button" className="mt-4" disabled={busy||!ready} onClick={()=>void publish()}>
-        {busy?"Publishing…":"Publish engagement"}
+        {busy?"Preparing…":outreach?"Prepare invitation & add recipients":"Publish engagement"}
       </Button>
     </> : <>
+      {outreach&&emailLink&& !revoked.has(emailLink)&&<EngagementEmailDistribution engagementId={published.engagementId} linkId={emailLink} onClose={()=>setEmailLink(null)}/>}
+      {outreach&&links.filter(link=>!revoked.has(link.linkId)).map(link=><Button key={link.linkId} type="button" variant="outline" onClick={()=>setEmailLink(link.linkId)}>Add recipients</Button>)}
       <p className="mt-4 text-sm font-medium">Published engagement version {published.version}</p>
       <p className="mt-1 text-xs text-muted-foreground">The public experience content cannot be changed in this version. New Go Links can be issued or revoked.</p>
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <Field label="Distribution channel">
+        {!outreach&&<Field label="Distribution channel">
           <Select value={channel} onChange={event=>setChannel(event.target.value as typeof channel)}>
             {engagementChannels.map(c=>
               <option key={c} value={c}>{engagementChannelLabels[c]}</option>)}
           </Select>
-        </Field>
+        </Field>}
         <Button disabled={busy} type="button" onClick={()=>void createLink()}>
-          {busy?"Working…":"Create Go Link"}
+          {busy?"Working…":outreach?"Create email link":"Create Go Link"}
         </Button>
       </div>
       <div className="mt-4 space-y-3">
