@@ -204,10 +204,10 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs font-semibold">Resolution note
                   <Textarea rows={2} maxLength={2000} value={resolutions[hold.id] ?? ""}
                     onChange={event => setResolutions(current => ({...current, [hold.id]: event.target.value}))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Label className="mt-2 block text-xs">Documented authority basis
-                  <Select className="mt-1 block w-full border bg-background p-2"
+                  <Select className="mt-1"
                     value={resolutionBases[hold.id] ?? (hold.kind === "emergency" ? "documented_emergency_cleared" : "verified_court_order")}
                     onChange={event => setResolutionBases(current => ({...current, [hold.id]: event.target.value}))}>
                     {hold.kind === "emergency"
@@ -221,7 +221,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-2 block text-xs">Verified case or document reference
                   <Input maxLength={500} value={resolutionReferences[hold.id] ?? ""}
                     onChange={event => setResolutionReferences(current => ({...current, [hold.id]: event.target.value}))}
-                    className="mt-1 block w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Button variant="outline" type="button"
                   disabled={!!busy || (resolutions[hold.id] ?? "").trim().length < 20 ||
@@ -283,13 +283,13 @@ export function OnsitePickupPanel({ date, onChanged }: {
               <Label className="mt-3 block text-xs font-semibold">Legal name verified on required credential
                 <Input value={verifiedNames[key] ?? ""} maxLength={201}
                   onChange={event => setVerifiedNames(current => ({ ...current, [key]: event.target.value }))}
-                  className="mt-1 w-full border bg-background p-2 text-sm" />
+                  className="mt-1" />
               </Label>
               <Label className="mt-3 block text-xs font-semibold">Handoff evidence
                 <Textarea rows={2} maxLength={2000} value={evidence[key] ?? ""}
                   placeholder="What you checked and observed; never enter a document number"
                   onChange={event => setEvidence(current => ({ ...current, [key]: event.target.value }))}
-                  className="mt-1 w-full border bg-background p-2 text-sm" />
+                  className="mt-1" />
               </Label>
               <p className="mt-2 text-xs text-muted-foreground">By recording this command you attest that you checked the required credential, matched the adult, and personally witnessed the handoff.</p>
               <Button variant="default" type="button" disabled={!!busy}
@@ -314,19 +314,19 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs">Presented name
                   <Input value={denialNames[key] ?? ""} maxLength={201}
                     onChange={event => setDenialNames(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Label className="mt-2 block text-xs">Household context
                   <Select value={denialHouseholds[key] ?? student.householdIds[0] ?? ""}
                     onChange={event => setDenialHouseholds(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     {student.householdIds.map(id => <option key={id} value={id}>{id}</option>)}
                   </Select>
                 </Label>
                 <Label className="mt-2 block text-xs">Denial reason
                   <Select value={denialReasons[key] ?? "not_authorized"}
                     onChange={event => setDenialReasons(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     <option value="not_authorized">Not authorized</option>
                     <option value="identity_not_verified">Identity not verified</option>
                     <option value="custody_dispute">Disputed custody</option>
@@ -353,7 +353,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs">Hold type
                   <Select value={holdKinds[key] ?? "disputed_custody"}
                     onChange={event => setHoldKinds(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     <option value="disputed_custody">Disputed custody</option>
                     <option value="emergency">Emergency</option>
                   </Select>
@@ -361,14 +361,14 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-2 block text-xs">Household context
                   <Select value={holdHouseholds[key] ?? student.householdIds[0] ?? ""}
                     onChange={event => setHoldHouseholds(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     {student.householdIds.map(id => <option key={id} value={id}>{id}</option>)}
                   </Select>
                 </Label>
                 <Label className="mt-2 block text-xs">Safety reason
                   <Textarea rows={2} maxLength={2000} value={holdReasons[key] ?? ""}
                     onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Button variant="outline" type="button" disabled={!!busy || !student.householdIds.length}
                   className="mt-3"
@@ -388,7 +388,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs">Supervision and family contact plan
                   <Textarea rows={3} maxLength={2000} value={followUpPlans[key] ?? ""}
                     onChange={event => setFollowUpPlans(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Button variant="outline" type="button" disabled={!!busy || !!student.uncollectedActionId}
                   className="mt-3"
