@@ -55,6 +55,24 @@ describe("P0 single Person transactional CAN grant",()=>{
     }
   });
 
+  it("rejects Platform Owner projections for independently authorized grant mutations",async()=>{
+    vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER","P".repeat(40));
+    for(const mode of ["view","act"] as const){
+      const database=tx([{effective_account_id:actor.accountId}]);
+      await expect(assertCurrentCANGrantForMutation(database as never,request(),{
+        ...actor,delegatedByPlatformOwner:true,delegationMode:mode,
+        impersonatedByAccountId:"owner",
+      },scope)).rejects.toThrow();
+      expect(database.execute).not.toHaveBeenCalled();
+    }
+  });
+  it("rechecks direct session status under lock when delegation changes",()=>{
+    const source=readFileSync("src/modules/identity/current-can-grant-transaction.server.ts","utf8");
+    for(const column of ["delegated_grant_id","delegated_mode","delegated_until","delegated_reason"]){
+      expect(source).toContain("session."+column+" IS NULL");
+    }
+    expect(source).toContain("FOR SHARE OF session,session_owner,target_account,current_grant,person");
+  });
   it("fails closed for absent session, mismatched effective account or bad bearer",async()=>{
     vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER","P".repeat(40));
     await expect(assertCurrentCANGrantForMutation(

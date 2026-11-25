@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { db } from "@/db/client";
 import type { AccessContext } from "@/domain/access-context";
+import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { AuthorizationError } from "@/domain/command-context";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
@@ -37,6 +38,8 @@ export async function assertCurrentCANGrantForMutation(
 ): Promise<void> {
   if (!actor.accountId || !actor.sessionId || !actor.grantId ||
       !actor.actorPersonId || !actor.role || actor.sessionAccountId ||
+      actor.delegatedByPlatformOwner || actor.delegationMode ||
+      !hasValidAccessGrantScope({role:actor.role,organizationId:expected.organizationId,siteId:expected.siteId}) ||
       !expected.roles.includes(actor.role) ||
       (expected.organizationType && !expected.organizationId) ||
       (actor.scope.organizationIds?.length ?? 0) !== (expected.organizationId ? 1 : 0) ||
@@ -95,6 +98,14 @@ export async function assertCurrentCANGrantForMutation(
       AND target_account.disabled=false AND target_account.email_verified_at IS NOT NULL
       AND session_owner.disabled=false AND session_owner.email_verified_at IS NOT NULL
       AND session.revoked_at IS NULL
+      -- This is a direct-grant transaction guard (with the existing exact
+      -- Demo Admin exception below), not a Platform Owner delegation grant.
+      -- Recheck while holding the session row lock: a stale direct request
+      -- must not authorize a write after a delegation has begun.
+      AND session.delegated_grant_id IS NULL
+      AND session.delegated_mode IS NULL
+      AND session.delegated_until IS NULL
+      AND session.delegated_reason IS NULL
       AND session.expires_at>clock_timestamp()
       AND session.updated_at>clock_timestamp()-interval '30 minutes'
       AND (NOT session.shared_device OR
