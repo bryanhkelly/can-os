@@ -37,6 +37,8 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
   email:accessAccounts.emailNormalized,emailVerifiedAt:accessAccounts.emailVerifiedAt,
   accountPersonId:accessAccounts.personId,
+  authenticationMethod:accessSessions.authenticationMethod,
+  privateAccessCodeHash:accessAccounts.privateAccessCodeHash,
   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
   delegatedGrantId:accessSessions.delegatedGrantId,
   delegatedMode:accessSessions.delegatedMode,
@@ -48,7 +50,9 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   .limit(1);
  // Only real email-link logins attest mailbox ownership. A .demo session
  // must instead pass the exact active grant and tenant binding checks below.
- if(!session || (!session.emailVerifiedAt && !isDemoAccountEmail(session.email)))
+ if(!session || (!session.emailVerifiedAt && !isDemoAccountEmail(session.email)) ||
+    (session.privateAccessCodeHash != null && session.authenticationMethod!=="private_access_code") ||
+    (session.authenticationMethod==="private_access_code" && !session.privateAccessCodeHash))
   return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
