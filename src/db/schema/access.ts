@@ -17,7 +17,8 @@ export const accessAccounts = pgTable("access_accounts", {
  createdAt: createdAt(),
  updatedAt: updatedAt(),
 }, t => [
- check("access_accounts_private_access_code_hash_ck", sql`${t.privateAccessCodeHash} IS NULL OR ${t.privateAccessCodeHash} ~ '^[a-f0-9]{64}
+ check("access_accounts_private_access_code_hash_ck", sql`${t.privateAccessCodeHash} IS NULL OR ${t.privateAccessCodeHash} ~ '^[a-f0-9]{64}$'`),
+ uniqueIndex("access_accounts_email_uq").on(t.emailNormalized),
  uniqueIndex("access_accounts_person_id_uq").on(t.personId).where(sql`${t.personId} IS NOT NULL`),
 ]);
 
