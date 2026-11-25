@@ -4,7 +4,7 @@ import { accessAccounts, sites, programs, people } from "@/db/schema";
 import { parseStudentDisplayPreferences } from "@/domain/student-display-preferences";
 import { AuthorizationError } from "@/domain/command-context";
 import { getIdentityContext } from "./command-context.server";
-import { readSessionGrants } from "./session-grants.server";
+import { readSessionGrants, readOwnerDelegationGrants } from "./session-grants.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 
 export async function readWorkspaceSession(request: Request) {
@@ -21,7 +21,13 @@ export async function readWorkspaceSession(request: Request) {
     .from(accessAccounts).where(eq(accessAccounts.id, sessionAccountId)).limit(1);
   if (!account) throw new AuthorizationError("authenticated account");
 
-  const { grants, demoAccountSwitching } = await readSessionGrants(sessionAccountId, account.email);
+  if(!context.actorPersonId)throw new AuthorizationError("authenticated person");
+  // Owner delegation is authorized by the original independently authenticated
+  // owner, not by the target account's ability to redeem a shared demo code.
+  // An expired delegation projects the original owner in read-only mode.
+  const { grants, demoAccountSwitching } = context.delegatedByPlatformOwner && context.role !== "platform_owner"
+    ? { grants: await readOwnerDelegationGrants(sessionAccountId, context.actorPersonId, account.email), demoAccountSwitching: false }
+    : await readSessionGrants(sessionAccountId, account.email);
   const visibleGrants = context.delegatedByPlatformOwner
     ? grants.filter(grant => grant.id === context.grantId) : grants;
   if (!visibleGrants.some(grant => grant.id === context.grantId)) {
@@ -30,7 +36,6 @@ export async function readWorkspaceSession(request: Request) {
 
   const siteIds = context.scope.siteIds ?? [];
   const programIds = context.scope.programIds ?? [];
-  if(!context.actorPersonId)throw new AuthorizationError("authenticated person");
   const [siteChoices, programChoices, studentPerson] = await Promise.all([
     siteIds.length ? db.select({ id: sites.id, name: sites.name, organizationId: sites.organizationId })
       .from(sites).where(inArray(sites.id, siteIds)) : Promise.resolve([]),
