@@ -26,7 +26,7 @@ export type SessionSecurityEvidence = {
   sessionId: string;
   grantId?: string | null;
   role?: string | null;
-  method?: "email_link" | "local_demo_code";
+  method?: "email_link" | "local_demo_code" | "private_access_code";
   targetSessionId?: string;
   revokedCount?: number;
   requestId?: string;
