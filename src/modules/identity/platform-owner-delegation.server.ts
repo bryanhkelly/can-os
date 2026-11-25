@@ -40,6 +40,7 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
     grantId: accountPersonGrants.id,
     grantPersonId: accountPersonGrants.personId,
     accountVerifiedAt: accessAccounts.emailVerifiedAt,
+    privateCredential: sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
     accountDisabled: accessAccounts.disabled,
     personActive: people.active,
     sessionSharedDevice: accessSessions.sharedDevice,
@@ -64,7 +65,7 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
       isNull(accountPersonGrants.siteId),
     )).limit(1);
   if (!owner || !owner.ownerPersonId || owner.ownerPersonId !== owner.grantPersonId ||
-      !owner.accountVerifiedAt || owner.accountDisabled || !owner.personActive ||
+      !owner.accountVerifiedAt || owner.privateCredential || owner.accountDisabled || !owner.personActive ||
       isDemoAccountEmail(owner.ownerEmail) ||
       (owner.sessionSharedDevice && now.getTime() - owner.lastActivityAt.getTime() >= 5 * 60_000))
     throw new AuthorizationError("verified Platform Owner identity");
