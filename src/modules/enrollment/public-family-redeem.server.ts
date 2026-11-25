@@ -1,3 +1,4 @@
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -83,7 +84,7 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
   let personId=uniqueAccountPersonId(grants);
   if(!personId){
     const [person]=await tx.insert(people).values({
-      legalFirstName:intent.firstName,legalLastName:intent.lastName,email:intent.email,
+      legalFirstName:intent.firstName,legalLastName:intent.lastName,email:intent.email,domain:identityEmailDomain(intent.email),
       metadata:{origin:"public_family_verified_email",guardianVerification:"pending"},
     }).returning({id:people.id});
     if(!person)throw new Error("Unable to create prospective family identity");
