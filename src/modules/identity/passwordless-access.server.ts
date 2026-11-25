@@ -313,7 +313,7 @@ export async function redeemDemoAccess(
     : code!==LOCAL_DEMO_ACCESS_CODE)
    throw new InvalidAccessCredentialError("Invalid demo credentials");
   step="grant_lookup";
-  if(!email.endsWith("@valorschool.demo")){
+  if(!privateCredential && !email.endsWith("@valorschool.demo")){
    const bindings=await readDemoStaffBindings(account.id,tx);
    if(bindings.length){
     const pending=await listPendingStaffInvitations(tx,account.id);
@@ -325,8 +325,8 @@ export async function redeemDemoAccess(
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
   // Demo login chooses the fixed original primary membership; all additional
   // roles are selected through the same normal server-authoritative switcher.
-  const fixed=LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===account.id);
-  const grant=account.id===LOCAL_DEMO_ADMIN.accountId
+  const fixed=privateCredential?undefined:LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===account.id);
+  const grant=!privateCredential && account.id===LOCAL_DEMO_ADMIN.accountId
    ?accountGrants.find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
    :fixed?accountGrants.find(candidate=>candidate.role===fixed.role.toLowerCase())
    :[...accountGrants].sort((a,b)=>a.role.localeCompare(b.role)||a.id.localeCompare(b.id))[0];
