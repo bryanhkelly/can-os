@@ -49,19 +49,14 @@ export const Route = createFileRoute("/site/new")({
           { status: 400, headers: noStore });
       }
       try {
-        const { isDemoAccountEmail } = await import("@/domain/local-demo-access");
-        if (isDemoAccountEmail(parsed.data.email)) {
-          const { provisionDemoSiteSignup } = await import("@/modules/identity/school-setup-signup.server");
-          await provisionDemoSiteSignup(parsed.data);
-          return Response.json({ accepted: true, demo: true }, { status: 202, headers: noStore });
-        }
-        const { requestSchoolSetupAccess } = await import("@/modules/identity/passwordless-access.server");
-        await requestSchoolSetupAccess(parsed.data);
+        const { requestSiteSignup } = await import("@/modules/identity/passwordless-access.server");
+        const outcome = await requestSiteSignup(parsed.data);
+        return Response.json(outcome, { status: 202, headers: noStore });
       } catch {
-        // Preserve account-existence and delivery-status indistinguishability.
-        console.error("[site-signup] verified email request unavailable");
+        console.error("[site-signup] account setup unavailable");
+        return Response.json({ error: "Site setup could not be completed. Check your details or sign in if you already have an account." },
+          { status: 409, headers: noStore });
       }
-      return Response.json({ accepted: true }, { status: 202, headers: noStore });
     }),
   } },
   component: SiteNewPage,
@@ -131,7 +126,7 @@ function SiteNewPage() {
       setDemoReady(result.demo === true);
       setRequested(true);
     } catch {
-      setError("We couldn't start verification. Check your details and try again.");
+      setError("We couldn't create your Site. Check your details or sign in if you already have an account.");
     } finally {
       setSending(false);
     }
@@ -164,7 +159,7 @@ function SiteNewPage() {
             </p>
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium">
               <span>✓ Simple to get started</span>
-              <span>✓ Secure email verification</span>
+              <span>✓ Secure account access</span>
               <span>✓ Complete details later</span>
             </div>
           </section>
@@ -213,7 +208,7 @@ function SiteNewPage() {
               {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
               <Button className="w-full justify-between" disabled={!hydrated || sending} type="submit">
                 <Mail className="size-4" aria-hidden="true" />
-                {sending ? "Sending verification…" : "Verify email & continue"}
+                {sending ? "Creating your account…" : "Continue"}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
               <p className="flex items-start gap-2 bg-muted p-3 text-xs leading-5 text-muted-foreground">
