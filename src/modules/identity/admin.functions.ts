@@ -246,7 +246,8 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       const linkedPeople = await tx.select({ personId: accountPersonGrants.personId })
         .from(accountPersonGrants).where(and(
           eq(accountPersonGrants.accountId, account!.id),
-        )).limit(100);
+        )).limit(101);
+      if (linkedPeople.length > 100) throw new DomainError("CONFLICT", "Account memberships exceed the safe identity reconciliation limit.");
       const distinctPeople = [...new Set(linkedPeople.map(grant => grant.personId))];
       // A verified mailbox alone cannot resolve multiple different real Person
       // records. Require operator review instead of choosing an arbitrary one.
