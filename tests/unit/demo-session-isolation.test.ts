@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR, LOCAL_DEMO_RILEY_FACILITATOR } from "@/domain/local-demo-access";
-import { readSessionGrants } from "@/modules/identity/session-grants.server";
+import { readSessionGrants, readOwnerDelegationGrants } from "@/modules/identity/session-grants.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], select: vi.fn() }));
@@ -129,6 +129,11 @@ describe("public demo session isolation", () => {
       demoAccountSwitching:true,
       launchSiteId:LOCAL_DEMO_ADMIN.siteId,
     });
+  });
+  it("projects only the delegated account, never its fixture switch targets", async () => {
+    const ownerTarget = { ...adminGrant, accountPersonId: adminGrant.personId, emailVerifiedAt: null };
+    state.rows = [[ownerTarget], [studentGrant]];
+    expect(await readOwnerDelegationGrants(ownerTarget.accountId, ownerTarget.personId, ownerTarget.email)).toEqual([ownerTarget]);
   });
   it("does not expose a real verified account through public demo-admin switching", async () => {
     const real = { ...studentGrant, id:"real-grant", accountId:"real-account",
