@@ -5,19 +5,20 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** A titled group of related fields on a dedicated create/edit page. */
-export function FormSection({ title, description, children, className, columns = 2 }: {
+export function FormSection({ title, description, children, className, columns = 2, headingLevel: Heading = "h2" }: {
   title: ReactNode;
   description?: ReactNode;
   children: ReactNode;
   className?: string;
   /** Use one column for lengthy evidence, consent or free-form review fields. */
   columns?: 1 | 2;
+  headingLevel?: "h2" | "h3" | "h4" | "h5" | "h6";
 }) {
   const id = useId();
   const descriptionId = useId();
   return <section aria-labelledby={id} aria-describedby={description ? descriptionId : undefined}
     data-form-section="" className={cn("min-w-0 border-t border-border/60 pt-6 first:border-t-0 first:pt-0", className)}>
-    <h2 id={id} className="text-lg font-semibold leading-6 [overflow-wrap:anywhere]">{title}</h2>
+    <Heading id={id} className="text-lg font-semibold leading-6 [overflow-wrap:anywhere]">{title}</Heading>
     {description && <div id={descriptionId} className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">{description}</div>}
     <div className={cn("mt-4 grid min-w-0 grid-cols-1 gap-5 [&>*]:min-w-0", columns === 2 && "sm:grid-cols-2")}>{children}</div>
   </section>;
