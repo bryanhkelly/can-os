@@ -16,8 +16,6 @@ import {db} from "@/db/client";
 import {accessAccounts,organizations} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {authorizeEngagementDistribution,readAuthorizedEngagementInvitation} from "@/modules/engagement/engagement-registry.server";
-import {isDemoTenantOrganization} from "@/modules/identity/demo-school-tenants.server";
-import {isDemoAccountEmail} from "@/domain/local-demo-access";
 import {campaignOwnerScope,parseCampaignRecipients,campaignRecipientLimit} from "@/domain/campaign-policy";
 import {campaignRows,campaignSender} from "./campaign-store.server";
 async function scope(engagementId:string){
@@ -25,7 +23,7 @@ async function scope(engagementId:string){
  const actor=await getCommandContext(getRequest());
  const record=await authorizeEngagementDistribution(engagementId,actor);
  const [account]=await db.select({email:accessAccounts.emailNormalized}).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
- if(!account||isDemoAccountEmail(account.email)||await isDemoTenantOrganization(record.organizationId))throw new Error("Native distribution requires a real authorized tenant and operator.");
+ if(!account)throw new Error("Native distribution requires an authorized operator.");
  const organization=record.organizationId?(await db.select({name:organizations.name}).from(organizations).where(eq(organizations.id,record.organizationId)).limit(1))[0]:null;
  if(record.organizationId&&!organization)throw new Error("Organization unavailable.");
  return {...campaignOwnerScope(record),actor,record,senderLabel:organization?.name??"Becomuna"};
