@@ -2,6 +2,7 @@ import { identityEmailDomain } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
+import { individualStaffIssuerEligible, individualStaffTargetEligible } from "@/domain/individual-staff-handoff";
 import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { personLegalName } from "@/domain/person-name";
 import { and, eq, gt, isNull, ilike, inArray, or, sql } from "drizzle-orm";
@@ -241,10 +242,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           .where(and(eq(accessAccounts.id,actor.accountId),eq(accessSessions.id,actor.sessionId),
             eq(accessSessions.activeGrantId,actor.grantId),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date()),
             isNull(accessSessions.delegatedGrantId))).limit(1);
-        if (!issuer || issuer.disabled || issuer.personId!==actor.actorPersonId ||
-          !(issuer.privateCredential ? issuer.authenticationMethod==="private_access_code" :
-            !!issuer.emailVerifiedAt && !isDemoAccountEmail(issuer.email) &&
-            (issuer.authenticationMethod===null || issuer.authenticationMethod==="email_link")))
+        if (!individualStaffIssuerEligible(issuer,actor.actorPersonId))
           throw new AuthorizationError("individually authenticated administrator");
       }
       // Legacy shared credentials retain the exact original tenant boundary.
@@ -259,12 +257,9 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
       if (account?.privateCredential && !individual)
         throw new AuthorizationError("explicit individual identity confirmation required");
-      if (individual && account && (!account.privateCredential || !account.personId ||
-        confirmation?.existingPersonId!==account.personId))
+      if (individual && !individualStaffTargetEligible(account,confirmation?.existingPersonId))
         throw new AuthorizationError("independently confirmed existing individual Person");
       if (!account) {
-        if (individual && confirmation?.existingPersonId)
-          throw new AuthorizationError("existing confirmed Person Account");
         if(individual) privateAccessCode=issueOpaqueSecret();
         [account] = await tx.insert(accessAccounts).values({ emailNormalized,
           ...(privateAccessCode?{privateAccessCodeHash:hashPrivateAccessCode(privateAccessCode,process.env.CAN_ACCESS_TOKEN_PEPPER??"")}:{})
