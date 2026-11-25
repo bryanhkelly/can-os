@@ -8,4 +8,4 @@
  * call it for diploma kind at grant creation AND on EVERY recipient download,
  * and keep diploma/external-school release disabled until verified end-to-end.
  */
-export { assertDiplomaFreshForAuthorizedRelease } from "./graduation.functions";
+export { assertDiplomaFreshForAuthorizedRelease } from "./graduation.server";

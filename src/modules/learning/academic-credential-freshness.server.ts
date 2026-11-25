@@ -11,4 +11,4 @@
 export {
  assertDiplomaFreshForAuthorizedRelease,
  assertOfficialTranscriptFreshForAuthorizedRelease,
-} from "./graduation.functions";
+} from "./graduation.server";
