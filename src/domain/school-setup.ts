@@ -2,11 +2,10 @@ import { z } from "zod";
 import { DEMO_ACCOUNT_DOMAIN, isDemoAccountEmail } from "./local-demo-access";
 import { siteTimezoneSchema } from "./site-timezone";
 
-const demoDomainPattern = /^[a-z0-9](?:[a-z0-9-]{1,41}[a-z0-9])\.demo$/;
+import { identityEmailDomain, isDemoDomain } from "./domain-classification";
 
 export function isDemoSchoolDomain(domain: string): boolean {
-  return demoDomainPattern.test(domain.trim().toLowerCase()) &&
-    !domain.includes("--");
+  return isDemoDomain(domain);
 }
 
 export const schoolSetupSchema = z.object({
@@ -80,7 +79,7 @@ export function matchesDemoSchoolAdministrator(
   email: string,
 ): boolean {
   return school.enabled && isDemoSchoolDomain(school.domain) &&
-    email.split("@")[1] === school.domain &&
+    identityEmailDomain(email) === school.domain &&
     grant.id === school.adminGrantId && grant.accountId === school.adminAccountId &&
     grant.personId === school.adminPersonId && grant.role === "site_admin" &&
     grant.organizationId === school.organizationId && grant.siteId === school.siteId;
