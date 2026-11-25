@@ -14,7 +14,7 @@ export async function assertScopedCredential(
   tx: Pick<Tx,"select">, email: string, organizationId: string, siteId: string | null,
 ): Promise<void> {
   if (email.endsWith(".invalid") ||
-      (isDemoAccountEmail(email) && !await matchesDemoCredentialScope(email, organizationId, siteId, tx)))
+      (email.endsWith(".demo") && !await matchesDemoCredentialScope(email, organizationId, siteId, tx)))
     throw new AuthorizationError("eligible credential for the requested Site");
 }
 
@@ -36,9 +36,11 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
     const grants = await tx.select({personId:accountPersonGrants.personId,role:accountPersonGrants.role,
       organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId})
       .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
-    if (grants.some(g=>g.personId!==input.personId ||
-        (input.onlyRole && g.role!==input.onlyRole) ||
-        (isDemoAccountEmail(email) && (g.organizationId!==input.organizationId || g.siteId!==input.siteId))))
+    if (grants.some(g=>g.personId!==input.personId))
+      throw new AuthorizationError("account email belongs to a different identity");
+    if (input.onlyRole && grants.some(g=>g.role!==input.onlyRole))
+      throw new AuthorizationError("separate student-only account required");
+    if (isDemoAccountEmail(email) && grants.some(g=>g.organizationId!==input.organizationId || g.siteId!==input.siteId))
       throw new AuthorizationError("existing identity and membership scope");
     if (!account.personId) {
       await tx.update(accessAccounts).set({personId:input.personId,updatedAt:new Date()})
@@ -50,4 +52,21 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
   }
   if (!account) throw new Error("Account could not be provisioned");
   return {id:account.id,email};
+}
+
+/** A shared-code guardian can authorize a synthetic child account at the
+ * same Site, never an actual mailbox or a different institution. */
+export async function assertFamilyCredentialPair(
+  tx: Pick<Tx,"select">, adult: {email:string;verified:Date|null}|undefined,
+  childEmail:string, organizationId:string, siteId:string,
+) {
+  await assertScopedCredential(tx,childEmail,organizationId,siteId);
+  if (!adult || adult.email===childEmail) throw new AuthorizationError("separate adult and student identities");
+  if (isDemoAccountEmail(adult.email)) {
+    if (!isDemoAccountEmail(childEmail) ||
+        !await matchesDemoCredentialScope(adult.email,organizationId,siteId,tx))
+      throw new AuthorizationError("approved same-Site family credentials");
+  } else if (!adult.verified) {
+    throw new AuthorizationError("verified adult account");
+  }
 }
