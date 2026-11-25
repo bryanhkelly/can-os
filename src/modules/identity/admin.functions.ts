@@ -1,3 +1,4 @@
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
 import { personLegalName } from "@/domain/person-name";
 import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
@@ -255,7 +256,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       let personId = account!.personId ?? distinctPeople[0];
       if (!personId) {
         const [person] = await tx.insert(people).values({
-          legalFirstName: data.firstName, legalLastName: data.lastName, email: emailNormalized,
+          legalFirstName: data.firstName, legalLastName: data.lastName, email: emailNormalized, domain: identityEmailDomain(emailNormalized),
         }).returning({ id: people.id });
         personId = person!.id;
         await recordAudit(tx, actor, {
