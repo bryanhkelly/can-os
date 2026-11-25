@@ -77,7 +77,7 @@ export function assertPlatformOwnerUndelegated(owner:{delegatedGrantId:string|nu
   if(owner.delegatedGrantId) throw new AuthorizationError("return to Platform Owner first");
 }
 
-/** Opaque existing grant IDs are resolved only from current verified accounts.
+/** Opaque existing grant IDs are resolved from current eligible canonical accounts.
  * No impersonated persona, organization relationship or preview record is created.
  */
 export async function listPlatformOwnerTargets(request: Request, search: string) {
@@ -157,7 +157,7 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
     const grants = await readOwnerDelegationGrants(target.accountId, target.personId, target.email, tx);
     if (!grants.some(grant => grant.id === target.grantId && grant.active))
       throw new AuthorizationError("current delegated membership");
-    await assertRawAccountPerson(target.accountId, target.personId);
+    await assertRawAccountPerson(target.accountId, target.personId, tx);
     // Do not let delegation authorize a simulated independent reviewer decision.
     // Reviewer roles may be inspected with "View as" only.
     if (data.mode === "act" && !platformOwnerMayActAs(target.role))
