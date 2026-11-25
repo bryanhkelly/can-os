@@ -23,5 +23,3 @@ FROM (VALUES
  ('edb3bcec-bb84-4f66-8878-d1efec2c7e0b'::uuid,'school.f098f921.gf25.demo'),
  ('54633a42-5ee6-4a51-b74e-9e5c9f04e516'::uuid,'school.ff759d54.gf25.demo')
 ) AS v(id,domain) WHERE o.id=v.id AND o.domain IS NULL;
---> statement-breakpoint
--- No account emails, account bindings, grants or permissions are modified.
