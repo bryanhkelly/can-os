@@ -120,6 +120,8 @@ function controlAppearanceIssues(syntax) {
       const control = bindings.get(tag.getText(syntax)) ?? (ts.isPropertyAccessExpression(tag) && namespaces.has(tag.expression.getText(syntax)) && governedControls.has(tag.name.text) ? tag.name.text : undefined);
       if (control) {
         const classes = attribute(node, "className");
+        const style = attribute(node, "style");
+        if (style) issues.push({ control, utility: "inline-style", ...location(syntax, style) });
         const utilities = new Set();
         for (const literal of literals(classes?.initializer)) for (const token of literal.text.split(/\s+/)) {
           const utility = token.replace(/^(?:(?:[\w-]+|\[[^\]]+\]):)+/, "").replace(/^!|!$/g, "");
@@ -276,6 +278,7 @@ export function createInventory(projectRoot) {
       files: feature.length,
       native: feature.reduce((n, file) => n + inspect(file).native.length, 0),
       corners: feature.reduce((n, file) => n + inspect(file).corners.length, 0),
+      appearance: feature.reduce((n, file) => n + inspect(file).appearance.length, 0),
     };
   }
   const rows = routes.map(file => {
@@ -285,11 +288,12 @@ export function createInventory(projectRoot) {
     return {
       file: relative(root, file).replaceAll("\\", "/"), route,
       directNative: audit.native.length, directCorners: audit.corners.length,
+      directAppearance: audit.appearance.length, reachableAppearance: dependencies.appearance,
       reachableComponentFiles: dependencies.files,
       reachableNative: dependencies.native, reachableCorners: dependencies.corners,
-      sourceClean: audit.native.length === 0 && audit.corners.length === 0,
+      sourceClean: audit.native.length === 0 && audit.corners.length === 0 && audit.appearance.length === 0 && audit.syntaxErrors.length === 0,
       composedSourceClean: audit.native.length + audit.corners.length +
-        dependencies.native + dependencies.corners === 0,
+        dependencies.native + dependencies.corners + audit.appearance.length + dependencies.appearance + audit.syntaxErrors.length === 0,
       acceptance: "unverified",
     };
   });
@@ -302,7 +306,7 @@ export function createInventory(projectRoot) {
       components: components.length,
       extraUiFiles: extraUi.length,
       directlyCleanComponents: components.filter(file =>
-        inspect(file).native.length === 0 && inspect(file).corners.length === 0).length,
+        inspect(file).native.length === 0 && inspect(file).corners.length === 0 && inspect(file).appearance.length === 0 && inspect(file).syntaxErrors.length === 0).length,
     },
     inspected: [...routes, ...components, ...extraUi].map(file => ({
       path: relative(root, file).replaceAll("\\", "/"),
