@@ -36,7 +36,8 @@ describe("noncredit 48-hour invitation delivery",()=>{
     expect(worker).toContain("record.delivery.invitationExpiresAt");
     expect(worker).toContain("readEligibleSelfEnrollmentReleases(db, record.releaseId)");
     expect(worker).toContain("record.releaseStatus");
-    expect(worker).toContain("isDemoTenantOrganization(");
+    expect(worker).toContain("suppressDemoEmailDelivery(recipient.email)");
+    expect(worker).not.toContain("isDemoTenantOrganization(");
     expect(worker).toContain("assertUnambiguousAdultAccount(record.accountId, record.personId)");
     expect(read("src/modules/identity/unambiguous-adult-account.server.ts"))
       .toContain("eq(accountPersonGrants.active, true)");
