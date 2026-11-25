@@ -8,7 +8,7 @@ import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { provisionScopedPersonAccount, assertScopedCredential } from "@/modules/identity/scoped-person-account.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
-import { isDemoDomain } from "@/domain/domain-classification";
+import { isDemoDomain, identityEmailDomain } from "@/domain/domain-classification";
 import { assertPublicInterestConversion } from "@/domain/public-interest-conversion";
 import { applicationGuardianContact } from "@/domain/application-guardian-contact";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
@@ -443,7 +443,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
      // Intake creates an unverified prospective contact. No account grant is
      // created until a registrar explicitly provisions guardian access.
      const [guardian]=await tx.insert(people).values({
-      legalFirstName:data.guardianFirstName,legalLastName:data.guardianLastName,email:data.guardianEmail,
+      legalFirstName:data.guardianFirstName,legalLastName:data.guardianLastName,email:data.guardianEmail,domain:identityEmailDomain(data.guardianEmail),
       metadata:{synthetic:false,origin:"registrar_intake"},
      }).returning({id:people.id});
      const [household]=await tx.insert(households).values({
