@@ -20,14 +20,14 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 - Configuration and policies vary by program/site/jurisdiction; avoid scattered special cases and parallel workflow engines.
 - Do not copy prototype JSON, localStorage business state, synthetic personas, or portal-based authorization into production.
 
-## Synthetic data is test infrastructure
+## Demo identity, synthetic data and test infrastructure
 
-- Use isolated deterministic fixtures for the workflows that need acceptance testing; preserve idempotency and privacy, with no authentic student/family records in fixtures.
-- **Never** create separate production routes, user experiences, or business operations merely because a record was seeded. Provenance metadata is not authorization; Valor is a canonical tenant and uses the same product APIs.
-- Approved Valor demo accounts use `000000` locally and on Netlify production without access flags. Preserve their fixed account list, active canonical Valor grants, session checks and server domain authority. These intentionally public accounts must never access authentic records. Separately invited real-email testers can accept an exact-Site staff invitation by verified passwordless sign-in; they are not added to the fixed public demo list. Operator provisioning still requires literal `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and development/test mode. The obsolete `CAN_DEMO_WRITES_ENABLED` gate is retired.
-- The public `/site/new` journey uses verified-email Site creation only. Synthetic tenant setup is restricted to guarded test fixtures and must not be exposed through public signup. Its Site Admin and explicitly invited `.demo` staff use `000000` only with exact registry/invitation identity bindings and active canonical grants. Separately invited real-email staff use verified passwordless access with exact original email, account, person, role, grant and Site evidence. This does not expand the fixed Valor list or permit adopting authentic identities. Bootstrap hands off to ordinary Launch Studio; registrar authority cannot appoint or disable a Site Admin.
-- Do not introduce new `*-demo.functions.ts` product handlers or bypass verified session/grant checks without explicit architectural review.
-- A generic product feature does not automatically require its own demo persona, special UI, or duplicate test tenant. External synthetic-school staff invitations use the ordinary identity workflow; they do not authorize uncontrolled family outreach, notifications or SMS.
+- A demo Organization or Person is classified by its normalized .demo domain. Synthetic operational data is classified by its owning Organization, not the participant's email or fixture provenance.
+- Production application functionality, authorization, workflow, rendering, persistence and performance must be independent of demo classification. Use the same services, canonical identities, grants and components.
+- The only intended functional exceptions are automatic email verification for demo identities and suppression of outbound email to .demo destinations. Record verification provenance accurately. Never equate automatic email verification with authentication or grant authority.
+- Preserve account ownership, current session checks, role/capability/resource/scope/relationship authorization and separation of duties for all identities. Existing public shared-code fixtures must not gain access to authentic records or privileged operations; migrate to equivalent secure credentials and canonical grants before removing legacy guards.
+- Synthetic classification is a reporting dimension; fixture provenance is test infrastructure, not business authorization. Use isolated deterministic fixtures and never place authentic student/family records in test fixtures.
+- During the convergence release, legacy demo registry, fixture and SMS restrictions remain until their consumers, data and security invariants are reconciled. Their existence is not a precedent for new demo-specific business logic. Do not introduce new demo-only handlers or deployment flags.
 
 ## Development and completion
 
