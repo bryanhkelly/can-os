@@ -13,8 +13,8 @@ import {
   assertChurchLocalInvitationOrganization, localStaffInviteInput, localStaffInviteRoles, staffOnboardingState,
 } from "@/domain/staff-onboarding-policy";
 import {
-  listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE,
-, acceptStaffInvitations } from "@/modules/identity/staff-invitations.server";
+  listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE, acceptStaffInvitations,
+} from "@/modules/identity/staff-invitations.server";
 import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
 import { demoSchoolTenants } from "@/db/schema";
 import { DomainError } from "@/domain/errors";
