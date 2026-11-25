@@ -1,8 +1,11 @@
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   checkChangedFiles,
   createInventory,
   collectV61SourceViolations,
+  inspectV61ThemeTokens,
 } from "./lib/v61-source-audit.mjs";
 
 // Generic design-system enforcement only. Behavior, authorization, consent,
@@ -12,6 +15,13 @@ const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const inventory = createInventory(projectRoot);
 console.log("V6.1 source inventory: " + JSON.stringify(inventory.totals));
 
+const theme = inspectV61ThemeTokens(readFileSync(join(projectRoot, "src/styles.css"), "utf8"));
+for (const [token, valid] of Object.entries(theme)) {
+  if (!valid) {
+    console.error("V6.1 required theme token missing or invalid: " + token);
+    process.exitCode = 1;
+  }
+}
 const violations = collectV61SourceViolations(inventory);
 for (const issue of violations) {
   console.error("V6.1 " + issue.kind + " " + issue.file + ":" + issue.line +

@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { analyzeSource, createInventory, checkChangedFiles, findSharedLayerGeometryViolations, collectV61SourceViolations } from "./v61-source-audit.mjs";
+import { analyzeSource, createInventory, checkChangedFiles, findSharedLayerGeometryViolations, collectV61SourceViolations, inspectV61ThemeTokens } from "./v61-source-audit.mjs";
 
 function temp(run) {
   const root = mkdtempSync(join(tmpdir(), "v61-audit-"));
@@ -206,3 +206,20 @@ test("absolute policy rejects unchanged debt in routes, feature components and e
   write("src/widgets/External.tsx", 'export const Widget = () => <Select/>;');
   assert.deepEqual(collectV61SourceViolations(createInventory(root)), []);
 }));
+
+test("the build and release share the same theme contract", () => {
+  const css = `
+    --font-sans: "DM Sans";
+    --font-serif: "Instrument Serif";
+    --radius: 0;
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-danger: var(--danger);
+    --sidebar-width: 16rem;
+    --topbar-height: 4rem;
+  `;
+  assert.ok(Object.values(inspectV61ThemeTokens(css)).every(Boolean));
+  assert.equal(inspectV61ThemeTokens(css.replace("--radius: 0;", "--radius: 8px;")).squareGeometry, false);
+  assert.equal(inspectV61ThemeTokens(css.replace('"DM Sans"', '"Arial"')).fontSans, false);
+  assert.equal(inspectV61ThemeTokens(css.replace("--color-danger: var(--danger);", "")).semanticDanger, false);
+});

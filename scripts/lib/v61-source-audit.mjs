@@ -265,6 +265,20 @@ export function collectV61SourceViolations(inventory) {
   ]);
 }
 
+/** Shared theme ownership is evaluated by both build and release checks. */
+export function inspectV61ThemeTokens(sharedCss) {
+  return {
+    fontSans: /--font-sans:\s*"DM Sans"/.test(sharedCss),
+    fontSerif: /--font-serif:\s*"Instrument Serif"/.test(sharedCss),
+    squareGeometry: /--radius:\s*0(?:px|rem)?\s*;/.test(sharedCss),
+    semanticSuccess: /--color-success:\s*var\(--success\)/.test(sharedCss),
+    semanticWarning: /--color-warning:\s*var\(--warning\)/.test(sharedCss),
+    semanticDanger: /--color-danger:\s*var\(--danger\)/.test(sharedCss),
+    shellWidth: /--sidebar-width:\s*[^;]+;/.test(sharedCss),
+    shellHeight: /--topbar-height:\s*[^;]+;/.test(sharedCss),
+  };
+}
+
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
