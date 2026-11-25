@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const state=vi.hoisted(()=>({
  rows:[] as unknown[][],actor:{} as unknown,inTransaction:false,committed:false,
- sender:vi.fn(),scope:vi.fn(),update:vi.fn(),insert:vi.fn(),emit:vi.fn(),audit:vi.fn(),transactions:vi.fn(),
+ sender:vi.fn(),scope:vi.fn(),issuer:vi.fn(),update:vi.fn(),insert:vi.fn(),emit:vi.fn(),audit:vi.fn(),transactions:vi.fn(),
 }));
 vi.mock("@/db/client",()=>{
  const select=()=>{
@@ -30,6 +30,7 @@ vi.mock("@/domain/access-tokens",()=>({normalizeAccessEmail:(email:string)=>emai
 vi.mock("@/modules/enrollment/instructional-section-readiness.server",()=>({staffedPublishedSectionIds:async(ids:string[])=>new Set(ids)}));
 vi.mock("@/modules/identity/passwordless-access.server",()=>({requestOneTimeAccess:state.sender}));
 vi.mock("@/modules/identity/demo-school-tenants.server",()=>({matchesDemoCredentialScope:state.scope}));
+vi.mock("@/modules/identity/individual-credential-issuer.server",()=>({canIssueIndividualCredential:state.issuer}));
 vi.mock("@/platform/mutation",()=>({emitEvent:state.emit,writeAudit:state.audit,notify:vi.fn()}));
 vi.mock("@/domain/event-types",()=>({EventTypes:{StudentLearningAccessApproved:"StudentLearningAccessApproved"}}));
 import { provisionStudentLearningAccess } from "@/modules/enrollment/student-access-handoff.functions";
@@ -45,7 +46,6 @@ function rows(status="pending_review",grants=[{personId:"student",role:"student"
    guardianPersonId:"guardian",studentEmail:email}],
   [{permission:true,metadata:{verification:"verified"}}],
   [{active:true,email}],
-  ...(email.endsWith(".demo")?[[]]:[]),
   [{id:"account",personId:"student",disabled:false}],grants,[{id:"grant",active:true}],
  ];
 }
@@ -55,6 +55,7 @@ beforeEach(()=>{
   capabilities:new Set(["enrollment.activate"]),scope:{programIds:["program"],siteIds:["site"],organizationIds:["church"]}};
  rows();
  state.scope.mockResolvedValue(false);
+ state.issuer.mockResolvedValue(false);
  state.update.mockImplementation(()=>({set:()=>({where:async()=>undefined})}));
  state.sender.mockImplementation(async()=>{
   expect(state.inTransaction).toBe(false);expect(state.committed).toBe(true);
@@ -105,9 +106,23 @@ describe("student approval and sign-in request outcomes",()=>{
   expect(state.sender).not.toHaveBeenCalled();
   expect(state.emit).not.toHaveBeenCalled();
  });
+ it("issues a private code for a new student after independent review, without a registry or email",async()=>{
+  rows("pending_review",undefined,"child@example.demo");
+  state.issuer.mockResolvedValue(true);
+  state.rows[6]=[];
+  state.rows[7]=[];
+  state.rows.splice(8,1);
+  state.insert.mockImplementation(()=>({values:()=>({returning:async()=>[{id:"new-account",personId:"student",disabled:false,privateCredential:true}]})}));
+  const result=await provisionStudentLearningAccess({data:input});
+  expect(result).toEqual({status:"approved",signInRequest:"private_code",privateAccessCode:"a".repeat(43)});
+  expect(state.scope).not.toHaveBeenCalled();
+  expect(state.sender).not.toHaveBeenCalled();
+  expect(state.emit).toHaveBeenCalledTimes(1);
+  expect(JSON.stringify(state.audit.mock.calls)).not.toContain("a".repeat(43));
+ });
  it("reuses an existing private student credential without sending or revealing it",async()=>{
   rows("approved",undefined,"child@example.demo");
-  state.rows[7]=[{id:"account",personId:"student",disabled:false,privateCredential:true}];
+  state.rows[6]=[{id:"account",personId:"student",disabled:false,privateCredential:true}];
   expect(await provisionStudentLearningAccess({data:{applicationId:"application"}})).toEqual({status:"approved",signInRequest:"private_code"});
   expect(state.sender).not.toHaveBeenCalled();
   expect(state.emit).not.toHaveBeenCalled();
