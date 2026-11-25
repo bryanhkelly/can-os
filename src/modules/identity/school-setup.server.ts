@@ -49,6 +49,7 @@ export async function setupSchool(
 
     const [organization] = await tx.insert(organizations).values({
       name: data.name, slug, type: "christian_school",
+      domain: data.domain,
       metadata: { synthetic: true, demoDomain: data.domain },
     }).returning();
     if (!organization) throw new Error("School organization was not created");
