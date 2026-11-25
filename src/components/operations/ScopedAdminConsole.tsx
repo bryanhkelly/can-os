@@ -12,6 +12,7 @@ import {
   inviteStaffMember, listAccessAccounts, listPeople, listScopedSites, setGrantActive,
 } from "@/modules/identity/admin.functions";
 import { CreateAction, DirectoryTable, WorkspaceShell, QueryState, WorkspacePanel, WorkspaceNotice, EmptyState, ActionFooter } from "@/components/workspace";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
 import { launchStaffInvitationDefaults } from "@/domain/launch-staff-invitation";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,9 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [identityReason,setIdentityReason]=useState("");
+  const [existingPersonId,setExistingPersonId]=useState("");
+  const [issuedCredential,setIssuedCredential]=useState<{email:string;code:string}|null>(null);
 
   const [query, setQuery] = useState("");
 
@@ -116,6 +120,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
     setBusy(true);
     setError("");
     setNotice("");
+    setIssuedCredential(null);
     try {
       const result = await inviteStaffMember({
         data: {
@@ -124,8 +129,11 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
           lastName: values.lastName,
           role: values.role,
           siteId: values.siteId,
+          ...(isDemoAccountEmail(values.email)&&identityReason.trim()?{privateIdentityConfirmation:{reason:identityReason.trim(),...(existingPersonId.trim()?{existingPersonId:existingPersonId.trim()}:{})}}:{}),
         },
       });
+      if ("privateAccessCode" in result && typeof result.privateAccessCode==="string") setIssuedCredential({email:values.email,code:result.privateAccessCode});
+      setIdentityReason("");setExistingPersonId("");
       setNotice(!result.pending
         ? "demoAccess" in result && result.demoAccess
           ? `Access is approved for ${values.email}. No email is sent. Use the account’s current credential or contact the Platform Owner for secure enrollment.`
@@ -171,6 +179,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
       <QueryState loading={loading ? "Loading admin console…" : ""} error={authError}>
         {error && <WorkspaceNotice tone="danger" className="mt-8">{error}</WorkspaceNotice>}
         {notice && <WorkspaceNotice className="mt-8">{notice}</WorkspaceNotice>}
+        {issuedCredential&&<WorkspacePanel title="Individual staff access code" className="mt-4"><WorkspaceNotice>Shown once for {issuedCredential.email}. Confirm the recipient and transfer it privately. Do not email or post this code.</WorkspaceNotice><Field label="Private access code"><Input value={issuedCredential.code} readOnly autoComplete="off" /></Field><Button type="button" variant="outline" onClick={()=>setIssuedCredential(null)}>Dismiss code</Button></WorkspacePanel>}
 
         {mode==="invite"&&<WorkspacePanel id="invite-staff" title="Invitation details" className="mt-8">
           <p className="mt-1 text-sm text-muted-foreground">Create or reuse a Person and issue an exact-Site invitation. Email recipients accept through a secure access link; approved non-deliverable addresses use their current account credential.</p>
@@ -233,6 +242,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                   <FormMessage />
                 </FormItem>
               )} />
+              {isDemoAccountEmail(form.watch("email"))&&<div className="sm:col-span-2 space-y-3"><p className="text-sm text-muted-foreground">For individual credentials, confirm the intended recipient independently. Existing Accounts require the exact canonical Person ID. Leave blank only for the existing restricted fixture workflow.</p><Field label="Identity confirmation reason"><Input value={identityReason} onChange={e=>setIdentityReason(e.target.value)} maxLength={500} placeholder="How you independently confirmed the recipient" /></Field><Field label="Existing Person ID (only for an existing Account)"><Input value={existingPersonId} onChange={e=>setExistingPersonId(e.target.value)} autoComplete="off" /></Field></div>}
               <ActionFooter layout="form" className="sm:col-span-2">
                 <Button variant="default" size="lg" type="submit" loading={busy} loadingLabel="Inviting…"
                   disabled={busy || Boolean(lockedSiteId && !sites.some(site => site.id === lockedSiteId))}>
