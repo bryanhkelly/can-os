@@ -25,7 +25,7 @@ export function AdmissionsGuardianActions({applicationId,verified,loginProvision
   <WorkspaceNotice className="mt-3"><strong>Next for family access: </strong>
    {!verified?"Admissions registrar verifies the guardian relationship before granting family access.":
     !loginProvisioned?"Admissions registrar provisions verified guardian sign-in; invitation is a separate step.":
-     "Guardian sign-in is provisioned. The registrar may send the secure invitation; offer decisions remain with the guardian."}
+     "Guardian sign-in is provisioned. The registrar may request a secure invitation or confirm the existing sign-in method; offer decisions remain with the guardian."}
   </WorkspaceNotice>
   <ActionFooter layout="inline">
    <Button type="button" variant="outline" size="sm" disabled={busy||verified} onClick={()=>setVerifying(true)}
@@ -38,7 +38,7 @@ export function AdmissionsGuardianActions({applicationId,verified,loginProvision
    </Button>
    <Button type="button" variant="outline" size="sm" disabled={busy||!loginProvisioned} onClick={()=>onInvite(applicationId)}
     >
-    Send secure guardian invitation
+    Request guardian sign-in
    </Button>
   </ActionFooter>
   {verifying&&!verified&&<form noValidate className="mt-5 space-y-3 text-sm"
