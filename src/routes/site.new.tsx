@@ -98,6 +98,8 @@ function SiteNewPage() {
   const [sending, setSending] = useState(false);
   const [requested, setRequested] = useState(false);
   const [demoReady, setDemoReady] = useState(false);
+  const [privateAccessCode, setPrivateAccessCode] = useState<string | null>(null);
+  const [signupEmail, setSignupEmail] = useState("");
   const [error, setError] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -124,7 +126,9 @@ function SiteNewPage() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Request not accepted");
-      const result = await response.json() as { demo?: boolean };
+      const result = await response.json() as { demo?: boolean; privateAccessCode?: string };
+      setSignupEmail(payload.email);
+      setPrivateAccessCode(result.privateAccessCode ?? null);
       setDemoReady(result.demo === true);
       setRequested(true);
     } catch {
@@ -170,9 +174,13 @@ function SiteNewPage() {
               <CheckCircle2 className="size-9 text-success" aria-hidden="true" />
               <h2 className="font-serif text-3xl">{demoReady ? "Your demo Site is ready." : "Check your email."}</h2>
               <p className="leading-7 text-muted-foreground">
-                {demoReady ? "Sign in with your demo email and the shared demo access code. No email verification is required." : "If the address is eligible, you will receive a secure verification link. Follow it to create your Site and continue into Launch Studio."}
+                {demoReady ? "Your Site administrator is automatically approved without email verification. Use your private access code to sign in." : "If the address is eligible, you will receive a secure verification link. Follow it to create your Site and continue into Launch Studio."}
               </p>
-              <Button asChild variant="outline"><Link to="/access">Go to sign in</Link></Button>
+              {privateAccessCode && <div className="space-y-2">
+                <WorkspaceNotice>Save this private access code in your password manager now. It is shown only once. Do not share it with other users.</WorkspaceNotice>
+                <Field label="Private access code"><Input value={privateAccessCode} readOnly autoComplete="off" /></Field>
+              </div>}
+              <Button asChild variant="outline"><Link to="/access" search={{email:signupEmail || undefined}}>Go to sign in</Link></Button>
             </div> : <form onSubmit={submit} aria-busy={sending} className="space-y-5">
               <p className={eyebrow}>Your learning Site</p>
               <Field label="Site name" required description="The name of the learning community you want to create.">
