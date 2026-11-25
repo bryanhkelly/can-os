@@ -1,6 +1,6 @@
-import { and, eq, sql, type SQLWrapper } from "drizzle-orm";
+import { and, eq, isNotNull, sql, type SQLWrapper } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
-import { demoSchoolTenants, sites } from "@/db/schema";
+import { accessAccountSignups, demoSchoolTenants, sites } from "@/db/schema";
 import { DEMO_ACCOUNT_DOMAIN, LOCAL_DEMO_ADMIN, isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
 
 type Reader = Pick<Database, "select">;
@@ -73,4 +73,29 @@ export function demoCredentialScopePredicate(
           AND credential_tenant.site_id=${siteId})
     )
   )`;
+}
+
+/** Account-only demo approval is tied to a current registered credential
+ * domain. It does not create any Site, network or program membership. */
+export async function readDemoCredentialDomain(email:string, reader:Reader=db) {
+  if (!isDemoAccountEmail(email)) return null;
+  const domain=email.trim().toLowerCase().split("@")[1]!;
+  if (domain===DEMO_ACCOUNT_DOMAIN) {
+    const [site]=await reader.select({organizationId:sites.organizationId,siteId:sites.id})
+      .from(sites).where(and(eq(sites.id,LOCAL_DEMO_ADMIN.siteId),
+        eq(sites.organizationId,LOCAL_DEMO_ADMIN.organizationId))).limit(1);
+    return site??null;
+  }
+  const [binding]=await reader.select({organizationId:demoSchoolTenants.organizationId,siteId:demoSchoolTenants.siteId})
+    .from(demoSchoolTenants).innerJoin(sites,and(eq(sites.id,demoSchoolTenants.siteId),
+      eq(sites.organizationId,demoSchoolTenants.organizationId)))
+    .where(and(eq(demoSchoolTenants.domain,domain),eq(demoSchoolTenants.enabled,true))).limit(1);
+  return binding??null;
+}
+
+export async function hasApprovedDemoPersonalCredential(accountId:string,email:string,reader:Reader=db) {
+  if (!await readDemoCredentialDomain(email,reader)) return false;
+  const [signup]=await reader.select({id:accessAccountSignups.id}).from(accessAccountSignups)
+    .where(and(eq(accessAccountSignups.accountId,accountId),isNotNull(accessAccountSignups.consumedAt))).limit(1);
+  return Boolean(signup);
 }
