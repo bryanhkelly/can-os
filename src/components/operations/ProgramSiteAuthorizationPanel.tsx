@@ -1,3 +1,4 @@
+import { WorkspacePanel, WorkspaceNotice, QueryState, StatusBadge, ActionFooter } from "@/components/workspace";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/choice";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
@@ -97,8 +98,7 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     );
   }
   if(status && !status.eligible) return null;
-  return <section className="mt-7  border bg-card p-5" aria-label="CAN church institutional authorization">
-    <h2 className="font-serif text-2xl">CAN–church operating agreement</h2>
+  return <WorkspacePanel title="CAN–church operating agreement" className="mt-7">
     <p className="mt-2 text-sm text-muted-foreground">
       A church-owned Site can request separately authorized CAN academic services without
       transferring church ownership. The contract, individual staff grants, school opening
@@ -114,12 +114,11 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       current service authority and academic setup. Only CAN can approve institutional services;
       the church supplies the signed agreement and completes its own opening requirements.
     </p>
-    {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {!status?(error?<p className="mt-3 text-sm text-muted-foreground">Agreement status is unavailable. Ask your host registrar or CAN contact to review it, or refresh to try again. You can continue preparing the other school setup steps.</p>:<p role="status" className="mt-3 text-sm">Checking institutional authorization…</p>):
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {notice&&<WorkspaceNotice className="mt-3">{notice}</WorkspaceNotice>}
+    {!status?(error?<p className="mt-3 text-sm text-muted-foreground">Agreement status is unavailable. Ask your host registrar or CAN contact to review it, or refresh to try again. You can continue preparing the other school setup steps.</p>:<QueryState loading="Checking institutional authorization…"/>):
     status.authorization?<div className="mt-3 text-sm">
-      <p><strong>Request v{status.authorization.version}:</strong> {status.authorization.status}
-        {status.authorization.lapsed&&" — lapsed"}</p>
+      <div className="flex flex-wrap items-center gap-2"><strong>Request v{status.authorization.version}</strong><StatusBadge tone={status.authorization.lapsed?"attention":status.authorization.status==="approved"?"success":status.authorization.status==="suspended"?"danger":"neutral"}>{status.authorization.status}{status.authorization.lapsed&&" (lapsed)"}</StatusBadge></div>
       {status.authorization.lapsed&&<p role="status" className="mt-2">
         The agreement window has elapsed. Delegated CAN operations are blocked
         until the independent CAN steward renews the agreement under fresh evidence.
@@ -151,7 +150,7 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
           error={revokeAttempted&&revokeReason.trim().length<10?"Enter at least 10 characters explaining this revocation.":undefined}>
           <Input value={revokeReason} onChange={e=>setRevokeReason(e.target.value)} maxLength={500}/>
         </Field>
-        <Button type="submit" variant="outline" disabled={busy}>Revoke authorization</Button>
+        <ActionFooter layout="inline"><Button type="submit" variant="outline" disabled={busy}>Revoke authorization</Button></ActionFooter>
       </form>}
       {(status.authorization.status==="denied"||status.authorization.status==="revoked")&&
         <Button variant="outline" type="button" disabled={busy} onClick={()=>void request()}
@@ -177,5 +176,5 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
         Requests do not activate your school or authorize staff to serve students.
       </p>
     </div>}
-  </section>;
+  </WorkspacePanel>;
 }

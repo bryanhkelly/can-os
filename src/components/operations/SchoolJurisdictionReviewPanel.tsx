@@ -1,4 +1,5 @@
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
+import { WorkspacePanel, WorkspaceNotice, DisclosureSection, QueryState, ActionFooter } from "@/components/workspace";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
@@ -80,21 +81,19 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
       setError("Evidence could not be submitted. Refresh the current requirement, verify your role and selected document, then retry.");
     }finally{setSubmitting(false);}
   }
-  return <section className="mt-4  border bg-card p-4" aria-labelledby="school-jurisdiction-title">
-    <h3 id="school-jurisdiction-title" className="font-semibold">State-specific legal review</h3>
+  return <WorkspacePanel title="State-specific legal review" className="mt-4" id="school-jurisdiction-title">
     <p className="mt-1 text-sm text-muted-foreground">
       CAN checks the actual school's state, program, delivery model, responsible entity and authoritative policy evidence.
       General state research above cannot replace this review.
     </p>
-    {loading&&<p className="mt-3 text-sm" role="status">Loading your school's jurisdiction review…</p>}
+    {loading&&<QueryState loading="Loading your school’s jurisdiction review…"/>}
     {!loading&&review&&<div className="mt-3 space-y-3 text-sm">
       <p className="font-medium">{review.reviewRequired?"CAN legal review is required":"This school's current jurisdiction scope has been independently reviewed"}</p>
-      {review.schoolReviewReason&&<p role="status" className=" border p-3 text-sm">{review.schoolReviewReason}</p>}
+      {review.schoolReviewReason&&<WorkspaceNotice>{review.schoolReviewReason}</WorkspaceNotice>}
       {review.locationReviewReason&&<p className="text-xs text-muted-foreground">Please correct the physical Site address in school configuration before requesting independent verification.</p>}
       <p className="text-xs text-muted-foreground">Profile revision: {review.revision??"not published"}. This is a scoped evaluation, not authorization to open or enroll.</p>
       {review.readiness.status==="verified_policy"&&<>
-        <details className=" border p-3">
-          <summary className="cursor-pointer font-medium">School-specific legal requirements ({review.readiness.requirements.length})</summary>
+        <DisclosureSection title={`School-specific legal requirements (${review.readiness.requirements.length})`}>
           <ul className="mt-2 space-y-3">{review.readiness.requirements.map(item=><li key={item.id}>
             <p className="font-medium">{item.title} · {item.applicability.replaceAll("_"," ")}</p>
             <p className="text-muted-foreground">{item.nextAction}</p>
@@ -103,9 +102,8 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
             {item.sources.map(source=><a key={source.url} className="block underline" href={source.url}
               target="_blank" rel="noopener noreferrer">{source.title} · checked {source.checkedAt.slice(0,10)}</a>)}
           </li>)}</ul>
-        </details>
-        <details className=" border p-3">
-          <summary className="cursor-pointer font-medium">Sourced funding research ({review.readiness.fundingOpportunities.length})</summary>
+        </DisclosureSection>
+        <DisclosureSection title={`Sourced funding research (${review.readiness.fundingOpportunities.length})`}>
           <p className="mt-2 text-xs text-muted-foreground">These are researched opportunities, not confirmed school eligibility, provider participation, government approval or revenue.</p>
           <ul className="mt-2 space-y-3">{review.readiness.fundingOpportunities.map(item=><li key={item.id}>
             <p className="font-medium">{item.name}</p><p>{item.summary}</p>
@@ -114,10 +112,9 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
             {item.sources.map(source=><a key={source.url} href={source.url} className="block underline"
               target="_blank" rel="noopener noreferrer">{source.title}</a>)}
           </li>)}</ul>
-        </details>
+        </DisclosureSection>
       </>}
-      {work&&work.items.length>0&&<details className=" border p-3">
-        <summary className="cursor-pointer font-medium">Assigned legal requirement Actions ({work.items.length})</summary>
+      {work&&work.items.length>0&&<DisclosureSection title={`Assigned legal requirement Actions (${work.items.length})`}>
         <p className="mt-2 text-xs text-muted-foreground">These Actions track obligations and independently reviewed evidence. Completing an Action does not authorize opening, enrollment or government funding.</p>
         <ul className="mt-2 space-y-3">{work.items.map(item=><li key={item.id} className=" border p-3">
           <p className="font-medium">{item.title}</p>
@@ -148,41 +145,41 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
             }}
             submitLabel="Upload legal evidence"
           />
-          <Label className="block text-sm font-medium" htmlFor="legal-doc-selection">Select previously uploaded, verified-storage Program evidence</Label>
-          <Select id="legal-doc-selection" value={selectedDocument}
+          <Field label="Select previously uploaded, verified-storage Program evidence">
+          <Select value={selectedDocument}
             onChange={event=>setSelectedDocument(event.target.value)}
-            className="w-full  border bg-background p-2">
+            >
             <option value="">Choose a document</option>
             {work.evidenceDocuments.filter(document=>document.actionId===selectedAction)
               .map(document=><option key={document.id} value={document.id}>
               {document.fileName}
             </option>)}
-          </Select>
+          </Select></Field>
           {!work.evidenceDocuments.some(document=>document.actionId===selectedAction)&&
             <p className="text-xs text-muted-foreground">No eligible documents are available. Upload the correctly scoped file above, then select it for independent CAN review.</p>}
-          <Label className="block text-sm font-medium" htmlFor="legal-evidence-statement">Evidence statement</Label>
-          <Textarea id="legal-evidence-statement" rows={3} value={evidenceStatement}
+          <Field label="Evidence statement">
+          <Textarea rows={3} value={evidenceStatement}
             onChange={event=>setEvidenceStatement(event.target.value)}
-            className="w-full  border bg-background p-2" placeholder="Explain how this document addresses the particular required filing or obligation."/>
+            placeholder="Explain how this document addresses the particular required filing or obligation."/></Field>
+          <ActionFooter layout="inline">
           <Button type="button" disabled={submitting||!selectedDocument||evidenceStatement.trim().length<10}
             onClick={()=>void submitEvidence()}>
             {submitting?"Submitting…":"Submit for independent review"}
           </Button>
-          <Button type="button" variant="ghost" onClick={()=>setSelectedAction("")}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={()=>setSelectedAction("")}>Cancel</Button></ActionFooter>
         </div>}
-      </details>}
-      {review.decisions.length>0&&<details className=" border p-3">
-        <summary className="cursor-pointer font-medium">Requirement evaluation ({review.decisions.length})</summary>
+      </DisclosureSection>}
+      {review.decisions.length>0&&<DisclosureSection title={`Requirement evaluation (${review.decisions.length})`}>
         <ul className="mt-2 space-y-2">{review.decisions.map(item=><li key={item.id}>
           <span className="font-medium">{item.status.replaceAll("_"," ")}</span>
           <span className="text-muted-foreground"> · {item.reason}</span>
         </li>)}</ul>
-      </details>}
+      </DisclosureSection>}
       {review.reviewRequired&&<Button type="button" disabled={submitting} onClick={requestReview}>
         {submitting?"Requesting review…":"Request CAN legal review"}
       </Button>}
     </div>}
-    {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
-  </section>;
+    {message&&<WorkspaceNotice className="mt-3">{message}</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+  </WorkspacePanel>;
 }
