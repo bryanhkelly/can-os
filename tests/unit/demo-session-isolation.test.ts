@@ -73,7 +73,7 @@ describe("public demo session isolation", () => {
     },
   );
   it("includes a currently verified Riley facilitator in Admin switching", async () => {
-    const riley={...LOCAL_DEMO_RILEY_FACILITATOR,
+    const riley={...LOCAL_DEMO_RILEY_FACILITATOR, accountPersonId:LOCAL_DEMO_RILEY_FACILITATOR.personId,
       id:LOCAL_DEMO_RILEY_FACILITATOR.grantId,
       role:"room_facilitator",active:true};
     state.rows=[[adminGrant],[riley]];
@@ -120,7 +120,7 @@ describe("public demo session isolation", () => {
   it("enumerates current existing Site users for Admin switch without a fixed roster", async () => {
     const newStaff = {
       ...studentGrant, id:"new-person-grant", accountId:"new-person-account",
-      personId:"new-person", role:"student",email:"student@valorschool.demo",
+      personId:"new-person", accountPersonId:"new-person", role:"student",email:"student@valorschool.demo",
     };
     state.rows = [[adminGrant],[studentGrant,newStaff]];
     const result=await readSessionGrants(LOCAL_DEMO_ADMIN.accountId,LOCAL_DEMO_ADMIN.email);
@@ -132,8 +132,24 @@ describe("public demo session isolation", () => {
   });
   it("projects only the delegated account, never its fixture switch targets", async () => {
     const ownerTarget = { ...adminGrant, accountPersonId: adminGrant.personId, emailVerifiedAt: null };
-    state.rows = [[ownerTarget], [studentGrant]];
+    state.rows = [[], [ownerTarget, studentGrant]];
     expect(await readOwnerDelegationGrants(ownerTarget.accountId, ownerTarget.personId, ownerTarget.email)).toEqual([ownerTarget]);
+  });
+  it("allows an existing canonical demo membership for independent owner delegation without shared-code registration", async () => {
+    const target = { ...newGrant, email:"admin@unregistered.demo", emailVerifiedAt:null };
+    state.rows = [[], [target]];
+    expect(await readOwnerDelegationGrants(target.accountId,target.personId,target.email)).toEqual([target]);
+  });
+  it("rejects delegation to an ambiguous Account Person", async () => {
+    state.rows = [[{id:"conflicting-active-grant"}]];
+    expect(await readOwnerDelegationGrants(newGrant.accountId,newGrant.personId,newGrant.email)).toEqual([]);
+  });
+  it("rejects delegation to unverified real addresses and malformed scope", async () => {
+    const target = {...newGrant,email:"admin@example.org",emailVerifiedAt:null};
+    state.rows = [[], [target]];
+    expect(await readOwnerDelegationGrants(target.accountId,target.personId,target.email)).toEqual([]);
+    state.rows = [[], [{...newGrant,siteId:null}]];
+    expect(await readOwnerDelegationGrants(newGrant.accountId,newGrant.personId,newGrant.email)).toEqual([]);
   });
   it("does not expose a real verified account through public demo-admin switching", async () => {
     const real = { ...studentGrant, id:"real-grant", accountId:"real-account",
