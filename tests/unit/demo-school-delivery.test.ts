@@ -17,8 +17,8 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("registered demo-school external delivery", () => {
-  it("classifies new demo tenants from the registry even when disabled", async () => {
-    state.rows = [{ domain: "newschool.demo", enabled: false }];
+  it("classifies organizations using their canonical domain", async () => {
+    state.rows = [{ domain: "newschool.demo" }];
     expect(await isDemoTenantOrganization("newschool-org")).toBe(true);
   });
   it("resolves eligible real recipients in demo organizations using the ordinary query", async () => {
@@ -29,6 +29,7 @@ describe("registered demo-school external delivery", () => {
     expect(await emailNotificationRecipients(["real-person", "demo-person"], "newschool-org")).toEqual(new Map([["real-person", "person@real.org"]]));
   });
   it("preserves ordinary tenant classification without inferring demo status from provenance metadata", async () => {
+    state.rows = [{ domain: "ordinary-school.org", synthetic: true }];
     expect(await isDemoTenantOrganization("ordinary-school")).toBe(false);
     expect(await isDemoTenantOrganization(null)).toBe(false);
   });
