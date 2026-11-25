@@ -33,7 +33,10 @@ describe("Personal CAN account boundaries", () => {
     const signin=readFileSync(
       "src/modules/identity/passwordless-access.server.ts","utf8");
     expect(personal).toContain("eq(accountPersonGrants.active, true)");
-    expect(personal).toContain("if (!existing.consumedAt && existing.expiresAt > new Date()) return;");
+    expect(personal).toContain("if (!existing.consumedAt && existing.expiresAt > new Date())");
+    expect(personal).toContain('if (demo) await provisionVerifiedPersonalCanAccount(tx,account.id,email,new Date(),"demo_code")');
+    expect(personal).toContain('emailVerified: approval==="verified_email"');
+    expect(personal).toContain("if (!demo) await requestOneTimeAccess");
     expect(personal).toContain("let personId=account.personId");
     expect(personal).toContain("if(!existing?.active)throw new Error");
     expect(school).toContain("associated[0]?.personId??account.personId");
