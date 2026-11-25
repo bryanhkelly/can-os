@@ -5,7 +5,7 @@ import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkspaceNotice } from "@/components/workspace";
+import { QueryState, ActionFooter } from "@/components/workspace";
 import { useMutationFeedback, mutationErrorMessage } from "@/lib/mutation-feedback";
 import { getPrivateLessonNote, savePrivateLessonNote } from "@/modules/learning/classroom-notes.functions";
 
@@ -36,7 +36,7 @@ export function PrivateLessonNotes({ sectionId, versionId, lessonId }: {
   const blocker = useBlocker({ shouldBlockFn: () => dirty || mutation.pending || mutation.refreshFailed,
     enableBeforeUnload: dirty || mutation.pending || mutation.refreshFailed, withResolver: true });
   async function save() {
-    if (!saved) return;
+    if (!saved || busy || !dirty) return;
     await mutation.run(() => savePrivateLessonNote({ data: { sectionId, versionId, lessonId, body, revision: saved.revision } }), {
       successMessage: "Private notes saved.", commandErrorMessage: "Unable to save your private notes.",
     });
@@ -47,25 +47,24 @@ export function PrivateLessonNotes({ sectionId, versionId, lessonId }: {
         <p className="text-sm">{mutation.pending ? "Your note is still saving. Wait for the result before leaving." :
           mutation.refreshFailed ? "The save succeeded but could not be refreshed. Retry the refresh before leaving, or leave without confirming the saved revision." :
           "You have unsaved private notes. Stay to save them, or discard this unsaved writing."}</p>
-        <div className="flex flex-wrap gap-2"><Button type="button" onClick={() => blocker.reset?.()}>Stay in lesson</Button>
-          <Button type="button" variant="outline" disabled={mutation.pending} onClick={() => blocker.proceed?.()}>{dirty ? "Discard changes and leave" : "Leave lesson"}</Button></div>
+        <ActionFooter layout="dialog"><Button type="button" onClick={() => blocker.reset?.()}>Stay in lesson</Button>
+          <Button type="button" variant="outline" disabled={mutation.pending} onClick={() => blocker.proceed?.()}>{dirty ? "Discard changes and leave" : "Leave lesson"}</Button></ActionFooter>
       </div>
     </Modal>
     <p className="text-sm text-muted-foreground">These notes are private to your signed-in identity. They are not submitted work, teacher feedback, or a grade. Shared demo identities also share their notes.</p>
-    {loading && <p role="status">Loading private notes...</p>}
-    {loadError && <WorkspaceNotice tone="danger">{loadError}<Button variant="outline" size="sm" className="ml-2"
-      onClick={() => { setLoading(true); setReload(value => value + 1); }}>Retry loading notes</Button></WorkspaceNotice>}
+    <QueryState loading={loading?"Loading private notes…":undefined} error={loadError||undefined} onRetry={() => { setLoading(true); setLoadError(""); setReload(value => value + 1); }}>
     {saved && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(); }}>
       <Field label="Your notes" className="text-sm font-semibold">
         <Textarea value={body} rows={10} maxLength={30000} disabled={busy}
           onChange={event => setBody(event.target.value)} className="p-4 font-normal leading-7"
           placeholder="Capture a question, an example, or what you want to remember."/>
       </Field>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={busy || !dirty}>Save notes</Button>
+      <ActionFooter layout="inline">
+        <Button type="submit" disabled={busy || !dirty} loading={mutation.pending} loadingLabel="Saving notes…">Save notes</Button>
         <span className="text-xs text-muted-foreground">{dirty ? "Unsaved changes. Save before leaving this lesson." : saved.revision > 0 ? "Saved to your account" : "No notes saved yet"} · {body.length.toLocaleString()} / 30,000</span>
-      </div>
+      </ActionFooter>
     </form>}
+    </QueryState>
     <MutationFeedback state={mutation} pendingMessage="Saving private notes..."/>
     {mutation.error && !mutation.refreshFailed && saved && <details className="text-sm">
       <summary className="cursor-pointer underline">Resolve a conflict or uncertain save</summary>

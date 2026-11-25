@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { WorkspacePanel } from "@/components/workspace";
+import { WorkspacePanel, EmptyState } from "@/components/workspace";
 import type { ClassContent } from "@/domain/class-content";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { CourseLessonProgress } from "./CourseLessonProgress";
@@ -24,7 +24,7 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
     actions={published.length>0?<span className="text-xs text-muted-foreground">
       {showCompletion?completedCount+" / "+published.length:published.length+" lessons"}
     </span>:undefined}>
-    {!content&&<p className="text-sm text-muted-foreground">No published course sequence is available.</p>}
+    {!content&&<EmptyState title="No published course sequence is available."/>}
     <div id="published-lesson-outline" className="scroll-mt-5">
       <UnifiedLessonOutline lessons={published} selectedId={currentLessonId}
         label="Published lesson outline"

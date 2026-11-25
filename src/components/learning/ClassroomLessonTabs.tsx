@@ -14,11 +14,12 @@ export function ClassroomLessonTabs({ materials, transcript, notes, discussion }
     ...(notes ? [{ id: "notes" as const, label: "My notes", content: notes }] : []),
     ...(discussion ? [{ id: "discussion" as const, label: "Discussion", content: discussion }] : []),
   ];
-  return <div className="classroom-lesson-information border bg-card">
+  const activeTab = tabs.some(tab => tab.id === selected) ? selected : "materials";
+  return <div className="classroom-lesson-information min-w-0 border bg-card">
     <div role="tablist" aria-label="Lesson workspace" className="flex overflow-x-auto border-b">
       {tabs.map((tab, index) => <Button variant="ghost" key={tab.id} type="button" role="tab" ref={element => { refs.current[tab.id] = element; }}
-        id={`${id}-${tab.id}-tab`} aria-controls={`${id}-${tab.id}-panel`} aria-selected={selected === tab.id}
-        tabIndex={selected === tab.id ? 0 : -1} onClick={() => setSelected(tab.id)}
+        id={`${id}-${tab.id}-tab`} aria-controls={`${id}-${tab.id}-panel`} aria-selected={activeTab === tab.id}
+        tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setSelected(tab.id)}
         onKeyDown={event => {
           let next: number | undefined;
           if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
@@ -29,11 +30,11 @@ export function ClassroomLessonTabs({ materials, transcript, notes, discussion }
           event.preventDefault();
           const target = tabs[next]!;
           setSelected(target.id); refs.current[target.id]?.focus();
-        }} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${selected === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+        }} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
         {tab.label}
       </Button>)}
     </div>
     {tabs.map(tab => <div key={tab.id} role="tabpanel" id={`${id}-${tab.id}-panel`} aria-labelledby={`${id}-${tab.id}-tab`}
-      hidden={selected !== tab.id} tabIndex={0} className="p-5 sm:p-6">{tab.content}</div>)}
+      hidden={activeTab !== tab.id} tabIndex={0} className="min-w-0 p-4 [overflow-wrap:anywhere] sm:p-6">{tab.content}</div>)}
   </div>;
 }

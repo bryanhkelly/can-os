@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, PanelRightClose, PanelRightOpen, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WorkspaceNotice } from "@/components/workspace/notice";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 
 export type ClassroomReturnTo = "academic" | "native" | "training";
@@ -34,7 +35,7 @@ export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPositio
   }
   return <main className="classroom-workspace min-h-screen bg-background text-foreground">
     <div className="classroom-focus-bar flex flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-3 sm:px-6">
-      <div className="min-w-0"><p className="font-semibold">{title}</p>
+      <div className="min-w-0 [overflow-wrap:anywhere]"><p className="font-semibold">{title}</p>
         <p className="text-xs text-muted-foreground">{lessonPosition ? `Lesson ${lessonPosition.current} · ` : ""}{lessonTitle ?? "Your classroom"}</p></div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" aria-expanded={toolsVisible} aria-controls={toolsId} onClick={() => setToolsVisible(value => !value)}>
@@ -49,7 +50,7 @@ export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPositio
     <div className="classroom-content">
       <header className="classroom-header">
         <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap gap-2 text-xs text-muted-foreground"><ReturnToClasses target={returnTo}/><span>/</span>{title}{lessonPosition && <><span>/</span><span>Lesson {lessonPosition.current}</span></>}</nav>
-        <div className="flex flex-wrap items-end justify-between gap-4"><div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-end justify-between gap-4"><div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         <p className="can-eyebrow">Your classroom</p>
         <h1 className="mt-2 font-serif text-2xl font-normal tracking-tight sm:text-3xl">{title}</h1>
         {lessonTitle && <h2 className="mt-1 font-serif text-lg font-normal tracking-tight sm:text-xl">{lessonTitle}</h2>}
@@ -58,8 +59,8 @@ export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPositio
           <Button size="sm" variant="outline" onClick={() => void share()}><Share2 aria-hidden="true"/>Share class link</Button>
         </div></div>
         {metadata && <div className="classroom-meta">{metadata}</div>}
-        {shareNotice && <p role="status" className="mt-3 text-xs">{shareNotice}</p>}
-        {shareError && <p role="alert" className="mt-3 text-xs text-destructive">{shareError}</p>}
+        {shareNotice && <WorkspaceNotice tone="success" className="mt-3">{shareNotice}</WorkspaceNotice>}
+        {shareError && <WorkspaceNotice tone="danger" className="mt-3">{shareError}</WorkspaceNotice>}
       </header>
       <div className={toolsVisible ? "classroom-columns" : undefined}>
         <div className="min-w-0">{children}</div>
