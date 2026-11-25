@@ -15,7 +15,7 @@ export async function setupSchool(
   database: Pick<Database, "transaction"> = db,
 ): Promise<SchoolSetupResult> {
   const data = schoolSetupSchema.parse(input);
-  const slug = `demo-${data.domain.slice(0, -5)}`;
+  const slug = `demo-${data.domain.slice(0, -5).replace(/\./g, "-")}`;
   const adminEmail = `admin.demo@${data.domain}`;
   return database.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"school-setup:" + data.domain}))`);
