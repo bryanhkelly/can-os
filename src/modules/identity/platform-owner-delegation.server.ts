@@ -230,7 +230,7 @@ export async function stopPlatformOwnerDelegation(request: Request) {
 export async function rotatePrivateAccountAccessCode(request: Request, raw: unknown) {
   if(request.headers.get("origin")!==new URL(request.url).origin)
     throw new AuthorizationError("same-origin credential recovery");
-  const data=z.object({grantId:uuid,reason:z.string().trim().min(12).max(500),confirm:z.literal(true)}).strict().parse(raw);
+  const data=z.object({grantId:uuid,reason:z.string().trim().min(12).max(500),confirm:z.literal(true),operation:z.enum(["enroll","rotate"]).default("rotate")}).strict().parse(raw);
   const owner=await getVerifiedPlatformOwnerSession(request);
   assertPlatformOwnerUndelegated(owner);
   const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
@@ -244,7 +244,8 @@ export async function rotatePrivateAccountAccessCode(request: Request, raw: unkn
     const [account]=await tx.select({id:accessAccounts.id,personId:accessAccounts.personId,email:accessAccounts.emailNormalized,
       privateAccessCodeHash:accessAccounts.privateAccessCodeHash,disabled:accessAccounts.disabled})
       .from(accessAccounts).where(eq(accessAccounts.id,target.accountId)).for("update").limit(1);
-    if(!account||account.disabled||account.personId!==target.personId||!account.privateAccessCodeHash||!isDemoAccountEmail(account.email))
+    if(!account||account.disabled||account.personId!==target.personId||!isDemoAccountEmail(account.email)||
+      (data.operation==="rotate"?!account.privateAccessCodeHash:!!account.privateAccessCodeHash))
       throw new AuthorizationError("existing private-code account");
     const eligible=await readOwnerDelegationGrants(account.id,target.personId,account.email,tx);
     const allGrants=await tx.select({role:accountPersonGrants.role,personId:accountPersonGrants.personId})
@@ -259,7 +260,7 @@ export async function rotatePrivateAccountAccessCode(request: Request, raw: unkn
     const revoked=await tx.update(accessSessions).set({revokedAt:now,updatedAt:now})
       .where(and(eq(accessSessions.accountId,account.id),isNull(accessSessions.revokedAt)))
       .returning({id:accessSessions.id});
-    await writeAudit(tx,{actorPersonId:owner.ownerPersonId,action:"identity.private_access_code.rotated",
+    await writeAudit(tx,{actorPersonId:owner.ownerPersonId,action:data.operation==="enroll"?"identity.private_access_code.enrolled":"identity.private_access_code.rotated",
       resourceType:"account",resourceId:account.id,scope:{},context:{
         ownerAccountId:owner.ownerAccountId,targetPersonId:target.personId,grantId:data.grantId,
         reason:data.reason,revokedCount:revoked.length,
