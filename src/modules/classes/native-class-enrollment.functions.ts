@@ -34,6 +34,7 @@ import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.server";
 import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
+import { studentSiteScope } from "@/domain/student-site-scope";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { resolveAuthorizedLearningPerson } from "@/modules/identity/authorized-learning-person.server";
 import { assertCurrentNativeClassLearnerForMutation } from "./native-class-learner-session.server";
@@ -406,6 +407,7 @@ const myClassHistoryInput=z.object({
 type NativeClassHistoryCursor=NonNullable<z.infer<typeof myClassHistoryInput>["cursor"]>;
 async function readNativeClassHistoryPage(
   learnerPersonId:string,cursor:NativeClassHistoryCursor|null,
+  membership?:{siteId:string;organizationId:string},
 ){
     // Date objects truncate PostgreSQL microseconds to milliseconds. Using
     // them for a keyset cursor can skip same-millisecond history rows.
@@ -435,7 +437,9 @@ async function readNativeClassHistoryPage(
         eq(canonicalClasses.id,canonicalClassEnrollments.classId))
       .leftJoin(canonicalEnrollmentSites,
         eq(canonicalEnrollmentSites.id,canonicalClasses.siteId))
-      .where(and(eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),older))
+      .where(and(eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),older,
+        membership?eq(canonicalClasses.siteId,membership.siteId):undefined,
+        membership?eq(canonicalClasses.operatingOrganizationId,membership.organizationId):undefined))
       .orderBy(desc(canonicalClassEnrollments.enrolledAt),
         desc(canonicalClassEnrollments.id)).limit(51);
     const items=rows.slice(0,50);
@@ -505,7 +509,7 @@ export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"}
   });
 
 /**
- * Read-only CAN account bridge for My Activity. This never issues a native
+ * Read-only CAN account history for My Activity. Direct Students use their verified Site grant and Person; other roles retain the existing bridge. This never issues a native
  * learner cookie, creates a canonical Person, or grants playback/enrollment.
  * It permits source-owned history only after a live CAN session, exact
  * explicit CAN→canonical Account+Person bridge, verified native account,
@@ -516,6 +520,11 @@ export const getMyNativeClassHistoryForCanAccountPage=createServerFn({method:"GE
   .handler(async({data})=>{
     guard();
     const actor=await getCommandContext(getRequest());
+    if(actor.role==="student"){
+      const membership=studentSiteScope(actor);
+      if(!membership)throw new AuthorizationError("current direct CAN student Site membership");
+      return readNativeClassHistoryPage(membership.personId,data.cursor,membership);
+    }
     if(!actor.actorPersonId||actor.sessionAccountId)
       throw new AuthorizationError("real verified CAN account Person");
     const [account]=await db.select({

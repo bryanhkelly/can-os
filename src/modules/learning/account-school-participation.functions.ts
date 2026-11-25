@@ -13,6 +13,7 @@ import {
 } from "@/domain/participation-projections";
 import type {ParticipationRecord} from "@/domain/participation-read-model";
 import {getCommandContext} from "@/modules/identity/command-context.server";
+import {studentSiteScope} from "@/domain/student-site-scope";
 import {readSessionGrants} from "@/modules/identity/session-grants.server";
 
 const id=z.string().uuid();
@@ -49,7 +50,8 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
     const actor=await getCommandContext(getRequest());
-    if(!actor.actorPersonId||!actor.accountId||actor.sessionAccountId)
+    const directStudent=studentSiteScope(actor);
+    if(!actor.actorPersonId||!actor.accountId||(actor.sessionAccountId&&!directStudent))
       throw new AuthorizationError("real verified account Person");
     const [account]=await db.select({
       email:s.accessAccounts.emailNormalized,personId:s.accessAccounts.personId,
@@ -61,9 +63,10 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     const {grants}=await readSessionGrants(actor.accountId,account.email);
     // Explicitly match original live grants to this single authenticated
     // Person. Demo delegation cannot ever merge a second Person's history.
-    const {student,guardian:guardians}=selectActivityMemberships(
-      grants,actor.accountId,actor.actorPersonId,
-    );
+    const memberships=selectActivityMemberships(grants,actor.accountId,actor.actorPersonId);
+    // A switched Student sees only the effective verified Site grant, never the operator’s memberships.
+    const student=directStudent?memberships.student.filter(g=>g.id===actor.grantId&&g.siteId===directStudent.siteId&&g.organizationId===directStudent.organizationId):memberships.student;
+    const guardians=directStudent?[]:memberships.guardian;
     // Match each original organization/Site grant separately. A Site-only
     // grant never broadens to sibling sites just because the org matches.
     // Each source Person profile must be matched to the role that actually
