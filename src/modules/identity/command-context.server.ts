@@ -1,4 +1,4 @@
-import {and,eq,gt,isNull,inArray} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
@@ -38,7 +38,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   email:accessAccounts.emailNormalized,emailVerifiedAt:accessAccounts.emailVerifiedAt,
   accountPersonId:accessAccounts.personId,
   authenticationMethod:accessSessions.authenticationMethod,
-  privateAccessCodeHash:accessAccounts.privateAccessCodeHash,
+  privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
   delegatedGrantId:accessSessions.delegatedGrantId,
   delegatedMode:accessSessions.delegatedMode,
@@ -51,8 +51,8 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  // Only real email-link logins attest mailbox ownership. A .demo session
  // must instead pass the exact active grant and tenant binding checks below.
  if(!session || (!session.emailVerifiedAt && !isDemoAccountEmail(session.email)) ||
-    (session.privateAccessCodeHash != null && session.authenticationMethod!=="private_access_code") ||
-    (session.authenticationMethod==="private_access_code" && !session.privateAccessCodeHash))
+    (session.privateCredential && session.authenticationMethod!=="private_access_code") ||
+    (session.authenticationMethod==="private_access_code" && !session.privateCredential))
   return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
@@ -86,12 +86,12 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
    personId:accessAccounts.personId,
    email:accessAccounts.emailNormalized,
    emailVerifiedAt:accessAccounts.emailVerifiedAt,
-   privateAccessCodeHash:accessAccounts.privateAccessCodeHash,
+   privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
   }).from(accessAccounts).where(and(
    eq(accessAccounts.id,activeGrant.accountId),
    eq(accessAccounts.disabled,false),
   )).limit(1);
-  if(!target || target.privateAccessCodeHash || target.personId!==activeGrant.personId ||
+  if(!target || target.privateCredential || target.personId!==activeGrant.personId ||
      !isDemoAccountEmail(target.email) || !target.email.endsWith("@valorschool.demo"))
    return rejectSession(request,"membership_unavailable");
   try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
