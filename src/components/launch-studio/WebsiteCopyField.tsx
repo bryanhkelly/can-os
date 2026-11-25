@@ -46,11 +46,11 @@ export function WebsiteCopyField({field,content,candidate,disabled,onChange,onRe
           rows={field.key==="statementOfFaith"?6:field.key==="heroHeadline"?2:4}
           maxLength={siteLocalContentLimits[field.key]} disabled={disabled}
           value={content[field.key]??""} onChange={event=>onChange(event.target.value)}
-          className="mt-3 w-full border bg-background p-3 text-sm leading-6"/>
+          className="mt-3"/>
       : <Input id={`website-copy-${field.key}`} type="text"
           maxLength={siteLocalContentLimits[field.key]} disabled={disabled}
           value={content[field.key]??""} onChange={event=>onChange(event.target.value)}
-          className="mt-3 min-h-11 w-full border bg-background p-3 text-sm"/>}
+          className="mt-3"/>}
     {candidate&&<div className="mt-3 border bg-muted/20 p-3">
       <p className="text-xs font-semibold">Suggested text</p>
       <p className="mt-1 text-xs text-muted-foreground">{candidate.reason}</p>
