@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Copy, LayoutGrid, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { Select } from "@/components/ui/select";
+import { ActionFooter, EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   defaultSiteContentChannelConfig, siteContentChannelConfigSchema,
   siteContentChannelIds, siteContentChannelDescriptions,
@@ -114,22 +115,11 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
     }catch(e){setError(mutationErrorMessage(e,"Publication requires an authorized Site website publisher. No public content changed."));}
     finally{setPublishing(false);}
   }
-  return <section className="border bg-card p-6 sm:p-8" aria-labelledby="site-channel-editor-title">
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-primary">Site content channels</p>
-        <h3 id="site-channel-editor-title" className="mt-2 flex items-center gap-2 font-serif text-2xl">
-          <LayoutGrid className="size-5"/> Arrange your website content
-        </h3>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Choose which data channels appear, where they belong, and how they look.
-          Content is pulled from this Site's saved plans and independently approved catalogs.
-          These controls cannot create, approve, publish, or enroll in a Program.
-        </p>
-      </div>
-      <span className="border px-3 py-2 text-xs text-muted-foreground">Saved layout v{revision}</span>
-    </div>
+  return <WorkspacePanel headingLevel="h3" id="site-channel-editor-title" title="Arrange your website content"
+    description="Choose which data channels appear, where they belong, and how they look. Content is pulled from saved Site plans and independently approved catalogs. These controls cannot create, approve, publish, or enroll in a Program."
+    actions={<StatusBadge>Saved layout v{revision}</StatusBadge>}>
     <div className="mt-5 space-y-4">
+      {!blocks.length&&<EmptyState title="No content blocks" description="Choose a content channel to add your first block."/>}
       {blocks.map(block=>{
         const info=siteContentChannelDescriptions[block.channel];
         return <fieldset key={block.id} className="border p-4 sm:p-5">
@@ -224,7 +214,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
       })}
     </div>
     {blocks.length<12&&<div className="mt-5 flex flex-wrap items-end gap-3 border-t pt-5">
-      <Field label="Add a content channel" className="min-w-[230px] flex-1">
+      <Field label="Add a content channel" className="min-w-0 flex-1 sm:min-w-[230px]">
         <Select value={addChannel} onChange={e=>setAddChannel(e.target.value as SiteContentChannelId|"")}>
           <option value="">Choose a data channel</option>
           {available.map(id=><option key={id} value={id}>{siteContentChannelDescriptions[id].label}</option>)}
@@ -232,24 +222,24 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
       </Field>
       <Button variant="outline" disabled={!addChannel} onClick={addBlock}><Plus/> Add block</Button>
     </div>}
-    {error&&<p role="alert" className="mt-4 border border-destructive p-3 text-sm text-destructive">{error}</p>}
-    {saved&&<p role="status" className="mt-4 text-sm text-success">Your changes are saved, and your private preview is updated. Publish the website when you're ready for visitors to see them.</p>}
-    {published&&<p role="status" className="mt-4 text-sm text-success">Website content block settings published. This does not approve Programs or make a Site publicly reachable.</p>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
+    {saved&&<WorkspaceNotice tone="success" className="mt-4">Your changes are saved, and your private preview is updated. Publish the website when you're ready for visitors to see them.</WorkspaceNotice>}
+    {published&&<WorkspaceNotice tone="success" className="mt-4">Website content block settings published. This does not approve Programs or make a Site publicly reachable.</WorkspaceNotice>}
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
       <p className="max-w-xl text-xs leading-5 text-muted-foreground">
         Site blocks customize presentation. Saved Site details, affiliations and planning interests
         may appear on the website when published. Their current status remains visible,
         and Program, licensing and enrollment approvals are independently governed.
       </p>
-      <div className="flex flex-wrap gap-3">
-        <Button disabled={saving||publishing||!siteId} onClick={()=>void save()}>
-          <Save/>{saving?"Saving channels…":"Save private blocks"}
+      <ActionFooter layout="inline" className="mt-0">
+        <Button type="button" disabled={saving||publishing||!siteId} loading={saving} loadingLabel="Saving channels…" onClick={()=>void save()}>
+          <Save/>Save private blocks
         </Button>
         {canPublish&&<Button variant="outline" disabled={saving||publishing||!siteId||unsavedChanges||(revision===0&&!saved)}
-          onClick={()=>void publish()}>
-          {publishing?"Publishing…":"Publish approved content blocks"}
+          type="button" loading={publishing} loadingLabel="Publishing…" onClick={()=>void publish()}>
+          Publish approved content blocks
         </Button>}
-      </div>
+      </ActionFooter>
     </div>
-  </section>;
+  </WorkspacePanel>;
 }
