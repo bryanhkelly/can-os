@@ -77,6 +77,6 @@ export function LaunchWebsitePreview({ data }: { data: Website }) {
       View the verified public website
     </a>}
     <p className="text-xs text-muted-foreground">Editing, publishing and school-opening approvals are separate, server-verified actions.</p>
-    <Button asChild variant="outline"><Link to="/launch/site" search={{ siteId: data.siteId, programId: data.programId, module: "recruit" }}>Continue to family invitations</Link></Button>
+    <Button asChild variant="outline"><Link to="/launch/site" search={{ siteId: data.siteId, programId: data.programId, module: "create-outreach" }}>Continue to family invitations</Link></Button>
   </div>;
 }
