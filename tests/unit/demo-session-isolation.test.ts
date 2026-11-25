@@ -130,6 +130,12 @@ describe("public demo session isolation", () => {
       launchSiteId:LOCAL_DEMO_ADMIN.siteId,
     });
   });
+  it("does not expose a real verified account through public demo-admin switching", async () => {
+    const real = { ...studentGrant, id:"real-grant", accountId:"real-account",
+      personId:"real-person", accountPersonId:"real-person", email:"person@example.org", emailVerifiedAt:new Date() };
+    state.rows = [[adminGrant], [real, studentGrant]];
+    expect((await readSessionGrants(adminGrant.accountId,adminGrant.email)).grants).toEqual([adminGrant,studentGrant]);
+  });
   it("allows a correctly scoped synthetic Valor demo Person without an email mailbox", async () => {
     const newStudent = {
       ...studentGrant, id:"new-verified-grant", accountId:"new-can-account",
