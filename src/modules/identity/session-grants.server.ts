@@ -9,7 +9,7 @@ import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { EventTypes } from "@/domain/event-types";
 import { matchesVerifiedExternalSandboxInvitation } from "@/domain/sandbox-external-invitation";
 import { matchesDemoSchoolAdministrator } from "@/domain/school-setup";
-import { matchesDemoCredentialScope, readDemoSchoolForAccount } from "./demo-school-tenants.server";
+import { hasApprovedDemoPersonalCredential, matchesDemoCredentialScope, readDemoSchoolForAccount } from "./demo-school-tenants.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -135,32 +135,36 @@ export async function readSessionGrants(accountId: string, email: string, reader
   const ownGrants = (await listActiveAccountGrants(accountId, reader))
     .filter(grant => grant.accountId === accountId && hasValidAccessGrantScope(grant));
 
-  const valorAccount = LOCAL_DEMO_ACCOUNTS.some(account => account.accountId === accountId) ||
-    normalizedEmail.endsWith("@valorschool.demo");
-  if (!valorAccount) {
+  if (demoAccount && !adminAccount) {
+    // All non-switching credentials use the same current Person and active
+    // grants. Credential approval limits the reachable institution, not
+    // the permitted business capabilities of a valid role.
     const school = await readDemoSchoolForAccount(accountId, reader);
-    if (school) {
-      const grants = ownGrants.filter(grant => matchesDemoSchoolAdministrator(school, grant, normalizedEmail));
-      return { grants, demoAccountSwitching: false, launchSiteId: school.siteId };
-    }
     const bindings = await readDemoStaffBindings(accountId, reader);
-    if (bindings.length && demoAccount) {
-      return { grants: ownGrants.filter(grant =>
-        bindings.some(binding => matchesDemoStaffBinding(binding, grant, normalizedEmail))),
-      demoAccountSwitching: false };
-    }
-    if (demoAccount) {
-      // Family provisioning already enforces the same relationship, consent and
-      // approval rules as real accounts. Authentication only validates scope.
-      const grants = [];
-      for (const grant of ownGrants) {
-        if ((grant.role === "guardian" || grant.role === "student") &&
-            grant.accountPersonId === grant.personId && grant.email === normalizedEmail &&
-            await matchesDemoCredentialScope(normalizedEmail, grant.organizationId, grant.siteId, reader))
-          grants.push(grant);
+    const fixedIdentity = LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===accountId ||
+      candidate.email===normalizedEmail);
+    if (fixedIdentity && (fixedIdentity.accountId!==accountId || fixedIdentity.email!==normalizedEmail))
+      return {grants:[],demoAccountSwitching:false};
+    const grants:typeof ownGrants=[];
+    for (const grant of ownGrants) {
+      if (grant.email!==normalizedEmail || grant.accountPersonId!==grant.personId) continue;
+      if (fixedIdentity) {
+        if (isApprovedDemoGrant(grant,normalizedEmail)) grants.push(grant);
+        continue;
       }
-      return { grants, demoAccountSwitching: false };
+      if (grant.role==="account_holder" && !grant.organizationId && !grant.siteId) {
+        if (await hasApprovedDemoPersonalCredential(accountId,normalizedEmail,reader)) grants.push(grant);
+        continue;
+      }
+      if (!await matchesDemoCredentialScope(normalizedEmail,grant.organizationId,grant.siteId,reader)) continue;
+      // Privileged roles are never acquired from a shared personal credential.
+      if (grant.role==="guardian" || grant.role==="student" ||
+          (school && matchesDemoSchoolAdministrator(school,grant,normalizedEmail)) ||
+          bindings.some(binding=>matchesDemoStaffBinding(binding,grant,normalizedEmail)) ||
+          (normalizedEmail.endsWith("@valorschool.demo") && grant.role!=="platform_owner" && grant.role!=="app_admin"))
+        grants.push(grant);
     }
+    return {grants,demoAccountSwitching:false,...(school&&grants.some(g=>g.id===school.adminGrantId)?{launchSiteId:school.siteId}:{})};
   }
 
   if (!adminAccount && !demoAccount) {
@@ -224,17 +228,5 @@ export async function readSessionGrants(accountId: string, email: string, reader
     };
   }
 
-  // Fixed accounts keep immutable identity bindings. Additional Valor demo
-  // accounts need the same exact active tenant grant, not mailbox verification.
-  // Ordinary real-email testers use the separate verified-email path above.
-  const fixed = LOCAL_DEMO_ACCOUNTS.some(account =>
-    account.accountId === accountId && account.email === normalizedEmail);
-  const grants = ownGrants.filter(grant =>
-    fixed ? isApprovedDemoGrant(grant, normalizedEmail) :
-      normalizedEmail.endsWith("@valorschool.demo") &&
-      grant.email === normalizedEmail &&
-      grant.organizationId === LOCAL_DEMO_ADMIN.organizationId &&
-      grant.siteId === LOCAL_DEMO_ADMIN.siteId,
-  );
-  return { grants, demoAccountSwitching: false };
+  return {grants:[],demoAccountSwitching:false};
 }
