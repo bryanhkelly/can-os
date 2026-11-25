@@ -15,6 +15,10 @@ export const localStaffInviteInput = z.object({
   role: z.enum(localStaffInviteRoles),
   /** Local onboarding never creates organization-wide or sibling-Site access. */
   siteId: z.string().uuid(),
+  privateIdentityConfirmation: z.object({
+    reason:z.string().trim().min(12).max(500),
+    existingPersonId:z.string().uuid().optional(),
+  }).strict().optional(),
 }).strict();
 
 export type LocalStaffInviteInput = z.infer<typeof localStaffInviteInput>;
