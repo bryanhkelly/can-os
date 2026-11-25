@@ -33,7 +33,7 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
   const [organization] = await tx.insert(organizations).values({
     type: initialType, name: signup.organizationName?.trim() || signup.schoolName,
     slug, lifecycleStatus: "active",
-    domain: approval === "demo_code" ? email.split("@")[1]! : null,
+    domain: approval === "demo_code" ? identityEmailDomain(email) : signup.organizationDomain ?? null,
     metadata: { signup: { requestedOrganizationType: requestedType,
       classification: initialType === requestedType ? "self_reported" : "pending_verification" } },
   }).returning({ id: organizations.id });
@@ -163,7 +163,7 @@ export async function provisionDemoSiteSignup(input: unknown) {
       .returning({id:accessAccounts.id});
     if (!account) throw new Error("Account could not be created");
     const [signup] = await tx.insert(schoolSetupSignups).values({
-      accountId:account.id,schoolName:data.name,organizationName:data.organizationName??null,
+      accountId:account.id,schoolName:data.name,organizationName:data.organizationName??null,organizationDomain:data.organizationDomain??null,
       organizationType:data.organizationType,firstName:data.firstName,lastName:data.lastName,
       expiresAt:new Date(now.getTime()+600000),
     }).returning();
