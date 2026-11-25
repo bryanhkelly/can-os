@@ -1,9 +1,8 @@
-import { Button } from "@/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, EmptyState, DisclosureSection } from "@/components/workspace";
 import { ExtendedSeasonEvidencePanel } from "@/components/operations/ExtendedSeasonEvidencePanel";
 import { listExtendedEvidenceReviewsFn } from "@/modules/activities/extended-learning-evidence.functions";
 
@@ -20,14 +19,10 @@ function EnrichmentReview() {
     title="Summer and after-school operating evidence"
     subtitle="For verified CAN network reviewers. All approvals are restricted, audited and tied to one Season.">
     <div className="mt-5 space-y-3">
-      {!result.data.length && <p className="text-sm">No extended-learning seasons are awaiting operating review.</p>}
-      {result.data.map(season => <div className=" border bg-card p-3" key={season.seasonId}>
-        <Button variant="ghost" type="button" className="text-left text-sm font-semibold underline"
-          onClick={() => setSelected(old => old === season.seasonId ? "" : season.seasonId)}>
-          {season.offeringName} · {season.seasonName} · {season.status}
-        </Button>
+      {!result.data.length && <EmptyState title="No seasons awaiting review" description="No extended-learning seasons are awaiting operating review."/>}
+      {result.data.map(season => <DisclosureSection key={season.seasonId} headingLevel="h2" title={`${season.offeringName} · ${season.seasonName}`} description={season.status} open={selected === season.seasonId} onOpenChange={open => setSelected(open ? season.seasonId : "")}>
         {selected === season.seasonId && <ExtendedSeasonEvidencePanel seasonId={season.seasonId}/>}
-      </div>)}
+      </DisclosureSection>)}
     </div>
   </WorkspaceShell>;
 }
