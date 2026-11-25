@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 import { WorkspacePanel } from "@/components/workspace";
 
 export interface ClassDirectoryEntry {
@@ -26,13 +27,7 @@ export function ClassDirectoryCards({
             title={section.title}
             description={role === "guardian" ? section.studentName ?? section.code : section.code}
           >
-            <Link
-                to="/class"
-                
-                className="inline-block  bg-foreground px-4 py-2 text-sm font-semibold text-background"
-              >
-                Open class
-            </Link>
+            <Button asChild><Link to="/class">Open class</Link></Button>
           </WorkspacePanel>
         ))}
       </div>
