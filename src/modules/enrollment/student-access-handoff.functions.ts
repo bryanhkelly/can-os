@@ -12,6 +12,8 @@ import {
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { familyApplicationSchoolYearId } from "@/domain/family-application-handoff";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
+import { provisionScopedPersonAccount, assertFamilyCredentialPair } from "@/modules/identity/scoped-person-account.server";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { staffedPublishedSectionIds } from "./instructional-section-readiness.server";
 import { requestOneTimeAccess } from "@/modules/identity/passwordless-access.server";
@@ -119,7 +121,7 @@ export const consentToStudentLearningAccount=createServerFn({method:"POST"})
   // The real passwordless issuer deliberately never sends to .invalid.
   // Refuse an undeliverable testing address BEFORE recording guardian consent,
   // instead of approving an enrollment handoff whose link cannot be sent.
-  if(studentEmail.endsWith(".invalid")||studentEmail.endsWith(".demo"))
+  if(studentEmail.endsWith(".invalid"))
    throw new Error("Provide a deliverable student email to receive the learning sign-in link");
   await db.transaction(async tx=>{
    const app=await eligibleStudent(tx,data.applicationId);
@@ -140,8 +142,7 @@ export const consentToStudentLearningAccount=createServerFn({method:"POST"})
    const [adultAccount]=await tx.select({email:accessAccounts.emailNormalized,
      verified:accessAccounts.emailVerifiedAt}).from(accessAccounts)
      .where(eq(accessAccounts.id,actor.accountId)).limit(1);
-   if(!adultAccount?.verified||adultAccount.email===studentEmail)
-    throw new AuthorizationError("separate verified adult and student email addresses");
+   await assertFamilyCredentialPair(tx,adultAccount,studentEmail,app.organizationId,app.siteId!);
    const [person]=await tx.select({email:people.email}).from(people)
     .where(eq(people.id,app.studentPersonId)).limit(1);
    if(person?.email && normalizeAccessEmail(person.email)!==studentEmail)
@@ -264,28 +265,10 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      .from(people).where(eq(people.id,app.studentPersonId)).for("update").limit(1);
    if(!student?.active || (student.email && normalizeAccessEmail(student.email)!==normalized))
     throw new AuthorizationError("validated student identity and contact");
-   let [account]=await tx.select({id:accessAccounts.id,disabled:accessAccounts.disabled})
-     .from(accessAccounts).where(eq(accessAccounts.emailNormalized,normalized))
-     .for("update").limit(1);
-   if(account?.disabled)throw new AuthorizationError("student account disabled");
-   if(account){
-     const grants=await tx.select({
-       personId:accountPersonGrants.personId,
-       role:accountPersonGrants.role,
-     }).from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
-     if(grants.some(g=>g.personId!==app.studentPersonId))
-      throw new AuthorizationError("student email is already bound to a different identity");
-     // The passwordless email challenge chooses an active role from its
-     // account. Do not create a student invitation on a teacher, guardian or
-     // demo account: it could sign the child into another persona instead of
-     // the independently consented learning account. Multiple same-child
-     // student memberships across authorized Sites are still supported.
-     if(grants.some(g=>g.role!=="student"))
-      throw new AuthorizationError("student email requires a separate, real student-only account");
-   }else {
-     [account]=await tx.insert(accessAccounts).values({emailNormalized:normalized})
-       .returning({id:accessAccounts.id,disabled:accessAccounts.disabled});
-   }
+   const account=await provisionScopedPersonAccount(tx,{
+    email:normalized,personId:app.studentPersonId,organizationId:app.organizationId,
+    siteId:app.siteId!,onlyRole:"student",
+   });
    const [grant]=await tx.select({id:accountPersonGrants.id,active:accountPersonGrants.active})
      .from(accountPersonGrants).where(and(
       eq(accountPersonGrants.accountId,account!.id),
@@ -318,7 +301,7 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
        recipientPersonId:consent.guardianPersonId,
        type:"student_access_approved",
        title:"Your student's CAN OS learning account was approved",
-       body:"Admissions approved the separate student sign-in. Your student can use their own email address to request a secure sign-in link. Email delivery is not guaranteed.",
+       body:"Admissions approved the separate student sign-in. Your student can use their own account at the sign-in page.",
        resourceType:"application",resourceId:app.id,eventId:approvalEventId,
      });
    }
@@ -335,6 +318,7 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
   });
   // Email is never sent inside an open DB transaction. On delivery failure
   // the approved grant remains retryable through normal passwordless sign-in.
+  if(isDemoAccountEmail(email))return {status:"approved" as const,signInRequest:"demo_code" as const};
   try {
     await requestOneTimeAccess(email, undefined, "/profiles");
     // The passwordless API intentionally returns a generic acceptance result;
