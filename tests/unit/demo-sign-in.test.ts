@@ -71,6 +71,19 @@ describe("shared demo sign-in", () => {
       accountId: "new-school-account", role: "site_admin", launchSiteId: "new-school-site",
     });
   });
+  it("requires an individually issued code for a protected new Site founder", async () => {
+    const email = "admin@private.demo";
+    const code = issueOpaqueSecret();
+    const privateAccessCodeHash = hashPrivateAccessCode(code, process.env.CAN_ACCESS_TOKEN_PEPPER!);
+    state.select.mockImplementation(() => ({from: (table:unknown) => ({where: () => lockableLimit(async () => table === programs ? [] : [{id:"private-account",email,privateAccessCodeHash}])})}));
+    state.grants.mockResolvedValue({grants:[{...grant,id:"private-grant",accountId:"private-account",role:"site_admin"}],demoAccountSwitching:false});
+    await expect(redeemDemoAccess(email,"000000")).rejects.toThrow("Invalid demo credentials");
+    await expect(redeemDemoAccess(email,issueOpaqueSecret())).rejects.toThrow("Invalid demo credentials");
+    expect(state.insert).not.toHaveBeenCalled();
+    expect(await redeemDemoAccess(email,code)).toMatchObject({accountId:"private-account",role:"site_admin"});
+    expect(state.audit).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({method:"private_access_code"}));
+    expect(JSON.stringify(state.audit.mock.calls)).not.toContain(code);
+  });
   it("sends Valor's active school administrator to the school dashboard", async () => {
     state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true,
       launchSiteId: LOCAL_DEMO_ADMIN.siteId });
