@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTableName } from "drizzle-orm";
-import { realSchoolSetupSignupSchema, schoolSetupSchema, matchesDemoSchoolAdministrator, initialVerifiedSignupOrganizationType } from "@/domain/school-setup";
+import { realSchoolSetupSignupSchema, siteSignupSchema, schoolSetupSchema, matchesDemoSchoolAdministrator, initialVerifiedSignupOrganizationType } from "@/domain/school-setup";
 import { hasRegistrarAuthority, rolesAllow } from "@/domain/school-roles";
 import { resolveAccessContext, roleCapabilities } from "@/domain/access-context";
 import { getWorkspaceHome, getWorkspaceLinks } from "@/components/shell/workspace-navigation.registry";
@@ -175,6 +175,33 @@ describe("canonical demo school provisioning", () => {
   });
 });
 
+describe("shared real and demo founder provisioning", () => {
+  it("derives account mode from email and rejects caller-selected mode", () => {
+    const signup={name:"Training Hub",email:"founder@example.demo",firstName:"Alex",lastName:"Admin"};
+    expect(siteSignupSchema.parse(signup).email).toBe("founder@example.demo");
+    expect(siteSignupSchema.safeParse({...signup,demo:true}).success).toBe(false);
+    expect(siteSignupSchema.safeParse({...signup,email:"founder@bad.example.demo"}).success).toBe(false);
+  });
+  it("uses the ordinary Site, Person and active grant records for demo founders", async () => {
+    const now=new Date("2026-11-07T12:00:00Z");
+    const signup={id:"00000000-0000-4000-8000-000000000003",accountId:"account-demo",
+      schoolName:"Training Hub",organizationType:"church",firstName:"Alex",lastName:"Admin",
+      expiresAt:new Date(now.getTime()+60000),consumedAt:null,organizationId:null,siteId:null,
+      createdAt:now,updatedAt:now} as never;
+    state.reads=[[],[{personId:null}]];
+    await testDatabase.transaction(tx=>provisionVerifiedSchoolSignup(tx,signup,"account-demo","founder@example.demo",now,"demo_code"));
+    expect(state.writes.find(row=>row.table==="organizations")?.value)
+      .toMatchObject({type:"church",lifecycleStatus:"active"});
+    expect(state.writes.find(row=>row.table==="sites")?.value).toMatchObject({lifecycleStatus:"planning"});
+    expect(state.writes.find(row=>row.table==="account_person_grants")?.value)
+      .toMatchObject({role:"site_admin",active:true,personId:"people-id"});
+    expect(state.writes.find(row=>row.table==="demo_school_tenants")?.value)
+      .toMatchObject({domain:"example.demo",adminAccountId:"account-demo",adminPersonId:"people-id"});
+    expect(state.updates.find(row=>row.table==="access_accounts")?.value).not.toHaveProperty("emailVerifiedAt");
+    expect(state.writes.some(row=>["programs","site_publications","enrollments"].includes(row.table))).toBe(false);
+  });
+});
+
 describe("verified real-school signup provisioning", () => {
   it("creates a canonical Site Admin tenant without demo identity, Program, or publication rows", async () => {
     const now = new Date("2026-11-07T12:00:00Z");
@@ -281,8 +308,10 @@ describe("Site Admin inheritance and scope", () => {
   ])("rejects altered registered administrator bindings %j", change => {
     expect(matchesDemoSchoolAdministrator(school, { ...grant, ...change }, "admin.demo@example.demo")).toBe(false);
   });
-  it("does not authorize an arbitrary matching email or a disabled tenant", () => {
-    expect(matchesDemoSchoolAdministrator(school, grant, "someone@example.demo")).toBe(false);
+  it("accepts the registered founder regardless of email local part, but rejects foreign identities and disabled tenants", () => {
+    expect(matchesDemoSchoolAdministrator(school, grant, "founder@example.demo")).toBe(true);
+    expect(matchesDemoSchoolAdministrator(school, {...grant,accountId:"other-account"}, "founder@example.demo")).toBe(false);
+    expect(matchesDemoSchoolAdministrator(school, grant, "founder@foreign.demo")).toBe(false);
     expect(matchesDemoSchoolAdministrator({ ...school, enabled: false }, grant, "admin.demo@example.demo")).toBe(false);
   });
 });
