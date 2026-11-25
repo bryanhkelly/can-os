@@ -125,8 +125,13 @@ function OneClassWorkspace(){
   </WorkspaceShell>;
   if(workspace.isError||!workspace.data)return <WorkspaceShell width="wide" eyebrow="CAN OS · Class" title="Class unavailable">
     <p role="alert" className="mt-5 border border-border bg-card p-5 text-sm">
-      You cannot open this Class view with your current verified relationship. Select an authorized Class or sign in with the appropriate grant.
+      {normalizeClientError(workspace.error).kind==="authorization"
+        ? "You cannot open this Class view with your current verified relationship. Select an authorized Class or sign in with the appropriate grant."
+        : normalizeClientError(workspace.error).kind==="authentication"
+        ? "Your session could not be verified. Sign in again to open this Class."
+        : "The Class could not be loaded. Try again. If the problem persists, contact support."}
     </p>
+    <Button type="button" variant="outline" className="mt-4 mr-4" onClick={()=>void workspace.refetch()}>Try again</Button>
     <Link to="/class" search={{}} className="mt-4 inline-block text-sm font-semibold underline">
       Return to Classes
     </Link>

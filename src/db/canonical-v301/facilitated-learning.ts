@@ -1,6 +1,5 @@
 import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { educationV30 } from "./core";
 import { learnerCourseAttempts, courseVersions } from "./learning";
 import { programDeployments } from "./blueprints";
 import { catalogSites } from "./catalog";
@@ -9,7 +8,7 @@ import { catalogSites } from "./catalog";
  * Facilitator-controlled delivery: one in-room screen, many independently
  * registered learners. This is not a classroom Section or official attendance.
  */
-export const facilitatedLearningSessions = educationV30.table("facilitated_learning_sessions", {
+export const facilitatedLearningSessions = pgTable("facilitated_learning_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
   deploymentId: uuid("deployment_id").notNull().references(() => programDeployments.id),
   courseVersionId: uuid("course_version_id").notNull().references(() => courseVersions.id),

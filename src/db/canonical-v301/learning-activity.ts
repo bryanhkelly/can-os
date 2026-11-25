@@ -1,10 +1,9 @@
 import { boolean, check, foreignKey, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { educationV30 } from "./core";
 import { learnerCourseAttempts, courseVersions } from "./learning";
 
 /** Non-authoritative participation evidence. Authentication and academic outcomes remain separate. */
-export const canonicalLearningSessions = educationV30.table("learning_sessions", {
+export const canonicalLearningSessions = pgTable("learning_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
   courseAttemptId: uuid("course_attempt_id").notNull().references(() => learnerCourseAttempts.id, { onDelete: "restrict" }),
   courseVersionId: uuid("course_version_id").notNull().references(() => courseVersions.id, { onDelete: "restrict" }),
