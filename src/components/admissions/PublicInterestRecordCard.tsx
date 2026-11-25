@@ -42,7 +42,7 @@ export function PublicInterestRecordCard({
             </Link></Button> : row.programId && row.status !== "closed" && row.admissionsAuthorized && <Button asChild variant="outline" size="sm"><Link to="/admissions/intake/new"
               search={{siteId:row.siteId,programId:row.programId,
                 interest:row.id}}
-              className={buttonVariants({ variant: "outline", size: "sm" })}>
+              >
               Review and create inquiry
             </Link></Button>}
             {!row.applicationId && ["new","contacted"].includes(row.status) &&
