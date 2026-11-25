@@ -3,9 +3,12 @@ import { accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents, s
 import { EventTypes } from "@/domain/event-types";
 import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { demoCredentialScopePredicate } from "./demo-school-tenants.server";
+import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
 
-/** Shared demo acceptance is an identity binding, never proof of email ownership. */
+/** Identity readiness is not professional qualification or mailbox ownership.
+ * Individual credentials use the canonical active grant; shared credentials
+ * retain their existing scoped evidence requirements during migration. */
 export function verifiedStaffIdentityPredicate() {
   const grant = accountPersonGrants;
   const account = accessAccounts;
@@ -15,7 +18,29 @@ export function verifiedStaffIdentityPredicate() {
     and ${grant.personId} = ${identity.personId}::uuid
     and ${grant.role} = ${identity.email === LOCAL_DEMO_ADMIN.email ? "site_admin" : identity.role.toLowerCase()}
   )`), sql` or `);
+  const privateRoles = ["site_admin", ...localStaffInviteRoles].filter(privateAccountRoleEligible);
   return sql<boolean>`(
+    (
+      ${account.privateAccessCodeHash} is not null
+      and ${account.disabled} = false
+      and ${account.emailNormalized} like '%.demo'
+      and ${account.personId} = ${grant.personId}
+      and ${grant.active} = true
+      and ${inArray(grant.role,privateRoles)}
+      and ${grant.organizationId} is not null
+      and not exists (
+        select 1 from public.account_person_grants conflicting
+        where conflicting.account_id = ${account.id}
+          and conflicting.active = true
+          and conflicting.person_id <> ${account.personId}
+      )
+      and (${grant.siteId} is null or exists (
+        select 1 from public.sites scoped_site
+        where scoped_site.id = ${grant.siteId}
+          and scoped_site.organization_id = ${grant.organizationId}
+      ))
+    )
+    or (${account.privateAccessCodeHash} is null and (
     (${account.emailVerifiedAt} is not null and ${account.emailNormalized} not like '%.demo'
       and not ${inArray(account.id, LOCAL_DEMO_ACCOUNTS.map(identity => identity.accountId))}
       and ${grant.organizationId} is distinct from ${LOCAL_DEMO_ADMIN.organizationId}::uuid
@@ -110,5 +135,6 @@ export function verifiedStaffIdentityPredicate() {
           )
         )
     )
+    ))
   )`;
 }
