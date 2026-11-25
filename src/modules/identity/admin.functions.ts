@@ -281,7 +281,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         if (!pending) throw new Error("An inactive grant already exists; review it separately instead of creating a replacement invitation");
         if (localDemoIdentity) {
           const invitations = await listPendingStaffInvitations(tx, account!.id);
-          const accepted = await acceptStaffInvitations(tx, account!.id, invitations.filter(item => item.id === existingGrant.id));
+          const accepted = await acceptStaffInvitations(tx, account!.id, invitations.filter(item => item.id === existingGrant.id), new Date(), {actorPersonId:actor.actorPersonId!});
           if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
           return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false };
         }
@@ -311,7 +311,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       });
       if (localDemoIdentity) {
         const pending = await listPendingStaffInvitations(tx, account!.id);
-        const accepted = await acceptStaffInvitations(tx, account!.id, pending.filter(item => item.id === grant.id));
+        const accepted = await acceptStaffInvitations(tx, account!.id, pending.filter(item => item.id === grant.id), new Date(), {actorPersonId:actor.actorPersonId!});
         if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
         return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false };
       }
