@@ -1,7 +1,7 @@
 import { getRequest } from "@tanstack/react-start/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts, people } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import { canonicalSessions } from "@/db/canonical-v301";
 import { canonicalSessionCookie } from "@/domain/canonical-access";
 import { secureSessionCookieHeader } from "@/domain/session-cookies";
@@ -9,7 +9,9 @@ import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
+import { assertRawAccountPerson, assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
+
+import { hasApprovedDemoPersonalCredential, readDemoCredentialDomain } from "@/modules/identity/demo-school-tenants.server";
 
 type VerifiedSelfEnrollmentActor = {
   accountId: string; personId: string; email: string;
@@ -37,6 +39,64 @@ export async function requireVerifiedAdultAccount(): Promise<VerifiedSelfEnrollm
   return {accountId:actor.accountId,personId:actor.actorPersonId,
     email:account.email,preferredName:person.preferredName??person.firstName,
     emailVerifiedAt:account.verified};
+}
+
+
+type ParticipantReader = Pick<typeof db,"select">;
+export type NoncreditParticipantAccount = {
+  accountId:string; personId:string; email:string;
+  demoScope:{organizationId:string;siteId:string}|null;
+};
+
+/** Ordinary noncredit opportunity access supports approved account-only demo
+ * credentials. This is not independently verified adulthood or permission to
+ * enter the protected native learner/session bridge. */
+export async function readNoncreditParticipantAccount(
+  accountId:string,personId:string,reader:ParticipantReader=db,
+):Promise<NoncreditParticipantAccount> {
+  const [account]=await reader.select({email:accessAccounts.emailNormalized,
+    verified:accessAccounts.emailVerifiedAt,disabled:accessAccounts.disabled,
+    personId:accessAccounts.personId}).from(accessAccounts)
+    .where(eq(accessAccounts.id,accountId)).limit(1);
+  if(!account||account.disabled||account.personId!==personId)
+    throw new AuthorizationError("current participant identity");
+  const [person]=await reader.select({active:people.active}).from(people)
+    .where(eq(people.id,personId)).limit(1);
+  if(!person?.active)throw new AuthorizationError("active participant Person");
+  if(!isDemoAccountEmail(account.email)) {
+    await assertUnambiguousAdultAccount(accountId,personId,reader);
+    return {accountId,personId,email:account.email,demoScope:null};
+  }
+  if(!await hasApprovedDemoPersonalCredential(accountId,account.email,reader))
+    throw new AuthorizationError("approved personal demo credential");
+  await assertRawAccountPerson(accountId,personId,reader);
+  const grants=await reader.select({role:accountPersonGrants.role,personId:accountPersonGrants.personId,
+    organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId})
+    .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,accountId),
+      eq(accountPersonGrants.active,true))).limit(101);
+  if(grants.length!==1||grants[0]?.role!=="account_holder"||
+     grants[0].organizationId!==null||grants[0].siteId!==null||grants[0].personId!==personId)
+    throw new AuthorizationError("direct account-only demo participant");
+  const demoScope=await readDemoCredentialDomain(account.email,reader);
+  if(!demoScope)throw new AuthorizationError("current demo credential scope");
+  return {accountId,personId,email:account.email,demoScope};
+}
+
+export async function requireNoncreditParticipantAccount():Promise<NoncreditParticipantAccount> {
+  const actor=await getCommandContext(getRequest());
+  if(!actor.actorPersonId||actor.sessionAccountId||actor.impersonatedByAccountId||
+     actor.delegatedByPlatformOwner||actor.delegationMode)
+    throw new AuthorizationError("direct participant account");
+  return readNoncreditParticipantAccount(actor.accountId,actor.actorPersonId);
+}
+
+/** Shared credentials may never consume a live program seat or be included
+ * in another institution's participant ledger. */
+export function assertNoncreditParticipantRelease(owner:NoncreditParticipantAccount,
+  release:{registeringOrganizationId:string;siteId:string|null}) {
+  if(owner.demoScope&&(owner.demoScope.organizationId!==release.registeringOrganizationId||
+      owner.demoScope.siteId!==release.siteId))
+    throw new AuthorizationError("participant credential eligible for this release");
 }
 
 
