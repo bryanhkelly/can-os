@@ -16,8 +16,7 @@ import { Button } from "@/components/ui/button";
 const noStore = { "Cache-Control": "no-store" };
 
 /**
- * CAN OS public Site entry. Authentication and Site provisioning still occur
- * only when the existing single-use email challenge is redeemed.
+ * One public Site entry; identity approval determines when common provisioning runs.
  */
 export const Route = createFileRoute("/site/new")({
   server: { handlers: {
@@ -52,9 +51,8 @@ export const Route = createFileRoute("/site/new")({
       try {
         const { isDemoAccountEmail } = await import("@/domain/local-demo-access");
         if (isDemoAccountEmail(parsed.data.email)) {
-          const { setupSchool } = await import("@/modules/identity/school-setup.server");
-          const { DEFAULT_SITE_TIMEZONE } = await import("@/domain/site-timezone");
-          await setupSchool({ name: parsed.data.name, domain: parsed.data.email.split("@")[1]!, timezone: DEFAULT_SITE_TIMEZONE, syntheticOnly: true }, undefined, parsed.data);
+          const { provisionDemoSiteSignup } = await import("@/modules/identity/school-setup-signup.server");
+          await provisionDemoSiteSignup(parsed.data);
           return Response.json({ accepted: true, demo: true }, { status: 202, headers: noStore });
         }
         const { requestSchoolSetupAccess } = await import("@/modules/identity/passwordless-access.server");
@@ -220,7 +218,7 @@ function SiteNewPage() {
               </Button>
               <p className="flex items-start gap-2 bg-muted p-3 text-xs leading-5 text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                Real accounts require email verification. Demo addresses create an isolated synthetic Site.
+                Real accounts require email verification. Demo accounts are automatically approved. Both create a standard Site.
                 Creating a Site does not authorize opening or enrollment.
               </p>
               <p className="text-center text-xs text-muted-foreground">Already have a CAN OS account?{" "}
