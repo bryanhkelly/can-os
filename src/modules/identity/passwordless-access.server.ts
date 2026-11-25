@@ -5,7 +5,7 @@ import { roleCapabilities } from "@/domain/access-context";
 import { assertMembershipSwitchIdentity } from "@/domain/membership-switch-policy";
 import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
-import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
+import { clearSessionCookieHeader,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import {
  isDemoAccountEmail,isApprovedDemoGrant,
  LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,
@@ -152,8 +152,8 @@ export async function requestSiteSignup(input:unknown) {
  const data=siteSignupSchema.parse(input);
  if(isDemoAccountEmail(data.email)) {
   const {provisionDemoSiteSignup}=await import("./school-setup-signup.server");
-  await provisionDemoSiteSignup(data);
-  return {accepted:true as const,demo:true as const};
+  const result = await provisionDemoSiteSignup(data);
+  return {accepted:true as const,demo:true as const,privateAccessCode:result.privateAccessCode};
  }
  try {await requestSchoolSetupAccess(data);}
  catch {console.error("[site-signup] verified email request unavailable");}
@@ -281,7 +281,7 @@ export async function redeemDemoAccess(
  code:string,
   device?:SessionDeviceContext,
 ):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string;homeSiteId?:string}> {
- if(code!==LOCAL_DEMO_ACCESS_CODE) {
+ if(code!==LOCAL_DEMO_ACCESS_CODE && !isPrivateAccessCode(code)) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
  let email:string;
@@ -298,14 +298,20 @@ export async function redeemDemoAccess(
  try {
  return await db.transaction(async tx=>{
   step="account_lookup";
-  const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized})
+  const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized,
+   privateAccessCodeHash:accessAccounts.privateAccessCodeHash})
    .from(accessAccounts)
    // Shared demo codes attest an explicitly bound synthetic Person and grant,
    // NOT control of a deliverable mailbox. The grant reader below enforces
    // fixed Valor identities or exact registered-school/invitation bindings.
    .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
    .limit(1);
-  if(!account)throw new InvalidAccessCredentialError("Invalid demo credentials");
+  if(!account || account.email!==email)throw new InvalidAccessCredentialError("Invalid demo credentials");
+  const privateCredential = account.privateAccessCodeHash != null;
+  if (privateCredential
+    ? !isPrivateAccessCode(code) || !equalSecretHashes(account.privateAccessCodeHash!,hashPrivateAccessCode(code,pepper))
+    : code!==LOCAL_DEMO_ACCESS_CODE)
+   throw new InvalidAccessCredentialError("Invalid demo credentials");
   step="grant_lookup";
   if(!email.endsWith("@valorschool.demo")){
    const bindings=await readDemoStaffBindings(account.id,tx);
@@ -349,7 +355,7 @@ export async function redeemDemoAccess(
    action:"identity.session.started",actorPersonId:grant.personId,
    accountId:grant.accountId,sessionAccountId:account.id,
    sessionId:session.id,grantId:grant.id,
-   role:grant.role,method:"local_demo_code",
+   role:grant.role,method:privateCredential?"private_access_code":"local_demo_code",
   });
   step="session_transaction";
   return {
