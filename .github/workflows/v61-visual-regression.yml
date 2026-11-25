@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
   push:
-    branches: ['release-*']
+    branches: [main, 'release-*']
 permissions:
   contents: read
 jobs:
@@ -29,21 +29,24 @@ jobs:
           export V61_BASE_REF="$(git merge-base HEAD origin/main)"
           node scripts/check-design-system.mjs
       - run: npm run check:component-boundaries
-      - run: npm run typecheck:full
       - name: Require source coverage and reviewed independent render evidence
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         shell: bash
         run: |
           set -o pipefail
           mkdir -p acceptance-artifacts
+          npm run --silent design:inventory > acceptance-artifacts/v61-adoption.json
           node scripts/check-v61-coverage.mjs --strict | tee acceptance-artifacts/v61-coverage.json
       - name: Preserve source coverage diagnostics even when acceptance fails
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: v61-source-coverage-${{ github.run_attempt }}
-          path: acceptance-artifacts/v61-coverage.json
+          path: |
+            acceptance-artifacts/v61-coverage.json
+            acceptance-artifacts/v61-adoption.json
           if-no-files-found: error
+      - run: npm run typecheck:full
   visual:
     runs-on: ubuntu-24.04
     timeout-minutes: 45

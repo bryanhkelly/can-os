@@ -5,7 +5,7 @@ import ts from "typescript";
 
 // Automatically inspect every application route and component. Do not maintain
 // route names, JSX snippets, or expected component counts as migration gates.
-// Existing debt is reported; changed files may never add more debt.
+// Every production source must pass the absolute gate; the diff audit is supplemental.
 const nativeTags = new Set(["button", "input", "label", "select", "textarea", "dialog"]);
 // Covers directional/logical corners, arbitrary values and variants, including
 // Tailwind important modifiers. Brand shape data is handled separately below.
@@ -254,6 +254,15 @@ export function findSharedLayerGeometryViolations(inventory) {
       file: file.path, ...corner,
     }));
   });
+}
+
+/** Absolute source policy. No grandfathered files, baseline counts or route allowlists. */
+export function collectV61SourceViolations(inventory) {
+  return inventory.inspected.flatMap(file => [
+    ...file.native.map(issue => ({ file: file.path, kind: "native-control", detail: issue.tag, line: issue.line, column: issue.column })),
+    ...file.corners.map(issue => ({ file: file.path, kind: "geometry", detail: issue.utility, line: issue.line, column: issue.column })),
+    ...file.syntaxErrors.map(issue => ({ file: file.path, kind: "syntax", detail: issue.message, line: issue.line, column: issue.column })),
+  ]);
 }
 
 function git(root, args) {

@@ -29,6 +29,13 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 - Synthetic classification is a reporting dimension; fixture provenance is test infrastructure, not business authorization. Use isolated deterministic fixtures and never place authentic student/family records in test fixtures.
 - During the convergence release, legacy demo registry, fixture and SMS restrictions remain until their consumers, data and security invariants are reconciled. Their existence is not a precedent for new demo-specific business logic. Do not introduce new demo-only handlers or deployment flags.
 
+## Permanent V6.1 architecture contract
+
+- New feature UI composes canonical primitives and workspace/workflow patterns; new cross-feature interaction patterns belong to the existing shared layers, not a second component library. Remove superseded implementations after reference checks.
+- No legacy debt is grandfathered: `npm run design:source` must pass across the entire production TSX inventory, including untouched source. Normal and Cloudflare builds enforce it. Never weaken a rule or add a filename exception to get a release through.
+- For changes to reusable patterns, add representative populated, empty, error, loading and applicable keyboard/responsive Storybook cases. Review actual rendered output against approved V6.1 references; source compliance alone is not visual acceptance.
+- Release acceptance requires strict coverage, current reviewed independent-render evidence, Storybook interaction tests, visual regression review and applicable authenticated browser journeys. Missing execution or evidence is a release blocker, not permission to report completion.
+
 ## Development and completion
 
 - Use `main` as the active development baseline unless a task explicitly authorizes a different branch. FullFlow is released and retired; old phase and FullFlow branch/database handoffs are historical, not active instructions.

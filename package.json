@@ -6,8 +6,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "assets:prepare": "node scripts/prepare-template-images.mjs",
-    "prebuild": "npm run db:check:journal && npm run verify:reporting:sql && npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && npm run assets:prepare",
-    "prebuild:cloudflare": "npm run db:check:journal && npm run verify:reporting:sql && npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
+    "prebuild": "npm run db:check:journal && npm run verify:reporting:sql && npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run design:source && npm run check:route-identifiers && npm run assets:prepare",
+    "prebuild:cloudflare": "npm run db:check:journal && npm run verify:reporting:sql && npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run design:source && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
     "postbuild": "npm run typecheck",
     "postbuild:cloudflare": "npm run typecheck",
     "prebuild-storybook": "npm run assets:prepare",
@@ -148,7 +148,8 @@
     "test:e2e:live-go": "playwright test --config playwright.live.config.ts go-release.spec.ts",
     "verify:pilot:noncredit-schema": "node scripts/acceptance/check-noncredit-pilot-readiness.mjs",
     "verify:pilot:noncredit-regression": "node scripts/acceptance/test-noncredit-assessment-provisioning-qa.mjs",
-    "verify:release": "node scripts/acceptance/run-release-readiness.mjs"
+    "verify:release": "node scripts/acceptance/run-release-readiness.mjs",
+    "design:source": "node scripts/check-design-system.mjs --source-only"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

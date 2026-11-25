@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { analyzeSource, createInventory, checkChangedFiles, findSharedLayerGeometryViolations } from "./v61-source-audit.mjs";
+import { analyzeSource, createInventory, checkChangedFiles, findSharedLayerGeometryViolations, collectV61SourceViolations } from "./v61-source-audit.mjs";
 
 function temp(run) {
   const root = mkdtempSync(join(tmpdir(), "v61-audit-"));
@@ -187,3 +187,22 @@ test("directional, logical, arbitrary and important corner utilities cannot bypa
     utilities.join(" ") + ' border-t text-sm"/>;', "/demo/src/components/workspace/panel.tsx");
   assert.deepEqual(audit.corners.map(item => item.utility), utilities);
 });
+
+test("absolute policy rejects unchanged debt in routes, feature components and extra UI", () => temp(({root, write}) => {
+  write("src/routes/legacy.tsx", 'export const Legacy = () => <button>Old</button>;');
+  write("src/components/example/Panel.tsx", 'export const Panel = () => <div className="rounded-lg"/>;');
+  write("src/widgets/External.tsx", 'export const Widget = () => <select/>;');
+  write("src/components/ui/input.tsx", 'export const Input = () => <input/>;');
+  write("src/routes/clean.tsx", 'export const Clean = () => <input type="hidden"/>;');
+  const violations = collectV61SourceViolations(createInventory(root));
+  assert.deepEqual(violations.map(v => [v.file, v.kind, v.detail]).sort(), [
+    ["src/components/example/Panel.tsx", "geometry", "rounded-lg"],
+    ["src/routes/legacy.tsx", "native-control", "button"],
+    ["src/widgets/External.tsx", "native-control", "select"],
+  ]);
+  assert.ok(violations.every(v => v.line > 0 && v.column > 0));
+  write("src/routes/legacy.tsx", 'export const Legacy = () => <Button>Old</Button>;');
+  write("src/components/example/Panel.tsx", 'export const Panel = () => <div className="border"/>;');
+  write("src/widgets/External.tsx", 'export const Widget = () => <Select/>;');
+  assert.deepEqual(collectV61SourceViolations(createInventory(root)), []);
+}));
