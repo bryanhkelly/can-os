@@ -4,9 +4,8 @@ import { db } from "@/db/client";
 import {
   accessAccountSignups, accessAccounts, accountPersonGrants, people, schoolSetupSignups,
 } from "@/db/schema";
-import { normalizeAccessEmail } from "@/domain/access-tokens";
+import { normalizeAccessEmail, issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
 import { personalCanSignupSchema } from "@/domain/personal-account-signup";
-import { readDemoCredentialDomain } from "./demo-school-tenants.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { requestOneTimeAccess } from "./passwordless-access.server";
@@ -22,14 +21,14 @@ const genericResult = { accepted: true } as const;
  * The email challenge is the proof of mailbox possession; all responses are generic.
  */
 export async function requestPersonalCanAccount(input: unknown,
-  sender: AccessEmailSender = sendAccessLinkViaResend): Promise<typeof genericResult> {
+  sender: AccessEmailSender = sendAccessLinkViaResend): Promise<{accepted:true;privateAccessCode?:string}> {
   const data = personalCanSignupSchema.parse(input);
   const email = normalizeAccessEmail(data.email);
   const demo = isDemoAccountEmail(email);
   if (email.endsWith(".invalid") || (email.endsWith(".demo") && !demo)) return genericResult;
+  if (demo) return provisionPrivatePersonalSignup(data,email);
   await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"personal-signup:" + email}))`);
-    if (demo && !await readDemoCredentialDomain(email,tx)) return;
     let [account] = await tx.select({
       id: accessAccounts.id, disabled: accessAccounts.disabled,
     }).from(accessAccounts).where(eq(accessAccounts.emailNormalized, email)).limit(1);
@@ -51,12 +50,6 @@ export async function requestPersonalCanAccount(input: unknown,
     // Real existing school/staff/guardian identities are never overwritten by
     // an anonymous signup; the same email receives its ordinary sign-in link.
     if (grant || schoolSignup) return;
-    // Never resurrect a revoked synthetic membership from anonymous signup.
-    if (demo) {
-      const [prior]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants)
-        .where(eq(accountPersonGrants.accountId,account.id)).limit(1);
-      if (prior) return;
-    }
     const [existing] = await tx.select().from(accessAccountSignups)
       .where(eq(accessAccountSignups.accountId, account.id)).for("update").limit(1);
     const expiresAt = new Date(Date.now() + SIGNUP_LIFETIME_MS);
@@ -66,7 +59,6 @@ export async function requestPersonalCanAccount(input: unknown,
       // on creating an account-only membership after roles were revoked.
       // Never replace a still-pending verified-email signup.
       if (!existing.consumedAt && existing.expiresAt > new Date()) {
-        if (demo) await provisionVerifiedPersonalCanAccount(tx,account.id,email,new Date(),"demo_code");
         return;
       }
       await tx.update(accessAccountSignups).set({
@@ -77,10 +69,29 @@ export async function requestPersonalCanAccount(input: unknown,
         accountId: account.id, firstName: data.firstName, lastName: data.lastName, expiresAt,
       });
     }
-    if (demo) await provisionVerifiedPersonalCanAccount(tx,account.id,email,new Date(),"demo_code");
   });
-  if (!demo) await requestOneTimeAccess(email, sender, safeAccessReturnTo(data.returnTo) ?? "/account/");
+  await requestOneTimeAccess(email, sender, safeAccessReturnTo(data.returnTo) ?? "/account/");
   return genericResult;
+}
+
+/** Public registration can issue an individual credential only for a genuinely
+ * new Account. An existing invitation, Account, or revoked identity cannot be
+ * claimed through registration. No Organization or membership is inferred. */
+async function provisionPrivatePersonalSignup(data: ReturnType<typeof personalCanSignupSchema.parse>, email:string) {
+  const privateAccessCode = issueOpaqueSecret();
+  const privateAccessCodeHash = hashPrivateAccessCode(privateAccessCode,process.env.CAN_ACCESS_TOKEN_PEPPER??"");
+  return db.transaction(async tx=>{
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"personal-signup:" + email}))`);
+    const now=new Date();
+    const [account]=await tx.insert(accessAccounts).values({emailNormalized:email,privateAccessCodeHash})
+      .onConflictDoNothing().returning({id:accessAccounts.id});
+    if(!account)return genericResult;
+    await tx.insert(accessAccountSignups).values({accountId:account.id,firstName:data.firstName,lastName:data.lastName,
+      expiresAt:new Date(now.getTime()+SIGNUP_LIFETIME_MS)});
+    const grantId=await provisionVerifiedPersonalCanAccount(tx,account.id,email,now,"demo_code");
+    if(!grantId)throw new Error("Personal account approval unavailable");
+    return {...genericResult,privateAccessCode};
+  });
 }
 
 /** Called only inside atomic, single-use email-token redemption. */
