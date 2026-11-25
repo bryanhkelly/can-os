@@ -59,7 +59,7 @@ export async function setupSchool(
     }).returning();
     const [person] = await tx.insert(people).values({
       legalFirstName: "Demo", legalLastName: "Administrator",
-      email: adminEmail, metadata: { synthetic: true },
+      email: adminEmail, domain: data.domain, metadata: { synthetic: true },
     }).returning();
     if (!person) throw new Error("Demo administrator Person was not created");
     const [account] = await tx.insert(accessAccounts).values({ emailNormalized: adminEmail, personId: person.id }).returning();
