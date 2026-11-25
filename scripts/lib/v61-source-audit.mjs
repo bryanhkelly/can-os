@@ -279,6 +279,7 @@ export function createInventory(projectRoot) {
       native: feature.reduce((n, file) => n + inspect(file).native.length, 0),
       corners: feature.reduce((n, file) => n + inspect(file).corners.length, 0),
       appearance: feature.reduce((n, file) => n + inspect(file).appearance.length, 0),
+      syntaxErrors: feature.reduce((n, file) => n + inspect(file).syntaxErrors.length, 0),
     };
   }
   const rows = routes.map(file => {
@@ -289,11 +290,12 @@ export function createInventory(projectRoot) {
       file: relative(root, file).replaceAll("\\", "/"), route,
       directNative: audit.native.length, directCorners: audit.corners.length,
       directAppearance: audit.appearance.length, reachableAppearance: dependencies.appearance,
+      directSyntaxErrors: audit.syntaxErrors.length, reachableSyntaxErrors: dependencies.syntaxErrors,
       reachableComponentFiles: dependencies.files,
       reachableNative: dependencies.native, reachableCorners: dependencies.corners,
       sourceClean: audit.native.length === 0 && audit.corners.length === 0 && audit.appearance.length === 0 && audit.syntaxErrors.length === 0,
       composedSourceClean: audit.native.length + audit.corners.length +
-        dependencies.native + dependencies.corners + audit.appearance.length + dependencies.appearance + audit.syntaxErrors.length === 0,
+        dependencies.native + dependencies.corners + audit.appearance.length + dependencies.appearance + audit.syntaxErrors.length + dependencies.syntaxErrors === 0,
       acceptance: "unverified",
     };
   });

@@ -261,3 +261,14 @@ test("appearance ownership covers local constants, namespace imports and class m
   ].join("\n");
   assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["border", "focus:ring-2", "p-2"]);
 });
+
+test("appearance debt in reachable components invalidates composed route compliance", () => temp(({root, write}) => {
+  write("src/routes/page.tsx", 'import { Widget } from "@/components/feature/Widget"; export const Page = () => <Widget/>;');
+  write("src/components/feature/Widget.tsx", 'import { Button } from "@/components/ui/button"; export const Widget = () => <Button style={{color:"red"}}/>;');
+  write("src/components/ui/button.tsx", 'export const Button = () => <button/>;');
+  const inventory = createInventory(root);
+  assert.equal(inventory.routes[0].sourceClean, true);
+  assert.equal(inventory.routes[0].reachableAppearance, 1);
+  assert.equal(inventory.routes[0].composedSourceClean, false);
+  assert.equal(collectV61SourceViolations(inventory)[0].detail, "Button: inline-style");
+}));
