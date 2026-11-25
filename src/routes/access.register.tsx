@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { WorkspaceShell } from "@/components/workspace";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { useHydrated } from "@/lib/use-hydrated";
 import { logAuthenticationUnavailable } from "@/domain/access-errors";
@@ -67,7 +68,7 @@ function RegisterPersonalAccount() {
       if (response.status === 429) setMessage("Too many requests. Please try again later.");
       else if (response.status === 503) setMessage("Account creation is temporarily unavailable.");
       else if (!response.ok) setMessage("Please check your name and email address.");
-      else setMessage("If this address is eligible, we've sent a secure email link. Open it to complete account creation or sign in.");
+      else setMessage(isDemoAccountEmail(email) ? "If this demo address is eligible, your account is ready. Sign in using your demo access code. No email is sent." : "If this address is eligible, we have requested a secure email link. Open it to complete account creation or sign in.");
     } catch { setMessage("Account creation is temporarily unavailable."); }
     finally { setBusy(false); }
   }
@@ -89,9 +90,9 @@ function RegisterPersonalAccount() {
             className="mt-1"/>
           I am at least 18 years old. Student accounts for minors are set up through an authorized school or guardian.
         </Label>
-        <p className="text-sm leading-6 text-muted-foreground">We'll email you a single-use link. Your details stay in CAN OS; joining a participating organization requires a separate registration or invitation.</p>
+        <p className="text-sm leading-6 text-muted-foreground">{isDemoAccountEmail(email) ? "Eligible demo addresses receive automatic account approval and use the demo access code. Joining a program is a separate step." : "We will email you a single-use link. Your details stay in CAN OS; joining a participating organization requires a separate registration or invitation."}</p>
         <Button type="submit" disabled={!hydrated || busy} className="w-full">
-          {busy ? "Sending verification…" : "Continue with email"}
+          {busy ? "Creating account…" : "Continue"}
         </Button>
         <p role="status" aria-live="polite" className="text-sm">{message}</p>
       </form>
