@@ -39,16 +39,17 @@ export function initialVerifiedSignupOrganizationType(requested: PublicSignupOrg
     ? "other_partner" as const : requested;
 }
 
-export const realSchoolSetupSignupSchema = z.object({
+export const siteSignupSchema = z.object({
   name: z.string().trim().min(2).max(160),
   organizationName: z.string().trim().min(2).max(160).optional(),
   organizationType: publicSignupOrganizationTypeSchema.default("other_partner"),
   email: z.string().trim().toLowerCase().email().max(254)
-    .refine(email => !email.endsWith(".demo") && !email.endsWith(".invalid"),
-      "Use a real email address; demo schools use the shared-code setup."),
+    .refine(email => !email.endsWith(".invalid"), "Use a real or demo email address."),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
 }).strict();
+
+export const realSchoolSetupSignupSchema = siteSignupSchema.refine(data => !data.email.endsWith(".demo"), { path: ["email"], message: "Use a real email address." });
 
 export type SchoolSetupInput = z.infer<typeof schoolSetupSchema>;
 export type RealSchoolSetupSignupInput = z.infer<typeof realSchoolSetupSignupSchema>;
@@ -79,7 +80,7 @@ export function matchesDemoSchoolAdministrator(
   email: string,
 ): boolean {
   return school.enabled && isDemoSchoolDomain(school.domain) &&
-    email === `admin.demo@${school.domain}` &&
+    email.split("@")[1] === school.domain &&
     grant.id === school.adminGrantId && grant.accountId === school.adminAccountId &&
     grant.personId === school.adminPersonId && grant.role === "site_admin" &&
     grant.organizationId === school.organizationId && grant.siteId === school.siteId;
