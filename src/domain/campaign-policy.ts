@@ -27,12 +27,12 @@ export function parseCampaignRecipientCsv(raw:string){
  const lines=raw.replace(/^\uFEFF/,"").split(/\r\n|\n|\r/).map(v=>v.trim()).filter(Boolean);
  const cells=lines.map(line=>{
    const quoted=/^"([^"\r\n]*)"$/.exec(line);
-   if(quoted)return quoted[1].trim();
+   if(quoted)return (quoted[1]??"").trim();
    if(/[,"]/.test(line))throw new Error("Use a single email column with no other fields.");
    return line;
  });
  if(/^email(?: address)?$/i.test(cells[0]??""))cells.shift();
- if(cells.some(cell=>/[,;\s]/.test(cell)))throw new Error("Use one email address per row.");
+ if(cells.some(cell=>!cell||/[,;\s]/.test(cell)))throw new Error("Use one email address per row.");
  const parsed=parseCampaignRecipients(cells.join("\n"));
  if(!parsed.recipients.length||parsed.invalid.length||parsed.tooMany)throw new Error("CSV must contain 1 to 1,000 valid email addresses.");
  return parsed.recipients.join("\n");

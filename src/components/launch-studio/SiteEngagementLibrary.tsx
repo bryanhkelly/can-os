@@ -68,7 +68,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
     if(!selected){setLinksLoading(false);return;}
     setLinksLoading(true);
     listEngagementGoLinks({data:{engagementId:selected}})
-      .then(rows=>{if(active){const available=emailOnly?rows.filter(row=>row.channel==="email"&&row.status==="active"):rows;setLinks(available);setLinksFor(selected);setLinksLoading(false);if(emailOnly&&available.length===1)setDistribution(available[0].id);}})
+      .then(rows=>{if(active){const available=emailOnly?rows.filter(row=>row.channel==="email"&&row.status==="active"):rows;setLinks(available);setLinksFor(selected);setLinksLoading(false);if(emailOnly&&available.length===1&&available[0])setDistribution(available[0].id);}})
       .catch(()=>{if(active){setLinks([]);setError("Unable to load saved Go Links.");setLinksLoading(false);}});
     return ()=>{active=false;};
   },[selected,refresh,emailOnly]);
