@@ -227,3 +227,13 @@ export async function readSessionGrants(accountId: string, email: string, reader
 
   return {grants:[],demoAccountSwitching:false};
 }
+
+/** Independently authenticated Platform Owner may project an existing eligible
+ * membership, never the target account's cross-account fixture switch list. */
+export async function readOwnerDelegationGrants(accountId: string, personId: string, email: string, reader: GrantReader = db) {
+  const { grants } = await readSessionGrants(accountId, email, reader);
+  return grants.filter(grant => grant.accountId === accountId && grant.personId === personId &&
+    grant.accountPersonId === personId && grant.email === email.trim().toLowerCase() &&
+    (grant.emailVerifiedAt !== null && grant.emailVerifiedAt !== undefined || isDemoAccountEmail(grant.email)) &&
+    grant.active && grant.role !== "platform_owner");
+}
