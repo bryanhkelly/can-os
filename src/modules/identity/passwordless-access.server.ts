@@ -344,6 +344,7 @@ export async function redeemDemoAccess(
   step="session_creation";
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,
+   authenticationMethod:privateCredential?"private_access_code":"local_demo_code",
    secretHash:hashAccessSecret(secret,pepper),
    activeGrantId:grant.id,
    expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
