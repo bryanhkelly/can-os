@@ -102,7 +102,7 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
           return null;
         }
         const organizationId=policy!.organizationId(context!);
-        if(row.channel!=="in_app"&&(!organizationId||await isDemoTenantOrganization(organizationId,tx))){
+        if(row.channel!=="in_app"&&(!organizationId||(row.channel==="sms"&&await isDemoTenantOrganization(organizationId,tx)))){
           await tx.update(subscriptionDeliveries).set({
             status:"suppressed",lastError:"external_delivery_tenant_blocked",leaseUntil:null,updatedAt:now,
           }).where(owned());
