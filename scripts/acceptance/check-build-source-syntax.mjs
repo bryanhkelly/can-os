@@ -17,6 +17,7 @@ import { unresolvedLocalSourceModule } from "../lib/source-module-resolution.mjs
 // implementation imports inside createServerFn handlers. This catches a
 // narrow source contract; TanStack's real client bundle remains authoritative.
 const strictRpcShells=new Map([
+  ["src/modules/classes/native-class-repeats.functions.ts","native-class-repeats"],
   ["src/modules/engagement/engagement-registry.functions.ts","engagement-registry"],
   ["src/modules/communication/engagement-campaigns.functions.ts","engagement-campaigns"],
 ]);

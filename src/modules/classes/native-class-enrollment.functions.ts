@@ -31,7 +31,7 @@ import {readOpenNativeClassEnrollment,readLatestCompletedNativeClassEnrollment} 
 import { readNativeClassOccupancy } from "./native-class-capacity.server";
 import { createInitialNativeClassAttempt } from "./native-class-attempt.server";
 import {writeNativeClassAttribution} from "./native-class-attribution.server";
-import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
+import { requireNativeRepeatAuthorization } from "./native-class-repeats.server";
 import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";

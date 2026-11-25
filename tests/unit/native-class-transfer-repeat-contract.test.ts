@@ -4,7 +4,8 @@ const read=(path:string)=>readFileSync(path,"utf8");
 
 describe("native Class transfer and completed-repeat contracts",()=>{
  const transfer=read("src/modules/classes/native-class-transfers.functions.ts");
- const repeat=read("src/modules/classes/native-class-repeats.functions.ts");
+ const repeat=read("src/modules/classes/native-class-repeats.server.ts");
+ const repeatRpc=read("src/modules/classes/native-class-repeats.functions.ts");
  const enrollment=read("src/modules/classes/native-class-enrollment.functions.ts");
  const assignment=read("src/modules/classes/native-class-assignment.functions.ts");
  const guardian=read("src/modules/classes/native-class-guardian-enrollment.functions.ts");
@@ -37,6 +38,16 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(repeat).toContain('eq(canonicalClassOutcomes.resultCode,"completed")');
   expect(repeat).toContain("completion.completionPolicyVersionId");
   expect(repeat).toContain("isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId)");
+ });
+ it("keeps repeat authorization in a server-only owner",()=>{
+  expect(repeatRpc).not.toContain("@/db/");
+  expect(repeatRpc).not.toContain("requireNativeRepeatAuthorization");
+  expect(repeatRpc).toContain('await import("./native-class-repeats.server")');
+  expect(repeat).toContain('export async function requireNativeRepeatAuthorization(');
+  for(const source of [enrollment,assignment,guardian]){
+   expect(source).toContain('from "./native-class-repeats.server"');
+   expect(source).not.toContain('from "./native-class-repeats.functions"');
+  }
  });
  it("consumes authorized repeat only inside successful Class admission",()=>{
   const consumption=read("src/modules/classes/native-class-repeat-consumption.server.ts");
