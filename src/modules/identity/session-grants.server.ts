@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, like, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, like } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents,
@@ -90,13 +90,9 @@ async function listPublicFamilyStartGrantIds(
   return allowed;
 }
 
-/** Demo Admin may switch to any existing active Person/grant at the exact
- * demo Site, not just people on a hardcoded fixture allowlist.
- * This is LOGIN/SWITCH code ONLY. It never provisions or overrides a
- * Person's role, Site scope, independent approvals, or Class enrollment.
- * A demo-code account does not require verified mailbox ownership, but its
- * Person, tenant and active grant must still match. Real accounts still
- * require verified email; disabled accounts remain excluded.
+/** Public shared-code switching is limited to demo identities at the exact fixture Site.
+ * Real accounts use their own credentials or independently verified owner delegation.
+ * This cannot grant roles, alter memberships, or attest mailbox ownership.
  */
 export async function listDemoSourceGrants(database: GrantReader = db) {
   const rows = await database.select(grantSelection).from(accountPersonGrants)
@@ -104,10 +100,7 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
       eq(accessAccounts.id, accountPersonGrants.accountId),
       eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
-      // The original Valor tenant is an explicitly scoped synthetic fixture.
-      // Do not silently treat an arbitrary *.demo email as verified.
-      or(isNotNull(accessAccounts.emailVerifiedAt),
-        like(accessAccounts.emailNormalized, "%@valorschool.demo")),
+      like(accessAccounts.emailNormalized, "%@valorschool.demo"),
     ))
     .innerJoin(people, and(
       eq(people.id, accountPersonGrants.personId),
@@ -122,6 +115,8 @@ export async function listDemoSourceGrants(database: GrantReader = db) {
   return rows.filter(row =>
     row.accountId !== LOCAL_DEMO_ADMIN.accountId &&
     row.personId !== LOCAL_DEMO_ADMIN.personId &&
+    row.email.endsWith("@valorschool.demo") && isDemoAccountEmail(row.email) &&
+    row.role !== "platform_owner" && row.role !== "app_admin" &&
     hasValidAccessGrantScope(row));
 }
 
