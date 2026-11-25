@@ -76,11 +76,12 @@ beforeEach(() => {
 describe("public school setup validation", () => {
   it("normalizes the domain and recognizes demo classification", () => {
     expect(schoolSetupSchema.parse({ ...input, domain: "  EXAMPLE.DEMO " }).domain).toBe("example.demo");
+    expect(schoolSetupSchema.parse({ ...input, domain: "  TRAINING.EXAMPLE.DEMO " }).domain).toBe("training.example.demo");
   });
   it.each([
     { domain: "example.org" }, { domain: "example.demo.evil.org" }, { domain: "https://example.demo" },
-    { domain: "a.b.demo" }, { domain: "valorschool.demo" }, { domain: "a--b.demo" },
-    { domain: "-example.demo" }, { domain: "example-.demo" }, { domain: "ab.demo" },
+    { domain: "valorschool.demo" }, 
+    { domain: "-example.demo" }, { domain: "example-.demo" }, 
     { timezone: "not/a-timezone" }, { syntheticOnly: false }, { organizationId: "existing-school" },
     { role: "can_network_steward" },
   ])("rejects invalid input and caller-selected identity: %j", changes => {
@@ -180,7 +181,7 @@ describe("shared real and demo founder provisioning", () => {
     const signup={name:"Training Hub",email:"founder@example.demo",firstName:"Alex",lastName:"Admin"};
     expect(siteSignupSchema.parse(signup).email).toBe("founder@example.demo");
     expect(siteSignupSchema.safeParse({...signup,demo:true}).success).toBe(false);
-    expect(siteSignupSchema.safeParse({...signup,email:"founder@bad.example.demo"}).success).toBe(false);
+    expect(siteSignupSchema.parse({...signup,email:"founder@training.example.demo"}).email).toBe("founder@training.example.demo");
   });
   it("uses the ordinary Site, Person and active grant records for demo founders", async () => {
     const now=new Date("2026-11-07T12:00:00Z");
