@@ -80,6 +80,8 @@ function ApplicationLearningAccessHandoff({
     setNotice("Student access approval is saved.");
     if(result.signInRequest==="failed"){
       setError("The sign-in link could not be requested. Wait at least a minute, then request it again below. Approval does not need to be repeated.");
+    }else if(result.signInRequest==="demo_code"){
+      setNotice("Student access approval is saved. Sign in with the student’s demo email and shared access code. No email was sent.");
     }else{
       setNotice("Student access approval is saved. A sign-in link was requested; email delivery is not verified.");
     }
@@ -124,7 +126,7 @@ function ApplicationLearningAccessHandoff({
   <form noValidate onSubmit={event=>void submit(event)} className="mt-3 space-y-3">
     {role==="guardian" && status==="not_requested" ? <>
      <p>Authorize a separate student account after classroom placement.
-      Student email verification and school approval are required; this does not authorize your guardian login to act as a student.</p>
+      Account approval and school review are required; this does not authorize your guardian login to act as a student.</p>
      <Field label="Student's own email address" required
       error={attempted&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())?"Enter a valid email address for the student.":undefined}>
       <Input type="email" maxLength={254} value={email} onChange={event=>setEmail(event.target.value)} autoComplete="off"/>
@@ -155,15 +157,15 @@ function ApplicationLearningAccessHandoff({
        <Checkbox checked={independentReviewConfirmed} onChange={event=>setIndependentReviewConfirmed(event.target.checked)}/>
       </Field>
       <Button type="submit" variant="outline" disabled={busy}>
-       {busy?"Reviewing…":"Approve verified student account and send sign-in link"}
+       {busy?"Reviewing…":"Approve verified student account"}
       </Button>
      </>}
     </>:status==="approved"?<>
-     <p>Student access is approved. The student uses their own verified email address—not the parent’s account—to request a short-lived sign-in link and open assigned classes.</p>
+     <p>Student access is approved. The student uses their own approved account, not the parent’s account, to sign in and open assigned classes.</p>
      {role==="guardian"&&<Button asChild variant="outline" className="mt-3"><Link to="/access">Open student sign-in</Link></Button>}
      {hasRegistrarAuthority(role)&&<Button type="submit" variant="outline" disabled={busy}
        >
-       {busy?"Requesting…":"Request student sign-in link again"}
+       {busy?"Requesting…":"Request student sign-in again"}
      </Button>}
     </>:status==="not_requested"&&hasRegistrarAuthority(role)?
      <p>Enrollment and classroom placement are ready. A verified managing guardian
