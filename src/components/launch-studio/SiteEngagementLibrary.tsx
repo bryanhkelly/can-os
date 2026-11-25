@@ -5,7 +5,7 @@ import { GoLinkActions } from "@/components/links/GoLinkActions";
 import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
 import { engagementChannels, engagementChannelLabels, type EngagementChannel } from "@/domain/engagement-definition";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { ActionDialog, EmptyState, QueryState, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
@@ -39,6 +39,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
   const [refresh,setRefresh]=useState(0);
   const [channel,setChannel]=useState<EngagementChannel>("web");
   const [busy,setBusy]=useState(false);
+  const pending=useRef(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
   const [confirmation,setConfirmation]=useState<{engagementId:string;link?:Link}|null>(null);
@@ -72,9 +73,20 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
   },[selected,refresh]);
 
   const record=records.find(row=>row.engagementId===selected);
+  // State alone cannot fence two actions before React commits a busy render.
+  function beginMutation(){
+    if(pending.current||loading||linksLoading)return false;
+    pending.current=true;setBusy(true);setError("");setMessage("");
+    return true;
+  }
+  function endMutation(){pending.current=false;setBusy(false);}
+  function refreshLibrary(){
+    if(pending.current)return;
+    setError("");setMessage("");setConfirmation(null);
+    setRefresh(n=>n+1);
+  }
   async function createLink(){
-    if(!record||record.status!=="active"||busy)return;
-    setBusy(true);setError("");setMessage("");
+    if(!record||record.status!=="active"||!beginMutation())return;
     try{
       const created=await createEngagementGoLink({
         data:{engagementId:record.engagementId,versionId:record.versionId,channel},
@@ -83,11 +95,10 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
       // Reload saved links as the authoritative persisted representation.
       if(created.linkId)setRefresh(n=>n+1);
     }catch(error){setError(problem(error));}
-    finally{setBusy(false);}
+    finally{endMutation();}
   }
   async function revoke(link:Link){
-    if(!record||busy||linksFor!==record.engagementId||link.status==="revoked")return;
-    setBusy(true);setError("");setMessage("");
+    if(!record||linksFor!==record.engagementId||link.status==="revoked"||!beginMutation())return;
     try{
       await revokeEngagementGoLink({
         data:{engagementId:record.engagementId,linkId:link.id},
@@ -96,25 +107,24 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
         ? {...row,status:"revoked" as const}:row));
       setMessage("Go Link revoked.");setConfirmation(null);
     }catch(error){setError(problem(error));}
-    finally{setBusy(false);}
+    finally{endMutation();}
   }
   async function retire(){
-    if(!record||busy||record.status==="retired")return;
-    setBusy(true);setError("");setMessage("");
+    if(!record||record.status==="retired"||!beginMutation())return;
     try{
       await retireEngagementDefinition({data:{engagementId:record.engagementId}});
       setRecords(rows=>rows.map(row=>row.engagementId===record.engagementId
         ? {...row,status:"retired" as const}:row));
       setMessage("Engagement retired. Existing links cannot be used.");setConfirmation(null);
     }catch(error){setError(problem(error));}
-    finally{setBusy(false);}
+    finally{endMutation();}
   }
   return <WorkspacePanel
     title="Published engagement library"
     description="Saved invitations and links remain manageable after you leave this page. Each published engagement is an immutable version.">
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <Button type="button" variant="outline" size="sm" disabled={busy}
-        onClick={()=>setRefresh(n=>n+1)}>Refresh</Button>
+        onClick={refreshLibrary}>Refresh</Button>
     </div>
     {loading&&<QueryState loading="Loading published engagements…"/>}
     {!loading&&!records.length&&!error&&
@@ -122,6 +132,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
     {!loading&&records.length>0&&<>
       <Field className="mt-4" label="Published experience">
         <Select id="saved-go-engagement" disabled={busy} value={selected??""} onChange={event=>{
+          if(pending.current)return;
           setSelected(event.target.value);setLinks([]);setLinksFor(null);setLinksLoading(true);setDistribution(null);setConfirmation(null);setError("");setMessage("");
         }}>
           {records.map(row=><option key={row.engagementId} value={row.engagementId}>
@@ -135,14 +146,14 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
         </div>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <Field label="Channel">
-          <Select value={channel} onChange={event=>setChannel(event.target.value as EngagementChannel)}>
+          <Select value={channel} disabled={busy} onChange={event=>{if(!pending.current)setChannel(event.target.value as EngagementChannel);}}>
               {engagementChannels.map(id=><option value={id} key={id}>{engagementChannelLabels[id]}</option>)}
             </Select>
         </Field>
-          <Button type="button" disabled={busy||record.status!=="active"} onClick={()=>void createLink()}>
+          <Button type="button" disabled={busy||linksLoading||record.status!=="active"} onClick={()=>void createLink()}>
             {busy?"Working…":"Create another Go Link"}
           </Button>
-          <Button type="button" variant="outline" disabled={busy||record.status==="retired"}
+          <Button type="button" variant="outline" disabled={busy||linksLoading||record.status==="retired"}
             onClick={()=>setConfirmation({engagementId:record.engagementId})}>Retire engagement</Button>
         </div>
       </>}
@@ -173,7 +184,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
       title={confirmation?.link?"Revoke Go Link":"Retire engagement"}
       description={confirmation?.link?"Existing distributed copies of this Go Link will stop working.":"All Go Links for this engagement will stop resolving."}
       confirmLabel={confirmation?.link?"Revoke link":"Retire engagement"}
-      pending={busy} destructive confirmDisabled={!record||record.status!=="active"||!!confirmation?.link&&(linksFor!==selected||!links.some(link=>link.id===confirmation.link?.id&&link.status==="active"))}
+      pending={busy} destructive confirmDisabled={linksLoading||!record||record.status!=="active"||!!confirmation?.link&&(linksFor!==selected||!links.some(link=>link.id===confirmation.link?.id&&link.status==="active"))}
       onClose={()=>setConfirmation(null)} onConfirm={()=>{
         if(!confirmation||confirmation.engagementId!==selected)return;
         if(confirmation.link)void revoke(confirmation.link);else void retire();
