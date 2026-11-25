@@ -246,7 +246,6 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       const linkedPeople = await tx.select({ personId: accountPersonGrants.personId })
         .from(accountPersonGrants).where(and(
           eq(accountPersonGrants.accountId, account!.id),
-          ...(syntheticSchool ? [eq(accountPersonGrants.organizationId, organizationId), eq(accountPersonGrants.siteId, siteId)] : []),
         )).limit(100);
       const distinctPeople = [...new Set(linkedPeople.map(grant => grant.personId))];
       // A verified mailbox alone cannot resolve multiple different real Person
