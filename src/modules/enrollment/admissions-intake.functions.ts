@@ -6,6 +6,8 @@ import { accessAccounts,accountPersonGrants,admissionOffers,applications,actions
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
+import { provisionScopedPersonAccount, assertScopedCredential } from "@/modules/identity/scoped-person-account.server";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { assertPublicInterestConversion } from "@/domain/public-interest-conversion";
 import { applicationGuardianContact } from "@/domain/application-guardian-contact";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
@@ -645,18 +647,9 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
       !relationship.canManageEnrollment)
     throw new DomainError("ADMISSIONS_GUARDIAN_VERIFICATION_REQUIRED");
    const email=normalizeAccessEmail(contact.email);
-   let [account]=await tx.select({id:accessAccounts.id,disabled:accessAccounts.disabled})
-    .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).limit(1);
-   if(account?.disabled)throw new Error("Guardian account is disabled");
-   if(account){
-    const existing=await tx.select({personId:accountPersonGrants.personId})
-     .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
-    if(existing.some(g=>g.personId!==contact.id))
-     throw new Error("Account email belongs to another identity; verify and reconcile before granting access");
-   } else {
-    [account]=await tx.insert(accessAccounts).values({emailNormalized:email})
-     .returning({id:accessAccounts.id,disabled:accessAccounts.disabled});
-   }
+   const account=await provisionScopedPersonAccount(tx,{
+    email,personId:contact.id,organizationId:program.organizationId,siteId:program.siteId,
+   });
    const [grant]=await tx.select({id:accountPersonGrants.id,active:accountPersonGrants.active})
     .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account!.id),
      eq(accountPersonGrants.personId,contact.id),eq(accountPersonGrants.role,"guardian"),
@@ -720,15 +713,21 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
     eq(accountPersonGrants.role,"guardian"),eq(accountPersonGrants.active,true),
     eq(accountPersonGrants.organizationId,application.organizationId),
     ...(application.siteId?[or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,application.siteId))]:[isNull(accountPersonGrants.siteId)]),
-    eq(accessAccounts.emailNormalized,normalizeAccessEmail(contact.email)))).limit(1);
+    eq(accessAccounts.emailNormalized,normalizeAccessEmail(contact.email)),
+    eq(accessAccounts.personId,contactId),eq(accessAccounts.disabled,false))).limit(1);
   if(!grant)throw new DomainError("ADMISSIONS_GUARDIAN_LOGIN_REQUIRED");
-  const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
-  await requestOneTimeAccess(contact.email);
+  const email=normalizeAccessEmail(contact.email);
+  await assertScopedCredential(db,email,application.organizationId,application.siteId);
+  const demoAccess=isDemoAccountEmail(email);
+  if(!demoAccess){
+   const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
+   await requestOneTimeAccess(email);
+  }
   await writeAudit(db,actor,{
    action:"admissions.guardian.invite",entityType:"application",
    entityId:data.applicationId,scope:{programId:application.programId},
-   after:{invitationRequested:true}});
-  return {sent:true};
+   after:{invitationRequested:!demoAccess,signInMethod:demoAccess?"demo_code":"email_link"}});
+  return {sent:!demoAccess,signInMethod:demoAccess?"demo_code" as const:"email_link" as const};
  });
 
 /** Guardian permissions are not automatically created from a registrar-entered
