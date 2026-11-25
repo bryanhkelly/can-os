@@ -59,7 +59,7 @@ export function demoCredentialScopePredicate(
   email: SQLWrapper, organizationId: SQLWrapper, siteId: SQLWrapper,
 ) {
   return sql<boolean>`(
-    ${email} ~ '^[^@[:space:]]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?\\.demo$'
+    ${email} ~ '^[^@[:space:]]+@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*[.]demo$'
     AND ${organizationId} IS NOT NULL AND ${siteId} IS NOT NULL
     AND EXISTS (SELECT 1 FROM public.sites credential_site
       WHERE credential_site.id=${siteId} AND credential_site.organization_id=${organizationId})
