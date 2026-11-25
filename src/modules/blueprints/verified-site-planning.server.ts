@@ -1,10 +1,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts, sites } from "@/db/schema";
+import { sites } from "@/db/schema";
 import { isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { accessSessionCookie } from "@/domain/access-tokens";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readCookie } from "@/domain/session-cookies";
 import { getIdentityContext } from "@/modules/identity/command-context.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -48,15 +47,8 @@ export async function getBlueprintPlanningContext(request: Request): Promise<Com
   if (!organizationId) {
     throw new AuthorizationError("current verified CAN Organization grant");
   }
-  const [account] = await db.select({
-    email: accessAccounts.emailNormalized,
-    verifiedAt: accessAccounts.emailVerifiedAt,
-    disabled: accessAccounts.disabled,
-  }).from(accessAccounts).where(eq(accessAccounts.id, actor.accountId)).limit(1);
-  if (!account || !account.verifiedAt || account.disabled ||
-      isDemoAccountEmail(account.email)) {
-    throw new AuthorizationError("verified non-demo CAN Site administrator");
-  }
+  // getIdentityContext has already validated the current credential, Person and grant.
+  // Private planning depends on the exact scoped role, not the credential type.
 
   // Capabilities granted here are *only* for private planning. Not review,
   // publishing, Deployment execution, Class activation or enrollment.
