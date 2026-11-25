@@ -6,6 +6,7 @@ import { accessAccounts, accessAdultLearningReviews } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { readAccountHealth } from "./account-health.server";
 import academicIntegritySql from "../../../scripts/acceptance/academic-integrity-inventory.sql?raw";
 
 /**
@@ -188,7 +189,9 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
         siteId:item.site_id == null ? null : String(item.site_id),
         siteName:item.site_name == null ? "Unassigned Site" : String(item.site_name), affected:Number(item.affected)})),
     })).catch(() => ({status:"unavailable" as const,checkedAt:new Date().toISOString(),findings:[]}));
+    const accountHealth=await readAccountHealth();
     return {
+      accountHealth,
       academicIntegrity,
       platformOwner: actor.role === "platform_owner",
       reviewedAdultIdentityReady,
