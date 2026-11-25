@@ -305,7 +305,7 @@ export async function redeemDemoAccess(
    // NOT control of a deliverable mailbox. The grant reader below enforces
    // fixed Valor identities or exact registered-school/invitation bindings.
    .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
-   .limit(1);
+   .for("update").limit(1);
   if(!account || account.email!==email)throw new InvalidAccessCredentialError("Invalid demo credentials");
   const privateCredential = account.privateAccessCodeHash != null;
   if (privateCredential
