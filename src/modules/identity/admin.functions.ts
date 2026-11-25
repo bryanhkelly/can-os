@@ -2,10 +2,11 @@ import { identityEmailDomain } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
-import { individualStaffIssuerEligible, individualStaffTargetEligible } from "@/domain/individual-staff-handoff";
+import { canIssueIndividualCredential } from "@/modules/identity/individual-credential-issuer.server";
+import { individualStaffTargetEligible } from "@/domain/individual-staff-handoff";
 import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { personLegalName } from "@/domain/person-name";
-import { and, eq, gt, isNull, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -207,7 +208,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     assertSafeguardingStaffInviteSite(data.role, data.siteId);
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
-    const { people, accessAccounts, accessSessions, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const { people, accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
     const organizationId = actor.organizationIds[0]!;
     if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
       throw new AuthorizationError("site-limited registrar cannot create sibling school grants");
@@ -233,16 +234,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       if (individual) {
         if (actor.sessionAccountId || actor.impersonatedByAccountId || actor.delegatedByPlatformOwner)
           throw new AuthorizationError("direct administrator identity");
-        const [issuer] = await tx.select({
-          personId: accessAccounts.personId, disabled:accessAccounts.disabled,
-          emailVerifiedAt:accessAccounts.emailVerifiedAt,email:accessAccounts.emailNormalized,
-          authenticationMethod:accessSessions.authenticationMethod,
-          privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
-        }).from(accessAccounts).innerJoin(accessSessions,eq(accessSessions.accountId,accessAccounts.id))
-          .where(and(eq(accessAccounts.id,actor.accountId),eq(accessSessions.id,actor.sessionId),
-            eq(accessSessions.activeGrantId,actor.grantId),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date()),
-            isNull(accessSessions.delegatedGrantId))).limit(1);
-        if (!individualStaffIssuerEligible(issuer,actor.actorPersonId))
+        if (!await canIssueIndividualCredential(tx,actor))
           throw new AuthorizationError("individually authenticated administrator");
       }
       // Legacy shared credentials retain the exact original tenant boundary.
