@@ -1,6 +1,5 @@
 import { pgTable, check, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { educationV30 } from "./core";
 import { learnerCourseAttempts } from "./learning";
 import { facilitatedLearningSessions } from "./facilitated-learning";
 
@@ -52,7 +51,7 @@ export const facilitatedRoomPresenceEvents = pgTable("facilitated_room_presence_
   index("facilitated_room_presence_room_recent_idx").on(t.facilitatedSessionId,t.receivedAt),
   index("facilitated_room_presence_attempt_idx").on(t.courseAttemptId,t.receivedAt),
 ]);
-export const facilitatedRoomAttendanceAssertions = educationV30.table("facilitated_room_attendance_assertions",{
+export const facilitatedRoomAttendanceAssertions = pgTable("facilitated_room_attendance_assertions",{
   id:id(),
   facilitatedSessionId:uuid("facilitated_session_id").notNull().references(()=>facilitatedLearningSessions.id),
   courseAttemptId:uuid("course_attempt_id").notNull().references(()=>learnerCourseAttempts.id),

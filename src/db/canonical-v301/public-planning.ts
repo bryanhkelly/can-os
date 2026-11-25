@@ -7,11 +7,11 @@ import {
   uniqueIndex,
   pgTable,
 } from "drizzle-orm/pg-core";
-import { educationV30, educationV30Secure, type JsonObject } from "./core";
+import { educationV30Secure, type JsonObject } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 
-export const operationalAuthorizationDecisions = educationV30.table(
+export const operationalAuthorizationDecisions = pgTable(
   "operational_authorization_decisions",
   {
     id: id(),
@@ -53,7 +53,7 @@ export const operationalAuthorizationDecisions = educationV30.table(
   ],
 );
 
-export const operationPublicationSnapshots = educationV30.table(
+export const operationPublicationSnapshots = pgTable(
   "operation_publication_snapshots",
   {
     id: id(),

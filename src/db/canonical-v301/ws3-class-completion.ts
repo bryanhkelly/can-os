@@ -1,10 +1,9 @@
+import { pgTable } from "drizzle-orm/pg-core";
 import { boolean, integer, timestamp, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
-
 /** WS3 additive schema proposal. Migration owns the RLS, write triggers
  * and authoritative enrollment-time policy pin; NOT applied or enabled.
  */
-export const classCompletionPolicyVersions=educationV30.table(
+export const classCompletionPolicyVersions=pgTable(
   "class_completion_policy_versions",{
     id:uuid("id").defaultRandom().primaryKey(),
     classId:uuid("class_id").notNull(),
@@ -19,7 +18,7 @@ export const classCompletionPolicyVersions=educationV30.table(
     approvedByPersonId:uuid("approved_by_person_id").notNull(),
     approvedPolicyEvidenceVersionId:uuid("approved_policy_evidence_version_id").notNull(),
   });
-export const classEnrollmentCompletionPins=educationV30.table(
+export const classEnrollmentCompletionPins=pgTable(
   "class_enrollment_completion_pins",{
     classEnrollmentId:uuid("class_enrollment_id").primaryKey(),
     classId:uuid("class_id").notNull(),

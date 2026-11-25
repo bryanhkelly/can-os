@@ -1,12 +1,11 @@
+import { pgTable } from "drizzle-orm/pg-core";
 import { text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
-
 /**
  * WS3 migration proposal: independently approved immutable evidence-to-subject
  * references, never an outcome, enrollment, assessment or award ledger.
  * SQL patch owns RLS, integrity triggers and application access.
  */
-export const learningCompletionEvidenceBindings=educationV30.table(
+export const learningCompletionEvidenceBindings=pgTable(
   "learning_completion_evidence_bindings", {
     id:uuid("id").defaultRandom().primaryKey(),
     purpose:text("purpose")

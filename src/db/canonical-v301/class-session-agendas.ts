@@ -1,5 +1,5 @@
+import { pgTable } from "drizzle-orm/pg-core";
 import { index, integer, jsonb, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
 import type { ClassSessionAgendaItem } from "@/domain/native-class-session-agenda";
 
 /**
@@ -7,7 +7,7 @@ import type { ClassSessionAgendaItem } from "@/domain/native-class-session-agend
  * Course version, assessment, attendance or progress ledger is introduced.
  * Migration pending shared-schema approval in WS00.
  */
-export const classSessionAgendaRevisions = educationV30.table(
+export const classSessionAgendaRevisions = pgTable(
   "class_session_agenda_revisions", {
     id: uuid("id").defaultRandom().primaryKey(),
     classSessionId: uuid("class_session_id").notNull(),
