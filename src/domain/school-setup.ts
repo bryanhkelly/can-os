@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEMO_ACCOUNT_DOMAIN } from "./local-demo-access";
+import { DEMO_ACCOUNT_DOMAIN, isDemoAccountEmail } from "./local-demo-access";
 import { siteTimezoneSchema } from "./site-timezone";
 
 const demoDomainPattern = /^[a-z0-9](?:[a-z0-9-]{1,41}[a-z0-9])\.demo$/;
@@ -44,7 +44,7 @@ export const siteSignupSchema = z.object({
   organizationName: z.string().trim().min(2).max(160).optional(),
   organizationType: publicSignupOrganizationTypeSchema.default("other_partner"),
   email: z.string().trim().toLowerCase().email().max(254)
-    .refine(email => !email.endsWith(".invalid"), "Use a real or demo email address."),
+    .refine(email => !email.endsWith(".invalid") && (!email.endsWith(".demo") || (isDemoAccountEmail(email) && isDemoSchoolDomain(email.split("@")[1]!))), "Use a valid real or demo email address."),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
 }).strict();
