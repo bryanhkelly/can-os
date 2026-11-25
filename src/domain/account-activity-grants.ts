@@ -1,3 +1,5 @@
+import {studentSiteScope} from "./student-site-scope";
+import type {AccessContext} from "./access-context";
 /**
  * Project participation visibility from verified CAN grants. A role selected
  * for navigation does not replace the underlying account/Person membership.
@@ -33,4 +35,10 @@ export function activityMembershipCovers(
 ):boolean{
   return membership.organizationId===organizationId&&
     (membership.siteId===null||membership.siteId===siteId);
+}
+
+/** Only use a server-verified effective context. Never accept a client grant. */
+export function selectEffectiveStudentActivityMembership(actor:AccessContext):ActivityMembership[]{
+  const scope=studentSiteScope(actor);
+  return scope?[{id:actor.grantId,role:"student",organizationId:scope.organizationId,siteId:scope.siteId}]:[];
 }

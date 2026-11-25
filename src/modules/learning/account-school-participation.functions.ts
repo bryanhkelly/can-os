@@ -6,7 +6,7 @@ import {db} from "@/db/client";
 import * as s from "@/db/schema";
 import {AuthorizationError} from "@/domain/command-context";
 import {guardianRelationshipPredicate} from "@/domain/guardian-relationship";
-import {selectActivityMemberships} from "@/domain/account-activity-grants";
+import {selectActivityMemberships,selectEffectiveStudentActivityMembership} from "@/domain/account-activity-grants";
 import {
   projectSchoolSections,projectSchoolPrograms,projectFamilyEnrichment,
   projectAcceptedCalendarEvents,
@@ -57,15 +57,15 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
       email:s.accessAccounts.emailNormalized,personId:s.accessAccounts.personId,
       disabled:s.accessAccounts.disabled,verifiedAt:s.accessAccounts.emailVerifiedAt,
     }).from(s.accessAccounts).where(eq(s.accessAccounts.id,actor.accountId)).limit(1);
-    if(!account||account.disabled||!account.verifiedAt||
+    if(!account||account.disabled||(!account.verifiedAt&&!directStudent)||
        account.personId!==actor.actorPersonId)
       throw new AuthorizationError("single CAN account Person");
-    const {grants}=await readSessionGrants(actor.accountId,account.email);
+    const {grants}=directStudent?{grants:[]} : await readSessionGrants(actor.accountId,account.email);
     // Explicitly match original live grants to this single authenticated
     // Person. Demo delegation cannot ever merge a second Person's history.
     const memberships=selectActivityMemberships(grants,actor.accountId,actor.actorPersonId);
     // A switched Student sees only the effective verified Site grant, never the operator’s memberships.
-    const student=directStudent?memberships.student.filter(g=>g.id===actor.grantId&&g.siteId===directStudent.siteId&&g.organizationId===directStudent.organizationId):memberships.student;
+    const student=directStudent?selectEffectiveStudentActivityMembership(actor):memberships.student;
     const guardians=directStudent?[]:memberships.guardian;
     // Match each original organization/Site grant separately. A Site-only
     // grant never broadens to sibling sites just because the org matches.

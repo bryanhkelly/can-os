@@ -147,7 +147,8 @@ export const getMyActivity=createServerFn({method:"GET"})
             coverage:page.nextCursor?"partial":"complete",
             message:page.nextCursor?"Older records available. Load more Activity pages.":null,
           });
-        }catch{
+        }catch(error){
+          console.warn("My Activity source unavailable",{source,category:error instanceof AuthorizationError?"authorization":"unexpected"});
           // Never report unauthorized/unavailable sources as an empty history.
           sources.push({source,state:"unavailable",coverage:"unknown",
             message:"This source could not be verified with the current access."});
@@ -164,7 +165,8 @@ export const getMyActivity=createServerFn({method:"GET"})
         sources.push({source:"noncredit_waitlist",state:"ready",
           coverage:page.nextCursor?"partial":"complete",
           message:page.nextCursor?"Older invitation records are available.":null});
-      }catch{
+      }catch(error){
+        console.warn("My Activity source unavailable",{source:"noncredit_waitlist",category:error instanceof AuthorizationError?"authorization":"unexpected"});
         sources.push({source:"noncredit_waitlist",state:"unavailable",
           coverage:"unknown",message:"Waiting-list source could not be verified."});
       }
