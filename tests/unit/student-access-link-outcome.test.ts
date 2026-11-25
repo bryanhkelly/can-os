@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const state=vi.hoisted(()=>({
  rows:[] as unknown[][],actor:{} as unknown,inTransaction:false,committed:false,
- sender:vi.fn(),update:vi.fn(),insert:vi.fn(),emit:vi.fn(),audit:vi.fn(),transactions:vi.fn(),
+ sender:vi.fn(),scope:vi.fn(),update:vi.fn(),insert:vi.fn(),emit:vi.fn(),audit:vi.fn(),transactions:vi.fn(),
 }));
 vi.mock("@/db/client",()=>{
  const select=()=>{
@@ -12,7 +12,7 @@ vi.mock("@/db/client",()=>{
  };
  return {db:{select,transaction:async(callback:(tx:unknown)=>unknown)=>{
   state.transactions();state.inTransaction=true;
-  try{const result=await callback({select,insert:state.insert,update:state.update});state.committed=true;return result;}
+  try{const result=await callback({select,execute:async()=>({rows:[]}),insert:state.insert,update:state.update});state.committed=true;return result;}
   finally{state.inTransaction=false;}
  }}};
 });
@@ -29,11 +29,12 @@ vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:asyn
 vi.mock("@/domain/access-tokens",()=>({normalizeAccessEmail:(email:string)=>email.trim().toLowerCase()}));
 vi.mock("@/modules/enrollment/instructional-section-readiness.server",()=>({staffedPublishedSectionIds:async(ids:string[])=>new Set(ids)}));
 vi.mock("@/modules/identity/passwordless-access.server",()=>({requestOneTimeAccess:state.sender}));
+vi.mock("@/modules/identity/demo-school-tenants.server",()=>({matchesDemoCredentialScope:state.scope}));
 vi.mock("@/platform/mutation",()=>({emitEvent:state.emit,writeAudit:state.audit,notify:vi.fn()}));
 vi.mock("@/domain/event-types",()=>({EventTypes:{StudentLearningAccessApproved:"StudentLearningAccessApproved"}}));
 import { provisionStudentLearningAccess } from "@/modules/enrollment/student-access-handoff.functions";
 const input={applicationId:"application",confirmedIndependentIdentity:true as const,reviewMethod:"institutional_school_record" as const};
-function rows(status="pending_review",grants=[{personId:"student",role:"student",isSynthetic:false}]){
+function rows(status="pending_review",grants=[{personId:"student",role:"student",organizationId:"church",siteId:"site"}],email="child@example.test"){
  state.rows=[
   [{id:"application",programId:"program",studentProfileId:"profile",stage:"accepted",
    applicationMetadata:{schoolYearId:"year"},programStatus:"active",studentPersonId:"student",
@@ -41,10 +42,10 @@ function rows(status="pending_review",grants=[{personId:"student",role:"student"
   [{schoolYearId:"year"}],
   [{id:"section",sectionProgramId:"program",sectionSiteId:"site",sectionYearId:"year",enrollmentYearId:"year"}],
   [{id:"consent",status,studentProfileId:"profile",programId:"program",siteId:"site",
-   guardianPersonId:"guardian",studentEmail:"child@example.test"}],
+   guardianPersonId:"guardian",studentEmail:email}],
   [{permission:true,metadata:{verification:"verified"}}],
-  [{active:true,email:"child@example.test"}],
-  [{id:"account",disabled:false}],grants,[{id:"grant",active:true}],
+  [{active:true,email}],
+  [{id:"account",personId:"student",disabled:false}],grants,[{id:"grant",active:true}],
  ];
 }
 beforeEach(()=>{
@@ -52,6 +53,7 @@ beforeEach(()=>{
  state.actor={actorPersonId:"registrar",role:"registrar",accountId:"operator-account",sessionId:"session",
   capabilities:new Set(["enrollment.activate"]),scope:{programIds:["program"],siteIds:["site"],organizationIds:["church"]}};
  rows();
+ state.scope.mockResolvedValue(false);
  state.update.mockImplementation(()=>({set:()=>({where:async()=>undefined})}));
  state.sender.mockImplementation(async()=>{
   expect(state.inTransaction).toBe(false);expect(state.committed).toBe(true);
@@ -81,8 +83,23 @@ describe("student approval and sign-in request outcomes",()=>{
   expect(state.sender).toHaveBeenCalledWith("child@example.test",undefined,"/profiles");
  });
  it("does not convert an identity collision into a delivery warning",async()=>{
-  rows("pending_review",[{personId:"another-person",role:"student",isSynthetic:false}]);
+  rows("pending_review",[{personId:"another-person",role:"student",organizationId:"church",siteId:"site"}]);
   await expect(provisionStudentLearningAccess({data:input})).rejects.toThrow("different identity");
+  expect(state.committed).toBe(false);
+  expect(state.sender).not.toHaveBeenCalled();
+  expect(state.emit).not.toHaveBeenCalled();
+ });
+ it("approves the same account records and does not send email for an eligible demo credential",async()=>{
+  state.scope.mockResolvedValue(true);
+  rows("pending_review",undefined,"child@example.demo");
+  expect(await provisionStudentLearningAccess({data:input})).toEqual({status:"approved",signInRequest:"demo_code"});
+  expect(state.committed).toBe(true);
+  expect(state.emit).toHaveBeenCalledTimes(1);
+  expect(state.sender).not.toHaveBeenCalled();
+ });
+ it("rejects a shared credential outside the authorized Site before account provisioning",async()=>{
+  rows("pending_review",undefined,"child@example.demo");
+  await expect(provisionStudentLearningAccess({data:input})).rejects.toThrow("eligible credential");
   expect(state.committed).toBe(false);
   expect(state.sender).not.toHaveBeenCalled();
   expect(state.emit).not.toHaveBeenCalled();
