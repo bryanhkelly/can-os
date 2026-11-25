@@ -32,6 +32,7 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
   const [organization] = await tx.insert(organizations).values({
     type: initialType, name: signup.organizationName?.trim() || signup.schoolName,
     slug, lifecycleStatus: "active",
+    domain: approval === "demo_code" ? email.split("@")[1]! : null,
     metadata: { signup: { requestedOrganizationType: requestedType,
       classification: initialType === requestedType ? "self_reported" : "pending_verification" } },
   }).returning({ id: organizations.id });
