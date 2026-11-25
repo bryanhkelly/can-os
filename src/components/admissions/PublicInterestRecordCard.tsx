@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Field } from "@/components/ui/field";
+import { WorkspacePanel, WorkspaceNotice, ActionFooter, StatusBadge, FormSection } from "@/components/workspace";
 import { PublicInterestTimeline } from "./PublicInterestTimeline";
 import type { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
 
@@ -23,29 +24,27 @@ export function PublicInterestRecordCard({
   onSelectProgram?:(programId:string)=>void;
   onAssign?:(row:PublicInterestRecord)=>void|Promise<void>;
 }) {
-  return <article className=" border p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="font-semibold">{row.firstName} {row.lastName}</h3>
-            <p className="text-sm text-muted-foreground">{row.programName??"General Site interest"}</p>
+  return <WorkspacePanel title={`${row.firstName} ${row.lastName}`} description={row.programName??"General Site interest"} actions={<StatusBadge>{row.status}</StatusBadge>}>
+        <div className="space-y-3">
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <p className="mt-1 text-sm">{row.email}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {new Date(row.createdAt).toLocaleString()} · {row.status} · {row.source === "staff_invitation" ? "Pre-opening invitation response" :
                 row.source === "published_site_general" ? "Prelaunch Site interest" : "Public website inquiry"}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {row.applicationId && row.programId ? <Link to="/admissions/intake"
+          <ActionFooter layout="inline">
+            {row.applicationId && row.programId ? <Button asChild variant="outline" size="sm"><Link to="/admissions/intake"
               search={{siteId:row.siteId,programId:row.programId,
                 application:row.applicationId,interest:undefined}}
-              className={buttonVariants({ variant: "outline", size: "sm" })}>
+              >
               View linked inquiry
-            </Link> : row.programId && row.status !== "closed" && row.admissionsAuthorized && <Link to="/admissions/intake/new"
+            </Link></Button> : row.programId && row.status !== "closed" && row.admissionsAuthorized && <Button asChild variant="outline" size="sm"><Link to="/admissions/intake/new"
               search={{siteId:row.siteId,programId:row.programId,
                 interest:row.id}}
               className={buttonVariants({ variant: "outline", size: "sm" })}>
               Review and create inquiry
-            </Link>}
+            </Link></Button>}
             {!row.applicationId && ["new","contacted"].includes(row.status) &&
               row.canSendApplicationInvitation &&
               <Button type="button" size="sm" disabled={busy}
@@ -63,21 +62,15 @@ export function PublicInterestRecordCard({
               variant="outline">
               Close
             </Button>}
-          </div>
+          </ActionFooter>
         </div>
-        <div className="mt-3  border bg-muted/30 p-3 text-sm" role="status">
+        <WorkspaceNotice className="mt-3">
           <p className="font-semibold">Next step · {row.nextStep.owner}</p>
           <p className="mt-1">{row.nextStep.message}</p>
-        </div>
+        </WorkspaceNotice>
         {row.programId===null&&!row.applicationId&&
           ["new","contacted"].includes(row.status)&&row.consentAt&&
-          <div className="mt-3 border p-3 text-sm">
-            <p className="font-semibold">Move this Site interest to an authorized Program</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Only a registrar may select the appropriate Program. The server
-              rechecks current admissions authorization. Linking the existing
-              prospect does not create an Application or reserve a place.
-            </p>
+          <FormSection className="mt-4" columns={1} title="Move this Site interest to an authorized Program" description="Only a registrar may select the appropriate Program. The server rechecks current admissions authorization. Linking the existing prospect does not create an Application or reserve a place.">
             {programChoices?.length&&onAssign&&onSelectProgram
               ? <div className="mt-3 flex flex-wrap items-end gap-2">
                   <Field label="Program to invite about (authorization verified on save)">
@@ -96,10 +89,9 @@ export function PublicInterestRecordCard({
               : <p className="mt-2 text-xs text-muted-foreground">
                   No authorized Program is available for selection in your current scope.
                 </p>}
-          </div>}
+          </FormSection>}
         <PublicInterestTimeline row={row} />
-        {row.applicationId && row.programId && <div className="mt-3  border bg-background p-3 text-sm">
-          <p className="font-semibold">Next school handoff</p>
+        {row.applicationId && row.programId && <WorkspacePanel title="Next school handoff" className="mt-4">
           {!row.activeEnrollment
             ? <p className="mt-1">{row.latestOfferStatus === "accepted"
                 ? "The family accepted its offer. Admissions must activate school-year enrollment and assign a staffed instructional class."
@@ -121,11 +113,11 @@ export function PublicInterestRecordCard({
             {row.activeEnrollment && row.placedInClass &&
               <Link to="/staff/attendance" search={{programId:row.programId}} className="font-semibold underline">Scheduled school-day roster →</Link>}
           </div>
-        </div>}
+        </WorkspacePanel>}
         {row.familyStartRequestId && !row.emailVerifiedAt && !row.applicationId &&
           <p className="mt-2 text-xs text-muted-foreground">Awaiting family email verification or application. A sent invitation is not an accepted application.</p>}
         {row.programId && row.admissionsAuthorizationStatus === "not_authorized" && !row.applicationId && row.status !== "closed" &&
           <p className="mt-2 text-xs text-muted-foreground">The family's interest is saved. Application invitations become available after CAN authorizes this school.</p>}
         {row.message && <p className="mt-3 whitespace-pre-wrap text-sm">{row.message}</p>}
-      </article>;
+      </WorkspacePanel>;
 }

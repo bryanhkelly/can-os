@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { ActionFooter } from "@/components/workspace/action-footer";
 export type AdmissionsDecision="application"|"eligibility"|"accept"|"decline"|"withdraw"|"waitlist"|"restore";
 
 const actions:Record<string,readonly (readonly [AdmissionsDecision,string])[]>={
@@ -18,9 +19,9 @@ export function AdmissionsDecisionActions({stage,disposition,busy,onDecision}:{
   ?disposition:stage;
  const options=actions[key]??[];
  if(!options.length)return null;
- return <div className="mt-4 flex flex-wrap gap-2">
+ return <ActionFooter layout="inline">
   {options.map(([decision,label])=><Button key={decision} type="button" variant="outline" size="sm" disabled={busy}
    onClick={()=>onDecision(decision,label)}
    >{label}</Button>)}
- </div>;
+ </ActionFooter>;
 }
