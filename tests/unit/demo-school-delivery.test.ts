@@ -11,7 +11,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.rows = [];
   state.read.mockImplementation(() => {
-    const query = { from: () => query, where: () => query, limit: async () => state.rows };
+    const query = { from: () => query, innerJoin: () => query, where: () => query, limit: async () => state.rows, then: (resolve: (rows: unknown[]) => unknown) => Promise.resolve(state.rows).then(resolve) };
     return query;
   });
 });
@@ -19,9 +19,15 @@ describe("registered demo-school external delivery", () => {
   it("classifies new demo tenants from the registry even when disabled", async () => {
     state.rows = [{ domain: "newschool.demo", enabled: false }];
     expect(await isDemoTenantOrganization("newschool-org")).toBe(true);
-    expect(await emailNotificationRecipients(["any-person"], "newschool-org")).toEqual(new Map());
     expect(await sendOptedInSms("+15555550123", "No external message", "newschool-org")).toBe(false);
     await expect(beginSmsVerification("person", "+15555550123", ["newschool-org"])).rejects.toThrow("tenant scope");
+  });
+  it("resolves eligible real recipients in demo organizations using the ordinary query", async () => {
+    state.rows = [
+      { personId: "real-person", email: "person@real.org", accountDisabled: false, emailVerifiedAt: new Date(), grantActive: true, personActive: true },
+      { personId: "demo-person", email: "person@nested.school.demo", accountDisabled: false, emailVerifiedAt: new Date(), grantActive: true, personActive: true },
+    ];
+    expect(await emailNotificationRecipients(["real-person", "demo-person"], "newschool-org")).toEqual(new Map([["real-person", "person@real.org"]]));
   });
   it("preserves ordinary tenant classification without inferring demo status from provenance metadata", async () => {
     expect(await isDemoTenantOrganization("ordinary-school")).toBe(false);
