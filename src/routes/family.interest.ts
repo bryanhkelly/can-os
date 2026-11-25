@@ -114,14 +114,12 @@ export const Route=createFileRoute("/family/interest")({
         // Confirmation is sent only after this adult affirmatively responds.
         if(followUpAllowed && !parsed.website){
           try{
-            const [{readPreopeningFamilyWelcome},{sendNotificationEmail},{isDemoTenantOrganization}]=
+            const [{readPreopeningFamilyWelcome},{sendNotificationEmail}]=
               await Promise.all([
                 import("@/modules/enrollment/family-invitations.server"),
                 import("@/modules/communication/notification-email.server"),
-                import("@/modules/identity/demo-school-tenants.server"),
               ]);
             const context=await readPreopeningFamilyWelcome(parsed.invitationBatchId,parsed.invitationRecipientKey);
-            if(!await isDemoTenantOrganization(context.organizationId)){
               const url=new URL("/family/interest",request.url);
               url.searchParams.set("invitationBatchId",parsed.invitationBatchId);
               url.searchParams.set("invitationRecipientKey",parsed.invitationRecipientKey);
@@ -133,7 +131,6 @@ export const Route=createFileRoute("/family/interest")({
               await sendNotificationEmail({
                 to:parsed.email,subject:template.subject,html:template.html,text:template.text,
               },`family-interest:${parsed.invitationBatchId}:${parsed.invitationRecipientKey}:confirmation`);
-            }
           }catch{
             // Persistence succeeds independently of optional email delivery.
             console.warn("Family interest confirmation could not be delivered",{kind:"provider_unavailable"});
