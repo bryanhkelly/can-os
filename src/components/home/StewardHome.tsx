@@ -76,7 +76,7 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
     <MutationFeedback state={mutation} className="mt-4" pendingMessage="Recording partner authority..."/>
     <WorkspacePanel id="steward-agreement" title="Record independently verified agreement" className="mt-6">
       <form onSubmit={saveAgreement} className="space-y-4" aria-busy={busy}>
-        <FormSection title="Required information">
+        <FormSection headingLevel="h3" title="Required information">
         <Field label="Denomination" required>
           <Select required value={denominationOrganizationId} onChange={e=>setOrganization(e.target.value)}>
             <option value="">Choose denomination…</option>
@@ -101,7 +101,7 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
     </WorkspacePanel>
     <WorkspacePanel title="Authorize denomination HQ officer" description="Requires a current verified contract and an independently reviewed officer authorization document whose authorized email matches this officer." className="mt-6">
       <form onSubmit={provision} className="space-y-4" aria-busy={busy}>
-        <FormSection title="Required information">
+        <FormSection headingLevel="h3" title="Required information">
         <Field label="Denomination" required>
           <Select required value={officerOrganizationId} onChange={e=>setOfficerOrg(e.target.value)}>
             <option value="">Choose denomination…</option>
