@@ -222,8 +222,9 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId, organizationId)).limit(1);
       const syntheticSchool = Boolean(demoSchool) || isValorOrganization(organizationId);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
-      if ((demoSchool && !demoSchool.enabled) ||
-        (localDemoIdentity && !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx))) {
+      // Registry disablement controls shared credentials, not real-email invitations.
+      if (localDemoIdentity && ((demoSchool && !demoSchool.enabled) ||
+        !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx))) {
         throw new DomainError("FORBIDDEN", "Local demo identities require their original registered school domain");
       }
       let [account] = await tx.select({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled }).from(accessAccounts)
