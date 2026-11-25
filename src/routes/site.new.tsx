@@ -110,6 +110,7 @@ function SiteNewPage() {
       name: String(values.get("siteName") ?? "").trim(),
       organizationName: String(values.get("organizationName") ?? "").trim() || undefined,
       organizationType: String(values.get("organizationType") ?? "").trim(),
+      organizationDomain: String(values.get("organizationDomain") ?? "").trim() || undefined,
       firstName: String(values.get("firstName") ?? "").trim(),
       lastName: String(values.get("lastName") ?? "").trim(),
       email: String(values.get("email") ?? "").trim(),
@@ -181,6 +182,9 @@ function SiteNewPage() {
               <Field label="Organization name (optional)"
                 description="Only if the organization responsible for this Site has a different name. Affiliations and legal authority are reviewed separately.">
                 <Input name="organizationName" placeholder="e.g., Grace Community Church" minLength={2} maxLength={160} />
+              </Field>
+              <Field label="Organization domain" required description="The domain that identifies the organization, not necessarily your personal email domain. For demo setup, use the same .demo domain as your administrator email.">
+                <Input name="organizationDomain" placeholder="e.g., gracechurch.org" required maxLength={253} />
               </Field>
               <Field label="Responsible organization type" required
                 description="Choose how your organization describes itself. National network status and affiliations require independent verification.">
