@@ -67,7 +67,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const programs = planning.programs.filter(p => !siteId || p.siteId === siteId);
   const selectable = programs.filter(p => p.status !== "paused" && p.status !== "closed");
   const selected = selectable.find(p => p.id === programId);
-  const inputClass = "mt-1 w-full  border bg-background p-2 text-sm";
+  const inputClass = "mt-1";
 
   async function createDraft(event: React.FormEvent) {
     event.preventDefault();
