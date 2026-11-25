@@ -98,6 +98,9 @@ describe("account-wide participation source authority and pagination",()=>{
   expect(activity).toContain("nextCursors");
   expect(activity).toContain("getMyActivityOpportunityPage");
   expect(activity).toContain("getMyNoncreditWaitlistPage");
+  expect(activity).not.toContain("session.demoTenant");
+  expect(activity).not.toContain("isDemoAccountEmail");
+  expect(activity).toContain("independentSourceExcluded(session)");
   expect(ui).toContain("nextOpportunityCursor");
   expect(ui).toContain("getMyActivityOpportunityPage");
   expect(ui).toContain("Load older activity");
