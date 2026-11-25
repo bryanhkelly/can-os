@@ -1,3 +1,4 @@
+import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { existingStudentChoices } from "./admissions-student-choices.server";
 import { db } from "@/db/client";
@@ -625,9 +626,10 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
     (actor.scope.siteIds!==undefined&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
     throw new AuthorizationError("guardian membership scope");
    const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
+   if(!uuid.safeParse(contactId).success)throw new DomainError("ADMISSIONS_GUARDIAN_CONTACT_REQUIRED");
    const [contact]=await tx.select({id:people.id,email:people.email})
     .from(people).where(eq(people.id,contactId)).limit(1);
-   if(!contact?.email)throw new Error("Guardian contact email missing");
+   if(!contact?.email)throw new DomainError("ADMISSIONS_GUARDIAN_EMAIL_REQUIRED");
    const [learner]=await tx.select({personId:studentProfiles.personId})
     .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
    const [relationship]=learner?await tx.select({
@@ -641,7 +643,7 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    // activate passwordless access before an authorized relationship check.
    if(!relationship||relationship.metadata.verification!=="verified"||
       !relationship.canManageEnrollment)
-    throw new Error("Verify the student's guardian relationship before granting account access");
+    throw new DomainError("ADMISSIONS_GUARDIAN_VERIFICATION_REQUIRED");
    const email=normalizeAccessEmail(contact.email);
    let [account]=await tx.select({id:accessAccounts.id,disabled:accessAccounts.disabled})
     .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).limit(1);
@@ -696,9 +698,10 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
     (actor.scope.siteIds!==undefined&&(!application.siteId||!actor.scope.siteIds.includes(application.siteId))))
    throw new AuthorizationError("admissions invitation Program, school and site scope");
   const contactId=applicationGuardianContact(application.metadata,application.submittedByPersonId);
+   if(!uuid.safeParse(contactId).success)throw new DomainError("ADMISSIONS_GUARDIAN_CONTACT_REQUIRED");
   const [contact]=await db.select({email:people.email})
    .from(people).where(eq(people.id,contactId)).limit(1);
-  if(!contact?.email)throw new Error("Guardian email is missing");
+  if(!contact?.email)throw new DomainError("ADMISSIONS_GUARDIAN_EMAIL_REQUIRED");
   const [learner]=await db.select({personId:studentProfiles.personId})
    .from(studentProfiles).where(eq(studentProfiles.id,application.studentProfileId)).limit(1);
   const [verified]=learner?await db.select({
@@ -709,7 +712,7 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
    eq(guardianRelationships.studentPersonId,learner.personId),
   )).limit(1):[];
   if(!verified||verified.metadata.verification!=="verified"||!verified.canManageEnrollment)
-   throw new Error("Guardian relationship verification is required before inviting");
+   throw new DomainError("ADMISSIONS_GUARDIAN_VERIFICATION_REQUIRED");
   const [grant]=await db.select({id:accountPersonGrants.id})
    .from(accountPersonGrants)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
@@ -718,7 +721,7 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
     eq(accountPersonGrants.organizationId,application.organizationId),
     ...(application.siteId?[or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,application.siteId))]:[isNull(accountPersonGrants.siteId)]),
     eq(accessAccounts.emailNormalized,normalizeAccessEmail(contact.email)))).limit(1);
-  if(!grant)throw new Error("Provision the guardian's identity-bound access first");
+  if(!grant)throw new DomainError("ADMISSIONS_GUARDIAN_LOGIN_REQUIRED");
   const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
   await requestOneTimeAccess(contact.email);
   await writeAudit(db,actor,{
@@ -751,13 +754,14 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
       (actor.scope.siteIds!==undefined&&(!app.siteId||!actor.scope.siteIds.includes(app.siteId))))
     throw new AuthorizationError("guardian relationship verification Program, school and site scope");
    const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
+   if(!uuid.safeParse(contactId).success)throw new DomainError("ADMISSIONS_GUARDIAN_CONTACT_REQUIRED");
    const [learner]=await tx.select({personId:studentProfiles.personId})
     .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
-   if(!learner)throw new Error("Student not found");
+   if(!learner)throw new DomainError("ADMISSIONS_STUDENT_REQUIRED");
    const [relationship]=await tx.select().from(guardianRelationships)
     .where(and(eq(guardianRelationships.guardianPersonId,contactId),
      eq(guardianRelationships.studentPersonId,learner.personId))).for("update").limit(1);
-   if(!relationship)throw new Error("Guardian relationship not found");
+   if(!relationship)throw new DomainError("ADMISSIONS_GUARDIAN_RELATIONSHIP_REQUIRED");
    if(relationship.metadata.verification==="verified")return {verified:true};
    const verifiedAt=new Date();
    await tx.update(guardianRelationships).set({
