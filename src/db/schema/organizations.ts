@@ -38,6 +38,7 @@ export const organizations = pgTable(
     type: organizationType("type").notNull(),
     name: text("name").notNull(),
     legalName: text("legal_name"),
+    domain: text("domain"),
     lifecycleStatus: text("lifecycle_status").$type<"prospective" | "active" | "inactive" | "closed">(),
     externalReference: text("external_reference"),
     slug: text("slug").notNull(),
@@ -49,6 +50,7 @@ export const organizations = pgTable(
     uniqueIndex("organization_slug_uq").on(table.slug),
     index("organization_parent_idx").on(table.parentOrganizationId),
     index("organization_type_idx").on(table.type),
+    index("organization_domain_idx").on(table.domain),
     uniqueIndex("organizations_shared_external_reference_uq").on(table.externalReference).where(isNotNull(table.externalReference)),
   ],
 );
