@@ -63,6 +63,63 @@ function importNames(clause) {
   return names;
 }
 
+
+// Control appearance belongs to the canonical primitive, not its consumers.
+// Layout, width, wrapping and content-specific typography remain composable.
+const governedControls = new Set(["Button", "Input", "Select", "Textarea", "Checkbox", "Radio"]);
+const ownedUtility = /^(?:bg-|border(?:$|-)|rounded(?:$|-)|shadow(?:$|-)|ring(?:$|-)|outline(?:$|-)|p[xytrblse]?-(?!0$)|opacity-|font-(?:normal|medium|semibold|bold)|text-(?:xs|sm|base|lg|xl|foreground|background|muted-foreground|primary|secondary|destructive|white|black)(?:$|\/))/;
+function controlAppearanceIssues(syntax) {
+  const bindings = new Map(), constants = new Map(), issues = [];
+  for (const statement of syntax.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier) &&
+        /(?:^|\/)ui(?:\/|$)/.test(statement.moduleSpecifier.text)) {
+      const clause = statement.importClause;
+      if (!clause || clause.isTypeOnly) continue;
+      const named = clause.namedBindings;
+      if (named && ts.isNamedImports(named)) for (const el of named.elements) {
+        const original = el.propertyName?.text ?? el.name.text;
+        if (!el.isTypeOnly && governedControls.has(original)) bindings.set(el.name.text, original);
+      }
+    }
+    if (ts.isVariableStatement(statement) && (statement.declarationList.flags & ts.NodeFlags.Const))
+      for (const d of statement.declarationList.declarations)
+        if (ts.isIdentifier(d.name) && d.initializer) constants.set(d.name.text, d.initializer);
+  }
+  function literals(node, seen = new Set()) {
+    if (!node || seen.has(node)) return [];
+    seen.add(node);
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ||
+        ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) return [node];
+    if (ts.isIdentifier(node)) return literals(constants.get(node.text), seen);
+    if (ts.isConditionalExpression(node)) return [...literals(node.whenTrue, seen), ...literals(node.whenFalse, seen)];
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+      return literals(node.right, seen);
+    if (ts.isCallExpression(node) && /^(?:cn|clsx|twMerge)$/.test(node.expression.getText(syntax)))
+      return node.arguments.flatMap(arg => literals(arg, seen));
+    if (ts.isJsxExpression(node) || ts.isParenthesizedExpression(node)) return literals(node.expression, seen);
+    if (ts.isArrayLiteralExpression(node)) return node.elements.flatMap(el => literals(el, seen));
+    if (ts.isTemplateExpression(node)) return [node.head, ...node.templateSpans.flatMap(span => [...literals(span.expression, seen), span.literal])];
+    return [];
+  }
+  function walk(node) {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const control = bindings.get(node.tagName.getText(syntax));
+      if (control) {
+        const classes = attribute(node, "className");
+        const utilities = new Set();
+        for (const literal of literals(classes?.initializer)) for (const token of literal.text.split(/\s+/)) {
+          const utility = token.split(":").at(-1).replace(/^!|!$/g, "");
+          if (ownedUtility.test(utility)) utilities.add(token);
+        }
+        for (const utility of utilities) issues.push({ control, utility, ...location(syntax, classes) });
+      }
+    }
+    ts.forEachChild(node, walk);
+  }
+  walk(syntax);
+  return issues;
+}
+
 export function analyzeSource(source, path, options = {}) {
   const isTsx = path.endsWith(".tsx");
   const syntax = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true,
@@ -113,6 +170,7 @@ export function analyzeSource(source, path, options = {}) {
   walk(syntax);
   return {
     native, corners, imports,
+    appearance: isTsx && !primitive ? controlAppearanceIssues(syntax) : [],
     syntaxErrors: syntax.parseDiagnostics.map(d => ({
       message: ts.flattenDiagnosticMessageText(d.messageText, "\n"),
       ...location(syntax, { getStart: () => d.start ?? 0 }),
@@ -261,6 +319,7 @@ export function collectV61SourceViolations(inventory) {
   return inventory.inspected.flatMap(file => [
     ...file.native.map(issue => ({ file: file.path, kind: "native-control", detail: issue.tag, line: issue.line, column: issue.column })),
     ...file.corners.map(issue => ({ file: file.path, kind: "geometry", detail: issue.utility, line: issue.line, column: issue.column })),
+    ...(file.appearance ?? []).map(issue => ({ file: file.path, kind: "control-appearance", detail: issue.control + ": " + issue.utility, line: issue.line, column: issue.column })),
     ...file.syntaxErrors.map(issue => ({ file: file.path, kind: "syntax", detail: issue.message, line: issue.line, column: issue.column })),
   ]);
 }
@@ -319,7 +378,7 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF) {
     const current = analyzeSource(readFileSync(file, "utf8"), file);
     let previous;
     try { previous = analyzeSource(git(src, ["show", base + ":" + path]), file); }
-    catch { previous = { native: [], corners: [], syntaxErrors: [] }; }
+    catch { previous = { native: [], corners: [], appearance: [], syntaxErrors: [] }; }
     result.checked += 1;
     // Compare semantic control categories separately. Replacing one legacy
     // label with a new native button must not be mistaken for progress.
@@ -331,7 +390,7 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF) {
           before + " to " + after);
       }
     }
-    for (const key of ["corners", "syntaxErrors"]) {
+    for (const key of ["corners", "appearance", "syntaxErrors"]) {
       if (current[key].length > previous[key].length) {
         result.errors.push(path + ": " + key + " increased from " +
           previous[key].length + " to " + current[key].length);
