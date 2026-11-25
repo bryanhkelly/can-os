@@ -1,10 +1,10 @@
-import {and,eq,gt,isNull,inArray,isNotNull} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
-import {readSessionGrants} from "./session-grants.server";
+import {readSessionGrants, readOwnerDelegationGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { authorizedProgramWhere } from "./authorized-program-query.server";
@@ -127,20 +127,19 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   }).from(accountPersonGrants)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
    .where(and(eq(accountPersonGrants.id,session.delegatedGrantId),
-      eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false),
-      isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
-  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||isDemoAccountEmail(target.email)||
+      eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false))).limit(1);
+  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||
      !target.accountPersonId||target.accountPersonId!==target.personId)
    return rejectSession(request,"membership_unavailable");
   try{await assertRawAccountPerson(target.accountId,target.personId);}
   catch{return rejectSession(request,"membership_unavailable");}
-  const eligible=await readSessionGrants(target.accountId,target.email);
-  const exact=eligible.grants.find(grant=>grant.id===session.delegatedGrantId&&grant.active);
+  const eligible=await readOwnerDelegationGrants(target.accountId,target.personId,target.email);
+  const exact=eligible.find(grant=>grant.id===session.delegatedGrantId&&grant.active);
   if(!exact)return rejectSession(request,"membership_unavailable");
   if(session.delegatedMode==="act" && !platformOwnerMayActAs(exact.role))
    throw new AuthorizationError("independent protected reviewer role");
   effectiveGrant=exact;
-  effectiveGrants=eligible.grants;
+  effectiveGrants=eligible;
   ownerDelegation={mode:session.delegatedMode,expiresAt:session.delegatedUntil};
  }
  // A malformed Site membership must never expand into a different tenant.
