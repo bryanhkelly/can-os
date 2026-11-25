@@ -56,14 +56,14 @@ export function StatusBadge({ children, tone = "neutral" }: {
   children: ReactNode; tone?: StatusTone;
 }) {
   const Icon = statusIcons[tone];
-  return <span className={cn("inline-flex items-center gap-1.5 border px-2.5 py-1 text-xs font-medium",
+  return <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5 border px-2.5 py-1 text-xs font-medium",
     tone === "info" && "border-info/40 bg-info/10 text-foreground",
     tone === "attention" && "border-warning/50 bg-warning/10 text-foreground",
     tone === "success" && "border-success/50 bg-success/10 text-foreground",
     tone === "danger" && "border-danger/50 bg-danger/10 text-foreground",
     tone === "neutral" && "bg-muted text-muted-foreground")}>
     <Icon aria-hidden="true" className="size-3.5 shrink-0" />
-    <span>{children}</span>
+    <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
   </span>;
 }
 
