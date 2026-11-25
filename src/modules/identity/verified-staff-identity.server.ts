@@ -80,7 +80,7 @@ export function verifiedStaffIdentityPredicate() {
             and ${demoSchoolTenants.adminAccountId} = ${account.id}
             and ${demoSchoolTenants.adminPersonId} = ${grant.personId}
             and ${demoSchoolTenants.adminGrantId} = ${grant.id}
-            and ${account.emailNormalized} = 'admin.demo@' || ${demoSchoolTenants.domain})
+            and ${account.personId} = ${grant.personId})
           or exists (
             select 1 from ${domainEvents}
             where ${domainEvents.aggregateType} = 'StaffInvitation'
