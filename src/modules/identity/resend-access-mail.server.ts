@@ -3,6 +3,8 @@
  * Resend delivers mail; it never decides who the user is or what they can access.
  * Call from server code only; never import this module into a client component.
  */
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
+
 export type OneTimeAccessMessage = {
  to: string;
  accessUrl: string;
@@ -47,6 +49,9 @@ async function writeTestAccessMail(message:OneTimeAccessMessage):Promise<boolean
 
 export const sendAccessLinkViaResend: AccessEmailSender = async message => {
  const {to,accessUrl}=message;
+ // Reject before configuration, template, outbox or external transport access.
+ // This API promises delivery submission, so suppression must not report success.
+ if(suppressDemoEmailDelivery(to))throw new Error("Demo email destination suppressed");
  const url=new URL(accessUrl);
  if(url.protocol!=="https:" || !url.hostname) throw new Error("Access link must use HTTPS");
  const allowedOrigin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
