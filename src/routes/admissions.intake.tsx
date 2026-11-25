@@ -1,4 +1,3 @@
-import { buttonVariants } from "@/components/ui/button";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { AdmissionsApplicantCard } from "@/components/admissions/AdmissionsApplicantCard";
@@ -9,7 +8,7 @@ import {createFileRoute,Link,redirect,useRouter} from "@tanstack/react-router";
 import {getAdmissionsStageCounts,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceShell} from "@/components/workspace";
+import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspacePanel, WorkspaceShell} from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -108,13 +107,14 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  }
  return <WorkspaceShell eyebrow="Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
-  actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className={buttonVariants({ variant: "outline" })}>Offers & enrollment →</Link>}>
+  actions={<Button asChild variant="outline"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}}>Offers & enrollment</Link></Button>}>
   <div className="mt-5"><CreateAction><Link to="/admissions/intake/new" search={{siteId:selected.siteId,programId:selected.programId}}>New inquiry</Link></CreateAction></div>
   <MutationFeedback state={mutation} pendingMessage="Saving admissions records..." className="mt-5"/>
   <PublicInterestInbox initialPage={data.publicInterests} availablePrograms={data.programs}
     siteId={selected.siteId} programId={selected.programId}/>
   <AdmissionsPipelineSummary counts={data.stageCounts}/>
-  <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
+  <WorkspacePanel title="Applicants and next actions" className="mt-8">
+   {pageNavigation}
    <DirectoryTable label="Admissions applicants" caption="Authorized applications for the selected Site and Program."
     rows={records} rowKey={record=>record.id}
     columns={[
@@ -125,7 +125,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     ]}
     rowActions={[{id:"review",label:"Review application",allowed:()=>true,onClick:record=>{void router.navigate({to:"/admissions/intake",search:{...selected,application:record.id}});}}]}
     pagination={<AdmissionsPageNavigation selection={selected} hasMore={data.records.hasMore} kind="applications"/>}
-    empty={<span>No applications recorded in your authorized programs.</span>}/>
-  </section>
+    empty={<EmptyState title="No applications found" description="No applications recorded in your authorized programs match the current search."/>}/>
+  </WorkspacePanel>
  </WorkspaceShell>;
 }
