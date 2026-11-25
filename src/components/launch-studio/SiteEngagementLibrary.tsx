@@ -159,7 +159,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface}:LibraryPro
           </div>
           <div className="flex flex-wrap gap-2">
             {link.status==="active"&&record?.status==="active"&&<GoLinkActions code={link.code} status="active"
-              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")setConfirmation({engagementId:record.engagementId,link});}}/>
+              busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")setConfirmation({engagementId:record.engagementId,link});}}/>}
             {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>Prepare email</Button>}
           </div>
         </div>)}

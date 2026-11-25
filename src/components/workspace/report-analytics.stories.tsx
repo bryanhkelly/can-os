@@ -20,7 +20,7 @@ function AnalyticsFixture(){
   </div>;
 }
 const meta={title:"V6.1 foundations/Data Visualization/Analytical components",component:AnalyticsFixture,
-  parameters:{chromatic:{viewports:[390,768,1024,1440],modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}} satisfies Meta<typeof AnalyticsFixture>;
+  parameters:{chromatic:{viewports:[390,768,1024,1440],modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}}} satisfies Meta<typeof AnalyticsFixture>;
 export default meta;
 type Story=StoryObj<typeof meta>;
 export const Interactive:Story={play:async({canvasElement})=>{

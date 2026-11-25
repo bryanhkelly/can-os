@@ -55,7 +55,7 @@ export function LaunchSiteNavigation({
             onClick={() => onToggleStage(stage)}
             className="flex min-h-11 w-full min-w-0 justify-between px-3 py-3 text-left text-sm font-semibold">
             <span className="flex min-w-0 items-center gap-2">{index + 1}. {stage}
-              {completedLaunchStageV61(stage,completion)&&<><CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden="true"/><span className="sr-only">Saved setup complete</span></>}}
+              {completedLaunchStageV61(stage,completion)&&<><CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden="true"/><span className="sr-only">Saved setup complete</span></>}
             </span>
             <span aria-hidden="true">{expanded === stage ? "−" : "+"}</span>
           </Button>
