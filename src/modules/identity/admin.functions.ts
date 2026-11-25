@@ -4,7 +4,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
 import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { personLegalName } from "@/domain/person-name";
-import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -206,7 +206,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     assertSafeguardingStaffInviteSite(data.role, data.siteId);
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
-    const { people, accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const { people, accessAccounts, accessSessions, accountPersonGrants, organizations, sites } = await import("@/db/schema");
     const organizationId = actor.organizationIds[0]!;
     if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
       throw new AuthorizationError("site-limited registrar cannot create sibling school grants");
@@ -234,11 +234,17 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           throw new AuthorizationError("direct administrator identity");
         const [issuer] = await tx.select({
           personId: accessAccounts.personId, disabled:accessAccounts.disabled,
-          emailVerifiedAt:accessAccounts.emailVerifiedAt,
+          emailVerifiedAt:accessAccounts.emailVerifiedAt,email:accessAccounts.emailNormalized,
+          authenticationMethod:accessSessions.authenticationMethod,
           privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
-        }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
+        }).from(accessAccounts).innerJoin(accessSessions,eq(accessSessions.accountId,accessAccounts.id))
+          .where(and(eq(accessAccounts.id,actor.accountId),eq(accessSessions.id,actor.sessionId),
+            eq(accessSessions.activeGrantId,actor.grantId),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date()),
+            isNull(accessSessions.delegatedGrantId))).limit(1);
         if (!issuer || issuer.disabled || issuer.personId!==actor.actorPersonId ||
-          (!issuer.emailVerifiedAt && !issuer.privateCredential))
+          !(issuer.privateCredential ? issuer.authenticationMethod==="private_access_code" :
+            !!issuer.emailVerifiedAt && !isDemoAccountEmail(issuer.email) &&
+            (issuer.authenticationMethod===null || issuer.authenticationMethod==="email_link")))
           throw new AuthorizationError("individually authenticated administrator");
       }
       // Legacy shared credentials retain the exact original tenant boundary.
@@ -251,6 +257,8 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)` }).from(accessAccounts)
         .where(eq(accessAccounts.emailNormalized, emailNormalized)).for("update").limit(1);
       if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
+      if (account?.privateCredential && !individual)
+        throw new AuthorizationError("explicit individual identity confirmation required");
       if (individual && account && (!account.privateCredential || !account.personId ||
         confirmation?.existingPersonId!==account.personId))
         throw new AuthorizationError("independently confirmed existing individual Person");
@@ -295,6 +303,8 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           after: { firstName: data.firstName, lastName: data.lastName, email: emailNormalized },
         });
       }
+      const [currentPerson] = await tx.select({active:people.active}).from(people).where(eq(people.id,personId)).limit(1);
+      if(!currentPerson?.active)throw new AuthorizationError("active staff Person");
       if (!account!.personId) {
         await tx.update(accessAccounts).set({ personId, updatedAt: new Date() })
           .where(eq(accessAccounts.id, account!.id));
@@ -356,13 +366,13 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       }
       return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };
     });
-    if ("privateAccessCode" in invitation && invitation.privateAccessCode) {
+    if (data.privateIdentityConfirmation) {
       setResponseHeader("Cache-Control","private, no-store");
       setResponseHeader("Referrer-Policy","no-referrer");
     }
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
       return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized),
-        deliveryStatus: isDemoAccountEmail(emailNormalized) ? "demo_code" as const : "already_active" as const };
+        deliveryStatus: isDemoAccountEmail(emailNormalized) ? (data.privateIdentityConfirmation ? "private_code" as const : "demo_code" as const) : "already_active" as const };
     try {
       const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(
         emailNormalized, data.role === "teacher" ? "/profiles" : undefined);
