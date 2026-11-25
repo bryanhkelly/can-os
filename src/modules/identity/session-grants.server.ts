@@ -9,7 +9,7 @@ import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { EventTypes } from "@/domain/event-types";
 import { matchesVerifiedExternalSandboxInvitation } from "@/domain/sandbox-external-invitation";
 import { matchesDemoSchoolAdministrator } from "@/domain/school-setup";
-import { readDemoSchoolForAccount } from "./demo-school-tenants.server";
+import { matchesDemoCredentialScope, readDemoSchoolForAccount } from "./demo-school-tenants.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -33,6 +33,7 @@ const grantSelection = {
   lastName: people.legalLastName,
   email: accessAccounts.emailNormalized,
   emailVerifiedAt: accessAccounts.emailVerifiedAt,
+  accountPersonId: accessAccounts.personId,
 };
 
 const supportedRoles = Object.keys(roleCapabilities);
@@ -148,7 +149,18 @@ export async function readSessionGrants(accountId: string, email: string, reader
         bindings.some(binding => matchesDemoStaffBinding(binding, grant, normalizedEmail))),
       demoAccountSwitching: false };
     }
-    if (demoAccount) return { grants: [], demoAccountSwitching: false };
+    if (demoAccount) {
+      // Family provisioning already enforces the same relationship, consent and
+      // approval rules as real accounts. Authentication only validates scope.
+      const grants = [];
+      for (const grant of ownGrants) {
+        if ((grant.role === "guardian" || grant.role === "student") &&
+            grant.accountPersonId === grant.personId && grant.email === normalizedEmail &&
+            await matchesDemoCredentialScope(normalizedEmail, grant.organizationId, grant.siteId, reader))
+          grants.push(grant);
+      }
+      return { grants, demoAccountSwitching: false };
+    }
   }
 
   if (!adminAccount && !demoAccount) {
