@@ -2,7 +2,7 @@ import { z } from "zod";
 import { DEMO_ACCOUNT_DOMAIN, isDemoAccountEmail } from "./local-demo-access";
 import { siteTimezoneSchema } from "./site-timezone";
 
-import { identityEmailDomain, isDemoDomain } from "./domain-classification";
+import { identityEmailDomain, isDemoDomain, normalizeIdentityDomain } from "./domain-classification";
 
 export function isDemoSchoolDomain(domain: string): boolean {
   return isDemoDomain(domain);
@@ -41,12 +41,21 @@ export function initialVerifiedSignupOrganizationType(requested: PublicSignupOrg
 export const siteSignupSchema = z.object({
   name: z.string().trim().min(2).max(160),
   organizationName: z.string().trim().min(2).max(160).optional(),
+  organizationDomain: z.string().trim().toLowerCase().refine(value => normalizeIdentityDomain(value) === value, "Enter a valid organization domain.").optional(),
   organizationType: publicSignupOrganizationTypeSchema.default("other_partner"),
   email: z.string().trim().toLowerCase().email().max(254)
     .refine(email => !email.endsWith(".invalid") && (!email.endsWith(".demo") || (isDemoAccountEmail(email) && isDemoSchoolDomain(email.split("@")[1]!))), "Use a valid real or demo email address."),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
-}).strict();
+}).strict().superRefine((data, ctx) => {
+  // A public shared-code identity must never bootstrap a real-domain organization.
+  if (isDemoAccountEmail(data.email) && data.organizationDomain && data.organizationDomain !== identityEmailDomain(data.email)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["organizationDomain"], message: "Use the same demo domain as your administrator email." });
+  }
+  if (!isDemoAccountEmail(data.email) && isDemoDomain(data.organizationDomain)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["organizationDomain"], message: "Demo organization setup requires a demo administrator email." });
+  }
+});
 
 export const realSchoolSetupSignupSchema = siteSignupSchema.refine(data => !data.email.endsWith(".demo"), { path: ["email"], message: "Use a real email address." });
 
