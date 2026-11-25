@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { prepareChurchOnboarding } from "@/modules/networks/network-steward.functions";
 
-const field = "mt-1 block w-full  border bg-background p-2 text-sm";
+const field = "mt-1";
 const defaults = {
   churchName: "", churchSlug: "", siteName: "", siteSlug: "",
   timezone: "America/Los_Angeles", contactEmail: "",
@@ -68,8 +68,8 @@ export function ChurchBootstrapPanel() {
               ? "[a-z0-9]+(-[a-z0-9]+)*" : undefined}
             onChange={e => set(key, e.target.value)}/>
         </Label>)}
-      <Button variant="ghost" type="submit" disabled={busy}
-        className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50 sm:col-span-2">
+      <Button type="submit" disabled={busy}
+        className="sm:col-span-2">
         {busy ? "Preparing…" : "Prepare church and invite launch administrator"}
       </Button>
     </form>
