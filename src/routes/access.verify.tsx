@@ -1,6 +1,6 @@
-import {createFileRoute} from "@tanstack/react-router";
+import {createFileRoute,Link} from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {createServerOnlyFn} from "@tanstack/react-start";
 import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
@@ -107,16 +107,16 @@ function VerifyAccess(){
    subtitle="Complete the secure sign-in using your one-time access link.">
    <WorkspacePanel title="Verify your access" className="mt-6">
      <div className="space-y-5">
-       <p role="status" className="text-sm text-muted-foreground">{ready&&!token
-         ?"The access link is missing. Request a new sign-in link to continue."
-         :"Use the button to complete your sign-in."}</p>
-       <form action={verifyAction} method="post" onSubmit={()=>{clearLearnerBrowserState();setWorking(true);}}
+       {ready&&!token?<WorkspaceNotice tone="attention">The access link is missing. Request a new sign-in link to continue.</WorkspaceNotice>:
+         <p role="status" className="text-sm text-muted-foreground">{ready?"Use the button to complete your sign-in.":"Preparing secure sign-in…"}</p>}
+       <form action={verifyAction} method="post" aria-busy={working} onSubmit={event=>{if(working||!ready||!token){event.preventDefault();return;}clearLearnerBrowserState();setWorking(true);}}
          className="space-y-4">
          <input type="hidden" name="token" value={token??""}/>
          <input type="hidden" name="returnTo" value={search.returnTo??""}/>
          <Button type="submit" disabled={working||!ready||!token}
            loading={working} loadingLabel="Signing in securely…">Sign in securely</Button>
        </form>
+       {ready&&!token&&<Button asChild variant="outline"><Link to="/access" search={{returnTo:search.returnTo}}>Request a new sign-in link</Link></Button>}
      </div>
    </WorkspacePanel>
  </WorkspaceShell>;
