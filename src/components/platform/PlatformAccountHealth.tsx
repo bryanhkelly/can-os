@@ -1,4 +1,4 @@
-import { DirectoryTable, StatCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { DirectoryTable, EmptyState, StatCard, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import type { AccountHealth } from "@/modules/identity/account-health.server";
 
 export function PlatformAccountHealth({health}:{health:AccountHealth}){
@@ -12,14 +12,14 @@ export function PlatformAccountHealth({health}:{health:AccountHealth}){
       Account integrity could not be checked. This is not evidence that accounts are healthy.
     </WorkspaceNotice>:<>
       <p className="text-xs text-muted-foreground">Checked {new Date(health.checkedAt).toLocaleString()}. Finding counts may overlap.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="my-4 grid gap-3 sm:grid-cols-3">
         <StatCard label="Accounts" value={totals.accounts}/>
         <StatCard label="Active grants" value={totals.grants}/>
         <StatCard label="Integrity findings" value={totals.issues}/>
       </div>
       <DirectoryTable label="Account integrity inventory" caption="Aggregate counts by credential classification."
         rows={health.rows} rowKey={row=>row.kind}
-        empty={<p className="p-4 text-sm text-muted-foreground">No accounts in the inventory.</p>}
+        empty={<EmptyState title="No accounts in the inventory." />}
         columns={[
           {id:"kind",title:"Credential",render:row=>row.kind==="demo"?"Demo":"Real"},
           {id:"accounts",title:"Accounts",render:row=>row.accounts},
