@@ -3,6 +3,8 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,eq,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
+import {organizations} from "@/db/schema";
+import {classifyOwnedData} from "@/domain/domain-classification";
 import {
   canonicalClasses,canonicalClassEnrollments,canonicalClassOfferingVersions,
   canonicalClassSessions,canonicalClassOutcomes,canonicalClassAwards,
@@ -63,6 +65,9 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         operatingOrganizationId:cls.operatingOrganizationId,siteId:cls.siteId,
         title:cls.title,deliveryMode:cls.deliveryMode,
       });
+      const [owner] = await tx.select({domain:organizations.domain}).from(organizations)
+        .where(eq(organizations.id,cls.operatingOrganizationId)).limit(1);
+      if (!owner) throw new Error("Class reporting operating Organization unavailable");
       const offerings=bounded(await tx.select({
         id:canonicalClassOfferingVersions.id,
         offeringId:canonicalClassOfferingVersions.classOfferingId,
@@ -253,6 +258,7 @@ export const getNativeClassReport=createServerFn({method:"GET"})
       return {
         ...report,title:cls.title,courseVersionId:cls.courseVersionId,
         deliverySiteId:cls.siteId,operatorOrganizationId:cls.operatingOrganizationId,
+        dataClassification:classifyOwnedData(owner.domain),
         visibility:"authorized_provider_private" as const,
         publicationApproved:false as const,
       };
