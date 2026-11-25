@@ -12,6 +12,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { WorkspacePanel, WorkspaceNotice, FormSection } from "@/components/workspace";
 
 const noStore = { "Cache-Control": "no-store" };
 
@@ -163,7 +164,7 @@ function SiteNewPage() {
               <span>✓ Complete details later</span>
             </div>
           </section>
-          <section className="border bg-card p-5 sm:p-7" aria-label="Create your Site">
+          <WorkspacePanel title="Create your Site">
             {requested ? <div role="status" className="space-y-4">
               <CheckCircle2 className="size-9 text-success" aria-hidden="true" />
               <h2 className="font-serif text-3xl">{demoReady ? "Your demo Site is ready." : "Check your email."}</h2>
@@ -171,7 +172,7 @@ function SiteNewPage() {
                 {demoReady ? "Sign in with your demo email and the shared demo access code. No email verification is required." : "If the address is eligible, you will receive a secure verification link. Follow it to create your Site and continue into Launch Studio."}
               </p>
               <Button asChild variant="outline"><Link to="/access">Go to sign in</Link></Button>
-            </div> : <form onSubmit={submit} className="space-y-5">
+            </div> : <form onSubmit={submit} aria-busy={sending} className="space-y-5">
               <p className={eyebrow}>Your learning Site</p>
               <Field label="Site name" required description="The name of the learning community you want to create.">
                 <Input name="siteName" autoComplete="organization" placeholder="e.g., Valor Learning Center"
@@ -188,39 +189,35 @@ function SiteNewPage() {
                     <option key={option.value} value={option.value}>{option.label}</option>)}
                 </Select>
               </Field>
-              <div className="border-t pt-5">
-                <p className={eyebrow}>Initial Site administrator</p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <FormSection title="Initial Site administrator">
                   <Field label="First name" required>
                     <Input name="firstName" autoComplete="given-name" placeholder="First name" required maxLength={80} />
                   </Field>
                   <Field label="Last name" required>
                     <Input name="lastName" autoComplete="family-name" placeholder="Last name" required maxLength={80} />
                   </Field>
-                </div>
-                <div className="mt-4">
+                <div className="sm:col-span-2">
                   <Field label="Email address" required>
                     <Input name="email" type="email" autoComplete="email" placeholder="you@organization.org"
                       required maxLength={254} />
                   </Field>
                 </div>
-              </div>
-              {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-              <Button className="w-full justify-between" disabled={!hydrated || sending} type="submit">
+              </FormSection>
+              {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+              <Button className="w-full" disabled={!hydrated} loading={sending} loadingLabel="Creating your account…" type="submit">
                 <Mail className="size-4" aria-hidden="true" />
-                {sending ? "Creating your account…" : "Continue"}
+                Continue
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
-              <p className="flex items-start gap-2 bg-muted p-3 text-xs leading-5 text-muted-foreground">
-                <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
+              <WorkspaceNotice>
                 Real accounts require email verification. Demo accounts are automatically approved. Both create a standard Site.
                 Creating a Site does not authorize opening or enrollment.
-              </p>
+              </WorkspaceNotice>
               <p className="text-center text-xs text-muted-foreground">Already have a CAN OS account?{" "}
                 <Link to="/access" className="font-semibold text-primary underline underline-offset-4">Sign in</Link>
               </p>
             </form>}
-          </section>
+          </WorkspacePanel>
         </div>
         <aside className="min-w-0 border bg-card" aria-label="What CAN OS enables">
           <img src="/school-template-previews/v1/modern/hero.jpg"
