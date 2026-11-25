@@ -1,3 +1,4 @@
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, demoSchoolTenants, memberships, organizations, people, roleAssignments, schoolSetupSignups, sites } from "@/db/schema";
@@ -73,7 +74,7 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
     if(!existing?.active)throw new Error("School founder Person is not active");
   }else{
     const [createdPerson] = await tx.insert(people).values({
-      legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
+      legalFirstName: signup.firstName, legalLastName: signup.lastName, email, domain: identityEmailDomain(email),
     }).returning({id:people.id});
     personId=createdPerson?.id??null;
   }
