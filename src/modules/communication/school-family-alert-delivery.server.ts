@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, outboundAttemptOutcome } from "@/domain/outbound-sms-safety";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import {
   dispatchOutboundMessages, type OutboundAdapter, type OutboundClaim,
@@ -95,7 +96,7 @@ const schoolFamilyAdapter = {
         record.actionType !== "school_family_bulletin" ||
         !record.programId || !record.siteId || !record.organizationId)
       return { kind: "suppress", reason: "invalid_school_alert" };
-    if (await isDemoTenantOrganization(record.organizationId))
+    if (record.outbound.channel === "sms" && await isDemoTenantOrganization(record.organizationId))
       return { kind: "suppress", reason: "demo_tenant_external_delivery" };
 
     // Re-evaluate custody, school enrollment, active account and scoped
@@ -163,6 +164,7 @@ const schoolFamilyAdapter = {
           isNotNull(s.accessAccounts.emailVerifiedAt),
         )).limit(1);
       if (!mail?.email) return { kind: "fail", reason: "no_active_school_email" };
+      if (suppressDemoEmailDelivery(mail.email)) return { kind: "suppress", reason: "demo_email_destination" };
       return { kind: "ready", message: {
         channel: "email",
         email: {
