@@ -272,3 +272,8 @@ test("appearance debt in reachable components invalidates composed route complia
   assert.equal(inventory.routes[0].composedSourceClean, false);
   assert.equal(collectV61SourceViolations(inventory)[0].detail, "Button: inline-style");
 }));
+
+test("appearance rules reject zero padding and arbitrary typography but preserve alignment", () => {
+  const source = 'import { Button } from "@/components/ui/button"; export const Page = () => <Button className={custom ?? "p-0 text-[13px] font-light text-left text-wrap w-full"}/>';
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["font-light", "p-0", "text-[13px]"]);
+});
