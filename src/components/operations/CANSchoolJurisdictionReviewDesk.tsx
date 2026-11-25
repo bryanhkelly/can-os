@@ -155,7 +155,7 @@ export function CANSchoolJurisdictionReviewDesk(){
       <Label className="block text-sm font-medium" htmlFor="can-jurisdiction-note">Independent decision rationale</Label>
       <Textarea id="can-jurisdiction-note" value={note} rows={4}
         onChange={event=>setNote(event.target.value)}
-        className="w-full  border bg-background p-2 text-sm"
+        className="w-full"
         placeholder="Record which current official requirements and evidence were verified, or why corrections are necessary."/>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={submitting||note.trim().length<25||
