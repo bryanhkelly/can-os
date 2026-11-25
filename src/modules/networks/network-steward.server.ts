@@ -1,3 +1,4 @@
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -149,7 +150,7 @@ export async function provisionHQOfficer(actor: AccessContext, input: {
     let personId = uniquePeople[0];
     if (!personId) {
       const [person] = await tx.insert(people).values({
-        legalFirstName: input.firstName, legalLastName: input.lastName, email: input.email,
+        legalFirstName: input.firstName, legalLastName: input.lastName, email: input.email, domain: identityEmailDomain(input.email),
       }).returning({ id: people.id });
       personId = person!.id;
       await writeAudit(tx, actor, {
