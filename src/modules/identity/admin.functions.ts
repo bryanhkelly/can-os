@@ -1,5 +1,8 @@
 import { identityEmailDomain } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
+import { issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
+import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { personLegalName } from "@/domain/person-name";
 import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -222,22 +225,49 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId, organizationId)).limit(1);
       const syntheticSchool = Boolean(demoSchool) || isValorOrganization(organizationId);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
-      // Registry disablement controls shared credentials, not real-email invitations.
-      if (localDemoIdentity && ((demoSchool && !demoSchool.enabled) ||
-        !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx))) {
-        throw new DomainError("FORBIDDEN", "Local demo identities require their original registered school domain");
+      const confirmation = data.privateIdentityConfirmation;
+      const individual = localDemoIdentity && !!confirmation;
+      if (confirmation && (!localDemoIdentity || !privateAccountRoleEligible(data.role)))
+        throw new AuthorizationError("eligible individual staff identity");
+      if (individual) {
+        if (actor.sessionAccountId || actor.impersonatedByAccountId || actor.delegatedByPlatformOwner)
+          throw new AuthorizationError("direct administrator identity");
+        const [issuer] = await tx.select({
+          personId: accessAccounts.personId, disabled:accessAccounts.disabled,
+          emailVerifiedAt:accessAccounts.emailVerifiedAt,
+          privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
+        }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
+        if (!issuer || issuer.disabled || issuer.personId!==actor.actorPersonId ||
+          (!issuer.emailVerifiedAt && !issuer.privateCredential))
+          throw new AuthorizationError("individually authenticated administrator");
       }
-      let [account] = await tx.select({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled }).from(accessAccounts)
+      // Legacy shared credentials retain the exact original tenant boundary.
+      if (localDemoIdentity && !individual && ((demoSchool && !demoSchool.enabled) ||
+        !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx))) {
+        throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the original shared credential scope");
+      }
+      let privateAccessCode:string|undefined;
+      let [account] = await tx.select({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled,
+        privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)` }).from(accessAccounts)
         .where(eq(accessAccounts.emailNormalized, emailNormalized)).for("update").limit(1);
       if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
+      if (individual && account && (!account.privateCredential || !account.personId ||
+        confirmation?.existingPersonId!==account.personId))
+        throw new AuthorizationError("independently confirmed existing individual Person");
       if (!account) {
-        [account] = await tx.insert(accessAccounts).values({ emailNormalized }).returning({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled });
+        if (individual && confirmation?.existingPersonId)
+          throw new AuthorizationError("existing confirmed Person Account");
+        if(individual) privateAccessCode=issueOpaqueSecret();
+        [account] = await tx.insert(accessAccounts).values({ emailNormalized,
+          ...(privateAccessCode?{privateAccessCodeHash:hashPrivateAccessCode(privateAccessCode,process.env.CAN_ACCESS_TOKEN_PEPPER??"")}:{})
+        }).returning({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled,
+          privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)` });
         await recordAudit(tx, actor, {
           action: "admin.access_account.create", resourceType: "access_account", resourceId: account!.id,
           after: { emailNormalized },
         });
       }
-      if (localDemoIdentity) {
+      if (localDemoIdentity && !individual) {
         const foreign = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
           .where(and(eq(accountPersonGrants.accountId, account!.id),
             sql`(${accountPersonGrants.organizationId} IS DISTINCT FROM ${organizationId}::uuid
@@ -268,6 +298,13 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       if (!account!.personId) {
         await tx.update(accessAccounts).set({ personId, updatedAt: new Date() })
           .where(eq(accessAccounts.id, account!.id));
+      }
+      if (individual) {
+        await recordAudit(tx, actor, {
+          action:"identity.staff_individual_confirmation",resourceType:"access_account",resourceId:account!.id,
+          after:{personId,reason:confirmation!.reason,credentialIssued:!!privateAccessCode},
+          scope:{organizationId,siteId},
+        });
       }
       const [existingGrant] = await tx.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
         .from(accountPersonGrants).where(and(
@@ -315,10 +352,14 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         const pending = await listPendingStaffInvitations(tx, account!.id);
         const accepted = await acceptStaffInvitations(tx, account!.id, pending.filter(item => item.id === grant.id), new Date(), {actorPersonId:actor.actorPersonId!});
         if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
-        return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false };
+        return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false, ...(privateAccessCode?{privateAccessCode}:{}) };
       }
       return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };
     });
+    if ("privateAccessCode" in invitation && invitation.privateAccessCode) {
+      setResponseHeader("Cache-Control","private, no-store");
+      setResponseHeader("Referrer-Policy","no-referrer");
+    }
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
       return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized),
         deliveryStatus: isDemoAccountEmail(emailNormalized) ? "demo_code" as const : "already_active" as const };
