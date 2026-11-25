@@ -1,17 +1,17 @@
 import { rolesAllow, hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
- accessAccounts, accessSessions, accountPersonGrants, applications, enrollments,
+ accessAccounts, accountPersonGrants, applications, enrollments,
  guardianRelationships, people, programs, sections, studentAccessConsents,
  studentProfiles, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { familyApplicationSchoolYearId } from "@/domain/family-application-handoff";
-import { individualStaffIssuerEligible } from "@/domain/individual-staff-handoff";
+import { canIssueIndividualCredential } from "@/modules/identity/individual-credential-issuer.server";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { provisionScopedPersonAccount, assertFamilyCredentialPair } from "@/modules/identity/scoped-person-account.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -268,20 +268,9 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      .from(people).where(eq(people.id,app.studentPersonId)).for("update").limit(1);
    if(!student?.active || (student.email && normalizeAccessEmail(student.email)!==normalized))
     throw new AuthorizationError("validated student identity and contact");
-   let allowIndividualCredential=false;
-   if(isDemoAccountEmail(normalized)){
-     const [issuer]=await tx.select({
-       personId:accessAccounts.personId,disabled:accessAccounts.disabled,
-       email:accessAccounts.emailNormalized,emailVerifiedAt:accessAccounts.emailVerifiedAt,
-       privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
-       authenticationMethod:accessSessions.authenticationMethod,
-     }).from(accessAccounts).innerJoin(accessSessions,eq(accessSessions.accountId,accessAccounts.id))
-       .where(and(eq(accessAccounts.id,actor.accountId),eq(accessSessions.id,actor.sessionId),
-         eq(accessSessions.activeGrantId,actor.grantId),isNull(accessSessions.revokedAt),
-         gt(accessSessions.expiresAt,new Date()),isNull(accessSessions.delegatedGrantId))).limit(1);
-     allowIndividualCredential=individualStaffIssuerEligible(issuer,actor.actorPersonId) &&
-       consent.status==="pending_review" && data.confirmedIndependentIdentity===true && !!data.reviewMethod;
-   }
+   const allowIndividualCredential=isDemoAccountEmail(normalized) &&
+     consent.status==="pending_review" && data.confirmedIndependentIdentity===true && !!data.reviewMethod &&
+     await canIssueIndividualCredential(tx,actor);
    const account=await provisionScopedPersonAccount(tx,{
     email:normalized,personId:app.studentPersonId,organizationId:app.organizationId,
     siteId:app.siteId!,onlyRole:"student",allowIndividualCredential,
