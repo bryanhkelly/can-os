@@ -277,3 +277,10 @@ test("appearance rules reject zero padding and arbitrary typography but preserve
   const source = 'import { Button } from "@/components/ui/button"; export const Page = () => <Button className={custom ?? "p-0 text-[13px] font-light text-left text-wrap w-full"}/>';
   assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["font-light", "p-0", "text-[13px]"]);
 });
+
+test("re-exported controls and literal spread overrides remain governed", () => temp(({root, write}) => {
+  write("src/components/ui/button.tsx", 'export const Button = () => <button/>;');
+  write("src/components/actions/index.ts", 'export { Button as Action } from "../ui/button";');
+  write("src/routes/page.tsx", 'import { Action } from "@/components/actions"; export const Page = () => <Action {...{className:"p-0", style:{color:"red"}}}/>;');
+  assert.deepEqual(collectV61SourceViolations(createInventory(root)).map(v => v.detail).sort(), ["Button: inline-style", "Button: p-0"]);
+}));

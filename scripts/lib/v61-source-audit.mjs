@@ -126,6 +126,19 @@ function controlAppearanceIssues(syntax, resolveControl) {
       if (control) {
         const classes = attribute(node, "className");
         const style = attribute(node, "style");
+        for (const prop of node.attributes.properties) {
+          if (!ts.isJsxSpreadAttribute(prop) || !ts.isObjectLiteralExpression(prop.expression)) continue;
+          for (const member of prop.expression.properties) {
+            if (!ts.isPropertyAssignment(member)) continue;
+            const name = member.name;
+            if (!(ts.isIdentifier(name) || ts.isStringLiteral(name))) continue;
+            if (name.text === "style") issues.push({ control, utility: "inline-style", ...location(syntax, member) });
+            if (name.text === "className") for (const literal of literals(member.initializer)) for (const token of literal.text.split(/\s+/)) {
+              const utility = token.replace(/^(?:(?:[\w-]+|\[[^\]]+\]):)+/, "").replace(/^!|!$/g, "");
+              if (ownedUtility.test(utility)) issues.push({ control, utility: token, ...location(syntax, member) });
+            }
+          }
+        }
         if (style) issues.push({ control, utility: "inline-style", ...location(syntax, style) });
         const utilities = new Set();
         for (const literal of literals(classes?.initializer)) for (const token of literal.text.split(/\s+/)) {
