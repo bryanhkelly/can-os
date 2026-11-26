@@ -64,6 +64,7 @@ jobs:
       - run: npm ci
       - run: npm run storybook:doctor
       - run: npx playwright install --with-deps chromium
+      - run: npm run check:storybook:catalog
       - run: npm run check:storybook:fonts
       - run: npm run check:storybook:visual-config
       - run: npm run test:storybook:contracts

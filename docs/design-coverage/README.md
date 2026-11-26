@@ -72,3 +72,7 @@ Calendar now has a controlled production composer story, including focus restora
 ## Site Intelligence status
 
 Website and the shared Site Intelligence panel now present the existing server eligibility and request outcomes with governed operation status. Processing confirmation followed by a read failure is explicitly distinguished from a failed generation. Story fixtures use the actual eligibility rules; no Gloo call is made. Production authorization, provider configuration, and stored package integrity checks remain unchanged.
+
+## Catalog consolidation
+
+All inspected story families have been moved to governed numbered navigation or were already governed. Explicit legacy IDs preserve intended story identity for migrated families; the source catalog checker checks titles, IDs and migrated exports, and the generated-index checker validates actual indexed stories. Public experience contracts have a dedicated MDX guide. No runtime acceptance is inferred from these declarations.

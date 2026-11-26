@@ -1,0 +1,28 @@
+import { Meta, Canvas } from '@storybook/addon-docs/blocks';
+import * as LayoutStories from '../../src/components/workspace/experience-layouts.stories';
+
+<Meta title="09 Public experiences/Experience contracts" />
+
+# Public experiences
+
+A public destination is a bounded entry point, not an authenticated workspace or permission grant. Keep the Site's approved brand, source-of-truth wording and the destination's actual eligibility visible.
+
+## Branded inquiry
+
+<Canvas of={LayoutStories.PublicRegistration} />
+
+This is a synthetic interaction reference. It exercises the shared input, form and acknowledgement patterns. It does not call the public registration service or create an enrollment.
+
+## Required public states
+
+| State | Presentation contract |
+| --- | --- |
+| Private website preview | Proposed content, not publication or enrollment |
+| Active Go Link | Render only its authorized destination and public disclosure |
+| Paused, expired or revoked | Explain that the destination is unavailable; never expose private details |
+| Interest | Acknowledge contact intent, not registration |
+| Registration | Confirm only the recorded outcome |
+| Verification pending | Explain the next verification step; do not infer guardianship |
+| Unknown access or failed read | Fail closed, without revealing private records |
+
+Use the existing Go Link lifecycle, consent, and public admission contracts. Storybook is an illustrative fixture, not the independent authorization test for any of these endpoints.

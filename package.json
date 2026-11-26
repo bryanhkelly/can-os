@@ -154,12 +154,13 @@
     "storybook:inventory": "node scripts/storybook/check-index.mjs",
     "test:storybook:browser": "playwright test --config playwright.storybook.config.ts",
     "test:storybook:contracts": "node --test scripts/storybook/index-contract.test.mjs scripts/lib/v61-experience-registry.test.mjs scripts/storybook/static-server.test.mjs scripts/storybook/fixture-isolation.test.mjs",
-    "verify:storybook": "npm run check:storybook:fonts && npm run check:storybook:visual-config && npm run test:storybook:contracts && npm run test:storybook && npm run build-storybook && npm run storybook:inventory && npm run test:storybook:browser",
+    "verify:storybook": "npm run check:storybook:catalog && npm run check:storybook:fonts && npm run check:storybook:visual-config && npm run test:storybook:contracts && npm run test:storybook && npm run build-storybook && npm run storybook:inventory && npm run test:storybook:browser",
     "check:storybook:visual-config": "node scripts/storybook/check-visual-config.mjs",
     "storybook:doctor": "node scripts/storybook/doctor.mjs",
     "storybook:serve": "node scripts/storybook/serve-static.mjs",
     "test:storybook:cross-browser": "playwright test --config playwright.storybook.config.ts --project=firefox-desktop --project=webkit-phone",
-    "check:storybook:fonts": "node scripts/storybook/check-fonts.mjs"
+    "check:storybook:fonts": "node scripts/storybook/check-fonts.mjs",
+    "check:storybook:catalog": "node scripts/storybook/check-catalog.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

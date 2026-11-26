@@ -46,7 +46,7 @@ const preview: Preview = {
     chromatic: { modes: baselineModes },
     options: {
       storySort: {
-        order: ["00 Start here", "V6.1 foundations", "01 Foundations", "02 Primitives", "03 Components", "04 Application patterns", "05 Page layouts", "06 Interaction states", "07 Persona experiences", "08 Feature workspaces", "09 Public experiences", "10 User journeys", "11 Accessibility and responsive", "12 Engineering and acceptance", "V6.1 templates", "Foundations", "Workspace", "Workflows", "Launch Studio", "Personas", "Branding"],
+        order: ["00 Start here","01 Foundations","02 Primitives","03 Components","04 Application patterns","05 Page layouts","06 Interaction states","07 Persona experiences","08 Feature workspaces","09 Public experiences","10 User journeys","11 Accessibility and responsive","12 Engineering and acceptance"],
       },
     },
   },

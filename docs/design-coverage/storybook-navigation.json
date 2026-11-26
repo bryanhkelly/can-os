@@ -958,6 +958,16 @@
         "Proposal",
         "Incoming"
       ]
+    },
+    {
+      "path": "src/components/communication/ContactLookup.stories.tsx",
+      "previousTitle": "Communication/Contact lookup",
+      "title": "08 Feature workspaces/Communication/Contact lookup",
+      "metaId": "communication-contact-lookup",
+      "exports": [
+        "SearchAndSelect",
+        "Saving"
+      ]
     }
   ]
 }

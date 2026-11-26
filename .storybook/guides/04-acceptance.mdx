@@ -42,3 +42,7 @@ The optional browser projects extend critical and registered-layout smoke cases;
 Storybook uses local copies of the approved V6.1 typefaces, with pinned upstream blob identities and OFL licenses. `npm run check:storybook:fonts` verifies byte integrity. Browser acceptance requires the local fonts to load and no longer permits third-party font calls.
 
 The Storybook and Vitest bundlers reject runtime imports of production routes, database and server modules, and RPC facades without explicit fixture aliases. A failed isolation check identifies the offending module; fix the adapter boundary rather than bypassing the gate. The static acceptance server restricts connections, form submissions, fonts, and media with a content security policy. This is a development fixture boundary, not a production access-control system.
+
+## Catalog governance
+
+Run `npm run check:storybook:catalog` before review. All story families must use the numbered catalog taxonomy. Duplicate titles, duplicate metadata IDs and removed migrated exports fail the source contract. The built-index contract independently checks the generated catalog.
