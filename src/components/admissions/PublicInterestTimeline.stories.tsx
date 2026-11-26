@@ -10,7 +10,7 @@ const meta={title:"08 Feature workspaces/Admissions/Interest evidence timeline",
 export default meta;
 type Story=StoryObj<typeof meta>;
 export const Inquiry:Story={};
-export const VerifiedEmailIsNotEnrollment:Story={args:{row:{...row,familyStartRequestId:"fixture-start",emailVerifiedAt:"2026-11-12T20:00:00Z",applicationId:"fixture-application",applicationStage:"Inquiry"}},play:async({canvasElement})=>{
+export const VerifiedEmailIsNotEnrollment:Story={args:{row:{...row,familyStartRequestId:"fixture-start",emailVerifiedAt:"2026-11-12T20:00:00Z",applicationId:"fixture-application",applicationStage:"inquiry"}},play:async({canvasElement})=>{
  const c=within(canvasElement);await expect(c.getByText(/Family verified email link.*not guardianship/)).toBeVisible();
  await expect(c.getByText("School-year enrollment not yet active")).toBeVisible();
  await expect(c.queryByText("School-year enrollment activated")).not.toBeInTheDocument();

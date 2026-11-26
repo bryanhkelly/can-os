@@ -21,7 +21,7 @@ function Fixture({limit=false}:{limit?:boolean}){
  const count=countCalendarInvitees(inviteGroups,groups,people);
  return <WorkspaceShell title="Calendar event workspace" subtitle="Local fixture only. No calendar event or invitation is created.">
   <Button onClick={()=>{setAttempted(false);setOpen(true);}}>New event</Button>
-  {saved&&<WorkspaceNotice tone="success" className="mt-4">Fixture event prepared for {count} guests. No invitations sent.</WorkspaceNotice>}
+  {saved&&<WorkspaceNotice tone="success" className="mt-4">Fixture event prepared for {count} {count===1?"guest":"guests"}. No invitations sent.</WorkspaceNotice>}
   <CalendarEventComposer open={open} busy={false} attempted={attempted} error="" mutation={mutation}
    initialFocus={focus} form={form} selectedInviteeCount={count} inviteGroupCount={groups.length}
    invitees={{inviteGroups,inviteContacts:contacts,inviteContactsError:"",inviteGroupsError:"",loading:false,inviteSearch:search,setInviteSearch:setSearch,inviteGroupIds:groups,setInviteGroupIds:setGroups,inviteePersonIds:people,setInviteePersonIds:setPeople}}
@@ -41,7 +41,7 @@ export const CreateAndValidate:Story={play:async({canvasElement})=>{
  await userEvent.type(title,"Digital skills session");
  await userEvent.click(d.getByRole("checkbox",{name:/Example participant 1/}));
  await userEvent.click(d.getByRole("button",{name:"Create event"}));
- await expect(c.getByText("Fixture event prepared for 1 guests. No invitations sent.")).toBeVisible();
+ await expect(c.getByText("Fixture event prepared for 1 guest. No invitations sent.")).toBeVisible();
  await expect(trigger).toHaveFocus();
 }};
 export const InviteeLimit:Story={args:{limit:true},play:async({canvasElement})=>{
