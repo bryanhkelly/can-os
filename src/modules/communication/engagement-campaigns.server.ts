@@ -1,3 +1,4 @@
+import type { CampaignDeliveryMetrics } from "@/domain/campaign-metrics";
 import type {
   readEngagementCampaignWorkspaceInput,
   saveCampaignRecipientListInput,
@@ -22,14 +23,19 @@ async function scope(engagementId:string){
  setResponseHeader("Cache-Control","private, no-store");
  const actor=await getCommandContext(getRequest());
  const record=await authorizeEngagementDistribution(engagementId,actor);
- const [account]=await db.select({email:accessAccounts.emailNormalized}).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
+ const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
  if(!account)throw new Error("Native distribution requires an authorized operator.");
  const organization=record.organizationId?(await db.select({name:organizations.name}).from(organizations).where(eq(organizations.id,record.organizationId)).limit(1))[0]:null;
  if(record.organizationId&&!organization)throw new Error("Organization unavailable.");
  return {...campaignOwnerScope(record),actor,record,senderLabel:organization?.name??"Becomuna"};
 }
 type ListRow={id:string;name:string;recipients:number};
-type CampaignRow={id:string;subject:string;scheduled_at:string;cancelled_at:string|null;total:number;pending:number;accepted:number;delivered:number;bounced:number;complained:number;failed:number;unconfirmed:number;suppressed:number;cancelled:number};
+type CampaignRow = CampaignDeliveryMetrics & {
+  id: string;
+  subject: string;
+  scheduled_at: string;
+  cancelled_at: string | null;
+};
 export const readEngagementCampaignWorkspace = async (data: z.output<typeof readEngagementCampaignWorkspaceInput>) =>{
  const s=await scope(data.engagementId);
  const lists=await campaignRows<ListRow>(db,sql`SELECT l.id,l.name,count(m.email)::int AS recipients
@@ -50,9 +56,9 @@ export const saveCampaignRecipientList = async (data: z.output<typeof saveCampai
  const [list]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_recipient_lists(owner_scope,sender_scope,name,created_by_person_id)
  VALUES(${s.ownerScope},${s.senderScope},${data.name},${s.actor.actorPersonId}) ON CONFLICT(owner_scope,name) DO UPDATE SET name=excluded.name RETURNING id`);
  if(!list)throw new Error("Recipient list write returned no record.");
- const [count]=await campaignRows<{count:number}>(tx,sql`SELECT count(*)::int count FROM public.campaign_list_members WHERE list_id=${list.id} AND NOT(email=ANY(${sql`ARRAY[${sql.join(parsed.recipients.map(email=>sql`${email}`),sql`,`)}]::text[]`}))`);
+ const addresses = sql`ARRAY[${sql.join(parsed.recipients.map(email=>sql`${email}`),sql`,`)}]::text[]`;
+ const [count]=await campaignRows<{count:number}>(tx,sql`SELECT count(*)::int count FROM public.campaign_list_members WHERE list_id=${list.id} AND NOT(email=ANY(${addresses}))`);
  if((count?.count??0)+parsed.recipients.length>campaignRecipientLimit)throw new Error("List exceeds the current campaign limit.");
- const addresses=sql`ARRAY[${sql.join(parsed.recipients.map(email=>sql`${email}`),sql`,`)}]::text[]`;
  await tx.execute(sql`INSERT INTO public.campaign_contacts(owner_scope,email,consent_source,consent_by_person_id)
  SELECT ${s.ownerScope},email,${data.consentSource},${s.actor.actorPersonId}::uuid FROM unnest(${addresses}) AS entries(email)
  ON CONFLICT(owner_scope,email) DO NOTHING`);
