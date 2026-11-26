@@ -2,7 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
 const mocked=vi.hoisted(()=>({
  execute:vi.fn(),txExecute:vi.fn(),transaction:vi.fn(),resolve:vi.fn(),
 }));
-vi.mock("@/modules/communication/sender-registry.server",()=>({readCampaignSenderRegistry:vi.fn(async()=>null)}));
+vi.mock("@/modules/communication/sender-registry.server",()=>({readCampaignSenderRegistryState:vi.fn(async()=>({configured:false,active:null}))}));
 vi.mock("@/db/client",()=>({db:{execute:mocked.execute,transaction:mocked.transaction}}));
 vi.mock("@/modules/engagement/engagement-go.server",()=>({resolveGoExperience:mocked.resolve}));
 import {processEngagementCampaignDeliveries,campaignSenderReadiness} from "@/modules/communication/campaign-store.server";
