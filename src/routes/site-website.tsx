@@ -1,5 +1,6 @@
 import { decodeUuidPathParam } from "@/domain/opaque-url-id";
-import { previewSiteIntelligence, processSiteIntelligence, readSiteIntelligenceContent } from "@/modules/sites/site-content-generation.functions";
+import { previewSiteIntelligence } from "@/modules/sites/site-content-generation.functions";
+import { runSiteGeneration, useSiteGenerationPreview } from "@/components/launch-studio/useSiteGeneration";
 import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
@@ -318,6 +319,8 @@ function LocalWebsiteCopyEditor({
   const mutation = useMutationFeedback(() => router.invalidate());
   const [generating,setGenerating]=useState(false);
   const [generationMessage,setGenerationMessage]=useState("");
+  const generationRequest={siteId:data.siteId,consumer:"website" as const,options:{tone:"welcoming" as const,language:"en" as const,includeStory:true,includeLeadership:false,includeExistingCopy:false,includePublicReferences:false}};
+  const generationStatus=useSiteGenerationPreview(generationRequest,step===4&&content.contentReuseConsent==="granted"&&data.canEdit,data.currentRevision);
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork || generating;
   const artworkGaps = [content.branding.heroImage, content.branding.logoImage ?? null]
     .flatMap(siteLocalImagePublicationGaps);
@@ -438,7 +441,7 @@ function LocalWebsiteCopyEditor({
     }
   }
   async function generateContent(advance=false) {
-    if(!canSave)return;
+    if(!canSave||(!advance&&!generationStatus.preview?.eligibility.allowed))return;
     const consent=content.contentReuseConsent;
     if(consent!=="granted"&&consent!=="denied")return;
     // Save through the existing versioned draft command before reading the brief.
@@ -448,17 +451,11 @@ function LocalWebsiteCopyEditor({
       if(!await saveDraft("stay"))return;
       if(advance)onStepChange(4);
       if(consent==="denied")return;
-      const request={siteId:data.siteId,consumer:"website" as const,options:{
-        tone:"welcoming" as const,language:"en" as const,includeStory:true,
-        includeLeadership:false,includeExistingCopy:false,includePublicReferences:false,
-      }};
-      const preview=await previewSiteIntelligence({data:request});
-      const outcome=await processSiteIntelligence({data:{...request,digest:preview.digest,externalProcessingConfirmed:true}});
-      if(outcome.status==="failed"){setGenerationMessage(outcome.message+" ("+outcome.code+"). Existing content is unchanged.");return;}
-      if(outcome.status==="processing"){setGenerationMessage("Content is already being generated. Select Generate Site Content again to retrieve it.");return;}
-      const stored=await readSiteIntelligenceContent({data:{siteId:data.siteId,consumer:"website"}});
-      const item=stored.package;
-      if(!item?.website||item.stale)throw new Error("Current generated content is unavailable.");
+      const preview=await previewSiteIntelligence({data:generationRequest});
+      const result=await runSiteGeneration(generationRequest,preview);
+      if(!result.success){setGenerationMessage(result.message+" Existing content is unchanged.");return;}
+      const item=result.stored?.package;
+      if(!item?.website)throw new Error("Current generated content is unavailable.");
       // Only initialize unchanged starter fields on Continue; explicit regeneration
       // may replace wording after the operator confirms.
       setContent(old=>{
@@ -472,9 +469,9 @@ function LocalWebsiteCopyEditor({
         return next;
       });
       setGenerationMessage("Site content is ready. Review your wording and save your private draft.");
-    }catch{
-      setGenerationMessage("Site content could not be generated. Your draft is saved. Retry Generate Site Content or edit the wording manually.");
-    }finally{setGenerating(false);}
+    }catch(cause){
+      setGenerationMessage(mutationErrorMessage(cause,"Site content generation could not finish. Edit the wording manually or reload generation status."));
+    }finally{setGenerating(false);generationStatus.reload();}
   }
   async function previewCurrentDraft() {
     if (previewPending) return;
@@ -645,10 +642,12 @@ function LocalWebsiteCopyEditor({
       {step===4&&<WebsiteSiteContentStep data={data} content={content}
         setContent={setContent} busy={busy}/>}
       {step===4&&content.contentReuseConsent==="granted"&&<div className="space-y-2 border p-3">
-        <p role="status" className="text-sm">{generating?"Generating Site content…":generationMessage||"Generate website and outreach wording from your saved Site information."}</p>
-        <Button type="button" variant="outline" disabled={busy||!data.canEdit||revisionConflict} onClick={()=>{
+        <p role="status" className="text-sm">{generating?"Generating Site content…":generationMessage||generationStatus.error||generationStatus.preview?.eligibility.message||"Checking generation availability…"}</p>
+        <Button type="button" disabled={!canSave||!generationStatus.preview?.eligibility.allowed} loading={generating} loadingLabel="Generating content…" onClick={()=>{
           if(window.confirm("Generate and replace the five main website text fields? Saved versions remain available."))void generateContent();
         }}>Generate Site Content</Button>
+        <Button type="button" variant="ghost" disabled={busy} onClick={generationStatus.reload}>Reload generation status</Button>
+        {generationStatus.preview&&!generationStatus.preview.eligibility.allowed&&<p role="status" className="text-xs text-muted-foreground">{generationStatus.preview.eligibility.message} You can continue with manual content.</p>}
       </div>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
