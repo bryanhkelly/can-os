@@ -30,6 +30,16 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 - Synthetic classification is a reporting dimension; fixture provenance is test infrastructure, not business authorization. Use isolated deterministic fixtures and never place authentic student/family records in test fixtures.
 - During the convergence release, legacy shared-credential registry and fixture restrictions remain until their consumers, data and security invariants are reconciled. Their existence is not a precedent for new demo-specific business logic. Do not introduce new demo-only handlers or deployment flags.
 
+## Becomuna Engineering Standard V1.0 — canonical identity foundation
+
+- Separate Person/Account identity, credential possession, Organization-owned data classification and authorization. A role is not a credential; a domain is not a grant. Independent attestation must be recorded by the actual authorized actor.
+- Use `domain-classification.ts` for normalized identity domains and owner-data classification, `access-grant-scope.ts` and `private-account-authority.ts` for domain invariants, and `account-grant-reader.server.ts` for canonical active membership projection. Do not expose stored credential hashes through membership projections.
+- Generate individual credentials only through `private-account-credential.server.ts`; persist only the hash and display a raw credential once through the authorized handoff. Use `scoped-person-account.server.ts` for known Person provisioning and `individual-credential-issuer.server.ts` to authorize direct operator issuance. Do not create competing provisioning services.
+- The isolated `legacy-shared-credential-grants.server.ts` boundary is migration debt, not a new business-layer abstraction. No new institution-specific operations, privileges or shared-credential users. Retire it after secure handoff, actual login, session revocation, independent owner authorization and regression evidence.
+- Use the existing shared email delivery policy at provider dispatch. Reporting classification follows canonical operating Organization ownership; preserve unknown, and never substitute Person identity for owner classification.
+- The existing component/architecture verification gate enforces foundational identity dependencies and credential issuance ownership. It also emits an application-source compatibility inventory. Inventory entries are outstanding review findings, not exceptions, passes or evidence of complete remediation. Extend the enforceable scope as the remaining production paths are reconciled.
+- Record exact-commit verification using the existing release readiness runner; no silent skips or quality claims based on source edits alone. Source policy checks do not replace behavioral tests, database acceptance or browser journeys.
+
 ## Permanent V6.1 architecture contract
 
 - New feature UI composes canonical primitives and workspace/workflow patterns; new cross-feature interaction patterns belong to the existing shared layers, not a second component library. Remove superseded implementations after reference checks.
