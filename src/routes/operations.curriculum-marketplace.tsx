@@ -392,7 +392,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
        placeholder="district-sis" maxLength={100} onChange={e=>{setRosterSource(e.target.value);setRosterValidated(false);}}/>
      </Label>
      <Label className="block text-sm">OneRoster classes.csv
-      <Textarea className="mt-1 min-h-28 font-mono text-xs"
+      <Textarea className="mt-1 min-h-28"
        value={rosterCsv} maxLength={500000}
        placeholder={"sourcedId,title,courseSourcedId,classCode,schoolSourcedId"}
        onChange={e=>{setRosterCsv(e.target.value);setRosterValidated(false);setRosterMap({});}}/>
