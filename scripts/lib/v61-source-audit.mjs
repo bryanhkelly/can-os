@@ -127,11 +127,21 @@ function controlAppearanceIssues(syntax, resolveControl) {
         const classes = attribute(node, "className");
         const style = attribute(node, "style");
         for (const prop of node.attributes.properties) {
-          if (!ts.isJsxSpreadAttribute(prop) || !ts.isObjectLiteralExpression(prop.expression)) continue;
+          if (!ts.isJsxSpreadAttribute(prop)) continue;
+          if (!ts.isObjectLiteralExpression(prop.expression)) {
+            issues.push({ control, utility: "unverified-spread", ...location(syntax, prop) });
+            continue;
+          }
           for (const member of prop.expression.properties) {
-            if (!ts.isPropertyAssignment(member)) continue;
+            if (!ts.isPropertyAssignment(member)) {
+              issues.push({ control, utility: "unverified-spread-member", ...location(syntax, member) });
+              continue;
+            }
             const name = member.name;
-            if (!(ts.isIdentifier(name) || ts.isStringLiteral(name))) continue;
+            if (!(ts.isIdentifier(name) || ts.isStringLiteral(name))) {
+              issues.push({ control, utility: "unverified-spread-key", ...location(syntax, member) });
+              continue;
+            }
             if (name.text === "style") issues.push({ control, utility: "inline-style", ...location(syntax, member) });
             if (name.text === "className") for (const literal of literals(member.initializer)) for (const token of literal.text.split(/\s+/)) {
               const utility = token.replace(/^(?:(?:[\w-]+|\[[^\]]+\]):)+/, "").replace(/^!|!$/g, "");
@@ -253,7 +263,7 @@ export function createInventory(projectRoot) {
     for (const file of [base, base + ".tsx", base + ".ts",
       join(base, "index.ts"), join(base, "index.tsx")]) {
       if (existsSync(file) && (file.endsWith(".tsx") ||
-          (file.endsWith(".ts") && within(file, componentsDir)))) return file;
+          file.endsWith(".ts"))) return file;
     }
     return null;
   }
