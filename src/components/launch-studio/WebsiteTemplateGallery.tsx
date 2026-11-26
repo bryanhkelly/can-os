@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-const previewLabels: Record<PublicSitePath, string> = {
+export const previewLabels: Record<PublicSitePath, string> = {
   "/": "Home", "/about": "About us", "/leadership": "Leadership", "/academics": "Academics",
   "/school-day": "Learning model", "/student-life": "Student life",
   "/families": "Families", "/admissions": "Admissions", "/tuition": "Tuition & aid",
@@ -28,7 +28,7 @@ const structuralLayouts: Record<SiteTemplateId,readonly Rect[]> = {
   campus: [[0,0,200,18,1],[13,28,86,10,2],[13,46,77,4],[111,28,77,60,0],[13,63,87,25,0],[13,100,54,40,0],[73,100,54,40,0],[133,100,54,40,0]],
 };
 const grays=["#d1d5db","#9ca3af","#52525b","#f3f4f6"];
-function Structure({id,page,viewport,thumbnail=false}:{
+export function Structure({id,page,viewport,thumbnail=false}:{
   id:SiteTemplateId;page:PublicSitePath;viewport:"desktop"|"mobile";thumbnail?:boolean;
 }) {
   const mobile=viewport==="mobile";
