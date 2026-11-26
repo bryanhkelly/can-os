@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 
-const meta = { title: "Foundations/Reusable workflow controls",
+const meta = { id: "foundations-reusable-workflow-controls", title: "04 Application patterns/Reusable workflow controls",
   parameters: { chromatic: { modes: {
     light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" },
   } } },

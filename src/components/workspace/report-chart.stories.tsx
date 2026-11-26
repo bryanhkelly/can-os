@@ -5,7 +5,7 @@ import { ReportChart } from "./report-chart";
 import type {ReportChartSpec} from "./report-chart-data";
 const fixture={title:"Pilot participation",description:"Synthetic fixture only. Counts overlap.",valueLabel:"Registrations",kind:"comparison",format:"count",points:[{id:"registered",label:"Registered",value:102},{id:"engaged",label:"Engaged",value:87},{id:"completed",label:"Completed",value:69}]} satisfies ReportChartSpec;
 const meta = {
-  title:"V6.1 foundations/Data Visualization/Charts", component:ReportChart,
+  id: "v6-1-foundations-data-visualization-charts", title: "03 Components/Reporting/Charts", component:ReportChart,
   parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}},
   args:{spec:fixture as ReportChartSpec},
 } satisfies Meta<typeof ReportChart>;

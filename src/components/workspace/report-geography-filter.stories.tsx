@@ -3,7 +3,7 @@ import type {Meta,StoryObj} from "@storybook/react-vite";
 import {useState,type ComponentProps} from "react";
 import {expect,within,userEvent} from "storybook/test";
 import {ReportGeographyFilter} from "./report-geography-filter";
-const meta={title:"Foundations/V6.1 reporting geography filter",component:ReportGeographyFilter,args:{
+const meta={id: "foundations-v6-1-reporting-geography-filter", title: "03 Components/Reporting/Geography filter",component:ReportGeographyFilter,args:{
  value:"",basis:"current",options:[{code:"US-CBSA-12060",name:"Atlanta Metro",kind:"metro"},{code:"US-GA",name:"Georgia",kind:"state"},{code:"US-COUNTY-13067",name:"Cobb County",kind:"county"}],onChange:()=>{},
  },parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"}}}}} satisfies Meta<typeof ReportGeographyFilter>;
 export default meta;

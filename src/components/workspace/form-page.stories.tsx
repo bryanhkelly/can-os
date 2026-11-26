@@ -26,7 +26,7 @@ function DedicatedForm({ pending = false, onSubmit }: { pending?: boolean; onSub
 }
 
 const meta = {
-  title: "Foundations/Dedicated form page",
+  id: "foundations-dedicated-form-page", title: "05 Page layouts/Dedicated form page",
   component: DedicatedForm,
   args: { onSubmit: fn() },
   render: args => <div className="min-h-screen bg-background p-4 sm:p-8"><DedicatedForm {...args} /></div>,

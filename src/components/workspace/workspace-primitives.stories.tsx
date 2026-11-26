@@ -9,7 +9,7 @@ import { StatCard } from "./stat-card";
 import { StatusBadge, WorkspacePanel } from "./workspace-panel";
 import { WorkspaceActionLink } from "./workspace-action-link";
 
-const meta = { title: "Foundations/Workspace primitives" } satisfies Meta;
+const meta = { id: "foundations-workspace-primitives", title: "03 Components/Workspace primitives" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

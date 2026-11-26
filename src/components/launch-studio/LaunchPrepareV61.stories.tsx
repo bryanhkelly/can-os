@@ -9,7 +9,7 @@ import { LaunchPrepareV61 } from "./LaunchPrepareV61";
  */
 const siteId = "00000000-0000-4000-8000-000000000001";
 const meta = {
-  title: "Workflows/Launch Studio/V6.1 Prepare",
+  id: "workflows-launch-studio-v6-1-prepare", title: "08 Feature workspaces/Launch Studio/Prepare",
   component: LaunchPrepareV61,
   parameters: { layout: "fullscreen" },
   args: { siteId, module: "facilities-resources" },

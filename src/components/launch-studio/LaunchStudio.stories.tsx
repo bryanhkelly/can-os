@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
 
 const meta = {
-  title: "Workflows/Launch Studio",
+  id: "workflows-launch-studio", title: "08 Feature workspaces/Launch Studio/Overview and shell",
   parameters: { layout: "fullscreen" },
   decorators: [Story => {
     const router = createRouter({ routeTree: createRootRoute({ component: Story }),

@@ -8,7 +8,7 @@ import { DirectoryWindowPagination } from "./directory-window-pagination";
 import { Button } from "@/components/ui/button";
 
 const meta = {
-  title: "Foundations/V6.1 reporting tables and navigation",
+  id: "foundations-v6-1-reporting-tables-and-navigation", title: "03 Components/Reporting/Tables and navigation",
   parameters: {
     chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" } } },
   },

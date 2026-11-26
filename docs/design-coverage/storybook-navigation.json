@@ -257,6 +257,196 @@
         "NarrowWorkspace",
         "StandardWorkspace"
       ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchV61StepNavigation.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio/V6.1 internal steps",
+      "title": "08 Feature workspaces/Launch Studio/Internal steps",
+      "metaId": "workflows-launch-studio-v6-1-internal-steps",
+      "exports": [
+        "FourSiteInformationSteps",
+        "TwoProgramsAudiencesSteps",
+        "PassiveMarketingPackageProgress",
+        "SixWebsiteBrandSteps"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchPrepareV61.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio/V6.1 Prepare",
+      "title": "08 Feature workspaces/Launch Studio/Prepare",
+      "metaId": "workflows-launch-studio-v6-1-prepare",
+      "exports": [
+        "Facilities",
+        "Team",
+        "Scheduling",
+        "Funding",
+        "Safety",
+        "PublishSite"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-chart.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Charts",
+      "title": "03 Components/Reporting/Charts",
+      "metaId": "v6-1-foundations-data-visualization-charts",
+      "exports": [
+        "Comparison",
+        "Trend",
+        "Missing",
+        "Zero",
+        "Mobile",
+        "Dark",
+        "Distribution",
+        "Stacked",
+        "Funnel",
+        "SiteBrand",
+        "Empty",
+        "Invalid",
+        "LongLabelsAndLargeValues",
+        "Dense",
+        "CategoricalFourSeries",
+        "CategoricalDark",
+        "CategoricalSiteBrand",
+        "CategoricalMobile",
+        "PrintExactValues",
+        "DarkTokenResolution",
+        "FixedSharedAxis",
+        "ReservedSeriesSlots"
+      ]
+    },
+    {
+      "path": "src/components/workspace/master-detail-workspace.stories.tsx",
+      "previousTitle": "V6.1 templates/Master detail explorer",
+      "title": "05 Page layouts/Master detail explorer",
+      "metaId": "v6-1-templates-master-detail-explorer",
+      "exports": [
+        "AdmissionsQueue"
+      ]
+    },
+    {
+      "path": "src/components/workspace/record-layout.stories.tsx",
+      "previousTitle": "V6.1 templates/Directories and records",
+      "title": "05 Page layouts/Directories and records",
+      "metaId": "v6-1-templates-directories-and-records",
+      "exports": [
+        "SchoolSiteDirectory",
+        "ApplicantRecord",
+        "CompactRecordFacts",
+        "SchoolDayEvidenceTiles"
+      ]
+    },
+    {
+      "path": "src/components/workspace/workspace-primitives.stories.tsx",
+      "previousTitle": "Foundations/Workspace primitives",
+      "title": "03 Components/Workspace primitives",
+      "metaId": "foundations-workspace-primitives",
+      "exports": [
+        "PanelAndStatuses",
+        "Metrics",
+        "InteractiveMetric",
+        "Loading",
+        "Empty",
+        "ErrorWithRetry",
+        "AttentionNotice",
+        "SuccessConfirmation",
+        "AuthorizedActionLink",
+        "NarrowWorkspace",
+        "NestedPanels"
+      ]
+    },
+    {
+      "path": "src/components/workspace/reusable-controls.stories.tsx",
+      "previousTitle": "Foundations/Reusable workflow controls",
+      "title": "04 Application patterns/Reusable workflow controls",
+      "metaId": "foundations-reusable-workflow-controls",
+      "exports": [
+        "ScopeSelection",
+        "ReasonDialog",
+        "PendingDialog",
+        "DuplicateConfirmProtection",
+        "DestructiveConfirmation",
+        "ExplicitTimezone",
+        "FileSelection",
+        "SavedButRefreshFailed",
+        "UploadedNotRecorded",
+        "RetrySavedRefresh",
+        "DarkRefreshRecovery",
+        "RetryQuery"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-geography-filter.stories.tsx",
+      "previousTitle": "Foundations/V6.1 reporting geography filter",
+      "title": "03 Components/Reporting/Geography filter",
+      "metaId": "foundations-v6-1-reporting-geography-filter",
+      "exports": [
+        "MarketSelection",
+        "Historical",
+        "Unknown",
+        "OutsideMarket",
+        "Loading",
+        "ErrorState",
+        "StaleSelection",
+        "Mobile",
+        "Dark"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-table.stories.tsx",
+      "previousTitle": "Foundations/V6.1 reporting tables and navigation",
+      "title": "03 Components/Reporting/Tables and navigation",
+      "metaId": "foundations-v6-1-reporting-tables-and-navigation",
+      "exports": [
+        "Desktop",
+        "Tablet",
+        "Mobile",
+        "Dark",
+        "CursorPagingInteractions"
+      ]
+    },
+    {
+      "path": "src/components/workspace/provider-report-filter-bar.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Provider report filters",
+      "title": "03 Components/Reporting/Provider report filters",
+      "metaId": "v6-1-foundations-data-visualization-provider-report-filters",
+      "exports": [
+        "CrossReportSelection",
+        "Dark",
+        "SiteBrand",
+        "ScopeIsolation"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchStudio.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio",
+      "title": "08 Feature workspaces/Launch Studio/Overview and shell",
+      "metaId": "workflows-launch-studio",
+      "exports": [
+        "Entry",
+        "Welcome",
+        "PendingReview",
+        "Unavailable",
+        "Forbidden",
+        "Unconfigured",
+        "SchoolForm",
+        "NeedsJurisdictionReview",
+        "ReturningWithSavedShape",
+        "CompletionUnavailable"
+      ]
+    },
+    {
+      "path": "src/components/workspace/form-page.stories.tsx",
+      "previousTitle": "Foundations/Dedicated form page",
+      "title": "05 Page layouts/Dedicated form page",
+      "metaId": "foundations-dedicated-form-page",
+      "exports": [
+        "GroupedFieldsAndActions",
+        "Pending",
+        "SingleColumnEvidenceReview",
+        "InlineRecordActions",
+        "StepNavigationActions",
+        "NarrowFormAndValidation"
+      ]
     }
   ]
 }
