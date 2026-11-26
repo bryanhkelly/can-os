@@ -37,12 +37,15 @@ beforeEach(()=>{
  state.rows=[[grant],[account],[grant]];
  state.select.mockImplementation(()=>query(state.ownerRows));
  state.grants.mockResolvedValue([{id:grantId,...grant,active:true}]);
- state.transaction.mockImplementation(async run=>run({
-   select:()=>query(state.rows.shift()??[]),
+ state.transaction.mockImplementation(async run=>{
+   let first=true;
+   return run({
+   select:()=>{if(first){first=false;return query(state.ownerRows);}return query(state.rows.shift()??[]);},
    update:()=>({set:(values:unknown)=>{state.updates.push(values);return {where:()=>({
      returning:async()=>[{id:"revoked-session"}],
    })};}}),
- }));
+ });
+ });
 });
 afterEach(()=>vi.unstubAllEnvs());
 
@@ -74,10 +77,15 @@ describe("private account credential recovery",()=>{
    await expect(rotatePrivateAccountAccessCode(request(),input)).rejects.toThrow();
    expect(state.updates).toEqual([]);
  });
+ it("rejects stale shared-code owner authentication even with a mailbox timestamp",async()=>{
+   state.ownerRows=[{...(state.ownerRows[0] as object),authenticationMethod:"local_demo_code"}];
+   await expect(rotatePrivateAccountAccessCode(request(),input)).rejects.toThrow();
+   expect(state.updates).toEqual([]);
+ });
  it("cannot rotate while delegated or from a foreign origin",async()=>{
    state.ownerRows=[{...(state.ownerRows[0] as object),delegatedGrantId:"other-grant"}];
    await expect(rotatePrivateAccountAccessCode(request(),input)).rejects.toThrow();
    await expect(rotatePrivateAccountAccessCode(new Request("https://example.org/platform",{method:"POST",headers:{origin:"https://other.example"}}),input)).rejects.toThrow();
-   expect(state.transaction).not.toHaveBeenCalled();
+   expect(state.updates).toEqual([]);
  });
 });
