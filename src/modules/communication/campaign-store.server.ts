@@ -1,3 +1,4 @@
+import { readEmailProviderReceipt } from "@/domain/email-provider-receipt";
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
@@ -122,9 +123,10 @@ export async function processEngagementCampaignDeliveries(limit=10){
      tags:[{name:"can_source",value:"engagement_campaign"},{name:"can_receipt",value:work.id}]},
      sender.key,"engagement-campaign/"+work.id);
    if(response.ok){
-    const result=await response.json() as {id?:unknown};
-    if(typeof result.id!=="string"||!result.id)throw new Error("missing provider receipt");
-    countSettled(await settle(work,"accepted",result.id));continue;
+    const providerMessageId = await readEmailProviderReceipt(response);
+    if (!providerMessageId) throw new Error("missing provider receipt");
+    countSettled(await settle(work, "accepted", providerMessageId));
+    continue;
    }
    const failure = campaignProviderFailure(response.status);
    if (failure.retryable) {
