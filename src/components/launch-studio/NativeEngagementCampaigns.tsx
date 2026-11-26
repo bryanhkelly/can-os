@@ -4,7 +4,7 @@ import {Checkbox} from "@/components/ui/choice";
 import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
-import {Textarea} from "@/components/ui/textarea";
+import {EmailRecipientField} from "@/components/communication/EmailRecipientField";
 import {ActionFooter,EmptyState,QueryState,WorkspaceNotice,WorkspacePanel,StatusBadge,RecordFacts} from "@/components/workspace";
 import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagementCampaign,cancelEngagementCampaign} from "@/modules/communication/engagement-campaigns.functions";
 import {CampaignListMembers} from "./CampaignListMembers";
@@ -31,7 +31,7 @@ function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDra
      const imported=parseCampaignRecipientCsv(await file.text());
      const merged=parseCampaignRecipients([raw,imported].filter(Boolean).join("\n"));
      if(merged.invalid.length||merged.tooMany)throw new Error("Combined list must contain at most 1,000 valid addresses.");
-     setRaw(merged.recipients.join("\n"));setConfirmed(false);
+     setRaw(merged.recipients.join("\n"));setList("");setManageList(false);setConfirmed(false);
    }catch(e){setImportError(e instanceof Error?e.message:"Unable to import CSV.");}
    finally{importPending.current=false;setImporting(false);}
  }
@@ -52,8 +52,7 @@ function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDra
  {data&&<RecordFacts columns={1} items={[{label:"Campaign sender",value:data.senderLabel}]}/>}
  {!data&&<p className="text-sm text-muted-foreground">You can enter addresses now. Saving requires a successfully loaded campaign workspace.</p>}
  <Field label="Recipient list name (optional)"><Input value={name} maxLength={120} disabled={busy} onChange={e=>setName(e.target.value)}/></Field>
- <Field label="Recipient email addresses" description={parsed.recipients.length+" unique addresses; up to 1,000 per list"} error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"List exceeds the current limit.":undefined}>
- <Textarea placeholder="Enter one email address per line" value={raw} rows={4} maxLength={256000} disabled={busy||importing} onChange={e=>{setRaw(e.target.value);setAttested(false);setConfirmed(false);}}/></Field>
+ <EmailRecipientField value={raw} disabled={busy||importing} onChange={value=>{setRaw(value);setList("");setManageList(false);setAttested(false);setConfirmed(false);}}/>
  <Field label="Import email CSV" description="Optional single email column, with or without an email header. Review addresses and confirm consent before sending."><Input type="file" accept=".csv,text/csv" disabled={busy||importing} onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value="";if(file)void importCsv(file);}}/></Field>
  {importError&&<WorkspaceNotice tone="danger">{importError}</WorkspaceNotice>}
  <Field label="Consent evidence" description="Describe where and how these recipients agreed to campaign emails."><Input value={source} maxLength={500} disabled={busy} onChange={e=>{setSource(e.target.value);setAttested(false);setConfirmed(false);}}/></Field>
