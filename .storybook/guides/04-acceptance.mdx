@@ -1,0 +1,20 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="12 Engineering and acceptance/Release gates" />
+
+# Acceptance is evidence, not inventory
+
+| Gate | Command or artifact |
+| --- | --- |
+| Local catalog | `npm run storybook` |
+| Static build | `npm run build-storybook` |
+| Interaction and accessibility | `npm run test:storybook` |
+| Route and layout coverage | `node scripts/check-v61-experience-coverage.mjs` |
+| Complete declaration gate | Same command with `--strict` |
+| Reviewed visual evidence | Existing V6.1 evidence manifest and Chromatic acceptance |
+
+Accessibility checks are errors by default. Any exception must be narrowly scoped and documented. Automated checks supplement, not replace, keyboard and assistive-technology review.
+
+The route registry starts with candidate layout assignments. Do not mark a route verified until its real rendering, authorizations and acceptance evidence have been checked.
+
+Storybook build or CI failure is not a passing gate. Missing runner logs or absent visual credentials are blockers, not grounds for auto-approval.

@@ -38,3 +38,7 @@ Do not equate a file count with tested experience coverage.
 Calendar invitees and messaging share EntitySelectionResults. Family onboarding uses the embedded OutcomeMilestoneList. Noncredit seat release explains its existing reason requirement. Network authorization decisions use the shared mutation/refresh recovery, and network reporting has a source-data presentation fixture that explicitly excludes outcome totals.
 
 Registry output now includes missing requirements per route and a summary by archetype. Verified declarations with missing or non-string evidence references fail even in inventory mode. Unit tests cover drift, missing story exports, incomplete declarations and invalid source paths. Evidence links still require independent human or browser review.
+
+## Storybook reference experience
+
+Storybook now has a branded manager, five editorial guide pages, a six-preset responsive viewport toolbar and one fixture alias map shared by Vite and Vitest. Existing story IDs and legacy Chromatic viewport baselines are retained wherever possible. The guide pages use the existing MDX/docs addon; no new packages are required. The manager identity is Becomuna, while production component styling remains V6.1.

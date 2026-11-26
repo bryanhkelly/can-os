@@ -1,0 +1,24 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="05 Page layouts/Choosing a layout" />
+
+# Choose a governed page layout
+
+| Archetype | Composition | Purpose |
+| --- | --- | --- |
+| Dashboard | DashboardLayout, DashboardPanel, StatCard | Priorities and next actions |
+| Directory | DirectoryPage, DirectoryTable, FilterBar | Find, filter and manage collections |
+| Record | RecordLayout, RecordHeader, RecordFacts | Inspect one entity in context |
+| Guided setup | GuidedSetupShell, OutcomeMilestones, ActionFooter | Reach a confirmed outcome |
+| Builder | StudioLayout, Field, ActionStateIndicator | Navigate, edit and inspect |
+| Review | SplitReviewShell, WorkQueue, StatusTimeline | Evidence and authorized decisions |
+| Learning | ClassroomWorkspace | Focused instruction and participation |
+| Reporting | ReportDocumentView, ReportChart | Evidence, definitions and scope |
+| Public | BrandTheme, form primitives | Public information and engagement |
+| Calendar | Calendar grids, LocalDateTimeField | Scheduling and date context |
+| Communication | MessagesWorkspace, DistributionDialog | Conversations and distribution |
+| Settings | WorkspaceShell, WorkspacePanel, RecordFacts | Configuration and authorized administration |
+
+Do not introduce a second shell or recreate an existing interaction pattern inside a route.
+
+A layout reference is not a verified route. The registry records route-specific adoption and independent responsive, accessibility, visual and browser-journey evidence.

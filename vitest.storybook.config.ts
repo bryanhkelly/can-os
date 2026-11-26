@@ -3,6 +3,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
+import { storybookFixtureAliases } from "./.storybook/fixture-aliases";
 
 export default defineConfig({
   plugins: [
@@ -12,12 +13,7 @@ export default defineConfig({
     }),
   ],
   resolve: {
-    alias: {
-      "@/modules/programs/launch-drafts.functions": fileURLToPath(new URL("./src/modules/programs/__mocks__/launch-drafts.functions.ts", import.meta.url)),
-      "@/modules/profiles/student-self-profile.functions": fileURLToPath(new URL("./src/modules/profiles/__mocks__/student-self-profile.functions.ts", import.meta.url)),
-      "@/modules/profiles/qualifications.functions": fileURLToPath(new URL("./src/modules/profiles/__mocks__/qualifications.functions.ts", import.meta.url)),
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
+    alias: storybookFixtureAliases,
   },
   test: {
     name: "storybook",
