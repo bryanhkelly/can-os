@@ -4,7 +4,7 @@ import {db} from "@/db/client";
 import {resolveGoExperience} from "@/modules/engagement/engagement-go.server";
 import {suppressDemoEmailDelivery} from "@/domain/email-delivery-policy";
 import {OUTBOUND_LEASE_MS,outboundRetryDelayMs} from "@/domain/outbound-retry-policy";
-import {campaignRetryable,parseCampaignRecipients,campaignRetryAfterMs} from "@/domain/campaign-policy";
+import { campaignRetryable, parseCampaignRecipients, campaignRetryAfterMs, campaignMaxAttempts, campaignRetryWindowMs, campaignProviderFailure } from "@/domain/campaign-policy";
 import type {ResendReceiptEvent} from "@/domain/resend-webhook";
 
 type Executor=Pick<typeof db,"execute">;
@@ -31,13 +31,13 @@ async function claimCampaignDelivery(){
  AND (d.status='pending' OR (d.status='processing' AND d.lease_until<now()))`);
  await tx.execute(sql`UPDATE public.campaign_deliveries SET status='failed',outcome_unconfirmed=outcome_unconfirmed OR status='processing',lease_id=NULL,lease_until=NULL
  WHERE status IN ('pending','processing') AND (lease_until IS NULL OR lease_until<now())
- AND (attempts>=4 OR first_attempt_at<now()-interval '20 hours')`);
+ AND (attempts>=${campaignMaxAttempts} OR first_attempt_at<now()-(${campaignRetryWindowMs} * interval '1 millisecond'))`);
  const [row]=await campaignRows<Work>(tx,sql`
  WITH candidate AS (
   SELECT d.id FROM public.campaign_deliveries d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
   WHERE c.scheduled_at<=now() AND c.cancelled_at IS NULL AND d.next_attempt_at<=now()
   AND (d.status='pending' OR (d.status='processing' AND d.lease_until<now()))
-  AND d.attempts<4 AND (d.first_attempt_at IS NULL OR d.first_attempt_at>now()-interval '20 hours')
+  AND d.attempts<${campaignMaxAttempts} AND (d.first_attempt_at IS NULL OR d.first_attempt_at>now()-(${campaignRetryWindowMs} * interval '1 millisecond'))
   ORDER BY d.next_attempt_at,d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
  ), claimed AS (
   UPDATE public.campaign_deliveries d SET status='processing',lease_id=gen_random_uuid(),
@@ -111,12 +111,13 @@ export async function processEngagementCampaignDeliveries(limit=10){
     if(typeof result.id!=="string"||!result.id)throw new Error("missing provider receipt");
     countSettled(await settle(work,"accepted",result.id));continue;
    }
-   if(response.status===429||response.status===408||response.status===409||response.status>=500){
+   const failure = campaignProviderFailure(response.status);
+   if (failure.retryable) {
     const retry=campaignRetryable(work.attempts,work.first_attempt_at);
     const delay=Math.max(outboundRetryDelayMs(work.attempts),campaignRetryAfterMs(response.headers.get("retry-after")));
     // 429 is a definite rejection of this attempt, but cannot erase earlier uncertainty.
-    countSettled(await settle(work,retry?"pending":"failed",null,response.status!==429,delay));
-    if(response.status===429||response.status>=500)break;
+    countSettled(await settle(work, retry ? "pending" : "failed", null, failure.outcomeUnconfirmed, delay));
+    if (failure.stopBatch) break;
     continue;
    }
    countSettled(await settle(work,"failed"));
