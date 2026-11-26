@@ -275,7 +275,7 @@ test("appearance debt in reachable components invalidates composed route complia
 
 test("appearance rules reject zero padding and arbitrary typography but preserve alignment", () => {
   const source = 'import { Button } from "@/components/ui/button"; export const Page = () => <Button className={custom ?? "p-0 text-[13px] font-light text-left text-wrap w-full"}/>';
-  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["font-light", "p-0", "text-[13px]"]);
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["font-light", "p-0", "text-[13px]", "unverified-class-expression"]);
 });
 
 test("re-exported controls and literal spread overrides remain governed", () => temp(({root, write}) => {
@@ -283,4 +283,16 @@ test("re-exported controls and literal spread overrides remain governed", () => 
   write("src/components/actions/index.ts", 'export { Button as Action } from "../ui/button";');
   write("src/routes/page.tsx", 'import { Action } from "@/components/actions"; export const Page = () => <Action {...{className:"p-0", style:{color:"red"}}}/>;');
   assert.deepEqual(collectV61SourceViolations(createInventory(root)).map(v => v.detail).sort(), ["Button: inline-style", "Button: p-0"]);
+}));
+
+test("opaque spreads and dynamic classes fail closed", () => {
+  const source = 'import { Button } from "@/components/ui/button"; export const Page = () => <><Button {...props}/><Button className={external}/><Button {...{...props}}/><Button className={active ? "w-full" : "mt-2"}/></>';
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["unverified-class-expression", "unverified-spread", "unverified-spread-member"]);
+});
+test("JSX and shared primitive geometry are included in composed compliance", () => temp(({root, write}) => {
+  write("src/routes/page.jsx", 'import { Button } from "@/components/ui/button"; export const Page = () => <Button/>;');
+  write("src/components/ui/button.tsx", 'export const Button = () => <button className="rounded-lg"/>;');
+  const inventory = createInventory(root);
+  assert.equal(inventory.routes[0].reachableCorners, 1);
+  assert.equal(inventory.routes[0].composedSourceClean, false);
 }));
