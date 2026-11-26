@@ -1,3 +1,4 @@
+import { GEOGRAPHIC_JOB_MAX_ATTEMPTS, GEOGRAPHIC_JOB_LEASE_SECONDS, geographicJobRetryStatus, geographicJobRetryDelayMinutes } from "@/domain/geographic-job-policy";
 import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
 import {physicalSiteAddressSchema,siteAddressEditorDraft} from "@/domain/site-setup-configuration";
@@ -14,15 +15,16 @@ type Work={site_id:string;organization_id:string;generation:string;lease_id:stri
 async function claimSite():Promise<Work|undefined>{
  return db.transaction(async tx=>{
   await tx.execute(sql`UPDATE public.site_geography_jobs SET status='failed',lease_id=NULL,lease_until=NULL,updated_at=now()
-   WHERE status='processing' AND lease_until<now() AND attempts>=4`);
+   WHERE status='processing' AND lease_until<now() AND attempts>=${GEOGRAPHIC_JOB_MAX_ATTEMPTS}`);
   const [work]=await rows<Work>(tx,sql`
     WITH candidate AS (SELECT j.site_id FROM public.site_geography_jobs j
-      WHERE j.next_attempt_at<=now() AND j.attempts<4
+      WHERE j.next_attempt_at<=now() AND j.attempts<${GEOGRAPHIC_JOB_MAX_ATTEMPTS}
        AND (j.status='pending' OR (j.status='processing' AND j.lease_until<now()))
       ORDER BY j.next_attempt_at,j.site_id LIMIT 1 FOR UPDATE SKIP LOCKED),
     claimed AS (UPDATE public.site_geography_jobs j SET status='processing',attempts=attempts+1,
-      lease_id=gen_random_uuid(),lease_until=now()+interval '2 minutes',updated_at=now()
-      FROM candidate c WHERE j.site_id=c.site_id RETURNING j.*)
+      lease_id=gen_random_uuid(),lease_until=now()+(${GEOGRAPHIC_JOB_LEASE_SECONDS} * interval '1 second'),updated_at=now()
+      FROM candidate c WHERE j.site_id=c.site_id
+      RETURNING j.site_id,j.organization_id,j.generation,j.lease_id,j.attempts)
     SELECT j.site_id,j.organization_id,j.generation,j.lease_id,j.attempts,s.address,public.site_geography_eligible(s.site_kind,s.metadata,s.address) AS eligible FROM claimed j
     JOIN public.sites s ON s.id=j.site_id AND s.organization_id=j.organization_id`);
   return work;
@@ -74,9 +76,9 @@ async function finishSite(work:Work,status:"resolved"|"unresolved"|"unsupported"
    await link(ids.get("county"),market,"market_member");
    await link(market,ids.get("csa"),"contained_in");
   }
-  const final=status==="retry"?(work.attempts>=4?"failed":"pending"):status;
+  const final=status==="retry"?(geographicJobRetryStatus(work.attempts)):status;
   await tx.execute(sql`UPDATE public.site_geography_jobs SET status=${final},lease_id=NULL,lease_until=NULL,
-   next_attempt_at=now()+(${Math.min(60,2**work.attempts)}*interval '1 minute'),updated_at=now()
+   next_attempt_at=now()+(${geographicJobRetryDelayMinutes(work.attempts)}*interval '1 minute'),updated_at=now()
    WHERE site_id=${work.site_id} AND generation=${work.generation} AND lease_id=${work.lease_id}`);
  });
 }
@@ -84,15 +86,16 @@ type ProfileWork={area_version_id:string;area_id:string;year:number;lease_id:str
 async function claimProfile(){
  return db.transaction(async tx=>{
   await tx.execute(sql`UPDATE public.geographic_profile_jobs SET status='failed',lease_id=NULL,lease_until=NULL
-   WHERE status='processing' AND lease_until<now() AND attempts>=4`);
+   WHERE status='processing' AND lease_until<now() AND attempts>=${GEOGRAPHIC_JOB_MAX_ATTEMPTS}`);
   const [work]=await rows<ProfileWork>(tx,sql`WITH candidate AS (
-   SELECT area_version_id,year FROM public.geographic_profile_jobs WHERE attempts<4 AND next_attempt_at<=now()
+   SELECT area_version_id,year FROM public.geographic_profile_jobs WHERE attempts<${GEOGRAPHIC_JOB_MAX_ATTEMPTS} AND next_attempt_at<=now()
    AND (status='pending' OR (status='processing' AND lease_until<now()))
    ORDER BY next_attempt_at,area_version_id LIMIT 1 FOR UPDATE SKIP LOCKED),
    claimed AS (UPDATE public.geographic_profile_jobs j SET status='processing',attempts=attempts+1,
-    lease_id=gen_random_uuid(),lease_until=now()+interval '2 minutes' FROM candidate c
-    WHERE j.area_version_id=c.area_version_id AND j.year=c.year RETURNING j.*)
-   SELECT j.*,v.area_id,v.name,v.kind,v.source_id,a.code FROM claimed j
+    lease_id=gen_random_uuid(),lease_until=now()+(${GEOGRAPHIC_JOB_LEASE_SECONDS} * interval '1 second') FROM candidate c
+    WHERE j.area_version_id=c.area_version_id AND j.year=c.year
+    RETURNING j.area_version_id,j.year,j.lease_id,j.attempts)
+   SELECT j.area_version_id,j.year,j.lease_id,j.attempts,v.area_id,v.name,v.kind,v.source_id,a.code FROM claimed j
    JOIN public.geographic_area_versions v ON v.id=j.area_version_id JOIN public.geographic_areas a ON a.id=v.area_id`);
   return work;
  });
@@ -105,9 +108,9 @@ async function finishProfile(work:ProfileWork,profile:CommunityProfile|null,retr
   if(!job)return;
   if(profile)await tx.execute(sql`INSERT INTO public.geographic_community_profiles(area_id,source,year,indicators)
    VALUES(${work.area_id},'acs5',${profile.year},${JSON.stringify(profile.indicators)}::jsonb) ON CONFLICT DO NOTHING`);
-  const status=profile?"resolved":retry?(work.attempts>=4?"failed":"pending"):"unresolved";
+  const status=profile?"resolved":retry?(geographicJobRetryStatus(work.attempts)):"unresolved";
   await tx.execute(sql`UPDATE public.geographic_profile_jobs SET status=${status},lease_id=NULL,lease_until=NULL,
-   next_attempt_at=now()+(${Math.min(60,2**work.attempts)}*interval '1 minute')
+   next_attempt_at=now()+(${geographicJobRetryDelayMinutes(work.attempts)}*interval '1 minute')
    WHERE area_version_id=${work.area_version_id} AND year=${work.year} AND lease_id=${work.lease_id}`);
  });
 }
