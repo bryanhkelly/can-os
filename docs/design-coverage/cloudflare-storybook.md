@@ -13,7 +13,7 @@ npm run storybook:acceptance
 npm run storybook:prepare-cloudflare
 ```
 
-On Linux, install Playwright OS dependencies if needed (`npx playwright install --with-deps chromium`). The acceptance receipt must be for the exact checkout and the static output must match its fingerprint. The packager writes a separate Wrangler JSON configuration alongside a commit-specific assets directory under `acceptance-artifacts/storybook-release/`. It excludes source maps and carries static security headers.
+On Linux, install Playwright OS dependencies if needed (`npx playwright install --with-deps chromium`). The acceptance receipt must be for the exact checkout and the static output must match its fingerprint. The packager writes a separate Wrangler JSON configuration alongside a commit-specific assets directory under `acceptance-artifacts/storybook-release/`. It excludes source maps and carries static security headers. A single root rewrite serves the Storybook manager at `/`; the iframe retains its exact `/iframe.html` URL and unknown paths do not fall back to the manager.
 
 Run the exact `npx wrangler deploy --config ...` command printed by the packager. Authenticate Wrangler locally with `npx wrangler login` if necessary. Never use the production application's deploy script or root Wrangler configuration.
 

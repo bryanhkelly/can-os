@@ -33,6 +33,8 @@ try{
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: connect-src 'self'; form-action 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' blob:; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:
 `);
+ // Preserve the Storybook iframe.html path and map only the root to the manager.
+ if(cloudflare)writeFileSync(join(staging,"_redirects"),"/ /index.html 200\n");
  writeFileSync(join(staging,"robots.txt"),"User-agent: *\nDisallow: /\n");
  renameSync(staging,destination);
  writeFileSync(join(out,prefix+head.slice(0,12)+".json"),JSON.stringify({commit:head,sourceStaticDigest:manifest.digest,sourceMapsExcluded:true,publication:"not deployed",access:"Private project required for production and previews",receipt:"receipt.json"},null,2)+"\n");
