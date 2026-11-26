@@ -10,7 +10,7 @@ const nativeTags = new Set(["button", "input", "label", "select", "textarea", "d
 // Covers directional/logical corners, arbitrary values and variants, including
 // Tailwind important modifiers. Brand shape data is handled separately below.
 const radiusPattern = /(?:^|\s)(?:(?:[\w-]+|\[[^\]\r\n]+\]):)*!?rounded(?:-(?:[trblse]|tl|tr|bl|br|ss|se|es|ee))?(?:-(?:none|xs|sm|md|lg|xl|[2-9]xl|full|\[[^\]\r\n]+\]|\([^\)\r\n]+\)))?!?(?=\s|$)/g;
-const ignoredFile = /\.(?:test|spec|stories)\.tsx$/;
+const ignoredFile = /\.(?:test|spec|stories)\.[jt]sx$/;
 
 function location(file, node) {
   const at = file.getLineAndCharacterOfPosition(node.getStart(file));
@@ -165,9 +165,9 @@ function controlAppearanceIssues(syntax, resolveControl) {
 }
 
 export function analyzeSource(source, path, options = {}) {
-  const isTsx = path.endsWith(".tsx");
+  const isTsx = /\.[jt]sx$/.test(path);
   const syntax = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true,
-    isTsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    path.endsWith(".jsx") ? ts.ScriptKind.JSX : isTsx ? ts.ScriptKind.TSX : path.endsWith(".js") ? ts.ScriptKind.JS : ts.ScriptKind.TS);
   const primitive = options.primitive ?? path.replaceAll("\\", "/").includes("/components/ui/");
   const native = [], corners = [], imports = [];
   function walk(node) {
@@ -229,7 +229,7 @@ export function discoverTsx(dir) {
     for (const item of readdirSync(location, { withFileTypes: true })) {
       const absolute = join(location, item.name);
       if (item.isDirectory()) visit(absolute);
-      else if (item.isFile() && item.name.endsWith(".tsx") &&
+      else if (item.isFile() && /\.[jt]sx$/.test(item.name) &&
           !ignoredFile.test(item.name)) found.push(absolute);
     }
   }
@@ -260,10 +260,9 @@ export function createInventory(projectRoot) {
     const base = specifier.startsWith("@/") ? resolve(src, specifier.slice(2))
       : specifier.startsWith(".") ? resolve(dirname(origin), specifier) : null;
     if (!base || !within(base, src)) return null;
-    for (const file of [base, base + ".tsx", base + ".ts",
-      join(base, "index.ts"), join(base, "index.tsx")]) {
-      if (existsSync(file) && (file.endsWith(".tsx") ||
-          file.endsWith(".ts"))) return file;
+    for (const file of [base, base + ".tsx", base + ".ts", base + ".jsx", base + ".js",
+      join(base, "index.ts"), join(base, "index.tsx"), join(base, "index.js"), join(base, "index.jsx")]) {
+      if (existsSync(file) && /\.[jt]sx?$/.test(file)) return file;
     }
     return null;
   }
@@ -341,7 +340,7 @@ export function createInventory(projectRoot) {
     // Barrel exports are resolved by requested symbols. These totals remain
     // static dependencies, not proof that a component renders at runtime.
     const reachable = [...files].filter(file =>
-      file !== entry && file.endsWith(".tsx"));
+      file !== entry && /\.[jt]sx?$/.test(file));
     return {
       files: reachable.length,
       native: reachable.reduce((n, file) => n + inspect(file).native.length, 0),
