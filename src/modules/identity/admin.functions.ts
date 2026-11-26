@@ -1,4 +1,4 @@
-import { identityEmailDomain } from "@/domain/domain-classification";
+import { identityEmailDomain, isDemoAccountEmail } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { issuePrivateAccountCredential } from "./private-account-credential.server";
@@ -23,7 +23,6 @@ import {
 } from "@/modules/identity/staff-invitations.server";
 import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
 import { DomainError } from "@/domain/errors";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { matchesLegacyStaffInvitationScope } from "./demo-school-tenants.server";
 import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
