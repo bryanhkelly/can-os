@@ -1,3 +1,4 @@
+import { parseClosedReportingWindow } from "@/domain/reporting-window";
 import {readAuthorizedOwnerClassification} from "./reporting-population.server";
 import {sql} from "drizzle-orm";
 import {db} from "@/db/client";
@@ -19,9 +20,10 @@ export const campaignDeliveryCountColumns=sql`
  count(d.id) FILTER(WHERE d.status='cancelled')::int cancelled
 `;
 export async function readSiteCampaignDeliveryMetrics(actor:AccessContext,input:{siteId:string;from:string;to:string}){
- const from=new Date(input.from),to=new Date(input.to),asOf=new Date();
- if(!Number.isFinite(from.getTime())||!Number.isFinite(to.getTime())||from>=to||to>asOf||to.getTime()-from.getTime()>90*86400000)
-  throw new Error("Campaign reporting requires a closed positive period of at most 90 days");
+ const asOf = new Date();
+ const { from, to } = parseClosedReportingWindow(
+   input, asOf, "Campaign reporting requires a closed positive period of at most 90 days",
+ );
  return db.transaction(async tx=>{
   const site=await loadAuthorizedSiteReportingScope(tx,actor,input.siteId);
   const result=await tx.execute(sql`SELECT ${campaignDeliveryCountColumns}
