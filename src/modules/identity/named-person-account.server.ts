@@ -24,6 +24,18 @@ export async function provisionNamedMailboxPerson(tx:Tx,input:{
     .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).for("update").limit(1);
   if(!account||account.disabled||account.privateCredential)
     throw new AuthorizationError("current mailbox account");
+  const identity=await bindAuthorizedAccountPerson(tx,account,{...input,email});
+  return {accountId:account.id,email,accountCreated:created.length===1,...identity};
+}
+
+/** Shared Person binding for callers holding the normalized mailbox advisory
+ * lock and current Account row lock. The workflow owns credential eligibility,
+ * permission to create a Person, role assignment and evidence. */
+export async function bindAuthorizedAccountPerson(tx:Tx,account:{
+  id:string;personId:string|null;disabled:boolean;
+},input:{email:string;firstName:string;lastName:string}){
+  if(account.disabled)throw new AuthorizationError("enabled canonical Account");
+  const email=normalizeAccessEmail(input.email);
   const prior=await tx.select({personId:accountPersonGrants.personId})
     .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id)).limit(101);
   const peopleIds=new Set(prior.map(row=>row.personId));
@@ -40,7 +52,7 @@ export async function provisionNamedMailboxPerson(tx:Tx,input:{
     personId=person.id;
   }
   const [person]=await tx.select({active:people.active}).from(people)
-    .where(eq(people.id,personId)).for("share").limit(1);
+    .where(eq(people.id,personId)).for("update").limit(1);
   if(!person?.active)throw new AuthorizationError("active canonical Person");
   if(!account.personId){
     const [bound]=await tx.update(accessAccounts).set({personId,updatedAt:new Date()})
@@ -50,5 +62,5 @@ export async function provisionNamedMailboxPerson(tx:Tx,input:{
   }
   await tx.update(people).set({domain:identityEmailDomain(email),updatedAt:new Date()})
     .where(and(eq(people.id,personId),isNull(people.domain)));
-  return {accountId:account.id,personId,email,accountCreated:created.length===1,personCreated};
+  return {personId,personCreated};
 }
