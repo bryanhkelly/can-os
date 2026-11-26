@@ -43,7 +43,7 @@ export function EntitySelectionResults({options,selected,onToggle,multiple=false
  return <div className={"divide-y border bg-card "+(className??"")}>{options.map(option=>mode==="single-action"?<div key={option.id}><Button type="button" variant={selected.includes(option.id)?"secondary":"ghost"} disabled={disabled||option.disabled} aria-pressed={selected.includes(option.id)} onClick={()=>onToggle(option.id,true)} className="h-auto w-full justify-start whitespace-normal text-left">
       {selected.includes(option.id)&&<Check aria-hidden="true"/>}<span className="min-w-0 break-words">{option.label}{option.detail&&<span className="block">{option.detail}</span>}</span>
     </Button></div>:<Label key={option.id} className="flex min-w-0 items-start gap-3 p-3 text-sm">
-    {multiple?<Checkbox checked={selected.includes(option.id)} disabled={option.disabled} onChange={e=>onToggle(option.id,e.target.checked)}/>:<Radio name={id} value={option.id} checked={selected.includes(option.id)} disabled={option.disabled} onChange={e=>onToggle(option.id,e.target.checked)}/>}
+    {multiple?<Checkbox checked={selected.includes(option.id)} disabled={disabled||option.disabled} onChange={e=>onToggle(option.id,e.target.checked)}/>:<Radio name={id} value={option.id} checked={selected.includes(option.id)} disabled={disabled||option.disabled} onChange={e=>onToggle(option.id,e.target.checked)}/>}
     <span className="min-w-0 [overflow-wrap:anywhere]"><span className="block font-medium">{option.label}</span>{option.detail&&<span className="block text-xs text-muted-foreground">{option.detail}</span>}</span>
    </Label>)}</div>;
 }

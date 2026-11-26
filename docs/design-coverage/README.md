@@ -32,3 +32,9 @@ Do not equate a file count with tested experience coverage.
 - WorkQueue now owns the shared read-only list presentation for AttentionQueue and the bounded Platform Release Center. It does not create assignments, change decisions or broaden access. The release inventory retains its existing 25-version bound and explicitly reports its scope.
 - DistributionDialog composes the existing accessible Modal and preserves Go Link origin, QR, expiry, pause and revoke commands in the feature. No generic private URL sharing path was added.
 - FileSelectionField is now workspace-owned; evidence callers retain their existing import via a re-export. Upload adapters and authorization remain unchanged.
+
+## Calendar, admissions, enrollment and reporting
+
+Calendar invitees and messaging share EntitySelectionResults. Family onboarding uses the embedded OutcomeMilestoneList. Noncredit seat release explains its existing reason requirement. Network authorization decisions use the shared mutation/refresh recovery, and network reporting has a source-data presentation fixture that explicitly excludes outcome totals.
+
+Registry output now includes missing requirements per route and a summary by archetype. Verified declarations with missing or non-string evidence references fail even in inventory mode. Unit tests cover drift, missing story exports, incomplete declarations and invalid source paths. Evidence links still require independent human or browser review.
