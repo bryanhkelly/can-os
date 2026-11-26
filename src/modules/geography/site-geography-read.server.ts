@@ -1,7 +1,7 @@
 import {sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import type {AccessContext} from "@/domain/access-context";
-import type {CommunityProfile,GeographyKind} from "@/domain/geographic-intelligence";
+import { marketArea, type CommunityProfile, type GeographyKind } from "@/domain/geographic-intelligence";
 import {loadAuthorizedSiteReportingScope} from "@/modules/insights/site-reporting-source-scope.server";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type AreaRow={code:string;name:string;kind:GeographyKind;source_id:string;year:number|null;indicators:CommunityProfile["indicators"]|null};
@@ -25,7 +25,7 @@ export async function readScopedSiteGeography(tx:Tx,scope:{id:string;organizatio
  ) p ON true WHERE m.site_geography_version_id=${version.id} ORDER BY a.code`);
  const areas=(membership.rows as unknown as AreaRow[]);
  const facts=areas.map(a=>({code:a.code,name:a.name,kind:a.kind,sourceId:a.source_id}));
- return {status:"resolved",market:facts.find(a=>a.kind==="metro"||a.kind==="micro")??null,areas:facts,
+ return {status:"resolved",market:marketArea({areas:facts}),areas:facts,
   communityProfiles:areas.filter(a=>a.year!==null&&a.indicators!==null).map(a=>({areaCode:a.code,source:"acs5" as const,year:a.year!,indicators:a.indicators!})),version};
 }
 export async function readAuthorizedSiteGeography(actor:AccessContext,siteId:string,asOf?:Date){

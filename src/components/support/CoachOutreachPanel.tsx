@@ -53,7 +53,7 @@ export function CoachOutreachPanel({
                       onChange={(event) => onNoteChange(event.target.value)}
                       rows={4}
                       placeholder="Who did you contact, what was discussed, and what happens next?"
-                      className="mt-2 w-full  border border-border bg-background p-3 text-sm"
+                      className="mt-2"
                     />
                   </Label>
                   <Label className="mt-3 block text-sm font-semibold">
@@ -61,7 +61,7 @@ export function CoachOutreachPanel({
                     <Select
                       value={outcome}
                       onChange={(event) => onOutcomeChange(event.target.value as CoachOutreachOutcome)}
-                      className="mt-2 w-full  border border-border bg-background p-3 text-sm"
+                      className="mt-2"
                     >
                       {coachOutcomes.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -73,7 +73,7 @@ export function CoachOutreachPanel({
                   <Button type="submit" variant="ghost"
                     disabled={busy || note.trim().length < 3}
                     onClick={() => void onSubmit()}
-                    className="mt-4 w-full  bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40"
+                    className="mt-4 w-full"
                   >
                     Log outreach
                   </Button>

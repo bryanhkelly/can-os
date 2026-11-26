@@ -335,7 +335,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
        <h3 className="font-semibold">Add supported web links to a class</h3>
        <p className="text-xs text-muted-foreground">Select the original external links you reviewed. Their URLs and source identifiers are preserved in canonical curriculum resources; this does not import a course or lesson package.</p>
        <Label className="block text-sm">Destination class
-        <Select className="mt-1 block w-full  border bg-background p-2" value={cartridgeSection} onChange={e=>setCartridgeSection(e.target.value)}>
+        <Select className="mt-1" value={cartridgeSection} onChange={e=>setCartridgeSection(e.target.value)}>
          <option value="">Select a class</option>
          {market.sections.map(section=><option key={section.id} value={section.id}>{section.code} · {section.title}</option>)}
         </Select>
@@ -388,11 +388,11 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
      <h2 className="font-serif text-2xl">Match OneRoster classes</h2>
      <p className="text-sm text-muted-foreground">Paste a OneRoster 1.2 classes.csv to connect external sourced IDs to existing CAN classes. No child profiles, enrollments, teacher accounts or grades are changed. Match every class explicitly and review the destination before saving.</p>
      <Label className="block text-sm">Source system
-      <Input className="mt-1 block w-full  border bg-background p-2" value={rosterSource}
+      <Input className="mt-1" value={rosterSource}
        placeholder="district-sis" maxLength={100} onChange={e=>{setRosterSource(e.target.value);setRosterValidated(false);}}/>
      </Label>
      <Label className="block text-sm">OneRoster classes.csv
-      <Textarea className="mt-1 block min-h-28 w-full  border bg-background p-2 font-mono text-xs"
+      <Textarea className="mt-1 min-h-28"
        value={rosterCsv} maxLength={500000}
        placeholder={"sourcedId,title,courseSourcedId,classCode,schoolSourcedId"}
        onChange={e=>{setRosterCsv(e.target.value);setRosterValidated(false);setRosterMap({});}}/>

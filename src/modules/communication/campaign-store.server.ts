@@ -1,9 +1,11 @@
+import { readEmailProviderReceipt } from "@/domain/email-provider-receipt";
+import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
 import {resolveGoExperience} from "@/modules/engagement/engagement-go.server";
-import {isDemoTenantOrganization} from "@/modules/identity/demo-school-tenants.server";
+import {suppressDemoEmailDelivery} from "@/domain/email-delivery-policy";
 import {OUTBOUND_LEASE_MS,outboundRetryDelayMs} from "@/domain/outbound-retry-policy";
-import {campaignRetryable,parseCampaignRecipients,campaignRetryAfterMs} from "@/domain/campaign-policy";
+import { campaignRetryable, parseCampaignRecipients, campaignRetryAfterMs, campaignMaxAttempts, campaignRetryWindowMs, campaignProviderFailure } from "@/domain/campaign-policy";
 import type {ResendReceiptEvent} from "@/domain/resend-webhook";
 
 type Executor=Pick<typeof db,"execute">;
@@ -20,7 +22,20 @@ export function campaignSender(){
  try{const url=new URL(origin);if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)return null;}catch{return null;}
  return {from,address,key,origin};
 }
-type Work={id:string;lease_id:string;email:string;unsubscribe_token:string;attempts:number;first_attempt_at:string;outcome_unconfirmed:boolean;subject:string;body:string;public_url:string;sender_from:string;sender_address:string;sender_scope:string;organization_id:string|null;code:string;cancelled_at:string|null};
+type Work = {
+  id: string;
+  lease_id: string;
+  email: string;
+  unsubscribe_token: string;
+  attempts: number;
+  first_attempt_at: string;
+  subject: string;
+  body: string;
+  public_url: string;
+  sender_from: string;
+  sender_address: string;
+  code: string;
+};
 async function claimCampaignDelivery(){
  return db.transaction(async tx=>{
  // Expired ambiguous attempts are never retried outside the provider's idempotency window.
@@ -30,22 +45,24 @@ async function claimCampaignDelivery(){
  AND (d.status='pending' OR (d.status='processing' AND d.lease_until<now()))`);
  await tx.execute(sql`UPDATE public.campaign_deliveries SET status='failed',outcome_unconfirmed=outcome_unconfirmed OR status='processing',lease_id=NULL,lease_until=NULL
  WHERE status IN ('pending','processing') AND (lease_until IS NULL OR lease_until<now())
- AND (attempts>=4 OR first_attempt_at<now()-interval '20 hours')`);
+ AND (attempts>=${campaignMaxAttempts} OR first_attempt_at<now()-(${campaignRetryWindowMs} * interval '1 millisecond'))`);
  const [row]=await campaignRows<Work>(tx,sql`
  WITH candidate AS (
   SELECT d.id FROM public.campaign_deliveries d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
   WHERE c.scheduled_at<=now() AND c.cancelled_at IS NULL AND d.next_attempt_at<=now()
   AND (d.status='pending' OR (d.status='processing' AND d.lease_until<now()))
-  AND d.attempts<4 AND (d.first_attempt_at IS NULL OR d.first_attempt_at>now()-interval '20 hours')
+  AND d.attempts<${campaignMaxAttempts} AND (d.first_attempt_at IS NULL OR d.first_attempt_at>now()-(${campaignRetryWindowMs} * interval '1 millisecond'))
   ORDER BY d.next_attempt_at,d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
  ), claimed AS (
   UPDATE public.campaign_deliveries d SET status='processing',lease_id=gen_random_uuid(),
    lease_until=now()+(${OUTBOUND_LEASE_MS} * interval '1 millisecond'),attempts=attempts+1,first_attempt_at=coalesce(first_attempt_at,now()),
    outcome_unconfirmed=outcome_unconfirmed OR status='processing'
-  FROM candidate WHERE d.id=candidate.id RETURNING d.*
+  FROM candidate WHERE d.id=candidate.id
+  RETURNING d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,d.campaign_id
  )
- SELECT d.*,c.subject,c.body,c.public_url,c.sender_from,c.sender_address,c.sender_scope,c.cancelled_at,
-  e.organization_id,l.code FROM claimed d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
+ SELECT d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,
+  c.subject,c.body,c.public_url,c.sender_from,c.sender_address,l.code
+ FROM claimed d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
  JOIN public.engagement_definitions e ON e.id=c.engagement_id JOIN public.site_go_links l ON l.id=c.link_id`);
  return row;
  });
@@ -71,63 +88,111 @@ async function stillEligible(work:Work){
  ) AS eligible`);
  return row?.eligible===true;
 }
-/** Both schedulers use this exact queue. One message per recipient; never BCC bulk mail. */
-export async function processEngagementCampaignDeliveries(limit=10){
- const counts={accepted:0,failed:0,suppressed:0,retry:0,unconfirmed:0};
- const sender=campaignSender();if(!sender)return counts;
- function countSettled(row:Awaited<ReturnType<typeof settle>>){
-  if(!row)return;
-  if(row.status==="accepted")counts.accepted++;
-  else if(row.status==="pending")counts.retry++;
-  else if(row.status==="suppressed")counts.suppressed++;
-  else if(row.status==="failed")counts[row.outcome_unconfirmed?"unconfirmed":"failed"]++;
- }
- for(let i=0;i<Math.min(10,limit);i++){
-  const work=await claimCampaignDelivery();if(!work)break;
-  let transportStarted=false;
-  try{
-   const parsed=parseCampaignRecipients(work.email);
-   const url=new URL(work.public_url);
-   if(parsed.invalid.length||parsed.recipients.length!==1||work.sender_from!==sender.from||work.sender_address!==sender.address||
-     url.origin!==new URL(sender.origin).origin||url.pathname!=="/go/"+work.code||url.search||url.hash||
-     await isDemoTenantOrganization(work.organization_id)){
-    countSettled(await settle(work,"suppressed"));continue;
-   }
-   const experience=await resolveGoExperience(work.code,"/",false);
-   if(!experience||experience.mode==="website-preview"||!await stillEligible(work)){
-    countSettled(await settle(work,"suppressed"));continue;
-   }
-   const unsubscribe=new URL("/api/campaigns/unsubscribe",sender.origin);
-   unsubscribe.searchParams.set("token",work.unsubscribe_token);
-   transportStarted=true;
-   const response=await fetch("https://api.resend.com/emails",{
-    method:"POST",redirect:"error",signal:AbortSignal.timeout(20000),headers:{Authorization:"Bearer "+sender.key,
-     "Content-Type":"application/json","Idempotency-Key":"engagement-campaign/"+work.id},
-    body:JSON.stringify({from:sender.from,to:[work.email],subject:work.subject,
-     text:work.body+"\n\nSent by "+sender.from+"\n"+sender.address+"\nUnsubscribe: "+unsubscribe.href,
-     headers:{"List-Unsubscribe":"<"+unsubscribe.href+">","List-Unsubscribe-Post":"List-Unsubscribe=One-Click"},
-     tags:[{name:"can_source",value:"engagement_campaign"},{name:"can_receipt",value:work.id}]}),
-   });
-   if(response.ok){
-    const result=await response.json() as {id?:unknown};
-    if(typeof result.id!=="string"||!result.id)throw new Error("missing provider receipt");
-    countSettled(await settle(work,"accepted",result.id));continue;
-   }
-   if(response.status===429||response.status===408||response.status===409||response.status>=500){
-    const retry=campaignRetryable(work.attempts,work.first_attempt_at);
-    const delay=Math.max(outboundRetryDelayMs(work.attempts),campaignRetryAfterMs(response.headers.get("retry-after")));
-    // 429 is a definite rejection of this attempt, but cannot erase earlier uncertainty.
-    countSettled(await settle(work,retry?"pending":"failed",null,response.status!==429,delay));
-    if(response.status===429||response.status>=500)break;
-    continue;
-   }
-   countSettled(await settle(work,"failed"));
-  }catch{
-   const retry=campaignRetryable(work.attempts,work.first_attempt_at);
-   countSettled(await settle(work,retry?"pending":"failed",null,transportStarted));
+type CampaignSender = NonNullable<ReturnType<typeof campaignSender>>;
+type CampaignSettlement = Awaited<ReturnType<typeof settle>>;
+type CampaignCounts = {
+  accepted: number;
+  failed: number;
+  suppressed: number;
+  retry: number;
+  unconfirmed: number;
+};
+
+/** Count only a successful fenced settlement. A webhook may own the result. */
+function countCampaignSettlement(counts: CampaignCounts, row: CampaignSettlement) {
+  if (!row) return;
+  switch (row.status) {
+    case "accepted": counts.accepted++; break;
+    case "pending": counts.retry++; break;
+    case "suppressed": counts.suppressed++; break;
+    case "failed": counts[row.outcome_unconfirmed ? "unconfirmed" : "failed"]++; break;
   }
- }
- return counts;
+}
+
+function matchesCampaignDestination(work: Work, sender: CampaignSender): boolean {
+  const parsed = parseCampaignRecipients(work.email);
+  const url = new URL(work.public_url);
+  return !parsed.invalid.length && parsed.recipients.length === 1 &&
+    work.sender_from === sender.from && work.sender_address === sender.address &&
+    url.origin === new URL(sender.origin).origin && url.pathname === "/go/" + work.code &&
+    !url.search && !url.hash && !suppressDemoEmailDelivery(work.email);
+}
+
+/** Handle one leased delivery, leaving the batch loop responsible for scheduling
+ * and aggregation. No success is counted until settlement wins the lease fence. */
+async function processCampaignDelivery(work: Work, sender: CampaignSender): Promise<{
+  row: CampaignSettlement;
+  stopBatch: boolean;
+}> {
+  let transportStarted = false;
+  try {
+    if (!matchesCampaignDestination(work, sender)) {
+      return { row: await settle(work, "suppressed"), stopBatch: false };
+    }
+    const experience = await resolveGoExperience(work.code, "/", false);
+    if (!experience || experience.mode === "website-preview" || !await stillEligible(work)) {
+      return { row: await settle(work, "suppressed"), stopBatch: false };
+    }
+
+    const unsubscribe = new URL("/api/campaigns/unsubscribe", sender.origin);
+    unsubscribe.searchParams.set("token", work.unsubscribe_token);
+    transportStarted = true;
+    const response = await submitResendEmail({
+      from: sender.from,
+      to: [work.email],
+      subject: work.subject,
+      text: work.body + "\n\nSent by " + sender.from + "\n" + sender.address + "\nUnsubscribe: " + unsubscribe.href,
+      headers: {
+        "List-Unsubscribe": "<" + unsubscribe.href + ">",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+      tags: [
+        { name: "can_source", value: "engagement_campaign" },
+        { name: "can_receipt", value: work.id },
+      ],
+    }, sender.key, "engagement-campaign/" + work.id);
+
+    if (response.ok) {
+      const providerMessageId = await readEmailProviderReceipt(response);
+      if (!providerMessageId) throw new Error("missing provider receipt");
+      return { row: await settle(work, "accepted", providerMessageId), stopBatch: false };
+    }
+
+    const failure = campaignProviderFailure(response.status);
+    if (failure.retryable) {
+      const retry = campaignRetryable(work.attempts, work.first_attempt_at);
+      const delay = Math.max(outboundRetryDelayMs(work.attempts),
+        campaignRetryAfterMs(response.headers.get("retry-after")));
+      // A 429 is a definite rejection of this attempt, not of earlier attempts.
+      return {
+        row: await settle(work, retry ? "pending" : "failed", null, failure.outcomeUnconfirmed, delay),
+        stopBatch: failure.stopBatch,
+      };
+    }
+    return { row: await settle(work, "failed"), stopBatch: false };
+  } catch {
+    const retry = campaignRetryable(work.attempts, work.first_attempt_at);
+    return {
+      row: await settle(work, retry ? "pending" : "failed", null, transportStarted),
+      stopBatch: false,
+    };
+  }
+}
+
+/** Both schedulers use this exact queue. One message per recipient; never BCC bulk mail. */
+export async function processEngagementCampaignDeliveries(limit = 10): Promise<CampaignCounts> {
+  const counts: CampaignCounts = { accepted: 0, failed: 0, suppressed: 0, retry: 0, unconfirmed: 0 };
+  const sender = campaignSender();
+  if (!sender) return counts;
+
+  for (let i = 0; i < Math.min(10, limit); i++) {
+    const work = await claimCampaignDelivery();
+    if (!work) break;
+    const result = await processCampaignDelivery(work, sender);
+    countCampaignSettlement(counts, result.row);
+    if (result.stopBatch) break;
+  }
+  return counts;
 }
 export async function suppressCampaignRecipient(token:string){
  await db.transaction(async tx=>{

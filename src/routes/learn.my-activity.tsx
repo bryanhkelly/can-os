@@ -92,9 +92,9 @@ function ActivityCard({item,viewerRole,managing,onManage}: {item: ParticipationR
         </WorkspaceLinkNavigation>}
       </div>
       {canManageTraining ? <Button type="button" variant="outline" onClick={onManage} aria-expanded={managing}
-        className="min-h-11 whitespace-normal text-left">
+        size="lg" className="text-left">
         {managing?"Close registration controls":"Manage registration"}
-      </Button> : item.action && <Button asChild variant="outline" className="min-h-11 whitespace-normal"><a href={item.action.href}>
+      </Button> : item.action && <Button asChild variant="outline" size="lg"><a href={item.action.href}>
         {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
       </a></Button>}
     </div>
@@ -118,11 +118,11 @@ function OpportunityCard({item,managing,onManage}: {item: ParticipationOpportuni
         {item.state === "invited" && expires && <p className="mt-2 text-sm text-muted-foreground">Offer expires: {expires}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        {item.state==="invited"&&item.action&&<Button asChild variant="outline" className="min-h-11 whitespace-normal"><a href={item.action.href}>
+        {item.state==="invited"&&item.action&&<Button asChild variant="outline" size="lg"><a href={item.action.href}>
           {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
         </a></Button>}
         {(item.state==="waiting"||item.state==="invited")&&<Button type="button" variant="outline" onClick={onManage} aria-expanded={managing}
-          className="min-h-11 whitespace-normal">
+          size="lg">
           {managing?"Close waitlist controls":"Manage waiting list"}
         </Button>}
       </div>
@@ -337,7 +337,7 @@ function MyActivityPage() {
             ?"Some sources are unavailable, so this view may be incomplete."
             :"No verified participation matches these filters in the active workspace."}
           actions={<>
-            <Button type="button" variant="ghost" className="font-semibold text-primary underline"
+            <Button type="button" variant="ghost"
               onClick={()=>{setBucket("current");setKind("all");}}>Clear filters</Button>
             <Link to="/explore" className="font-semibold text-primary underline">Explore opportunities</Link>
           </>}/> : null}
@@ -378,7 +378,7 @@ function MyActivityPage() {
         available even when the assembled participation read model fails. */}
       {trainingApplicable&&<section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
          <Button type="button" variant="outline" aria-expanded={showAllTraining}
-           className="min-h-11 text-sm font-semibold text-primary underline underline-offset-4"
+           size="lg"
            onClick={()=>{setManagingKey(null);setShowAllTraining(value=>!value);}}>
            {showAllTraining?"Hide all training controls":"Manage all training registrations and waiting lists"}
          </Button>

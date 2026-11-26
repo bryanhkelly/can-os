@@ -27,6 +27,7 @@ const sha=git(["rev-parse","HEAD"]);
 const branch=git(["branch","--show-current"]);
 if(git(["status","--porcelain"]))throw new Error("Commit or stash changes before exact-SHA validation.");
 const results=[];
+let lockedDependenciesAvailable=true;
 const sanitized={...process.env};
 for(const key of Object.keys(sanitized)){
   if(/DATABASE_URL|NEON_API_KEY|CLOUDFLARE_API_TOKEN|CF_API_TOKEN|NETLIFY_AUTH_TOKEN|CAN_R2_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|CAN_LIVE_PREVIEW_CODE|GLOO_API_KEY|RESEND_API_KEY|CAN_NONCREDIT_QA_CAN_SESSION|CAN_PILOT_QA_.*(?:SESSION|FIXTURE)|CAN_ACCESS_TOKEN_PEPPER|CAN_CANONICAL_ACCESS_TOKEN_PEPPER|CAN_NONCREDIT_ASSESSMENT_KEY_HEX|RESEND_WEBHOOK_SECRET|CAN_CAMPAIGN_FROM_EMAIL|CAN_CAMPAIGN_POSTAL_ADDRESS/i.test(key))delete sanitized[key];
@@ -35,17 +36,23 @@ for(const key of Object.keys(sanitized)){
 // from accidentally sending real email or submitting data to an AI provider.
 const browserEnv={...process.env,APP_ENV:"test",NODE_ENV:"test",RESEND_API_KEY:"",RESEND_WEBHOOK_SECRET:"",GLOO_API_KEY:"",GLOO_MODEL:"",CAN_CAMPAIGN_FROM_EMAIL:""};
 function run(name,argv,env=sanitized){
+  if(!lockedDependenciesAvailable){
+    block(name,"Locked dependency installation failed; refusing to use stale or partial dependencies");
+    return false;
+  }
   const start=Date.now();
   console.log("\n[release] "+name);
   const r=spawnSync(npm,argv,{stdio:"inherit",env,shell:process.platform==="win32"});
-  results.push({name,status:r.status===0?"passed":"failed",exitCode:r.status??null,durationMs:Date.now()-start});
+  results.push({name,status:r.status===0?"passed":"failed",exitCode:r.status??null,durationMs:Date.now()-start,...(r.error?{reason:r.error.code??"Unable to start npm"}:{})});
+  return r.status===0;
 }
 function block(name,reason){results.push({name,status:"blocked",reason});}
-if(enabled("--install"))run("Locked dependency installation",["ci"]);
+if(enabled("--install"))lockedDependenciesAvailable=run("Locked dependency installation",["ci"]);
 run("Engineering architecture, migration safety and V6.1 source governance",["run","verify:architecture"]);
 run("Cloudflare production bundle",["run","build:cloudflare"]);
 run("TypeScript",["run","typecheck:full"]);
 if(profile==="engineering"){
+  run("Netlify application production bundle",["run","build"]);
   run("Full ESLint and V6.1 source coverage",["run","lint"]);
   run("Lint warning ratchet tests",["run","test:lint-regressions"]);
   run("Lint warning ratchet",["run","check:lint-regressions"]);
@@ -62,6 +69,12 @@ if(profile==="pilot"){
   run("Lint and V6.1 design-system coverage",["run","lint"]);
   run("V6.1 independent visual evidence",["run","design:coverage","--","--strict"]);
   run("Canonical reporting foundation",["run","test:reporting:foundation"]);
+  run("Individual credential and identity parity regressions",["exec","--","vitest","run",
+    "tests/unit/domain-classification.test.ts","tests/unit/session-credential-policy.test.ts","tests/unit/individual-staff-handoff.test.ts","tests/unit/resend-email-transport.test.ts",
+    "tests/unit/private-account-code-recovery.test.ts","tests/unit/demo-session-isolation.test.ts",
+    "tests/unit/demo-sign-in.test.ts","tests/unit/student-access-link-outcome.test.ts",
+    "tests/unit/account-activity-source-contract.test.ts","tests/unit/participation-rollups.test.ts","tests/unit/relationship-registration-projection.test.ts",
+    "tests/unit/synthetic-real-workflow-parity-v61.test.ts"]);
   run("Pilot publication, participant outcomes, distribution and Site Intelligence",["exec","--","vitest","run",
     "tests/unit/release-11232026-training-launch-contract.test.ts",
     "tests/unit/noncredit-completion.test.ts","tests/unit/noncredit-pilot-outcomes.test.ts",
@@ -94,6 +107,7 @@ if(profile==="pilot"){
 }
 if(enabled("--database")&&process.env.DATABASE_URL){
   run("Deployment database schema and privileges (read only)",["run","db:check:friendly-urls:deploy"],process.env);
+  run("Identity and credential migration prerequisites (read only)",["exec","--","node","scripts/acceptance/check-one-person-deploy-schema.mjs"],process.env);
 }else block("Deployment database schema and privileges","Requires --database and exact deployment DATABASE_URL");
 if(enabled("--browser")&&process.env.TEST_DATABASE_URL){
   run("Isolated browser security acceptance",["run","test:e2e:release-security"],{...browserEnv,DATABASE_URL:process.env.TEST_DATABASE_URL,CAN_ADMISSIONS_TEST_BRANCH_ID:process.env.CAN_ADMISSIONS_TEST_BRANCH_ID??process.env.CAN_E2E_TEST_BRANCH_ID??process.env.CAN_PILOT_QA_BRANCH_ID});

@@ -1,6 +1,6 @@
 import {readBoundedResponseText} from "@/domain/bounded-request-body";
 import type { PhysicalSiteAddress } from "@/domain/site-setup-configuration";
-import {censusEstimate,communityIndicators,type CommunityProfile,type GeographicAreaFact,type GeographicResolution,type GeographyKind} from "@/domain/geographic-intelligence";
+import {censusEstimate,communityIndicators,classifyMarketStatus,CENSUS_GEOGRAPHY_YEAR,type CommunityProfile,type GeographicAreaFact,type GeographicResolution,type GeographyKind} from "@/domain/geographic-intelligence";
 
 export interface GeographyProvider {
   resolve(address:PhysicalSiteAddress):Promise<GeographicResolution|null>;
@@ -9,7 +9,7 @@ export interface GeographyProvider {
 type Row=Record<string,unknown>;
 const object=(value:unknown):Row=>value!==null&&typeof value==="object"&&!Array.isArray(value)?value as Row:{};
 const string=(value:unknown)=>typeof value==="string"?value:"";
-export const CENSUS_GEOGRAPHY_YEAR=2024;
+export { CENSUS_GEOGRAPHY_YEAR } from "@/domain/geographic-intelligence";
 const MAX_CENSUS_RESPONSE_BYTES=1024*1024;
 const layers:readonly [string,GeographyKind,string,RegExp][]=[
   ["Counties","county","COUNTY",/^\d{5}$/],
@@ -63,12 +63,10 @@ export function parseCensusGeography(raw:unknown,address:PhysicalSiteAddress):Ge
     for(const row of rows){const item=object(row),id=string(item.GEOID);if(/^[0-9A-Z]{4,6}$/.test(id))add(type[0],type[1],id,string(item.NAME));}
   }
   if(!areas.some(a=>a.kind==="county"))return null;
-  const markets=areas.filter(a=>a.kind==="metro"||a.kind==="micro");
-  if(markets.length>1)throw new Error("geography_provider_ambiguous_market");
   // An omitted layer is not evidence that a point lies outside a market.
   const complete=["Metropolitan Statistical Areas","Micropolitan Statistical Areas"].every(key=>Array.isArray(geo[key])&&(geo[key] as unknown[]).length===0);
   return {source:"us-census-geocoder",benchmark,vintage,latitude,longitude,areas,
-    marketStatus:markets[0]?.kind==="metro"?"metro":markets[0]?.kind==="micro"?"micro":complete?"outside_market":"unknown"};
+    marketStatus:classifyMarketStatus(areas,complete)};
 }
 export function parseCommunityProfile(raw:unknown,area:GeographicAreaFact,year:number):CommunityProfile|null {
   if(!Array.isArray(raw)||raw.length!==2||!Array.isArray(raw[0])||!Array.isArray(raw[1]))return null;
@@ -123,9 +121,8 @@ export function createCensusGeographyProvider(options:{fetcher?:typeof fetch;api
       // polygons, never the closest city, ZIP centroid or current live vintage.
       const [metro,micro]=await Promise.all([boundaryMarket(result,"metro"),boundaryMarket(result,"micro")]);
       const markets=[...metro,...micro];
-      if(markets.length>1)throw new Error("geography_provider_ambiguous_market");
       return {...result,areas:[...result.areas,...markets],
-        marketStatus:markets[0]?.kind==="metro"?"metro":markets[0]?.kind==="micro"?"micro":"outside_market"};
+        marketStatus:classifyMarketStatus(markets,true)};
     },
     async communityProfile(area,year){
       if(!options.apiKey)return null;

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { StatusBadge } from "@/components/workspace";
+import { StatusBadge, WorkspacePanel, WorkspaceNotice, QueryState, EmptyState, ActionFooter } from "@/components/workspace";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
  transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist,offerLifecycleWaitlistSeat
@@ -35,10 +35,10 @@ function LifecycleWorkspaceContent({programId,staff}:LifecycleWorkspaceProps){
    .finally(()=>{if(active)setLoading(false)});
   return ()=>{active=false};
  },[programId,attempt]);
- return <div>{loading?<p className="mt-6 text-sm">Loading operational lifecycle…</p>:error?
-  <div className="mt-6 space-y-2"><p role="alert" className="text-sm">{error}</p>
-   <Button variant="outline" size="sm" onClick={()=>{setLoading(true);setError("");setSections([]);setAttempt(value=>value+1);}}>Retry lifecycle records</Button></div>:
-  <SectionLifecycleManager key={programId} sections={sections} staff={staff} onChanged={reload}/>}</div>;
+ return <QueryState loading={loading?"Loading operational lifecycle…":undefined} error={error||undefined}
+  onRetry={()=>{setLoading(true);setError("");setSections([]);setAttempt(value=>value+1);}} retrying={loading}>
+  <SectionLifecycleManager key={programId} sections={sections} staff={staff} onChanged={reload}/>
+ </QueryState>;
 }
 export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Snapshot;staff:{personId:string;first:string;last:string}[];onChanged:()=>Promise<void>}){
  const router=useRouter();
@@ -69,8 +69,7 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
   else if(result.status==="refresh-failed")resetSavedDraft.current=onReconciled;
   return result;
  }
- return <section className="mt-9 space-y-4" aria-label="Operational lifecycle">
-  <h2 className="font-serif text-2xl">School operations · lifecycle management</h2>
+ return <WorkspacePanel title="School operations · lifecycle management" className="mt-9">
   <p className="text-sm text-muted-foreground">Manage staffing transitions, schedule corrections, section closure and enrollment exceptions. Every change is audited. Sections cannot close with active students or reserved instruction.</p>
   <MutationFeedback state={{...mutation,retryRefresh}} pendingMessage="Saving lifecycle change..."/>
   <fieldset disabled={busy} aria-busy={mutation.pending} className="space-y-4">
@@ -78,10 +77,11 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
    <Textarea value={reason} onChange={e=>setReason(e.target.value)} rows={2} maxLength={1000}
     placeholder="Document the decision and any necessary student/teacher follow-up"/>
   </Field>
+  {!sections.length&&<EmptyState title="No Sections to manage" description="Create Sections before managing staffing, scheduling and enrollment transitions."/>}
   {sections.map(section=><LifecycleSection key={section.id} section={section} staff={staff}
    busy={busy} reason={reason} allSections={sections} run={run}/>)}
   </fieldset>
- </section>;
+ </WorkspacePanel>;
 }
 function LifecycleSection({section,staff,busy,reason,allSections,run}:{
  section:Snapshot[number];staff:{personId:string;first:string;last:string}[];
@@ -99,11 +99,7 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
    candidate.programId===section.programId&&candidate.termId===section.termId);
  const selectedDestination=destinations.some(candidate=>candidate.id===destination)?destination:"";
  const [enrollmentStatus,setEnrollmentStatus]=useState<"withdrawn"|"transferred">("withdrawn");
- return <article className="border bg-card p-5">
-  <div className="flex flex-wrap items-center justify-between gap-2">
-   <h3 className="font-semibold">{section.title} · {section.code}</h3>
-   <StatusBadge tone={section.active?"success":"neutral"}>{section.active?"Active":"Closed"}</StatusBadge>
-  </div>
+ return <WorkspacePanel headingLevel="h3" title={`${section.title} · ${section.code}`} actions={<StatusBadge tone={section.active?"success":"neutral"}>{section.active?"Active":"Closed"}</StatusBadge>}>
   <p className="mt-2 text-xs text-muted-foreground">
    {section.students.length} active section enrollments · {section.teachers.length} instructors · {section.waitlist.length} waiting · {section.allocations.filter(a=>a.status==="held"||a.status==="committed").length} live capacity reservations
   </p>
@@ -137,12 +133,12 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
       {section.scheduleOptions.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
      </Select>
     </Field>
-    <div className="mt-3 border bg-muted p-2 text-xs">
+    <WorkspaceNotice className="mt-3">
      <strong>Schedule impact preview:</strong> {section.students.length} active enrollments,
      {" "}{section.teachers.length} assigned instructors and
      {" "}{section.allocations.filter(a=>a.status==="held"||a.status==="committed").length} active capacity allocations.
      Calendar and attendance obligations should be reviewed before confirming.
-    </div>
+    </WorkspaceNotice>
     <Button variant="outline" size="sm" disabled={busy||!section.active} onClick={()=>void run(section.id,
       ()=>updateSectionLifecycleSchedule({data:{sectionId:section.id,scheduleTemplateId:schedule||null,
         startsAt:start?new Date(start).toISOString():null,endsAt:end?new Date(end).toISOString():null,reason}}),
@@ -181,15 +177,16 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
      onAdd={(studentProfileId,reset)=>void run(section.id,
       ()=>queueLifecycleWaitlist({data:{sectionId:section.id,studentProfileId,reason}}),
       "Student placed on waitlist.",reset)}/>
-    {section.waitlist.map(w=><div key={w.id} className="mt-2 flex justify-between gap-2 border p-2 text-xs">
-     <span>{lifecycleStudentLabel(w)} · {w.status}</span>
+    {section.waitlist.map(w=><div key={w.id} className="mt-2 border border-border p-3 text-sm">
+     <div className="flex min-w-0 flex-wrap items-center gap-2"><span className="min-w-0 [overflow-wrap:anywhere]">{lifecycleStudentLabel(w)}</span><StatusBadge>{w.status.replaceAll("_"," ")}</StatusBadge></div>
+     <ActionFooter layout="inline">
      {w.status!=="in_progress"&&<Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
        ()=>offerLifecycleWaitlistSeat({data:{actionId:w.id,expiresAt:new Date(Date.now()+3*86400000).toISOString()}}),
        "A three-day waitlist offer was recorded.")}>Offer seat</Button>}
      <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
        ()=>promoteLifecycleWaitlist({data:{actionId:w.id}}),"Waitlisted student enrolled.")}>Promote</Button><Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
        ()=>resolveLifecycleWaitlist({data:{actionId:w.id,reason}}),"Waitlist item resolved.")}>Resolve</Button>
-    </div>)}
+    </ActionFooter></div>)}
     <Button variant={section.active?"destructive":"outline"} size="sm" disabled={busy} onClick={()=>void run(section.id,
      ()=>setSectionLifecycleState({data:{sectionId:section.id,active:!section.active,reason}}),
      section.active?"Section closed.":"Section reopened.")}
@@ -198,7 +195,7 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
     </Button>
    </div>
   </div>
- </article>;
+ </WorkspacePanel>;
 }
 
 function CapacityReplacement({section,reason,busy,run}:{section:Snapshot[number];reason:string;busy:boolean;run:LifecycleRun}){

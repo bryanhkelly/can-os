@@ -28,7 +28,7 @@ export function ExtendedSeasonReadinessRequests({
   const available=operators.filter(person=>person.programId===season.programId);
   const existingOwner=tasks[0]?.ownerPersonId??"";
   const operatorId=owner??existingOwner;
-  const inputClass="mt-1 w-full  border bg-background p-2 text-sm";
+  const inputClass="mt-1";
   return <details className="mt-3  border p-3">
                     <summary className="cursor-pointer text-xs font-semibold">Optional evidence requests</summary>
                     <p className="text-xs font-semibold">

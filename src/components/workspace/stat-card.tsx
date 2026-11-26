@@ -24,7 +24,7 @@ function StatCard({ label, value, hint, asChild = false, children, className }: 
   </>;
   return (
     <Comp className={cn(
-      "block border border-border bg-card p-5",
+      "block min-w-0 border border-border bg-card p-5 [overflow-wrap:anywhere]",
       asChild && "transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       className,
     )}>

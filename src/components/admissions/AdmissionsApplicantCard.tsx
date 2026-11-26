@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/workspace/workspace-panel";
+import { StatusBadge, WorkspacePanel, WorkspaceNotice, ActionFooter } from "@/components/workspace";
 import { AdmissionsGuardianActions,type GuardianVerification } from "./AdmissionsGuardianActions";
 import { AdmissionsDecisionActions,type AdmissionsDecision } from "./AdmissionsDecisionActions";
 import { AdmissionsTransferStatus } from "./AdmissionsTransferStatus";
@@ -25,13 +25,10 @@ export function AdmissionsApplicantCard({r,busy,onVerify,onProvision,onInvite,on
  onDecision:(id:string,decision:AdmissionsDecision,label:string)=>void;
  showSummary?:boolean;
 }){
- return <>
-   <article aria-label={showSummary?undefined:"Admissions application actions"} className="border bg-card p-5">
-    {showSummary&&<div className="flex flex-wrap justify-between gap-3"><div><h3 className="text-lg font-semibold">{r.studentFirst} {r.studentLast}</h3>
-     <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
-     <StatusBadge>{r.disposition??r.stage}</StatusBadge>
-    </div>}
-    <p role="status" className="mt-3 border bg-muted p-3 text-sm"><strong>Next admissions step: </strong>{admissionsNextStep(r.stage,r.disposition)}</p>
+ return <WorkspacePanel title={showSummary?`${r.studentFirst} ${r.studentLast}`:"Admissions application actions"}
+    description={showSummary?`${r.programName} · ${r.disposition??r.stage} · Last updated ${new Date(r.updatedAt).toLocaleDateString()}`:undefined}
+    actions={showSummary?<StatusBadge>{r.disposition??r.stage}</StatusBadge>:undefined}>
+    <WorkspaceNotice><strong>Next admissions step: </strong>{admissionsNextStep(r.stage,r.disposition)}</WorkspaceNotice>
     <AdmissionsTransferStatus applicationId={r.id} transferOriginStatus={r.transferOriginStatus}
      transferNamedDestination={r.transferNamedDestination} transferRecordsStatus={r.transferRecordsStatus}
      destinationTranscriptConsentRecorded={r.destinationTranscriptConsentRecorded}/>
@@ -43,11 +40,8 @@ export function AdmissionsApplicantCard({r,busy,onVerify,onProvision,onInvite,on
     </Button>}
     <AdmissionsDecisionActions stage={r.stage} disposition={r.disposition} busy={busy}
      onDecision={(decision,label)=>onDecision(r.id,decision,label)}/>
-    <Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
-      className="mt-3 inline-block text-xs underline">Review this application's offers and enrollment →</Link>
+    <ActionFooter layout="inline"><Button asChild variant="outline" size="sm"><Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}>Review this application's offers and enrollment</Link></Button></ActionFooter>
     <p className="mt-2 text-xs text-muted-foreground">Withdraw unaccepted offers before waitlisting, declining or withdrawing an application.
       Accepted offers and active enrollments require their enrollment workflow and cannot be cancelled here.</p>
-   </article>
-
- </>;
+   </WorkspacePanel>;
 }

@@ -1,0 +1,3 @@
+-- Superseded by drizzle/0133_restricted_staff_credential_parity.sql.
+-- Intentionally not executable as a standalone production patch. The tracked
+-- migration requires 0131 and 0132 first and must be deployed with the release.

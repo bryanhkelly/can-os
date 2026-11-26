@@ -6,18 +6,18 @@ import {
   Globe2, Mail, ShieldCheck, Sun, UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { realSchoolSetupSignupSchema, publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
+import { siteSignupSchema, publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
 import { useHydrated } from "@/lib/use-hydrated";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { WorkspacePanel, WorkspaceNotice, FormSection } from "@/components/workspace";
 
-const noStore = { "Cache-Control": "no-store" };
+const noStore = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
 
 /**
- * CAN OS public Site entry. Authentication and Site provisioning still occur
- * only when the existing single-use email challenge is redeemed.
+ * One public Site entry; identity approval determines when common provisioning runs.
  */
 export const Route = createFileRoute("/site/new")({
   server: { handlers: {
@@ -44,19 +44,20 @@ export const Route = createFileRoute("/site/new")({
       } catch {
         return Response.json({ error: "Invalid submission." }, { status: 400, headers: noStore });
       }
-      const parsed = realSchoolSetupSignupSchema.safeParse(submitted);
+      const parsed = siteSignupSchema.safeParse(submitted);
       if (!parsed.success) {
         return Response.json({ error: "Please check the Site and administrator details." },
           { status: 400, headers: noStore });
       }
       try {
-        const { requestSchoolSetupAccess } = await import("@/modules/identity/passwordless-access.server");
-        await requestSchoolSetupAccess(parsed.data);
+        const { requestSiteSignup } = await import("@/modules/identity/passwordless-access.server");
+        const outcome = await requestSiteSignup(parsed.data);
+        return Response.json(outcome, { status: 202, headers: noStore });
       } catch {
-        // Preserve account-existence and delivery-status indistinguishability.
-        console.error("[site-signup] verified email request unavailable");
+        console.error("[site-signup] account setup unavailable");
+        return Response.json({ error: "Site setup could not be completed. Check your details or sign in if you already have an account." },
+          { status: 409, headers: noStore });
       }
-      return Response.json({ accepted: true }, { status: 202, headers: noStore });
     }),
   } },
   component: SiteNewPage,
@@ -96,6 +97,9 @@ function SiteNewPage() {
   const hydrated = useHydrated();
   const [sending, setSending] = useState(false);
   const [requested, setRequested] = useState(false);
+  const [demoReady, setDemoReady] = useState(false);
+  const [privateAccessCode, setPrivateAccessCode] = useState<string | null>(null);
+  const [signupEmail, setSignupEmail] = useState("");
   const [error, setError] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -108,6 +112,7 @@ function SiteNewPage() {
       name: String(values.get("siteName") ?? "").trim(),
       organizationName: String(values.get("organizationName") ?? "").trim() || undefined,
       organizationType: String(values.get("organizationType") ?? "").trim(),
+      organizationDomain: String(values.get("organizationDomain") ?? "").trim() || undefined,
       firstName: String(values.get("firstName") ?? "").trim(),
       lastName: String(values.get("lastName") ?? "").trim(),
       email: String(values.get("email") ?? "").trim(),
@@ -121,9 +126,14 @@ function SiteNewPage() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Request not accepted");
+      const result = await response.json() as { demo?: boolean; privateAccessCode?: string };
+      if (result.demo === true && !result.privateAccessCode) throw new Error("Private access credential unavailable");
+      setSignupEmail(payload.email);
+      setPrivateAccessCode(result.privateAccessCode ?? null);
+      setDemoReady(result.demo === true);
       setRequested(true);
     } catch {
-      setError("We couldn't start verification. Check your details and try again.");
+      setError("We couldn't create your Site. Check your details or sign in if you already have an account.");
     } finally {
       setSending(false);
     }
@@ -156,20 +166,23 @@ function SiteNewPage() {
             </p>
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium">
               <span>✓ Simple to get started</span>
-              <span>✓ Secure email verification</span>
+              <span>✓ Secure account access</span>
               <span>✓ Complete details later</span>
             </div>
           </section>
-          <section className="border bg-card p-5 sm:p-7" aria-label="Create your Site">
+          <WorkspacePanel title="Create your Site">
             {requested ? <div role="status" className="space-y-4">
               <CheckCircle2 className="size-9 text-success" aria-hidden="true" />
-              <h2 className="font-serif text-3xl">Check your email.</h2>
+              <h2 className="font-serif text-3xl">{demoReady ? "Your demo Site is ready." : "Check your email."}</h2>
               <p className="leading-7 text-muted-foreground">
-                If the address is eligible, you'll receive a secure verification link.
-                Follow it to create your Site and continue into Launch Studio.
+                {demoReady ? "Your Site administrator is automatically approved without email verification. Use your private access code to sign in." : "If the address is eligible, you will receive a secure verification link. Follow it to create your Site and continue into Launch Studio."}
               </p>
-              <Button asChild variant="outline"><Link to="/access">Go to sign in</Link></Button>
-            </div> : <form onSubmit={submit} className="space-y-5">
+              {privateAccessCode && <div className="space-y-2">
+                <WorkspaceNotice>Save this private access code in your password manager now. It is shown only once. Do not share it with other users.</WorkspaceNotice>
+                <Field label="Private access code"><Input value={privateAccessCode} readOnly autoComplete="off" /></Field>
+              </div>}
+              <Button asChild variant="outline"><Link to="/access" search={{email:signupEmail || undefined}}>Go to sign in</Link></Button>
+            </div> : <form onSubmit={submit} aria-busy={sending} className="space-y-5">
               <p className={eyebrow}>Your learning Site</p>
               <Field label="Site name" required description="The name of the learning community you want to create.">
                 <Input name="siteName" autoComplete="organization" placeholder="e.g., Valor Learning Center"
@@ -179,6 +192,9 @@ function SiteNewPage() {
                 description="Only if the organization responsible for this Site has a different name. Affiliations and legal authority are reviewed separately.">
                 <Input name="organizationName" placeholder="e.g., Grace Community Church" minLength={2} maxLength={160} />
               </Field>
+              <Field label="Organization domain" required description="The domain that identifies the organization, not necessarily your personal email domain. For demo setup, use the same .demo domain as your administrator email.">
+                <Input name="organizationDomain" placeholder="e.g., gracechurch.org" required maxLength={253} />
+              </Field>
               <Field label="Responsible organization type" required
                 description="Choose how your organization describes itself. National network status and affiliations require independent verification.">
                 <Select name="organizationType" defaultValue="other_partner" required>
@@ -186,39 +202,35 @@ function SiteNewPage() {
                     <option key={option.value} value={option.value}>{option.label}</option>)}
                 </Select>
               </Field>
-              <div className="border-t pt-5">
-                <p className={eyebrow}>Initial Site administrator</p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <FormSection title="Initial Site administrator">
                   <Field label="First name" required>
                     <Input name="firstName" autoComplete="given-name" placeholder="First name" required maxLength={80} />
                   </Field>
                   <Field label="Last name" required>
                     <Input name="lastName" autoComplete="family-name" placeholder="Last name" required maxLength={80} />
                   </Field>
-                </div>
-                <div className="mt-4">
+                <div className="sm:col-span-2">
                   <Field label="Email address" required>
                     <Input name="email" type="email" autoComplete="email" placeholder="you@organization.org"
                       required maxLength={254} />
                   </Field>
                 </div>
-              </div>
-              {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-              <Button className="w-full justify-between" disabled={!hydrated || sending} type="submit">
+              </FormSection>
+              {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+              <Button className="w-full" disabled={!hydrated} loading={sending} loadingLabel="Creating your account…" type="submit">
                 <Mail className="size-4" aria-hidden="true" />
-                {sending ? "Sending verification…" : "Verify email & continue"}
+                Continue
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
-              <p className="flex items-start gap-2 bg-muted p-3 text-xs leading-5 text-muted-foreground">
-                <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                We send a secure verification link. Your Site is created only after you verify your email.
+              <WorkspaceNotice>
+                Real accounts require email verification. Demo accounts are automatically approved. Both create a standard Site.
                 Creating a Site does not authorize opening or enrollment.
-              </p>
+              </WorkspaceNotice>
               <p className="text-center text-xs text-muted-foreground">Already have a CAN OS account?{" "}
                 <Link to="/access" className="font-semibold text-primary underline underline-offset-4">Sign in</Link>
               </p>
             </form>}
-          </section>
+          </WorkspacePanel>
         </div>
         <aside className="min-w-0 border bg-card" aria-label="What CAN OS enables">
           <img src="/school-template-previews/v1/modern/hero.jpg"

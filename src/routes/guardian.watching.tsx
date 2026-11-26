@@ -7,14 +7,14 @@ import {
   updateWatchOptions,
   updateWatchStatus,
 } from "@/modules/conversation/ask-can.functions";
-import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
+import { WorkspaceShell, EmptyState, QueryState, WorkspacePanel, FormSection, ActionFooter } from "@/components/workspace";
 import { NotificationPreferences } from "@/components/guardian/NotificationPreferences";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { StatusBadge } from "@/components/workspace";
 
 export const Route = createFileRoute("/guardian/watching")({
@@ -67,12 +67,8 @@ function WatchingPage() {
         )}
         <div className="mt-6 grid gap-3">
           {watches.map((watch) => (
-            <article key={watch.id} className=" border bg-card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+            <WorkspacePanel key={watch.id} title={watch.eventTypes.join(", ").replaceAll(/([a-z])([A-Z])/g, "$1 $2")} actions={<StatusBadge tone={watch.status === "active" ? "success" : watch.status === "paused" ? "attention" : "neutral"}>{watch.status}</StatusBadge>}>
                 <div>
-                  <p className="font-semibold">
-                    {watch.eventTypes.join(", ").replaceAll(/([a-z])([A-Z])/g, "$1 $2")}
-                  </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Watching {watch.subjectType.replaceAll("_", " ")} ·{" "}
                     {watch.channel === "in_app" ? "CAN notification" : watch.channel}
@@ -85,11 +81,7 @@ function WatchingPage() {
                     {watch.createdVia === "conversation" ? " via Ask CAN" : ""}
                   </p>
                 </div>
-                <StatusBadge tone={watch.status === "active" ? "success" : watch.status === "paused" ? "attention" : "neutral"}>
-                  {watch.status}
-                </StatusBadge>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-sm">
+              <ActionFooter layout="inline">
                 <Button type="button" variant="outline" size="sm"
                   onClick={() => {
                     if (historyFor === watch.id) { setHistoryFor(""); return; }
@@ -125,10 +117,10 @@ function WatchingPage() {
                     Turn off
                   </Button>
                 )}
-              </div>
+              </ActionFooter>
               {watch.status === "active" && <WatchSettings watch={watch} onSaved={load} />}
               {historyFor === watch.id && <WatchDeliveryHistory subscriptionId={watch.id}/>}
-            </article>
+            </WorkspacePanel>
           ))}
         </div>
       </QueryState>
@@ -166,37 +158,37 @@ function WatchSettings({ watch, onSaved }: { watch: Watch; onSaved: () => Promis
   const mutation = useMutationFeedback(onSaved);
   const saving = mutation.pending || mutation.refreshFailed;
   async function save() {
+    if (saving) return;
     await mutation.run(() => updateWatchOptions({ data: {
         subscriptionId: watch.id, channel, remindAfterHours: first,
         repeatEveryHours: repeat, maxReminders: maximum,
       } }), { successMessage: "Saved.", commandErrorMessage: "Could not save reminder settings." });
   }
-  return <div className="mt-4 grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
-    <Label>Channel
+  return <FormSection title="Reminder settings" className="mt-4">
+    <Field label="Channel">
       <Select value={channel} onChange={e => setChannel(e.target.value as "in_app" | "email" | "sms")}
-        className="mt-1 block w-full  border bg-background p-2">
+       >
         <option value="in_app">In-app</option><option value="email">Email</option><option value="sms">Verified SMS</option>
       </Select>
-    </Label>
-    <Label>First reminder after (hours)
+    </Field>
+    <Field label="First reminder after (hours)">
       <Input type="number" min={1} max={720} value={first}
         onChange={e => setFirst(Number(e.target.value))}
-        className="mt-1 block w-full  border bg-background p-2"/>
-    </Label>
-    <Label>Repeat every (hours)
+       />
+    </Field>
+    <Field label="Repeat every (hours)">
       <Input type="number" min={1} max={720} value={repeat}
         onChange={e => setRepeat(Number(e.target.value))}
-        className="mt-1 block w-full  border bg-background p-2"/>
-    </Label>
-    <Label>Maximum reminders
+       />
+    </Field>
+    <Field label="Maximum reminders">
       <Input type="number" min={1} max={30} value={maximum}
         onChange={e => setMaximum(Number(e.target.value))}
-        className="mt-1 block w-full  border bg-background p-2"/>
-    </Label>
-    <div className="flex items-center gap-2">
-      <Button type="button" disabled={saving} onClick={() => void save()}
-        className=" bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">Save</Button>
+       />
+    </Field>
+    <ActionFooter layout="inline" className="sm:col-span-2">
+      <Button type="button" disabled={saving} loading={mutation.pending} loadingLabel="Saving…" onClick={() => void save()}>Save</Button>
       <MutationFeedback state={mutation} pendingMessage="Saving reminder settings..."/>
-    </div>
-  </div>;
+    </ActionFooter>
+  </FormSection>;
 }

@@ -66,6 +66,7 @@ export async function acceptStaffInvitations(
   accountId: string,
   invitations: readonly PendingStaffInvitation[],
   now = new Date(),
+  automaticApproval?: {actorPersonId:string},
 ): Promise<PendingStaffInvitation[]> {
   const accepted: PendingStaffInvitation[] = [];
   for (const invitation of invitations) {
@@ -88,20 +89,22 @@ export async function acceptStaffInvitations(
       eventType: EventTypes.StaffInvitationAccepted,
       aggregateType: STAFF_INVITATION_AGGREGATE,
       aggregateId: invitation.id,
-      actorPersonId: invitation.personId,
+      actorPersonId: automaticApproval?.actorPersonId ?? invitation.personId,
       organizationId: invitation.organizationId,
       siteId: invitation.siteId,
-      payload: { accountId, personId: invitation.personId, role: invitation.role },
+      payload: { accountId, personId: invitation.personId, role: invitation.role,
+        approvalMethod: automaticApproval ? "automatic_demo" : "recipient_sign_in" },
     });
     await writeAudit(tx, {
-      actorPersonId: invitation.personId,
+      actorPersonId: automaticApproval?.actorPersonId ?? invitation.personId,
       action: "identity.staff_invitation.accepted",
       resourceType: STAFF_INVITATION_AGGREGATE,
       resourceId: invitation.id,
       scope: { organizationId: invitation.organizationId, siteId: invitation.siteId },
       before: { active: false },
       after: { active: true, accountId, personId: invitation.personId, role: invitation.role },
-      context: { accountId, grantId: invitation.id, role: invitation.role },
+      context: { accountId, grantId: invitation.id, role: invitation.role,
+        approvalMethod: automaticApproval ? "automatic_demo" : "recipient_sign_in" },
     });
     accepted.push(invitation);
   }

@@ -1,3 +1,4 @@
+import { CAMPAIGN_METRIC_DEFINITIONS, CAMPAIGN_METRIC_VERSION } from "@/domain/campaign-metrics";
 import {describe,it,expect} from "vitest";
 import {validateReportChart,type ReportChartSpec} from "@/components/workspace/report-chart-data";
 import {previousCompleteUtcDays,resolveReportDateRange} from "@/components/workspace/report-date-range";
@@ -18,7 +19,14 @@ describe("governed report views",()=>{
     expect(validateReportChart({...spec,rows:[{id:"x",label:"X",total:10,values:[6,5]}]})).toBe(false);
   });
   it("uses registered versioned metrics rather than local counting rules",()=>{
-    expect(campaignReportDefinitions().map(d=>d.metricKey)).toContain("campaign.delivered");
+    const campaignDefinitions = campaignReportDefinitions();
+    expect(campaignDefinitions.map(d => d.metricKey)).toEqual(
+      CAMPAIGN_METRIC_DEFINITIONS.map(d => "campaign." + d.key),
+    );
+    expect(campaignDefinitions.every(d => d.definitionVersion === CAMPAIGN_METRIC_VERSION)).toBe(true);
+    expect(campaignDefinitions.map(d => d.sourceMetricKey)).toEqual(
+      CAMPAIGN_METRIC_DEFINITIONS.map(d => d.key),
+    );
     expect(pilotOutcomeDefinitions().map(d=>d.metricKey)).toContain("noncredit.confirmedNoncreditCompletions");
     const definitions=goReportDefinitions();
     const values=bindRegisteredCounts(definitions,{linkOpens30d:0,pageViews30d:NaN,referralNoncreditRegistrations30d:null});

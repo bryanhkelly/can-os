@@ -3,12 +3,13 @@ import { Link, type RegisteredRouter, type ValidateLinkOptions } from "@tanstack
 import { Circle, CircleAlert, CircleCheck, Info, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function WorkspacePanel({ title, description, actions, children, className, id }: {
+export function WorkspacePanel({ title, description, actions, children, className, id, headingLevel: Heading = "h2" }: {
   title: string; description?: string; actions?: ReactNode; children: ReactNode; className?: string; id?: string;
+  headingLevel?: "h2" | "h3" | "h4" | "h5" | "h6";
 }) {
   return <section id={id} aria-label={title} className={cn("min-w-0 overflow-hidden border border-border/70 bg-card shadow-sm", className)}>
     <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5 sm:py-5">
-      <div className="min-w-0 [overflow-wrap:anywhere]"><h2 className="text-base font-semibold">{title}</h2>
+      <div className="min-w-0 [overflow-wrap:anywhere]"><Heading className="text-base font-semibold">{title}</Heading>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>
       {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -56,14 +57,14 @@ export function StatusBadge({ children, tone = "neutral" }: {
   children: ReactNode; tone?: StatusTone;
 }) {
   const Icon = statusIcons[tone];
-  return <span className={cn("inline-flex items-center gap-1.5 border px-2.5 py-1 text-xs font-medium",
+  return <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5 border px-2.5 py-1 text-xs font-medium",
     tone === "info" && "border-info/40 bg-info/10 text-foreground",
     tone === "attention" && "border-warning/50 bg-warning/10 text-foreground",
     tone === "success" && "border-success/50 bg-success/10 text-foreground",
     tone === "danger" && "border-danger/50 bg-danger/10 text-foreground",
     tone === "neutral" && "bg-muted text-muted-foreground")}>
     <Icon aria-hidden="true" className="size-3.5 shrink-0" />
-    <span>{children}</span>
+    <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
   </span>;
 }
 

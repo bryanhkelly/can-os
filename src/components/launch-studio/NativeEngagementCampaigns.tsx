@@ -5,7 +5,7 @@ import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
 import {Textarea} from "@/components/ui/textarea";
-import {EmptyState,QueryState,WorkspaceNotice} from "@/components/workspace";
+import {ActionFooter,EmptyState,QueryState,WorkspaceNotice,WorkspacePanel,StatusBadge,RecordFacts} from "@/components/workspace";
 import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagementCampaign,cancelEngagementCampaign} from "@/modules/communication/engagement-campaigns.functions";
 import {CampaignListMembers} from "./CampaignListMembers";
 import {parseCampaignRecipients,parseCampaignRecipientCsv} from "@/domain/campaign-policy";
@@ -39,12 +39,11 @@ function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignPro
  async function run(action:()=>Promise<void>){if(pending.current||importPending.current)return;pending.current=true;setBusy(true);setError("");setNotice("");try{await action();setRefresh(v=>v+1);}catch{setError("The operation could not be confirmed. Review the saved state and try again.");}finally{pending.current=false;setBusy(false);}}
  const parsed=parseCampaignRecipients(raw);
  const valid=!!name.trim()&&source.trim().length>=5&&attested&&parsed.recipients.length>0&&!parsed.invalid.length&&!parsed.tooMany;
- return <section className="mt-4 space-y-4 border p-4" aria-label="Native email campaigns">
- <h3 className="text-sm font-semibold">Email campaigns</h3>
+ return <WorkspacePanel headingLevel="h3" title="Email campaigns" className="mt-4"><div className="space-y-4">
  {!data&&<QueryState loading={!error?"Loading campaigns…":undefined} error={error||undefined} onRetry={()=>setRefresh(v=>v+1)}/>}
  {data&&<>
  {!data.senderReady&&<WorkspaceNotice>Sending is unavailable until an authorized campaign sender, postal address, provider and signed delivery webhook are configured.</WorkspaceNotice>}
- <p className="text-sm">Campaign sender: {data.senderLabel}</p>
+ <RecordFacts columns={1} items={[{label:"Campaign sender",value:data.senderLabel}]}/>
  <Field label="Recipient list name"><Input value={name} maxLength={120} disabled={busy} onChange={e=>setName(e.target.value)}/></Field>
  <Field label="Consented email addresses" description={parsed.recipients.length+" unique addresses; up to 1,000 per list"} error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"List exceeds the current limit.":undefined}>
  <Textarea placeholder="Enter one email address per line" value={raw} rows={4} maxLength={256000} disabled={busy||importing} onChange={e=>{setRaw(e.target.value);setAttested(false);}}/></Field>
@@ -52,16 +51,17 @@ function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignPro
  {importError&&<WorkspaceNotice tone="danger">{importError}</WorkspaceNotice>}
  <Field label="Consent evidence" description="Describe where and how these recipients agreed to campaign emails."><Input value={source} maxLength={500} disabled={busy} onChange={e=>{setSource(e.target.value);setAttested(false);}}/></Field>
  <label className="flex items-start gap-2 text-sm"><Checkbox checked={attested} disabled={busy||importing} onChange={e=>setAttested(e.target.checked)}/>I have documented permission from every listed recipient for these campaign emails. Existing opt-outs will not be overridden.</label>
- <Button type="button" disabled={!valid||busy||importing} onClick={()=>void run(async()=>{const saved=await saveCampaignRecipientList({data:{...scope,name,raw,consentSource:source,attested:true}});setList(saved.id);setRaw("");setAttested(false);setConfirmed(false);requestId.current=null;setNotice("Recipient list saved. No messages sent.");})}>Save or add to list</Button>
+ <ActionFooter layout="inline"><Button type="button" disabled={!valid||busy||importing} onClick={()=>void run(async()=>{const saved=await saveCampaignRecipientList({data:{...scope,name,raw,consentSource:source,attested:true}});setList(saved.id);setRaw("");setAttested(false);setConfirmed(false);requestId.current=null;setNotice("Recipient list saved. No messages sent.");})}>Save or add to list</Button></ActionFooter>
  <Field label="Saved recipient list"><Select value={list} disabled={busy} onChange={e=>{setList(e.target.value);setManageList(false);setConfirmed(false);requestId.current=null;}}><option value="">Select a list</option>{data.lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.recipients})</option>)}</Select></Field>
  {list&&<><Button type="button" variant="outline" disabled={busy} onClick={()=>setManageList(v=>!v)}>{manageList?"Close recipient management":"Manage saved recipients"}</Button>{manageList&&<CampaignListMembers key={list} engagementId={engagementId} linkId={linkId} listId={list} onChange={()=>{setConfirmed(false);setRefresh(v=>v+1);}}/>}</>}
  <Field label="Schedule (local time)" description="Leave empty to queue now. Scheduled processing is periodic, not an exact minute guarantee."><Input type="datetime-local" value={when} disabled={busy} onChange={e=>{setWhen(e.target.value);setConfirmed(false);requestId.current=null;}}/></Field>
  <label className="flex items-start gap-2 text-sm"><Checkbox checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/>Queue the displayed invitation for this list. Recipients with opt-outs will be suppressed.</label>
- <Button type="button" disabled={!invitationReady||!data.senderReady||!list||!confirmed||busy||importing||!data.lists.some(item=>item.id===list&&item.recipients>0)} onClick={()=>void run(async()=>{requestId.current??={id:crypto.randomUUID(),scheduledAt:when?new Date(when).toISOString():new Date().toISOString()};await queueEngagementCampaign({data:{...scope,listId:list,requestId:requestId.current.id,scheduledAt:requestId.current.scheduledAt,confirmed:true}});requestId.current=null;setConfirmed(false);setNotice("Campaign queued. Delivery is not yet confirmed.");})}>{when?"Schedule campaign":"Queue campaign"}</Button>
- <div className="flex items-center justify-between"><h4 className="text-sm font-semibold">Campaign history</h4><Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setRefresh(v=>v+1)}>Refresh</Button></div>
+ <ActionFooter layout="inline"><Button type="button" disabled={!invitationReady||!data.senderReady||!list||!confirmed||busy||importing||!data.lists.some(item=>item.id===list&&item.recipients>0)} onClick={()=>void run(async()=>{requestId.current??={id:crypto.randomUUID(),scheduledAt:when?new Date(when).toISOString():new Date().toISOString()};await queueEngagementCampaign({data:{...scope,listId:list,requestId:requestId.current.id,scheduledAt:requestId.current.scheduledAt,confirmed:true}});requestId.current=null;setConfirmed(false);setNotice("Campaign queued. Delivery is not yet confirmed.");})}>{when?"Schedule campaign":"Queue campaign"}</Button></ActionFooter>
+ <WorkspacePanel headingLevel="h4" title="Campaign history" actions={<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setRefresh(v=>v+1)}>Refresh</Button>}><div className="space-y-3">
  {data.campaigns.length===0&&<EmptyState title="No campaigns yet."/>}
- {data.campaigns.map(c=><div key={c.id} className="space-y-2 border p-3 text-sm"><p className="font-semibold">{c.subject}</p><p>{new Date(c.scheduled_at).toLocaleString()} · {c.cancelled_at?"Cancelled":c.pending?"Queued / processing":"Queue settled"}</p><p>{c.total} recipients · {c.pending} pending · {c.accepted} provider accepted · {c.delivered} delivered · {c.bounced} bounced · {c.complained} complaints · {c.failed} failed · {c.unconfirmed} unconfirmed · {c.suppressed} suppressed · {c.cancelled} cancelled</p>{c.pending>0&&!c.cancelled_at&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await cancelEngagementCampaign({data:{...scope,campaignId:c.id}});setNotice("Remaining queued messages cancelled. In-flight messages may still arrive.");})}>Cancel remaining</Button>}</div>)}
+ {data.campaigns.map(c=><WorkspacePanel key={c.id} headingLevel="h5" title={c.subject} description={new Date(c.scheduled_at).toLocaleString()} actions={<StatusBadge tone={c.cancelled_at?"neutral":c.pending?"info":"neutral"}>{c.cancelled_at?"Cancelled":c.pending?"Queued / processing":"Queue settled"}</StatusBadge>}><RecordFacts columns={3} items={[{label:"Recipients",value:c.total},{label:"Pending",value:c.pending},{label:"Provider accepted",value:c.accepted},{label:"Delivered",value:c.delivered},{label:"Bounced",value:c.bounced},{label:"Complaints",value:c.complained},{label:"Failed",value:c.failed},{label:"Unconfirmed",value:c.unconfirmed},{label:"Suppressed",value:c.suppressed},{label:"Cancelled",value:c.cancelled}]}/>{c.pending>0&&!c.cancelled_at&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await cancelEngagementCampaign({data:{...scope,campaignId:c.id}});setNotice("Remaining queued messages cancelled. In-flight messages may still arrive.");})}>Cancel remaining</Button>}</WorkspacePanel>)}
+ </div></WorkspacePanel>
  </>}
  {notice&&<WorkspaceNotice tone="success">{notice}</WorkspaceNotice>}{data&&error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
- </section>;
+ </div></WorkspacePanel>;
 }

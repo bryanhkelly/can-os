@@ -12,6 +12,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { identityArchitectureViolations, identityCompatibilityReferences } from "./lib/identity-architecture.mjs";
 import { sharedUiImportViolation, sourceDependencySpecifiers, resolveSourceDependency, runtimeDependencySpecifiers, featureRuntimeImportViolation, reportVisualizationImportViolation } from "./lib/v61-component-dependencies.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -69,12 +70,15 @@ for (const file of files) {
 // The chart dependency is forbidden outside its adapter even in routes, hooks,
  // and other non-component source. Avoid parsing unrelated files twice.
 const chartSources=new Set();
+const identityInventory=[];
 collect("src",chartSources);
 for(const file of chartSources){
-  if(files.has(file))continue;
   const source=readFileSync(resolve(root,file),"utf8");
-  if(!/recharts|report-chart-plot/.test(source))continue;
   const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,file.endsWith(".tsx")?ts.ScriptKind.TSX:ts.ScriptKind.TS);
+  for(const violation of identityArchitectureViolations(file,parsed,ts))failures.push(file+": "+violation);
+  const references=identityCompatibilityReferences(parsed,ts);
+  if(references.length)identityInventory.push({file,references});
+  if(files.has(file)||!/recharts|report-chart-plot/.test(source))continue;
   for(const specifier of runtimeDependencySpecifiers(parsed,ts)){
     const violation=reportVisualizationImportViolation(file,specifier);
     if(violation)failures.push(file+": "+violation);
@@ -159,6 +163,7 @@ for (const [file, banned] of owners) {
     if (source.includes(legacy)) failures.push(file + ": duplicate inline UI returned: " + legacy);
   }
 }
+console.log("Identity compatibility inventory: "+JSON.stringify(identityInventory.sort((a,b)=>a.file.localeCompare(b.file))));
 if (failures.length) {
   for (const failure of failures) console.error("Component architecture: " + failure);
   process.exitCode = 1;

@@ -3,7 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
   getVerifiedPlatformOwnerSession, listPlatformOwnerTargets,
-  startPlatformOwnerDelegation, stopPlatformOwnerDelegation,
+  startPlatformOwnerDelegation, stopPlatformOwnerDelegation, rotatePrivateAccountAccessCode,
 } from "./platform-owner-delegation.server";
 
 const noStore=()=>setResponseHeader("Cache-Control","private, no-store");
@@ -31,3 +31,8 @@ export const beginPlatformOwnerDelegation=createServerFn({method:"POST"})
 export const endPlatformOwnerDelegation=createServerFn({method:"POST"})
   .validator((raw:unknown)=>z.object({confirm:z.literal(true)}).strict().parse(raw))
   .handler(async()=>{noStore();return stopPlatformOwnerDelegation(getRequest());});
+
+/** Never cache the one-time raw replacement credential. */
+export const recoverPrivateAccountAccessCode=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>z.object({grantId:z.string().uuid(),reason:z.string().trim().min(12).max(500),confirm:z.literal(true),operation:z.enum(["enroll","rotate"]).default("rotate")}).strict().parse(raw))
+  .handler(async({data})=>{noStore();setResponseHeader("Referrer-Policy","no-referrer");return rotatePrivateAccountAccessCode(getRequest(),data);});

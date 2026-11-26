@@ -172,6 +172,7 @@ async function provisionScopedDemoStaff(
       id: fixture.personId, legalFirstName: isRoomFacilitator ? "Sally" : isAdmin ? "Demo" : "Alex",
       legalLastName: isRoomFacilitator ? "Demo" : isAdmin ? "Admin" : "Example",
       preferredName: isRoomFacilitator ? "Sally" : isAdmin ? "Demo" : "Alex",
+      domain: "valorschool.demo",
       metadata: { synthetic: true, role: expectedRole },
     }).onConflictDoNothing().returning({ id: people.id });
     if (personRows.length) changes.push("person");

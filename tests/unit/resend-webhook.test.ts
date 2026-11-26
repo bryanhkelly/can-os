@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { readEmailProviderMessageId } from "@/domain/email-provider-receipt";
 import { describe, expect, it } from "vitest";
 import {
   parseResendReceiptEvent,
@@ -96,5 +97,21 @@ describe("Strict webhook wire format",()=>{
     const event=JSON.parse(body);
     expect(parseResendReceiptEvent({...event,type:["email.delivered"]})).toBeNull();
     expect(parseResendReceiptEvent({...event,data:{...event.data,tags:{...event.data.tags,can_source:["engagement_campaign"]}}})).toBeNull();
+  });
+});
+
+
+describe("Provider ID correlation contract", () => {
+  it.each(["receipt", "        ", " opaque-provider", "opaque-provider\n", "opaque\u0000provider", "x".repeat(257)])(
+    "rejects unusable provider IDs in both acceptance and webhook paths", id => {
+      expect(readEmailProviderMessageId({ id })).toBeUndefined();
+      expect(parseResendReceiptEvent({type:"email.delivered",data:{email_id:id,
+        tags:{can_source:"engagement_campaign",can_receipt:receiptId}}})).toBeNull();
+    },
+  );
+  it.each(["abcdefgh", providerMessageId, "x".repeat(256)])("preserves the same valid opaque ID in both paths", id => {
+    expect(readEmailProviderMessageId({id})).toBe(id);
+    expect(parseResendReceiptEvent({type:"email.delivered",data:{email_id:id,
+      tags:{can_source:"engagement_campaign",can_receipt:receiptId}}})?.providerMessageId).toBe(id);
   });
 });

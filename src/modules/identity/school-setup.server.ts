@@ -9,13 +9,13 @@ import { EventTypes } from "@/domain/event-types";
 import { matchesDemoSchoolAdministrator, schoolSetupSchema, type SchoolSetupInput, type SchoolSetupResult } from "@/domain/school-setup";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
-/** Public bootstrap creates only a new synthetic institution; never adopts existing records. */
+/** Legacy disposable test fixture only. Public signup uses school-setup-signup.server. */
 export async function setupSchool(
   input: SchoolSetupInput,
   database: Pick<Database, "transaction"> = db,
 ): Promise<SchoolSetupResult> {
   const data = schoolSetupSchema.parse(input);
-  const slug = `demo-${data.domain.slice(0, -5)}`;
+  const slug = `demo-${data.domain.slice(0, -5).replace(/\./g, "-")}`;
   const adminEmail = `admin.demo@${data.domain}`;
   return database.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"school-setup:" + data.domain}))`);
@@ -33,7 +33,7 @@ export async function setupSchool(
         .where(eq(accountPersonGrants.id, existing.adminGrantId)).limit(1);
       if (!organization || organization.name !== data.name || !site ||
         site.organizationId !== organization.id || site.timezone !== data.timezone ||
-        !account || account.disabled || !person?.active || !grant?.active ||
+        !account || account.emailNormalized !== adminEmail || account.disabled || !person?.active || !grant?.active ||
         !matchesDemoSchoolAdministrator(existing, grant, account.emailNormalized)) {
         throw new DomainError("CONFLICT", "The demo domain has a different or unavailable setup");
       }
@@ -49,6 +49,7 @@ export async function setupSchool(
 
     const [organization] = await tx.insert(organizations).values({
       name: data.name, slug, type: "christian_school",
+      domain: data.domain,
       metadata: { synthetic: true, demoDomain: data.domain },
     }).returning();
     if (!organization) throw new Error("School organization was not created");
@@ -58,9 +59,10 @@ export async function setupSchool(
     }).returning();
     const [person] = await tx.insert(people).values({
       legalFirstName: "Demo", legalLastName: "Administrator",
-      metadata: { synthetic: true },
+      email: adminEmail, domain: data.domain, metadata: { synthetic: true },
     }).returning();
-    const [account] = await tx.insert(accessAccounts).values({ emailNormalized: adminEmail }).returning();
+    if (!person) throw new Error("Demo administrator Person was not created");
+    const [account] = await tx.insert(accessAccounts).values({ emailNormalized: adminEmail, personId: person.id }).returning();
     if (!site || !person || !account) throw new Error("School bootstrap identity was not created");
     const [grant] = await tx.insert(accountPersonGrants).values({
       accountId: account.id, personId: person.id, role: "site_admin",

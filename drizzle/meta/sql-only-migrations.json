@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lastGeneratedSnapshotIndex": 86,
-  "currentSqlTipIndex": 124,
+  "currentSqlTipIndex": 133,
   "modelParityVerified": false,
   "note": "Reviewed immutable SQL-only migration suffix. Generated Drizzle model parity is NOT claimed. Generate and push remain prohibited until a verified new modeled baseline exists.",
   "sqlOnlyMigrations": [
@@ -194,6 +194,51 @@
       "idx": 124,
       "tag": "0124_private_academic_evidence_schema",
       "gitBlobSha": "d2d7bb0319224b2545bdbc3bc5fec8bc75957189"
+    },
+    {
+      "idx": 125,
+      "tag": "0125_organization_domain_classification",
+      "gitBlobSha": "b3d6df179027e03ef205c4614238c6b036bfb64e"
+    },
+    {
+      "idx": 126,
+      "tag": "0126_person_and_provider_domains",
+      "gitBlobSha": "173661107b1df21cd382fef1f4bb850cb2788450"
+    },
+    {
+      "idx": 127,
+      "tag": "0127_site_signup_and_fixture_domains",
+      "gitBlobSha": "43e19993a923ee5409f47001bb1803b4807ac15a"
+    },
+    {
+      "idx": 128,
+      "tag": "0128_fixture_person_domain_reconciliation",
+      "gitBlobSha": "580f2be84526a13e76cdceaafe0ad6bc0e9a71b5"
+    },
+    {
+      "idx": 129,
+      "tag": "0129_valor_fixture_domains",
+      "gitBlobSha": "17e3c0b03cd528526b026e20b800ef524ddeae85"
+    },
+    {
+      "idx": 130,
+      "tag": "0130_geography_domain_parity",
+      "gitBlobSha": "ed4da8f0b9dd89ecef5fbe0af488941fc06bfd4a"
+    },
+    {
+      "idx": 131,
+      "tag": "0131_private_account_access_code",
+      "gitBlobSha": "f97ecd4b65abf995981e7de1ca96049e077d294c"
+    },
+    {
+      "idx": 132,
+      "tag": "0132_session_authentication_provenance",
+      "gitBlobSha": "6f119e0182fad80ba3d57483e14270d63a1a4f9e"
+    },
+    {
+      "idx": 133,
+      "tag": "0133_restricted_staff_credential_parity",
+      "gitBlobSha": "05e89f06e5fe71bbb57ed7f4c4fb3412f32b0887"
     }
   ]
 }

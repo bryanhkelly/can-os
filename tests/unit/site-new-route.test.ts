@@ -11,7 +11,7 @@ vi.mock("@tanstack/react-router", () => ({
     return {};
   },
 }));
-vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestSchoolSetupAccess: state.signup }));
+vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestSiteSignup: state.signup }));
 vi.mock("@/modules/identity/anonymous-auth-admission.server", () => ({
   admitAnonymousAuthRequest: state.admission,
   anonymousAuthAdmissionResponse: (value: { allowed: boolean }) => value.allowed ? null :
@@ -20,7 +20,7 @@ vi.mock("@/modules/identity/anonymous-auth-admission.server", () => ({
 import "@/routes/site.new";
 
 const input = { name: "Valor Learning Center", organizationName: "Grace Community Church",
-  organizationType: "other_partner",
+  organizationType: "other_partner", organizationDomain: "gracechurch.org",
   firstName: "Alex", lastName: "Leader", email: "admin@example.org" };
 function request(body: unknown, origin = "https://example.org") {
   return new Request("https://example.org/site/new", { method: "POST",
@@ -39,9 +39,27 @@ describe("/site/new signup boundary", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(state.signup).toHaveBeenCalledWith(input);
   });
+  it("returns the newly created private credential only in the noncacheable signup response", async () => {
+    const data={...input,email:"admin@grace.demo",organizationDomain:"grace.demo"};
+    state.signup.mockResolvedValue({accepted:true,demo:true,privateAccessCode:"a".repeat(43)});
+    const response=await state.post!({request:request(data)});
+    expect(response.status).toBe(202);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({accepted:true,demo:true,privateAccessCode:"a".repeat(43)});
+  });
   it("keeps a denomination request provisional rather than granting network authority", async () => {
     const data = { ...input, name: "National Learning Center",
       organizationName: "National Faith Network", organizationType: "denomination" };
+    expect((await state.post!({ request: request(data) })).status).toBe(202);
+    expect(state.signup).toHaveBeenCalledWith(data);
+  });
+  it("rejects malformed domains and shared-code bootstrap of a real organization", async () => {
+    expect((await state.post!({ request: request({ ...input, organizationDomain: "https://gracechurch.org" }) })).status).toBe(400);
+    expect((await state.post!({ request: request({ ...input, email: "admin@grace.demo" }) })).status).toBe(400);
+    expect(state.signup).not.toHaveBeenCalled();
+  });
+  it("accepts a verified-email administrator for a demo organization", async () => {
+    const data = { ...input, organizationDomain: "grace.demo" };
     expect((await state.post!({ request: request(data) })).status).toBe(202);
     expect(state.signup).toHaveBeenCalledWith(data);
   });
@@ -61,10 +79,10 @@ describe("/site/new signup boundary", () => {
     expect((await state.post!({ request: request(input) })).status).toBe(429);
     expect(state.signup).not.toHaveBeenCalled();
   });
-  it("does not disclose delivery or account eligibility on sender failures", async () => {
+  it("returns a generic setup error if the provisioning service throws", async () => {
     state.signup.mockRejectedValue(new Error("sender unavailable"));
     const response = await state.post!({ request: request(input) });
-    expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ accepted: true });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: expect.any(String) });
   });
 });

@@ -68,7 +68,7 @@ describe("Platform Owner signed delegation foundation",()=>{
     expect(service).toContain("eq(accessSessions.activeGrantId, owner.grantId)");
     expect(service).toContain('action: "platform.owner.delegation.started"');
     expect(service).toContain('action: "platform.owner.delegation.ended"');
-    expect(service).toContain("await readSessionGrants(target.accountId, target.email, tx)");
+    expect(service).toContain("await readOwnerDelegationGrants(target.accountId, target.personId, target.email, tx)");
     expect(session).toContain("context.delegatedByPlatformOwner");
     expect(session).toContain("ownerDelegation");
   });

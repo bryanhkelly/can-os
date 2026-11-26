@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {issueOpaqueSecret,hashAccessSecret,equalSecretHashes,normalizeAccessEmail,accessChallengeIsUsable,accessSessionIsUsable,sessionCookieHeader,clearSessionCookieHeader,ACCESS_SESSION_IDLE_TIMEOUT_MS,sessionIdleCutoff,accessSessionIsWithinIdleWindow} from "@/domain/access-tokens";
+import {issueOpaqueSecret,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,normalizeAccessEmail,accessChallengeIsUsable,accessSessionIsUsable,sessionCookieHeader,clearSessionCookieHeader,ACCESS_SESSION_IDLE_TIMEOUT_MS,sessionIdleCutoff,accessSessionIsWithinIdleWindow} from "@/domain/access-tokens";
 const pepper="test-pepper-with-more-than-thirty-two-characters";
 describe("passwordless access token primitives",()=>{
  it("generates unique opaque values and constant-time comparable hashes",()=>{
@@ -8,6 +8,14 @@ describe("passwordless access token primitives",()=>{
   const a=hashAccessSecret(one,pepper);
   expect(a).not.toContain(one);expect(equalSecretHashes(a,hashAccessSecret(one,pepper))).toBe(true);
   expect(equalSecretHashes(a,hashAccessSecret(two,pepper))).toBe(false);
+ });
+ it("separates private access code hashes from session and email tokens",()=>{
+  const code=issueOpaqueSecret();
+  expect(isPrivateAccessCode(code)).toBe(true);
+  expect(isPrivateAccessCode("000000")).toBe(false);
+  expect(hashPrivateAccessCode(code,pepper)).not.toBe(hashAccessSecret(code,pepper));
+  expect(()=>hashPrivateAccessCode("000000",pepper)).toThrow();
+  expect(equalSecretHashes(hashPrivateAccessCode(code,pepper),hashPrivateAccessCode(code,pepper))).toBe(true);
  });
  it("requires pepper and normalizes addresses",()=>{
   expect(()=>hashAccessSecret("test","short")).toThrow();

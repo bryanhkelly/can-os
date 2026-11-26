@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
   push:
-    branches: [release-11232026]
+    branches: [main, 'release-*']
 permissions:
   contents: read
 jobs:
@@ -35,14 +35,21 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p acceptance-artifacts
+          npm run --silent design:inventory > acceptance-artifacts/v61-adoption.json
+          npm run --silent architecture:inventory > acceptance-artifacts/v61-architecture.json
           node scripts/check-v61-coverage.mjs --strict | tee acceptance-artifacts/v61-coverage.json
       - name: Preserve source coverage diagnostics even when acceptance fails
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: v61-source-coverage-${{ github.run_attempt }}
-          path: acceptance-artifacts/v61-coverage.json
+          path: |
+            acceptance-artifacts/v61-coverage.json
+            acceptance-artifacts/v61-adoption.json
+            acceptance-artifacts/v61-architecture.json
           if-no-files-found: error
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck:full
   visual:
     runs-on: ubuntu-24.04
     timeout-minutes: 45

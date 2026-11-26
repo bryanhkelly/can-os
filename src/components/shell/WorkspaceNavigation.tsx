@@ -108,7 +108,6 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  <div className="min-w-0"><WorkspaceTopBar member={current} sites={authenticated?.sites??[]} authenticated={Boolean(authenticated)}
   sessionAvailable={Boolean(session)} sessionError={sessionError} error={error}
   demoAccountSwitching={authenticated?.demoAccountSwitching===true} changing={changing}
-  demoTenant={authenticated?.demoTenant===true}
   ownerDelegation={authenticated?.ownerDelegation}
   focused={focusedClassroom}
   menuOpen={menuOpen} switcherOpen={switcherOpen} accountOpen={accountOpen} notificationsOpen={tray==="notifications"}

@@ -7,7 +7,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
-import { ActionFooter } from "@/components/workspace/action-footer";
+import { ActionFooter, WorkspacePanel, WorkspaceNotice, QueryState, EmptyState, MutationFeedback, DisclosureSection } from "@/components/workspace";
 
 export function SchoolRoomsSetup({ programId }: { programId: string }) {
   const rooms = useQuery({ queryKey: ["school-rooms", programId],
@@ -18,18 +18,14 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
   const [capacity, setCapacity] = useState("");
   const [createAttempted, setCreateAttempted] = useState(false);
   const busy = feedback.pending || feedback.refreshFailed;
-  return <section id="physical-classrooms" aria-label="Physical classrooms" className="mt-6  border p-5">
-    <h2 className="font-serif text-2xl">Physical classrooms</h2>
+  return <WorkspacePanel id="physical-classrooms" title="Physical classrooms" className="mt-6">
     <p className="mt-2 text-sm">Create the actual rooms at this Site once, then select them for
       scheduled classes in school-day room and adult coverage planning. Rooms are shared by
       Programs at the same Site; they are separate from teaching classes (Sections).</p>
     <p className="mt-2 text-sm text-muted-foreground">Record the school's reviewed occupancy
       limit. Saving a room does not certify an inspection, reserve it, approve supervision
       or authorize opening.</p>
-    {rooms.isPending && <p role="status" className="mt-3">Loading school rooms…</p>}
-    {rooms.error && <div role="alert" className="mt-3 text-sm">
-      {mutationErrorMessage(rooms.error, "Unable to load the school room directory.")} <Button variant="outline" type="button" onClick={() => void rooms.refetch()}>Retry room directory</Button>
-    </div>}
+    <QueryState loading={rooms.isPending?"Loading school rooms…":undefined} error={rooms.error?mutationErrorMessage(rooms.error,"Unable to load the school room directory."):undefined} onRetry={()=>void rooms.refetch()} retrying={rooms.isFetching}>
     {rooms.data && <>
       {rooms.data.rooms.length ? <ul className="mt-4 space-y-2 text-sm">
         {rooms.data.rooms.map(room => <li key={room.id+":"+room.revision} className=" border p-3">
@@ -45,10 +41,11 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
                 }), { successMessage: "Classroom retired. Review defaults that still reference it; approved plans and history were not rewritten.",
                   commandErrorMessage: "Unable to retire this classroom." })}/> : null}
         </li>)}
-      </ul> : <p role="status" className="mt-4 text-sm">No physical classrooms have been created for this Site.</p>}
-      {!rooms.data.canManage && <p className="mt-4 text-sm" role="status">Room configuration is managed by the school registrar. You may review this physical directory, but cannot edit rooms or class locations.</p>}
+      </ul> : <EmptyState title="No physical classrooms have been created for this Site."/>}
+      {!rooms.data.canManage && <WorkspaceNotice className="mt-4">Room configuration is managed by the school registrar. You may review this physical directory, but cannot edit rooms or class locations.</WorkspaceNotice>}
       {rooms.data.canManage && <form noValidate className="mt-4 grid gap-3 sm:grid-cols-3" onSubmit={event => {
         event.preventDefault();
+        if (busy) return;
         setCreateAttempted(true);
         const capacityValue = Number(capacity);
         if (name.trim().length < 2 || !Number.isInteger(capacityValue) || capacityValue < 1 || capacityValue > 1000) return;
@@ -90,11 +87,9 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
             commandErrorMessage: "The classroom location could not be saved." })}/>)}
       </div>}
     </>}
-    {feedback.notice && <p role="status" className="mt-3 text-sm">{feedback.notice}</p>}
-    {feedback.error && <p role="alert" className="mt-3 text-sm">{feedback.error}</p>}
-    {feedback.refreshFailed && <Button type="button" variant="outline" disabled={feedback.pending}
-      onClick={() => void feedback.retryRefresh()}>Refresh saved rooms</Button>}
-  </section>;
+    </QueryState>
+    <MutationFeedback state={feedback} pendingMessage="Saving classroom changes…" className="mt-3"/>
+  </WorkspacePanel>;
 }
 
 function SectionRoomLocation({ section, rooms, busy, save }: {
@@ -106,9 +101,9 @@ function SectionRoomLocation({ section, rooms, busy, save }: {
   const activeRooms = rooms.filter(room => !room.retiredAt);
   const retiredDefault = rooms.find(room => room.id === section.roomId && room.retiredAt);
   return <form className="flex flex-wrap items-end gap-3" onSubmit={event => {
-    event.preventDefault(); void save(roomId||null);
+    event.preventDefault(); if (busy || roomId===(section.roomId??"")) return; void save(roomId||null);
   }}>
-    <Field className="min-w-48 flex-1" label={`${section.title} (${section.code}) physical room`}>
+    <Field className="min-w-0 flex-1 sm:min-w-48" label={`${section.title} (${section.code}) physical room`}>
       <Select value={roomId} disabled={busy} onChange={event => setRoomId(event.target.value)}>
         <option value="">Not assigned</option>
         {retiredDefault && <option value={retiredDefault.id} disabled>{retiredDefault.name} (retired - replace or clear)</option>}
@@ -135,14 +130,14 @@ function RoomEditor({ room, busy, update, retire }: {
   const [confirmed, setConfirmed] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [retireAttempted, setRetireAttempted] = useState(false);
-  return <details className="mt-2">
-    <summary className="cursor-pointer font-semibold">Edit or retire {room.name}</summary>
+  return <DisclosureSection title={`Edit or retire ${room.name}`} className="mt-2">
     <p className="mt-2 text-sm">Changes affect every Program at this Site. Existing approved daily plans retain
       their reviewed name and occupancy limit; a change here does not approve or amend them. Pending plans
       must match the current active room before approval. Retirement prevents new use, not physical access,
       and is not an emergency closure or an instruction to move children.</p>
     <form noValidate className="mt-3 grid gap-3" onSubmit={event => {
       event.preventDefault();
+      if (busy) return;
       setAttempted(true);
       const capacityValue = Number(capacity);
       if (name.trim().length < 2 || !Number.isInteger(capacityValue) || capacityValue < 1 || capacityValue > 1000 || reason.trim().length < 5) return;
@@ -175,9 +170,10 @@ function RoomEditor({ room, busy, update, retire }: {
     </Field>
     <Button type="button" variant="outline" className="mt-2" disabled={busy}
       onClick={() => {
+        if (busy) return;
         setRetireAttempted(true);
         if (!confirmed || reason.trim().length < 5) return;
         void retire(reason.trim());
       }}>Retire {room.name}</Button>
-  </details>;
+  </DisclosureSection>;
 }

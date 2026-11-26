@@ -160,7 +160,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                     <Label className="mt-2 block text-xs">Reason
                       <Textarea rows={2} maxLength={2000} minLength={10} required value={revocationReasons[adult.id] ?? ""}
                         onChange={event => setRevocationReasons(current => ({ ...current, [adult.id]: event.target.value }))}
-                        className="mt-1 w-full  border bg-background p-2" />
+                        className="mt-1" />
                     </Label>
                     <Button variant="outline" type="button" disabled={busy || (revocationReasons[adult.id] ?? "").trim().length < 10}
                       className="mt-2  border px-3 py-2 text-xs font-semibold disabled:opacity-50"
@@ -180,22 +180,22 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                 <Label className="text-xs font-semibold">Legal first name
                   <Input value={firstNames[key] ?? ""} maxLength={100}
                     onChange={event => setFirstNames(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full  border bg-background p-2 text-sm" />
+                    className="mt-1" />
                 </Label>
                 <Label className="text-xs font-semibold">Legal last name
                   <Input value={lastNames[key] ?? ""} maxLength={100}
                     onChange={event => setLastNames(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full  border bg-background p-2 text-sm" />
+                    className="mt-1" />
                 </Label>
                 <Label className="text-xs font-semibold">Relationship to child
                   <Input value={relationships[key] ?? ""} maxLength={80} placeholder="Grandparent, aunt, family friend"
                     onChange={event => setRelationships(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full  border bg-background p-2 text-sm" />
+                    className="mt-1" />
                 </Label>
                 <Label className="text-xs font-semibold">Required identity check
                   <Select value={methods[key] ?? "government_photo_id"}
                     onChange={event => setMethods(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full  border bg-background p-2 text-sm">
+                    className="mt-1">
                     <option value="government_photo_id">Government photo ID</option>
                     <option value="school_issued_id">School-issued pickup ID</option>
                   </Select>
@@ -203,12 +203,12 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                 <Label className="text-xs font-semibold">Valid from
                   <Input type="date" value={startDates[key] ?? student.schoolLocalToday}
                     onChange={event => setStartDates(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full  border bg-background p-2 text-sm" />
+                    className="mt-1" />
                 </Label>
                 <Label className="text-xs font-semibold">Valid through (optional)
                   <Input type="date" value={expiryDates[key] ?? ""}
                     onChange={event => setExpiryDates(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full  border bg-background p-2 text-sm" />
+                    className="mt-1" />
                 </Label>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">Only enter the adult's legal name. Never enter identity-document numbers in CAN OS. The default start date uses the school's local calendar day, not your device's time zone.</p>
@@ -235,7 +235,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
               <Label className="mt-3 block text-xs font-semibold">What requires school review
                 <Textarea rows={3} maxLength={2000} minLength={10} required value={holdReasons[key] ?? ""}
                   onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}
-                  className="mt-1 w-full  border bg-background p-2 text-sm" />
+                  className="mt-1" />
               </Label>
               <Button variant="outline" type="button" disabled={busy || activeHold || (holdReasons[key] ?? "").trim().length < 10}
                 className="mt-3  border px-3 py-2 text-xs font-semibold disabled:opacity-50"

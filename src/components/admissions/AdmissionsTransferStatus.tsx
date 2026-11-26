@@ -1,3 +1,4 @@
+import { WorkspacePanel, WorkspaceNotice } from "@/components/workspace";
 import { ReceivingTransferTranscript } from "./ReceivingTransferTranscript";
 type TransferProps={
  applicationId:string;
@@ -9,8 +10,8 @@ type TransferProps={
 
 export function AdmissionsTransferStatus({applicationId,transferOriginStatus,transferNamedDestination,transferRecordsStatus,destinationTranscriptConsentRecorded}:TransferProps){
  return <>
-    {transferOriginStatus&&<div className="mt-3  border p-3 text-sm">
-      <strong>Linked transfer application</strong>
+    {transferOriginStatus&&<WorkspacePanel title="Linked transfer application" className="mt-4">
+      <div className="space-y-2 text-sm">
       <p className="mt-1">Origin school exit: {transferOriginStatus==="completed"?
         "Institutionally completed":transferOriginStatus==="pending"?
         "Pending — may review and issue an offer; activation must wait":"Requires review before placement"}.</p>
@@ -29,11 +30,12 @@ export function AdmissionsTransferStatus({applicationId,transferOriginStatus,tra
       {transferRecordsStatus==="available_in_can"&&<ReceivingTransferTranscript
         applicationId={applicationId} consentRequested={destinationTranscriptConsentRecorded}/>}
       {transferRecordsStatus==="available_in_can"&&!destinationTranscriptConsentRecorded&&
-        <p role="status" className="mt-2 font-medium">
+        <WorkspaceNotice tone="attention">
           This application predates specific receiving-school transcript consent.
           Request authorization from the verified guardian before accessing the official record.
-        </p>}
-    </div>}
+        </WorkspaceNotice>}
+      </div>
+    </WorkspacePanel>}
 
  </>;
 }

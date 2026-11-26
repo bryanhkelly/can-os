@@ -17,7 +17,7 @@ import {
 import {
   sendNotificationEmailWithReceipt, type NotificationEmailMessage,
 } from "@/modules/communication/notification-email.server";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 import { classSessionCalendarUid, renderCalendarInvitation, type CalendarInvitationEvent } from "@/domain/calendar-invitations";
 
 const receipt = classParticipantDeliveries;
@@ -183,8 +183,6 @@ const adapter = {
     const [cls] = await db.select().from(canonicalClasses)
       .where(eq(canonicalClasses.id, record.classId)).limit(1);
     if (!cls || !cls.siteId) return { kind: "suppress", reason: "Class_missing_or_unscoped" };
-    if (await isDemoTenantOrganization(cls.operatingOrganizationId))
-      return { kind: "suppress", reason: "demo_tenant_suppressed" };
     const [site] = await db.select({
       name: canonicalEnrollmentSites.name, timezone: canonicalEnrollmentSites.timeZone,
       status: canonicalEnrollmentSites.status,
@@ -236,6 +234,7 @@ const adapter = {
     const email = await verifiedRecipient(record.recipientPersonId,
       enrollment??cancelledEnrollment??null,now);
     if (!email) return { kind: "suppress", reason: "verified_recipient_contact_unavailable" };
+    if (suppressDemoEmailDelivery(email)) return { kind: "suppress", reason: "demo_email_destination" };
     const sender = process.env.CAN_NOTIFICATIONS_FROM_EMAIL ?? process.env.CAN_ACCESS_FROM_EMAIL;
     const organizerEmail = sender?.includes("<")
       ? sender.split("<").at(-1)?.replace(">", "").trim()

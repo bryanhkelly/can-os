@@ -122,6 +122,23 @@ integration("CAN verified network contracts and HQ officer access", () => {
         const [savedAccount] = await tx.select().from(s.accessAccounts)
           .where(eq(s.accessAccounts.id, savedGrant.accountId));
         expect(savedAccount.emailNormalized).toBe(email);
+        expect(savedAccount.personId).toBe(savedGrant.personId);
+        expect(savedAccount.emailVerifiedAt).toBeNull();
+        const {provisionNamedMailboxPerson}=await import("@/modules/identity/named-person-account.server");
+        const anchoredEmail="anchored-"+suffix+"@example.test";
+        const [anchoredPerson]=await tx.insert(s.people).values({
+          legalFirstName:"Already",legalLastName:"Bound",email:anchoredEmail,
+        }).returning({id:s.people.id});
+        const [anchoredAccount]=await tx.insert(s.accessAccounts).values({
+          personId:anchoredPerson!.id,emailNormalized:anchoredEmail,
+        }).returning({id:s.accessAccounts.id});
+        expect(await provisionNamedMailboxPerson(tx,{email:anchoredEmail,firstName:"Do not",lastName:"Replace"}))
+          .toMatchObject({accountId:anchoredAccount!.id,personId:anchoredPerson!.id,accountCreated:false,personCreated:false});
+        const [canonicalPerson]=await tx.select({firstName:s.people.legalFirstName,domain:s.people.domain})
+          .from(s.people).where(eq(s.people.id,anchoredPerson!.id));
+        expect(canonicalPerson).toEqual({firstName:"Already",domain:"example.test"});
+        expect(await tx.select({id:s.accountPersonGrants.id}).from(s.accountPersonGrants)
+          .where(eq(s.accountPersonGrants.accountId,anchoredAccount!.id))).toHaveLength(0);
         // Revoked contracts deny *new* HQ authorization despite previously provisioned grants.
         await tx.update(s.networkAgreements).set({ revokedAt: new Date() })
           .where(eq(s.networkAgreements.id, agreementId));

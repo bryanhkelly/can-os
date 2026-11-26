@@ -12,7 +12,7 @@ import { accessReturnToFromLocation, safeAccessReturnTo } from "@/domain/access-
 import { useHydrated } from "@/lib/use-hydrated";
 
 export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable, sessionError,
-  error, demoAccountSwitching, demoTenant, ownerDelegation, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
+  error, demoAccountSwitching, ownerDelegation, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
   onOpenSwitcher, onOpenSearch, onOpenAsk, onOpenNotifications, onOpenAccount, focused = false, notificationsOpen = false }: {
   member?: { role: string; firstName: string; lastName: string; siteId: string | null };
   sites: readonly { id: string; name: string }[];
@@ -21,7 +21,6 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   sessionError: string | null;
   error: string;
   demoAccountSwitching: boolean;
-  demoTenant?: boolean;
   ownerDelegation?: {mode:"view"|"act";expiresAt:string};
   changing: boolean;
   menuOpen: boolean;
@@ -43,7 +42,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
     : accessReturnToFromLocation({ ...location, hash: hydrated ? location.hash : "" });
   const switcherRef = useRef<HTMLButtonElement>(null);
   const [dismissedDemoContext, setDismissedDemoContext] = useState<string | null>(null);
-  const demoContext = JSON.stringify([demoAccountSwitching, demoTenant, member]);
+  const demoContext = JSON.stringify([demoAccountSwitching, member]);
   const dismissDemoNotice = () => {
     setDismissedDemoContext(demoContext);
     switcherRef.current?.focus();
@@ -100,11 +99,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
         <span className="sm:hidden">Demo session as {member?.firstName} ({member && formatWorkspaceRole(member.role)}). Shared data; switches audited.</span>
         <span className="hidden sm:inline">Demo admin session: acting as {member?.firstName} {member?.lastName} ({member && formatWorkspaceRole(member.role)}). Changes affect shared demo data. User switches are audited.</span>
       </WorkspaceNotice>}
-      {demoTenant && !demoAccountSwitching && dismissedDemoContext !== demoContext && <WorkspaceNotice className="w-full"
-        onDismiss={dismissDemoNotice} dismissLabel="Dismiss demo information">
-        <span className="sm:hidden">Demo school: synthetic, shared data only. Email and SMS suppressed.</span>
-        <span className="hidden sm:inline">Demo school: use synthetic data only. These shared accounts and changes are visible to other participants. External email and SMS are suppressed.</span>
-      </WorkspaceNotice>}
+
   </div>
   </>;
 }

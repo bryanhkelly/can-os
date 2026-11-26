@@ -16,7 +16,11 @@ export type SessionPrincipal = {
  sessionId: string;
  activeGrantId: string | null;
 };
+import type { SessionAuthenticationMethod } from "./session-credential-policy";
+export type { SessionAuthenticationMethod } from "./session-credential-policy";
 export type AccessContext = CommandContext & {
+ /** Server-derived credential provenance, never accepted from a client command. */
+ authenticationMethod?: SessionAuthenticationMethod | null;
  accountId: string;
  sessionId: string;
  grantId: string;

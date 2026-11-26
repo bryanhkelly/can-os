@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, DisclosureSection, EmptyState, QueryState, ActionFooter } from "@/components/workspace";
 import { marketingFormatOptions, type MarketingFormat } from "@/domain/marketing-package-v61";
 import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
@@ -36,18 +36,14 @@ export function MarketingPackageReleaseHistoryV61({
   return <WorkspacePanel title="Package release history"
           description="Downloads are grouped by Package Release. Every version preserves its original Brand, message and outputs.">
           <div className="space-y-3">
-            {loading&&<p role="status" className="text-sm text-muted-foreground">Loading releases…</p>}
+            {loading&&<QueryState loading="Loading releases…"/>}
             {!loading&&versions.length===0&&
-              <p className="text-sm text-muted-foreground">No Package Releases yet.</p>}
+              <EmptyState title="No Package Releases yet."/>}
             {!loading&&versions.map((version,index)=>
-              <details key={version.id} className="border bg-background" open={index===0}>
-                <summary className="cursor-pointer p-4 text-sm font-semibold">
-                  Package Release v{version.releaseNumber} {index===0?"· Latest generated":"· Previous version"}
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {new Date(version.createdAt).toLocaleDateString()} · {version.formats.length} materials
-                  </span>
-                </summary>
-                <div className="space-y-3 border-t p-4">
+              <DisclosureSection key={version.id} defaultOpen={index===0}
+                title={`Package Release v${version.releaseNumber} · ${index===0?"Latest generated":"Previous version"}`}
+                description={`${new Date(version.createdAt).toLocaleDateString()} · ${version.formats.length} materials`}>
+                <div className="space-y-3">
                   <p className="text-xs text-muted-foreground">
                     Saved content revision {version.packageRevision} · Brand preserved with this release
                   </p>
@@ -66,7 +62,7 @@ export function MarketingPackageReleaseHistoryV61({
                       <span className="text-sm">{marketingFormatOptions.find(x=>x.id===item.format)?.label??item.format}
                         {item.withdrawnAt?" · Withdrawn":""}
                       </span>
-                      <div className="flex flex-wrap gap-2">
+                      <ActionFooter layout="inline" className="mt-0">
                         <Button type="button" variant="outline" size="sm"
                           disabled={busy||Boolean(item.withdrawnAt)}
                           onClick={()=>void onCompare(item.id,item.format,version.releaseNumber)}>
@@ -81,16 +77,13 @@ export function MarketingPackageReleaseHistoryV61({
                         {item.format==="social"&&<Button type="button" variant="outline" size="sm"
                           disabled={busy||Boolean(item.withdrawnAt)}
                           onClick={()=>void onCopyCaption(item.id)}>Copy caption</Button>}
-                      </div>
+                      </ActionFooter>
                     </li>)}
                   </ul>
                 </div>
-              </details>)}
-            {!loading&&historicalSingles.length>0&&<details className="border bg-background">
-              <summary className="cursor-pointer p-4 text-sm font-semibold">
-                Previous individually generated materials ({historicalSingles.length})
-              </summary>
-              <ul className="space-y-2 border-t p-4">
+              </DisclosureSection>)}
+            {!loading&&historicalSingles.length>0&&<DisclosureSection title={`Previous individually generated materials (${historicalSingles.length})`}>
+              <ul className="space-y-2">
                 {historicalSingles.map(item=><li key={item.id}
                   className="flex flex-wrap items-center justify-between gap-2 border p-3">
                   <span className="text-xs">{item.format} · {new Date(item.createdAt).toLocaleDateString()}
@@ -100,12 +93,9 @@ export function MarketingPackageReleaseHistoryV61({
                     onClick={()=>void onDownloadOriginal(item.id)}>Download original</Button>
                 </li>)}
               </ul>
-            </details>}
-            {compare&&<section aria-label="Compare Package material" className="space-y-3 border p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-semibold text-sm">Compare {compare.format} · Release v{compare.releaseNumber}</h3>
-                <Button type="button" variant="ghost" size="sm" onClick={()=>onCloseCompare()}>Close</Button>
-              </div>
+            </DisclosureSection>}
+            {compare&&<WorkspacePanel headingLevel="h3" title={`Compare ${compare.format} · Release v${compare.releaseNumber}`}
+              actions={<Button type="button" variant="ghost" size="sm" onClick={onCloseCompare}>Close</Button>}>
               <div className="grid min-w-0 gap-3 lg:grid-cols-2">
                 <div className="min-w-0 space-y-2">
                   <p className="text-sm font-semibold">Original released material</p>
@@ -122,11 +112,10 @@ export function MarketingPackageReleaseHistoryV61({
                     ? <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
                         brandVersionId={record.brandVersionId}
                         format={compare.format} content={record.content}/>
-                    : <p className="border p-4 text-sm">This format was removed from the working Package.
-                        It remains available in the original release.</p>}
+                    : <WorkspaceNotice>This format was removed from the working Package. It remains available in the original release.</WorkspaceNotice>}
                 </div>
               </div>
-            </section>}
+            </WorkspacePanel>}
           </div>
         </WorkspacePanel>;
 }

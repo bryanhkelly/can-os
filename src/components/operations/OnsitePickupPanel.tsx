@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MutationFeedback, SelectionCard, StatusBadge, WorkspacePanel } from "@/components/workspace";
+import { MutationFeedback, SelectionCard, StatCard, StatusBadge, WorkspacePanel } from "@/components/workspace";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -150,10 +150,10 @@ export function OnsitePickupPanel({ date, onChanged }: {
         <h3 className="font-semibold">Dismissal overview</h3>
         <p className="mt-1 text-xs text-muted-foreground">Current verified pickup roster only. Counts are student-program entries, not a deduplicated headcount or permission to release anyone.</p>
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <p className="border bg-background p-3">Roster entries<strong className="mt-1 block text-2xl">{roster.students.length}</strong></p>
-          <p className="border bg-background p-3">Verified releases<strong className="mt-1 block text-2xl">{roster.students.filter(s=>Boolean(s.release)).length}</strong></p>
-          <p className="border bg-background p-3">Release holds<strong className="mt-1 block text-2xl">{roster.students.filter(s=>s.activeHolds.length>0&&!s.release).length}</strong></p>
-          <p className="border bg-background p-3">Present or tardy, not released<strong className="mt-1 block text-2xl">{roster.students.filter(s=>["present","tardy"].includes(s.status)&&!s.release).length}</strong></p>
+          <StatCard label="Roster entries" value={roster.students.length}/>
+          <StatCard label="Verified releases" value={roster.students.filter(s=>Boolean(s.release)).length}/>
+          <StatCard label="Release holds" value={roster.students.filter(s=>s.activeHolds.length>0&&!s.release).length}/>
+          <StatCard label="Present or tardy, not released" value={roster.students.filter(s=>["present","tardy"].includes(s.status)&&!s.release).length}/>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">An unreleased record does not establish a child is still physically present. Verify current observed facts and custody authority before any action.</p>
       </section>
@@ -204,10 +204,10 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs font-semibold">Resolution note
                   <Textarea rows={2} maxLength={2000} value={resolutions[hold.id] ?? ""}
                     onChange={event => setResolutions(current => ({...current, [hold.id]: event.target.value}))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Label className="mt-2 block text-xs">Documented authority basis
-                  <Select className="mt-1 block w-full border bg-background p-2"
+                  <Select className="mt-1"
                     value={resolutionBases[hold.id] ?? (hold.kind === "emergency" ? "documented_emergency_cleared" : "verified_court_order")}
                     onChange={event => setResolutionBases(current => ({...current, [hold.id]: event.target.value}))}>
                     {hold.kind === "emergency"
@@ -221,7 +221,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-2 block text-xs">Verified case or document reference
                   <Input maxLength={500} value={resolutionReferences[hold.id] ?? ""}
                     onChange={event => setResolutionReferences(current => ({...current, [hold.id]: event.target.value}))}
-                    className="mt-1 block w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Button variant="outline" type="button"
                   disabled={!!busy || (resolutions[hold.id] ?? "").trim().length < 20 ||
@@ -283,13 +283,13 @@ export function OnsitePickupPanel({ date, onChanged }: {
               <Label className="mt-3 block text-xs font-semibold">Legal name verified on required credential
                 <Input value={verifiedNames[key] ?? ""} maxLength={201}
                   onChange={event => setVerifiedNames(current => ({ ...current, [key]: event.target.value }))}
-                  className="mt-1 w-full border bg-background p-2 text-sm" />
+                  className="mt-1" />
               </Label>
               <Label className="mt-3 block text-xs font-semibold">Handoff evidence
                 <Textarea rows={2} maxLength={2000} value={evidence[key] ?? ""}
                   placeholder="What you checked and observed; never enter a document number"
                   onChange={event => setEvidence(current => ({ ...current, [key]: event.target.value }))}
-                  className="mt-1 w-full border bg-background p-2 text-sm" />
+                  className="mt-1" />
               </Label>
               <p className="mt-2 text-xs text-muted-foreground">By recording this command you attest that you checked the required credential, matched the adult, and personally witnessed the handoff.</p>
               <Button variant="default" type="button" disabled={!!busy}
@@ -314,19 +314,19 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs">Presented name
                   <Input value={denialNames[key] ?? ""} maxLength={201}
                     onChange={event => setDenialNames(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Label className="mt-2 block text-xs">Household context
                   <Select value={denialHouseholds[key] ?? student.householdIds[0] ?? ""}
                     onChange={event => setDenialHouseholds(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     {student.householdIds.map(id => <option key={id} value={id}>{id}</option>)}
                   </Select>
                 </Label>
                 <Label className="mt-2 block text-xs">Denial reason
                   <Select value={denialReasons[key] ?? "not_authorized"}
                     onChange={event => setDenialReasons(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     <option value="not_authorized">Not authorized</option>
                     <option value="identity_not_verified">Identity not verified</option>
                     <option value="custody_dispute">Disputed custody</option>
@@ -353,7 +353,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs">Hold type
                   <Select value={holdKinds[key] ?? "disputed_custody"}
                     onChange={event => setHoldKinds(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     <option value="disputed_custody">Disputed custody</option>
                     <option value="emergency">Emergency</option>
                   </Select>
@@ -361,14 +361,14 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-2 block text-xs">Household context
                   <Select value={holdHouseholds[key] ?? student.householdIds[0] ?? ""}
                     onChange={event => setHoldHouseholds(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2">
+                    className="mt-1">
                     {student.householdIds.map(id => <option key={id} value={id}>{id}</option>)}
                   </Select>
                 </Label>
                 <Label className="mt-2 block text-xs">Safety reason
                   <Textarea rows={2} maxLength={2000} value={holdReasons[key] ?? ""}
                     onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Button variant="outline" type="button" disabled={!!busy || !student.householdIds.length}
                   className="mt-3"
@@ -388,7 +388,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 <Label className="mt-3 block text-xs">Supervision and family contact plan
                   <Textarea rows={3} maxLength={2000} value={followUpPlans[key] ?? ""}
                     onChange={event => setFollowUpPlans(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full border bg-background p-2" />
+                    className="mt-1" />
                 </Label>
                 <Button variant="outline" type="button" disabled={!!busy || !!student.uncollectedActionId}
                   className="mt-3"

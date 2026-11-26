@@ -1,9 +1,10 @@
-import { and, asc, eq, gt, isNotNull, isNull, lte, notInArray, or, sql } from "drizzle-orm";
+import { outboundClaimPredicate, outboundLeaseOwnership } from "@/modules/communication/outbound-lease-predicates.server";
+import { and, asc, eq, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, outboundAttemptOutcome } from "@/domain/outbound-sms-safety";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 import {
   dispatchOutboundMessages, type OutboundAdapter, type OutboundClaim,
   type OutboundPreparation, type OutboundSendResult,
@@ -33,9 +34,7 @@ function schoolFamilyReceipt() {
 }
 
 function owned(claim: OutboundClaim) {
-  return and(eq(delivery.id, claim.id),
-    eq(delivery.status, "processing"),
-    eq(delivery.leaseUntil, claim.leaseUntil));
+  return outboundLeaseOwnership(delivery, claim);
 }
 
 /**
@@ -54,13 +53,7 @@ const schoolFamilyAdapter = {
         // Only claim this feature's receipts. A correlated EXISTS avoids
         // locking a shared school bulletin Action during SKIP LOCKED claims.
         schoolFamilyReceipt(),
-        ...(seenIds.length ? [notInArray(delivery.id, [...seenIds])] : []),
-        or(
-          and(eq(delivery.status, "pending"),
-            or(isNull(delivery.nextAttemptAt), lte(delivery.nextAttemptAt, now))),
-          and(eq(delivery.status, "failed"), lte(delivery.nextAttemptAt, now)),
-          and(eq(delivery.status, "processing"), lte(delivery.leaseUntil, now)),
-        ),
+        outboundClaimPredicate(delivery, now, seenIds),
       )).orderBy(asc(delivery.createdAt)).limit(1)
         .for("update", { skipLocked: true });
       if (!row) return null;
@@ -95,8 +88,6 @@ const schoolFamilyAdapter = {
         record.actionType !== "school_family_bulletin" ||
         !record.programId || !record.siteId || !record.organizationId)
       return { kind: "suppress", reason: "invalid_school_alert" };
-    if (await isDemoTenantOrganization(record.organizationId))
-      return { kind: "suppress", reason: "demo_tenant_external_delivery" };
 
     // Re-evaluate custody, school enrollment, active account and scoped
     // guardian grant on every attempt, not from publication-time recipients.
@@ -163,6 +154,7 @@ const schoolFamilyAdapter = {
           isNotNull(s.accessAccounts.emailVerifiedAt),
         )).limit(1);
       if (!mail?.email) return { kind: "fail", reason: "no_active_school_email" };
+      if (suppressDemoEmailDelivery(mail.email)) return { kind: "suppress", reason: "demo_email_destination" };
       return { kind: "ready", message: {
         channel: "email",
         email: {

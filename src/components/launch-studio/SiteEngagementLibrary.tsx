@@ -8,7 +8,7 @@ import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementD
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { ActionDialog, EmptyState, QueryState, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { ActionDialog, ActionFooter, EmptyState, QueryState, WorkspaceNotice, WorkspacePanel, StatusBadge, RecordFacts } from "@/components/workspace";
 import {
   createEngagementGoLink, listEngagementGoLinks,
   listSiteEngagementDefinitions, listOwnerEngagementDefinitions, retireEngagementDefinition,
@@ -142,10 +142,12 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
         </Select>
       </Field>
       {record&&<>
-        <div className="mt-3 text-sm text-muted-foreground">
-          <span className="font-medium">{record.domain}</span> · {record.mode==="page"?"Rendered experience":"Direct destination"} · {record.status}
-        </div>
-        <div className="mt-4 flex flex-wrap items-end gap-3">
+        <RecordFacts columns={3} className="mt-3" items={[
+          {label:"Domain",value:record.domain},
+          {label:"Visitor experience",value:record.mode==="page"?"Rendered experience":"Direct destination"},
+          {label:"Status",value:<StatusBadge tone={record.status==="active"?"success":"neutral"}>{record.status}</StatusBadge>},
+        ]}/>
+        <ActionFooter layout="inline" className="items-end">
           {!emailOnly&&<Field label="Channel">
           <Select value={channel} disabled={busy} onChange={event=>{if(!pending.current)setChannel(event.target.value as EngagementChannel);}}>
               {engagementChannels.map(id=><option value={id} key={id}>{engagementChannelLabels[id]}</option>)}
@@ -156,25 +158,23 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
           </Button>
           {!emailOnly&&<Button type="button" variant="outline" disabled={busy||linksLoading||record.status==="retired"}
             onClick={()=>setConfirmation({engagementId:record.engagementId})}>Retire engagement</Button>}
-        </div>
+        </ActionFooter>
       </>}
       {linksLoading&&<QueryState loading="Loading saved links…"/>}
       {!linksLoading&&selected!==null&&linksFor===selected&&<div className="mt-4 grid gap-2">
         {!links.length&&<EmptyState title="No Go Links issued for this engagement."/>}
-        {links.map(link=><div key={link.id} className="flex flex-wrap justify-between gap-2 border p-3">
+        {links.map(link=><WorkspacePanel key={link.id} headingLevel="h3" title={"/go/"+link.code}
+          description={link.channel??"Unspecified channel"}
+          actions={<StatusBadge tone={record?.status==="active"&&link.status==="active"?"success":"neutral"}>{record?.status==="retired"?"Engagement retired":link.status}</StatusBadge>}>
           <div className="min-w-0">
-            <p className="font-mono text-sm select-all">/go/{link.code}</p>
-            <p className="text-xs text-muted-foreground">
-              {link.channel??"Unspecified channel"} · {record?.status==="retired"?"Engagement retired":link.status}
-            </p>
             {link.evidence?<p className="mt-1 text-xs text-muted-foreground">{link.evidence.redirects30d} observed requests · {link.evidence.registrationEvidence==="referenced_noncredit_claim"?`${link.evidence.referralRegistrations30d??0} matching registration claims`:"Outcome not connected"} (30 days; not unique people or causal conversions)</p>:<p className="mt-1 text-xs text-muted-foreground">Outcome evidence unavailable.</p>}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <ActionFooter layout="inline">
             {!emailOnly&&link.status==="active"&&record?.status==="active"&&<GoLinkActions code={link.code} status="active"
               busy={busy} allowPause={false} onChange={action=>{if(action==="revoke")setConfirmation({engagementId:record.engagementId,link});}}/>}
             {link.channel==="email"&&link.status==="active"&&record?.status==="active"&&<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setDistribution(link.id)}>{emailOnly?"Add recipients / manage campaign":"Prepare email"}</Button>}
-          </div>
-        </div>)}
+          </ActionFooter>
+        </WorkspacePanel>)}
       </div>}
       {distribution&&!linksLoading&&linksFor===selected&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
     </>}

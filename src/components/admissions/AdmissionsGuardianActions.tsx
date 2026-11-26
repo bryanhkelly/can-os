@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ActionFooter } from "@/components/workspace/action-footer";
+import { ActionFooter, WorkspaceNotice, FormSection, StatusBadge } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,17 +21,13 @@ export function AdmissionsGuardianActions({applicationId,verified,loginProvision
  const [evidenceNote,setEvidenceNote]=useState("");
  const [attempted,setAttempted]=useState(false);
  return <>
-  <p className="mt-3 text-xs text-muted-foreground">
-   Guardian verification: <strong>{verified?"Verified":"Required"}</strong> ·{" "}
-   Sign-in access: <strong>{loginProvisioned?"Provisioned":"Not provisioned"}</strong>.
-   Verify the relationship independently before granting or inviting access.
-  </p>
-  <p role="status" className="mt-2 text-sm"><strong>Next for family access: </strong>
+  <div className="mt-4 flex flex-wrap gap-2"><StatusBadge tone={verified?"success":"attention"}>Guardian relationship: {verified?"Verified":"Required"}</StatusBadge><StatusBadge tone={loginProvisioned?"success":"neutral"}>Sign-in access: {loginProvisioned?"Provisioned":"Not provisioned"}</StatusBadge></div>
+  <WorkspaceNotice className="mt-3"><strong>Next for family access: </strong>
    {!verified?"Admissions registrar verifies the guardian relationship before granting family access.":
     !loginProvisioned?"Admissions registrar provisions verified guardian sign-in; invitation is a separate step.":
-     "Guardian sign-in is provisioned. The registrar may send the secure invitation; offer decisions remain with the guardian."}
-  </p>
-  <div className="mt-3 flex flex-wrap gap-2">
+     "Guardian sign-in is provisioned. The registrar may request a secure invitation or confirm the existing sign-in method; offer decisions remain with the guardian."}
+  </WorkspaceNotice>
+  <ActionFooter layout="inline">
    <Button type="button" variant="outline" size="sm" disabled={busy||verified} onClick={()=>setVerifying(true)}
     >
     {verified?"Relationship verified":"Verify guardian relationship"}
@@ -42,18 +38,18 @@ export function AdmissionsGuardianActions({applicationId,verified,loginProvision
    </Button>
    <Button type="button" variant="outline" size="sm" disabled={busy||!loginProvisioned} onClick={()=>onInvite(applicationId)}
     >
-    Send secure guardian invitation
+    Request guardian sign-in
    </Button>
-  </div>
-  {verifying&&!verified&&<form noValidate className="mt-3 space-y-3  border p-3 text-sm"
+  </ActionFooter>
+  {verifying&&!verified&&<form noValidate className="mt-5 space-y-3 text-sm"
    onSubmit={event=>{
     event.preventDefault();setAttempted(true);
-    if(evidenceNote.trim().length<12)return;
+    if(busy||evidenceNote.trim().length<12)return;
     onVerify(applicationId,{method,evidenceNote:evidenceNote.trim()});
    }}>
    <fieldset disabled={busy} className="space-y-3">
-    <legend className="font-semibold">Independent guardian relationship verification</legend>
-    <p>Record the documentation or identification actually reviewed. An email address or inquiry alone does not establish guardianship.</p>
+    <legend className="sr-only">Independent guardian relationship verification</legend>
+    <FormSection columns={1} title="Independent guardian relationship verification" description="Record the documentation or identification actually reviewed. An email address or inquiry alone does not establish guardianship.">
     <Field label="Verification method">
      <Select value={method}
       onChange={event=>{
@@ -70,7 +66,8 @@ export function AdmissionsGuardianActions({applicationId,verified,loginProvision
      <Textarea minLength={12} maxLength={2000} rows={3} value={evidenceNote}
       onChange={event=>setEvidenceNote(event.target.value)}/>
     </Field>
-    <ActionFooter layout="inline" className="mt-0">
+    </FormSection>
+    <ActionFooter layout="form">
      <Button type="submit" disabled={busy} loading={busy} loadingLabel="Recording verification...">Record guardian verification</Button>
      <Button type="button" variant="outline" disabled={busy} onClick={()=>{setVerifying(false);setAttempted(false);}}>Cancel verification</Button>
     </ActionFooter>

@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { WorkspacePanel, QueryState, EmptyState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import { plural } from "@/lib/format";
 import type { ReadinessRecord, LaunchReadinessNoncredit } from "./launch-readiness-types-v61";
 
@@ -8,16 +8,12 @@ import type { ReadinessRecord, LaunchReadinessNoncredit } from "./launch-readine
 export function NoncreditPublisherReadinessV61({ siteId,noncredit }: {
   siteId: string; noncredit: ReadinessRecord<LaunchReadinessNoncredit>;
 }) {
-  return <section className="border bg-background p-4"
-        aria-label="Independently authorized noncredit enrollment releases">
-        <h3 className="text-sm font-semibold">Registration for noncredit learning</h3>
+  return <WorkspacePanel headingLevel="h3" title="Registration for noncredit learning">
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
           See which noncredit learning opportunities may be ready for registration.
           Each offering needs its own final checks before people can sign up.
         </p>
-        {noncredit.state==="loading" && <p role="status" className="mt-2 text-sm">
-          Checking noncredit registration options…
-        </p>}
+        {noncredit.state==="loading" && <QueryState loading="Checking noncredit registration options…"/>}
         {noncredit.state==="unavailable" && <WorkspaceNotice tone="attention" className="mt-3">
           We couldn't check noncredit registration right now. Try again before making plans.
         </WorkspaceNotice>}
@@ -46,9 +42,7 @@ export function NoncreditPublisherReadinessV61({ siteId,noncredit }: {
                 </p>
               </li>)}
             </ul>}
-            {!releases.length && !candidates.length && <p className="text-sm text-muted-foreground">
-              No noncredit registration options are listed for this site yet. Other types of classes may still be available.
-            </p>}
+            {!releases.length && !candidates.length && <EmptyState title="No noncredit registration options yet" description="Other types of classes may still be available."/>}
             <Button asChild variant="outline" size="sm">
               <Link to="/programs/noncredit/enrollment" search={{publicSiteId:siteId}}>
                 Manage noncredit registration
@@ -56,5 +50,5 @@ export function NoncreditPublisherReadinessV61({ siteId,noncredit }: {
             </Button>
           </div>;
         })()}
-      </section>;
+      </WorkspacePanel>;
 }

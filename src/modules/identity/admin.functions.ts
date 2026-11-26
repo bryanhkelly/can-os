@@ -1,4 +1,11 @@
+import { bindAuthorizedAccountPerson } from "./named-person-account.server";
+import { isDemoAccountEmail } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { canIssueIndividualCredential } from "@/modules/identity/individual-credential-issuer.server";
+import { individualStaffTargetEligible } from "@/domain/individual-staff-handoff";
+import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { personLegalName } from "@/domain/person-name";
 import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -13,13 +20,11 @@ import {
   assertChurchLocalInvitationOrganization, localStaffInviteInput, localStaffInviteRoles, staffOnboardingState,
 } from "@/domain/staff-onboarding-policy";
 import {
-  listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE,
+  listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE, acceptStaffInvitations,
 } from "@/modules/identity/staff-invitations.server";
 import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
-import { demoSchoolTenants } from "@/db/schema";
 import { DomainError } from "@/domain/errors";
-import { isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
-import { readDemoStaffBindings } from "./demo-staff-access.server";
+import { matchesLegacyStaffInvitationScope } from "./demo-school-tenants.server";
 import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
 const assignableRoles = localStaffInviteRoles;
@@ -202,7 +207,8 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     assertSafeguardingStaffInviteSite(data.role, data.siteId);
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
-    const { people, accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const { accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const { lockAccountProvisioningEmail, provisioningAccountSelection, readLockedProvisioningAccount } = await import("./account-provisioning-store.server");
     const organizationId = actor.organizationIds[0]!;
     if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
       throw new AuthorizationError("site-limited registrar cannot create sibling school grants");
@@ -216,56 +222,61 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     const siteId = site.id;
     const emailNormalized = data.email.toLowerCase();
     const invitation = await db.transaction(async tx => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"staff-invitation:" + emailNormalized}))`);
-      const [demoSchool] = await tx.select({ domain: demoSchoolTenants.domain, enabled: demoSchoolTenants.enabled })
-        .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId, organizationId)).limit(1);
-      const syntheticSchool = Boolean(demoSchool) || isValorOrganization(organizationId);
+      await lockAccountProvisioningEmail(tx, emailNormalized);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
-      if ((demoSchool && !demoSchool.enabled) ||
-        (localDemoIdentity && (!demoSchool || emailNormalized.split("@")[1] !== demoSchool.domain))) {
-        throw new DomainError("FORBIDDEN", "Local demo identities require their original registered school domain");
+      const confirmation = data.privateIdentityConfirmation;
+      const individual = localDemoIdentity && !!confirmation;
+      if (confirmation && (!localDemoIdentity || !privateAccountRoleEligible(data.role)))
+        throw new AuthorizationError("eligible individual staff identity");
+      if (individual) {
+        if (actor.sessionAccountId || actor.impersonatedByAccountId || actor.delegatedByPlatformOwner)
+          throw new AuthorizationError("direct administrator identity");
+        if (!await canIssueIndividualCredential(tx,actor))
+          throw new AuthorizationError("individually authenticated administrator");
       }
-      let [account] = await tx.select({ id: accessAccounts.id }).from(accessAccounts)
-        .where(eq(accessAccounts.emailNormalized, emailNormalized)).limit(1);
-      if (account && demoSchool && localDemoIdentity) {
-        const bindings = await readDemoStaffBindings(account.id, tx);
-        if (!bindings.some(binding => binding.enabled && binding.domain === demoSchool.domain &&
-          binding.payload.accountId === account!.id && binding.payload.role === data.role))
-          throw new DomainError("FORBIDDEN", "Existing accounts require an exact demo staff invitation binding");
+      // Legacy shared credentials retain the exact original tenant boundary.
+      if (localDemoIdentity && !individual && !await matchesLegacyStaffInvitationScope(emailNormalized, organizationId, siteId, tx)) {
+        throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the original shared credential scope");
       }
+      let privateAccessCode:string|undefined;
+      let [account] = await readLockedProvisioningAccount(tx, emailNormalized);
+      if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
+      if (account?.privateCredential && !individual)
+        throw new AuthorizationError("explicit individual identity confirmation required");
+      if (individual && !individualStaffTargetEligible(account,confirmation?.existingPersonId))
+        throw new AuthorizationError("independently confirmed existing individual Person");
       if (!account) {
-        [account] = await tx.insert(accessAccounts).values({ emailNormalized }).returning({ id: accessAccounts.id });
+        const credential=individual?issuePrivateAccountCredential():undefined;
+        privateAccessCode=credential?.privateAccessCode;
+        [account] = await tx.insert(accessAccounts).values({ emailNormalized,
+          ...(credential?{privateAccessCodeHash:credential.privateAccessCodeHash}:{})
+        }).returning(provisioningAccountSelection);
         await recordAudit(tx, actor, {
           action: "admin.access_account.create", resourceType: "access_account", resourceId: account!.id,
           after: { emailNormalized },
         });
       }
-      if (demoSchool && localDemoIdentity) {
+      if (localDemoIdentity && !individual) {
         const foreign = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
           .where(and(eq(accountPersonGrants.accountId, account!.id),
             sql`(${accountPersonGrants.organizationId} IS DISTINCT FROM ${organizationId}::uuid
               OR ${accountPersonGrants.siteId} IS DISTINCT FROM ${siteId}::uuid)`)).limit(1);
         if (foreign.length) throw new DomainError("FORBIDDEN", "An existing identity belongs to another school");
       }
-      const linkedPeople = await tx.select({ personId: accountPersonGrants.personId })
-        .from(accountPersonGrants).where(and(
-          eq(accountPersonGrants.accountId, account!.id),
-          ...(syntheticSchool ? [eq(accountPersonGrants.organizationId, organizationId), eq(accountPersonGrants.siteId, siteId)] : []),
-        )).limit(100);
-      const distinctPeople = [...new Set(linkedPeople.map(grant => grant.personId))];
-      // A verified mailbox alone cannot resolve multiple different real Person
-      // records. Require operator review instead of choosing an arbitrary one.
-      if (!syntheticSchool && distinctPeople.length > 1)
-        throw new DomainError("CONFLICT", "This account has multiple Person records. Reconcile identity before inviting staff.");
-      let personId = distinctPeople[0];
-      if (!personId) {
-        const [person] = await tx.insert(people).values({
-          legalFirstName: data.firstName, legalLastName: data.lastName, email: emailNormalized,
-        }).returning({ id: people.id });
-        personId = person!.id;
+      if(!account)throw new Error("Staff Account could not be provisioned");
+      const identity=await bindAuthorizedAccountPerson(tx,account,{
+        email:emailNormalized,firstName:data.firstName,lastName:data.lastName,
+      });
+      const personId=identity.personId;
+      if(identity.personCreated)await recordAudit(tx,actor,{
+        action:"admin.person.create",resourceType:"person",resourceId:personId,
+        after:{firstName:data.firstName,lastName:data.lastName,email:emailNormalized},
+      });
+      if (individual) {
         await recordAudit(tx, actor, {
-          action: "admin.person.create", resourceType: "person", resourceId: personId,
-          after: { firstName: data.firstName, lastName: data.lastName, email: emailNormalized },
+          action:"identity.staff_individual_confirmation",resourceType:"access_account",resourceId:account!.id,
+          after:{personId,reason:confirmation!.reason,credentialIssued:!!privateAccessCode},
+          scope:{organizationId,siteId},
         });
       }
       const [existingGrant] = await tx.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
@@ -280,6 +291,12 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         if (existingGrant.active) return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false };
         const pending = (await listPendingStaffInvitations(tx, account!.id)).some(grant => grant.id === existingGrant.id);
         if (!pending) throw new Error("An inactive grant already exists; review it separately instead of creating a replacement invitation");
+        if (localDemoIdentity) {
+          const invitations = await listPendingStaffInvitations(tx, account!.id);
+          const accepted = await acceptStaffInvitations(tx, account!.id, invitations.filter(item => item.id === existingGrant.id), new Date(), {actorPersonId:actor.actorPersonId!});
+          if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
+          return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false };
+        }
         return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: true };
       }
       const [grant] = await tx.insert(accountPersonGrants).values({
@@ -296,7 +313,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         actorPersonId: actor.actorPersonId,
         organizationId, siteId,
         payload: { accountId: account!.id, personId, role: data.role, publisherRelationship,
-          ...(syntheticSchool && !localDemoIdentity ? { invitationMode: "verified_email", emailNormalized } : {}),
+          invitationMode: individual ? "individual_credential" : localDemoIdentity ? "legacy_shared_credential" : "verified_email", emailNormalized,
         },
       });
       await recordAudit(tx, actor, {
@@ -304,11 +321,21 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         after: { accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false, publisherRelationship },
         scope: { organizationId, siteId },
       });
+      if (localDemoIdentity) {
+        const pending = await listPendingStaffInvitations(tx, account!.id);
+        const accepted = await acceptStaffInvitations(tx, account!.id, pending.filter(item => item.id === grant.id), new Date(), {actorPersonId:actor.actorPersonId!});
+        if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
+        return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false, ...(privateAccessCode?{privateAccessCode}:{}) };
+      }
       return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };
     });
+    if (data.privateIdentityConfirmation) {
+      setResponseHeader("Cache-Control","private, no-store");
+      setResponseHeader("Referrer-Policy","no-referrer");
+    }
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
       return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized),
-        deliveryStatus: invitation.pending ? "demo_code" as const : "already_active" as const };
+        deliveryStatus: isDemoAccountEmail(emailNormalized) ? (data.privateIdentityConfirmation ? "private_code" as const : "demo_code" as const) : "already_active" as const };
     try {
       const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(
         emailNormalized, data.role === "teacher" ? "/profiles" : undefined);

@@ -198,19 +198,19 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       <h3 className="font-semibold">Add a source excerpt for review</h3>
       <Label className="text-sm">Church information field
         <Select value={field} onChange={event => setField(event.target.value as ChurchSuggestionField)}
-          className="mt-1 block w-full  border bg-background p-2">
+          className="mt-1">
           {fieldOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </Select>
       </Label>
       <Label className="text-sm">Source page URL (same church website)
         <Input type="url" required maxLength={2048} value={sourcePageUrl}
           onChange={event => setSourcePageUrl(event.target.value)}
-          className="mt-1 block w-full  border bg-background p-2" />
+          className="mt-1" />
       </Label>
       <Label className="text-sm">Source excerpt or your proposed summary
         <Textarea required value={text} maxLength={siteLocalContentLimits[churchSuggestionTargetFields[field] ?? "churchHistory"]} rows={4}
           onChange={event => setText(event.target.value)}
-          className="mt-1 block w-full  border bg-background p-2" />
+          className="mt-1" />
       </Label>
       <p className="text-xs text-muted-foreground">Your excerpt is stored only in the private editorial queue; it is not published on submission.</p>
       <Button variant="default" type="submit" disabled={busy}
@@ -260,7 +260,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
         <Label className="mt-3 block text-sm">Edit before saving
           <Textarea rows={3} maxLength={target ? siteLocalContentLimits[target] : 1400} value={edits[item.id] ?? item.proposedText}
             onChange={event => setEdits(old => ({ ...old, [item.id]: event.target.value }))}
-            className="mt-1 block w-full  border bg-background p-2" />
+            className="mt-1" />
         </Label>
         <Label className="mt-3 flex items-start gap-2 text-sm">
           <Checkbox className="mt-1" checked={rightsConfirmations[item.id] === true}

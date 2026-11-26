@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceNotice, EmptyState, ActionFooter, StatusBadge } from "@/components/workspace";
 import { type LoadOutcome } from "@/lib/safe-loader";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
@@ -64,6 +64,7 @@ function ClassroomMediaStageSession({ recorded, meetings, sectionId, timezone, r
       setMode("live");
   }, [outcome, role]);
   async function schedule() {
+    if (busy) return;
     const specification = JSON.stringify({ title: title.trim(), startsLocal, endsLocal, url: url.trim() });
     setScheduleAttempted(true);
     const validUrl=isHttpsMeetingUrl(url);
@@ -99,11 +100,11 @@ function ClassroomMediaStageSession({ recorded, meetings, sectionId, timezone, r
               refresh: async () => undefined })}>Retry</Button>
         </WorkspaceNotice>}
         {outcome?.ok && <>
-          {!outcome.data.length && <p role="status" className="border bg-muted p-5 text-sm">No class calendar events are scheduled in the next 30 days.</p>}
+          {!outcome.data.length && <EmptyState title="No upcoming class calendar events" description="No class calendar events are scheduled in the next 30 days."/>}
           <ul className="space-y-3">{outcome.data.map(event => <li key={event.id} className="space-y-3 border p-4">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{event.title}</h3>
               <p className="mt-1 text-xs text-muted-foreground">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: event.timezone }).format(new Date(event.startsAt))} · {event.timezone}</p>
-              <p className="mt-1 text-xs">{event.cancelled ? "Cancelled" : event.meetingUrl ? "Meeting link available" : "The teacher has not attached a meeting link."}</p></div>
+              <div className="mt-2"><StatusBadge tone={event.cancelled?"neutral":event.meetingUrl?"success":"attention"}>{event.cancelled ? "Cancelled" : event.meetingUrl ? "Meeting link available" : "Meeting link not attached"}</StatusBadge></div></div>
               {event.meetingUrl && !event.cancelled && <Button asChild variant="outline" size="sm"><a href={event.meetingUrl} target="_blank" rel="noopener noreferrer">Open meeting<span className="sr-only"> for {event.title} in a new tab</span></a></Button>}
             </div>
             <Link to="/calendar" search={{ section: sectionId, event: event.id, date: dateKeyInTimezone(event.startsAt, event.timezone), view: "agenda" }} className="text-xs underline">View calendar event</Link>
@@ -111,7 +112,7 @@ function ClassroomMediaStageSession({ recorded, meetings, sectionId, timezone, r
               {editing === event.id ? <form noValidate className="mt-3 space-y-3" onSubmit={submit => {
                 submit.preventDefault();setLinkAttempted(event.id);
                 const validUrl=!editUrl.trim()||isHttpsMeetingUrl(editUrl);
-                if(!validUrl)return;
+                if(busy||!validUrl)return;
                 void mutation.run(async () => {
                 await commands.saveLink({ data: { sectionId, eventId: event.id, meetingUrl: editUrl.trim() || null, expectedMeetingUrl: event.meetingUrl } });
                 setEditing(null);setLinkAttempted(null);
@@ -120,7 +121,7 @@ function ClassroomMediaStageSession({ recorded, meetings, sectionId, timezone, r
                   error={linkAttempted===event.id&&editUrl.trim()&&!isHttpsMeetingUrl(editUrl)?"Enter a valid HTTPS meeting URL or clear the field.":undefined}>
                   <Input type="url" maxLength={2048} value={editUrl} disabled={busy} onChange={change => setEditUrl(change.target.value)}/>
                 </Field>
-                <div className="flex gap-2"><Button size="sm" disabled={busy}>Save link</Button><Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(null)}>Cancel</Button></div>
+                <ActionFooter layout="inline"><Button type="submit" size="sm" disabled={busy}>Save link</Button><Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(null)}>Cancel</Button></ActionFooter>
               </form> : <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => { setEditing(event.id); setEditUrl(event.meetingUrl ?? ""); }}>Manage meeting link</Button>}
             </div>}
             {role === "teacher" && !event.canManage && !event.cancelled && <p className="text-xs text-muted-foreground">This event is owned by another school workflow. Its details must be managed there.</p>}

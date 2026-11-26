@@ -110,7 +110,7 @@ npm run build
 
 # Only after an approved QA-only schema migration:
 APP_ENV=test CAN_NETWORK_SCHEMA_VALIDATION=1 \
-  TEST_DATABASE_URL="$TEST_DATABASE_URL" npm run db:network:test01:verify
+  TEST_DATABASE_URL="$TEST_DATABASE_URL" npm run db:network:qa:verify
 ```
 
 ## Remaining gates, not claimed to be shipped

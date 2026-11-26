@@ -2,7 +2,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/choice";
-import { DisclosureSection, WorkspaceNotice } from "@/components/workspace";
+import { DisclosureSection, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {useState} from "react";
 import {usePrivateReportQuery,usePrivateReportScope} from "@/hooks/use-private-report-query";
 import {ReportDateFilter} from "@/components/workspace/report-date-filter";
@@ -56,18 +56,18 @@ export function NativeClassReportPanel({classId}:{classId:string}){
         </p>
       </div>
       <Button variant="outline" type="button" disabled={!data} onClick={()=>data&&exportReport(data)}
-        className="min-h-11 border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">
+        size="lg">
         Export evidence CSV
       </Button>
     </div>
-    <div className="space-y-3 border border-border bg-card p-4">
+    <WorkspacePanel headingLevel="h3" title="Reporting period"><div className="space-y-3">
       <ReportDateFilter initial={range} maxDays={366} allowPartialToday onApply={setRange}/>
       <Label className="flex items-center gap-2 text-sm">
         <Checkbox checked={compare} onChange={e=>setCompare(e.target.checked)}/> Compare equal-length prior period
       </Label>
-      {compare&&!priorRange&&<p role="status" className="text-xs text-muted-foreground">Choose a completed UTC window for an equal-period comparison. Today is partial.</p>}
+      {compare&&!priorRange&&<WorkspaceNotice>Choose a completed UTC window for an equal-period comparison. Today is partial.</WorkspaceNotice>}
       {compare&&priorRange&&<p className="text-xs text-muted-foreground">Prior window: {priorRange.fromDay} to {priorRange.untilDay} exclusive (UTC). Both cohorts reflect their source state at query time, not historical snapshots.</p>}
-    </div>
+    </div></WorkspacePanel>
     {scope===null&&<WorkspaceNotice tone="attention">A current verified workspace session is required.</WorkspaceNotice>}
     {!valid&&<WorkspaceNotice tone="attention">Choose ascending dates covering no more than 366 days.</WorkspaceNotice>}
     {scope!==null&&valid&&(report.isPending||report.isFetching)&&<WorkspaceNotice>Reconciling verified Class records…</WorkspaceNotice>}
@@ -85,9 +85,7 @@ export function NativeClassReportPanel({classId}:{classId:string}){
       <ReportMetricComparison compare={compare&&priorRange!==null} items={data.definitions.map(def=>({
         id:def.key,label:def.label,value:data.metrics[def.key],prior:comparable?.metrics[def.key],hint:def.denominator,asOf:data.asOf,
       }))}/>
-      {compare&&previous.isError&&<p role="status" className="text-sm">
-        Prior-period comparison is unavailable. Current period remains independently sourced.
-      </p>}
+      {compare&&previous.isError&&<WorkspaceNotice tone="attention">Prior-period comparison is unavailable. Current period remains independently sourced.</WorkspaceNotice>}
       <DisclosureSection title="Metric definitions and audit trail">
           <Table scrollLabel="Class metric definitions and audit trail" aria-label="Class metric definitions and audit trail" className="w-full min-w-[42rem] text-left text-sm"><TableCaption className="sr-only">Class metric definitions and audit trail</TableCaption>
             <TableHeader className="border-b border-border bg-muted/40"><TableRow>

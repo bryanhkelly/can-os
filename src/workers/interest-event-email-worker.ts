@@ -11,7 +11,7 @@ import {
 } from "@/db/schema";
 import { renderInterestEventCalendar, type InterestEventEmailKind } from "@/domain/interest-event-delivery";
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 
 const MAX_ATTEMPTS = 5;
 const LEASE_MS = 120_000;
@@ -140,7 +140,7 @@ export async function processInterestEventEmailDeliveries(
           eq(calendarEvents.sourceId, interestEvents.id),
         )).where(owned).limit(1);
       if (!record || record.eventStatus !== "published" || !record.contactConsentAt ||
-        await isDemoTenantOrganization(record.organizationId) ||
+        suppressDemoEmailDelivery(record.email) ||
         ((record.kind === "follow_up_attended" && record.attendanceStatus !== "attended") ||
           (record.kind === "follow_up_no_show" && record.attendanceStatus !== "no_show")) ||
         ((record.kind === "reminder_24h" || record.kind === "reminder_2h") && record.startsAt <= now)) {

@@ -11,10 +11,13 @@ export const accessAccounts = pgTable("access_accounts", {
  personId: uuid("person_id").references(() => people.id, {onDelete:"restrict"}),
  emailNormalized: text("email_normalized").notNull(),
  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+ // Optional account-held credential; never returned by an Account projection.
+ privateAccessCodeHash: text("private_access_code_hash"),
  disabled: boolean("disabled").notNull().default(false),
  createdAt: createdAt(),
  updatedAt: updatedAt(),
 }, t => [
+ check("access_accounts_private_access_code_hash_ck", sql`${t.privateAccessCodeHash} IS NULL OR ${t.privateAccessCodeHash} ~ '^[a-f0-9]{64}$'`),
  uniqueIndex("access_accounts_email_uq").on(t.emailNormalized),
  uniqueIndex("access_accounts_person_id_uq").on(t.personId).where(sql`${t.personId} IS NOT NULL`),
 ]);
@@ -77,6 +80,7 @@ export const authRequestRateLimits = pgTable("auth_request_rate_limits", {
 /** Independent of OTP provider; hash opaque session secret and revoke server-side. */
 export const accessSessions = pgTable("access_sessions", {
  id: id(),
+ authenticationMethod: text("authentication_method").$type<"email_link"|"local_demo_code"|"private_access_code">(),
  accountId: uuid("account_id").notNull().references(() => accessAccounts.id,{onDelete:"cascade"}),
  secretHash: text("secret_hash").notNull(),
  activeGrantId: uuid("active_grant_id").references(() => accountPersonGrants.id,{onDelete:"set null"}),

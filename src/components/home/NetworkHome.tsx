@@ -2,7 +2,7 @@ import {NetworkReportingReadinessPanel} from "@/components/reports/NetworkReport
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
-import { Label } from "@/components/ui/label";
+import { WorkspacePanel, EmptyState, StatusBadge, ActionFooter, FormSection, FormActions } from "@/components/workspace";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
@@ -54,6 +54,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setCreateAttempted(true);
     if(name.trim().length<2||!(/^[a-z0-9]+(-[a-z0-9]+)*$/).test(slug)||!isValidTimezone(timezone))return;
     await mutation.run(async () => {
@@ -66,6 +67,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
   }
 
   async function decide(id: string, decision: "approve" | "reject" | "revoke") {
+    if (busy || (reasons[id] ?? "").trim().length < 4) return;
     await mutation.run(() => reviewNetworkAffiliation({ data: {
         affiliationId: id, decision, reason: reasons[id] ?? "",
       } }), { successMessage: "Affiliation decision recorded.", commandErrorMessage: "Unable to review affiliation." });
@@ -80,42 +82,36 @@ function NetworkSites({ data }: { data: NetworkData }) {
       <DashboardShortcut title="Messages" description="Partner conversations" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
     </>}
     actions={<><a href="#network-create">Add an HQ-operated location →</a><Link to="/profiles">My profile →</Link></>}>
-    <section id="network-affiliations" className="border bg-card p-5">
-      <h2 className="font-serif text-2xl">School affiliation requests</h2>
+    <WorkspacePanel id="network-affiliations" title="School affiliation requests">
       <p className="mt-2 text-sm text-muted-foreground">Schools retain their own organizations and academic permissions. Approving a link does not give HQ access to students, families, courses or admissions.</p>
       <div className="mt-4 space-y-3">
-        {data.affiliations.map(entry => <article key={entry.id} className=" border p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold">{entry.siteName}</h3>
-            <span className="text-xs text-muted-foreground">{entry.siteOrganizationName} · {entry.status}</span>
-          </div>
+        {data.affiliations.map(entry => <WorkspacePanel key={entry.id} headingLevel="h3" title={entry.siteName} description={entry.siteOrganizationName} actions={<StatusBadge tone={entry.status==="approved"?"success":entry.status==="pending"?"attention":"neutral"}>{entry.status}</StatusBadge>}>
           <p className="mt-2 text-sm">{entry.requestNote}</p>
           {entry.decisionReason && <p className="mt-2 text-sm text-muted-foreground">Last decision: {entry.decisionReason}</p>}
           {(entry.status === "pending" || entry.status === "approved") && <>
-            <Label className="mt-3 block text-sm font-medium">Decision reason
+            <Field label="Decision reason" className="mt-3">
               <Textarea rows={2} minLength={4} maxLength={1000}
-                className="mt-1"
                 placeholder="Reason for this network decision"
                 value={reasons[entry.id] ?? ""}
                 onChange={event => setReasons(old => ({ ...old, [entry.id]: event.target.value }))}/>
-            </Label>
-            <div className="mt-2 flex gap-2">
+            </Field>
+            <ActionFooter layout="inline">
               {entry.status === "pending" ? <>
-                <Button type="submit" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
+                <Button type="button" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
                   
                   onClick={() => void decide(entry.id, "approve")}>Approve</Button>
-                <Button type="submit" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
+                <Button type="button" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
                   
                   onClick={() => void decide(entry.id, "reject")}>Reject</Button>
-              </> : <Button type="submit" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
+              </> : <Button type="button" variant="outline" disabled={busy || (reasons[entry.id] ?? "").trim().length < 4}
                 
                 onClick={() => void decide(entry.id, "revoke")}>Revoke affiliation</Button>}
-            </div>
+            </ActionFooter>
           </>}
-        </article>)}
-        {data.affiliations.length === 0 && <p className="text-sm text-muted-foreground">No school affiliation requests yet.</p>}
+        </WorkspacePanel>)}
+        {data.affiliations.length === 0 && <EmptyState title="No school affiliation requests yet."/>}
       </div>
-    </section>
+    </WorkspacePanel>
     <NetworkReportingReadinessPanel/>
     <section id="network-engagement" className="mt-8 space-y-4">
       <h2 className="font-serif text-2xl">Network invitations and distribution</h2>
@@ -123,10 +119,10 @@ function NetworkSites({ data }: { data: NetworkData }) {
       <UniversalEngagementPublisher key={"publish:"+data.organization.id} ownerSurface={engagementSurface}/>
       <SiteEngagementLibrary key={"library:"+data.organization.id} ownerSurface={engagementSurface}/>
     </section>
-    <section id="network-create" className="mt-8  border bg-card p-5">
-      <h2 className="font-serif text-2xl">Add a headquarters-operated location</h2>
+    <WorkspacePanel id="network-create" title="Add a headquarters-operated location" className="mt-8">
       <p className="mt-2 text-sm text-muted-foreground">Use this only for a location owned or operated by the denomination. Independently owned churches and schools require a reviewed affiliation link, not a transfer of site ownership.</p>
-      <form noValidate className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={create}>
+      <form noValidate className="mt-5 space-y-4" onSubmit={create} aria-busy={busy}>
+        <FormSection headingLevel="h3" title="Location details">
         <Field label="Location name" className="text-sm" required error={createAttempted&&name.trim().length<2?"Enter a location name with at least 2 characters.":undefined}>
           <Input minLength={2} maxLength={160} value={name} onChange={event => setName(event.target.value)} placeholder="Central Community Campus"/>
         </Field>
@@ -138,14 +134,11 @@ function NetworkSites({ data }: { data: NetworkData }) {
           error={createAttempted&&!isValidTimezone(timezone)?"Enter a valid IANA timezone, such as America/Los_Angeles.":undefined}>
           <Input value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="America/Los_Angeles"/>
         </Field>
-        <div className="sm:col-span-2">
-          <Button type="submit" disabled={busy}>
-            {busy ? "Creating location…" : "Create location"}
-          </Button>
-        </div>
+        </FormSection>
+        <FormActions submitLabel="Create location" pendingLabel="Creating location…" pending={mutation.pending} disabled={busy}/>
       </form>
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording network change..."/>
-    </section>
+    </WorkspacePanel>
     <div className="mt-8">
       <ScopedWorkspaceSection id="network-locations" title="Directly operated locations"
         scopeDescription="Locations returned by your current network headquarters membership. Network affiliation does not grant Site management access.">

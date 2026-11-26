@@ -1,7 +1,8 @@
+import { provisionNamedMailboxPerson } from "@/modules/identity/named-person-account.server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  accessAccounts, accountPersonGrants, documents, networkAgreements, organizations, people,
+  accountPersonGrants, documents, networkAgreements, organizations,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
@@ -127,37 +128,17 @@ export async function provisionHQOfficer(actor: AccessContext, input: {
     if (document!.verifiedByPersonId === actor.actorPersonId)
       throw new AuthorizationError("independent officer authorization verifier");
 
-    let [account] = await tx.select({
-      id: accessAccounts.id, disabled: accessAccounts.disabled,
-    }).from(accessAccounts).where(eq(accessAccounts.emailNormalized, input.email)).limit(1);
-    if (account?.disabled) throw new AuthorizationError("disabled HQ account");
-    if (!account) {
-      [account] = await tx.insert(accessAccounts).values({ emailNormalized: input.email })
-        .returning({ id: accessAccounts.id, disabled: accessAccounts.disabled });
-      await writeAudit(tx, actor, {
-        action: "network.officer.account.create", entityType: "access_account",
-        entityId: account!.id, scope: { organizationId: denomination.id },
-        after: { accountId: account!.id },
-      });
-    }
-
-    const priorPeople = await tx.select({ personId: accountPersonGrants.personId })
-      .from(accountPersonGrants).where(eq(accountPersonGrants.accountId, account!.id));
-    const uniquePeople = [...new Set(priorPeople.map(row => row.personId))];
-    if (uniquePeople.length > 1)
-      throw new AuthorizationError("ambiguous person identity for HQ account");
-    let personId = uniquePeople[0];
-    if (!personId) {
-      const [person] = await tx.insert(people).values({
-        legalFirstName: input.firstName, legalLastName: input.lastName, email: input.email,
-      }).returning({ id: people.id });
-      personId = person!.id;
-      await writeAudit(tx, actor, {
-        action: "network.officer.person.create", entityType: "person",
-        entityId: personId, scope: { organizationId: denomination.id },
-        after: { personId },
-      });
-    }
+    const identity=await provisionNamedMailboxPerson(tx,input);
+    const account={id:identity.accountId};
+    const personId=identity.personId;
+    if(identity.accountCreated)await writeAudit(tx,actor,{
+      action:"network.officer.account.create",entityType:"access_account",entityId:account.id,
+      scope:{organizationId:denomination.id},after:{accountId:account.id},
+    });
+    if(identity.personCreated)await writeAudit(tx,actor,{
+      action:"network.officer.person.create",entityType:"person",entityId:personId,
+      scope:{organizationId:denomination.id},after:{personId},
+    });
     const [existing] = await tx.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
       .from(accountPersonGrants).where(and(
         eq(accountPersonGrants.accountId, account!.id),

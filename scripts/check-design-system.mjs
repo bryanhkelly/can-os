@@ -1,8 +1,11 @@
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   checkChangedFiles,
   createInventory,
-  findSharedLayerGeometryViolations,
+  collectV61SourceViolations,
+  inspectV61ThemeTokens,
 } from "./lib/v61-source-audit.mjs";
 
 // Generic design-system enforcement only. Behavior, authorization, consent,
@@ -12,34 +15,37 @@ const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const inventory = createInventory(projectRoot);
 console.log("V6.1 source inventory: " + JSON.stringify(inventory.totals));
 
-for (const file of inventory.inspected) {
-  for (const diagnostic of file.syntaxErrors) {
-    console.error("V6.1 syntax " + file.path + ":" + diagnostic.line +
-      ":" + diagnostic.column + ": " + diagnostic.message);
+const theme = inspectV61ThemeTokens(readFileSync(join(projectRoot, "src/styles.css"), "utf8"));
+for (const [token, valid] of Object.entries(theme)) {
+  if (!valid) {
+    console.error("V6.1 required theme token missing or invalid: " + token);
     process.exitCode = 1;
   }
 }
-
-for (const issue of findSharedLayerGeometryViolations(inventory)) {
-  console.error("V6.1 shared geometry " + issue.file + ":" + issue.line +
-    ":" + issue.column + ": " + issue.utility);
+const violations = collectV61SourceViolations(inventory);
+for (const issue of violations) {
+  console.error("V6.1 " + issue.kind + " " + issue.file + ":" + issue.line +
+    ":" + issue.column + ": " + issue.detail);
+}
+if (violations.length) {
+  console.error("V6.1 absolute source gate failed: " + violations.length + " violations.");
   process.exitCode = 1;
 }
-
-const regression = checkChangedFiles(projectRoot);
-if (regression.warning) {
-  console.warn("V6.1 incremental comparison: " + regression.warning);
-  if (process.env.CI || process.env.V61_BASE_REF || !regression.base) {
-    // Never claim an executed CI check when the requested Git base is missing.
+// Builds use the absolute source gate without relying on Git history.
+// CI and developer verification retain supplemental diff diagnostics.
+if (!process.argv.includes("--source-only")) {
+  const regression = checkChangedFiles(projectRoot);
+  if (regression.warning) {
+    console.warn("V6.1 incremental comparison: " + regression.warning);
+    if (process.env.CI || process.env.V61_BASE_REF || !regression.base) process.exitCode = 1;
+  } else {
+    console.log("V6.1 changed source: " + regression.checked +
+      " TSX files compared against " + regression.base);
+  }
+  for (const issue of regression.errors) {
+    console.error("V6.1 regression: " + issue);
     process.exitCode = 1;
   }
-} else {
-  console.log("V6.1 changed source: " + regression.checked +
-    " TSX files compared against " + regression.base);
-}
-for (const issue of regression.errors) {
-  console.error("V6.1 regression: " + issue);
-  process.exitCode = 1;
 }
 
 console.log("V6.1 source checks are not a substitute for TypeScript typecheck, " +

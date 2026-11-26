@@ -201,7 +201,7 @@ function GuardianEnrollmentChanges(){
       <p>If the destination is a published CAN school, request a secure email verification link. This provides prospective family application access only. The original school handles enrollment exit and records.</p>
       {destinations.length>0&&<>
         <Label className="block font-medium">Receiving CAN school
-          <Select className="mt-1 w-full  border bg-background p-3"
+          <Select className="mt-1"
             value={destinationChoices[item.id]??""}
             onChange={event=>{
               setDestinationChoices(old=>({...old,[item.id]:event.target.value}));
@@ -220,8 +220,7 @@ function GuardianEnrollmentChanges(){
           <span>I confirm this is the receiving school I wish to contact. My original transfer request names <strong>{item.destinationSchoolName}</strong>. A different school selection does not change that records-release authorization.</span>
         </Label>}
         <Button type="button" disabled={busy||!destinationChoices[item.id]||!destinationConfirmations[item.id]}
-          onClick={()=>void requestDestination(item)}
-          className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          onClick={()=>void requestDestination(item)}>
           {busy?"Requesting…":"Email a secure receiving-school sign-in link"}
         </Button>
       </>}

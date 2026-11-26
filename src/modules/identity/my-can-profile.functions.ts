@@ -26,7 +26,7 @@ export const saveMyCanContact = createServerFn({ method: "POST" })
     }).from(accessAccounts).where(and(eq(accessAccounts.id, accountId),
       eq(accessAccounts.disabled, false))).limit(1);
     if (!account?.verified) throw new AuthorizationError("verified CAN account");
-    const { grants, demoAccountSwitching } = await readSessionGrants(accountId, account.email);
+    const { grants, demoAccountSwitching } = await readSessionGrants(accountId, account.email,db,actor.authenticationMethod);
     if (!accountProfileCanEdit({
       demoAccountSwitching, actorPersonId: actor.actorPersonId,
       activeGrantId: actor.grantId, grants,

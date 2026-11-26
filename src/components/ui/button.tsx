@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { focusRingClasses } from "./control-styles";
 
 const buttonVariants = cva(
-  cn("inline-flex shrink-0 items-center justify-center gap-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0", focusRingClasses),
+  cn("inline-flex min-w-0 max-w-full shrink-0 items-center justify-center gap-2 whitespace-normal break-words text-center text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0", focusRingClasses),
   {
     variants: {
       variant: {

@@ -70,13 +70,14 @@ for (const path of files) {
   }
   visit(node);
   const audit = analyzeSource(source, path);
-  const row = families[family] ??= { files: 0, native: {}, canonical: {}, auditedNative: 0, auditedCorners: 0, syntaxErrors: 0 };
+  const row = families[family] ??= { files: 0, native: {}, canonical: {}, auditedNative: 0, auditedCorners: 0, auditedAppearance: 0, syntaxErrors: 0 };
   row.files++;
   row.auditedNative += audit.native.length;
   row.auditedCorners += audit.corners.length;
+  row.auditedAppearance += audit.appearance.length;
   row.syntaxErrors += audit.syntaxErrors.length;
-  if (audit.native.length || audit.corners.length || audit.syntaxErrors.length) {
-    violations.push({ file, family, native: audit.native, corners: audit.corners, syntaxErrors: audit.syntaxErrors });
+  if (audit.native.length || audit.corners.length || audit.appearance.length || audit.syntaxErrors.length) {
+    violations.push({ file, family, native: audit.native, corners: audit.corners, appearance: audit.appearance, syntaxErrors: audit.syntaxErrors });
   }
   for (const [tag,count] of Object.entries(native)) row.native[tag] = (row.native[tag] ?? 0) + count;
   for (const [tag,count] of Object.entries(canonical)) row.canonical[tag] = (row.canonical[tag] ?? 0) + count;
@@ -85,7 +86,7 @@ for (const path of files) {
 }
 sites.sort((a,b)=>b.nativeTotal-a.nativeTotal || a.file.localeCompare(b.file));
 violations.sort((a,b)=>b.syntaxErrors.length-a.syntaxErrors.length ||
-  (b.native.length+b.corners.length)-(a.native.length+a.corners.length) || a.file.localeCompare(b.file));
+  (b.native.length+b.corners.length+b.appearance.length)-(a.native.length+a.corners.length+a.appearance.length) || a.file.localeCompare(b.file));
 console.log(JSON.stringify({
   contract: "CAN OS V6.1 component adoption inventory",
   sourceFiles: files.length,
@@ -95,6 +96,7 @@ console.log(JSON.stringify({
     affectedFiles: violations.length,
     native: violations.reduce((sum,row)=>sum+row.native.length,0),
     corners: violations.reduce((sum,row)=>sum+row.corners.length,0),
+    appearance: violations.reduce((sum,row)=>sum+row.appearance.length,0),
     syntaxErrors: violations.reduce((sum,row)=>sum+row.syntaxErrors.length,0),
     files: violations,
   },

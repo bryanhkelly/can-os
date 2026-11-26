@@ -96,13 +96,13 @@ function GuardianNativeClasses(){
     <Input id="guardian-native-class-search" type="search" maxLength={100}
      value={searchText} onChange={e=>setSearchText(e.target.value)}
      placeholder="Search available Classes"
-     className="min-h-11 flex-1 border border-border bg-background px-3 text-sm"/>
+     className="min-w-0 flex-1"/>
     <Button type="submit">Search</Button>
    </form>
    <div className="mt-4 grid gap-4 md:grid-cols-2">
     <Label className="text-sm font-semibold">Learner
      <Select value={learner} onChange={e=>setLearner(e.target.value)}
-      className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+      className="mt-2">
       <option value="">Choose verified learner</option>
       {children.data?.map(row=><option key={row.learnerPersonId}
        value={row.learnerPersonId}>{row.name}</option>)}
@@ -110,7 +110,7 @@ function GuardianNativeClasses(){
     </Label>
     <Label className="text-sm font-semibold">Class
      <Select value={target} onChange={e=>setTarget(e.target.value)}
-      className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+      className="mt-2">
       <option value="">Choose published Class</option>
       {eligible.map(row=><option key={row.classOfferingVersionId}
        value={row.classOfferingVersionId}>{row.classTitle}</option>)}
@@ -181,7 +181,7 @@ function GuardianClassApprovalCard({item,onChanged}:{
   {eligible&&<>
    <Label className="mt-3 block text-sm font-semibold">Participation
     <Select value={credit} onChange={e=>setCredit(e.target.value as typeof credit)}
-     className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+     className="mt-2">
      {item.allowedCreditModes.map(mode=><option key={mode} value={mode}>{mode}</option>)}
     </Select>
    </Label>

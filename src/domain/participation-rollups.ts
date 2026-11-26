@@ -1,3 +1,5 @@
+import { classifyOwnedData } from "./domain-classification";
+
 /**
  * WS6 reusable dimension projection from already-authorized source facts.
  * THIS IS NOT AN AUTHORIZATION SERVICE. The caller must verify every active
@@ -23,6 +25,19 @@ export type ReportingScopeProof={
   verifiedOrganizationIds:ReadonlySet<string>;
   verifiedSiteIds:ReadonlySet<string>;
 };
+export type ReportingPopulation={
+  ownerDomains:ReadonlyMap<string,string|null>;
+  classification:"all"|"real"|"synthetic"|"unknown";
+};
+export function matchesReportingPopulation(
+  fact:Pick<ParticipationReportingFact,"operatingOrganizationId">,
+  population:ReportingPopulation,
+):boolean{
+  if(!population.ownerDomains.has(fact.operatingOrganizationId))
+    throw new Error("Operating Organization classification evidence missing");
+  return population.classification==="all" ||
+    classifyOwnedData(population.ownerDomains.get(fact.operatingOrganizationId))===population.classification;
+}
 export type ParticipationCount={
   registrations:number;uniquePeople:number;active:number;withdrawn:number;
 };
@@ -44,13 +59,21 @@ export function assertAuthorizedReportFacts(
       throw new Error("Out-of-scope Organization or Site participation cannot be reported");
   }
 }
-function count(rows:readonly ParticipationReportingFact[]):ParticipationCount{
-  return {
-    registrations:rows.length,
-    uniquePeople:new Set(rows.map(r=>r.personId)).size,
-    active:rows.filter(r=>["registered","active"].includes(r.currentStatus)).length,
-    withdrawn:rows.filter(r=>r.currentStatus==="withdrawn").length,
-  };
+function count(rows: readonly ParticipationReportingFact[]): ParticipationCount {
+  const people = new Set<string>();
+  let active = 0;
+  let withdrawn = 0;
+
+  for (const row of rows) {
+    people.add(row.personId);
+    if (row.currentStatus === "registered" || row.currentStatus === "active") {
+      active++;
+    } else if (row.currentStatus === "withdrawn") {
+      withdrawn++;
+    }
+  }
+
+  return { registrations: rows.length, uniquePeople: people.size, active, withdrawn };
 }
 function group(
   facts:readonly ParticipationReportingFact[],
@@ -60,7 +83,8 @@ function group(
   for(const fact of facts){
     const id=key(fact);
     if(!id)continue;
-    grouped.set(id,[...(grouped.get(id)??[]),fact]);
+    const existing=grouped.get(id);
+    if(existing)existing.push(fact);else grouped.set(id,[fact]);
   }
   return [...grouped].sort(([a],[b])=>a.localeCompare(b))
     .map(([id,rows])=>({id,...count(rows)}));
@@ -69,6 +93,7 @@ export function rollupAuthorizedParticipation(
   facts:readonly ParticipationReportingFact[],
   proof:ReportingScopeProof,
   period:{from:string;to:string;asOf:string},
+  population?:ReportingPopulation,
 ){
   assertAuthorizedReportFacts(facts,proof);
   const from=Date.parse(period.from),to=Date.parse(period.to),asOf=Date.parse(period.asOf);
@@ -77,7 +102,8 @@ export function rollupAuthorizedParticipation(
   const inPeriod=facts.filter(f=>{
     const at=Date.parse(f.registeredAt);
     if(!Number.isFinite(at))throw new Error("Invalid canonical registration date");
-    return at>=from&&at<to&&at<=asOf;
+    const populationMatch=!population||matchesReportingPopulation(f,population);
+    return at>=from&&at<to&&at<=asOf&&populationMatch;
   });
   const totals=count(inPeriod);
   const sites=group(inPeriod,x=>x.deliverySiteId);
@@ -91,6 +117,7 @@ export function rollupAuthorizedParticipation(
   // unique-person subtotals as though these groups were mutually exclusive.
   return {asOf:period.asOf,period:{from:period.from,to:period.to},totals,
     sites,organizations,courses,programs,
+    ...(population?{population:population.classification,classificationBasis:"current_operating_organization_domain" as const}:{}),
     exclusions:"Standalone Courses do not create synthetic Program membership",
     networkReportAvailable:false as const};
 }

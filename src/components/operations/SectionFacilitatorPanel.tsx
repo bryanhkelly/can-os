@@ -1,7 +1,7 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { QueryState } from "@/components/workspace";
+import { QueryState, WorkspacePanel, WorkspaceNotice, EmptyState, ActionFooter } from "@/components/workspace";
 import { SiteStaffingFeedback } from "./SiteStaffingFeedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -58,8 +58,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
     }
   }
 
-  return <section className="mt-7 border bg-card p-5" aria-label="Section facilitator assignments">
-    <h2 className="font-serif text-2xl">Staff each onsite class</h2>
+  return <WorkspacePanel title="Staff each onsite class" className="mt-7">
     <p className="mt-2 text-sm text-muted-foreground">
       Assign multiple verified local adults to the Sections they actually support.
       A facilitator does not gain access to other Sections or a full Program roster.
@@ -71,13 +70,11 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
     <QueryState loading={query.isPending ? "Loading class staffing…" : undefined}
       error={query.isError ? mutationErrorMessage(query.error, "Unable to load class staffing.") : undefined}
       onRetry={retry} retrying={busy}>
-    {data && (!data.hasConfiguration ? <p role="status" className="mt-4 border p-3 text-sm">
+    {data && (!data.hasConfiguration ? <WorkspaceNotice className="mt-4">
         Appoint your local Site director first to establish a draft school-operations
         configuration. A draft does not authorize student attendance or school opening.
-      </p> : <>
-        {!data.sections.length && <p className="mt-4 text-sm">
-          Create your first Section and instructional calendar before assigning classroom staff.
-        </p>}
+      </WorkspaceNotice> : <>
+        {!data.sections.length && <EmptyState title="No Sections yet" description="Create your first Section and instructional calendar before assigning classroom staff."/>}
         {data.sections.map(section => {
           const current = data.appointments.filter(a => a.sectionId === section.id);
           const key = section.id;
@@ -87,8 +84,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
           const effective = (a: (typeof current)[number]) =>
             !!a.effectiveFrom && Date.parse(a.effectiveFrom) <= Date.now() &&
             !!a.effectiveThrough && Date.parse(a.effectiveThrough) > Date.now();
-          return <div key={key} className="mt-5 border p-4">
-            <h3 className="font-semibold">{section.code} · {section.title}</h3>
+          return <WorkspacePanel key={key} title={`${section.code} · ${section.title}`} className="mt-5">
             <p className="mt-2 text-xs text-muted-foreground">
               Current named classroom support (not verified physical attendance)
             </p>
@@ -122,7 +118,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
               <AppointmentExpiryField label="Appointment ends" disabled={writesBlocked} value={through}
                 onChange={value => setExpires(old => ({ ...old, [key]: value }))}/>
             </div>
-            <Button type="button" variant="outline" disabled={writesBlocked || !personId || !through}
+            <ActionFooter layout="inline"><Button type="button" variant="outline" disabled={writesBlocked || !personId || !through}
               onClick={() => void change({
                 sectionId:section.id, personId, action:"appoint",
                 expectedAssignmentId: existing?.id ?? null,
@@ -130,8 +126,8 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
               })}
               className="mt-3">
               {existing ? "Renew Section appointment" : "Add Section facilitator"}
-            </Button>
-          </div>;
+            </Button></ActionFooter>
+          </WorkspacePanel>;
         })}
         {!data.staff.length && <p className="mt-4 text-sm">
           No active email-verified facilitators belong to this exact church Site.
@@ -144,5 +140,5 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
       relationship cannot approve CAN academics, create student enrollment,
       certify child safeguarding, or mark staff physically present.
     </p>
-  </section>;
+  </WorkspacePanel>;
 }

@@ -75,18 +75,18 @@ export const DismissDemoInformation: Story = {
   },
 };
 
-export const DismissDemoSchoolInformation: Story = {
-  args: { demoTenant: true, sessionError: "Session refresh unavailable" },
+export const OrdinarySessionRefreshError: Story = {
+  args: { demoAccountSwitching: false, sessionError: "Session refresh unavailable" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Dismiss demo information" }));
+    await expect(canvas.queryByRole("button", { name: "Dismiss demo information" })).not.toBeInTheDocument();
     await expect(canvas.queryByText(/Demo school:/)).not.toBeInTheDocument();
     await expect(canvas.getByRole("alert")).toHaveTextContent("Session refresh unavailable");
   },
 };
 
 export const DemoWorkspaceChange: Story = {
-  render: args => {
+  render: function DemoWorkspaceChangeRender(args) {
     const [member, setMember] = useState(args.member);
     return <>
       <WorkspaceTopBar {...args} member={member} demoAccountSwitching />

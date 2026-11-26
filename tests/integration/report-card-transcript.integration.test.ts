@@ -58,11 +58,13 @@ integration("GF25 report card and transcript", () => {
       type: "christian_school",
       name: `GF25 School ${suffix}`,
       slug: `gf25-school-${suffix}`,
+      domain: `school.${suffix}.gf25.demo`,
     }).returning();
     const [issuer] = await db.insert(s.organizations).values({
       type: "can_network",
       name: `GF25 Credit Issuer ${suffix}`,
       slug: `gf25-issuer-${suffix}`,
+      domain: `issuer.${suffix}.gf25.demo`,
     }).returning();
     const [site] = await db.insert(s.sites).values({
       organizationId: host!.id,
@@ -94,7 +96,7 @@ integration("GF25 report card and transcript", () => {
       { legalFirstName: "Finalization", legalLastName: suffix },
       { legalFirstName: "Guardian", legalLastName: suffix },
       { legalFirstName: "Unrelated", legalLastName: suffix },
-    ]).returning();
+    ].map(person => ({ ...person, domain: `school.${suffix}.gf25.demo` }))).returning();
     const [profile, finalizationProfile] = await db.insert(s.studentProfiles).values([
       { personId: student!.id, gradeLevel: "10" },
       { personId: finalizationStudent!.id, gradeLevel: "10" },

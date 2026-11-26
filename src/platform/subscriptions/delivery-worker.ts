@@ -6,7 +6,6 @@ import { domainEvents, subscriptionDeliveries, subscriptions, conversationMessag
 import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
 import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "./preferences";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 
 const LEASE_MS=OUTBOUND_LEASE_MS;
 const MAX_ATTEMPTS=OUTBOUND_MAX_ATTEMPTS;
@@ -102,7 +101,7 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
           return null;
         }
         const organizationId=policy!.organizationId(context!);
-        if(row.channel!=="in_app"&&(!organizationId||await isDemoTenantOrganization(organizationId,tx))){
+        if(row.channel!=="in_app"&&!organizationId){
           await tx.update(subscriptionDeliveries).set({
             status:"suppressed",lastError:"external_delivery_tenant_blocked",leaseUntil:null,updatedAt:now,
           }).where(owned());

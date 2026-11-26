@@ -184,7 +184,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           to: "/launch/site",
           search: { programId: event.target.value, siteId: selected?.siteId ?? undefined },
         });
-      }} className="mt-1 block w-full  border bg-background p-2">
+      }} className="mt-1">
         {launches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </Select>
     </Label>}

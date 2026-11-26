@@ -1,3 +1,5 @@
+export { isDemoAccountEmail } from "./domain-classification";
+
 export const LOCAL_DEMO_ACCESS_CODE = "000000";
 export const DEMO_ACCOUNT_DOMAIN = "valorschool.demo";
 
@@ -41,11 +43,6 @@ export const LOCAL_DEMO_ROOM_FACILITATOR = {
   siteId: LOCAL_DEMO_ADMIN.siteId,
   email: "sally.facilitator@valorschool.demo",
 } as const;
-
-export function isDemoAccountEmail(email: string): boolean {
-  const normalized = email.trim().toLowerCase();
-  return /^[^@\s]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.demo$/.test(normalized);
-}
 
 export function isDemoSchoolGrant(grant: {
   organizationId: string | null;

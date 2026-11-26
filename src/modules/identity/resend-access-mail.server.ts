@@ -1,8 +1,12 @@
+import { readOptionalEmailBrand } from "@/modules/communication/email-brand.server";
+import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
  * Server-only transactional email boundary.
  * Resend delivers mail; it never decides who the user is or what they can access.
  * Call from server code only; never import this module into a client component.
  */
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
+
 export type OneTimeAccessMessage = {
  to: string;
  accessUrl: string;
@@ -47,6 +51,9 @@ async function writeTestAccessMail(message:OneTimeAccessMessage):Promise<boolean
 
 export const sendAccessLinkViaResend: AccessEmailSender = async message => {
  const {to,accessUrl}=message;
+ // Reject before configuration, template, outbox or external transport access.
+ // This API promises delivery submission, so suppression must not report success.
+ if(suppressDemoEmailDelivery(to))throw new Error("Demo email destination suppressed");
  const url=new URL(accessUrl);
  if(url.protocol!=="https:" || !url.hostname) throw new Error("Access link must use HTTPS");
  const allowedOrigin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
@@ -55,26 +62,16 @@ export const sendAccessLinkViaResend: AccessEmailSender = async message => {
  const apiKey=process.env.RESEND_API_KEY;
  const from=process.env.CAN_ACCESS_FROM_EMAIL;
  if(!apiKey || !from) throw new Error("Resend access mail is not configured");
- const brand=message.siteId
-  ? await import("@/modules/sites/school-brand.server")
-    .then(module=>module.readSchoolBrand(message.siteId!))
-    .catch(()=>{console.warn("[access-email] School branding unavailable; using CAN branding");return null;}) : null;
+ const brand = await readOptionalEmailBrand(message.siteId, "access-email");
  const name=brand?.name??"CAN OS";
  const instructions=`Use this one-time link to continue to ${name}. It expires in 10 minutes. If you did not request it, you can ignore this message.\n\n${accessUrl}`;
  const text=message.introduction?`${message.introduction}\n\n${instructions}`:instructions;
  const {renderSchoolEmail,schoolEmailLogoAttachment}=await import("@/domain/school-email");
  const logoAttachment=schoolEmailLogoAttachment(brand);
- const response=await fetch("https://api.resend.com/emails",{
-  method:"POST",
-  headers:{
-   "Authorization":`Bearer ${apiKey}`,"Content-Type":"application/json",
-   ...(message.idempotencyKey?{"Idempotency-Key":message.idempotencyKey}:{}),
-  },
-  body:JSON.stringify({
+ const response=await submitResendEmail({
   from,to:[to],subject:message.subject??`Your ${name} sign-in link`,
   text,html:renderSchoolEmail({brand,text,actionUrl:accessUrl,actionLabel:"Continue"}),
   ...(logoAttachment?{attachments:[logoAttachment]}:{}),
-  }),
- });
+ },apiKey,message.idempotencyKey);
  if(!response.ok) throw new Error("Unable to deliver access email");
 };

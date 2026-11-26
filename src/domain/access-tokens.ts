@@ -9,6 +9,14 @@ export function hashAccessSecret(secret: string, pepper: string): string {
  if (!pepper || pepper.length < 32) throw new Error("CAN_ACCESS_TOKEN_PEPPER must contain at least 32 characters");
  return createHash("sha256").update(pepper).update(":").update(secret).digest("hex");
 }
+/** A high-entropy account-held access code is distinct from session and email tokens. */
+export function isPrivateAccessCode(value: string): boolean {
+ return /^[A-Za-z0-9_-]{43}$/.test(value);
+}
+export function hashPrivateAccessCode(code: string, pepper: string): string {
+ if(!isPrivateAccessCode(code)) throw new Error("Invalid private access code");
+ return hashAccessSecret("account-access-code:"+code,pepper);
+}
 export function equalSecretHashes(a: string, b: string): boolean {
  if (!/^[a-f0-9]{64}$/.test(a) || !/^[a-f0-9]{64}$/.test(b)) return false;
  return timingSafeEqual(Buffer.from(a,"hex"),Buffer.from(b,"hex"));

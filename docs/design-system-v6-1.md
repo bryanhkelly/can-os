@@ -117,6 +117,12 @@ Recorded integration checks for this classroom slice:
 - `git diff --check` passed. No classroom behavioral/database/browser test
   suite was run; those acceptance checks remain unverified.
 
+## Permanent enforcement and definition of done
+
+The design contract applies to every feature on every branch. `npm run design:source` performs an absolute AST audit of production TSX; both standard and Cloudflare prebuilds invoke it. Untouched violations fail just like newly introduced violations. The Git comparison remains a supplemental regression diagnostic, never a debt allowance. The V6.1 acceptance workflow runs on main, release branches and pull requests to main, preserving machine-readable adoption and coverage diagnostics even when source acceptance fails.
+
+A reusable pattern is complete only when canonical ownership, consumer migration, removal of superseded duplicates, representative Storybook interactions, responsive/keyboard accessibility and reviewed visual evidence have been established. Strict coverage and Chromatic acceptance remain separate from source-only build checks. A successful source audit is not proof of visual fidelity or authenticated journeys.
+
 ## Component architecture and adoption policy
 
 CAN OS V6.1 uses three layers of **one** design system, not three competing libraries.

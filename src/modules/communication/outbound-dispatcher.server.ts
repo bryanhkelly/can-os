@@ -91,55 +91,71 @@ export async function dispatchOutboundMessages<Message>(
       throw new Error("Outbound adapter reclaimed the same receipt within a dispatch run");
     }
     seen.push(claimed.id);
-    let active = claimed;
-    try {
-      const prepared = await adapter.prepare(active, clock());
-      if (prepared.kind === "suppress") {
-        if (await adapter.settle(active, {
-          kind: "suppressed", reason: prepared.reason,
-          attempts: active.attempts, nextAttemptAt: null, now: clock(),
-        })) totals.suppressed++;
-        continue;
-      }
-      if (prepared.kind === "defer") {
-        if (!adapter.defer) throw new Error("Outbound adapter does not support deferral");
-        await adapter.defer(active, prepared.nextAttemptAt, clock());
-        continue;
-      }
-      if (prepared.kind === "fail") {
-        if (await adapter.settle(active, {
-          kind: "failed", reason: prepared.reason,
-          attempts: active.attempts + 1, nextAttemptAt: null, now: clock(),
-        })) totals.failed++;
-        continue;
-      }
-      const renewed = await adapter.renew(active, clock(), leaseMs);
-      if (!renewed) continue;
-      active = renewed;
-      const providerResult = await adapter.send(prepared.message, active.id);
-      const providerAccepted = typeof providerResult === "boolean" ? providerResult : providerResult.accepted;
-      const providerMessageId = typeof providerResult === "boolean" ? undefined : providerResult.providerMessageId;
-      const attempts = active.attempts + 1;
-      const at = clock();
-      const kind = providerAccepted ? "accepted" : "failed";
-      if (await adapter.settle(active, {
-        kind, now: at, attempts,
-        reason: providerAccepted ? null : "provider_not_accepted",
-        ...(providerAccepted && providerMessageId ? { providerMessageId } : {}),
-        nextAttemptAt: providerAccepted || attempts >= maxAttempts
-          ? null : new Date(at.getTime() + retryDelayMs(attempts)),
-      })) totals[kind]++;
-    } catch {
-      const attempts = await adapter.attemptsAfterError(active);
-      if (attempts === null) continue; // Lost ownership: do not mutate.
-      const at = clock();
-      if (await adapter.settle(active, {
-        kind: "failed", attempts, now: at,
-        reason: "delivery_worker_error",
-        nextAttemptAt: attempts >= maxAttempts
-          ? null : new Date(at.getTime() + retryDelayMs(attempts)),
-      })) totals.failed++;
-    }
+    const outcome = await processOutboundClaim(adapter, claimed, {
+      clock, leaseMs, maxAttempts, retryDelayMs,
+    });
+    if (outcome) totals[outcome]++;
   }
   return totals;
+}
+
+/** Process one receipt independently from batch iteration and aggregation. */
+async function processOutboundClaim<Message>(
+  adapter: OutboundAdapter<Message>,
+  claimed: OutboundClaim,
+  options: {
+    clock: () => Date;
+    leaseMs: number;
+    maxAttempts: number;
+    retryDelayMs: (attempt: number) => number;
+  },
+): Promise<keyof OutboundDispatchSummary | null> {
+  const { clock, leaseMs, maxAttempts, retryDelayMs } = options;
+  let active = claimed;
+  try {
+    const prepared = await adapter.prepare(active, clock());
+    if (prepared.kind === "suppress") {
+      return await adapter.settle(active, {
+        kind: "suppressed", reason: prepared.reason,
+        attempts: active.attempts, nextAttemptAt: null, now: clock(),
+      }) ? "suppressed" : null;
+    }
+    if (prepared.kind === "defer") {
+      if (!adapter.defer) throw new Error("Outbound adapter does not support deferral");
+      await adapter.defer(active, prepared.nextAttemptAt, clock());
+      return null;
+    }
+    if (prepared.kind === "fail") {
+      return await adapter.settle(active, {
+        kind: "failed", reason: prepared.reason,
+        attempts: active.attempts + 1, nextAttemptAt: null, now: clock(),
+      }) ? "failed" : null;
+    }
+    const renewed = await adapter.renew(active, clock(), leaseMs);
+    if (!renewed) return null;
+    active = renewed;
+    const providerResult = await adapter.send(prepared.message, active.id);
+    const providerAccepted = typeof providerResult === "boolean" ? providerResult : providerResult.accepted;
+    const providerMessageId = typeof providerResult === "boolean" ? undefined : providerResult.providerMessageId;
+    const attempts = active.attempts + 1;
+    const at = clock();
+    const kind = providerAccepted ? "accepted" : "failed";
+    return await adapter.settle(active, {
+      kind, now: at, attempts,
+      reason: providerAccepted ? null : "provider_not_accepted",
+      ...(providerAccepted && providerMessageId ? { providerMessageId } : {}),
+      nextAttemptAt: providerAccepted || attempts >= maxAttempts
+        ? null : new Date(at.getTime() + retryDelayMs(attempts)),
+    }) ? kind : null;
+  } catch {
+    const attempts = await adapter.attemptsAfterError(active);
+    if (attempts === null) return null; // Lost ownership: do not mutate.
+    const at = clock();
+    return await adapter.settle(active, {
+      kind: "failed", attempts, now: at,
+      reason: "delivery_worker_error",
+      nextAttemptAt: attempts >= maxAttempts
+        ? null : new Date(at.getTime() + retryDelayMs(attempts)),
+    }) ? "failed" : null;
+  }
 }

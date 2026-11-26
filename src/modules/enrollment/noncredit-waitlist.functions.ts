@@ -1,10 +1,10 @@
 import {createServerFn} from "@tanstack/react-start";
-import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
+import {setResponseHeader} from "@tanstack/react-start/server";
 import {and,desc,eq,lt,or,sql,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
-  accessAccountNoncreditPrincipals,accessAccounts,
+  accessAccountNoncreditPrincipals,
 } from "@/db/schema";
 import {
   noncreditEnrollmentWaitlist,
@@ -13,8 +13,7 @@ import {
 } from "@/db/canonical-v301";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {isDemoAccountEmail} from "@/domain/local-demo-access";
+import {requireNoncreditParticipantAccount,readNoncreditParticipantAccount,assertNoncreditParticipantRelease} from "./noncredit-self-enrollment-identity.server";
 import {noncreditEnrollCommand} from "@/domain/noncredit-self-enrollment";
 import {readEligibleSelfEnrollmentReleases} from "./noncredit-self-enrollment-catalog.server";
 
@@ -34,15 +33,16 @@ export const joinNoncreditWaitlist=createServerFn({method:"POST"})
   .validator((v:unknown)=>waitlistInput.parse(v))
   .handler(async({data})=>{
     privateGuard();
-    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
-    const owner=await requireVerifiedAdultAccount();
+    const owner=await requireNoncreditParticipantAccount();
     return db.transaction(async tx=>{
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+data.releaseId}))`);
+      const current=await readNoncreditParticipantAccount(owner.accountId,owner.personId,tx);
       const releases=await readEligibleSelfEnrollmentReleases(tx,data.releaseId);
       const release=releases[0];
       if(!release||release.consentVersion!==data.consentVersion||
         release.consentSha256!==data.consentSha256)
         throw new AuthorizationError("current published registration terms");
+      assertNoncreditParticipantRelease(current,release);
       if(release.seatsRemaining>0&&!release.hasWaitingQueue)
         throw new AuthorizationError("registration is open; enroll directly instead");
       const [linked]=await tx.select({
@@ -112,19 +112,7 @@ async function readMyNoncreditWaitlistPage(
   releaseId?:string,
 ){
   privateGuard();
-  const actor=await getCommandContext(getRequest());
-  if(!actor.actorPersonId||actor.sessionAccountId)
-    throw new AuthorizationError("real verified CAN Person");
-  const [owner]=await db.select({
-    accountId:accessAccounts.id,personId:accessAccounts.personId,
-    email:accessAccounts.emailNormalized,
-    disabled:accessAccounts.disabled,
-    verifiedAt:accessAccounts.emailVerifiedAt,
-  }).from(accessAccounts)
-    .where(eq(accessAccounts.id,actor.accountId)).limit(1);
-  if(!owner||owner.disabled||!owner.verifiedAt||
-     owner.personId!==actor.actorPersonId||isDemoAccountEmail(owner.email))
-    throw new AuthorizationError("current verified account Person");
+  const owner=await requireNoncreditParticipantAccount();
   const rows=await db.select({
     waitlistId:noncreditEnrollmentWaitlist.id,
     releaseId:noncreditEnrollmentWaitlist.releaseId,
@@ -143,6 +131,8 @@ async function readMyNoncreditWaitlistPage(
       eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId),
       eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId),
       releaseId?eq(noncreditEnrollmentWaitlist.releaseId,releaseId):undefined,
+      owner.demoScope?eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,owner.demoScope.organizationId):undefined,
+      owner.demoScope?eq(noncreditSelfEnrollmentReleases.siteId,owner.demoScope.siteId):undefined,
       inArray(noncreditEnrollmentWaitlist.status,["waiting","invited"]),
       cursor?or(
         sql`${noncreditEnrollmentWaitlist.joinedAt} < ${cursor.joinedAt}::timestamptz`,
@@ -215,10 +205,17 @@ export const cancelMyNoncreditWaitlist=createServerFn({method:"POST"})
   .validator((v:unknown)=>cancelInput.parse(v))
   .handler(async({data})=>{
     privateGuard();
-    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
-    const owner=await requireVerifiedAdultAccount();
+    const owner=await requireNoncreditParticipantAccount();
     return db.transaction(async tx=>{
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+data.releaseId}))`);
+      const current=await readNoncreditParticipantAccount(owner.accountId,owner.personId,tx);
+      if(current.demoScope){
+        const [release]=await tx.select({registeringOrganizationId:noncreditSelfEnrollmentReleases.registeringOrganizationId,
+          siteId:noncreditSelfEnrollmentReleases.siteId}).from(noncreditSelfEnrollmentReleases)
+          .where(eq(noncreditSelfEnrollmentReleases.id,data.releaseId)).limit(1);
+        if(!release)throw new AuthorizationError("own waitlist release");
+        assertNoncreditParticipantRelease(current,release);
+      }
       const [entry]=await tx.select().from(noncreditEnrollmentWaitlist).where(and(
         eq(noncreditEnrollmentWaitlist.releaseId,data.releaseId),
         eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId),

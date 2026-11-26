@@ -4,7 +4,7 @@ import {providerDeliveryQueryKey,PROVIDER_REPORT_FILTER_CAPABILITIES} from "@/do
 import {ProviderReportFilters} from "./ProviderReportFilters";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "@/components/ui/table";
 import {useMemo} from "react";
-import { DisclosureSection, WorkspaceNotice } from "@/components/workspace";
+import { DisclosureSection, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {ReportMetricCard} from "@/components/workspace/report-metric-card";
 import {ReportRankedComparison} from "@/components/workspace/report-ranked-comparison";
@@ -85,11 +85,8 @@ export function NoncreditProviderEvidencePanel(){
     {scope===null&&<WorkspaceNotice tone="attention">A current verified workspace session is required.</WorkspaceNotice>}
     {scope!==null&&<ProviderReportFilters controller={controller} options={options} basis={basis}/>}
     {data&&<>
-      <div className="border border-border bg-card p-4 text-xs text-muted-foreground">
-        <p>As of {data.asOf}</p>
-        <p>Lifetime registered releases. Historical time-window selection requires a versioned source lifecycle projection.</p>
-      </div>
-      {selectionUnavailable&&<p role="status" className="text-sm text-muted-foreground">No release evidence matches the selected Site and current geography. The selection remains applied.</p>}
+      <WorkspaceNotice><p>As of {data.asOf}</p><p>Lifetime registered releases. Historical time-window selection requires a versioned source lifecycle projection.</p></WorkspaceNotice>
+      {selectionUnavailable&&<WorkspaceNotice>No release evidence matches the selected Site and current geography. The selection remains applied.</WorkspaceNotice>}
       {data.sites.length>0&&data.sites.length<=60&&<ReportRankedComparison title="Registrations by authorized Site" description="Comparison across Sites matching the current geography. Select a Site to narrow the metrics, release chart and evidence below; this comparison remains the navigation overview."
         rows={data.sites.map(s=>({id:s.siteId,label:s.siteName,value:s.registrations}))} selectedId={requestedSite} onSelect={value=>controller.dispatch({type:"site",value})}/>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -109,9 +106,9 @@ export function NoncreditProviderEvidencePanel(){
         kind:"comparison",format:"count",valueLabel:"Registrations",
         points:selectedCohorts.map(c=>({id:c.releaseId,label:c.trainingTitle+" · "+c.siteName,value:c.registrations})),
       }}/>}
-      <div className="border border-border bg-card">
+      <WorkspacePanel headingLevel="h3" title="Release-level evidence drill-down">
         <Table scrollLabel="Release-level evidence drill-down" aria-label="Release-level evidence drill-down" className="w-full min-w-[40rem] text-left text-sm">
-          <TableCaption className="p-4 text-left font-semibold">Release-level evidence drill-down</TableCaption>
+          <TableCaption className="sr-only">Release-level evidence drill-down</TableCaption>
           <TableHeader className="border-y border-border bg-muted/40">
             <TableRow>
               <TableHead scope="col" className="p-3">Training / Release</TableHead>
@@ -137,7 +134,7 @@ export function NoncreditProviderEvidencePanel(){
           </TableCell></TableRow>}
           </TableBody>
         </Table>
-      </div>
+      </WorkspacePanel>
       <DisclosureSection title="Metric definitions and source interpretation">
           <Table scrollLabel="Metric definitions and source interpretation" aria-label="Metric definitions and source interpretation" className="w-full min-w-[36rem] text-left text-sm"><TableCaption className="sr-only">Metric definitions and source interpretation</TableCaption>
             <TableHeader className="border-b border-border">

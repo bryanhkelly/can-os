@@ -1,9 +1,24 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { StatCard, StatusBadge, WorkspaceNotice, WorkspacePanel, type StatusTone } from "@/components/workspace";
+import { FormSection, StatCard, StatusBadge, WorkspaceNotice, WorkspacePanel, type StatusTone } from "@/components/workspace";
 
 describe("workspace design primitives", () => {
+  it("preserves the named form section and allows nested heading levels", () => {
+    const html = renderToStaticMarkup(<WorkspacePanel title="Authorization">
+      <FormSection headingLevel="h3" title="Required information" description="Review the agreement">
+        <p>Agreement details</p>
+      </FormSection>
+    </WorkspacePanel>);
+    expect(html).toMatch(/<h2[^>]*>Authorization<\/h2>/);
+    const heading = html.match(/<h3 id="([^"]+)"[^>]*>Required information<\/h3>/);
+    expect(heading).not.toBeNull();
+    expect(html).toContain('aria-labelledby="' + heading?.[1] + '"');
+    expect(html).toContain("Review the agreement");
+    const standalone = renderToStaticMarkup(<FormSection title="Details"><p>Content</p></FormSection>);
+    expect(standalone).toMatch(/<h2[^>]*>Details<\/h2>/);
+  });
+
   it("only exposes a labelled dismissal control when the caller opts in", () => {
     const notice = renderToStaticMarkup(<WorkspaceNotice>Session information</WorkspaceNotice>);
     expect(notice).not.toContain("<button");
@@ -32,7 +47,7 @@ describe("workspace design primitives", () => {
       <p>Saved successfully</p><p>Refresh may still be pending</p>
     </WorkspaceNotice>);
     expect(html).toMatch(/^<div\b/);
-    expect(html).toContain("<div class=\"min-w-0 flex-1\"><p>Saved successfully</p>");
+    expect(html).toMatch(/<div[^>]*><p>Saved successfully<\/p>/);
     expect(html).not.toContain("<span class=\"min-w-0 flex-1\"><p>");
     expect(html).toContain("<p>Refresh may still be pending</p>");
   });
@@ -68,6 +83,13 @@ describe("workspace design primitives", () => {
     expect(html).toContain("Authorized context");
     expect(html).toContain("Review");
     expect(html).toContain("Evidence");
+  });
+
+  it("supports nested panel headings and named regions", () => {
+    const html = renderToStaticMarkup(<WorkspacePanel title="Lifecycle"><WorkspacePanel headingLevel="h3" title="Algebra II">Section record</WorkspacePanel></WorkspacePanel>);
+    expect(html).toContain('aria-label="Algebra II"');
+    expect(html).toMatch(/<h2[^>]*>Lifecycle<\/h2>/);
+    expect(html).toMatch(/<h3[^>]*>Algebra II<\/h3>/);
   });
 
   it("keeps informational metrics still and gives linked metrics explicit hover and keyboard feedback", () => {

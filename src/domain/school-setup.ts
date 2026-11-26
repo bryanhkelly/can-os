@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { DEMO_ACCOUNT_DOMAIN } from "./local-demo-access";
+import { DEMO_ACCOUNT_DOMAIN, isDemoAccountEmail } from "./local-demo-access";
 import { siteTimezoneSchema } from "./site-timezone";
 
-const demoDomainPattern = /^[a-z0-9](?:[a-z0-9-]{1,41}[a-z0-9])\.demo$/;
+import { identityEmailDomain, isDemoDomain, normalizeIdentityDomain } from "./domain-classification";
 
 export function isDemoSchoolDomain(domain: string): boolean {
-  return demoDomainPattern.test(domain.trim().toLowerCase()) &&
-    !domain.includes("--");
+  return isDemoDomain(domain);
 }
 
 export const schoolSetupSchema = z.object({
@@ -39,16 +38,23 @@ export function initialVerifiedSignupOrganizationType(requested: PublicSignupOrg
     ? "other_partner" as const : requested;
 }
 
-export const realSchoolSetupSignupSchema = z.object({
+export const siteSignupSchema = z.object({
   name: z.string().trim().min(2).max(160),
   organizationName: z.string().trim().min(2).max(160).optional(),
+  organizationDomain: z.string().trim().toLowerCase().refine(value => normalizeIdentityDomain(value) === value, "Enter a valid organization domain.").optional(),
   organizationType: publicSignupOrganizationTypeSchema.default("other_partner"),
   email: z.string().trim().toLowerCase().email().max(254)
-    .refine(email => !email.endsWith(".demo") && !email.endsWith(".invalid"),
-      "Use a real email address; demo schools use the shared-code setup."),
+    .refine(email => !email.endsWith(".invalid") && (!email.endsWith(".demo") || (isDemoAccountEmail(email) && isDemoSchoolDomain(email.split("@")[1]!))), "Use a valid real or demo email address."),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
-}).strict();
+}).strict().superRefine((data, ctx) => {
+  // A public shared-code identity must never bootstrap a real-domain organization.
+  if (isDemoAccountEmail(data.email) && data.organizationDomain && data.organizationDomain !== identityEmailDomain(data.email)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["organizationDomain"], message: "Use the same demo domain as your administrator email." });
+  }
+});
+
+export const realSchoolSetupSignupSchema = siteSignupSchema.refine(data => !data.email.endsWith(".demo"), { path: ["email"], message: "Use a real email address." });
 
 export type SchoolSetupInput = z.infer<typeof schoolSetupSchema>;
 export type RealSchoolSetupSignupInput = z.infer<typeof realSchoolSetupSignupSchema>;
@@ -79,7 +85,7 @@ export function matchesDemoSchoolAdministrator(
   email: string,
 ): boolean {
   return school.enabled && isDemoSchoolDomain(school.domain) &&
-    email === `admin.demo@${school.domain}` &&
+    identityEmailDomain(email) === school.domain &&
     grant.id === school.adminGrantId && grant.accountId === school.adminAccountId &&
     grant.personId === school.adminPersonId && grant.role === "site_admin" &&
     grant.organizationId === school.organizationId && grant.siteId === school.siteId;

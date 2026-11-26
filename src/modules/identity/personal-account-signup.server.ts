@@ -1,8 +1,10 @@
+import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccountSignups, accessAccounts, accountPersonGrants, people, schoolSetupSignups,
 } from "@/db/schema";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { personalCanSignupSchema } from "@/domain/personal-account-signup";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -20,10 +22,12 @@ const genericResult = { accepted: true } as const;
  * The email challenge is the proof of mailbox possession; all responses are generic.
  */
 export async function requestPersonalCanAccount(input: unknown,
-  sender: AccessEmailSender = sendAccessLinkViaResend): Promise<typeof genericResult> {
+  sender: AccessEmailSender = sendAccessLinkViaResend): Promise<{accepted:true;privateAccessCode?:string}> {
   const data = personalCanSignupSchema.parse(input);
   const email = normalizeAccessEmail(data.email);
-  if (isDemoAccountEmail(email) || email.endsWith(".invalid")) return genericResult;
+  const demo = isDemoAccountEmail(email);
+  if (email.endsWith(".invalid") || (email.endsWith(".demo") && !demo)) return genericResult;
+  if (demo) return provisionPrivatePersonalSignup(data,email);
   await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"personal-signup:" + email}))`);
     let [account] = await tx.select({
@@ -55,7 +59,9 @@ export async function requestPersonalCanAccount(input: unknown,
       // A consumed prior signup is historical evidence, not an eternal ban
       // on creating an account-only membership after roles were revoked.
       // Never replace a still-pending verified-email signup.
-      if (!existing.consumedAt && existing.expiresAt > new Date()) return;
+      if (!existing.consumedAt && existing.expiresAt > new Date()) {
+        return;
+      }
       await tx.update(accessAccountSignups).set({
         firstName: data.firstName, lastName: data.lastName, expiresAt, consumedAt: null,
       }).where(eq(accessAccountSignups.accountId, account.id));
@@ -69,9 +75,30 @@ export async function requestPersonalCanAccount(input: unknown,
   return genericResult;
 }
 
+/** Public registration can issue an individual credential only for a genuinely
+ * new Account. An existing invitation, Account, or revoked identity cannot be
+ * claimed through registration. No Organization or membership is inferred. */
+async function provisionPrivatePersonalSignup(data: ReturnType<typeof personalCanSignupSchema.parse>, email:string) {
+  const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential();
+  return db.transaction(async tx=>{
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"personal-signup:" + email}))`);
+    const now=new Date();
+    const [account]=await tx.insert(accessAccounts).values({emailNormalized:email,privateAccessCodeHash})
+      .onConflictDoNothing().returning({id:accessAccounts.id});
+    if(!account)return genericResult;
+    await tx.insert(accessAccountSignups).values({accountId:account.id,firstName:data.firstName,lastName:data.lastName,
+      expiresAt:new Date(now.getTime()+SIGNUP_LIFETIME_MS)});
+    const grantId=await provisionVerifiedPersonalCanAccount(tx,account.id,email,now,"demo_code");
+    if(!grantId)throw new Error("Personal account approval unavailable");
+    return {...genericResult,privateAccessCode};
+  });
+}
+
 /** Called only inside atomic, single-use email-token redemption. */
 export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: string,
-  email: string, now: Date): Promise<string | null> {
+  email: string, now: Date, approval: "verified_email" | "demo_code" = "verified_email"): Promise<string | null> {
+  if ((approval==="demo_code")!==isDemoAccountEmail(email)) throw new Error("Invalid account approval method");
+  const source=approval==="demo_code"?"automatic_demo_approval":"single_use_email_verification";
   const [signup] = await tx.select().from(accessAccountSignups).where(and(
     eq(accessAccountSignups.accountId, accountId), isNull(accessAccountSignups.consumedAt),
     gt(accessAccountSignups.expiresAt, now),
@@ -100,15 +127,21 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
     if(!existing?.active)throw new Error("CAN account Person is not active");
   }else{
     const [created] = await tx.insert(people).values({
-      legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
+      legalFirstName: signup.firstName, legalLastName: signup.lastName, email, domain: identityEmailDomain(email),
       metadata: {
-        origin: "verified_email_personal_signup",
+        origin: approval==="demo_code"?"demo_personal_signup":"verified_email_personal_signup",
         nameEvidence: "self_declared",
         legalNameVerified: false,
       },
     }).returning({id:people.id});
     if(!created)throw new Error("Personal profile could not be initialized");
     personId=created.id;
+  }
+  if (!account.personId) {
+    const [bound]=await tx.update(accessAccounts).set({personId,updatedAt:now})
+      .where(and(eq(accessAccounts.id,accountId),isNull(accessAccounts.personId)))
+      .returning({personId:accessAccounts.personId});
+    if(bound?.personId!==personId)throw new Error("Personal account identity binding failed");
   }
   const [grant] = await tx.insert(accountPersonGrants).values({
     accountId, personId, role: "account_holder",
@@ -123,11 +156,12 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
     scope: {},
     after: {
       personalGrantId: grant.id,
-      emailVerified: true,
+      emailVerified: approval==="verified_email",
+      approvalMethod:approval,
       nameEvidence: "self_declared",
       institutionGranted: false,
     },
-    context: { accountId, source: "single_use_email_verification" },
+    context: { accountId, source },
   });
   await tx.update(accessAccountSignups).set({ consumedAt: now })
     .where(eq(accessAccountSignups.accountId, accountId));

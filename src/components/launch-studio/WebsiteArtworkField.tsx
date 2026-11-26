@@ -29,7 +29,7 @@ export function WebsiteArtworkField({ field, value, disabled, onSelect, onChange
         <span className="font-medium">Artwork description for screen readers</span>
         <Input type="text" maxLength={180} value={value.altText}
           onChange={event=>onChange({...value,altText:event.target.value})}
-          className="mt-2 w-full border bg-background p-2 text-sm"/>
+          className="mt-2"/>
       </Label>
       <Label className="flex items-start gap-2 text-sm">
         <Checkbox checked={value.rightsConfirmed} onChange={event=>onChange({...value,rightsConfirmed:event.target.checked})} className="mt-1"/>
@@ -39,7 +39,7 @@ export function WebsiteArtworkField({ field, value, disabled, onSelect, onChange
         <span className="font-medium">Child privacy and consent</span>
         <Select value={value.childImageConsent}
           onChange={event=>onChange({...value,childImageConsent:event.target.value as SiteLocalImageConsent})}
-          className="mt-2 w-full border bg-background p-2 text-sm">
+          className="mt-2">
           <option value="unconfirmed">Choose a confirmation</option>
           <option value="no_identifiable_children">No identifiable children appear</option>
           <option value="guardian_consent_confirmed">Documented guardian consent covers every identifiable child</option>

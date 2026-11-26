@@ -1,4 +1,3 @@
-import { buttonVariants } from "@/components/ui/button";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { AdmissionsApplicantCard } from "@/components/admissions/AdmissionsApplicantCard";
@@ -9,7 +8,7 @@ import {createFileRoute,Link,redirect,useRouter} from "@tanstack/react-router";
 import {getAdmissionsStageCounts,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceShell} from "@/components/workspace";
+import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell} from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -48,7 +47,7 @@ function IntakePage(){
  const outcome=Route.useLoaderData();
  const selected=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="Admissions" title="Inquiry and decision pipeline" outcome={outcome}/>;
- return <Intake key={`${selected.siteId??""}:${selected.programId??""}:${selected.interest??""}:${selected.studentPage??1}`} data={outcome.data}/>;
+ return <Intake key={`${selected.siteId??""}:${selected.programId??""}:${selected.interest??""}:${selected.studentPage??1}:${selected.application??""}`} data={outcome.data}/>;
 }
 function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const router=useRouter();
@@ -68,19 +67,26 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
 
  const mutation=useMutationFeedback(()=>router.invalidate());
  const [interactive,setInteractive]=useState(false);
+ const [issuedCredential,setIssuedCredential]=useState<{applicationId:string;email:string;code:string}|null>(null);
  useEffect(()=>setInteractive(true),[]);
  const busy=mutation.pending||mutation.refreshFailed||!interactive;
- async function perform(fn:()=>Promise<unknown>,message:string,refresh?:()=>Promise<unknown>){
+ async function perform<T>(fn:()=>Promise<T>,message:string|((value:T)=>string),refresh?:()=>Promise<unknown>){
   await mutation.run(fn,{successMessage:message,commandErrorMessage:"Unable to save",refresh});
  }
  const onVerify=(applicationId:string,verification:GuardianVerification)=>{
   void perform(()=>verifyAdmissionsGuardianRelationship({data:{applicationId,...verification}}),
    "Guardian relationship verified and family permissions enabled.");
  };
- const onProvision=(applicationId:string)=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),
-  "Verified guardian sign-in access provisioned.");
+ const onProvision=(applicationId:string)=>{
+  setIssuedCredential(null);
+  void perform(async()=>{
+   const result=await provisionInquiryGuardianAccount({data:{applicationId}});
+   if("privateAccessCode" in result && typeof result.privateAccessCode==="string")setIssuedCredential({applicationId,email:result.email,code:result.privateAccessCode});
+   return result;
+  },"Verified guardian sign-in access provisioned.");
+ };
  const onInvite=(applicationId:string)=>void perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId}}),
-  "A secure email sign-in invitation was requested for this guardian.");
+  result=>result.signInMethod==="email_link"?"A secure email sign-in invitation was requested for this guardian.":"Guardian access is provisioned. Use the existing authorized credential; no email is sent to this address.");
  const onDecision=(applicationId:string,decision:AdmissionsDecision,label:string)=>{
   void perform(()=>transitionAdmissionsStage({data:{applicationId,decision}}),label+" saved.");
  };
@@ -97,6 +103,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
    main={record ? (
     <div className="space-y-5">
      <MutationFeedback state={mutation} pendingMessage="Saving admissions records..."/>
+     {issuedCredential?.applicationId===record.id&&<WorkspacePanel title="Guardian private access code"><WorkspaceNotice>Transfer this one-time-displayed credential privately to the independently verified guardian at {issuedCredential.email}. Do not email or post it.</WorkspaceNotice><Field label="Private access code"><Input value={issuedCredential.code} readOnly autoComplete="off" /></Field><Button type="button" variant="outline" onClick={()=>setIssuedCredential(null)}>Dismiss code</Button></WorkspacePanel>}
     <AdmissionsApplicantCard r={record} busy={busy} showSummary={false} onVerify={onVerify}
       onProvision={onProvision} onInvite={onInvite} onDecision={onDecision}/>
     </div>
@@ -108,13 +115,14 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  }
  return <WorkspaceShell eyebrow="Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
-  actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className={buttonVariants({ variant: "outline" })}>Offers & enrollment →</Link>}>
+  actions={<Button asChild variant="outline"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}}>Offers & enrollment</Link></Button>}>
   <div className="mt-5"><CreateAction><Link to="/admissions/intake/new" search={{siteId:selected.siteId,programId:selected.programId}}>New inquiry</Link></CreateAction></div>
   <MutationFeedback state={mutation} pendingMessage="Saving admissions records..." className="mt-5"/>
   <PublicInterestInbox initialPage={data.publicInterests} availablePrograms={data.programs}
     siteId={selected.siteId} programId={selected.programId}/>
   <AdmissionsPipelineSummary counts={data.stageCounts}/>
-  <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
+  <WorkspacePanel title="Applicants and next actions" className="mt-8">
+   {pageNavigation}
    <DirectoryTable label="Admissions applicants" caption="Authorized applications for the selected Site and Program."
     rows={records} rowKey={record=>record.id}
     columns={[
@@ -125,7 +133,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     ]}
     rowActions={[{id:"review",label:"Review application",allowed:()=>true,onClick:record=>{void router.navigate({to:"/admissions/intake",search:{...selected,application:record.id}});}}]}
     pagination={<AdmissionsPageNavigation selection={selected} hasMore={data.records.hasMore} kind="applications"/>}
-    empty={<span>No applications recorded in your authorized programs.</span>}/>
-  </section>
+    empty={<EmptyState title="No applications found" description="No applications recorded in your authorized programs match the current search."/>}/>
+  </WorkspacePanel>
  </WorkspaceShell>;
 }

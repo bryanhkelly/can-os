@@ -403,6 +403,14 @@ integration("FullFlow: one school and Program across the six-stage academic jour
         await expect(verifyAdmissionsGuardianRelationship({data:guardianVerification}))
           .rejects.toThrow("admissions registrar");
         state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
+        // A malformed legacy or demo application must fail safely without
+        // inferring guardianship from the submitting person.
+        await tx.update(s.applications).set({metadata:{}})
+          .where(eq(s.applications.id,application.applicationId));
+        await expect(verifyAdmissionsGuardianRelationship({data:guardianVerification}))
+          .rejects.toMatchObject({code:"ADMISSIONS_GUARDIAN_CONTACT_REQUIRED"});
+        await tx.update(s.applications).set({metadata:applicationRow.metadata})
+          .where(eq(s.applications.id,application.applicationId));
         await verifyAdmissionsGuardianRelationship({data:guardianVerification});
         await verifyAdmissionsGuardianRelationship({data:guardianVerification});
         const relationship=first(await tx.select().from(s.guardianRelationships).where(and(

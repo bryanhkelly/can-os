@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { analyzeSource, createInventory, checkChangedFiles, findSharedLayerGeometryViolations } from "./v61-source-audit.mjs";
+import { analyzeSource, createInventory, checkChangedFiles, findSharedLayerGeometryViolations, collectV61SourceViolations, inspectV61ThemeTokens } from "./v61-source-audit.mjs";
 
 function temp(run) {
   const root = mkdtempSync(join(tmpdir(), "v61-audit-"));
@@ -187,3 +187,112 @@ test("directional, logical, arbitrary and important corner utilities cannot bypa
     utilities.join(" ") + ' border-t text-sm"/>;', "/demo/src/components/workspace/panel.tsx");
   assert.deepEqual(audit.corners.map(item => item.utility), utilities);
 });
+
+test("absolute policy rejects unchanged debt in routes, feature components and extra UI", () => temp(({root, write}) => {
+  write("src/routes/legacy.tsx", 'export const Legacy = () => <button>Old</button>;');
+  write("src/components/example/Panel.tsx", 'export const Panel = () => <div className="rounded-lg"/>;');
+  write("src/widgets/External.tsx", 'export const Widget = () => <select/>;');
+  write("src/components/ui/input.tsx", 'export const Input = () => <input/>;');
+  write("src/routes/clean.tsx", 'export const Clean = () => <input type="hidden"/>;');
+  const violations = collectV61SourceViolations(createInventory(root));
+  assert.deepEqual(violations.map(v => [v.file, v.kind, v.detail]).sort(), [
+    ["src/components/example/Panel.tsx", "geometry", "rounded-lg"],
+    ["src/routes/legacy.tsx", "native-control", "button"],
+    ["src/widgets/External.tsx", "native-control", "select"],
+  ]);
+  assert.ok(violations.every(v => v.line > 0 && v.column > 0));
+  write("src/routes/legacy.tsx", 'export const Legacy = () => <Button>Old</Button>;');
+  write("src/components/example/Panel.tsx", 'export const Panel = () => <div className="border"/>;');
+  write("src/widgets/External.tsx", 'export const Widget = () => <Select/>;');
+  assert.deepEqual(collectV61SourceViolations(createInventory(root)), []);
+}));
+
+test("the build and release share the same theme contract", () => {
+  const css = `
+    --font-sans: "DM Sans";
+    --font-serif: "Instrument Serif";
+    --radius: 0;
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-danger: var(--danger);
+    --sidebar-width: 16rem;
+    --topbar-height: 4rem;
+  `;
+  assert.ok(Object.values(inspectV61ThemeTokens(css)).every(Boolean));
+  assert.equal(inspectV61ThemeTokens(css.replace("--radius: 0;", "--radius: 8px;")).squareGeometry, false);
+  assert.equal(inspectV61ThemeTokens(css.replace('"DM Sans"', '"Arial"')).fontSans, false);
+  assert.equal(inspectV61ThemeTokens(css.replace("--color-danger: var(--danger);", "")).semanticDanger, false);
+});
+
+
+test("canonical appearance ownership follows imported aliases and conditional classes", () => {
+  const source = [
+    'import { Button as Action } from "@/components/ui/button";',
+    'import { Input } from "@/components/ui/input";',
+    'const field = "mt-1 border bg-background p-2";',
+    'export const Page = () => <div><Action className={cn("w-full", active && "hover:bg-primary", active ? "px-4" : "mt-2")}/><Input className={field}/></div>;',
+  ].join("\n");
+  const audit = analyzeSource(source, "/demo/src/routes/example.tsx");
+  assert.deepEqual(audit.appearance.map(issue => issue.utility).sort(),
+    ["bg-background", "border", "hover:bg-primary", "p-2", "px-4"]);
+});
+test("layout composition and feature-local names are not appearance violations", () => {
+  const source = [
+    'import { Button } from "@/components/ui/button";',
+    'import { Input } from "./custom-input";',
+    'export const Page = () => <div><Button className="mt-2 w-full min-w-0 flex-1 whitespace-normal text-left"/><Input className="bg-background"/></div>;',
+  ].join("\n");
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/example.tsx").appearance, []);
+});
+test("appearance violations block the absolute source gate", () => temp(({root, write}) => {
+  write("src/routes/page.tsx", 'import { Button } from "@/components/ui/button"; export const Page = () => <Button className="bg-red-500"/>;');
+  write("src/components/ui/button.tsx", 'export const Button = () => <button className="bg-primary"/>;');
+  const violations = collectV61SourceViolations(createInventory(root));
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0].kind, "control-appearance");
+  assert.equal(violations[0].detail, "Button: bg-red-500");
+}));
+
+test("appearance ownership covers local constants, namespace imports and class maps", () => {
+  const source = [
+    'import * as UI from "@/components/ui";',
+    'const field = "mt-1";',
+    'export function Page() { const field = "border p-2"; return <UI.Input className={cn(field, {"focus:ring-2": true, "w-full": true})}/>; }',
+  ].join("\n");
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["border", "focus:ring-2", "p-2"]);
+});
+
+test("appearance debt in reachable components invalidates composed route compliance", () => temp(({root, write}) => {
+  write("src/routes/page.tsx", 'import { Widget } from "@/components/feature/Widget"; export const Page = () => <Widget/>;');
+  write("src/components/feature/Widget.tsx", 'import { Button } from "@/components/ui/button"; export const Widget = () => <Button style={{color:"red"}}/>;');
+  write("src/components/ui/button.tsx", 'export const Button = () => <button/>;');
+  const inventory = createInventory(root);
+  assert.equal(inventory.routes[0].sourceClean, true);
+  assert.equal(inventory.routes[0].reachableAppearance, 1);
+  assert.equal(inventory.routes[0].composedSourceClean, false);
+  assert.equal(collectV61SourceViolations(inventory)[0].detail, "Button: inline-style");
+}));
+
+test("appearance rules reject zero padding and arbitrary typography but preserve alignment", () => {
+  const source = 'import { Button } from "@/components/ui/button"; export const Page = () => <Button className={custom ?? "p-0 text-[13px] font-light text-left text-wrap w-full"}/>';
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["font-light", "p-0", "text-[13px]", "unverified-class-expression"]);
+});
+
+test("re-exported controls and literal spread overrides remain governed", () => temp(({root, write}) => {
+  write("src/components/ui/button.tsx", 'export const Button = () => <button/>;');
+  write("src/components/actions/index.ts", 'export { Button as Action } from "../ui/button";');
+  write("src/routes/page.tsx", 'import { Action } from "@/components/actions"; export const Page = () => <Action {...{className:"p-0", style:{color:"red"}}}/>;');
+  assert.deepEqual(collectV61SourceViolations(createInventory(root)).map(v => v.detail).sort(), ["Button: inline-style", "Button: p-0"]);
+}));
+
+test("opaque spreads and dynamic classes fail closed", () => {
+  const source = 'import { Button } from "@/components/ui/button"; export const Page = () => <><Button {...props}/><Button className={external}/><Button {...{...props}}/><Button className={active ? "w-full" : "mt-2"}/></>';
+  assert.deepEqual(analyzeSource(source, "/demo/src/routes/page.tsx").appearance.map(issue => issue.utility).sort(), ["unverified-class-expression", "unverified-spread", "unverified-spread-member"]);
+});
+test("JSX and shared primitive geometry are included in composed compliance", () => temp(({root, write}) => {
+  write("src/routes/page.jsx", 'import { Button } from "@/components/ui/button"; export const Page = () => <Button/>;');
+  write("src/components/ui/button.tsx", 'export const Button = () => <button className="rounded-lg"/>;');
+  const inventory = createInventory(root);
+  assert.equal(inventory.routes[0].reachableCorners, 1);
+  assert.equal(inventory.routes[0].composedSourceClean, false);
+}));

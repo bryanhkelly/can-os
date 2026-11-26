@@ -1,11 +1,13 @@
 import { sql } from "drizzle-orm";
 import type { db } from "@/db/client";
 import type { AccessContext } from "@/domain/access-context";
+import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { AuthorizationError } from "@/domain/command-context";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { demoCredentialScopePredicate } from "./demo-school-tenants.server";
 
 type Tx = Pick<typeof db, "execute">;
 
@@ -95,8 +97,30 @@ export async function assertCurrentCANGrantForMutation(
         IS NOT DISTINCT FROM ${expected.siteId}::uuid
       ${organizationCheck}
       AND current_grant.active=true AND person.active=true
-      AND target_account.disabled=false AND target_account.email_verified_at IS NOT NULL
-      AND session_owner.disabled=false AND session_owner.email_verified_at IS NOT NULL
+      AND target_account.disabled=false
+      AND session_owner.disabled=false
+      AND (
+        (session_owner.private_access_code_hash IS NOT NULL
+          AND session.authentication_method='private_access_code'
+          AND session_owner.email_normalized LIKE '%.demo'
+          AND current_grant.account_id=session_owner.id
+          AND ${privateAccountRoleEligible(actor.role)}::boolean)
+        OR
+        (session_owner.private_access_code_hash IS NULL
+          AND target_account.private_access_code_hash IS NULL
+          AND (
+            (session_owner.email_verified_at IS NOT NULL
+              AND session_owner.email_normalized NOT LIKE '%.demo'
+              AND target_account.email_verified_at IS NOT NULL
+              AND target_account.email_normalized NOT LIKE '%.demo'
+              AND current_grant.account_id=session_owner.id
+              AND (session.authentication_method IS NULL OR session.authentication_method='email_link'))
+            OR
+            ((session.authentication_method IS NULL OR session.authentication_method='local_demo_code')
+              AND ${demoCredentialScopePredicate(sql`session_owner.email_normalized`,sql`current_grant.organization_id`,sql`current_grant.site_id`)}
+              AND ${demoCredentialScopePredicate(sql`target_account.email_normalized`,sql`current_grant.organization_id`,sql`current_grant.site_id`)})
+          ))
+      )
       AND session.revoked_at IS NULL
       -- This is a direct-grant transaction guard (with the existing exact
       -- Demo Admin exception below), not a Platform Owner delegation grant.
@@ -121,6 +145,9 @@ export async function assertCurrentCANGrantForMutation(
         OR
         (session_owner.id=${LOCAL_DEMO_ADMIN.accountId}::uuid
           AND session_owner.email_normalized=${LOCAL_DEMO_ADMIN.email}
+          AND session_owner.private_access_code_hash IS NULL
+          AND target_account.private_access_code_hash IS NULL
+          AND target_account.email_normalized LIKE '%@valorschool.demo'
           AND ${actor.impersonatedByAccountId ?? null}::uuid=session_owner.id
           AND EXISTS (
             SELECT 1 FROM public.account_person_grants admin_grant

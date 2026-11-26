@@ -1,14 +1,16 @@
+import { readOptionalEmailBrand } from "./email-brand.server";
+import { readEmailProviderReceipt } from "@/domain/email-provider-receipt";
+import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
  * Server-only transactional email for in-app notifications.
- * Mirrors the Resend fetch pattern in identity/resend-access-mail.server.ts,
- * but never throws: email delivery must not break a domain transaction.
+ * Uses the shared Resend transport. Delivery errors return a failed receipt
+ * rather than interrupting the calling domain workflow.
  * Call from server code only; never import this module into a client component.
  */
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 
 export type NotificationEmailMessage = {
   to: string;
@@ -68,7 +70,7 @@ async function sendNotificationEmailCore(
   message: NotificationEmailMessage,
   idempotencyKey?: string,
 ): Promise<NotificationEmailSendReceipt> {
-  if(isDemoAccountEmail(message.to)){
+  if (suppressDemoEmailDelivery(message.to)) {
     console.log("[notification-email] Demo account delivery suppressed");
     return { accepted: false };
   }
@@ -87,10 +89,7 @@ async function sendNotificationEmailCore(
     : message.text;
 
   try {
-    const brand = message.siteId
-      ? await import("@/modules/sites/school-brand.server")
-        .then(module => module.readSchoolBrand(message.siteId!))
-        .catch(() => { console.warn("[notification-email] School branding unavailable; using CAN branding"); return null; }) : null;
+    const brand = await readOptionalEmailBrand(message.siteId, "notification-email");
     const { renderSchoolEmail, schoolEmailLogoAttachment } = await import("@/domain/school-email");
     const logoAttachment = schoolEmailLogoAttachment(brand);
     const attachments = [
@@ -98,35 +97,25 @@ async function sendNotificationEmailCore(
         content: attachment.content, content_type: attachment.contentType })),
       ...(logoAttachment ? [logoAttachment] : []),
     ];
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(20_000),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      },
-      body: JSON.stringify({
-        from,
-        to: [message.to],
-        subject: message.subject,
-        text,
-        html: message.html ?? renderSchoolEmail({ brand, text, actionUrl }),
-        ...(attachments.length ? { attachments } : {}),
-        ...(message.providerReceipt ? { tags: [
-          { name: "can_source", value: message.providerReceipt.source },
-          { name: "can_receipt", value: message.providerReceipt.receiptId },
-        ] } : {}),
-      }),
-    });
+    const response = await submitResendEmail({
+      from,
+      to: [message.to],
+      subject: message.subject,
+      text,
+      html: message.html ?? renderSchoolEmail({ brand, text, actionUrl }),
+      ...(attachments.length ? { attachments } : {}),
+      ...(message.providerReceipt ? { tags: [
+        { name: "can_source", value: message.providerReceipt.source },
+        { name: "can_receipt", value: message.providerReceipt.receiptId },
+      ] } : {}),
+    }, apiKey, idempotencyKey);
     if (!response.ok) {
       console.log(
         `[notification-email] Resend delivery failed with status ${response.status}`,
       );
       return { accepted: false };
     }
-    const responseBody = await response.json().catch(() => null) as { id?: unknown } | null;
-    const providerMessageId = typeof responseBody?.id === "string" ? responseBody.id : undefined;
+    const providerMessageId = await readEmailProviderReceipt(response);
     return { accepted: true, ...(providerMessageId ? { providerMessageId } : {}) };
   } catch (error) {
     console.log(
@@ -139,8 +128,10 @@ async function sendNotificationEmailCore(
 /** Defense in depth: account/grant eligibility must survive both the SQL
  * filter and projection, including if a caller changes the query later. */
 export function eligibleNotificationEmailAccount(record: {
-  accountDisabled:boolean;emailVerifiedAt:Date|null;
-  grantActive:boolean;personActive:boolean;
+  accountDisabled: boolean;
+  emailVerifiedAt: Date | null;
+  grantActive: boolean;
+  personActive: boolean;
 }): boolean {
   return !record.accountDisabled && !!record.emailVerifiedAt &&
     record.grantActive && record.personActive;
@@ -157,7 +148,7 @@ export async function emailNotificationRecipients(
   organizationId: string | null,
 ): Promise<Map<string, string>> {
   const recipients = new Map<string, string>();
-  if(!organizationId || await isDemoTenantOrganization(organizationId))return recipients;
+  if (!organizationId) return recipients;
   const uniqueIds = [...new Set(personIds)];
   if (uniqueIds.length === 0) return recipients;
 
@@ -171,7 +162,8 @@ export async function emailNotificationRecipients(
       personActive: people.active,
     })
     .from(accountPersonGrants)
-    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
+    .innerJoin(accessAccounts, and(eq(accessAccounts.id, accountPersonGrants.accountId),
+      eq(accessAccounts.personId, accountPersonGrants.personId)))
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
     .where(
       and(
@@ -184,7 +176,7 @@ export async function emailNotificationRecipients(
     );
 
   for (const row of rows) {
-    if (!eligibleNotificationEmailAccount(row) || isDemoAccountEmail(row.email)) continue;
+    if (!eligibleNotificationEmailAccount(row) || suppressDemoEmailDelivery(row.email)) continue;
     if (!recipients.has(row.personId)) {
       recipients.set(row.personId, row.email);
     }

@@ -17,6 +17,7 @@ export const people = pgTable(
     legalLastName: text("legal_last_name").notNull(),
     preferredName: text("preferred_name"),
     email: text("email"),
+    domain: text("domain"),
     phone: text("phone"),
     active: boolean("active").default(true).notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
@@ -25,6 +26,7 @@ export const people = pgTable(
   },
   (table) => [
     index("people_email_idx").on(table.email),
+    index("people_domain_idx").on(table.domain),
     index("people_name_idx").on(table.legalLastName, table.legalFirstName),
   ],
 );

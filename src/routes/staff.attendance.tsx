@@ -237,7 +237,7 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
 
   return <WorkspaceShell width="standard" eyebrow="Attendance" title="Daily attendance" subtitle={selectedProgram.name + " · " + selectedProgram.timezone}>
       <Label className="mt-4 block text-sm font-semibold">School Program
-        <Select value={programId} onChange={event => void navigate({ search: { programId: event.target.value } })} className="mt-2 w-full  border bg-background p-3">
+        <Select value={programId} onChange={event => void navigate({ search: { programId: event.target.value } })} className="mt-2">
           {workspace.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
         </Select>
       </Label>
@@ -251,7 +251,7 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
         Attendance date
         <Input
           type="date"
-          className="mt-2 w-full  border bg-background p-3"
+          className="mt-2"
           value={date}
           onChange={event => setDate(event.target.value)}
         />
@@ -312,7 +312,7 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
               <Input value={correctionNotes[student.programId+":"+student.studentProfileId]??""}
                 onChange={e=>setCorrectionNotes(current=>({...current,[student.programId+":"+student.studentProfileId]:e.target.value}))}
                 placeholder="Reason for correction"
-                className="mt-1 w-full  border bg-background p-2 text-sm"/>
+                className="mt-1"/>
             </Label>}
             <div className="mt-4 flex flex-wrap gap-2">
               {statusOptions.map(option => <Button variant={student.status === option ? "default" : "outline"} size="sm"
@@ -350,7 +350,7 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
             <Label className="mt-3 block text-sm font-semibold">
               Review note
               <Textarea
-                className="mt-2 w-full  border bg-background p-3 text-sm"
+                className="mt-2"
                 rows={2}
                 value={notes[excuse.excuseId] ?? ""}
                 onChange={event => setNotes(current => ({ ...current, [excuse.excuseId]: event.target.value }))}

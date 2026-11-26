@@ -17,8 +17,28 @@ export type GeographicEntityKind=keyof typeof entityGeographyRoles;
 export type EntityGeographyReference = {[K in GeographicEntityKind]:{
   entityKind:K;entityId:string;role:(typeof entityGeographyRoles)[K][number];areaCode:string;
 }}[GeographicEntityKind];
-export function marketArea(result:GeographicResolution) {
-  return result.areas.find(area=>area.kind==="metro"||area.kind==="micro")??null;
+/** Pin both the geography source and the default ACS profile cohort to the
+ * reviewed release dataset. A later year requires a deliberate version change. */
+export const CENSUS_GEOGRAPHY_YEAR = 2024;
+
+function isMarketArea(area: GeographicAreaFact): boolean {
+  return area.kind === "metro" || area.kind === "micro";
+}
+
+export function marketArea(result: Pick<GeographicResolution, "areas">) {
+  return result.areas.find(isMarketArea) ?? null;
+}
+
+/** Absence is evidence only when both market boundary layers are complete. */
+export function classifyMarketStatus(
+  areas: readonly GeographicAreaFact[],
+  complete: boolean,
+): GeographicResolution["marketStatus"] {
+  const markets = areas.filter(isMarketArea);
+  if (markets.length > 1) throw new Error("geography_provider_ambiguous_market");
+  const kind = markets[0]?.kind;
+  if (kind === "metro" || kind === "micro") return kind;
+  return complete ? "outside_market" : "unknown";
 }
 export function communityArea(result:GeographicResolution) {
   return marketArea(result)??result.areas.find(area=>area.kind==="county")??null;

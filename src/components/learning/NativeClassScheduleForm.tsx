@@ -62,11 +62,11 @@ export function NativeClassScheduleForm({
       {mode!=="custom"?<div className="grid gap-3 sm:grid-cols-2">
         <Field label={`${mode==="weekly"?"First Session":"Session"} start (${siteTimeZone})`} required>
           <Input id="native-series-start" type="datetime-local" required value={first}
-            onChange={e=>onFirstChange(e.target.value)} className="min-h-11"/>
+            onChange={e=>onFirstChange(e.target.value)}/>
         </Field>
         <Field label="Duration (minutes)" required>
           <Input id="native-series-duration" type="number" required min={15} max={480}
-            value={minutes} onChange={e=>onMinutesChange(Number(e.target.value))} className="min-h-11"/>
+            value={minutes} onChange={e=>onMinutesChange(Number(e.target.value))}/>
         </Field>
       </div>:<div className="space-y-3">
         {customRows.map((row,index)=><div key={row.id}
@@ -74,12 +74,12 @@ export function NativeClassScheduleForm({
           <Field label={`Session ${index+1} start (${siteTimeZone})`} required>
             <Input id={"class-custom-"+row.id} type="datetime-local" required
               value={row.localStart} onChange={e=>onRowChange(row.id,{localStart:e.target.value})}
-              className="min-h-11"/>
+             />
           </Field>
           <Field label="Minutes" required>
             <Input id={"class-minutes-"+row.id} type="number" min={15} max={480} required
               value={row.minutes} onChange={e=>onRowChange(row.id,{minutes:Number(e.target.value)})}
-              className="min-h-11"/>
+             />
           </Field>
           <Button size="sm" variant="outline" type="button" disabled={customRows.length<=1||busy}
             onClick={()=>onRemoveRow(row.id)}>

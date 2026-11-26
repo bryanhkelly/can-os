@@ -1,3 +1,5 @@
+import { parseClosedReportingWindow } from "@/domain/reporting-window";
+import {readAuthorizedOwnerClassification} from "./reporting-population.server";
 import {readScopedSiteGeography} from "@/modules/geography/site-geography-read.server";
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -15,7 +17,6 @@ import { reportingProjectionEnabled } from "@/modules/insights/reporting-project
  * the browser. This reader is private and never computes learner outcomes.
  */
 export type SourceCoverageSelection = {siteId:string;from:string;to:string};
-const MAX_PERIOD_MS = 90 * 86_400_000;
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -26,12 +27,9 @@ export async function querySiteReportingSourceCoverageInTx(
   if (!reportingProjectionEnabled()) {
     throw new Error("Reporting source projections are not activated");
   }
-  const from = new Date(selection.from), to = new Date(selection.to);
-  if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) ||
-      !Number.isFinite(asOf.getTime()) ||
-      to <= from || to > asOf || to.getTime() - from.getTime() > MAX_PERIOD_MS) {
-    throw new Error("Source coverage requires a closed, positive UTC window up to 90 days");
-  }
+  const { from, to } = parseClosedReportingWindow(
+    selection, asOf, "Source coverage requires a closed, positive UTC window up to 90 days",
+  );
   const site = await loadAuthorizedSiteReportingScope(tx, actor, selection.siteId);
 
   const scoped = and(
@@ -103,7 +101,7 @@ export async function querySiteReportingSourceCoverageInTx(
     Number(corrections?.count ?? 0),
   );
   return {
-    siteId: site.id, geography: await readScopedSiteGeography(tx,site,asOf), from: from.toISOString(), to: to.toISOString(), asOf: asOf.toISOString(),
+    siteId: site.id, ...await readAuthorizedOwnerClassification(tx,site.organizationId), geography: await readScopedSiteGeography(tx,site,asOf), from: from.toISOString(), to: to.toISOString(), asOf: asOf.toISOString(),
     ...result, outcomeMetricsAvailable: false as const,
     // Even a complete projection stream is NOT proof of full module
     // instrumentation, Person reconciliation, or verified training outcomes.

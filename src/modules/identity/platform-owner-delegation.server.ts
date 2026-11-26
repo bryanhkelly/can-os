@@ -8,7 +8,9 @@ import { readCookie } from "@/domain/session-cookies";
 import { roleCapabilities } from "@/domain/access-context";
 import { platformOwnerMayActAs, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
-import { readSessionGrants } from "./session-grants.server";
+import { isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { readOwnerDelegationGrants } from "./session-grants.server";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { writeAudit } from "@/platform/mutation";
 
@@ -26,13 +28,13 @@ export type PlatformOwnerDelegationRequest = z.infer<typeof delegationRequest>;
  * Always recheck the grant, the one-Person invariant, account verification and
  * the session's idle and absolute expiration.
  */
-export async function getVerifiedPlatformOwnerSession(request: Request) {
+export async function getVerifiedPlatformOwnerSession(request: Request, reader: Pick<typeof db,"select"> = db, lock = false) {
   const token = readCookie(request, accessSessionCookie);
   const pepper = process.env.CAN_ACCESS_TOKEN_PEPPER;
   if (!token || !/^[A-Za-z0-9_-]{40,}$/.test(token) || !pepper || pepper.length < 32)
     throw new AuthorizationError("verified Platform Owner session");
   const now = new Date();
-  const [owner] = await db.select({
+  const query = reader.select({
     sessionId: accessSessions.id,
     ownerAccountId: accessSessions.accountId,
     ownerPersonId: accessAccounts.personId,
@@ -40,6 +42,8 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
     grantId: accountPersonGrants.id,
     grantPersonId: accountPersonGrants.personId,
     accountVerifiedAt: accessAccounts.emailVerifiedAt,
+    authenticationMethod:accessSessions.authenticationMethod,
+    privateCredential: sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
     accountDisabled: accessAccounts.disabled,
     personActive: people.active,
     sessionSharedDevice: accessSessions.sharedDevice,
@@ -62,13 +66,15 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
       eq(accountPersonGrants.active, true),
       isNull(accountPersonGrants.organizationId),
       isNull(accountPersonGrants.siteId),
-    )).limit(1);
+    ));
+  const [owner]=await (lock?query.for("update"):query).limit(1);
   if (!owner || !owner.ownerPersonId || owner.ownerPersonId !== owner.grantPersonId ||
-      !owner.accountVerifiedAt || owner.accountDisabled || !owner.personActive ||
-      isDemoAccountEmail(owner.ownerEmail) ||
+      !owner.accountVerifiedAt || owner.privateCredential || owner.accountDisabled || !owner.personActive ||
+      !isEligiblePrivilegedMailbox(owner.ownerEmail) ||
+      (owner.authenticationMethod!=null && owner.authenticationMethod!=="email_link") ||
       (owner.sessionSharedDevice && now.getTime() - owner.lastActivityAt.getTime() >= 5 * 60_000))
     throw new AuthorizationError("verified Platform Owner identity");
-  await assertRawAccountPerson(owner.ownerAccountId, owner.ownerPersonId);
+  await assertRawAccountPerson(owner.ownerAccountId, owner.ownerPersonId,reader);
   return owner;
 }
 
@@ -77,7 +83,7 @@ export function assertPlatformOwnerUndelegated(owner:{delegatedGrantId:string|nu
   if(owner.delegatedGrantId) throw new AuthorizationError("return to Platform Owner first");
 }
 
-/** Opaque existing grant IDs are resolved only from current verified accounts.
+/** Opaque existing grant IDs are resolved from current eligible canonical accounts.
  * No impersonated persona, organization relationship or preview record is created.
  */
 export async function listPlatformOwnerTargets(request: Request, search: string) {
@@ -94,6 +100,7 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
     firstName: people.legalFirstName,
     lastName: people.legalLastName,
     email: accessAccounts.emailNormalized,
+    privateAccessCodeEnabled: sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
     organizationId: accountPersonGrants.organizationId,
     siteId: accountPersonGrants.siteId,
   }).from(accountPersonGrants)
@@ -101,7 +108,7 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
       eq(accessAccounts.id, accountPersonGrants.accountId),
       eq(accessAccounts.personId, accountPersonGrants.personId),
       eq(accessAccounts.disabled, false),
-      isNotNull(accessAccounts.emailVerifiedAt)))
+      or(isNotNull(accessAccounts.emailVerifiedAt), sql`${accessAccounts.emailNormalized} LIKE '%.demo'`)))
     .innerJoin(people, and(
       eq(people.id, accountPersonGrants.personId),
       eq(people.active, true)))
@@ -113,8 +120,12 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
         ilike(people.legalFirstName, term),
         ilike(people.legalLastName, term)),
     )).limit(26);
-  return { targets: rows.filter(row=>Object.hasOwn(roleCapabilities,row.role)&&!isDemoAccountEmail(row.email)).slice(0,25),
-    limited: rows.length > 25 };
+  const eligible = await Promise.all(rows.map(async row => {
+    if (!Object.hasOwn(roleCapabilities, row.role)) return null;
+    const grants = await readOwnerDelegationGrants(row.accountId, row.personId, row.email);
+    return grants.some(grant => grant.id === row.grantId) ? row : null;
+  }));
+  return { targets: eligible.filter(row => row !== null).slice(0,25), limited: rows.length > 25 };
 }
 
 /** Independent-account authorizations are rechecked again when the delegated
@@ -147,13 +158,13 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
       .where(eq(accountPersonGrants.id, data.grantId)).limit(1);
     if (!target || target.accountId === owner.ownerAccountId ||
         target.role === "platform_owner" || !Object.hasOwn(roleCapabilities, target.role) ||
-        !target.personActive || target.accountDisabled || !target.verifiedAt || isDemoAccountEmail(target.email) ||
+        !target.personActive || target.accountDisabled ||
         target.accountPersonId !== target.personId)
-      throw new AuthorizationError("existing verified delegate");
-    const { grants } = await readSessionGrants(target.accountId, target.email, tx);
+      throw new AuthorizationError("existing eligible delegate");
+    const grants = await readOwnerDelegationGrants(target.accountId, target.personId, target.email, tx);
     if (!grants.some(grant => grant.id === target.grantId && grant.active))
       throw new AuthorizationError("current delegated membership");
-    await assertRawAccountPerson(target.accountId, target.personId);
+    await assertRawAccountPerson(target.accountId, target.personId, tx);
     // Do not let delegation authorize a simulated independent reviewer decision.
     // Reviewer roles may be inspected with "View as" only.
     if (data.mode === "act" && !platformOwnerMayActAs(target.role))
@@ -216,5 +227,50 @@ export async function stopPlatformOwnerDelegation(request: Request) {
         previousGrantId: owner.delegatedGrantId, previousMode: owner.delegatedMode },
     });
     return { stopped: true };
+  });
+}
+
+/** Recover an already-issued private credential without reverting to a public
+ * shared code. Only an independently authenticated, undelegated owner may
+ * perform this operation. Protected roles cannot be acquired by rotation. */
+export async function rotatePrivateAccountAccessCode(request: Request, raw: unknown) {
+  if(request.headers.get("origin")!==new URL(request.url).origin)
+    throw new AuthorizationError("same-origin credential recovery");
+  const data=z.object({grantId:uuid,reason:z.string().trim().min(12).max(500),confirm:z.literal(true),operation:z.enum(["enroll","rotate"]).default("rotate")}).strict().parse(raw);
+  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+  if(!pepper||pepper.length<32)throw new Error("Account access is temporarily unavailable");
+  return db.transaction(async tx=>{
+    const owner=await getVerifiedPlatformOwnerSession(request,tx,true);
+    assertPlatformOwnerUndelegated(owner);
+    const [target]=await tx.select({accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
+      role:accountPersonGrants.role}).from(accountPersonGrants)
+      .where(and(eq(accountPersonGrants.id,data.grantId),eq(accountPersonGrants.active,true))).limit(1);
+    if(!target||target.accountId===owner.ownerAccountId||!platformOwnerMayActAs(target.role))
+      throw new AuthorizationError("eligible existing private-code account");
+    const [account]=await tx.select({id:accessAccounts.id,personId:accessAccounts.personId,email:accessAccounts.emailNormalized,
+      privateAccessCodeHash:accessAccounts.privateAccessCodeHash,disabled:accessAccounts.disabled})
+      .from(accessAccounts).where(eq(accessAccounts.id,target.accountId)).for("update").limit(1);
+    if(!account||account.disabled||account.personId!==target.personId||!isDemoAccountEmail(account.email)||
+      (data.operation==="rotate"?!account.privateAccessCodeHash:!!account.privateAccessCodeHash))
+      throw new AuthorizationError("existing private-code account");
+    const eligible=await readOwnerDelegationGrants(account.id,target.personId,account.email,tx);
+    const allGrants=await tx.select({role:accountPersonGrants.role,personId:accountPersonGrants.personId})
+      .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true))).limit(101);
+    if(!eligible.some(grant=>grant.id===data.grantId)||!allGrants.length||allGrants.length>100||
+      allGrants.some(grant=>grant.personId!==target.personId||!platformOwnerMayActAs(grant.role)))
+      throw new AuthorizationError("independently protected account");
+    const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential(pepper);
+    const now=new Date();
+    await tx.update(accessAccounts).set({privateAccessCodeHash,updatedAt:now})
+      .where(eq(accessAccounts.id,account.id));
+    const revoked=await tx.update(accessSessions).set({revokedAt:now,updatedAt:now})
+      .where(and(eq(accessSessions.accountId,account.id),isNull(accessSessions.revokedAt)))
+      .returning({id:accessSessions.id});
+    await writeAudit(tx,{actorPersonId:owner.ownerPersonId,action:data.operation==="enroll"?"identity.private_access_code.enrolled":"identity.private_access_code.rotated",
+      resourceType:"account",resourceId:account.id,scope:{},context:{
+        ownerAccountId:owner.ownerAccountId,targetPersonId:target.personId,grantId:data.grantId,
+        reason:data.reason,revokedCount:revoked.length,
+      }});
+    return {privateAccessCode,revokedCount:revoked.length};
   });
 }

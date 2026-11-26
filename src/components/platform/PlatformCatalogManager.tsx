@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/ui/field";
-import { WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, QueryState, ActionFooter } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import type { PlatformProgramDraft, PlatformBlueprintDraft } from "@/domain/platform-catalog";
 import {
@@ -132,16 +132,11 @@ export function PlatformCatalogManager() {
 
     {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
     {message && <WorkspaceNotice tone="success">{message}</WorkspaceNotice>}
-    {!catalog && !error && <p role="status" className="text-sm text-muted-foreground">Loading catalog definitions…</p>}
+    {!catalog && !error && <QueryState loading="Loading catalog definitions…"/>}
 
     <div className="grid gap-5 xl:grid-cols-2">
-      <section className="space-y-4 border border-border bg-card p-5" aria-label="Program definition editor">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-semibold">Program definitions</h3>
-          <Button type="button" variant="outline" size="sm" onClick={() => { setProgram(emptyProgram); setSelected(null); }}>
-            New Program
-          </Button>
-        </div>
+      <WorkspacePanel headingLevel="h3" title="Program definitions" actions={<Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => { setProgram(emptyProgram); setSelected(null); }}>New Program</Button>}>
+        <div className="space-y-4">
         <Field label="Load a Program version">
           <Select value="" disabled={!catalog || busy}
             onChange={event => {
@@ -181,17 +176,13 @@ export function PlatformCatalogManager() {
             <Textarea rows={3} value={program.description} maxLength={4000}
               onChange={event => setProgram({ ...program, description: event.target.value })}/>
           </Field>
-          <Button type="submit" disabled={busy} loading={busy}>Save new draft version</Button>
+          <ActionFooter layout="form"><Button type="submit" disabled={busy} loading={busy}>Save new draft version</Button></ActionFooter>
         </form>
-      </section>
-
-      <section className="space-y-4 border border-border bg-card p-5" aria-label="Reusable Blueprint editor">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-semibold">Solution Blueprints</h3>
-          <Button type="button" variant="outline" size="sm" onClick={() => { setBlueprint(emptyBlueprint); setSelected(null); }}>
-            New Blueprint
-          </Button>
         </div>
+      </WorkspacePanel>
+
+      <WorkspacePanel headingLevel="h3" title="Solution Blueprints" actions={<Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => { setBlueprint(emptyBlueprint); setSelected(null); }}>New Blueprint</Button>}>
+        <div className="space-y-4">
         <Field label="Load a Blueprint version">
           <Select value="" disabled={!catalog || busy}
             onChange={event => {
@@ -282,13 +273,14 @@ export function PlatformCatalogManager() {
               </Button>}
             </div>)}
           </div>
-          <Button type="submit" disabled={busy} loading={busy}>Save new draft version</Button>
+          <ActionFooter layout="form"><Button type="submit" disabled={busy} loading={busy}>Save new draft version</Button></ActionFooter>
         </form>
-      </section>
+        </div>
+      </WorkspacePanel>
     </div>
 
-    <section className="space-y-3 border border-border bg-card p-5" aria-label="Review and publish planning definitions">
-      <h3 className="font-semibold">Review and publish</h3>
+    <WorkspacePanel headingLevel="h3" title="Review and publish">
+      <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
         Select the latest draft version. Another App Admin may record an optional
         independent review. The author can publish planning-only definitions
@@ -312,12 +304,13 @@ export function PlatformCatalogManager() {
             </option>)}
         </Select>
       </Field>
-      <div className="flex flex-wrap gap-2">
+      <ActionFooter layout="inline">
         <Button type="button" variant="outline" disabled={!selected || busy}
           onClick={() => void decide("review")}>Optional peer review</Button>
         <Button type="button" disabled={!selected || busy}
           onClick={() => void decide("publish")}>Publish reviewed planning version</Button>
+      </ActionFooter>
       </div>
-    </section>
+    </WorkspacePanel>
   </section>;
 }

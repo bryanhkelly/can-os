@@ -6,6 +6,7 @@ const activity=read("src/modules/learning/my-activity.functions.ts");
 const native=read("src/modules/classes/native-class-enrollment.functions.ts");
 const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
 const waitlist=read("src/modules/enrollment/noncredit-waitlist.functions.ts");
+const participant=read("src/modules/enrollment/noncredit-self-enrollment-identity.server.ts");
 const ui=read("src/routes/learn.my-activity.tsx");
 
 describe("account-wide participation source authority and pagination",()=>{
@@ -80,8 +81,10 @@ describe("account-wide participation source authority and pagination",()=>{
     "cursor.waitlistId",
     "eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId)",
     "eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId)",
-    "owner.personId!==actor.actorPersonId",
+    "requireNoncreditParticipantAccount()",
   ])expect(waitlist).toContain(phrase);
+  expect(participant).toContain("account.personId!==personId");
+  expect(waitlist).toContain("assertNoncreditParticipantRelease(current,release)");
   expect(waitlist).toContain("limit(51)");
   expect(waitlist).toContain("nextCursor");
   expect(waitlist).not.toContain("tx.insert(canonicalClassEnrollments)");
@@ -95,6 +98,9 @@ describe("account-wide participation source authority and pagination",()=>{
   expect(activity).toContain("nextCursors");
   expect(activity).toContain("getMyActivityOpportunityPage");
   expect(activity).toContain("getMyNoncreditWaitlistPage");
+  expect(activity).not.toContain("session.demoTenant");
+  expect(activity).not.toContain("isDemoAccountEmail");
+  expect(activity).toContain("independentSourceExcluded(session)");
   expect(ui).toContain("nextOpportunityCursor");
   expect(ui).toContain("getMyActivityOpportunityPage");
   expect(ui).toContain("Load older activity");

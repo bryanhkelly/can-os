@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { hasReviewedVisualEvidence } from "./lib/v61-visual-evidence.mjs";
 import { join, relative } from "node:path";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { createInventory, discoverTsx } from "./lib/v61-source-audit.mjs";
+import { createInventory, discoverTsx, inspectV61ThemeTokens, collectV61SourceViolations } from "./lib/v61-source-audit.mjs";
 
 /**
  * Coverage guard for V6.1. The normal source audit inspects every non-test
@@ -25,12 +25,13 @@ const unresolvedSource = inventory.inspected.flatMap(file => {
   // The AST already exempts accessible checkbox/radio card labels. Any
   // remaining native label is actionable design-system debt.
   const rawControls = file.native;
-  if (!rawControls.length && !file.corners.length && !file.syntaxErrors.length) return [];
+  if (!rawControls.length && !file.corners.length && !file.appearance.length && !file.syntaxErrors.length) return [];
   return [{
     path: file.path,
     rawControlCount: rawControls.length,
     nativeLabelCount: file.native.filter(item => item.tag === "label").length,
     roundedUtilityCount: file.corners.length,
+    appearanceViolationCount: file.appearance.length,
     syntaxErrorCount: file.syntaxErrors.length,
   }];
 });
@@ -58,16 +59,7 @@ const serverPresentation = walk(src)
 // This establishes source ownership only; light/dark/browser contrast must
 // still be verified with the rendered page and BrandTheme where applicable.
 const sharedCss = readFileSync(join(src, "styles.css"), "utf8");
-const sharedThemeTokens = {
-  fontSans: /--font-sans:\s*"DM Sans"/.test(sharedCss),
-  fontSerif: /--font-serif:\s*"Instrument Serif"/.test(sharedCss),
-  squareGeometry: /--radius:\s*0(?:px|rem)?\s*;/.test(sharedCss),
-  semanticSuccess: /--color-success:\s*var\(--success\)/.test(sharedCss),
-  semanticWarning: /--color-warning:\s*var\(--warning\)/.test(sharedCss),
-  semanticDanger: /--color-danger:\s*var\(--danger\)/.test(sharedCss),
-  shellWidth: /--sidebar-width:\s*[^;]+;/.test(sharedCss),
-  shellHeight: /--topbar-height:\s*[^;]+;/.test(sharedCss),
-};
+const sharedThemeTokens = inspectV61ThemeTokens(sharedCss);
 const missingThemeTokens = Object.entries(sharedThemeTokens)
   .filter(([, found]) => !found).map(([token]) => token);
 
@@ -80,7 +72,7 @@ const report = {
   inspectedTsx: reviewed.size,
   omittedTsx: missing,
   sharedThemeTokens,
-  sourceDebt: { count: unresolvedSource.length, files: unresolvedSource },
+  sourceDebt: { count: unresolvedSource.length, files: unresolvedSource, violations: collectV61SourceViolations(inventory) },
   independentlyReviewedRequired: {
     note: "These render public HTML or Storybook content outside the application TSX audit; inspect their actual output independently.",
     serverPresentation,
@@ -103,7 +95,7 @@ if (missing.length) {
 }
 if (unresolvedSource.length) {
   console.error("V6.1 SOURCE NOT ALIGNED: " + unresolvedSource.length +
-    " files retain legacy controls, geometry or syntax. See sourceDebt.");
+    " files retain legacy controls, geometry, appearance overrides or syntax. See sourceDebt.");
   process.exitCode = 1;
 }
 const independent = [...new Set([

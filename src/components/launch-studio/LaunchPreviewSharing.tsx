@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { ActionDialog, EmptyState, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { ActionDialog, EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel, ActionFooter } from "@/components/workspace";
 import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -139,7 +139,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
           Sharing does not publish the Site.
         </WorkspaceNotice>
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="Link expiration" className="min-w-44 flex-1">
+          <Field label="Link expiration" className="min-w-0 flex-1 sm:min-w-44">
             <Select id="website-preview-expiration"
               value={expiresAfterDays === null ? "never" : String(expiresAfterDays)}
               disabled={busy} onChange={event => {
@@ -163,7 +163,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
           <p className="mt-1 text-xs text-muted-foreground">
             Copy this Go Link now or retrieve it later from your active preview links.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <ActionFooter layout="inline">
             <Input readOnly aria-label="Created shareable website preview URL" value={createdUrl}
               onFocus={event => event.currentTarget.select()} className="min-w-0 flex-1" />
             {createdCode && <CopyLinkButton destination={{kind:"go",code:createdCode}}/>}
@@ -171,13 +171,10 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
             <Button asChild variant="outline">
               <a href={createdUrl} target="_blank" rel="noopener noreferrer">Open <ExternalLink className="size-4" /></a>
             </Button>
-          </div>
+          </ActionFooter>
         </div>}
-        <div className="border-t pt-4">
-          <h3 className="text-sm font-semibold">Active preview links</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Up to five active links. Revoke any link to stop access to its frozen website snapshot.
-          </p>
+        <WorkspacePanel headingLevel="h3" title="Active preview links"
+          description="Up to five active links. Revoke any link to stop access to its frozen website snapshot.">
           {loading ? <QueryState loading="Loading preview links…"/>
             : activeShares.length ? <div className="mt-3 space-y-2">
               {activeShares.map(share => <div key={share.id}
@@ -200,7 +197,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
                 </div>
               </div>)}
             </div> : !error ? <EmptyState className="mt-3" title="No active preview links."/> : null}
-        </div>
+        </WorkspacePanel>
         {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
       </div>
     </Modal>

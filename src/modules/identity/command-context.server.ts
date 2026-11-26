@@ -1,14 +1,15 @@
-import {and,eq,gt,isNull,inArray,isNotNull} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
-import {readSessionGrants} from "./session-grants.server";
+import {readSessionGrants, readOwnerDelegationGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { authorizedProgramWhere } from "./authorized-program-query.server";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { isDemoAccountEmail } from "@/domain/domain-classification";
+import { sessionCredentialMode } from "@/domain/session-credential-policy";
 import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
 import { platformOwnerMayActAs } from "@/domain/platform-owner-delegation";
 
@@ -37,6 +38,8 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
   email:accessAccounts.emailNormalized,emailVerifiedAt:accessAccounts.emailVerifiedAt,
   accountPersonId:accessAccounts.personId,
+  authenticationMethod:accessSessions.authenticationMethod,
+  privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
   delegatedGrantId:accessSessions.delegatedGrantId,
   delegatedMode:accessSessions.delegatedMode,
@@ -48,11 +51,12 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   .limit(1);
  // Only real email-link logins attest mailbox ownership. A .demo session
  // must instead pass the exact active grant and tenant binding checks below.
- if(!session || (!session.emailVerifiedAt && !isDemoAccountEmail(session.email)))
+ if(!session || (!session.emailVerifiedAt && !isDemoAccountEmail(session.email)) ||
+    sessionCredentialMode({email:session.email,privateCredential:session.privateCredential,authenticationMethod:session.authenticationMethod})==="denied")
   return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
- const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
+ const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,db,session.authenticationMethod);
  // A real login cannot change Person by switching its active grant. This
  // invariant applies across all Site and Organization roles, not just staff.
  if(!demoAccountSwitching){
@@ -82,12 +86,13 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
    personId:accessAccounts.personId,
    email:accessAccounts.emailNormalized,
    emailVerifiedAt:accessAccounts.emailVerifiedAt,
+   privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
   }).from(accessAccounts).where(and(
    eq(accessAccounts.id,activeGrant.accountId),
    eq(accessAccounts.disabled,false),
   )).limit(1);
-  if(!target || target.personId!==activeGrant.personId ||
-     (!target.emailVerifiedAt && !isDemoAccountEmail(target.email)))
+  if(!target || target.privateCredential || target.personId!==activeGrant.personId ||
+     !isDemoAccountEmail(target.email) || !target.email.endsWith("@valorschool.demo"))
    return rejectSession(request,"membership_unavailable");
   try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
   catch { return rejectSession(request,"membership_unavailable"); }
@@ -127,20 +132,19 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   }).from(accountPersonGrants)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
    .where(and(eq(accountPersonGrants.id,session.delegatedGrantId),
-      eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false),
-      isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
-  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||isDemoAccountEmail(target.email)||
+      eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false))).limit(1);
+  if(!target||target.role==="platform_owner"||target.accountId===owner.ownerAccountId||
      !target.accountPersonId||target.accountPersonId!==target.personId)
    return rejectSession(request,"membership_unavailable");
   try{await assertRawAccountPerson(target.accountId,target.personId);}
   catch{return rejectSession(request,"membership_unavailable");}
-  const eligible=await readSessionGrants(target.accountId,target.email);
-  const exact=eligible.grants.find(grant=>grant.id===session.delegatedGrantId&&grant.active);
+  const eligible=await readOwnerDelegationGrants(target.accountId,target.personId,target.email);
+  const exact=eligible.find(grant=>grant.id===session.delegatedGrantId&&grant.active);
   if(!exact)return rejectSession(request,"membership_unavailable");
   if(session.delegatedMode==="act" && !platformOwnerMayActAs(exact.role))
    throw new AuthorizationError("independent protected reviewer role");
   effectiveGrant=exact;
-  effectiveGrants=eligible.grants;
+  effectiveGrants=eligible;
   ownerDelegation={mode:session.delegatedMode,expiresAt:session.delegatedUntil};
  }
  // A malformed Site membership must never expand into a different tenant.
@@ -154,6 +158,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   accountId:effectiveGrant.accountId,
   sessionId:session.id,activeGrantId:effectiveGrant.id,
  },effectiveGrants);
+ context.authenticationMethod=session.authenticationMethod;
  if(ownerDelegation){
   context.impersonatedByAccountId=session.accountId;
   context.delegatedByPlatformOwner=true;

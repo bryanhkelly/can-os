@@ -219,14 +219,14 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
             description="Record reviews identified by the authorized case response. A review assignment grants no new case access and does not determine legal reporting requirements." className="mt-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <Label className="text-sm">Review type
-                <Select value={reviewKind} onChange={event=>setReviewKind(event.target.value as typeof reviewKind)} className="mt-1 w-full  border bg-background p-2">
+                <Select value={reviewKind} onChange={event=>setReviewKind(event.target.value as typeof reviewKind)} className="mt-1">
                   <option value="follow_up_review">Follow-up review</option>
                   <option value="protective_measure_review">Protective-measure review</option>
                   <option value="external_reporting_review">External-reporting review</option>
                 </Select>
               </Label>
               <Label className="text-sm">Assigned case responder
-                <Select value={reviewerId} onChange={event=>setReviewerId(event.target.value)} className="mt-1 w-full  border bg-background p-2">
+                <Select value={reviewerId} onChange={event=>setReviewerId(event.target.value)} className="mt-1">
                   <option value="">Choose an assigned responder</option>
                   {[...new Map(detail.assignments.filter(row=>!row.revokedAt).map(row=>[row.personId,row])).values()]
                     .map(row=><option key={row.personId} value={row.personId}>{name(row)}</option>)}
@@ -235,7 +235,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
             </div>
             <Label className="mt-3 block text-sm">What must be reviewed
               <Textarea rows={2} maxLength={2000} value={reviewNotes} onChange={event=>setReviewNotes(event.target.value)}
-                className="mt-1 w-full  border bg-background p-2"/>
+                className="mt-1"/>
             </Label>
             <Button className="mt-3" disabled={!!busy||!reviewerId||reviewNotes.trim().length<10} onClick={()=>void assignReview()}>Assign restricted review</Button>
           </WorkspacePanel>}
@@ -250,7 +250,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
                 <Label className="mt-3 block text-sm">Your factual review outcome
                   <Textarea rows={2} maxLength={2000} value={reviewOutcomes[review.id]??""}
                     onChange={event=>setReviewOutcomes(values=>({...values,[review.id]:event.target.value}))}
-                    className="mt-1 w-full  border bg-background p-2"/>
+                    className="mt-1"/>
                 </Label>
                 <Button variant="outline" className="mt-2" disabled={!!busy||(reviewOutcomes[review.id]??"").trim().length<10}
                   onClick={()=>void completeReview(review.id)}>Complete assigned review</Button>
@@ -264,7 +264,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
               <Textarea value={resolution} maxLength={2000} rows={4}
                 onChange={event => setResolution(event.target.value)}
                 placeholder="What was actually done, by whom, and what — if anything — remains outstanding?"
-                className="mt-2 w-full  border bg-background p-3 text-sm font-normal" />
+                className="mt-2" />
             </Label>
             <Button className="mt-3" disabled={!!busy || resolution.trim().length < 10 || detail.reviews.some(review=>review.status==="pending")} onClick={() => void closeCase()}>
               {busy === "close" ? "Closing…" : "Close restricted case"}

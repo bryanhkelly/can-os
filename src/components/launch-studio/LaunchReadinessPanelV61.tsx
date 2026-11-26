@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { WorkspacePanel } from "@/components/workspace";
+import { WorkspacePanel, WorkspaceNotice } from "@/components/workspace";
 import { listLaunches } from "@/modules/programs/launch.functions";
 import { readCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-studio.functions";
 import { readLaunchSitePublication } from "@/modules/sites/launch-site-publication.functions";
@@ -104,7 +104,7 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
         {pending ? "Checking your latest progress…" : "Your current preparation status"}
       </p>
       <Button type="button" size="sm" variant="outline"
-        onClick={()=>setReload(value=>value+1)}>Refresh readiness</Button>
+        disabled={pending} loading={pending} loadingLabel="Checking readiness…" onClick={()=>setReload(value=>value+1)}>Refresh readiness</Button>
     </div>
     <div className="mt-4 grid gap-4">
       <ProgramOfferingJourneyReadinessV61 siteId={siteId} context={context}
@@ -113,10 +113,10 @@ function LaunchReadinessPanelScoped({ siteId, context }: LaunchReadinessPanelV61
       {solutionPreparation!==null
         ? <SolutionPreparationSummaryV61 siteId={siteId} plans={solutionPreparation}
             open={context==="open"}/>
-        : <p role="status" className="border p-3 text-sm">
+        : <WorkspaceNotice tone={solutions.state==="loading"?"info":"attention"}>
             Solution information is {solutions.state==="loading"?"loading":"unavailable"}.
             Try refreshing to check the latest requirements.
-          </p>}
+          </WorkspaceNotice>}
       <ProgramRequirementsReadinessV61 programs={programs} />
       <SitePublicationReadinessV61 publication={publication} />
       {context==="open" && <NoncreditPublisherReadinessV61 siteId={siteId} noncredit={noncredit}/>}

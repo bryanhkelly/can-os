@@ -876,6 +876,69 @@
       "when": 1795462018000,
       "tag": "0124_private_academic_evidence_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1795462019000,
+      "tag": "0125_organization_domain_classification",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1795462020000,
+      "tag": "0126_person_and_provider_domains",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1795462021000,
+      "tag": "0127_site_signup_and_fixture_domains",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1795462022000,
+      "tag": "0128_fixture_person_domain_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1795462023000,
+      "tag": "0129_valor_fixture_domains",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1795462024000,
+      "tag": "0130_geography_domain_parity",
+      "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "7",
+      "when": 1795462025000,
+      "tag": "0131_private_account_access_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1795462026000,
+      "tag": "0132_session_authentication_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1795462027000,
+      "tag": "0133_restricted_staff_credential_parity",
+      "breakpoints": true
     }
   ]
 }

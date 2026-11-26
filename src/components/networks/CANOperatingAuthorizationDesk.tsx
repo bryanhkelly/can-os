@@ -95,7 +95,7 @@ export function CANOperatingAuthorizationDesk() {
                   onChange={id=>update(item.id,"evidence",id)}/>
               </div>
               {item.status==="requested"&&<Label className="text-xs">Effective from
-                <Input type="date" className="mt-1 w-full  border bg-background p-2" value={value.from}
+                <Input type="date" className="mt-1" value={value.from}
                   onChange={e=>update(item.id,"from",e.target.value)}/>
               </Label>}
               {item.status==="approved"&&<p className="text-xs sm:col-span-2">
@@ -103,12 +103,12 @@ export function CANOperatingAuthorizationDesk() {
                 It does not renew school-opening authorization or change staff grants.
               </p>}
               <Label className="text-xs">Effective through (exclusive)
-                <Input type="date" className="mt-1 w-full  border bg-background p-2" value={value.through}
+                <Input type="date" className="mt-1" value={value.through}
                   onChange={e=>update(item.id,"through",e.target.value)}/>
               </Label>
             </>}
             <Label className="text-xs sm:col-span-2">Decision reason
-              <Input className="mt-1 w-full  border bg-background p-2" minLength={10} maxLength={500}
+              <Input className="mt-1" minLength={10} maxLength={500}
                 value={value.reason} onChange={e=>update(item.id,"reason",e.target.value)}/>
             </Label>
             <div className="sm:col-span-2 flex flex-wrap gap-2">
@@ -140,7 +140,7 @@ export function CANOperatingAuthorizationDesk() {
         Program and their specifically assigned classes.
       </p>
       <Label className="mt-3 block text-sm">Church school
-        <Select className="mt-1 w-full  border bg-background p-2"
+        <Select className="mt-1"
           value={staffProgramId} onChange={e=>setStaffProgramId(e.target.value)}>
           <option value="">Choose approved CAN–church Program…</option>
           {desk.authorizations.filter(item=>item.status==="approved")

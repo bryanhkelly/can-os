@@ -15,7 +15,7 @@ const member = { role: "site_admin", firstName: "Avery", lastName: "Admin", site
 const sites = [{ id: "east", name: "East School" }];
 const path = "/launch/site";
 
-function Shell({ children, demo = false }: { children: ReactNode; demo?: boolean }) {
+function Shell({ children, sharedCredentialSwitching = false }: { children: ReactNode; sharedCredentialSwitching?: boolean }) {
   const links = workspaceLinks.site_admin;
   const [collapsed, setCollapsed] = useState(false);
   return <div className="can-shell" data-sidebar={collapsed ? "collapsed" : undefined}>
@@ -23,7 +23,7 @@ function Shell({ children, demo = false }: { children: ReactNode; demo?: boolean
       expanded={!collapsed} onToggle={() => setCollapsed(value => !value)} />
     <div className="min-w-0">
       <WorkspaceTopBar member={member} sites={sites} authenticated sessionAvailable sessionError={null} error=""
-        demoAccountSwitching={false} demoTenant={demo} changing={false} menuOpen={false} switcherOpen={false} accountOpen={false}
+        demoAccountSwitching={sharedCredentialSwitching} changing={false} menuOpen={false} switcherOpen={false} accountOpen={false}
         onToggleMenu={fn()} onOpenSwitcher={fn()} onOpenSearch={fn()} onOpenAsk={fn()} onOpenNotifications={fn()} onOpenAccount={fn()} />
       {children}
     </div>
@@ -99,14 +99,15 @@ export const RoleHome: Story = {
   },
 };
 
-export const WithDemoNotice: Story = {
-  render: () => <Shell demo>
+export const WithSharedCredentialNotice: Story = {
+  render: () => <Shell sharedCredentialSwitching>
     <WorkspaceShell eyebrow="Operations" title="Needs you"><p>Content</p></WorkspaceShell>
   </Shell>,
   play: async ({ canvasElement }) => {
     await expectShellGrid(canvasElement);
     const bar = within(canvasElement).getByRole("banner", { name: "Workspace top bar" });
-    await expect(within(bar).queryByText(/Demo school:/)).not.toBeInTheDocument();
+    await expect(within(bar).queryByText(/Demo admin session:/)).not.toBeInTheDocument();
+    await expect(within(canvasElement).getByRole("button",{name:"Dismiss demo information"})).toBeVisible();
   },
 };
 

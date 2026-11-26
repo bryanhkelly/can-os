@@ -60,7 +60,7 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     if(!account||account.disabled||(!account.verifiedAt&&!directStudent)||
        account.personId!==actor.actorPersonId)
       throw new AuthorizationError("single CAN account Person");
-    const {grants}=directStudent?{grants:[]} : await readSessionGrants(actor.accountId,account.email);
+    const {grants}=directStudent?{grants:[]} : await readSessionGrants(actor.accountId,account.email,db,actor.authenticationMethod);
     // Explicitly match original live grants to this single authenticated
     // Person. Demo delegation cannot ever merge a second Person's history.
     const memberships=selectActivityMemberships(grants,actor.accountId,actor.actorPersonId);

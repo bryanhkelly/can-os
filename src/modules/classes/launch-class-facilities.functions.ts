@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people, sites } from "@/db/schema";
 import { canonicalClasses, canonicalClassStaffAssignments, siteSpaces } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
 import {
   readSiteSpacesV61Schema, parseSitePlanningResourcesV61,
   roomPlanningFitsClass, saveClassPhysicalPlanV61Schema,
@@ -74,7 +74,6 @@ export const readLaunchClassFacilitiesV61=createServerFn({method:"GET"})
       if(assignments.length>2000)throw new DomainError("UNAVAILABLE","Staff assignment directory too large");
       const peopleWithGrant=await tx.select({
         id:people.id,first:people.legalFirstName,last:people.legalLastName,
-        email:accessAccounts.emailNormalized,
       }).from(accountPersonGrants)
         .innerJoin(accessAccounts,and(
           eq(accessAccounts.id,accountPersonGrants.accountId),
@@ -86,7 +85,7 @@ export const readLaunchClassFacilitiesV61=createServerFn({method:"GET"})
           eq(accountPersonGrants.active,true),
           eq(people.active,true),
           eq(accessAccounts.disabled,false),
-          isNotNull(accessAccounts.emailVerifiedAt))).limit(501);
+          verifiedStaffIdentityPredicate())).limit(501);
       if(peopleWithGrant.length>500)throw new DomainError("UNAVAILABLE","Facilitator directory too large");
       const spaces=await tx.select().from(siteSpaces)
         .where(eq(siteSpaces.siteId,site.id)).orderBy(asc(siteSpaces.name)).limit(501);
@@ -96,7 +95,6 @@ export const readLaunchClassFacilitiesV61=createServerFn({method:"GET"})
         resources:parseSitePlanningResourcesV61(space.resources),
       })),
         facilitators:peopleWithGrant
-          .filter(row=>!isDemoAccountEmail(row.email))
           .map(row=>({personId:row.id,name:[row.first,row.last].filter(Boolean).join(" ")})),
         classes:classes.map(cls=>({
           classId:cls.id,title:cls.title,state:cls.state,capacity:cls.capacity,
@@ -177,7 +175,7 @@ export const saveLaunchClassPhysicalPlanV61=createServerFn({method:"POST"})
             eq(accountPersonGrants.active,true),
             eq(people.active,true),
             eq(accessAccounts.disabled,false),
-            isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
+            verifiedStaffIdentityPredicate())).limit(1);
         if(!grant)throw new AuthorizationError("current verified Site facilitator");
       }
       if(cls.physicalSpaceId===data.spaceId &&

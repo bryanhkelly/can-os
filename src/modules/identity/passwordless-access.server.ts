@@ -5,7 +5,7 @@ import { roleCapabilities } from "@/domain/access-context";
 import { assertMembershipSwitchIdentity } from "@/domain/membership-switch-policy";
 import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
-import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
+import { clearSessionCookieHeader,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import {
  isDemoAccountEmail,isApprovedDemoGrant,
  LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,
@@ -18,7 +18,7 @@ import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
-import { realSchoolSetupSignupSchema } from "@/domain/school-setup";
+import { realSchoolSetupSignupSchema, siteSignupSchema } from "@/domain/school-setup";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -128,24 +128,36 @@ export async function requestSchoolSetupAccess(input:unknown,sender:AccessEmailS
   if(prior?.consumedAt)return;
   if(prior&&prior.expiresAt>now){
    if(prior.schoolName!==data.name||prior.organizationName!== (data.organizationName ?? null)||
-     prior.organizationType!==data.organizationType||
+     prior.organizationType!==data.organizationType||prior.organizationDomain!==(data.organizationDomain??null)||
      prior.firstName!==data.firstName||prior.lastName!==data.lastName)return;
    await tx.update(schoolSetupSignups).set({expiresAt,updatedAt:now})
     .where(eq(schoolSetupSignups.id,prior.id));
    return;
   }
   if(prior){
-   await tx.update(schoolSetupSignups).set({schoolName:data.name,organizationName:data.organizationName??null,organizationType:data.organizationType,firstName:data.firstName,
+   await tx.update(schoolSetupSignups).set({schoolName:data.name,organizationName:data.organizationName??null,organizationDomain:data.organizationDomain??null,organizationType:data.organizationType,firstName:data.firstName,
     lastName:data.lastName,expiresAt,consumedAt:null,organizationId:null,siteId:null,updatedAt:now})
     .where(eq(schoolSetupSignups.id,prior.id));
   }else{
    await tx.insert(schoolSetupSignups).values({accountId,schoolName:data.name,
-    organizationName:data.organizationName??null,organizationType:data.organizationType,
+    organizationName:data.organizationName??null,organizationDomain:data.organizationDomain??null,organizationType:data.organizationType,
     firstName:data.firstName,lastName:data.lastName,expiresAt});
   }
  });
  await issueOneTimeAccess(email,sender);
  return genericResult;
+}
+/** Public signup approval dispatch. The UI never selects an account type. */
+export async function requestSiteSignup(input:unknown) {
+ const data=siteSignupSchema.parse(input);
+ if(isDemoAccountEmail(data.email)) {
+  const {provisionDemoSiteSignup}=await import("./school-setup-signup.server");
+  const result = await provisionDemoSiteSignup(data);
+  return {accepted:true as const,demo:true as const,privateAccessCode:result.privateAccessCode};
+ }
+ try {await requestSchoolSetupAccess(data);}
+ catch {console.error("[site-signup] verified email request unavailable");}
+ return {accepted:true as const,demo:false as const};
 }
 /** This privileged status is for already-authorized onboarding staff only.
  * Dispatched means the configured sender accepted the message, not inbox delivery. */
@@ -190,7 +202,7 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
     eq(people.active,true)));
-  const {grants:authorizedGrants}=await readSessionGrants(account.id,account.email,tx);
+  const {grants:authorizedGrants}=await readSessionGrants(account.id,account.email,tx,"email_link");
   const authorizedGrantIds=new Set(authorizedGrants.map(grant=>grant.id));
   // A newly accepted church-onboarding grant takes priority over an older
   // membership so the first sign-in lands in that church's own setup workspace.
@@ -246,6 +258,7 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
    activeGrantId:activeGrant.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
+   authenticationMethod:"email_link",
    ...(device?device:{}),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
@@ -269,7 +282,7 @@ export async function redeemDemoAccess(
  code:string,
   device?:SessionDeviceContext,
 ):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string;homeSiteId?:string}> {
- if(code!==LOCAL_DEMO_ACCESS_CODE) {
+ if(code!==LOCAL_DEMO_ACCESS_CODE && !isPrivateAccessCode(code)) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
  let email:string;
@@ -286,16 +299,22 @@ export async function redeemDemoAccess(
  try {
  return await db.transaction(async tx=>{
   step="account_lookup";
-  const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized})
+  const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized,
+   privateAccessCodeHash:accessAccounts.privateAccessCodeHash})
    .from(accessAccounts)
    // Shared demo codes attest an explicitly bound synthetic Person and grant,
    // NOT control of a deliverable mailbox. The grant reader below enforces
    // fixed Valor identities or exact registered-school/invitation bindings.
    .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
-   .limit(1);
-  if(!account)throw new InvalidAccessCredentialError("Invalid demo credentials");
+   .for("update").limit(1);
+  if(!account || account.email!==email)throw new InvalidAccessCredentialError("Invalid demo credentials");
+  const privateCredential = account.privateAccessCodeHash != null;
+  if (privateCredential
+    ? !isPrivateAccessCode(code) || !equalSecretHashes(account.privateAccessCodeHash!,hashPrivateAccessCode(code,pepper))
+    : code!==LOCAL_DEMO_ACCESS_CODE)
+   throw new InvalidAccessCredentialError("Invalid demo credentials");
   step="grant_lookup";
-  if(!email.endsWith("@valorschool.demo")){
+  if(!privateCredential && !email.endsWith("@valorschool.demo")){
    const bindings=await readDemoStaffBindings(account.id,tx);
    if(bindings.length){
     const pending=await listPendingStaffInvitations(tx,account.id);
@@ -303,12 +322,12 @@ export async function redeemDemoAccess(
      bindings.some(binding=>matchesDemoStaffBinding(binding,invitation,email))),now);
    }
   }
-  const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx);
+  const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx,privateCredential?"private_access_code":"local_demo_code");
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
   // Demo login chooses the fixed original primary membership; all additional
   // roles are selected through the same normal server-authoritative switcher.
-  const fixed=LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===account.id);
-  const grant=account.id===LOCAL_DEMO_ADMIN.accountId
+  const fixed=privateCredential?undefined:LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===account.id);
+  const grant=!privateCredential && account.id===LOCAL_DEMO_ADMIN.accountId
    ?accountGrants.find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
    :fixed?accountGrants.find(candidate=>candidate.role===fixed.role.toLowerCase())
    :[...accountGrants].sort((a,b)=>a.role.localeCompare(b.role)||a.id.localeCompare(b.id))[0];
@@ -326,6 +345,7 @@ export async function redeemDemoAccess(
   step="session_creation";
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,
+   authenticationMethod:privateCredential?"private_access_code":"local_demo_code",
    secretHash:hashAccessSecret(secret,pepper),
    activeGrantId:grant.id,
    expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
@@ -337,7 +357,7 @@ export async function redeemDemoAccess(
    action:"identity.session.started",actorPersonId:grant.personId,
    accountId:grant.accountId,sessionAccountId:account.id,
    sessionId:session.id,grantId:grant.id,
-   role:grant.role,method:"local_demo_code",
+   role:grant.role,method:privateCredential?"private_access_code":"local_demo_code",
   });
   step="session_transaction";
   return {
@@ -380,23 +400,24 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   const now=new Date();
   const [session]=await tx.select({
    accountId:accessSessions.accountId,email:accessAccounts.emailNormalized,
-   personId:accessAccounts.personId,
+   personId:accessAccounts.personId,authenticationMethod:accessSessions.authenticationMethod,
+   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
   }).from(accessSessions)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     eq(accessAccounts.disabled,false),isNull(accessSessions.revokedAt),
     gt(accessSessions.expiresAt,now),gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
    .limit(1).for("update");
-  if(!session)throw new AuthorizationError("authenticated session");
-  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,tx);
+  if(!session || (session.sharedDevice && now.getTime()-session.lastActivityAt.getTime()>=300000))throw new AuthorizationError("authenticated session");
+  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,tx,session.authenticationMethod);
   // Independently verify the entire real account inside the locked session
   // transaction. Filtered invitation grants cannot conceal a second Person.
   const activePersonIds=demoAccountSwitching?[]:(
-   await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants)
+   await tx.selectDistinct({personId:accountPersonGrants.personId}).from(accountPersonGrants)
     .where(and(eq(accountPersonGrants.accountId,accountId),
-      eq(accountPersonGrants.active,true))).limit(101)
+      eq(accountPersonGrants.active,true))).limit(2)
   ).map(row=>row.personId);
-  if(!demoAccountSwitching&&activePersonIds.length>100)
+  if(!demoAccountSwitching&&activePersonIds.length>1)
    throw new AuthorizationError("account Person reconciliation");
   const grant=assertMembershipSwitchIdentity({
    accountId,accountPersonId:session.personId,targetGrantId:grantId,

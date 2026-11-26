@@ -1,6 +1,11 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { identityEmailDomain } from "@/domain/domain-classification";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts, accountPersonGrants, memberships, organizations, people, roleAssignments, schoolSetupSignups, sites } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, demoSchoolTenants, memberships, organizations, people, roleAssignments, schoolSetupSignups, sites } from "@/db/schema";
+import { isDemoAccountEmail, DEMO_ACCOUNT_DOMAIN } from "@/domain/local-demo-access";
+import { isDemoSchoolDomain, siteSignupSchema } from "@/domain/school-setup";
+import { DomainError } from "@/domain/errors";
 import { DEFAULT_SITE_TIMEZONE } from "@/domain/site-timezone";
 import { initialVerifiedSignupOrganizationType, publicSignupOrganizationTypeSchema } from "@/domain/school-setup";
 import { EventTypes } from "@/domain/event-types";
@@ -16,7 +21,9 @@ function uniqueSlug(name: string, signupId: string): string {
 }
 
 /** Provision the first real Site Admin only while redeeming the email challenge. */
-export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, accountId: string, email: string, now: Date) {
+export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, accountId: string, email: string, now: Date, approval: "verified_email" | "demo_code" = "verified_email") {
+  if ((approval === "demo_code") !== isDemoAccountEmail(email)) throw new DomainError("FORBIDDEN");
+  const source = approval === "demo_code" ? "demo_account_school_setup" : "verified_email_school_setup";
   if (signup.consumedAt || signup.expiresAt <= now || signup.organizationId || signup.siteId)
     throw new Error("School setup signup is no longer available");
 
@@ -27,6 +34,7 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
   const [organization] = await tx.insert(organizations).values({
     type: initialType, name: signup.organizationName?.trim() || signup.schoolName,
     slug, lifecycleStatus: "active",
+    domain: approval === "demo_code" ? identityEmailDomain(email) : signup.organizationDomain ?? null,
     metadata: { signup: { requestedOrganizationType: requestedType,
       classification: initialType === requestedType ? "self_reported" : "pending_verification" } },
   }).returning({ id: organizations.id });
@@ -67,7 +75,7 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
     if(!existing?.active)throw new Error("School founder Person is not active");
   }else{
     const [createdPerson] = await tx.insert(people).values({
-      legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
+      legalFirstName: signup.firstName, legalLastName: signup.lastName, email, domain: identityEmailDomain(email),
     }).returning({id:people.id});
     personId=createdPerson?.id??null;
   }
@@ -105,15 +113,15 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
     resourceId: organization.id, scope: { organizationId: organization.id, siteId: site.id },
     after: { schoolName: signup.schoolName, requestedOrganizationType: requestedType,
       initialOrganizationType: initialType, initialGrantId: grant.id,
-      source: "verified_email_school_setup" },
-    context: { accountId, grantId: grant.id, role: "site_admin", authenticated: true,
-      source: "verified_email_school_setup" },
+      source },
+    context: { accountId, grantId: grant.id, role: "site_admin", authenticated: approval === "verified_email",
+      source },
   });
   await emitEvent(tx, {
     eventType: EventTypes.SchoolSetupCompleted, aggregateType: "organization",
     aggregateId: organization.id, actorPersonId: personId,
     organizationId: organization.id, siteId: site.id,
-    payload: { source: "verified_email_school_setup" },
+    payload: { source },
   });
   await emitEvent(tx, {
     eventType: EventTypes.SiteCreated, aggregateType: "site", aggregateId: site.id,
@@ -121,10 +129,54 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
     payload: { name: signup.schoolName, timezone: DEFAULT_SITE_TIMEZONE },
   });
 
+  if (approval === "demo_code") {
+    await tx.insert(demoSchoolTenants).values({ domain: email.split("@")[1]!, organizationId: organization.id,
+      siteId: site.id, adminAccountId: accountId, adminPersonId: personId, adminGrantId: grant.id });
+  }
+
   const [completed] = await tx.update(schoolSetupSignups).set({
     consumedAt: now, organizationId: organization.id, siteId: site.id, updatedAt: now,
   }).where(and(eq(schoolSetupSignups.id, signup.id), isNull(schoolSetupSignups.consumedAt)))
     .returning({ id: schoolSetupSignups.id });
   if (!completed) throw new Error("School setup signup was already consumed");
   return { organizationId: organization.id, siteId: site.id, grantId: grant.id };
+}
+
+/** Automatically approve a new demo founder, using the ordinary Site provisioning transaction.
+ * The registry is an authentication boundary, not a different Site or Organization model.
+ * Never adopt existing accounts or Sites through public signup.
+ */
+export async function provisionDemoSiteSignup(input: unknown) {
+  const data = siteSignupSchema.parse(input);
+  const domain = data.email.split("@")[1]!;
+  if (!isDemoAccountEmail(data.email) || !isDemoSchoolDomain(domain) || domain === DEMO_ACCOUNT_DOMAIN)
+    throw new DomainError("FORBIDDEN");
+  const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential();
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"demo-founder:" + domain}))`);
+    // Canonical Organization identity may predate the credential registry.
+    // Do not let public shared-domain signup claim an existing fixture/provider.
+    const [canonicalOwner] = await tx.select({id:organizations.id}).from(organizations)
+      .where(eq(organizations.domain,domain)).limit(1);
+    if(canonicalOwner)throw new DomainError("CONFLICT");
+    const [registered] = await tx.select().from(demoSchoolTenants)
+      .where(eq(demoSchoolTenants.domain, domain)).limit(1);
+    if (registered) throw new DomainError("CONFLICT");
+    const [occupied] = await tx.select({id:accessAccounts.id}).from(accessAccounts)
+      .where(eq(accessAccounts.emailNormalized,data.email)).limit(1);
+    if (occupied) throw new DomainError("CONFLICT");
+    const now = new Date();
+    const [account] = await tx.insert(accessAccounts).values({emailNormalized:data.email,privateAccessCodeHash})
+      .returning({id:accessAccounts.id});
+    if (!account) throw new Error("Account could not be created");
+    const [signup] = await tx.insert(schoolSetupSignups).values({
+      accountId:account.id,schoolName:data.name,organizationName:data.organizationName??null,organizationDomain:data.organizationDomain??null,
+      organizationType:data.organizationType,firstName:data.firstName,lastName:data.lastName,
+      expiresAt:new Date(now.getTime()+600000),
+    }).returning();
+    if (!signup) throw new Error("Site signup could not be created");
+    const provisioned = await provisionVerifiedSchoolSignup(tx,signup,account.id,data.email,now,"demo_code");
+    // Only this successful first response carries the raw credential. Never log it.
+    return {...provisioned,privateAccessCode};
+  });
 }

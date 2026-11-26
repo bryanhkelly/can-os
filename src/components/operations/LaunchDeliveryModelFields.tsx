@@ -35,7 +35,7 @@ export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLi
                         type="number"
                         min={1}
                         max={7}
-                        className="w-20  border bg-background p-2 text-sm"
+                        className="w-20"
                         value={onsiteDaysPerWeek}
                         onChange={(e) => setOnsiteDaysPerWeek(e.target.value)}
                       />

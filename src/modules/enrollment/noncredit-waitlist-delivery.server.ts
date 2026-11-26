@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, isNull, lte, notInArray, or } from "drizzle-orm";
+import { outboundClaimPredicate, outboundLeaseOwnership } from "@/modules/communication/outbound-lease-predicates.server";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import {
@@ -14,16 +15,12 @@ import {
 } from "@/modules/communication/notification-email.server";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { AuthorizationError } from "@/domain/command-context";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { currentWaitlistEmailOpportunity } from "@/domain/noncredit-waitlist-email-policy";
 
 function owned(claim: OutboundClaim) {
-  return and(
-    eq(noncreditWaitlistEmailDeliveries.id, claim.id),
-    eq(noncreditWaitlistEmailDeliveries.status, "processing"),
-    eq(noncreditWaitlistEmailDeliveries.leaseUntil, claim.leaseUntil),
-  );
+  return outboundLeaseOwnership(noncreditWaitlistEmailDeliveries, claim);
 }
 
 /**
@@ -40,20 +37,7 @@ const waitlistAdapter = {
         id: noncreditWaitlistEmailDeliveries.id,
         attempts: noncreditWaitlistEmailDeliveries.attempts,
       }).from(noncreditWaitlistEmailDeliveries)
-        .where(and(
-          ...(seenIds.length
-            ? [notInArray(noncreditWaitlistEmailDeliveries.id, [...seenIds])]
-            : []),
-          or(
-            and(eq(noncreditWaitlistEmailDeliveries.status, "pending"),
-              or(isNull(noncreditWaitlistEmailDeliveries.nextAttemptAt),
-                lte(noncreditWaitlistEmailDeliveries.nextAttemptAt, now))),
-            and(eq(noncreditWaitlistEmailDeliveries.status, "failed"),
-              lte(noncreditWaitlistEmailDeliveries.nextAttemptAt, now)),
-            and(eq(noncreditWaitlistEmailDeliveries.status, "processing"),
-              lte(noncreditWaitlistEmailDeliveries.leaseUntil, now)),
-          ),
-        )).orderBy(asc(noncreditWaitlistEmailDeliveries.createdAt))
+        .where(outboundClaimPredicate(noncreditWaitlistEmailDeliveries, now, seenIds)).orderBy(asc(noncreditWaitlistEmailDeliveries.createdAt))
         .limit(1).for("update", { skipLocked: true });
       if (!row) return null;
       const leaseUntil = new Date(now.getTime() + leaseMs);
@@ -98,8 +82,6 @@ const waitlistAdapter = {
     const [eligibleRelease] = await readEligibleSelfEnrollmentReleases(db, record.releaseId);
     if (!eligibleRelease)
       return { kind: "suppress", reason: "release_eligibility_revoked" };
-    if (await isDemoTenantOrganization(record.organizationId))
-      return { kind: "suppress", reason: "demo_tenant_external_delivery" };
 
     const [recipient] = await db.select({ email: accessAccounts.emailNormalized })
       .from(accessAccounts)
@@ -119,6 +101,7 @@ const waitlistAdapter = {
       )).limit(1);
     if (!recipient?.email)
       return { kind: "suppress", reason: "verified_account_person_unavailable" };
+    if (suppressDemoEmailDelivery(recipient.email)) return { kind: "suppress", reason: "demo_email_destination" };
     try {
       await assertUnambiguousAdultAccount(record.accountId, record.personId);
     } catch (error) {

@@ -1,7 +1,7 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ActionFooter, QueryState } from "@/components/workspace";
+import { ActionFooter, QueryState, WorkspacePanel, WorkspaceNotice, StatusBadge } from "@/components/workspace";
 import { SiteStaffingFeedback } from "./SiteStaffingFeedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -78,8 +78,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
     }
   }
 
-  return <section aria-label="Local school responsibilities" className="mt-7 border bg-card p-5">
-    <h2 className="font-serif text-2xl">Delegate local Site responsibilities</h2>
+  return <WorkspacePanel title="Delegate local Site responsibilities" className="mt-7">
     <p className="mt-2 text-sm text-muted-foreground">
       The church retains local leadership. Appoint its named Site director here.
       Assign multiple classroom facilitators to their individual Sections below.
@@ -93,11 +92,11 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
       error={query.isError ? mutationErrorMessage(query.error, "Unable to load Site staff assignments.") : undefined}
       onRetry={retry} retrying={busy}>
     {data && <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        {!data.hasConfiguration && <p role="status" className="border p-4 text-sm lg:col-span-2">
+        {!data.hasConfiguration && <WorkspaceNotice className="lg:col-span-2">
           No local school operating configuration exists yet. The first authorized
           appointment will create a <strong>draft planning configuration</strong>,
           not an approved opening or safeguarding certification.
-        </p>}
+        </WorkspaceNotice>}
         {assignments.map(item => {
           const current = data.responsibilities.find(row => row.key === item.key);
           const effective = !!current?.effectiveFrom && !!current.effectiveThrough &&
@@ -105,8 +104,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
             Date.parse(current.effectiveThrough) > Date.now();
           const candidates = data.candidates.filter(person =>
             person.role === localResponsibilityRoles[item.key]);
-          return <div key={item.key} className="border p-4">
-            <h3 className="font-semibold">{item.title}</h3>
+          return <WorkspacePanel key={item.key} title={item.title} actions={<StatusBadge tone={effective?"success":"attention"}>{effective?"Appointed":"Not appointed"}</StatusBadge>}>
             <p className="mt-2 text-sm text-muted-foreground">{item.explanation}</p>
             <p className="mt-3 text-sm" role="status">
               {effective ? "Currently assigned: " : "No active appointment. "}
@@ -141,7 +139,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
               No active email-verified staff with this role at this exact Site.
               Use your authorized staff invitation workflow first.
             </p>}
-          </div>;
+          </WorkspacePanel>;
         })}
       </div>}
     </QueryState>
@@ -149,5 +147,5 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
       Responsibility appointments are planning/accountability records, not proof
       of completed safeguarding, physical attendance, child release, or campus opening.
     </p>
-  </section>;
+  </WorkspacePanel>;
 }

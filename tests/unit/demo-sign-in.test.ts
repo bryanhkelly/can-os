@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { programs } from "@/db/schema";
 import { redeemDemoAccess } from "@/modules/identity/passwordless-access.server";
+import { hashPrivateAccessCode, issueOpaqueSecret } from "@/domain/access-tokens";
 import { AccessInfrastructureError } from "@/domain/access-errors";
 
 const state = vi.hoisted(() => ({
@@ -34,16 +35,16 @@ const grant = {
   role: "site_admin",
 };
 
+const lockableLimit = (limit: () => Promise<unknown[]>) => ({limit, for: () => ({limit})});
+
 beforeEach(() => {
   vi.clearAllMocks();
   state.activePrograms = [];
   vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "demo-sign-in-unit-test-pepper-not-a-secret");
   state.select.mockImplementation(() => ({
     from: (table: unknown) => ({
-      where: () => ({
-        limit: async () => table === programs ? state.activePrograms
-          : [{ id: LOCAL_DEMO_ADMIN.accountId, email: LOCAL_DEMO_ADMIN.email }],
-      }),
+      where: () => lockableLimit(async () => table === programs ? state.activePrograms
+          : [{ id: LOCAL_DEMO_ADMIN.accountId, email: LOCAL_DEMO_ADMIN.email }]),
     }),
   }));
   state.insert.mockReturnValue({
@@ -60,9 +61,7 @@ describe("shared demo sign-in", () => {
   it("issues a normal audited session for an explicitly registered new-school Site Admin", async () => {
     const email = "admin.demo@newschool.demo";
     state.select.mockImplementation(() => ({
-      from: (table: unknown) => ({ where: () => ({
-        limit: async () => table === programs ? state.activePrograms : [{ id: "new-school-account", email }],
-      }) }),
+      from: (table: unknown) => ({ where: () => lockableLimit(async () => table === programs ? state.activePrograms : [{ id: "new-school-account", email }]) }),
     }));
     state.grants.mockResolvedValue({
       grants: [{ ...grant, id: "new-school-grant", accountId: "new-school-account", role: "site_admin" }],
@@ -71,6 +70,19 @@ describe("shared demo sign-in", () => {
     expect(await redeemDemoAccess(email, "000000")).toMatchObject({
       accountId: "new-school-account", role: "site_admin", launchSiteId: "new-school-site",
     });
+  });
+  it("requires an individually issued code for a protected new Site founder", async () => {
+    const email = "admin@private.demo";
+    const code = issueOpaqueSecret();
+    const privateAccessCodeHash = hashPrivateAccessCode(code, process.env.CAN_ACCESS_TOKEN_PEPPER!);
+    state.select.mockImplementation(() => ({from: (table:unknown) => ({where: () => lockableLimit(async () => table === programs ? [] : [{id:"private-account",email,privateAccessCodeHash}])})}));
+    state.grants.mockResolvedValue({grants:[{...grant,id:"private-grant",accountId:"private-account",role:"site_admin"}],demoAccountSwitching:false});
+    await expect(redeemDemoAccess(email,"000000")).rejects.toThrow("Invalid demo credentials");
+    await expect(redeemDemoAccess(email,issueOpaqueSecret())).rejects.toThrow("Invalid demo credentials");
+    expect(state.insert).not.toHaveBeenCalled();
+    expect(await redeemDemoAccess(email,code)).toMatchObject({accountId:"private-account",role:"site_admin"});
+    expect(state.audit).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({method:"private_access_code"}));
+    expect(JSON.stringify(state.audit.mock.calls)).not.toContain(code);
   });
   it("sends Valor's active school administrator to the school dashboard", async () => {
     state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true,
@@ -104,7 +116,7 @@ describe("shared demo sign-in", () => {
   };
   function prepareStaff() {
     state.select.mockReturnValue({
-      from: () => ({ where: () => ({ limit: async () => [{ id: staff.accountId, email: "teacher@newschool.demo" }] }) }),
+      from: () => ({ where: () => lockableLimit(async () => [{ id: staff.accountId, email: "teacher@newschool.demo" }]) }),
     });
     state.bindings.mockResolvedValue([binding]);
     state.pending.mockResolvedValue([staff]);
@@ -166,13 +178,16 @@ describe("shared demo sign-in", () => {
   it.each([
     [LOCAL_DEMO_ADMIN.email, "wrong-code"],
     ["person@example.org", "000000"],
-    ["unapproved@valorschool.demo", "000000"],
   ])("rejects unapproved credentials for %s", async (email, code) => {
     await expect(redeemDemoAccess(email, code)).rejects.toThrow("Invalid demo credentials");
     expect(state.select).not.toHaveBeenCalled();
     expect(state.insert).not.toHaveBeenCalled();
   });
 
+  it("rejects a returned Account whose email differs from the submitted identity", async () => {
+    await expect(redeemDemoAccess("unapproved@valorschool.demo","000000")).rejects.toThrow("Invalid demo credentials");
+    expect(state.insert).not.toHaveBeenCalled();
+  });
   it.each([
     { grants: [] },
     { grants: [{ ...grant, siteId: "another-site" }] },

@@ -1,13 +1,12 @@
-import { StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { WorkspacePanel, QueryState, EmptyState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import type { ReadinessRecord, LaunchReadinessPrograms } from "./launch-readiness-types-v61";
 
 /** Presentation only: no independent readiness authorization, storage or commands. */
 export function ProgramRequirementsReadinessV61({ programs }: {
   programs: ReadinessRecord<LaunchReadinessPrograms>;
 }) {
-  return <section className="border bg-background p-4" aria-label="Program readiness state">
-        <h3 className="text-sm font-semibold">What your programs still need</h3>
-        {programs.state==="loading" && <p role="status" className="mt-2 text-sm">Loading Program requirements…</p>}
+  return <WorkspacePanel headingLevel="h3" title="What your programs still need">
+        {programs.state==="loading" && <QueryState loading="Loading Program requirements…"/>}
         {programs.state==="unavailable" && <WorkspaceNotice tone="attention" className="mt-3">
           We couldn't check the latest program requirements. Open the program workspace to review them.
         </WorkspaceNotice>}
@@ -30,6 +29,6 @@ export function ProgramRequirementsReadinessV61({ programs }: {
                 </ul>}
               </li>;
             })}</ul>
-          : <p className="mt-2 text-sm text-muted-foreground">No program launch plans are listed here yet. You can still explore solutions and plan other experiences.</p>)}
-      </section>;
+          : <EmptyState title="No program launch plans yet" description="You can still explore solutions and plan other experiences."/>)}
+      </WorkspacePanel>;
 }

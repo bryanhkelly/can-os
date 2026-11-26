@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, MinusSquare, Square } fro
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QueryState } from "./query-state";
+import { EmptyState } from "./empty-state";
 import { FilterBar } from "./filter-bar";
 import { DirectoryBulkActions, type DirectoryBulkAction } from "./directory-bulk-actions";
 import { WorkspaceShell, type WorkspaceShellProps } from "./workspace-shell";
@@ -80,7 +81,7 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
       {selectable && bulkActions && bulkActions.length > 0 && <DirectoryBulkActions label={label}
         selectedKeys={selectedKeys!} actions={bulkActions} pending={bulkPending}
         onClear={() => onSelectionChange!(new Set())} />}
-      {rows.length === 0 ? <div role="status" className="p-4">{empty ?? "No records in this page."}</div> : <Table aria-label={label} scrollLabel={`${label} scroll area`}>
+      {rows.length === 0 ? <div className="p-4">{empty ?? <EmptyState title="No records on this page." />}</div> : <Table aria-label={label} scrollLabel={`${label} scroll area`}>
         <TableCaption className="px-4 pb-4 text-left">{caption}</TableCaption>
         <TableHeader><TableRow>
           {selectable && <TableHead scope="col" className="w-12 px-4">

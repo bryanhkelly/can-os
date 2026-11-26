@@ -3,7 +3,7 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, EmptyState, ActionFooter } from "@/components/workspace";
 import { PublicInterestRecordCard } from "@/components/admissions/PublicInterestRecordCard";
 import {
   assignPublicSiteInterestToProgram, invitePublicAdmissionsInterestToApply, listPublicAdmissionsInterests,
@@ -80,8 +80,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId, availableP
     });
   }
 
-  return <section className="mt-8  border bg-card p-5">
-    <h2 className="font-serif text-2xl">Prospective participants and inquiries</h2>
+  return <WorkspacePanel title="Prospective participants and inquiries" className="mt-8">
     <p className="mt-2 text-sm text-muted-foreground">
       Track consented Site-wide and Program-specific requests from public websites and pre-opening invitations.
       Follow-up requires the adult's affirmative consent. Once CAN authorizes
@@ -96,15 +95,10 @@ export function PublicInterestInbox({ initialPage, siteId, programId, availableP
         onSelectProgram={id=>setProgramSelections(current=>({...current,[row.id]:id}))}
         onAssign={assignToProgram}
         onInvite={inviteToApply} onStatusChange={changeStatus} />)}
-      {items.length === 0 && <p className="text-sm text-muted-foreground">
-        {nextCursor ? "No matching inquiries on this page. Load older records to continue."
-          : "No Site or Program interest requests in your authorized scope yet."}
-      </p>}
+      {items.length === 0 && <EmptyState title={nextCursor?"No matching inquiries on this page":"No inquiries yet"} description={nextCursor?"Load older records to continue.":"No Site or Program interest requests in your authorized scope yet."}/>}
     </div>
     {loadError&&<WorkspaceNotice tone="danger" className="mt-3">{loadError}</WorkspaceNotice>}
-    {nextCursor&&<Button type="button" size="sm" disabled={loadingMore||busy}
-      onClick={()=>void loadMore()} variant="outline" className="mt-4">
-      {loadingMore?"Loading older inquiries…":"Load older inquiries"}
-    </Button>}
-  </section>;
+    {nextCursor&&<ActionFooter layout="inline"><Button type="button" size="sm" disabled={busy} loading={loadingMore} loadingLabel="Loading older inquiries…"
+      onClick={()=>void loadMore()} variant="outline">Load older inquiries</Button></ActionFooter>}
+  </WorkspacePanel>;
 }
