@@ -22,14 +22,14 @@ export function ContactLookup({ contacts, value, onChange, disabled }: {
     <div className="relative">
       <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
       <Input id="message-contact-search" type="search" value={query} disabled={disabled}
-        onChange={event => setQuery(event.target.value)} placeholder="Search by name or school relationship..." className="pl-9" />
+        onChange={event => setQuery(event.target.value)} placeholder="Search by name or school relationship..." leadingIconInset />
     </div>
     <p className="text-xs text-muted-foreground">Only contacts available through your verified school relationships are shown.</p>
     <ul aria-label="Matching contacts" className="max-h-52 overflow-y-auto divide-y border">
       {matches.map(contact => <li key={contact.personId}>
         <Button variant={value === contact.personId ? "secondary" : "ghost"} disabled={disabled}
           aria-pressed={value === contact.personId} onClick={() => onChange(contact.personId)}
-          className="h-auto w-full justify-start whitespace-normal px-3 py-3 text-left">
+          className="h-auto w-full justify-start whitespace-normal text-left">
           {value === contact.personId && <Check aria-hidden="true" />}
           <span className="min-w-0 break-words">{contact.label}</span>
         </Button>

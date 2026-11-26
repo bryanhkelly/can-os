@@ -263,10 +263,9 @@ function MyActivityPage() {
       <Link to="/explore" className="text-primary underline underline-offset-4">Explore opportunities</Link>
     </div>}>
     <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Participation summary">
-      {views.map(view => <Button type="button" variant="outline" key={view.id}
+      {views.map(view => <Button type="button" variant={bucket === view.id ? "secondary" : "outline"} size="lg" key={view.id}
         onClick={() => setBucket(view.id)} aria-pressed={bucket === view.id}
-        className={"flex items-center gap-4 border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-          (bucket === view.id ? "border-primary bg-muted/40" : "border-border bg-card hover:bg-muted/30")}>
+        className="flex h-auto items-center gap-4 text-left">
         <view.Icon className="size-5 text-primary" aria-hidden="true"/>
         <span className="flex-1">
           <span className="block text-xs uppercase tracking-widest text-muted-foreground">{view.title}</span>

@@ -95,11 +95,11 @@ function ClassroomJoinPage() {
         <Label htmlFor="classroom-pair-code" className="block text-sm font-medium">Facilitator code</Label>
         <Input id="classroom-pair-code" autoComplete="off" autoCapitalize="characters"
           spellCheck={false} maxLength={11} placeholder="XXXXX-XXXXX" value={code}
-          className="font-mono text-xl tracking-wider"
+          presentation="code"
           onChange={e => setCode(e.target.value.toUpperCase())}/>
         <Label htmlFor="classroom-course" className="block text-sm font-medium">Your enrolled Class or course</Label>
         <Select id="classroom-course" name="courseAttemptId" required
-          className="w-full min-h-10 border border-border bg-background p-2 text-sm">
+          className="w-full min-h-10">
           <option value="">Choose an active course</option>
           {choices.choices.map(choice => <option key={choice.courseAttemptId}
             value={choice.courseAttemptId}>{choice.courseTitle}</option>)}
