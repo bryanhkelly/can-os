@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils";
  * plus icon, placed in the page header. Wrap a single `<Link>` (preferred, to a
  * dedicated create page) or `<button>`.
  */
-export function CreateAction({ children, className }: { children: ReactElement; className?: string }) {
+export function CreateAction({ children }: { children: ReactElement }) {
   // The canonical Button owns visual treatments and link-style semantics.
   // Preserve the Link/button's original navigation and event props.
   const child = children as ReactElement<{ children?: ReactNode }>;
-  return <Button asChild size="lg" data-create-action="" className={cn("can-create-action", className)}>
+  return <Button asChild size="lg" data-create-action="" className="can-create-action">
     {cloneElement(child, undefined, <><Plus aria-hidden="true" />{child.props.children}</>)}
   </Button>;
 }

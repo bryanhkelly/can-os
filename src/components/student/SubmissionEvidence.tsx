@@ -45,7 +45,7 @@ export function SubmissionEvidence({ submissionId, historical = false }: { submi
       {review.attachments.length > 0 && <div>
         <h3 className="text-sm font-semibold">Verified attachments</h3>
         <ul className="mt-2 space-y-2">{review.attachments.map(file => <li key={file.id}>
-          <Button variant="ghost" type="button" disabled={opening} onClick={() => void download(file.id)} className="text-sm underline disabled:opacity-50">{file.fileName}</Button>
+          <Button variant="ghost" type="button" disabled={opening} onClick={() => void download(file.id)} className="underline">{file.fileName}</Button>
         </li>)}</ul>
       </div>}
       {!historical && review.attempts.length > 1 && <details>

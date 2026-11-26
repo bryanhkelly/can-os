@@ -41,8 +41,8 @@ export function GuidedSetupProgress({ steps, onStepChange, navigationDisabled = 
         const itemClass = cn("flex h-full min-h-11 min-w-0 items-start gap-2 border p-3 text-left",
           step.status === "current" ? "border-primary/40 bg-accent" : "border-transparent");
         return <li key={step.id} className="min-w-0">
-          {onStepChange ? <Button type="button" variant="ghost"
-            className={cn(itemClass, "h-full w-full shrink justify-start whitespace-normal hover:border-primary/40")}
+          {onStepChange ? <Button type="button" variant={step.status === "current" ? "secondary" : "ghost"}
+            className="h-full min-h-11 w-full min-w-0 shrink items-start justify-start gap-2 whitespace-normal text-left"
             aria-current={step.status === "current" ? "step" : undefined}
             disabled={navigationDisabled}
             onClick={() => onStepChange(step.id)}>{item}</Button> :
