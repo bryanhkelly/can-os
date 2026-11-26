@@ -60,3 +60,5 @@ The static browser matrix now retains a rendered PNG for each successful exercis
 ## Cloudflare review hosting
 
 Use `npm run storybook:prepare-cloudflare` after acceptance to generate a dedicated static Worker configuration. It starts with public URLs disabled, does not use the application Worker or any application bindings, and prints the exact deploy command. Configure Worker-level Cloudflare Access before enabling a hostname. See `docs/design-coverage/cloudflare-storybook.md` for the deployment checklist.
+
+For Git-connected Cloudflare Workers Builds, use `npm run build:storybook:cloudflare` and `npm run deploy:storybook:cloudflare` on the dedicated Storybook branch. Preview builds remain disabled. The deploy script revalidates the exact accepted package before invoking Wrangler.
