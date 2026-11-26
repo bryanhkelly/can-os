@@ -54,3 +54,9 @@ Chromatic baseline approval remains independent. Named Chromatic Modes replace t
 The project uses named Chromatic Modes only. Story-level theme modes remain supported, and legacy viewport arrays have been converted in the affected story files. The source contract detects accidental reintroduction of a legacy viewport array inside Chromatic configuration. The existing review workflow must still accept actual snapshots.
 
 The Storybook-only coverage explorer consumes the registry directly, with search, layout/review filters, pagination and story references. The independent browser suite now schedules 18 critical-workflow cases, 24 registered-layout smoke cases and one catalog-navigation case across six viewport/theme projects. These are planned automated checks, not a claim that the checks have passed.
+
+## Local acceptance and real interaction states
+
+Twelve core story families have explicit legacy IDs after navigation migration. A generated-index identity check guards the navigation map. A loopback static-only server, diagnostic command and optional Firefox/WebKit projects support local acceptance when CI is unavailable. The ordinary unit test runner excludes the dedicated Storybook acceptance folder.
+
+Mutation feedback stories now exercise the actual shared mutation runner with local command/read adapters, including refresh-only recovery after a committed write. FormActions exposes an optional accessible blocked reason. Actual LaunchStudioOverview stories cover a returned Site with confirmed Shape completion and a failed completion read. These fixtures are not production persistence evidence.

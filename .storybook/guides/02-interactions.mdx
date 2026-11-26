@@ -23,3 +23,7 @@ Every workflow must communicate the next meaningful outcome, not just the next f
 Use an embedded milestone list for a record, or the panel composition for a workspace. Missing evidence is never equivalent to completion.
 
 <Canvas of={MilestoneStories.Mixed} />
+
+## Real command recovery pattern
+
+The Mutation feedback family uses the application's actual mutation runner with controlled local fixtures. The interactive stories assert that a failed read after a successful command is recovered with a read-only retry, and that a failed command preserves the input. Use FormActions with a blocked reason when a form's owning workflow knows why saving is disabled.

@@ -21,7 +21,7 @@ function DedicatedForm({ pending = false, onSubmit }: { pending?: boolean; onSub
       </FormSection>
     </div>
     <FormActions submitLabel="Create school year" pendingLabel="Creating school year…" pending={pending}
-      disabled={!name.trim()} cancel={<a href="#school-years">Cancel</a>} />
+      disabled={!name.trim()} blockedReason={!name.trim()?"Enter a school year name.":undefined} cancel={<a href="#school-years">Cancel</a>} />
   </form>;
 }
 
@@ -43,12 +43,14 @@ export const GroupedFieldsAndActions: Story = {
     await expect(canvas.getByRole("region", { name: "Dates" })).toBeVisible();
     const submit = canvas.getByRole("button", { name: "Create school year" });
     await expect(submit).toBeDisabled();
+    await expect(submit).toHaveAccessibleDescription("Enter a school year name.");
     const actions = canvasElement.querySelector("[data-form-actions]");
     await expect(actions?.firstElementChild).toBe(submit);
     await expect(canvas.getByRole("link", { name: "Cancel" })).toHaveAttribute("href", "#school-years");
     await userEvent.type(canvas.getByLabelText(/Year name/), "2026–2027");
     await userEvent.type(canvas.getByLabelText(/Starts/), "2026-08-17");
     await expect(submit).toBeEnabled();
+    await expect(canvas.queryByText("Enter a school year name.")).not.toBeInTheDocument();
     await userEvent.click(submit);
     await expect(args.onSubmit).toHaveBeenCalledWith("2026–2027");
   },
