@@ -1,0 +1,27 @@
+{
+  "repository": "https://github.com/google/fonts",
+  "revision": "6ebe737e44fd64ee736bbc6feed6136a6dbfd222",
+  "license": "OFL-1.1",
+  "files": [
+    {
+      "path": ".storybook/assets/fonts/dm-sans.ttf",
+      "upstreamPath": "ofl/dmsans/DMSans[opsz,wght].ttf",
+      "gitBlobSha": "c672f98060af9b2c85fca704ebd5ad9a8717c1df"
+    },
+    {
+      "path": ".storybook/assets/fonts/instrument-serif-regular.ttf",
+      "upstreamPath": "ofl/instrumentserif/InstrumentSerif-Regular.ttf",
+      "gitBlobSha": "36fac00ef9b7d523236df6536cb09c712bb2c7e4"
+    },
+    {
+      "path": ".storybook/assets/fonts/instrument-serif-italic.ttf",
+      "upstreamPath": "ofl/instrumentserif/InstrumentSerif-Italic.ttf",
+      "gitBlobSha": "192c3eda9864241ad280e9bcc84e258c80a4a588"
+    },
+    {
+      "path": ".storybook/assets/fonts/jetbrains-mono.ttf",
+      "upstreamPath": "ofl/jetbrainsmono/JetBrainsMono[wght].ttf",
+      "gitBlobSha": "aa310be8b717fe3774f9444dd89d5f4101cc6d10"
+    }
+  ]
+}

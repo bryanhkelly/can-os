@@ -2,6 +2,7 @@ import type { StorybookConfig } from "@storybook/react-vite";
 
 const config: StorybookConfig = {
   stories: ["../.storybook/guides/**/*.mdx", "../src/**/*.stories.@(ts|tsx)"],
+  staticDirs: [{ from: "./assets/fonts/licenses", to: "/font-licenses" }],
   addons: [
     "@storybook/addon-a11y",
     "@storybook/addon-docs",

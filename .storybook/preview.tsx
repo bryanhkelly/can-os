@@ -1,6 +1,7 @@
 import type { Preview } from "@storybook/react-vite";
 import { BrandTheme } from "../src/design-system/brand-theme";
 import "../src/styles.css";
+import "./assets/fonts/fonts.css";
 import { viewports, baselineModes } from "./viewports";
 
 const preview: Preview = {

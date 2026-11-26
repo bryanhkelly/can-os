@@ -23,16 +23,22 @@ async function openStory(page:Page,id:string,theme:string){
  const pageErrors:string[]=[];
  page.on("pageerror",error=>pageErrors.push(error.message));
  // No application RPC, private data, remote images or provider calls.
- // Fonts are the existing explicit exception pending a local asset migration.
+ // Fonts are bundled locally; no third-party network access is expected.
  await page.route("**/*",async route=>{
    const url=new URL(route.request().url());
    if(url.origin==="http://127.0.0.1:6007"&&["GET","HEAD"].includes(route.request().method())&&!/^\/(?:api|_server|_serverFn|rpc|go)(?:\/|$)/i.test(url.pathname))return route.continue();
-   if(url.protocol==="data:"||url.protocol==="blob:"||(["GET","HEAD"].includes(route.request().method())&&["fonts.googleapis.com","fonts.gstatic.com"].includes(url.hostname)))return route.continue();
+   if(url.protocol==="data:"||url.protocol==="blob:")return route.continue();
    unexpectedRequests.push(url.origin+url.pathname);return route.abort();
  });
  await page.goto("/iframe.html?id="+encodeURIComponent(id)+"&viewMode=story&globals=theme:"+encodeURIComponent(theme));
  await expect(page.locator('[data-storybook-theme="'+theme+'"]').first()).toBeVisible();
- await page.evaluate(()=>document.fonts.ready.then(()=>undefined));
+ await page.evaluate(async()=>{
+  await Promise.all([document.fonts.load('400 16px "DM Sans"'),document.fonts.load('400 24px "Instrument Serif"'),document.fonts.load('400 16px "JetBrains Mono"')]);
+  await document.fonts.ready;
+  for(const family of ["DM Sans","Instrument Serif","JetBrains Mono"]){
+   if(![...document.fonts].some(face=>face.family.replace(/["']/g,"")===family&&face.status==="loaded"))throw Error("Bundled font unavailable: "+family);
+  }
+ });
  return {unexpectedRequests,pageErrors};
 }
 async function assertCanvas(page:Page,failures:{unexpectedRequests:string[];pageErrors:string[]}){
