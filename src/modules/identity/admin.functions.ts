@@ -1,7 +1,7 @@
 import { identityEmailDomain } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
 import { canIssueIndividualCredential } from "@/modules/identity/individual-credential-issuer.server";
 import { individualStaffTargetEligible } from "@/domain/individual-staff-handoff";
 import { privateAccountRoleEligible } from "@/domain/private-account-authority";
@@ -22,9 +22,8 @@ import {
   listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE, acceptStaffInvitations,
 } from "@/modules/identity/staff-invitations.server";
 import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
-import { demoSchoolTenants } from "@/db/schema";
 import { DomainError } from "@/domain/errors";
-import { isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { matchesDemoCredentialScope } from "./demo-school-tenants.server";
 import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
@@ -223,9 +222,6 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     const emailNormalized = data.email.toLowerCase();
     const invitation = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"staff-invitation:" + emailNormalized}))`);
-      const [demoSchool] = await tx.select({ domain: demoSchoolTenants.domain, enabled: demoSchoolTenants.enabled })
-        .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId, organizationId)).limit(1);
-      const syntheticSchool = Boolean(demoSchool) || isValorOrganization(organizationId);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
       const confirmation = data.privateIdentityConfirmation;
       const individual = localDemoIdentity && !!confirmation;
@@ -238,8 +234,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           throw new AuthorizationError("individually authenticated administrator");
       }
       // Legacy shared credentials retain the exact original tenant boundary.
-      if (localDemoIdentity && !individual && ((demoSchool && !demoSchool.enabled) ||
-        !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx))) {
+      if (localDemoIdentity && !individual && !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx)) {
         throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the original shared credential scope");
       }
       let privateAccessCode:string|undefined;
@@ -252,9 +247,10 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       if (individual && !individualStaffTargetEligible(account,confirmation?.existingPersonId))
         throw new AuthorizationError("independently confirmed existing individual Person");
       if (!account) {
-        if(individual) privateAccessCode=issueOpaqueSecret();
+        const credential=individual?issuePrivateAccountCredential():undefined;
+        privateAccessCode=credential?.privateAccessCode;
         [account] = await tx.insert(accessAccounts).values({ emailNormalized,
-          ...(privateAccessCode?{privateAccessCodeHash:hashPrivateAccessCode(privateAccessCode,process.env.CAN_ACCESS_TOKEN_PEPPER??"")}:{})
+          ...(credential?{privateAccessCodeHash:credential.privateAccessCodeHash}:{})
         }).returning({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled,
           privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)` });
         await recordAudit(tx, actor, {
@@ -337,7 +333,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         actorPersonId: actor.actorPersonId,
         organizationId, siteId,
         payload: { accountId: account!.id, personId, role: data.role, publisherRelationship,
-          ...(syntheticSchool && !localDemoIdentity ? { invitationMode: "verified_email", emailNormalized } : {}),
+          invitationMode: individual ? "individual_credential" : localDemoIdentity ? "legacy_shared_credential" : "verified_email", emailNormalized,
         },
       });
       await recordAudit(tx, actor, {
