@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import type { SessionAuthenticationMethod } from "@/domain/access-context";
+import { sessionCredentialMode, type SessionAuthenticationMethod } from "@/domain/session-credential-policy";
 import { privateAccountGrantEligible } from "@/domain/private-account-authority";
 import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { AuthorizationError } from "@/domain/command-context";
@@ -20,18 +20,15 @@ export async function readSessionGrants(accountId: string, email: string, reader
   // Private credentials replace the shared-code scope, not ordinary grants.
   // Enrollment/rotation revokes earlier sessions; public fixture switching
   // cannot target accounts with individual credentials.
-  if (ownGrants.some(grant => grant.privateCredential)) {
-    if (authenticationMethod !== "private_access_code" || !isDemoAccountEmail(normalizedEmail)) return {grants:[],demoAccountSwitching:false};
+  const mode=sessionCredentialMode({email:normalizedEmail,privateCredential:ownGrants.some(grant=>grant.privateCredential),authenticationMethod});
+  if(mode==="denied")return {grants:[],demoAccountSwitching:false};
+  if (mode==="individual") {
     const grants = ownGrants.filter(grant => grant.privateCredential && privateAccountGrantEligible(grant,accountId,normalizedEmail));
     if (grants.length) await assertRawAccountPerson(accountId,grants[0]!.personId,reader);
     const founder = grants.find(grant => grant.role==="site_admin" && grant.siteId);
     return {grants,demoAccountSwitching:false,...(founder?.siteId?{launchSiteId:founder.siteId}:{})};
   }
 
-  if (authenticationMethod === "private_access_code" ||
-      (authenticationMethod === "email_link" && isDemoAccountEmail(normalizedEmail)) ||
-      (authenticationMethod === "local_demo_code" && !isDemoAccountEmail(normalizedEmail)))
-    return {grants:[],demoAccountSwitching:false};
   return readLegacyCredentialGrants(accountId,normalizedEmail,ownGrants,reader);
 }
 
