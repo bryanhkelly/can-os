@@ -17,7 +17,7 @@ export function ClassroomLessonTabs({ materials, transcript, notes, discussion }
   const activeTab = tabs.some(tab => tab.id === selected) ? selected : "materials";
   return <div className="classroom-lesson-information min-w-0 border bg-card">
     <div role="tablist" aria-label="Lesson workspace" className="flex overflow-x-auto border-b">
-      {tabs.map((tab, index) => <Button variant="ghost" key={tab.id} type="button" role="tab" ref={element => { refs.current[tab.id] = element; }}
+      {tabs.map((tab, index) => <Button variant={activeTab === tab.id ? "local-tab-selected" : "local-tab"} size="tab" key={tab.id} type="button" role="tab" ref={element => { refs.current[tab.id] = element; }}
         id={`${id}-${tab.id}-tab`} aria-controls={`${id}-${tab.id}-panel`} aria-selected={activeTab === tab.id}
         tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setSelected(tab.id)}
         onKeyDown={event => {
@@ -30,7 +30,7 @@ export function ClassroomLessonTabs({ materials, transcript, notes, discussion }
           event.preventDefault();
           const target = tabs[next]!;
           setSelected(target.id); refs.current[target.id]?.focus();
-        }} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+        }} className="shrink-0">
         {tab.label}
       </Button>)}
     </div>

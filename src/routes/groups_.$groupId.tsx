@@ -142,13 +142,11 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
         <MutationFeedback state={mutation} pendingMessage="Saving group change..." />
         <div className="border border-border bg-card" role="tablist" aria-label="Study group sections">
           <div className="flex min-w-0 overflow-x-auto">
-            {tabs.map((tab, index) => <Button variant="ghost" key={tab.id} id={`group-tab-${tab.id}`} type="button" role="tab"
+            {tabs.map((tab, index) => <Button variant={activeTab === tab.id ? "local-tab-selected" : "local-tab"} size="tab" key={tab.id} id={`group-tab-${tab.id}`} type="button" role="tab"
               aria-selected={activeTab === tab.id} aria-controls={`group-panel-${tab.id}`}
               tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)}
               onKeyDown={event => handleTabKeyDown(event, index)}
-              className={activeTab === tab.id
-                ? "inline-flex min-h-12 shrink-0 items-center gap-2 border-b-2 border-primary px-4 text-sm font-semibold text-primary"
-                : "inline-flex min-h-12 shrink-0 items-center gap-2 border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground hover:text-foreground"}>
+              className="shrink-0">
               {tab.label}
               {"count" in tab && <span className="bg-muted px-2 py-0.5 text-xs tabular-nums">{tab.count}</span>}
             </Button>)}
