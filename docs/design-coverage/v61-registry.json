@@ -222,8 +222,14 @@
       "layout": "directory",
       "persona": "authorized workspace",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "AdmissionsDecisionActions",
+        "ActionFooter"
+      ],
+      "stories": [
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Eligibility",
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -236,8 +242,14 @@
       "layout": "directory",
       "persona": "authorized workspace",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "AdmissionsDecisionActions",
+        "ActionFooter"
+      ],
+      "stories": [
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Eligibility",
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -1999,8 +2011,13 @@
       "layout": "guided",
       "persona": "authorized applicant or operator",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "DirectoryTable",
+        "ActionStateIndicator"
+      ],
+      "stories": [
+        "src/components/enrollment/NoncreditParticipantRoster.stories.tsx#SeatRelease"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -2027,8 +2044,15 @@
       "layout": "report",
       "persona": "authorized report viewer",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "ReportDocumentView",
+        "ReportChart"
+      ],
+      "stories": [
+        "src/components/workspace/report-document.stories.tsx#Dashboard",
+        "src/components/workspace/report-document.stories.tsx#PrintReview",
+        "src/components/workspace/report-document.stories.tsx#NarrowMetrics"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
