@@ -447,6 +447,132 @@
         "StepNavigationActions",
         "NarrowFormAndValidation"
       ]
+    },
+    {
+      "path": "src/components/communication/DeliveryReceiptFacts.stories.tsx",
+      "previousTitle": "Communication/Delivery receipt facts",
+      "title": "08 Feature workspaces/Communication/Delivery receipt facts",
+      "metaId": "communication-delivery-receipt-facts",
+      "exports": [
+        "AwaitingProvider",
+        "ProviderAccepted"
+      ]
+    },
+    {
+      "path": "src/components/enrollment/GuardianApplicationForm.stories.tsx",
+      "previousTitle": "Workflows/GF22 Guardian application",
+      "title": "07 Persona experiences/Family/Guardian application",
+      "metaId": "workflows-gf22-guardian-application",
+      "exports": [
+        "Ready",
+        "RequiredFieldValidation",
+        "SuccessfulSubmission",
+        "Loading",
+        "ServerError",
+        "NoEligiblePrograms",
+        "ProgramDeepLinkChange"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceDocumentLink.stories.tsx",
+      "previousTitle": "Evidence/Private document link",
+      "title": "04 Application patterns/Evidence/Private document link",
+      "metaId": "evidence-private-document-link",
+      "exports": [
+        "Default",
+        "UnauthorizedDocument",
+        "Disabled",
+        "BlockedPopupAndDuplicateClicks",
+        "AuthorizedDocument"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceReviewForm.stories.tsx",
+      "previousTitle": "Evidence/Review form",
+      "title": "04 Application patterns/Evidence/Review form",
+      "metaId": "evidence-review-form",
+      "exports": [
+        "Default",
+        "Disabled",
+        "IndependentReview",
+        "ApproveWithKeyboard",
+        "FailedReviewRetainsRationale"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceUploader.stories.tsx",
+      "previousTitle": "Evidence/Uploader",
+      "title": "04 Application patterns/Evidence/Uploader",
+      "metaId": "evidence-uploader",
+      "exports": [
+        "Default",
+        "UploadsDisabled",
+        "UploadAndFinalize",
+        "RefreshFailureDoesNotRepeatFinalization",
+        "RetryFinalizationWithoutReupload",
+        "ChangeDocumentAfterFailedFinalization",
+        "BlocksRepeatedSubmissionWhileUploading"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceWorkflow.stories.tsx",
+      "previousTitle": "Evidence/Workflow",
+      "title": "04 Application patterns/Evidence/Workflow",
+      "metaId": "evidence-workflow",
+      "exports": [
+        "Pending",
+        "Rejected",
+        "LongContent"
+      ]
+    },
+    {
+      "path": "src/components/field-trips/FieldTripFacts.stories.tsx",
+      "previousTitle": "Field trips/Shared trip facts",
+      "title": "08 Feature workspaces/Field trips/Shared trip facts",
+      "metaId": "field-trips-shared-trip-facts",
+      "exports": [
+        "ScheduledTrip",
+        "DeadlineNotSet"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/AudienceIntentFieldsV61.stories.tsx",
+      "previousTitle": "Launch Studio/Shape/Audiences",
+      "title": "08 Feature workspaces/Launch Studio/Shape/Audiences",
+      "metaId": "launch-studio-shape-audiences",
+      "exports": [
+        "Empty",
+        "Typical",
+        "AllAudiences",
+        "Saving",
+        "SaveError"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/EstablishExperiencesV61.stories.tsx",
+      "previousTitle": "Launch Studio/Shape/Experiences",
+      "title": "08 Feature workspaces/Launch Studio/Shape/Experiences",
+      "metaId": "launch-studio-shape-experiences",
+      "exports": [
+        "Browse",
+        "FiveSelected",
+        "Personalize",
+        "EmptySearch",
+        "Disabled",
+        "LocalTopicValidation"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchJourneyForms.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio audience forms",
+      "title": "08 Feature workspaces/Launch Studio/Audience forms",
+      "metaId": "workflows-launch-studio-audience-forms",
+      "exports": [
+        "DraftSaveKeepsLaterEdits",
+        "ParentApplication",
+        "StudentProfile",
+        "StaffQualification"
+      ]
     }
   ]
 }

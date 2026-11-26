@@ -9,7 +9,7 @@ import { sitePlanningAudienceIds, type SitePlanningAudienceId } from "@/domain/s
 import { AudienceIntentFieldsV61 } from "./AudienceIntentFieldsV61";
 import { SiteGuideV61 } from "./SiteGuideV61";
 
-const meta = { title: "Launch Studio/Shape/Audiences", parameters:{layout:"fullscreen"} } satisfies Meta;
+const meta = { id: "launch-studio-shape-audiences", title: "08 Feature workspaces/Launch Studio/Shape/Audiences", parameters:{layout:"fullscreen"} } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const typical: SitePlanningAudienceId[] = ["children","adults","older_adults","immigrants","english_language_learners","homelessness"];

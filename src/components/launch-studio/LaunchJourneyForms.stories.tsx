@@ -14,7 +14,7 @@ import { LaunchDraftButton } from "./LaunchDraftButton";
 import { saveLaunchStudioDraft } from "@/modules/programs/launch-drafts.functions";
 
 const meta = {
-  title: "Workflows/Launch Studio audience forms",
+  id: "workflows-launch-studio-audience-forms", title: "08 Feature workspaces/Launch Studio/Audience forms",
   parameters: { layout: "fullscreen" },
   decorators: [Story => {
     const root = createRootRoute({ component: Outlet });
