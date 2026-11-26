@@ -202,7 +202,7 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
     eq(people.active,true)));
-  const {grants:authorizedGrants}=await readSessionGrants(account.id,account.email,tx);
+  const {grants:authorizedGrants}=await readSessionGrants(account.id,account.email,tx,"email_link");
   const authorizedGrantIds=new Set(authorizedGrants.map(grant=>grant.id));
   // A newly accepted church-onboarding grant takes priority over an older
   // membership so the first sign-in lands in that church's own setup workspace.
@@ -321,7 +321,7 @@ export async function redeemDemoAccess(
      bindings.some(binding=>matchesDemoStaffBinding(binding,invitation,email))),now);
    }
   }
-  const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx);
+  const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx,privateCredential?"private_access_code":"local_demo_code");
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
   // Demo login chooses the fixed original primary membership; all additional
   // roles are selected through the same normal server-authoritative switcher.
@@ -399,15 +399,16 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   const now=new Date();
   const [session]=await tx.select({
    accountId:accessSessions.accountId,email:accessAccounts.emailNormalized,
-   personId:accessAccounts.personId,
+   personId:accessAccounts.personId,authenticationMethod:accessSessions.authenticationMethod,
+   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
   }).from(accessSessions)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     eq(accessAccounts.disabled,false),isNull(accessSessions.revokedAt),
     gt(accessSessions.expiresAt,now),gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
    .limit(1).for("update");
-  if(!session)throw new AuthorizationError("authenticated session");
-  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,tx);
+  if(!session || (session.sharedDevice && now.getTime()-session.lastActivityAt.getTime()>=300000))throw new AuthorizationError("authenticated session");
+  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,tx,session.authenticationMethod);
   // Independently verify the entire real account inside the locked session
   // transaction. Filtered invitation grants cannot conceal a second Person.
   const activePersonIds=demoAccountSwitching?[]:(
