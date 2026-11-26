@@ -426,7 +426,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           <p className="text-sm text-muted-foreground">Choose who to reach, what to say, and how you want to share it.</p>
         </WorkspacePanel>}
         <MarketingPackageLibraryList records={visible} busy={busy}
-          onOpen={open} onDuplicate={duplicate} onArchiveToggle={setArchived}
+          onOpen={open} onSendEmail={item=>{open(item);setView("share");}} onDuplicate={duplicate} onArchiveToggle={setArchived}
           onDelete={setDeleteCandidate} />
         <WorkspacePanel title="Continue in Share"
           description={context.handoffDescription}>
