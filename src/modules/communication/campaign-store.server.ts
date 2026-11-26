@@ -21,7 +21,20 @@ export function campaignSender(){
  try{const url=new URL(origin);if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)return null;}catch{return null;}
  return {from,address,key,origin};
 }
-type Work={id:string;lease_id:string;email:string;unsubscribe_token:string;attempts:number;first_attempt_at:string;outcome_unconfirmed:boolean;subject:string;body:string;public_url:string;sender_from:string;sender_address:string;sender_scope:string;organization_id:string|null;code:string;cancelled_at:string|null};
+type Work = {
+  id: string;
+  lease_id: string;
+  email: string;
+  unsubscribe_token: string;
+  attempts: number;
+  first_attempt_at: string;
+  subject: string;
+  body: string;
+  public_url: string;
+  sender_from: string;
+  sender_address: string;
+  code: string;
+};
 async function claimCampaignDelivery(){
  return db.transaction(async tx=>{
  // Expired ambiguous attempts are never retried outside the provider's idempotency window.
@@ -43,10 +56,12 @@ async function claimCampaignDelivery(){
   UPDATE public.campaign_deliveries d SET status='processing',lease_id=gen_random_uuid(),
    lease_until=now()+(${OUTBOUND_LEASE_MS} * interval '1 millisecond'),attempts=attempts+1,first_attempt_at=coalesce(first_attempt_at,now()),
    outcome_unconfirmed=outcome_unconfirmed OR status='processing'
-  FROM candidate WHERE d.id=candidate.id RETURNING d.*
+  FROM candidate WHERE d.id=candidate.id
+  RETURNING d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,d.campaign_id
  )
- SELECT d.*,c.subject,c.body,c.public_url,c.sender_from,c.sender_address,c.sender_scope,c.cancelled_at,
-  e.organization_id,l.code FROM claimed d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
+ SELECT d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,
+  c.subject,c.body,c.public_url,c.sender_from,c.sender_address,l.code
+ FROM claimed d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
  JOIN public.engagement_definitions e ON e.id=c.engagement_id JOIN public.site_go_links l ON l.id=c.link_id`);
  return row;
  });
