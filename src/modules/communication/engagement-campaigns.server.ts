@@ -18,7 +18,7 @@ import {accessAccounts,organizations} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {authorizeEngagementDistribution,readAuthorizedEngagementInvitation} from "@/modules/engagement/engagement-registry.server";
 import {campaignOwnerScope,parseCampaignRecipients,campaignRecipientLimit} from "@/domain/campaign-policy";
-import {campaignRows,campaignSender,campaignSenderReadiness,processEngagementCampaignDeliveries} from "./campaign-store.server";
+import {campaignRows,readCampaignSenderReadiness,processEngagementCampaignDeliveries} from "./campaign-store.server";
 async function scope(engagementId:string){
  setResponseHeader("Cache-Control","private, no-store");
  const actor=await getCommandContext(getRequest());
@@ -46,7 +46,7 @@ export const readEngagementCampaignWorkspace = async (data: z.output<typeof read
  FROM public.engagement_campaigns c JOIN public.campaign_deliveries d ON d.campaign_id=c.id
  WHERE c.owner_scope=${s.ownerScope} AND c.engagement_id=${data.engagementId} AND c.link_id=${data.linkId}
  GROUP BY c.id ORDER BY c.created_at DESC LIMIT 50`);
- const readiness=campaignSenderReadiness();
+ const readiness=await readCampaignSenderReadiness();
  return {lists,campaigns,senderReady:!!readiness.sender,senderIssues:readiness.issues,senderLabel:s.senderLabel};
  };
 export const saveCampaignRecipientList = async (data: z.output<typeof saveCampaignRecipientListInput>) =>{
@@ -71,7 +71,7 @@ export const saveCampaignRecipientList = async (data: z.output<typeof saveCampai
  };
 export const queueEngagementCampaign = async (data: z.output<typeof queueEngagementCampaignInput>) =>{
  const s=await scope(data.engagementId);
- const sender=campaignSender();if(!sender)throw new Error("Campaign sender and postal address are not configured.");
+ const sender=(await readCampaignSenderReadiness()).sender;if(!sender)throw new Error("Campaign sender and postal address are not configured.");
  const draft=await readAuthorizedEngagementInvitation(data.engagementId,data.linkId,s.actor);
  const scheduledAt=new Date(data.scheduledAt);if(scheduledAt.getTime()>Date.now()+90*86400000)throw new Error("Schedule within 90 days.");
  const queued=await db.transaction(async tx=>{
