@@ -1,3 +1,4 @@
+import { Radio } from "@/components/ui/choice";
 import { WorkspaceNotice } from "@/components/workspace";
 import type { WebsiteContentReuseConsent } from "@/domain/site-local-content";
 
@@ -26,7 +27,7 @@ export function WebsiteContentConsentStep({
     <fieldset className="space-y-3" disabled={disabled}>
       <legend className="text-sm font-semibold">May we use what you've shared to suggest content?</legend>
       <label className={"flex cursor-pointer items-start gap-3 border p-4 "+(value==="granted"?"border-primary bg-primary/5":"border-border")}>
-        <input className="mt-1 size-4 accent-primary" type="radio" name="website-content-reuse"
+        <Radio className="mt-1" name="website-content-reuse"
           checked={value==="granted"} onChange={()=>onChange("granted")} />
         <span className="space-y-1">
           <span className="block font-semibold">Yes, use my information</span>
@@ -36,7 +37,7 @@ export function WebsiteContentConsentStep({
         </span>
       </label>
       <label className={"flex cursor-pointer items-start gap-3 border p-4 "+(value==="denied"?"border-primary bg-primary/5":"border-border")}>
-        <input className="mt-1 size-4 accent-primary" type="radio" name="website-content-reuse"
+        <Radio className="mt-1" name="website-content-reuse"
           checked={value==="denied"} onChange={()=>onChange("denied")} />
         <span className="space-y-1">
           <span className="block font-semibold">No, don't reuse my saved information</span>

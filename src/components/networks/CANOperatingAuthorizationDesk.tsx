@@ -113,20 +113,20 @@ export function CANOperatingAuthorizationDesk() {
             </Label>
             <div className="sm:col-span-2 flex flex-wrap gap-2">
               {item.status==="requested"&&<>
-                <Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10||!value.evidence||!value.from||!value.through}
-                  onClick={()=>void decide(item.id,"approved")} className=" border px-3 py-2 text-xs disabled:opacity-50">Approve verified agreement</Button>
-                <Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
-                  onClick={()=>void decide(item.id,"denied")} className=" border px-3 py-2 text-xs disabled:opacity-50">Deny request</Button>
+                <Button variant="outline" size="sm" type="button" disabled={busy||value.reason.trim().length<10||!value.evidence||!value.from||!value.through}
+                  onClick={()=>void decide(item.id,"approved")}>Approve verified agreement</Button>
+                <Button variant="outline" size="sm" type="button" disabled={busy||value.reason.trim().length<10}
+                  onClick={()=>void decide(item.id,"denied")}>Deny request</Button>
               </>}
-              {item.status==="approved"&&<Button variant="outline" type="button"
+              {item.status==="approved"&&<Button variant="outline" size="sm" type="button"
                 disabled={busy||value.reason.trim().length<10||!value.evidence||!value.through}
-                onClick={()=>void decide(item.id,"renewed")} className=" border px-3 py-2 text-xs disabled:opacity-50">Renew verified agreement</Button>}
-              {item.status==="approved"&&<Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
-                onClick={()=>void decide(item.id,"suspended")} className=" border px-3 py-2 text-xs disabled:opacity-50">Suspend agreement</Button>}
-              {item.status==="suspended"&&<Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
-                onClick={()=>void decide(item.id,"resumed")} className=" border px-3 py-2 text-xs disabled:opacity-50">Resume agreement</Button>}
-              {(item.status==="approved"||item.status==="suspended")&&<Button variant="outline" type="button" disabled={busy||value.reason.trim().length<10}
-                onClick={()=>void decide(item.id,"revoked")} className=" border px-3 py-2 text-xs disabled:opacity-50">Revoke agreement</Button>}
+                onClick={()=>void decide(item.id,"renewed")}>Renew verified agreement</Button>}
+              {item.status==="approved"&&<Button variant="outline" size="sm" type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"suspended")}>Suspend agreement</Button>}
+              {item.status==="suspended"&&<Button variant="outline" size="sm" type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"resumed")}>Resume agreement</Button>}
+              {(item.status==="approved"||item.status==="suspended")&&<Button variant="outline" size="sm" type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"revoked")}>Revoke agreement</Button>}
             </div>
           </div>}
         </article>;

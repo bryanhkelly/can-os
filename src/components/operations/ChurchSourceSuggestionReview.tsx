@@ -151,7 +151,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     {!loading && !website && <p className="mt-4  border p-4 text-sm">
       Save your church's public website above to add attributed excerpts. You can always write local copy manually.
       <Button variant="outline" type="button" disabled={busy} onClick={() => void refresh().catch(() => setError("Unable to refresh saved sources."))}
-        className="mt-3 block  border px-3 py-2 text-sm">Reload saved sources</Button>
+        className="mt-3">Reload saved sources</Button>
     </p>}
     {website && <div className="mt-4  border p-4">
       <h3 className="font-semibold">Discover church website suggestions</h3>
@@ -161,7 +161,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
         If extraction is disabled or the website blocks it, use the manual editor.
       </p>
       <Button variant="outline" type="button" disabled={busy} onClick={() => void discover()}
-        className="mt-3  border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+        className="mt-3">
         Check church website for suggestions
       </Button>
     </div>}
@@ -214,7 +214,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       </Label>
       <p className="text-xs text-muted-foreground">Your excerpt is stored only in the private editorial queue; it is not published on submission.</p>
       <Button variant="default" type="submit" disabled={busy}
-        className="w-fit  bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        className="w-fit">
         Add for review
       </Button>
     </form>}
@@ -274,13 +274,13 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="default" type="button" disabled={busy || rightsConfirmations[item.id] !== true} onClick={() => void review(item, "accepted")}
-            className=" bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">
+            >
             Accept and save church copy
           </Button>
           <Button variant="outline" type="button" disabled={busy || rightsConfirmations[item.id] !== true} onClick={() => void review(item, "edited")}
-            className=" border px-3 py-2 text-sm disabled:opacity-50">Save edited copy</Button>
+            >Save edited copy</Button>
           <Button variant="outline" type="button" disabled={busy} onClick={() => void review(item, "discarded")}
-            className=" border px-3 py-2 text-sm disabled:opacity-50">Discard</Button>
+            >Discard</Button>
         </div>
       </article>;
       })}
