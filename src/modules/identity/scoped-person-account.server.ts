@@ -2,7 +2,8 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import { identityEmailDomain } from "@/domain/domain-classification";
-import { normalizeAccessEmail, issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { matchesDemoCredentialScope } from "./demo-school-tenants.server";
@@ -52,9 +53,10 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
         .where(eq(accessAccounts.id,account.id));
     }
   } else {
-    if(individual)privateAccessCode=issueOpaqueSecret();
+    const credential=individual?issuePrivateAccountCredential():undefined;
+    privateAccessCode=credential?.privateAccessCode;
     [account] = await tx.insert(accessAccounts).values({emailNormalized:email,personId:input.personId,
-      ...(privateAccessCode?{privateAccessCodeHash:hashPrivateAccessCode(privateAccessCode,process.env.CAN_ACCESS_TOKEN_PEPPER??"")}:{})})
+      ...(credential?{privateAccessCodeHash:credential.privateAccessCodeHash}:{})})
       .returning({id:accessAccounts.id,personId:accessAccounts.personId,disabled:accessAccounts.disabled,
         privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`});
   }
