@@ -190,8 +190,12 @@
       "layout": "directory",
       "persona": "authorized workspace",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "OutcomeMilestoneList"
+      ],
+      "stories": [
+        "src/components/admissions/FamilyJourneyProgress.stories.tsx#PendingRequirements"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -358,8 +362,13 @@
       "layout": "calendar",
       "persona": "authorized participant or operator",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "EntitySelectionResults",
+        "CalendarInviteesPicker"
+      ],
+      "stories": [
+        "src/components/calendar/CalendarInviteesPicker.stories.tsx#DeduplicatedGuests"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,

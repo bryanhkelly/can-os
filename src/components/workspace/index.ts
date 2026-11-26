@@ -52,10 +52,10 @@ export {ReportSiteFilter} from "./report-site-filter";
 export {ProviderReportFilterBar} from "./provider-report-filter-bar";
 
 export { ActionStateIndicator, GovernedSaveAction, AsyncOperationStatus, type ActionState, type OperationState } from "./action-state";
-export { OutcomeMilestones, type OutcomeMilestone, type MilestoneState } from "./outcome-milestones";
+export { OutcomeMilestones, OutcomeMilestoneList, type OutcomeMilestone, type MilestoneState } from "./outcome-milestones";
 export { StudioLayout } from "./studio-layout";
 
-export { EntityPicker, type EntityPickerOption } from "./entity-picker";
+export { EntityPicker, EntitySelectionResults, type EntityPickerOption } from "./entity-picker";
 
 export { WorkQueue, type WorkQueueItem } from "./work-queue";
 export { DistributionDialog } from "./distribution-dialog";
