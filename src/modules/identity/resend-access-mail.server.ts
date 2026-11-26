@@ -1,3 +1,4 @@
+import { readOptionalEmailBrand } from "@/modules/communication/email-brand.server";
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
  * Server-only transactional email boundary.
@@ -61,10 +62,7 @@ export const sendAccessLinkViaResend: AccessEmailSender = async message => {
  const apiKey=process.env.RESEND_API_KEY;
  const from=process.env.CAN_ACCESS_FROM_EMAIL;
  if(!apiKey || !from) throw new Error("Resend access mail is not configured");
- const brand=message.siteId
-  ? await import("@/modules/sites/school-brand.server")
-    .then(module=>module.readSchoolBrand(message.siteId!))
-    .catch(()=>{console.warn("[access-email] School branding unavailable; using CAN branding");return null;}) : null;
+ const brand = await readOptionalEmailBrand(message.siteId, "access-email");
  const name=brand?.name??"CAN OS";
  const instructions=`Use this one-time link to continue to ${name}. It expires in 10 minutes. If you did not request it, you can ignore this message.\n\n${accessUrl}`;
  const text=message.introduction?`${message.introduction}\n\n${instructions}`:instructions;
