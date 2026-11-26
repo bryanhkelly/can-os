@@ -16,6 +16,11 @@ export function isDemoDomain(domain: string | null | undefined): boolean {
   return normalizeIdentityDomain(domain)?.endsWith(".demo") ?? false;
 }
 
+/** Email classification is not proof of mailbox ownership or authority. */
+export function isDemoAccountEmail(email: string): boolean {
+  return isDemoDomain(identityEmailDomain(email));
+}
+
 /** Unknown domains are not evidence that an Organization's data is real.
  * Classify the owner, never the learner, author, credential or publisher
  * of content consumed by that owner. This is not a permission check. */
