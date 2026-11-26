@@ -19,7 +19,8 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const sourceRoot = resolve(root, "src");
 const files = [];
 const args = process.argv.slice(2);
-if (args.some(arg => arg !== "--check")) throw new Error("Unknown component architecture option");
+if (args.some(arg => arg !== "--check" && arg !== "--all")) throw new Error("Unknown component architecture option");
+const fullInventory = args.includes("--all");
 const check = args.includes("--check");
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -100,7 +101,7 @@ for (const item of records) {
   familyRow.jsx+=item.jsx;
 }
 const duplicateGroups = crossFileDuplicates(fingerprints);
-const duplicateFunctions = duplicateGroups.slice(0,50).map(([,group])=>group);
+const duplicateFunctions = (fullInventory ? duplicateGroups : duplicateGroups.slice(0, 50)).map(([,group])=>group);
 const baseline = check ? resolveReuseBase(root) : null;
 const regressions = check ? newDuplicateGroups(fingerprints,indexCommittedSources(root,baseline)) : [];
 const largeUiFiles = records.filter(item => item.family === "components" || item.family === "routes")
@@ -112,6 +113,7 @@ console.log(JSON.stringify({
   familyTotals,
   largestUiModules: largeUiFiles,
   exactFunctionBodyGroupCount: duplicateGroups.length,
+  exactFunctionBodyCandidatesTruncated: duplicateFunctions.length < duplicateGroups.length,
   exactFunctionBodyCandidates: duplicateFunctions,
   reuseGate: {enabled:check,base:baseline,status:check?(regressions.length?"failed":"passed"):"not_run",regressions},
   componentDependencyCandidates: boundaryCandidates,
