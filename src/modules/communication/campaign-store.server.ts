@@ -1,3 +1,4 @@
+import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
 import {resolveGoExperience} from "@/modules/engagement/engagement-go.server";
@@ -100,14 +101,11 @@ export async function processEngagementCampaignDeliveries(limit=10){
    const unsubscribe=new URL("/api/campaigns/unsubscribe",sender.origin);
    unsubscribe.searchParams.set("token",work.unsubscribe_token);
    transportStarted=true;
-   const response=await fetch("https://api.resend.com/emails",{
-    method:"POST",redirect:"error",signal:AbortSignal.timeout(20000),headers:{Authorization:"Bearer "+sender.key,
-     "Content-Type":"application/json","Idempotency-Key":"engagement-campaign/"+work.id},
-    body:JSON.stringify({from:sender.from,to:[work.email],subject:work.subject,
+   const response=await submitResendEmail({from:sender.from,to:[work.email],subject:work.subject,
      text:work.body+"\n\nSent by "+sender.from+"\n"+sender.address+"\nUnsubscribe: "+unsubscribe.href,
      headers:{"List-Unsubscribe":"<"+unsubscribe.href+">","List-Unsubscribe-Post":"List-Unsubscribe=One-Click"},
-     tags:[{name:"can_source",value:"engagement_campaign"},{name:"can_receipt",value:work.id}]}),
-   });
+     tags:[{name:"can_source",value:"engagement_campaign"},{name:"can_receipt",value:work.id}]},
+     sender.key,"engagement-campaign/"+work.id);
    if(response.ok){
     const result=await response.json() as {id?:unknown};
     if(typeof result.id!=="string"||!result.id)throw new Error("missing provider receipt");
