@@ -56,7 +56,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
- const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
+ const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,db,session.authenticationMethod);
  // A real login cannot change Person by switching its active grant. This
  // invariant applies across all Site and Organization roles, not just staff.
  if(!demoAccountSwitching){
@@ -158,6 +158,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   accountId:effectiveGrant.accountId,
   sessionId:session.id,activeGrantId:effectiveGrant.id,
  },effectiveGrants);
+ context.authenticationMethod=session.authenticationMethod;
  if(ownerDelegation){
   context.impersonatedByAccountId=session.accountId;
   context.delegatedByPlatformOwner=true;
