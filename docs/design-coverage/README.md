@@ -68,3 +68,7 @@ Four unmodified OFL fonts are pinned to the upstream Google Fonts revision and o
 ## Actual feature story expansion
 
 Calendar now has a controlled production composer story, including focus restoration, validation and invitee limits. Family readiness and interest timeline stories distinguish an accepted offer, verified email, active enrollment and unavailable authorization. Local fixtures deliberately do not execute application commands. All route-level acceptance remains subject to independent review.
+
+## Site Intelligence status
+
+Website and the shared Site Intelligence panel now present the existing server eligibility and request outcomes with governed operation status. Processing confirmation followed by a read failure is explicitly distinguished from a failed generation. Story fixtures use the actual eligibility rules; no Gloo call is made. Production authorization, provider configuration, and stored package integrity checks remain unchanged.

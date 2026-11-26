@@ -2137,8 +2137,14 @@
       "layout": "builder",
       "persona": "publisher or site operator",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "SiteGenerationStatus",
+        "AsyncOperationStatus"
+      ],
+      "stories": [
+        "src/components/launch-studio/SiteGenerationStatus.stories.tsx#ProviderUnavailable",
+        "src/components/launch-studio/SiteGenerationStatus.stories.tsx#ConfirmedButReadUnavailable"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
