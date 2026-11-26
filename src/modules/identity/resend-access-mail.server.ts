@@ -1,3 +1,4 @@
+import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
  * Server-only transactional email boundary.
  * Resend delivers mail; it never decides who the user is or what they can access.
@@ -69,17 +70,10 @@ export const sendAccessLinkViaResend: AccessEmailSender = async message => {
  const text=message.introduction?`${message.introduction}\n\n${instructions}`:instructions;
  const {renderSchoolEmail,schoolEmailLogoAttachment}=await import("@/domain/school-email");
  const logoAttachment=schoolEmailLogoAttachment(brand);
- const response=await fetch("https://api.resend.com/emails",{
-  method:"POST",
-  headers:{
-   "Authorization":`Bearer ${apiKey}`,"Content-Type":"application/json",
-   ...(message.idempotencyKey?{"Idempotency-Key":message.idempotencyKey}:{}),
-  },
-  body:JSON.stringify({
+ const response=await submitResendEmail({
   from,to:[to],subject:message.subject??`Your ${name} sign-in link`,
   text,html:renderSchoolEmail({brand,text,actionUrl:accessUrl,actionLabel:"Continue"}),
   ...(logoAttachment?{attachments:[logoAttachment]}:{}),
-  }),
- });
+ },apiKey,message.idempotencyKey);
  if(!response.ok) throw new Error("Unable to deliver access email");
 };
