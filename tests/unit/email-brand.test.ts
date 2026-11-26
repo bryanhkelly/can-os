@@ -21,6 +21,13 @@ describe("shared email brand fallback", () => {
     expect(readSchoolBrand).toHaveBeenCalledWith("site");
   });
 
+  it("preserves the missing Site result without treating it as a storage error", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    readSchoolBrand.mockResolvedValue(null);
+    expect(await readOptionalEmailBrand("missing", "notification-email")).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("falls back on a storage failure without logging the private error", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     readSchoolBrand.mockRejectedValue(new Error("private storage detail"));
