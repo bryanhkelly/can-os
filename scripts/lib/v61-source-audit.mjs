@@ -119,6 +119,33 @@ function controlAppearanceIssues(syntax, resolveControl) {
     if (ts.isTemplateExpression(node)) return [node.head, ...node.templateSpans.flatMap(span => [...literals(span.expression, seen), span.literal])];
     return [];
   }
+  function provenClasses(node, seen = new Set()) {
+    if (!node || seen.has(node)) return false;
+    const next = new Set(seen).add(node);
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || node.kind === ts.SyntaxKind.NullKeyword || node.kind === ts.SyntaxKind.FalseKeyword) return true;
+    if (ts.isJsxExpression(node) || ts.isParenthesizedExpression(node)) return provenClasses(node.expression, next);
+    if (ts.isConditionalExpression(node)) return provenClasses(node.whenTrue, next) && provenClasses(node.whenFalse, next);
+    if (ts.isBinaryExpression(node)) {
+      if (node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) return provenClasses(node.right, next);
+      if ([ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(node.operatorToken.kind)) return provenClasses(node.left, next) && provenClasses(node.right, next);
+    }
+    if (ts.isIdentifier(node)) {
+      for (let scope = node.parent; scope; scope = scope.parent) {
+        if (!ts.isBlock(scope) && !ts.isSourceFile(scope)) continue;
+        for (const statement of scope.statements) {
+          if (!ts.isVariableStatement(statement)) continue;
+          for (const d of statement.declarationList.declarations) {
+            if (ts.isIdentifier(d.name) && d.name.text === node.text)
+              return !!(statement.declarationList.flags & ts.NodeFlags.Const) && provenClasses(d.initializer, next);
+          }
+        }
+      }
+    }
+    if (ts.isCallExpression(node) && /^(?:cn|clsx|twMerge)$/.test(node.expression.getText(syntax))) return node.arguments.every(arg => provenClasses(arg, next));
+    if (ts.isArrayLiteralExpression(node)) return node.elements.every(el => provenClasses(el, next));
+    if (ts.isObjectLiteralExpression(node)) return node.properties.every(prop => ts.isPropertyAssignment(prop) && (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)));
+    return false;
+  }
   function walk(node) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = node.tagName;
@@ -126,6 +153,7 @@ function controlAppearanceIssues(syntax, resolveControl) {
       if (control) {
         const classes = attribute(node, "className");
         const style = attribute(node, "style");
+        if (classes && !provenClasses(classes.initializer)) issues.push({ control, utility: "unverified-class-expression", ...location(syntax, classes) });
         for (const prop of node.attributes.properties) {
           if (!ts.isJsxSpreadAttribute(prop)) continue;
           if (!ts.isObjectLiteralExpression(prop.expression)) {
@@ -143,6 +171,7 @@ function controlAppearanceIssues(syntax, resolveControl) {
               continue;
             }
             if (name.text === "style") issues.push({ control, utility: "inline-style", ...location(syntax, member) });
+            if (name.text === "className" && !provenClasses(member.initializer)) issues.push({ control, utility: "unverified-class-expression", ...location(syntax, member) });
             if (name.text === "className") for (const literal of literals(member.initializer)) for (const token of literal.text.split(/\s+/)) {
               const utility = token.replace(/^(?:(?:[\w-]+|\[[^\]]+\]):)+/, "").replace(/^!|!$/g, "");
               if (ownedUtility.test(utility)) issues.push({ control, utility: token, ...location(syntax, member) });
