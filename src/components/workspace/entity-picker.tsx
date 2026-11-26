@@ -1,6 +1,7 @@
 import type {ReactNode} from "react";
 import {useId} from "react";
 import {Checkbox,Radio} from "@/components/ui/choice";
+import {Label} from "@/components/ui/label";
 import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {QueryState} from "./query-state";
@@ -23,10 +24,10 @@ export function EntityPicker({label,options,query,onQueryChange,selected,onChang
   <Field label={"Search "+label.toLowerCase()}><Input type="search" value={query} onChange={e=>onQueryChange(e.target.value)}/></Field>
   <p role="status" className="text-xs text-muted-foreground">{selected.length} selected</p>
   <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={!options.length} empty={<EmptyState kind="matches"/>}>
-   <div className="divide-y border bg-card">{options.map(option=><label key={option.id} className="flex min-w-0 items-start gap-3 p-3 text-sm">
+   <div className="divide-y border bg-card">{options.map(option=><Label key={option.id} className="flex min-w-0 items-start gap-3 p-3 text-sm">
     {multiple?<Checkbox checked={selected.includes(option.id)} disabled={option.disabled} onChange={e=>toggle(option,e.target.checked)}/>:<Radio name={id} value={option.id} checked={selected.includes(option.id)} disabled={option.disabled} onChange={e=>toggle(option,e.target.checked)}/>}
     <span className="min-w-0 [overflow-wrap:anywhere]"><span className="block font-medium">{option.label}</span>{option.detail&&<span className="block text-xs text-muted-foreground">{option.detail}</span>}</span>
-   </label>)}</div>
+   </Label>)}</div>
   </QueryState>
   {pagination}
  </fieldset>;

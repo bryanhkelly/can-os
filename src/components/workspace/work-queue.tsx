@@ -5,21 +5,21 @@ import {QueryState} from "./query-state";
 
 export interface WorkQueueItem {
   id:string; category:string; title:string; detail?:ReactNode;
-  priority:"critical"|"high"|"normal";
+  priority:"critical"|"high"|"normal"; status?:ReactNode;
   responsibility?:ReactNode; actions?:ReactNode; context?:ReactNode;
 }
 /** Ordered, authorized records supplied by the owner. No inferred urgency,
  * approval authority, cross-tenant aggregation or workflow writes. */
 export function WorkQueue({items,title="What needs my attention",description,
-  empty="No work items in this view.",loading,error,onRetry,toolbar,limited=false}:{
+  empty="No work items in this view.",loading,error,onRetry,toolbar,limited=false,countLabel}:{
   items:readonly WorkQueueItem[];title?:string;description?:string;empty?:string;
-  loading?:string;error?:string;onRetry?:()=>void;toolbar?:ReactNode;limited?:boolean;
+  loading?:string;error?:string;onRetry?:()=>void;toolbar?:ReactNode;limited?:boolean;countLabel?:string;
 }){
   return <section aria-label={title} className="mt-8 min-w-0">
     <div className="flex flex-wrap items-baseline justify-between gap-3">
       <div className="min-w-0"><h2 className="font-serif text-2xl">{title}</h2>
         {description&&<p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>
-      {!loading&&!error&&items.length>0&&<StatusBadge>{items.length} {limited?"shown":"open"}</StatusBadge>}
+      {!loading&&!error&&items.length>0&&<StatusBadge>{items.length} {countLabel??(limited?"shown":"open")}</StatusBadge>}
     </div>
     {toolbar&&<div className="mt-4">{toolbar}</div>}
     <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={!items.length}
@@ -28,7 +28,7 @@ export function WorkQueue({items,title="What needs my attention",description,
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
           <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.category}</p>
             <h3 className="mt-1 font-semibold [overflow-wrap:anywhere]">{item.title}</h3></div>
-          {item.priority!=="normal"&&<StatusBadge tone={item.priority==="critical"?"danger":"attention"}>{item.priority}</StatusBadge>}
+          <div className="flex flex-wrap items-center gap-2">{item.priority!=="normal"&&<StatusBadge tone={item.priority==="critical"?"danger":"attention"}>{item.priority}</StatusBadge>}{item.status}</div>
         </div>
         {item.detail&&<div className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">{item.detail}</div>}
         {item.context&&<div className="mt-3">{item.context}</div>}

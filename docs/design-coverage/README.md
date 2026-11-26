@@ -26,3 +26,9 @@ Do not equate a file count with tested experience coverage.
 - Launch Studio overview uses persisted stage status; unknown stage evidence remains unconfirmed. Website content uses StudioLayout. Campaign prerequisite explanations retain existing command guards.
 - Representative story references are recorded for selected routes, not marked verified. New persona stories are synthetic compositions, not authenticated browser evidence.
 - The separate registry CI gate checks route inventory and references; full strict review is intentionally outstanding.
+
+## Work and distribution adoption
+
+- WorkQueue now owns the shared read-only list presentation for AttentionQueue and the bounded Platform Release Center. It does not create assignments, change decisions or broaden access. The release inventory retains its existing 25-version bound and explicitly reports its scope.
+- DistributionDialog composes the existing accessible Modal and preserves Go Link origin, QR, expiry, pause and revoke commands in the feature. No generic private URL sharing path was added.
+- FileSelectionField is now workspace-owned; evidence callers retain their existing import via a re-export. Upload adapters and authorization remain unchanged.

@@ -59,3 +59,5 @@ export { EntityPicker, type EntityPickerOption } from "./entity-picker";
 
 export { WorkQueue, type WorkQueueItem } from "./work-queue";
 export { DistributionDialog } from "./distribution-dialog";
+
+export { FileSelectionField, UploadedFileNotice } from "./file-selection-field";

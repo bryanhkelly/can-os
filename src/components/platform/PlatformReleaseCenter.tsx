@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { EmptyState, StatCard, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { StatCard, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkQueue, type WorkQueueItem } from "@/components/workspace";
 import { projectPublisherReleaseNextStep, projectNoncreditPilotBlockers,
   type NativePublisherReleaseRecord,
   type PublisherReleaseNextStep } from "@/domain/native-publisher-release-readiness";
@@ -65,13 +65,12 @@ export function PlatformReleaseCenter({records,limited}:{
         onChange={event=>setQuery(event.target.value)}
         placeholder="Search by Course or Offering title"/>
     </Field>
-    <div className="mt-4 space-y-3">
-      {shown.map(({record,next})=>{
+    <WorkQueue title="Offering version review" countLabel="shown" limited={limited} empty={query?"No versions match":"No Offering versions found"}
+      description="Only versions in the current verified platform inventory can appear here."
+      items={shown.map(({record,next}):WorkQueueItem=>{
         const route=nextWorkspace[next.key];
         const pilotBlockers=record.noncreditTrainingStatus?projectNoncreditPilotBlockers(record):[];
-        return <WorkspacePanel key={record.offeringVersionId} headingLevel="h3" title={record.offeringTitle}
-          description={`Version ${record.versionNo} · ${record.lifecycle.replaceAll("_"," ")} · ${record.publishedCourses}/${record.courseCount} Courses published`}
-          actions={<StatusBadge tone={next.key==="class-verification"&&!pilotBlockers.length?"info":"attention"}>{pilotBlockers.length&&next.key==="class-verification"?"Noncredit prerequisites outstanding":next.label}</StatusBadge>}>
+        return {id:record.offeringVersionId, title:record.offeringTitle, category:`Version ${record.versionNo} · ${record.lifecycle.replaceAll("_"," ")} · ${record.publishedCourses}/${record.courseCount} Courses published`, priority:"normal", status:<StatusBadge tone={next.key==="class-verification"&&!pilotBlockers.length?"info":"attention"}>{pilotBlockers.length&&next.key==="class-verification"?"Noncredit prerequisites outstanding":next.label}</StatusBadge>, context:<>
           {record.noncreditTrainingStatus&&<p className="mt-3 text-sm">
             <strong>Noncredit training:</strong> {record.noncreditTrainingStatus}.
             {" "}<strong>Assessment:</strong> {record.noncreditAssessmentStatus??"unverified"}.
@@ -91,14 +90,8 @@ export function PlatformReleaseCenter({records,limited}:{
             {" "}Evidence records {record.currentEvidenceRecords} ·
             {" "}Manifest {record.manifestStatus??"not submitted"}
           </p>
-          {next.key!=="creator-membership"&&next.key!=="reviewer-membership"&&
-            <a href={route.url} className="mt-3 inline-flex text-sm font-semibold text-primary underline">
-              {route.label} (requires authorized role)
-            </a>}
-        </WorkspacePanel>;
-      })}
-      {!shown.length&&<EmptyState title={query?"No versions match":"No Offering versions found"}
-        description="Only versions in the current verified platform inventory can appear here."/>}
-    </div>
+        </>, actions:next.key!=="creator-membership"&&next.key!=="reviewer-membership"?
+            <a href={route.url} className="text-sm font-semibold text-primary underline">{route.label} (requires authorized role)</a>:undefined};
+      })}/>
   </WorkspacePanel>;
 }
