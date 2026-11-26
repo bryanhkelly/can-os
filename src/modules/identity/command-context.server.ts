@@ -8,7 +8,8 @@ import {readSessionGrants, readOwnerDelegationGrants} from "./session-grants.ser
 import { readCookie } from "@/domain/session-cookies";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { authorizedProgramWhere } from "./authorized-program-query.server";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { isDemoAccountEmail } from "@/domain/domain-classification";
+import { sessionCredentialMode } from "@/domain/session-credential-policy";
 import { getVerifiedPlatformOwnerSession } from "./platform-owner-delegation.server";
 import { platformOwnerMayActAs } from "@/domain/platform-owner-delegation";
 
@@ -51,8 +52,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  // Only real email-link logins attest mailbox ownership. A .demo session
  // must instead pass the exact active grant and tenant binding checks below.
  if(!session || (!session.emailVerifiedAt && !isDemoAccountEmail(session.email)) ||
-    (session.privateCredential && session.authenticationMethod!=="private_access_code") ||
-    (session.authenticationMethod==="private_access_code" && !session.privateCredential))
+    sessionCredentialMode({email:session.email,privateCredential:session.privateCredential,authenticationMethod:session.authenticationMethod})==="denied")
   return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
