@@ -80,7 +80,7 @@ test("print review preserves exact report values and definitions",async({page},i
 // intentionally separate from the broad six-case matrix of critical workflows.
 for(const [layout,reference] of Object.entries(registry.layoutReferences)){
  test("registered layout: "+layout,async({page},info)=>{
-  test.skip(!["compact-light","desktop-dark"].includes(info.project.name),"Layout smoke checks use compact and desktop projects.");
+  test.skip(!["compact-light","desktop-dark","firefox-desktop","webkit-phone"].includes(info.project.name),"Layout smoke checks use compact and desktop projects.");
   const failures=await openStory(page,registeredStoryId(reference),String(info.project.metadata.theme));
   await assertCanvas(page,failures);
  });

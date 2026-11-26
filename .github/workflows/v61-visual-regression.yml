@@ -62,6 +62,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm run storybook:doctor
       - run: npx playwright install --with-deps chromium
       - run: npm run check:storybook:visual-config
       - run: npm run test:storybook:contracts

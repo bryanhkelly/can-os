@@ -30,3 +30,9 @@ Use named Chromatic Modes exclusively. The default width modes are 390px, 768px,
 ## Independent browser coverage
 
 The six-case critical matrix covers the launch journey, milestone states and print reporting. The twelve registered layout reference stories are also exercised in compact and desktop projects. Browser tests validate the real generated index, visible canvas, page overflow and unexpected network or runtime errors. They do not grant visual approval or verify live production workflows.
+
+## Run without GitHub Actions
+
+Run `npm ci`, then `npm run storybook:doctor` to inspect local prerequisites without disclosing credentials. Install Chromium using `npx playwright install chromium` and run `npm run verify:storybook`. For browser compatibility, install Firefox and WebKit using `npx playwright install firefox webkit` and run `npm run test:storybook:cross-browser` after building. The static acceptance server binds only to loopback, serves existing build files only and rejects application RPC and writes. No production environment is needed.
+
+The optional browser projects extend critical and registered-layout smoke cases; they do not automatically expand paid visual snapshots. Chromatic is still independently reviewed.
