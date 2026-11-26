@@ -44,7 +44,7 @@
     "test:integration": "node scripts/run-integration-tests.mjs",
     "test:family:p0:unit": "node scripts/run-unit-suite.mjs family",
     "test:family:p0:integration": "node scripts/run-integration-tests.mjs family-p0",
-    "test:family:p0:site-day": "npm run test:integration:journey-c",
+    "test:family:p0:site-day": "npm run test:integration:journey-c --",
     "test:family:p0:browser": "npm run test:e2e:authenticated-routes --",
     "test:ws00:contracts": "node scripts/acceptance/check-ws00-cross-stream-guards.mjs",
     "verify:ws00:qa-readiness": "node scripts/acceptance/check-ws00-qa-readiness.mjs",
