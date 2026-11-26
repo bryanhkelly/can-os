@@ -46,8 +46,8 @@ export const readEngagementCampaignWorkspace = async (data: z.output<typeof read
  FROM public.engagement_campaigns c JOIN public.campaign_deliveries d ON d.campaign_id=c.id
  WHERE c.owner_scope=${s.ownerScope} AND c.engagement_id=${data.engagementId} AND c.link_id=${data.linkId}
  GROUP BY c.id ORDER BY c.created_at DESC LIMIT 50`);
- const readiness=await readCampaignSenderReadiness();
- return {lists,campaigns,senderReady:!!readiness.sender,senderIssues:readiness.issues,senderLabel:s.senderLabel};
+ const readiness=await readCampaignSenderReadiness(s.record.organizationId??null);
+ return {lists,campaigns,senderReady:!!readiness.sender,senderIssues:readiness.issues,senderLabel:readiness.sender?.from??s.senderLabel};
  };
 export const saveCampaignRecipientList = async (data: z.output<typeof saveCampaignRecipientListInput>) =>{
  const s=await scope(data.engagementId);
@@ -71,7 +71,7 @@ export const saveCampaignRecipientList = async (data: z.output<typeof saveCampai
  };
 export const queueEngagementCampaign = async (data: z.output<typeof queueEngagementCampaignInput>) =>{
  const s=await scope(data.engagementId);
- const sender=(await readCampaignSenderReadiness()).sender;if(!sender)throw new Error("Campaign sender and postal address are not configured.");
+ const sender=(await readCampaignSenderReadiness(s.record.organizationId??null)).sender;if(!sender)throw new Error("Campaign sender and postal address are not configured.");
  const draft=await readAuthorizedEngagementInvitation(data.engagementId,data.linkId,s.actor);
  const scheduledAt=new Date(data.scheduledAt);if(scheduledAt.getTime()>Date.now()+90*86400000)throw new Error("Schedule within 90 days.");
  const queued=await db.transaction(async tx=>{
@@ -107,8 +107,8 @@ export const queueEngagementCampaign = async (data: z.output<typeof queueEngagem
    SELECT ${s.ownerScope},${list.id}::uuid,email FROM unnest(${addresses}) AS entries(email)`);
  }
  if(!list)throw new Error("Recipient list unavailable.");
- const [campaign]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.engagement_campaigns(owner_scope,sender_scope,engagement_id,link_id,list_id,request_id,subject,body,public_url,sender_from,sender_address,created_by_person_id,scheduled_at)
- VALUES(${s.ownerScope},${s.senderScope},${data.engagementId},${data.linkId},${list.id},${data.requestId},${draft.subject},${draft.body+"\n\nInvited by "+s.senderLabel},${draft.url},${sender.from},${sender.address},${s.actor.actorPersonId},${data.scheduledAt}::timestamptz) RETURNING id`);
+ const [campaign]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.engagement_campaigns(owner_scope,sender_scope,engagement_id,link_id,list_id,request_id,subject,body,public_url,sender_from,sender_address,sender_version_id,created_by_person_id,scheduled_at)
+ VALUES(${s.ownerScope},${s.senderScope},${data.engagementId},${data.linkId},${list.id},${data.requestId},${draft.subject},${draft.body+"\n\nInvited by "+s.senderLabel},${draft.url},${sender.from},${sender.address},${sender.versionId},${s.actor.actorPersonId},${data.scheduledAt}::timestamptz) RETURNING id`);
  if(!campaign)throw new Error("Campaign write returned no record.");
  const inserted=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_deliveries(owner_scope,campaign_id,email,status,next_attempt_at)
  SELECT m.owner_scope,${campaign.id},m.email,CASE WHEN s.email IS NULL THEN 'pending' ELSE 'suppressed' END,${data.scheduledAt}::timestamptz
