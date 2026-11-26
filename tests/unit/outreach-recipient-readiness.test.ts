@@ -9,8 +9,8 @@ describe("outreach recipient readiness source contracts",()=>{
     expect(ui).toContain('disabled={!draft||busy||copying}');
     expect(ui).not.toContain('setRecipients("");setAuthorized');
     const native=source("src/components/launch-studio/NativeEngagementCampaigns.tsx");
-    expect(native.indexOf('label="Recipient email addresses"')).toBeGreaterThan(-1);
-    expect(native.indexOf('label="Recipient email addresses"')).toBeLessThan(native.indexOf('{data&&<>'));
+    expect(source("src/components/communication/EmailRecipientField.tsx")).toContain('label="Recipient email addresses"');
+    expect(native.indexOf("<EmailRecipientField")).toBeLessThan(native.indexOf('{data&&<>'));
     expect(ui).not.toContain("<Textarea");
     expect(ui).toContain("recipientDraft={recipients}");
     expect(native).toContain("useDirect?{raw,consentSource:source");
