@@ -76,3 +76,7 @@ Website and the shared Site Intelligence panel now present the existing server e
 ## Catalog consolidation
 
 All inspected story families have been moved to governed numbered navigation or were already governed. Explicit legacy IDs preserve intended story identity for migrated families; the source catalog checker checks titles, IDs and migrated exports, and the generated-index checker validates actual indexed stories. Public experience contracts have a dedicated MDX guide. No runtime acceptance is inferred from these declarations.
+
+## Portable exact-commit acceptance
+
+The dedicated acceptance runner writes per-stage logs and a receipt bound to a clean commit and SHA-256 of the built catalog. The private preview export requires all ten stages to have passed and the output to match the tested manifest. Hosting is manual and private; no provider, database, or production application deployment is involved. Visual baseline review and route-level authenticated acceptance remain separate.
