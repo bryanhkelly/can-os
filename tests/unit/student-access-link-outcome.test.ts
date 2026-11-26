@@ -35,7 +35,7 @@ vi.mock("@/platform/mutation",()=>({emitEvent:state.emit,writeAudit:state.audit,
 vi.mock("@/domain/event-types",()=>({EventTypes:{StudentLearningAccessApproved:"StudentLearningAccessApproved"}}));
 import { provisionStudentLearningAccess } from "@/modules/enrollment/student-access-handoff.functions";
 const input={applicationId:"application",confirmedIndependentIdentity:true as const,reviewMethod:"institutional_school_record" as const};
-function rows(status="pending_review",grants=[{personId:"student",role:"student",organizationId:"church",siteId:"site"}],email="child@example.test"){
+function rows(status="pending_review",conflicts:unknown[] = [],email="child@example.test"){
  state.rows=[
   [{id:"application",programId:"program",studentProfileId:"profile",stage:"accepted",
    applicationMetadata:{schoolYearId:"year"},programStatus:"active",studentPersonId:"student",
@@ -46,7 +46,7 @@ function rows(status="pending_review",grants=[{personId:"student",role:"student"
    guardianPersonId:"guardian",studentEmail:email}],
   [{permission:true,metadata:{verification:"verified"}}],
   [{active:true,email}],
-  [{id:"account",personId:"student",disabled:false}],grants,[{id:"grant",active:true}],
+  [{id:"account",personId:"student",disabled:false}],conflicts,[{id:"grant",active:true}],
  ];
 }
 beforeEach(()=>{
@@ -86,7 +86,7 @@ describe("student approval and sign-in request outcomes",()=>{
  });
  it("does not convert an identity collision into a delivery warning",async()=>{
   rows("pending_review",[{personId:"another-person",role:"student",organizationId:"church",siteId:"site"}]);
-  await expect(provisionStudentLearningAccess({data:input})).rejects.toThrow("different identity");
+  await expect(provisionStudentLearningAccess({data:input})).rejects.toThrow("scope conflict");
   expect(state.committed).toBe(false);
   expect(state.sender).not.toHaveBeenCalled();
   expect(state.emit).not.toHaveBeenCalled();
@@ -110,8 +110,8 @@ describe("student approval and sign-in request outcomes",()=>{
   rows("pending_review",undefined,"child@example.demo");
   state.issuer.mockResolvedValue(true);
   state.rows[6]=[];
+  state.rows.splice(7,1);
   state.rows[7]=[];
-  state.rows.splice(8,1);
   state.insert.mockImplementation(()=>({values:()=>({returning:async()=>[{id:"new-account",personId:"student",disabled:false,privateCredential:true}]})}));
   const result=await provisionStudentLearningAccess({data:input});
   expect(result).toEqual({status:"approved",signInRequest:"private_code",privateAccessCode:"a".repeat(43)});
