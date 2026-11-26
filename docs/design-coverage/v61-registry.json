@@ -194,7 +194,9 @@
         "OutcomeMilestoneList"
       ],
       "stories": [
-        "src/components/admissions/FamilyJourneyProgress.stories.tsx#PendingRequirements"
+        "src/components/admissions/FamilyJourneyProgress.stories.tsx#PendingRequirements",
+        "src/components/admissions/FamilyReadinessOverviewCard.stories.tsx#AcceptedAwaitingActivation",
+        "src/components/admissions/FamilyReadinessOverviewCard.stories.tsx#ActiveEnrollment"
       ],
       "evidence": {
         "responsive": null,
@@ -228,7 +230,9 @@
       ],
       "stories": [
         "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Eligibility",
-        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted"
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#VerifiedEmailIsNotEnrollment",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#AuthorizationUnavailable"
       ],
       "evidence": {
         "responsive": null,
@@ -248,7 +252,9 @@
       ],
       "stories": [
         "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Eligibility",
-        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted"
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#VerifiedEmailIsNotEnrollment",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#AuthorizationUnavailable"
       ],
       "evidence": {
         "responsive": null,
@@ -376,10 +382,14 @@
       "review": "unreviewed",
       "patterns": [
         "EntitySelectionResults",
-        "CalendarInviteesPicker"
+        "CalendarInviteesPicker",
+        "CalendarEventComposer",
+        "Modal"
       ],
       "stories": [
-        "src/components/calendar/CalendarInviteesPicker.stories.tsx#DeduplicatedGuests"
+        "src/components/calendar/CalendarInviteesPicker.stories.tsx#DeduplicatedGuests",
+        "src/components/calendar/CalendarEventComposer.stories.tsx#CreateAndValidate",
+        "src/components/calendar/CalendarEventComposer.stories.tsx#InviteeLimit"
       ],
       "evidence": {
         "responsive": null,

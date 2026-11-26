@@ -64,3 +64,7 @@ Mutation feedback stories now exercise the actual shared mutation runner with lo
 ## Deterministic typography and fixture isolation
 
 Four unmodified OFL fonts are pinned to the upstream Google Fonts revision and original Git blob identities. Licenses and provenance are copied into the static catalog. The build and browser test configurations now share a fail-closed runtime module guard for production-only dependencies. The loopback static server also restricts network and form access with CSP. Existing unmocked transitive imports, if present, must be resolved before the complete Storybook build can pass.
+
+## Actual feature story expansion
+
+Calendar now has a controlled production composer story, including focus restoration, validation and invitee limits. Family readiness and interest timeline stories distinguish an accepted offer, verified email, active enrollment and unavailable authorization. Local fixtures deliberately do not execute application commands. All route-level acceptance remains subject to independent review.

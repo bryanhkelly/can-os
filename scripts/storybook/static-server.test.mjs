@@ -18,6 +18,8 @@ test("static fixture serving allows assets, never falls back to an application o
   const port=server.address().port;
   const base="http://127.0.0.1:"+port;
   const rootResponse=await fetch(base+"/");assert.equal(rootResponse.status,200);assert.match(await rootResponse.text(),/fixture/);
+  assert.match(rootResponse.headers.get("content-security-policy"),/connect-src 'self'/);
+  assert.match(rootResponse.headers.get("content-security-policy"),/form-action 'none'/);
   const json=await fetch(base+"/index.json");assert.match(json.headers.get("content-type"),/application\/json/);assert.equal(json.headers.get("cache-control"),"no-store");
   assert.equal((await fetch(base+"/api/private")).status,404);
   assert.equal((await fetch(base+"/missing")).status,404);
