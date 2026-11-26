@@ -43,7 +43,7 @@ type Work = {
   sender_address: string;
   code: string;
 };
-async function claimCampaignDelivery(){
+async function claimCampaignDelivery(campaignId?:string){
  return db.transaction(async tx=>{
  // Expired ambiguous attempts are never retried outside the provider's idempotency window.
  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status=CASE WHEN d.outcome_unconfirmed OR d.status='processing' THEN 'failed' ELSE 'cancelled' END,
@@ -57,6 +57,7 @@ async function claimCampaignDelivery(){
  WITH candidate AS (
   SELECT d.id FROM public.campaign_deliveries d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
   WHERE c.scheduled_at<=now() AND c.cancelled_at IS NULL AND d.next_attempt_at<=now()
+  AND (${campaignId??null}::uuid IS NULL OR c.id=${campaignId??null}::uuid)
   AND (d.status='pending' OR (d.status='processing' AND d.lease_until<now()))
   AND d.attempts<${campaignMaxAttempts} AND (d.first_attempt_at IS NULL OR d.first_attempt_at>now()-(${campaignRetryWindowMs} * interval '1 millisecond'))
   ORDER BY d.next_attempt_at,d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
@@ -187,13 +188,13 @@ async function processCampaignDelivery(work: Work, sender: CampaignSender): Prom
 }
 
 /** Both schedulers use this exact queue. One message per recipient; never BCC bulk mail. */
-export async function processEngagementCampaignDeliveries(limit = 10): Promise<CampaignCounts> {
+export async function processEngagementCampaignDeliveries(limit = 10, campaignId?:string): Promise<CampaignCounts> {
   const counts: CampaignCounts = { accepted: 0, failed: 0, suppressed: 0, retry: 0, unconfirmed: 0 };
   const sender = campaignSender();
   if (!sender) return counts;
 
   for (let i = 0; i < Math.min(10, limit); i++) {
-    const work = await claimCampaignDelivery();
+    const work = await claimCampaignDelivery(campaignId);
     if (!work) break;
     const result = await processCampaignDelivery(work, sender);
     countCampaignSettlement(counts, result.row);
