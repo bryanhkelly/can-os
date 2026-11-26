@@ -1,4 +1,4 @@
-import { hashPrivateAccessCode, issueOpaqueSecret } from "@/domain/access-tokens";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
 import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -151,8 +151,7 @@ export async function provisionDemoSiteSignup(input: unknown) {
   const domain = data.email.split("@")[1]!;
   if (!isDemoAccountEmail(data.email) || !isDemoSchoolDomain(domain) || domain === DEMO_ACCOUNT_DOMAIN)
     throw new DomainError("FORBIDDEN");
-  const privateAccessCode = issueOpaqueSecret();
-  const privateAccessCodeHash = hashPrivateAccessCode(privateAccessCode, process.env.CAN_ACCESS_TOKEN_PEPPER ?? "");
+  const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential();
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"demo-founder:" + domain}))`);
     // Canonical Organization identity may predate the credential registry.
