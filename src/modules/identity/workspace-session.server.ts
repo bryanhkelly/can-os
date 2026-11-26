@@ -5,7 +5,6 @@ import { parseStudentDisplayPreferences } from "@/domain/student-display-prefere
 import { AuthorizationError } from "@/domain/command-context";
 import { getIdentityContext } from "./command-context.server";
 import { readSessionGrants, readOwnerDelegationGrants } from "./session-grants.server";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
 
 export async function readWorkspaceSession(request: Request) {
   let context;
@@ -47,7 +46,6 @@ export async function readWorkspaceSession(request: Request) {
   if(context.role==="student"&&!studentPerson[0])throw new AuthorizationError("student preferences identity");
   return {
     authenticated: true as const,
-    ...(isDemoAccountEmail(account.email) ? { demoTenant: true as const } : {}),
     ...(demoAccountSwitching && !context.delegatedByPlatformOwner ? { demoAccountSwitching: true as const } : {}),
     ...(context.delegatedByPlatformOwner ? { ownerDelegation: {
       mode: context.delegationMode!,
