@@ -20,10 +20,18 @@ const ticket=(process.env.PLATFORM_OWNER_TICKET??"").trim();
 const execute=process.argv.includes("--execute");
 const productionProject="sweet-hall-62441909";
 const productionBranch="br-restless-sea-ar9ooo55";
-const valid=email=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)&&!email.endsWith(".demo");
+// Fixture verification timestamps are not evidence of mailbox ownership.
+const valid=email=>{
+  const parts=email.split("@");
+  if(parts.length!==2||!parts[0]||/\s/.test(email))return false;
+  const domain=parts[1];
+  if(domain.length>253||!domain.includes(".")||!domain.split(".").every(label=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)))return false;
+  return !["demo","test","invalid","localhost","example"].includes(domain.split(".").at(-1))
+    && !["example.com","example.net","example.org"].some(base=>domain===base||domain.endsWith("."+base));
+};
 if(!process.env.DATABASE_URL)throw Error("DATABASE_URL is required");
 if(!valid(email)||!valid(approverEmail)||email===approverEmail)
-  throw Error("Two distinct, non-demo verified CAN accounts are required.");
+  throw Error("Two distinct, verified CAN accounts with deliverable non-fixture addresses are required.");
 if(ticket.length<16||ticket.length>240)
   throw Error("External authorization ticket (16-240 characters) is required.");
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:1});
@@ -42,7 +50,7 @@ try{
   if(execute)
     await client.query("SELECT pg_advisory_xact_lock(hashtext('platform-owner-bootstrap:global'))");
   const accounts=(await client.query(`
-    SELECT a.id,a.person_id,a.email_normalized,a.disabled,a.email_verified_at,
+    SELECT a.id,a.person_id,a.email_normalized,a.disabled,a.email_verified_at,a.private_access_code_hash IS NOT NULL AS private_credential,
            p.active AS person_active
     FROM public.access_accounts a
     JOIN public.people p ON p.id=a.person_id
@@ -52,7 +60,7 @@ try{
   const owner=accounts.find(row=>row.email_normalized===email);
   const approver=accounts.find(row=>row.email_normalized===approverEmail);
   if(!owner||!approver||!owner.person_active||!approver.person_active||
-     owner.disabled||approver.disabled||!owner.email_verified_at||
+     owner.disabled||approver.disabled||owner.private_credential||approver.private_credential||!owner.email_verified_at||
      !approver.email_verified_at||owner.person_id===approver.person_id)
     throw Error("Both distinct Persons must already have current verified, active CAN accounts.");
   for(const account of [owner,approver]){
